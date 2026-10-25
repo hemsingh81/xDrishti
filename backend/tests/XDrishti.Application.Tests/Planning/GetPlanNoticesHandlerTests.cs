@@ -27,7 +27,12 @@ public sealed class GetPlanNoticesHandlerTests
         _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns([]);
         _journal.FillsAsync(Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Ct).Returns([]);
         _journal.EntriesAsync(Arg.Any<long>(), Ct).Returns([]);
+        _plans.HistoryAsync(Arg.Any<long>(), Ct).Returns([]);
     }
+
+    // Approved on the evening before the session, before any fill of the session day.
+    private static PlanEventRow Approval(long item, DateTimeOffset? at = null) =>
+        new(item, item, "proposed", "approved", "owner:me", "ok", 1, at ?? new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
 
     private GetPlanNoticesHandler Handler() => new(_plans, _journal, _time);
 
@@ -75,7 +80,7 @@ public sealed class GetPlanNoticesHandlerTests
 
         var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
 
-        result.Items.ShouldHaveSingleItem().Id.ShouldBe("plan:review:2");
+        result.Items.ShouldHaveSingleItem().Id.ShouldBe("plan:review:2:info");
         await _plans.DidNotReceive().ItemsAsync(1, Ct);
         await _plans.DidNotReceive().ItemsAsync(3, Ct);
     }
@@ -110,6 +115,7 @@ public sealed class GetPlanNoticesHandlerTests
     {
         _time.SetUtcNow(new DateTimeOffset(2026, 10, 13, 12, 0, 0, TimeSpan.Zero));
         Store(Row(1, state: PlanState.Expired), Item(11, 1, TicketState.Closed), Item(12, 1, TicketState.Closed, symbol: "NSE:TCS"), Item(13, 1, TicketState.Proposed, symbol: "NSE:INFY"));
+        _plans.HistoryAsync(1, Ct).Returns([Approval(11), Approval(12)]);
         _journal.FillsAsync(Session, Session, Ct).Returns([Fill(), Fill("INFY")]); // INFY's ticket was never approved; TCS has no fill
 
         var raised = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
@@ -125,6 +131,7 @@ public sealed class GetPlanNoticesHandlerTests
     {
         _time.SetUtcNow(new DateTimeOffset(2026, 10, 13, 12, 0, 0, TimeSpan.Zero));
         Store(Row(1, state: PlanState.Expired), Item(11, 1, TicketState.Closed));
+        _plans.HistoryAsync(1, Ct).Returns([Approval(11)]);
         _journal.FillsAsync(Session, Session, Ct).Returns([Fill(account: Guid.NewGuid()), Fill(date: Session.AddDays(1))]);
 
         var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
@@ -138,11 +145,74 @@ public sealed class GetPlanNoticesHandlerTests
     {
         _time.SetUtcNow(new DateTimeOffset(2026, 10, 13, 12, 0, 0, TimeSpan.Zero));
         Store(Row(1), Item(11, 1, TicketState.Approved));
+        _plans.HistoryAsync(1, Ct).Returns([Approval(11)]);
         _journal.FillsAsync(Session, Session, Ct).Returns([Fill()]);
 
         await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
 
         var calls = _plans.ReceivedCalls().Select(c => c.GetMethodInfo().Name).Concat(_journal.ReceivedCalls().Select(c => c.GetMethodInfo().Name)).Distinct().ToList();
-        calls.ShouldBeSubsetOf(["ListRunsAsync", "ListAsync", "ItemsAsync", "FillsAsync", "EntriesAsync"]);
+        calls.ShouldBeSubsetOf(["ListRunsAsync", "ListAsync", "ItemsAsync", "HistoryAsync", "FillsAsync", "EntriesAsync"]);
+    }
+
+    [Fact]
+    public async Task A_fill_before_the_approval_is_the_owners_own_trade_and_raises_nothing()
+    {
+        _time.SetUtcNow(new DateTimeOffset(2026, 10, 13, 12, 0, 0, TimeSpan.Zero));
+        Store(Row(1, state: PlanState.Expired), Item(11, 1, TicketState.Closed));
+        _plans.HistoryAsync(1, Ct).Returns([Approval(11, new DateTimeOffset(2026, 10, 13, 5, 0, 0, TimeSpan.Zero))]); // 10:30 India, after the 10:00 fill
+        _journal.FillsAsync(Session, Session, Ct).Returns([Fill()]);
+
+        var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
+
+        result.Items.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_fill_that_fits_two_approved_tickets_is_said_not_to_be_linked_and_the_tickets_are_not_called_matchable()
+    {
+        _time.SetUtcNow(new DateTimeOffset(2026, 10, 13, 12, 0, 0, TimeSpan.Zero));
+        Store(Row(1, state: PlanState.Expired), Item(11, 1, TicketState.Closed), Item(12, 1, TicketState.Closed));
+        _plans.HistoryAsync(1, Ct).Returns([Approval(11), Approval(12)]);
+        _journal.FillsAsync(Session, Session, Ct).Returns([Fill()]);
+
+        var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
+
+        var item = result.Items.ShouldHaveSingleItem();
+        item.Id.ShouldBe("plan:fills-ambiguous:1:1");
+        item.Text.ShouldContain("fit more than one approved ticket");
+        item.Text.ShouldContain("will not guess");
+    }
+
+    [Theory]
+    [InlineData(2, true)]
+    [InlineData(3, false)]
+    public async Task The_window_is_today_and_the_two_days_before_it(int daysAgo, bool shown)
+    {
+        var date = new DateOnly(2026, 10, 12).AddDays(-daysAgo);
+        var cutoff = new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero).AddMinutes(60); // still ahead of the clock
+        var row = new PlanRow(1, new NewPlan("k", date, cutoff, 1, Hash, "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, []), PlanState.Published, 1, 0, 0);
+        _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns([row]);
+        _plans.ItemsAsync(1, Ct).Returns([Item(11, 1, TicketState.Proposed)]);
+        var run = new PlanRunRow(5, 1, new NewPlanRun(date, null, "failed_closed", "eod", "r", null, false, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch));
+        _plans.ListRunsAsync(null, 1, Ct).Returns([run]);
+
+        var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
+
+        result.Items.Select(i => i.Kind).Order().ShouldBe(shown ? ["plan_awaiting_review", "plan_nightly_failed"] : []);
+    }
+
+    [Theory]
+    [InlineData(31, "plan_awaiting_review", "info")]
+    [InlineData(30, "plan_awaiting_review", "warning")]
+    [InlineData(1, "plan_awaiting_review", "warning")]
+    [InlineData(0, null, null)]
+    public async Task The_reminder_changes_at_thirty_minutes_and_is_gone_at_exactly_the_cutoff(int minutesLeft, string? kind, string? severity)
+    {
+        _time.SetUtcNow(Cutoff.AddMinutes(-minutesLeft));
+        Store(Row(1), Item(11, 1, TicketState.Proposed));
+
+        var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
+
+        result.Items.Select(i => (i.Kind, i.Severity)).ToList().ShouldBe(kind is null ? [] : [(kind, severity!)]);
     }
 }

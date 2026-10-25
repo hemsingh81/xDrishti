@@ -90,7 +90,7 @@ public sealed class PlanNoticesApiTests(ApiFactory factory) : DataTestBase(facto
 
         var item = first.EnumerateArray().ShouldHaveSingleItem();
         item.GetProperty("kind").GetString().ShouldBe("plan_awaiting_review");
-        item.GetProperty("id").GetString().ShouldBe($"plan:review:{plan}");
+        item.GetProperty("id").GetString().ShouldBe($"plan:review:{plan}:info");
         item.GetProperty("route").GetString().ShouldBe($"/plans?plan={plan}");
         item.GetProperty("text").GetString()!.ShouldContain("2 tickets undecided, 1265 minutes to the cutoff at 09:05");
         item.GetProperty("text").GetString()!.ShouldNotContain("RELIANCE");

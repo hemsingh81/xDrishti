@@ -13,11 +13,11 @@ public sealed class PlanNoticeRulesTests
 
     private static DateTimeOffset MinutesBeforeCutoff(double minutes) => Cutoff.AddMinutes(-minutes);
 
-    private static PlanNoticePlan Plan(long id = 7, PlanState state = PlanState.Published, int undecided = 0, int lapsed = 0, int armed = 0, int invalidated = 0, int fills = 0, DateOnly? date = null, DateTimeOffset? cutoff = null) =>
-        new(id, date ?? Session, cutoff ?? Cutoff, state, undecided, lapsed, armed, invalidated, fills);
+    private static PlanNoticePlan Plan(long id = 7, PlanState state = PlanState.Published, int undecided = 0, int lapsed = 0, int armed = 0, int invalidated = 0, int fills = 0, DateOnly? date = null, DateTimeOffset? cutoff = null, int ambiguous = 0) =>
+        new(id, date ?? Session, cutoff ?? Cutoff, state, undecided, lapsed, armed, invalidated, fills, ambiguous);
 
-    private static PlanNoticeRun Run(string outcome = "failed_closed", string? gate = "eod", string reason = "the EOD run has not finished for 2026-10-12", DateOnly? date = null) =>
-        new(date ?? Session, outcome, gate, reason, new DateTimeOffset(2026, 10, 12, 13, 5, 0, TimeSpan.Zero));
+    private static PlanNoticeRun Run(string outcome = "failed_closed", string? gate = "eod", string reason = "the EOD run has not finished for 2026-10-12", DateOnly? date = null, int attempt = 1) =>
+        new(date ?? Session, outcome, gate, reason, new DateTimeOffset(2026, 10, 12, 13, 5, 0, TimeSpan.Zero), attempt);
 
     private static IReadOnlyList<PlanNotice> Derive(DateTimeOffset now, PlanNoticePlan[]? plans = null, PlanNoticeRun? run = null) => PlanNoticeRules.Derive(now, plans ?? [], run);
 
@@ -34,7 +34,7 @@ public sealed class PlanNoticeRulesTests
 
         var item = items.ShouldHaveSingleItem();
         item.Kind.ShouldBe("plan_awaiting_review");
-        item.Id.ShouldBe("plan:review:7");
+        item.Id.ShouldBe("plan:review:7:info");
         item.Severity.ShouldBe("info");
         item.Route.ShouldBe("/plans?plan=7");
         item.PlanId.ShouldBe(7);
@@ -75,7 +75,7 @@ public sealed class PlanNoticeRulesTests
         var item = Derive(MinutesBeforeCutoff(600), run: Run()).ShouldHaveSingleItem();
 
         item.Kind.ShouldBe("plan_nightly_failed");
-        item.Id.ShouldBe("plan:nightly:2026-10-13");
+        item.Id.ShouldBe("plan:nightly:2026-10-13:1");
         item.Severity.ShouldBe("error");
         item.Route.ShouldBe("/plans");
         item.PlanId.ShouldBeNull();
@@ -136,9 +136,9 @@ public sealed class PlanNoticeRulesTests
 
         var item = Derive(now, [Plan(state: PlanState.Expired, fills: 2)]).ShouldHaveSingleItem();
         item.Kind.ShouldBe("plan_fills_unmatched");
-        item.Id.ShouldBe("plan:fills:7");
+        item.Id.ShouldBe("plan:fills:7:2");
         item.Severity.ShouldBe("info");
-        item.Text.ShouldBe("2 tickets approved for 13 Oct have a fill from the Dhan sync that is not matched yet. The journal matches it to the ticket.");
+        item.Text.ShouldBe("2 tickets approved for 13 Oct have a fill from the Dhan sync that the journal will link to the ticket when it runs (xd plan journal).");
 
         Derive(now, [Plan(state: PlanState.Expired, fills: 0)]).ShouldBeEmpty();
     }
@@ -157,7 +157,7 @@ public sealed class PlanNoticeRulesTests
 
         var items = Derive(now, plans, Run());
 
-        items.Select(i => i.Id).ShouldBe(["plan:nightly:2026-10-13", "plan:invalidated:3", "plan:lapsed:1", "plan:armed:3", "plan:fills:2"]);
+        items.Select(i => i.Id).ShouldBe(["plan:nightly:2026-10-13:1", "plan:invalidated:3:1", "plan:lapsed:1:1", "plan:armed:3:1", "plan:fills:2:1"]);
     }
 
     [Fact]
@@ -169,5 +169,45 @@ public sealed class PlanNoticeRulesTests
         items.ShouldAllBe(i => i.Route.StartsWith("/plans", StringComparison.Ordinal));
         items.ShouldAllBe(i => !i.Text.Contains("RELIANCE", StringComparison.Ordinal) && !i.Text.Contains("POST ", StringComparison.Ordinal));
         typeof(PlanNotice).GetProperties().Select(p => p.Name).ShouldBe(["Id", "Kind", "Severity", "Text", "Route", "PlanId", "At"], ignoreOrder: true); // no action or command member
+    }
+
+    [Fact]
+    public void What_changes_is_in_the_id_so_a_worse_or_bigger_situation_is_unread_again()
+    {
+        var info = Derive(MinutesBeforeCutoff(31), [Plan(undecided: 2)]).Single();
+        var warning = Derive(MinutesBeforeCutoff(30), [Plan(undecided: 2)]).Single();
+        var live = Plan(state: PlanState.Armed, lapsed: 1, armed: 1, invalidated: 1, fills: 1);
+        var more = live with { Lapsed = 2, Armed = 2, Invalidated = 2, UnmatchedFills = 2 };
+        var now = MinutesBeforeCutoff(-30);
+
+        warning.Id.ShouldNotBe(info.Id);
+        Derive(now, [live]).Select(i => i.Id).Intersect(Derive(now, [more]).Select(i => i.Id)).ShouldBeEmpty();
+        Derive(now, run: Run(attempt: 1)).Single().Id.ShouldNotBe(Derive(now, run: Run(attempt: 2)).Single().Id);
+        Derive(MinutesBeforeCutoff(20), [Plan(undecided: 2)]).Single().Id.ShouldBe(warning.Id); // the same situation keeps its id as the minutes run down
+    }
+
+    [Fact]
+    public void Fills_that_fit_more_than_one_ticket_are_said_to_be_left_alone_not_matched_by_the_journal()
+    {
+        var item = Derive(MinutesBeforeCutoff(-30), [Plan(state: PlanState.Armed, ambiguous: 2)]).ShouldHaveSingleItem();
+
+        item.Kind.ShouldBe("plan_fills_unmatched");
+        item.Id.ShouldBe("plan:fills-ambiguous:7:2");
+        item.Text.ShouldBe("2 fills of 13 Oct fit more than one approved ticket. The journal will not guess, so it will not link them.");
+        item.Text.ShouldNotContain("will link");
+    }
+
+    [Fact]
+    public void A_long_or_odd_reason_and_gate_are_clipped_to_one_line_and_shown_as_plain_text()
+    {
+        var odd = "line one\nline two \u0000 {0} %s ${x} " + new string('y', 300);
+
+        var text = Derive(MinutesBeforeCutoff(600), run: Run(gate: new string('g', 200), reason: odd)).Single().Text;
+
+        text.ShouldNotContain("\n");
+        text.Length.ShouldBeLessThan(320);
+        text.ShouldContain("{0} %s $" + "{x}"); // shown as it is, never formatted
+        text.ShouldContain(new string('g', 40) + "… gate");
+        text.ShouldNotContain(new string('g', 41));
     }
 }

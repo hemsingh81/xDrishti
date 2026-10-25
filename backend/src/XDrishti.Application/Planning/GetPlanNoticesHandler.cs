@@ -12,24 +12,22 @@ namespace XDrishti.Application.Planning;
 /// </summary>
 internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore journal, TimeProvider clock) : IQueryHandler<GetPlanNoticesQuery, PlanNotices>
 {
-    /// <summary>A plan or a failed run older than this many India days is not mentioned any more.</summary>
+    /// <summary>The notices cover the last this many India days: today and the days before it, so three means today, yesterday and the day before. A plan or a failed run of an earlier session is not mentioned any more.</summary>
     public const int RecentDays = 3;
 
     private const int MaxSessions = 3;
     private const int ListLimit = 20;
-
-    private static readonly TicketState[] ApprovedFamily = [TicketState.Approved, TicketState.Armed, TicketState.Triggered, TicketState.Closed];
 
     public async ValueTask<PlanNotices> HandleAsync(GetPlanNoticesQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
         var now = clock.GetUtcNow();
         var today = IndiaTime.Today(now);
-        var from = today.AddDays(-RecentDays);
+        var from = today.AddDays(1 - RecentDays);
 
         var runRows = await plans.ListRunsAsync(null, 1, cancellationToken);
         var latestRun = runRows.Count > 0 && runRows[0].Run is { } run && run.ForDate >= from
-            ? new PlanNoticeRun(run.ForDate, run.Outcome, run.FailedGate, run.Reason, run.FinishedAt)
+            ? new PlanNoticeRun(run.ForDate, run.Outcome, run.FailedGate, run.Reason, run.FinishedAt, runRows[0].Attempt)
             : null;
 
         var rows = (await plans.ListAsync(null, null, ListLimit, cancellationToken))
@@ -56,15 +54,19 @@ internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore jour
             p.Items.Count(i => i.State == TicketState.Lapsed),
             p.Items.Count(i => i.State == TicketState.Armed),
             p.Items.Count(i => i.State == TicketState.Invalidated),
-            unmatched.GetValueOrDefault(p.Row.Id))).ToList();
+            unmatched.GetValueOrDefault(p.Row.Id).Would,
+            unmatched.GetValueOrDefault(p.Row.Id).Ambiguous)).ToList();
         return new PlanNotices(PlanNoticeRules.Derive(now, facts, latestRun));
     }
 
-    /// <summary>Per plan, how many approved tickets have a stored fill on the session day (same account, normalised symbol and side) and no journal entry for that account yet.</summary>
-    private async Task<Dictionary<long, int>> UnmatchedAsync(List<(PlanRow Row, IReadOnlyList<PlanItemRow> Items)> plansWithItems, DateOnly today, CancellationToken cancellationToken)
+    /// <summary>
+    /// Per plan, what the journal would do with the stored fills of the session day, by the pure <see cref="JournalMatcher"/> over the tickets approved before the fill (the same rule the journal applies):
+    /// the approved tickets that would get an entry and have none stored yet, and the fills that fit more than one ticket (never linked). A fill before the approval is discretionary and counts for neither.
+    /// </summary>
+    private async Task<Dictionary<long, (int Would, int Ambiguous)>> UnmatchedAsync(List<(PlanRow Row, IReadOnlyList<PlanItemRow> Items)> plansWithItems, DateOnly today, CancellationToken cancellationToken)
     {
-        var result = new Dictionary<long, int>();
-        var candidates = plansWithItems.Where(p => p.Row.Plan.ForDate <= today && p.Items.Any(i => ApprovedFamily.Contains(i.State))).ToList();
+        var result = new Dictionary<long, (int, int)>();
+        var candidates = plansWithItems.Where(p => p.Row.Plan.ForDate <= today && p.Items.Any(i => TicketLifecycle.ApprovedFamily.Contains(i.State))).ToList();
         if (candidates.Count == 0)
         {
             return result;
@@ -74,21 +76,38 @@ internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore jour
         foreach (var (row, items) in candidates)
         {
             var day = row.Plan.ForDate;
-            var wanted = items
-                .Where(i => ApprovedFamily.Contains(i.State))
-                .SelectMany(i => i.Item.Allocations.Select(a => (Item: i.Id, a.AccountId, Symbol: TradeRules.NormaliseSymbol(i.Item.Symbol), Side: JournalPlansHandler.ParseSide(i.Item.Side))))
-                .Where(t => t.Side is not null && fills.Any(f => f.Date == day && f.AccountId == t.AccountId && f.Symbol == t.Symbol && f.Side == t.Side))
-                .ToList();
-            if (wanted.Count == 0)
+            var dayFills = fills.Where(f => f.Date == day).ToList();
+            if (dayFills.Count == 0)
             {
                 continue;
             }
 
-            var entered = (await journal.EntriesAsync(row.Id, cancellationToken)).Select(e => (e.ItemId, e.AccountId)).ToHashSet();
-            var count = wanted.Where(t => !entered.Contains((t.Item, t.AccountId))).Select(t => t.Item).Distinct().Count();
-            if (count > 0)
+            var approvedAt = (await plans.HistoryAsync(row.Id, cancellationToken))
+                .Where(e => e.ItemId is not null && e.To == TicketState.Approved.Code())
+                .GroupBy(e => e.ItemId!.Value)
+                .ToDictionary(g => g.Key, g => g.Min(e => e.At));
+            var tickets = items
+                .Where(i => TicketLifecycle.ApprovedFamily.Contains(i.State) && approvedAt.ContainsKey(i.Id) && TicketLifecycle.ParseSide(i.Item.Side) is not null)
+                .SelectMany(i => i.Item.Allocations.Select(a => new JournalTicket(i.Id, row.Id, i.Item.Rank, a.AccountId, TradeRules.NormaliseSymbol(i.Item.Symbol), TicketLifecycle.ParseSide(i.Item.Side)!.Value, day, approvedAt[i.Id])))
+                .ToList();
+            if (tickets.Count == 0)
             {
-                result[row.Id] = count;
+                continue;
+            }
+
+            var matched = JournalMatcher.Match(day, tickets, dayFills);
+            var wanted = matched.Links.Where(l => l.Role == JournalRole.Entry && l.ItemId is not null).Select(l => (Item: l.ItemId!.Value, l.AccountId)).Distinct().ToList();
+            var ambiguous = matched.Unmatched.Count;
+            if (wanted.Count == 0 && ambiguous == 0)
+            {
+                continue;
+            }
+
+            var entered = wanted.Count == 0 ? [] : (await journal.EntriesAsync(row.Id, cancellationToken)).Select(e => (e.ItemId, e.AccountId)).ToHashSet();
+            var would = wanted.Where(t => !entered.Contains(t)).Select(t => t.Item).Distinct().Count();
+            if (would > 0 || ambiguous > 0)
+            {
+                result[row.Id] = (would, ambiguous);
             }
         }
 

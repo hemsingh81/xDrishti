@@ -153,7 +153,7 @@ export const buildOutcome = (
 
 /** A plan notice of the bell (P8-15): a plan awaiting review, with a route and no command. */
 export const buildPlanNotice = (over: Partial<Schemas['PlanNotice']> = {}): Schemas['PlanNotice'] => ({
-  id: 'plan:review:7',
+  id: 'plan:review:7:info',
   kind: 'plan_awaiting_review',
   severity: 'info',
   text: 'The plan for 26 Oct awaits your review: 3 tickets undecided, 40 minutes to the cutoff at 09:10. Unreviewed tickets lapse.',

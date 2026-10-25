@@ -23,18 +23,24 @@ const kinds: ReadonlySet<string> = new Set<PlanKind>([
   'plan_fills_unmatched',
 ]);
 
-/** A path inside this app: starts with one slash (not `//host`, not a backslash trick, not a scheme). */
-const isAppPath = (target: string): boolean => /^\/(?![/\\])/.test(target) && !target.includes('\\');
+/** The only places a plan notice may lead: the Plans screen, optionally on one plan. Anything else (another path, a scheme, `//host`, a backslash) is dropped. */
+const isPlansRoute = (target: string): boolean => /^\/plans(\?plan=\d+)?$/.test(target);
+
+/** The time of a notice in ms, or null when it is missing or not a date. */
+const timeOf = (at: string | null | undefined): number | null => {
+  const ms = at ? Date.parse(at) : Number.NaN;
+  return Number.isNaN(ms) ? null : ms;
+};
 
 /**
  * The plan notices of the API as bell notifications (P8-15). They are read only: Open is the only way on and it goes to the Plans
  * screen (`/plans?plan=<id>`); no button runs a command. The id comes from the API (one per plan and kind), so read state
  * behaves as for the other notices, and an item the API no longer returns simply leaves the list and the badge. A kind this
- * version does not know, or a route outside the app, is dropped rather than followed.
+ * version does not know, or a route other than the Plans screen, is dropped rather than followed.
  */
 export function derivePlanNotifications(notices: readonly PlanNotice[]): AppNotification[] {
   return notices.flatMap((notice) =>
-    kinds.has(notice.kind) && isAppPath(notice.route)
+    kinds.has(notice.kind) && isPlansRoute(notice.route)
       ? [
           {
             id: notice.id,
@@ -44,7 +50,7 @@ export function derivePlanNotifications(notices: readonly PlanNotice[]): AppNoti
             accountName: null,
             text: notice.text,
             href: notice.route,
-            at: notice.at ? Date.parse(notice.at) : null,
+            at: timeOf(notice.at),
             title: null,
             actions: [],
             resolved: false,
