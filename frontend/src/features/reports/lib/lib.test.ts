@@ -52,7 +52,10 @@ describe('metricFromApi', () => {
       n: 5,
       min: 30,
     });
-    expect(metricFromApi({ state: 'insufficient', number: null, reason: 'few' }).kind).toBe('unavailable');
+    expect(metricFromApi({ state: 'insufficient', number: null, reason: 'few' })).toEqual({
+      kind: 'not_evaluable',
+      reason: 'Insufficient data: few',
+    });
     expect(metricFromApi({ state: 'not_evaluable', number: null, reason: 'x' }).kind).toBe('not_evaluable');
     expect(metricFromApi({ state: 'empty', number: null, reason: null }).kind).toBe('empty');
     expect(metricFromApi({ state: 'mystery', number: 3, reason: null }).kind).toBe('unavailable');

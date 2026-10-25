@@ -102,7 +102,7 @@ export const dimensionReasonQuery = (dimension: 'regime' | 'account') =>
     queryKey: ['reports', 'dimension', dimension] as const,
     queryFn: async ({ signal }): Promise<string | null> => {
       const result = await api.GET('/api/reports/groups', { params: { query: { lens: dimension } }, signal });
-      return result.response.status === 422 ? (result.error?.title ?? null) : null;
+      return result.response.status === 422 ? (result.error?.title ?? result.error?.detail ?? null) : null;
     },
     staleTime: Infinity,
   });

@@ -16,7 +16,7 @@ import {
   runKeyA,
   runKeyB,
 } from '@/test/reportFixtures';
-import { renderReports, renderReportsFromStart, reportServer } from '@/test/reportScreen';
+import { dimensionReasons, renderReports, renderReportsFromStart, reportServer } from '@/test/reportScreen';
 import { problemResponse, server } from '@/test/server';
 
 pinClock('2026-10-25T10:00:00Z');
@@ -253,9 +253,8 @@ describe('Reports screen', () => {
     renderReports();
     const regime = await screen.findByRole('textbox', { name: 'Regime' });
     expect(regime).toBeDisabled();
-    await waitFor(() => {
-      expect(screen.getAllByText(/is not recorded by any run/)).toHaveLength(2);
-    });
+    expect(await screen.findByText(dimensionReasons.regime)).toBeInTheDocument();
+    expect(await screen.findByText(dimensionReasons.account)).toBeInTheDocument();
   });
 
   it('collapses the filter bar below md, keeping the active filters as chips', async () => {

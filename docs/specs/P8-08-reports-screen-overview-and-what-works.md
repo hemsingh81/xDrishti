@@ -85,3 +85,6 @@ None. (Choosing which runs to trust, and confirming the charge sheet, are the ow
 - Data used reads `evidence.runs`, `evidence.defaultRunSet` and `RunListItemView.inDefaultSet/defaultSetNote`. The built default set does not yet exclude experiment candidate runs (`created_by = experiment:<jobId>`, P8-18 D5); P8-18 must add that to `RunSelection`, and this screen then shows the server's note unchanged.
 - The server caps equity at 40 series (points per exit date); distribution bins are half an R from -4 R to 6 R with open end bins.
 - Test plan URL example uses `basket=`.
+
+## Built 2026-10-25
+- Branch feature/p8-08, [ADR 0103](../adr/0103-the-reports-screen-is-a-lazy-read-only-route-whose-filters-live-in-the-address-and-whose-figures-all-pass-through-the-kit.md). The Monthly, Basket and Weekday panels are one `GroupBars` component; the chips live in `FilterBar`; the interaction test needs 4 steps (Escape closes the multi-select); the lazy chunk is 8.75 KB gzip.

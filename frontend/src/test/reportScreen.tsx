@@ -18,7 +18,11 @@ import {
 import { renderRoutes } from './render';
 import { problemResponse, server } from './server';
 
-export const regimeReason = 'regime is not recorded by any run';
+// The server's own refusals (ReportErrors.DimensionUnavailable); the page prints the problem's `title`.
+export const dimensionReasons = {
+  regime: 'Regime is unavailable: no market context is stored, so no trade has a regime.',
+  account: 'Account is unavailable: a simulated trade has no account.',
+} as const;
 
 export interface ReportOptions {
   runs?: Schemas['RunsView'];
@@ -45,7 +49,7 @@ export function reportServer(opts: ReportOptions = {}) {
       seen(request);
       const lens = new URL(request.url).searchParams.get('lens') ?? '';
       if (lens === 'regime' || lens === 'account') {
-        return problemResponse({ title: `${lens}: ${regimeReason}`, code: 'reports.dimension_unavailable' }, 422);
+        return problemResponse({ title: dimensionReasons[lens], code: 'reports.dimension_unavailable' }, 422);
       }
       if (lens === 'basket') {
         return HttpResponse.json(

@@ -1,6 +1,6 @@
 import { Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { EvidenceBlock, formatR, NonValue } from '@/shared/analytics';
+import { carriesNumber, EvidenceBlock, formatR, NonValue } from '@/shared/analytics';
 import { TimeSeriesChart, type ChartSeries } from '@/shared/ui/chart';
 import { equityQuery } from '../api/reportQueries';
 import { evidenceOf } from '../lib/evidence';
@@ -17,8 +17,9 @@ export function EquityPanel({ query, min }: ReportPanelProps) {
         const all = series[0];
         const points = all?.points ?? [];
         const total = all ? metricFromApi(all.totalR, all.n, min) : ({ kind: 'empty' } as const);
-        if (!all || points.length === 0) {
-          return <NonValue state={asNonValue(total)} />;
+        // No curve and no numbers unless the total itself is a value (or provisional): a thin group has only a reason.
+        if (!all || !carriesNumber(total) || points.length === 0) {
+          return <NonValue state={asNonValue(total.kind === 'value' ? { kind: 'empty' } : total)} />;
         }
         const chartSeries: ChartSeries[] = [
           { id: 'equity', name: 'Running R', color: 'accent', data: points.map((p) => [p.date, p.cumulativeR]) },

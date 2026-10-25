@@ -1,5 +1,6 @@
 import BarChartIcon from '@mui/icons-material/BarChartOutlined';
 import { Alert, Box, Typography } from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { NonValue } from '@/shared/analytics';
@@ -55,10 +56,10 @@ export function ReportsPage() {
   // "Report updated" is announced once when the filters or the view change (not on the first render).
   const key = `${view}|${queryString(query)}`;
   const [seen, setSeen] = useState(key);
-  const [updated, setUpdated] = useState(false);
+  const [updates, setUpdates] = useState(0);
   if (seen !== key) {
     setSeen(key);
-    setUpdated(true);
+    setUpdates((count) => count + 1);
   }
 
   const open = (next: ReportView) => {
@@ -111,8 +112,9 @@ export function ReportsPage() {
   return (
     <>
       {header}
-      <Box role="status" aria-live="polite" sx={{ position: 'absolute', left: -9999 }}>
-        {updated ? 'Report updated' : ''}
+      <Box role="status" aria-live="polite" sx={visuallyHidden}>
+        {/* A new node per change, so the same words are announced again for every change. */}
+        {updates > 0 && <span key={updates}>Report updated</span>}
       </Box>
       <FilterBar runs={runs.data} filter={filter} set={set} />
       {netRefused && (

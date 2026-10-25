@@ -34,6 +34,8 @@ Say, from what can be read, whether the phase exit is met: the question answered
 12. **Headline.** `P8 exit: MET` is printed only when criteria 1 to 5 and 7 and 8 are MET and none of 1 to 10 is NOT MET; any NOT EVALUABLE among 1 to 5, 7, 8 gives `NOT EVALUABLE (n of 8 need evidence)`; any NOT MET gives `NOT MET`. A MET resting on a convention carries its caveat in the label. Before it prints MET the code re-checks that criteria 1 to 5, 7, 8 are all present and distinct (anything else: `NOT EVALUABLE, malformed report`). *`ReportsPhaseCheckTests`.*
 13. Given `Reports` has no stored run (the likely state at first), then criteria 1, 2, 3 are NOT EVALUABLE with "no stored run", criterion 4's probe and criterion 5 still run, and the text says so. *same.*
 
+**Built P8-08 note (ADR 0103):** the Baskets multi-select menu stays open and hides the page from assistive technology, so the P8-08 test closes it with Escape: 4 interactions (click Reports, open Baskets, pick, Escape). Count the Escape step; the limit stays 4.
+
 **Counting rule (the wrapper `countingUser`, written once in `src/test/interactions.ts`, reused from P8-08):** every call of `click`, `dblClick`, `hover` only if a menu opens on it, `selectOptions`, `type` (per field, however many characters), `upload` is 1; `keyboard('…')` is 1 per key token; `tab()` is 1 per call; opening a menu and choosing an item are 2. Navigation by the test's `initialEntries` is 0 (the cold start), a click on the sidebar entry is 1.
 
 ## The owner stopwatch procedure (written into the ADR; the owner's act)
