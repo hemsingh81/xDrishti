@@ -40,7 +40,7 @@ Run the system on the owner's real money at **25 % to 50 % of the intended risk*
 **D14. Honest states everywhere.** The six states of P8-00 D3 (`value`, `provisional`, `insufficient`, `unavailable`, `not_evaluable`, `empty`) and an Evidence block on every live number (basis, n, date range, reference kind, limits); gross versus net only on the owner's stored charge sheet (ISS-25); no composite score; no number without n.
 
 ## Slices
-Build order is **P11-04A -> P11-01 -> P11-02 -> P11-04B -> P11-03 -> P11-06**; **P11-05 starts first** (it is mostly waiting).
+Build order (P11-04A is built before P11-01, so its live-ready gate cannot require the capture and settle services to exist: it checks their service ids by name and reports `service not registered` as a failing item until P11-01 registers `live-capture` and `live-settle`) is **P11-04A -> P11-01 -> P11-02 -> P11-04B -> P11-03 -> P11-06**; **P11-05 starts first** (it is mostly waiting).
 
 | Slice | Content | Size | Needs | Safety |
 |---|---|---|---|---|
@@ -77,7 +77,7 @@ Total 19 agent-days for the slices (P11-05 2, P11-04 5 [04A 2.5 + 04B 2.5], P11-
 - **Events/jobs:** services `live-capture` (Window 09:10-15:40, poll 120 s) and `live-settle` (After `portfolio-broker-history`); both paused by default (owner switches them on).
 
 ## Non-functional
-Reads are tiny (one order book and one trade book per poll, a page of rows each); 120 s polls give 190 calls a day, far below Dhan's non-trading limit of 20 per second (documented per second 20, none per day) and spaced by the existing 250 ms throttle. Statistics are O(n log n) over at most a few thousand rows. Every number carries n; no log line carries a price, quantity, symbol list, account number, order id or token (counts, ids of rows and milliseconds only). Time through `TimeProvider`; India dates through `IndiaTime`. Frontend: one lazy chunk, no new dependency.
+Reads are tiny (one order book and one trade book per poll, a page of rows each); 120 s polls (about 195 polls in the 09:10-15:40 window) give about 390 GETs a day (one order book and one trade book each), far below Dhan's non-trading limit of 20 per second (documented per second 20, none per day) and spaced by the existing 250 ms throttle. Statistics are O(n log n) over at most a few thousand rows. Every number carries n; no log line carries a price, quantity, symbol list, account number, order id or token (counts, ids of rows and milliseconds only). Time through `TimeProvider`; India dates through `IndiaTime`. Frontend: one lazy chunk, no new dependency.
 
 ## Test plan
 Per slice (see each spec): pure Domain unit tests with hand-worked tables, application tests with fakes, Testcontainers integration (grants, constraints, idempotency), MSW screens (every state, no digit for a non-value), architecture (no-order tripwire, layers, log ids), properties with negative controls where an invariance claim is made (order independence of the matcher; adding a trade to a bucket never changes another bucket). **A recorded-fixture test of Dhan's real order book and trade book answers (captured by the owner once, scrubbed) is the first task of P11-01 and gates its Done.**
@@ -130,3 +130,7 @@ Pure owner acts; each has the default that applies until the owner acts.
 3. Cross-spec: P11-05's `compliance_records` is the single compliance store (P12-11 reads it); P11-04A's `AddRampAndHalts` is the first to extend `ck_plan_item_allocations_shape`, P12-07 extends it further and keeps the ramp scale; `live_halts` feeds P12-03 `no_halt`; later-mode fills are journaled via P12-06.
 4. The `Live` option section is shared with the feed; P11 options use their own sub-section classes. Highest log id seen at review 4801; next ADR number "next free at build time".
 5. P8-06 is built (`P8-06-report-read-endpoints.md`, ADR 0100); P11-02/03 follow its report serialisation.
+
+## Review fixes 2026-10-25 (2)
+- Request volume corrected: about 390 GETs a day (195 polls x 2), not 190 calls.
+- P11-04A is built before P11-01 but gates `manual_live` on services that exist only after P11-01: the gate checks service ids by name and reports `service not registered` as a failing item (P11-04A to carry this).

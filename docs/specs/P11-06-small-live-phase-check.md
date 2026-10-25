@@ -14,9 +14,9 @@ Say, from the stored records only, whether the small-live phase has met its exit
 
 ## Acceptance criteria
 1. **Window.** Given the live account, then the window starts at the first live entry fill on or after the account's first `set_step` event (`live_fills` of an entry of a live ticket, or the first captured fill if no ticket) and ends at `--through` (default: the last closed session; a non-trading date takes the session on or before; a later date or one before the window is refused with 422 `live.invalid`). Elapsed calendar days and trading sessions are counted from the calendar.
-2. **Eight criteria, each `MET`, `NOT MET` or `NOT EVALUABLE`:**
+2. **Eight criteria and integrity line I, each `MET`, `NOT MET` or `NOT EVALUABLE`:**
    - **C1 duration and coverage.** Below 56 elapsed days **or** below 40 trading sessions: `NOT EVALUABLE` ("week k of 8"). At or above both: coverage = sessions with an approved live ticket or a fill whose `CaptureHealth` is `complete`, over such sessions; below 0.90 is `NOT MET` (the missing sessions listed), else `MET`.
-   - **C2 risk band.** `NOT MET` if any live allocation in the window has `risk_scale` above 0.5 (impossible by the database before `exit_confirmed`; the check reports it if it ever happens); `NOT EVALUABLE` when fewer than 20 sessions carry a live allocation; `MET` when every live allocation is within 0.125 and 0.5 (0.125 allowed: a weekly halved S1) and at least 50 % of live sessions ran at S1 or S2.
+   - **C2 risk band.** `NOT MET` if any live allocation in the window has `risk_scale` above 0.5 (impossible by the database before `exit_confirmed`; the check reports it if it ever happens); `NOT EVALUABLE` when fewer than 20 sessions carry a live allocation; `MET` when every live allocation is within 0.125 and 0.5 (0.125 allowed: a weekly halved S1) and no session ran above the step factor in force that session (each session's `risk_scale` <= the factor of its ramp step from `ramp_events`).
    - **C3 volume.** Graded live round trips below 40 or paired tickets below 30: `NOT EVALUABLE` ("n of 40, m of 30", pace and ETA from the window's rate); both reached: `MET`. Never `NOT MET` for being short.
    - **C4 within expectations.** The P11-03 verdict on the window: `within` is `MET`; `not_within` is `NOT MET`; `inconclusive` or `insufficient` is `NOT EVALUABLE` (the interval and the pairs are printed).
    - **C5 slippage.** Overall live mean total entry slippage in R over one reference kind with n >= 20: one-sided 95 % upper bound <= 0.10 is `MET`; lower bound > 0.10 is `NOT MET`; else `NOT EVALUABLE`. The per-bucket table (n, mean, interval, state) is printed, not judged.
@@ -46,7 +46,7 @@ Say, from the stored records only, whether the small-live phase has met its exit
 Reads one window (about 40 sessions) with one query per store and the P11-03 summary; p95 < 1 s. No secret read or logged; no price, quantity, symbol or account number in logs. One lazy chunk shared with the other `/live` tabs.
 
 ## Test plan
-- **Unit (Domain `LivePhaseCheckTests`, hand tables):** each criterion at its boundaries (55 days / 56 days; 39 / 40 sessions; coverage 0.89 / 0.90; round trips 39 / 40 and pairs 29 / 30; C4 for each P11-03 verdict; C5 upper bound exactly 0.10; C6 with a hold, a step-down 19 and 21 sessions ago, an `after_halt` fill cleared and not cleared; C7 with 3 and 4 weeks; C8 with a record overdue before and after day 56); overall combinations; the malformed-window guard; caveat stacking order; the recommendation sentence appears only on MET.
+- **Unit (Domain `LivePhaseCheckTests`, hand tables):** each criterion at its boundaries (C2 rows: scale 0.5 MET and 0.51 NOT MET; 19 of 19 sessions at or under the factor but only 19 sessions with a live allocation NOT EVALUABLE, 20 of 20 MET, and 19 of 20 sessions within the factor (one above) NOT MET; a halved-S1 scale of exactly 0.125 MET; 55 days / 56 days; 39 / 40 sessions; coverage 0.89 / 0.90; round trips 39 / 40 and pairs 29 / 30; C4 for each P11-03 verdict; C5 upper bound exactly 0.10; C6 with a hold, a step-down 19 and 21 sessions ago, an `after_halt` fill cleared and not cleared; C7 with 3 and 4 weeks; C8 with a record overdue before and after day 56); overall combinations; the malformed-window guard; caveat stacking order; the recommendation sentence appears only on MET.
 - **Application (`EvaluateLivePhaseCheckHandlerTests`, fakes):** default end of the window, a weekend date, a later date refused, the write-throwing store, an unavailable paper source gives `NOT EVALUABLE`, services and switches read and named as blockers.
 - **Integration (Testcontainers):** the endpoint on an empty database (`empty`), on a seeded 8-week fixture (all MET with the stacked caveat of an all-S1 run), with a hold (NOT MET), with a missing compliance record, 422 and 404 cases.
 - **Frontend (MSW):** every verdict, the caveat in the label, blockers with the act, no digit for a non-value, no mutation import.
@@ -72,3 +72,8 @@ None for the build. For the owner (wall-clock): run the eight weeks; keep `live-
 - [ ] Contract regenerated (`scripts/gen-api.sh`); no migration
 - [ ] ADR written (next free number at build time); roadmap P11 row and doc 19 §5 note updated; `scripts/build-docs.sh`
 - [ ] The run on the owner's data is reported whichever way it falls
+
+## Review fixes 2026-10-25 (2)
+- C2: 'at least 50 % of sessions at S1 or S2' was always true under the band; replaced by 'no session above the step factor in force that session'.
+- 'Eight criteria' now reads 'eight criteria and integrity line I'.
+- Test plan: C2 rows added (0.5 / 0.51, 19 / 20 sessions, 0.125).

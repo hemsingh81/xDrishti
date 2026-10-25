@@ -2,7 +2,7 @@
 
 All files below are **Draft**: written under the owner's delegation ("do your own research for the best answers and write them into the specs"). Every design question was answered inside its spec under **Decisions (researched)** with reason, rejected alternative and source. An agent builds a slice only after the owner sets it **Approved**. SAFETY slices keep every new setting default OFF.
 
-Sizes are agent-days, uncalibrated estimates (earlier phases overran). Total of the new specs: about **290 agent-days** from the specs' own Size lines (P8 rest about 66, P3 leftovers 13, P7 leftovers 9, P9 31, P10 17, P11 20, P12 34.5, P13 to P15 about 97 as plans).
+Sizes are agent-days, uncalibrated estimates (earlier phases overran). Total of the new specs: about **295 agent-days** from the specs' own Size lines (P8 rest about 66, P3 leftovers 13, P7 leftovers 9, P9 33.5, P10 20, P11 20, P12 34.5, P13 to P15 about 97 as plans).
 
 **Built while these were written (2026-10-25):** the parallel build session merged **P8-02** (Learning screen), **P8-06** (report endpoints, ADR 0100) and **P8-15** (plan notices, ADR 0101) from their own Approved specs `P8-02-learning-screen.md`, `P8-06-report-read-endpoints.md`, `P8-15-plan-notifications.md`. The Drafts with the longer names for those three are marked SUPERSEDED and are not counted. Downstream Drafts were re-aligned to the built shapes.
 
@@ -13,11 +13,12 @@ Sizes are agent-days, uncalibrated estimates (earlier phases overran). Total of 
 | P8 reports & UI (rest) | P8-03, 04, 07, 08, 09, 10, 11, 12, 13, 14, 16, 17; SAFETY: **P8-18** tweak and re-run, **P8-19** owner-act forms, **P8-20** exports, **P8-21** PWA; P8-22 audit screen; plus the new small slices P8-02b (extract `HeatGrid` and the tab registry, 0.5 to 1 d) and P8-15b (carry the P7-20 items, 1 d) | about 66 |
 | Leftovers P3 | P3-01d context data (index, VIX), P3-01e breadth, P3-02e BUY to SELL mirror, P3-02f lag and never-true lint, P3-04d decision trace on cards | 13 |
 | Leftovers P7 | P7-16 depth recording (SAFETY), P7-19 numeric ticket levels, P7-20 price-crossing alerts and post-trade prompts | 9 |
-| P9 assistant | P9-00 plan, 01 xd-llm, 02 xd-mcp read-only, 03 endpoint and `ai.*`, 04 chat UI, 05 data tools, 06 briefing, 07 strategy drafting, 08 proposals, 09 eval set, 10 Hermes PoC | 31 |
-| P10 paper | P10-00 plan, 01 paper fill capture, 02 ledger and open positions, 03 weekly review and discipline, 04 backtest vs paper, 05 config governance, 06 phase check | 17 |
+| P9 assistant | P9-00 plan, 01 xd-llm, 02 xd-mcp read-only, 03 endpoint and `ai.*`, 04 chat UI, 05 data tools, 06 briefing, 07 strategy drafting, 08 proposals, 09 eval set, 10 Hermes PoC (sizes: P9-05 5 d, P9-09 5 to 6 d) | 33.5 |
+| P10 paper | P10-00 plan, 01 paper fill capture, 02 ledger and open positions, 03 weekly review and discipline, 04 backtest vs paper, 05 config governance, 06 phase check (sizes: P10-03 5 d, P10-04 4 d) | 20 |
 | P11 small live | P11-00 plan, 01 manual-live fill capture, 02 execution feedback, 03 live vs paper slippage, 04 scale-up and risk ramp, 05 static IP and SEBI runbook, 06 phase check | 20 |
 | P12 execution | P12-00 plan (build order 01 to 06, then 07, 11, 08, 09, 10, 12), 01 state machine, 02 Dhan adapter and sandbox, 03 pre-trade checks, 04 broker-side stops, 05 kill switch, 06 order stream and reconciliation, 07 modes, 08 semi-auto, 09 auto-live, 10 screens, 11 daily login and static IP ops, 12 phase check | 34.5 |
 | P13 to P15 (plans) | P13-00 tick and depth (10 slices, about 23 d), P14-00 options and stat-arb (17 slices, about 44.5 d), P15-00 fundamentals and events (12 slices, about 30 d) | about 97 |
+| **Total** | | about 295 |
 
 P8-00, P8-01, P8-05 and all P0 to P7 specs already existed, and P8-02, P8-06 and P8-15 are built.
 
@@ -90,3 +91,13 @@ Log event ids (existing code ends at 4801): P8-18 4900-4919, P8-19 4920-4939, P8
 - Many specs run 15 to 29 KB, above the 8 to 14 KB guide, because they carry hand-worked tables and decisions. Trim at Approval if wanted.
 - Three independent reviews on 2026-10-25 found 2 blockers in P9 (stored text steering an auto-run; auto-accept starting a backfill), 3 in P12 (an automatic corrective BUY, shorts flagged oversold, an unsatisfiable boundary test) and about 40 majors/minors; the fixes were sent back to the authors and are recorded at the end of each changed spec under 'Review fixes 2026-10-25'. Reviewers did not read every file: they skipped P9-04/05/06/09, P10-03/04/06, P11-00 to 03/06, P12 beyond the safety paths, P13 to P15, and the P3 leftovers. Spot-check those at Approval.
 - A parallel build session works on `main` in this checkout (worktrees under `.claude/worktrees`) and merged drafts of this folder into commits; commit or move these files soon to avoid merge friction.
+
+## 7. Review fixes round 2 (2026-10-25)
+A second review round was applied to the Drafts; each changed spec has a 'Review fixes 2026-10-25 (2)' section at its end. All stay Draft.
+- **P3-04d:** the new export format is `xd-sim-export-4` (3 is already the P4-01 legs); ORB has only a trigger (criteria 1-2 reworded); the log id is the next free one at build; `InstrumentInputReader` extends the card handler's own reader and the run handler's moves onto it.
+- **P3-01d / P3-01e:** `NSE:INDIA_VIX` cited to doc 06; no table-level UPDATE/DELETE, column grants only by P3-01e; breadth gets `BreadthGraceSessions` so a late Dhan load does not freeze `insufficient`; criterion 1 fixture states `MinVoters` 5.
+- **P3-02e / P3-02f:** mirror row for a subscript over a call (golden `close > highest(20)[1]` -> `close < lowest(20)[1]`), scalar `gap_pct` operator flip stated; P3-02f Part B depends on that row, `NR7_ID_BO` uses about seven `high[k]-low[k]` terms.
+- **P13-00:** NOT_EVALUABLE (not INCONCLUSIVE) at 5 folds; history need 10 months, earliest evaluable 2027-10-01; the two extension tables move to the P13-05 shared-core migration; `BrokerEndpoints` and `PlanPhaseCheck.PinnedAllowList` change in P7-16's commit.
+- **P14-00:** allow-list rows change `PlanPhaseCheck.PinnedAllowList` in the same commit (ADR 0097); fewer than 6 folds is NOT_EVALUABLE; the 5-year backfill adds about 59 M rows (about 100 M total).
+- **P15-00:** PEAD floor is 250 events and PEAD is NOT_EVALUABLE on this universe by construction (12-quarter burn-in, 32 seasons needed against 20); dependency wording fixed; `not_event_day` changes the `filter_not_available` refusals, the engine version (ADR 0037) and the run identity.
+- **Sizes:** P9-05 5 d, P9-09 5 to 6 d, P10-03 5 d, P10-04 4 d applied to the table: P9 33.5, P10 20, total about 295.

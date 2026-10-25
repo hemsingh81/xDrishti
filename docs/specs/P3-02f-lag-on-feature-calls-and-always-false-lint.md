@@ -22,7 +22,7 @@ An author can write "the close is above the highest high of the previous 20 bars
 4. The suggestion for `close > highest(n)` is `close >= highest(n, source=close)` before Part B exists and `close > highest(n)[1]` after it (a flag in the suggestion table, one line to change); for `low < lowest(n)` the mirror; for a range violation, the clamped literal or "remove the condition".
 5. The 15 stored strategies compile with no new warning (a regression test over `Seed/Strategies/*.yaml`), proving the rule does not fire on real, working text.
 
-**Part B**
+**Part B** (depends on the mirror row 'subscript over a call mirrors the call and keeps the lag' of P3-02e; `NR7_ID_BO` uses about seven `high[k]-low[k]` terms, so it needs no lagged call itself)
 6. Given `highest(20)[1]`, `lowest(5)[2]`, `rsi(14)[1]`, `atr(14)[3]`, `tf("1h").ema(20)[1]` and `nr(7)[1]`, when compiled and run on hand-calculated series, then each equals the same feature read k closed bars earlier (hand tables in the Test plan), including at the first bars (not ready until warm-up + k bars).
 7. `crosses_above(close, highest(20)[1])` is true on a bar whose close first exceeds the previous 20-bar high and false on the next bar if it stays above (the previous value of the operand is read one bar further back: lags add, as for references).
 8. The pinned invalid sources `rsi(14)[1]` and `tf("1h").ema(20)[1]` of `InvalidSources.cs` move from the invalid list to the valid list; `(a)[1]`, `x[1][2]`, `1[1]`, `time[1]`, `(close + open)[1]`, `highest(20)[0]`, `highest(20)[-1]`, `highest(20)[1.5]` stay refused with their present codes (`subscript_on_non_reference`, `lag_on_non_feature`, `negative_or_zero_lag`, `bad_subscript`).
@@ -68,3 +68,7 @@ Owner's act: the Approved of Part B (it supersedes ADR 0034 Amendment 8). Defaul
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers or majors
 - [ ] No API change; Lab validate golden updated for the new warning code
 - [ ] doc 11 §2 (*Lags*, lint table, "Not yet built"), ISS-24 and the roadmap row updated; an ADR (next free number at build time) records Part B and what it supersedes; `scripts/build-docs.sh`
+
+## Review fixes 2026-10-25 (2)
+- Part B depends on the P3-02e mirror row for a subscript over a call (golden `close > highest(20)[1]` -> `close < lowest(20)[1]`).
+- `NR7_ID_BO` uses about seven `high[k]-low[k]` terms (references, not lagged calls).
