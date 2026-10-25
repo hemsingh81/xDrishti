@@ -1,4 +1,4 @@
-# 0103 — The Reports screen is a lazy read-only route whose filters live in the address and whose figures all pass through the kit
+# 0104 — The Reports screen is a lazy read-only route whose filters live in the address and whose figures all pass through the kit
 
 - **Status:** Proposed (spec [P8-08](../specs/P8-08-reports-screen-overview-and-what-works.md), built 2026-10-25). Becomes Accepted when the owner has read it.
 - **Date:** 2026-10-25.

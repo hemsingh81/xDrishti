@@ -87,4 +87,4 @@ None. (Choosing which runs to trust, and confirming the charge sheet, are the ow
 - Test plan URL example uses `basket=`.
 
 ## Built 2026-10-25
-- Branch feature/p8-08, [ADR 0103](../adr/0103-the-reports-screen-is-a-lazy-read-only-route-whose-filters-live-in-the-address-and-whose-figures-all-pass-through-the-kit.md). The Monthly, Basket and Weekday panels are one `GroupBars` component; the chips live in `FilterBar`; the interaction test needs 4 steps (Escape closes the multi-select); the lazy chunk is 8.75 KB gzip.
+- Branch feature/p8-08, [ADR 0104](../adr/0104-the-reports-screen-is-a-lazy-read-only-route-whose-filters-live-in-the-address-and-whose-figures-all-pass-through-the-kit.md). The Monthly, Basket and Weekday panels are one `GroupBars` component; the chips live in `FilterBar`; the interaction test needs 4 steps (Escape closes the multi-select); the lazy chunk is 8.75 KB gzip.
