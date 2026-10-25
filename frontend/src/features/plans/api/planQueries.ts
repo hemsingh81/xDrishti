@@ -12,6 +12,8 @@ export type ApproveAllOutcome = Schemas['ApproveAllOutcome'];
 export type Suggestion = Schemas['SuggestionView'];
 export type PlanGrade = Schemas['PlanGradeView'];
 export type PlanJournal = Schemas['PlanJournalView'];
+export type PlanRun = Schemas['PlanRunView'];
+export type TicketChart = Schemas['TicketChartView'];
 export type Digest = Schemas['DigestView'];
 export type AutonomySettings = Schemas['AutonomySettingsView'];
 export interface Confirmation {
@@ -28,6 +30,8 @@ export const planKeys = {
   suggestions: (id: number) => ['plans', 'suggestions', id] as const,
   grade: (id: number) => ['plans', 'grade', id] as const,
   journal: (id: number) => ['plans', 'journal', id] as const,
+  runs: ['plans', 'runs'] as const,
+  chart: (id: number, itemId: number) => ['plans', 'chart', id, itemId] as const,
   notices: ['plans', 'notices'] as const, // read by the bell (shared/api/planNotices.ts)
   digests: ['plans', 'digests'] as const,
   autonomy: ['plans', 'autonomy'] as const,
@@ -42,6 +46,25 @@ export const planQuery = (id: number) =>
   queryOptions({
     queryKey: planKeys.one(id),
     queryFn: async ({ signal }) => unwrap(await api.GET('/api/plans/{id}', { params: { path: { id } }, signal })),
+  });
+
+/** The newest attempts of the nightly pipeline: a failed-closed one with no plan is told on the screen (read only). */
+export const planRunsQuery = queryOptions({
+  queryKey: planKeys.runs,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/plan-runs', { params: { query: { limit: 5 } }, signal })),
+});
+
+/** The last 60 daily bars of one ticket up to the planning session, with its own levels (read only). */
+export const ticketChartQuery = (id: number, itemId: number) =>
+  queryOptions({
+    queryKey: planKeys.chart(id, itemId),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/plans/{id}/items/{itemId}/chart', {
+          params: { path: { id, itemId }, query: { bars: 60 } },
+          signal,
+        }),
+      ),
   });
 
 export const reviewQuery = (id: number) =>

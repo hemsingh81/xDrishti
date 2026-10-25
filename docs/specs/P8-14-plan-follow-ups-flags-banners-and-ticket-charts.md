@@ -79,3 +79,9 @@ None.
 
 ## Review fixes 2026-10-25
 - No dependency on P8-15's earlier draft claims (an `ITicketNoticeSource` port, dropping fills-unmatched): none existed in the built slice. P8-02 is built; no change needed here.
+
+## Built 2026-10-25 (decisions and deviations)
+- ADR [0113](../adr/0113-plan-flags-are-stored-as-typed-json-beside-the-basis-and-the-ticket-chart-is-plain-svg-of-daily-bars-up-to-the-planning-session.md).  `PlanBasisFlags.From(SmartPlan, openBook, primaries)` takes the open-book state as a string instead of `PlanContext` (the domain cannot see an application type).
+- P8-11 and `lightweight-charts` are not on main and a new charting dependency is an owner decision, so the chart is plain SVG, lazy on expand; the attribution link does not apply. The chart is collapsed by default on every width.
+- `net_confirmed` cost basis is never written (cell statistics carry only costed or gross). The instrument match is by canonical symbol among non-retired shares.
+- An item that does not belong to the plan is `404 plans.item_not_found`.

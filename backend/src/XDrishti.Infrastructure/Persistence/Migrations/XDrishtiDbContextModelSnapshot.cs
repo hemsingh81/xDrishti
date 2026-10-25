@@ -5587,6 +5587,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("basis");
 
+                    b.Property<string>("BasisFlagsJson")
+                        .HasColumnType("text")
+                        .HasColumnName("basis_flags_json");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -5654,6 +5658,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("plans", "trading", t =>
                         {
+                            t.HasCheckConstraint("ck_plans_flags_json", "basis_flags_json IS NULL OR left(basis_flags_json, 1) = '{'");
+
                             t.HasCheckConstraint("ck_plans_shape", "version >= 1 AND length(plan_key) > 0 AND length(input_hash) = 64 AND (review_cutoff AT TIME ZONE 'Asia/Kolkata')::date = for_date");
                         });
                 });

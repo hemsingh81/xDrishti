@@ -8,6 +8,7 @@ import { accountNamesQuery, autonomyQuery, planKeys, planQuery, reviewQuery, typ
 import { useDecisions, type Notice } from '../hooks/useDecisions';
 import { decisionError, lapseWording, noOrderWording } from '../lib/planText';
 import { Countdown } from './Countdown';
+import { PlanBanner } from './PlanBanner';
 import { PlanFlags } from './PlanFlags';
 import { TicketCard } from './TicketCard';
 
@@ -56,6 +57,7 @@ export function PlanDetail({ planId }: { planId: number }) {
               Plan for {formatWeekdayDate(p.forDate)} (version {p.version})
             </Typography>
             <PlanFlags plan={p} />
+            {p.flags && <PlanBanner flags={p.flags} planOpen={planOpen} />}
             <Typography variant="body2">{p.notice} Armed or approved means watching only, not protected.</Typography>
             <Typography variant="body2">
               <strong>Basis:</strong> {p.basis}
@@ -146,6 +148,7 @@ export function PlanDetail({ planId }: { planId: number }) {
               {items.map((item) => (
                 <TicketCard
                   key={item.id}
+                  planId={planId}
                   item={item}
                   ticket={rv.tickets.find((t) => t.itemId === item.id)}
                   reviewOpen={rv.open}

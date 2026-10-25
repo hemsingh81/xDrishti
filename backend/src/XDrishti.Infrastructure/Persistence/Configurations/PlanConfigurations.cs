@@ -12,7 +12,11 @@ internal sealed class PlanRecordConfiguration : IEntityTypeConfiguration<PlanRec
 {
     public void Configure(EntityTypeBuilder<PlanRecord> builder)
     {
-        builder.ToTable("plans", Schemas.Trading, t => t.HasCheckConstraint("ck_plans_shape", "version >= 1 AND length(plan_key) > 0 AND length(input_hash) = 64 AND (review_cutoff AT TIME ZONE 'Asia/Kolkata')::date = for_date"));
+        builder.ToTable("plans", Schemas.Trading, t =>
+        {
+            t.HasCheckConstraint("ck_plans_shape", "version >= 1 AND length(plan_key) > 0 AND length(input_hash) = 64 AND (review_cutoff AT TIME ZONE 'Asia/Kolkata')::date = for_date");
+            t.HasCheckConstraint("ck_plans_flags_json", "basis_flags_json IS NULL OR left(basis_flags_json, 1) = '{'");
+        });
         builder.HasKey(x => x.Id).HasName("pk_plans");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.Property(x => x.PlanKey).HasMaxLength(100).IsRequired();
@@ -21,6 +25,7 @@ internal sealed class PlanRecordConfiguration : IEntityTypeConfiguration<PlanRec
         builder.Property(x => x.Basis).HasMaxLength(500).IsRequired();
         builder.Property(x => x.Notice).HasMaxLength(500).IsRequired();
         builder.Property(x => x.Limits).HasMaxLength(1000).IsRequired();
+        builder.Property(x => x.BasisFlagsJson);
         builder.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
         builder.HasIndex(x => x.PlanKey).IsUnique().HasDatabaseName("uq_plans_plan_key");
         builder.HasIndex(x => new { x.Id, x.ReviewCutoff }).IsUnique().HasDatabaseName("uq_plans_id_review_cutoff");

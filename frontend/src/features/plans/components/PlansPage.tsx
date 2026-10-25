@@ -9,6 +9,7 @@ import { GradePanel } from './GradePanel';
 import { JournalPanel } from './JournalPanel';
 import { PlanDetail } from './PlanDetail';
 import { PlanList } from './PlanList';
+import { PlanRunBanner } from './PlanRunBanner';
 import { Suggestions } from './Suggestions';
 
 /** Plan review (minimal, P7-17): the nightly plan, the owner's decisions, and the after-the-fact panels. */
@@ -34,6 +35,7 @@ export function PlansPage() {
         This screen places no order, and none exists in this phase. Plans are for paper accounts only. Approving means
         watching a ticket, nothing more.
       </Alert>
+      {plans.data && <PlanRunBanner plans={list} />}
       {plans.isPending && <LoadingState label="Loading plans…" />}
       {plans.isError && <ErrorState error={plans.error} />}
       {plans.data && list.length === 0 && (
