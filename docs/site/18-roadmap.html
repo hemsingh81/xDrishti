@@ -327,12 +327,12 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td>P3-04d</td>
-<td><strong>Proposed, no spec file: the decision trace and the &quot;conditions at the decision bar&quot; section of a card</strong> (fourth part of the former row P3-04b): <code>ISimulationEngine.Explain</code>, <code>TradeExplanation</code> and the extraction of the full input reader. The replay keeps no trace today (<code>SimTrade.EntrySnapshotJson</code> is always null and <code>InstrumentReplay</code> holds only trades), so the truth and values of every condition need a replay; the chart does not. P3-04c prints one line saying so. Whether the 20-trade check needs it is the owner&#39;s choice (P3-09 has no spec yet: UNVERIFIED).</td>
+<td><strong>The decision trace and the &quot;conditions at the decision bar&quot; section of a card, built 2026-10-25</strong> (fourth part of the former row P3-04b; <a href="../specs/P3-04d-decision-trace-and-conditions-on-cards.html">spec</a>, <a href="../adr/0041-the-simulate-verb-the-export-library-and-the-pipeline-in-the-host.html">ADR 0041</a> Amendment 5): <code>ISimulationEngine.Explain</code>, <code>TradeExplanation</code>, <code>CompiledCondition.Reads</code> and <code>InstrumentInputReader</code>. The second read of the cards recomputes each chosen trade with the engine that made it, must reproduce it (<code>simulation.cards_mismatch</code> otherwise) and prints, for setup, trigger and invalidate, each condition with its truth and the value of every feature it read at its lag. Export format <code>xd-sim-export-4</code>.</td>
 <td>2 (B), after P3-04c</td>
-<td>1.3 d</td>
-<td>Proposed</td>
-<td>Spec to be drafted (the size is the one P3-04c and P3-04b2 state)</td>
-<td>Spec to be drafted</td>
+<td>2 d</td>
+<td>Built</td>
+<td><a href="../specs/P3-04d-decision-trace-and-conditions-on-cards.html">spec</a></td>
+<td>Section equals the hand values of the ORB day; the guard refuses an edited trade; one replay per instrument</td>
 </tr>
 <tr>
 <td>P3-03d</td>
@@ -1023,8 +1023,8 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Catalogue reports the stored data can serve</strong> (strategies, side, calendar and time, MAE / MFE, instruments, symbol and sector, exit-policy comparison, Monte Carlo risk).</td>
 <td>P8</td>
 <td>5 d</td>
-<td>Spec Draft (plan)</td>
-<td><a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
+<td>Part a built 2026-10-25 (<a href="../adr/0106-the-report-engine-gains-excursions-entry-hour-and-sector-additively-and-mae-mfe-is-served-as-counts-in-bins.html">ADR 0106</a>): engine fields, <code>Sector</code>/<code>Hour</code> lenses, <code>GET /api/reports/mae-mfe</code>, strategies / side / calendar / MAE-MFE / distribution / instruments / sectors screens; part b (exit comparison, Monte Carlo, pointer entries) open</td>
+<td><a href="../specs/P8-10-catalogue-reports-the-stored-data-can-serve.html">spec</a></td>
 <td>Per report with the state vocabulary</td>
 </tr>
 <tr>
@@ -1248,8 +1248,8 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>BUY to SELL mirror</strong>: rewrite a BUY side into its SELL side on the syntax tree and print it (comparison direction, <code>crosses_above/below</code>, <code>rising/falling</code>, <code>highest/lowest</code>, <code>or_high/or_low</code>, previous-day high/low, <code>rsi(n)</code> to <code>100 − n</code>, signed features) from a closed rewrite table; anything without a defined mirror (<code>day_of_week</code>, <code>regime()</code>, several context names) is an error that tells the author to write a sell block. The three built-ins carry hand-written sell blocks, so this is for user strategies (doc 11 §2).</td>
 <td>free capacity</td>
 <td>3 d</td>
-<td>Later</td>
-<td>Spec to be drafted</td>
+<td>Built 2026-10-25 (ADR 0107)</td>
+<td><a href="../specs/P3-02e-buy-to-sell-mirror.html">Spec</a></td>
 <td><code>mirror(mirror(x))</code> equals <code>x</code> on a 500-condition corpus; a metamorphic test on an inverted price series (<code>p&#39; = K − p</code>) gives the same decisions as the original for every mirrored feature; the refusal list is pinned with codes and suggestions</td>
 </tr>
 <tr>
@@ -1577,7 +1577,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-25 15:40</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-25 17:19</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>
