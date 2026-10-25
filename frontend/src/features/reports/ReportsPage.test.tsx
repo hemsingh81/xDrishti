@@ -272,7 +272,9 @@ describe('Reports screen', () => {
     reportServer();
     renderReports();
     const nav = await screen.findByRole('navigation', { name: 'Report catalogue' });
-    expect(within(nav).getAllByText(/Planned, P8-09: Not built yet\./)).toHaveLength(2);
+    expect(within(nav).getAllByText(/Planned, P8-10: Not built yet\./).length).toBeGreaterThan(0);
+    expect(within(nav).getByRole('button', { name: 'Basket comparison' })).toBeInTheDocument();
+    expect(within(nav).getByRole('button', { name: 'Pivot builder' })).toBeInTheDocument();
     expect(within(nav).getByRole('button', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
   });
 

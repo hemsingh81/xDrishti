@@ -1,3 +1,4 @@
+import { isShaded, peakOf, shadeOf } from './heatCell';
 import { describe, expect, it } from 'vitest';
 import { dataEndOf, presetFrom } from './datePresets';
 import { metricFromApi } from './metricFromApi';
@@ -59,5 +60,23 @@ describe('metricFromApi', () => {
     expect(metricFromApi({ state: 'not_evaluable', number: null, reason: 'x' }).kind).toBe('not_evaluable');
     expect(metricFromApi({ state: 'empty', number: null, reason: null }).kind).toBe('empty');
     expect(metricFromApi({ state: 'mystery', number: 3, reason: null }).kind).toBe('unavailable');
+  });
+});
+
+describe('the pivot colour scale', () => {
+  const cells = [
+    { value: { state: 'value', number: 0.4 } },
+    { value: { state: 'insufficient', number: 9 } },
+    { value: { state: 'empty', number: null } },
+    { value: { state: 'value', number: -0.8 } },
+  ];
+  it('reads value cells only', () => {
+    expect(peakOf(cells)).toBe(0.8);
+    expect(shadeOf({ kind: 'insufficient', n: 3, min: 30 }, 0.8)).toBeUndefined();
+    expect(shadeOf({ kind: 'value', value: -0.8 }, 0.8)?.tone).toBe('error');
+  });
+  it('leaves drawdown, win rate, profit factor and trades unshaded', () => {
+    for (const m of ['max_drawdown_r', 'win_rate', 'profit_factor', 'trades'] as const) expect(isShaded(m)).toBe(false);
+    expect(isShaded('expectancy_r')).toBe(true);
   });
 });
