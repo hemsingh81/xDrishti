@@ -491,6 +491,10 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<BuildDigestCommand, DigestView>, BuildDigestHandler>(); // the weekly digest from stored records; its only write is the digest (P7-15, ADR 0094)
         services.AddScoped<IQueryHandler<GetDigestQuery, Result<DigestView>>, GetDigestHandler>();
         services.AddScoped<IQueryHandler<ListDigestsQuery, Result<IReadOnlyList<DigestView>>>, ListDigestsHandler>();
+        services.AddScoped<ICommandHandler<StoreCounterfactualCommand, StoredCounterfactual>, StoreCounterfactualHandler>(); // the counterfactual stored once per input hash; the verb's --store (P8-12, ADR 0110)
+        services.AddScoped<IQueryHandler<GetCounterfactualQuery, Result<CounterfactualReportView>>, GetCounterfactualHandler>();
+        services.AddScoped<IQueryHandler<ListCounterfactualsQuery, Result<IReadOnlyList<CounterfactualHeaderView>>>, ListCounterfactualsHandler>();
+        services.AddScoped<IQueryHandler<GetJourneyQuery, Result<JourneyView>>, GetJourneyHandler>(); // the Journey: stored counterfactual, plan-price weeks, live line not evaluable (P8-12)
         services.AddScoped<IQueryHandler<ShowSelectionQuery, Result<SelectionView>>, ShowSelectionHandler>(); // cell-level view of the P7 selection filters and rank, read-only (P7-01, ADR 0082)
         services.AddScoped<IQueryHandler<ListModelsQuery, Result<IReadOnlyList<ModelView>>>, ListModelsHandler>();
         services.AddScoped<IQueryHandler<GetModelQuery, Result<ModelDetailView>>, GetModelHandler>();

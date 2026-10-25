@@ -58,11 +58,11 @@ public sealed partial class ReportEndpointsArchitectureTests
     }
 
     [Fact]
-    public void The_stored_confirmation_is_read_by_the_loader_and_the_runs_list_and_by_nothing_in_the_api()
+    public void The_stored_confirmation_is_read_by_the_loader_the_runs_list_and_the_counterfactual_store_and_by_nothing_in_the_api()
     {
         var readers = Types.InAssembly(Application).That().HaveDependencyOn(ConfirmationSource).GetTypes().Select(t => t.Name).Where(n => !n.StartsWith('<')).Distinct().Order(StringComparer.Ordinal).ToList();
 
-        readers.ShouldBe(["ListReportRunsHandler", "ReportLoader"]);
+        readers.ShouldBe(["ListReportRunsHandler", "ReportLoader", "StoreCounterfactualHandler"]); // the last states the basis of a stored counterfactual (P8-12); it never writes a confirmation
         Types.InAssembly(Api).That().HaveDependencyOn(ConfirmationSource).GetTypes().ShouldBeEmpty();
         Types.InAssembly(Api).That().HaveDependencyOn(typeof(XDrishti.Domain.Reporting.ChargeSheetConfirmation).FullName!).GetTypes().ShouldBeEmpty();
         Types.InAssembly(typeof(ConfirmationReaderSentinel).Assembly).That().HaveDependencyOn(ConfirmationSource).GetTypes().Select(t => t.Name).ShouldContain(nameof(ConfirmationReaderSentinel));

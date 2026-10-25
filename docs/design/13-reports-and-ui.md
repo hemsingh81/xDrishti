@@ -269,7 +269,7 @@ What the app can mend by itself it mends quietly ([doc 12](12-portfolio-monitori
 | R27 | Basket comparison | Which basket works best and why | Multi-select baskets: KPIs, overlaid equity, strategy × basket, buy & hold |
 | R28 | Pivot | Any dimension × any dimension | Heatmap with metric selector |
 | R29 | Data quality | Is every timeframe correct | Validation status, stored vs recomputed |
-| R30 | Learning journey | Is the system actually getting better | Weekly expectancy: live vs frozen-model counterfactual vs plan prices; problem→fix bands; cumulative uplift |
+| R30 | Learning journey | Is the system actually getting better | Per retrain window (quarterly): retrained vs frozen-model counterfactual, with the live line `not_evaluable` until real trades exist; plan prices by week; problem→fix bands; cumulative take-R uplift |
 | R31 | Lessons | What went wrong and how it was fixed | Lesson cards (problem → diagnosis → fix → result), before/after metric, walk-forward evidence |
 | R32 | Execution gap | Where the edge is lost between plan and fills | Waterfall (plan → slippage → missed → overrides → charges → actual), by strategy and month |
 | R33 | Experiments | Which settings were tried and what they did | Experiment history with Δ expectancy, folds better, verdict, status |

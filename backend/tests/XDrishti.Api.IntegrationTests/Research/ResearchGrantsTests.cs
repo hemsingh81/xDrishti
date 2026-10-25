@@ -100,7 +100,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             }
         }
 
-        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiments", "hypotheses", "learning_changelog", "lessons", "model_designations", "model_versions", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "training_sets"]);
+        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiments", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "training_sets"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -134,6 +134,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
         (await SqlStateAsync(_app, "INSERT INTO research.trade_features (strategy) VALUES ('ORB')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a trade's features is there; the row is incomplete");
         (await SqlStateAsync(_app, "INSERT INTO research.learning_changelog (kind) VALUES ('transition')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a changelog row is there; the row is incomplete");
         (await SqlStateAsync(_app, "INSERT INTO research.hypotheses (state) VALUES ('proposed')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a hypothesis row is there; the row is incomplete");
+        (await SqlStateAsync(_app, "INSERT INTO research.learning_reports (kind) VALUES ('counterfactual')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a learning report is there; the row is incomplete");
         (await SqlStateAsync(_app, "INSERT INTO research.lessons (state) VALUES ('open')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a lesson row is there; the row is incomplete");
         (await SqlStateAsync(_app, "INSERT INTO research.training_sets (rule_version) VALUES ('tb-1')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a training set is there; the row is incomplete");
         foreach (var statement in new[]
@@ -147,6 +148,9 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             "UPDATE research.digests SET built_by = 'X' WHERE false",
             "DELETE FROM research.digests WHERE false",
             "TRUNCATE research.digests",
+            "UPDATE research.learning_reports SET built_by = 'X' WHERE false",
+            "DELETE FROM research.learning_reports WHERE false",
+            "TRUNCATE research.learning_reports",
             "UPDATE research.lessons SET actor = 'X' WHERE false",
             "DELETE FROM research.lessons WHERE false",
             "TRUNCATE research.lessons",
@@ -209,7 +213,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(17);
+        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(18);
     }
 
     [Fact]
@@ -263,6 +267,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
     [InlineData("AddLearningChangelog", new[] { "learning_changelog" })]
     [InlineData("AddHypotheses", new[] { "hypotheses" })]
     [InlineData("AddLessons", new[] { "lessons" })]
+    [InlineData("AddLearningReports", new[] { "learning_reports" })]
     public void The_later_research_migrations_make_each_of_their_tables_append_only(string migration, string[] tables)
     {
         var migrations = Path.GetFullPath(Path.Combine(ThisDirectory(), "..", "..", "..", "src", "XDrishti.Infrastructure", "Persistence", "Migrations"));

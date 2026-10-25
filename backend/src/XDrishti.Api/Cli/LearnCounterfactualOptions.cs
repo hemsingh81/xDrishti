@@ -6,18 +6,18 @@ using XDrishti.Domain.Learning;
 namespace XDrishti.Api.Cli;
 
 /// <summary>The parsed command line of <c>xd learn counterfactual</c> (spec P6-12). Nothing here reads a file or the database.</summary>
-internal sealed record LearnCounterfactualOptions(IReadOnlyList<CellSource> Sources, CounterfactualOptions Counterfactual, int HoldOutMonths)
+internal sealed record LearnCounterfactualOptions(IReadOnlyList<CellSource> Sources, CounterfactualOptions Counterfactual, int HoldOutMonths, bool Store = false)
 {
     public const string Usage = """
         usage:
-          xd learn counterfactual --run RUNKEY:STYLE:EXIT [--run ...] [--frozen-months N] [--retrain-months N] [--min-gain X] [--min-judged-windows N] [--min-window-rows N] [--significance-z X] [--trials N] [--hold-out-months N]
+          xd learn counterfactual --run RUNKEY:STYLE:EXIT [--run ...] [--frozen-months N] [--retrain-months N] [--min-gain X] [--min-judged-windows N] [--min-window-rows N] [--significance-z X] [--trials N] [--hold-out-months N] [--store]
             does continued learning help? a model frozen at a cut date (never refitted) against the same recipe refitted every --retrain-months, scoring the same later trades, out of sample
             --frozen-months is the stopped-learning age asked for, 1 to 12 (default 12; shortened to what the history allows, and printed)
             --min-gain is the log loss gain per trade retraining must show (default 0.005)
             --min-judged-windows (default 3, never below 3), --min-window-rows (default 10, never below 10) and --significance-z (default 1.645, never below 1.645) can only be made stricter
             --trials is a floor on the settings looked at, which widen the margins (default 1). EVERY re-run with a different --retrain-months or --frozen-months is another trial: count it, and raise --trials by one each time, or the verdict is flattered
             --hold-out-months keeps the last N months out (default 6; 0 keeps none)
-            prints the evidence; nothing is stored or applied
+            --store keeps the result in the insert-only learning reports (once per identical inputs; any changed knob is another row). Without it nothing is stored. Nothing is ever applied
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
         """;
@@ -30,11 +30,16 @@ internal sealed record LearnCounterfactualOptions(IReadOnlyList<CellSource> Sour
         ArgumentNullException.ThrowIfNull(args);
         var errors = new List<string>();
         var runs = new List<CellSource>();
+        var store = false;
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var i = 0; i < args.Count; i++)
         {
             var arg = args[i];
-            if (!Known.Contains(arg, StringComparer.Ordinal))
+            if (arg == "--store")
+            {
+                store = true;
+            }
+            else if (!Known.Contains(arg, StringComparer.Ordinal))
             {
                 errors.Add($"unknown argument '{SimulateOptions.Show(arg)}'");
             }
@@ -77,7 +82,7 @@ internal sealed record LearnCounterfactualOptions(IReadOnlyList<CellSource> Sour
             Trials = Whole(values, "--trials", d.Trials, errors),
         };
         var hold = Whole(values, "--hold-out-months", 6, errors);
-        return errors.Count > 0 ? (null, errors) : (new LearnCounterfactualOptions(runs, options, hold), errors);
+        return errors.Count > 0 ? (null, errors) : (new LearnCounterfactualOptions(runs, options, hold, store), errors);
     }
 
     private static int Whole(Dictionary<string, string> values, string key, int fallback, List<string> errors)

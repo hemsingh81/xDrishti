@@ -1,0 +1,24 @@
+# 0110 — The frozen-model counterfactual is stored by the verb in a generic insert-only report table and the Journey only reads it
+
+- **Status:** Proposed (spec [P8-12](../specs/P8-12-journey-counterfactual-stored-and-shown.md), built 2026-10-25). Becomes Accepted when the owner has read it.
+- **Date:** 2026-10-25.
+- **Number note:** taken as 0110 on purpose, to avoid a clash with other slices built in parallel that may take 0108 or 0109.
+- **Relation to other ADRs:** [0077](0077-frozen-model-counterfactual-same-trades-both-sides-and-no-difference-as-an-answer.md) (the counterfactual), [0094](0094-the-weekly-digest-lists-stored-proposals-in-one-insert-only-record-per-iso-week-and-the-weekly-service-applies-nothing.md) (insert-only pattern, the weekly service does not compute it), [0080](0080-the-phase-check-exit-criteria-from-stored-records-and-never-met-on-thin-data.md) (phase check, already served by P8-04).
+
+## Decision
+1. **One generic table, `research.learning_reports`,** insert-only for `xd_app` (SELECT and INSERT per table; no UPDATE, DELETE, TRUNCATE), keyed by `kind` (pattern `^[a-z][a-z_]{1,38}$`) and a 64-hex `input_hash`, unique together. This slice writes kind `counterfactual`; later kinds (P8-13) need no migration. The database refuses a text without `limit:`, a bad kind, a bad hash, a basis outside gross / costed_unconfirmed / net_confirmed, and an empty builder. Any later `research` migration that calls `GrantSchemaUsageToAppRole` must call `MakeAppendOnlyForAppRole` for this table again (`ResearchGrantsTests` enforces it).
+2. **The stored JSON is the view DTO (`schemaVersion` 1), not the domain record,** so NaN cannot enter and the stored text stays readable after later domain changes. Metrics that cannot be computed are null.
+3. **Only the verb writes:** `xd learn counterfactual ... --store`. A model fit per window is a job; a GET that started one would be a hidden job. The weekly service is not touched (ADR 0094 stands). The same inputs again add no row (`already stored as #N (same inputs)`); any changed knob is another row, because every re-run is another trial. The input hash covers the sorted runs, every knob, the hold-out months, the validation options and the model recipe line (trainer, parameters, training set id).
+4. **Basis follows the run headers:** gross, costed on a sheet that is not the owner's confirmed one (`costed_unconfirmed`, printed "costed on the stored sheet, not confirmed as yours"), or `net_confirmed`. Gross and costed runs are never mixed (422 `learning.invalid`).
+5. **Windows are quarterly, not weekly** (design change): docs 09 section 11 and 13 R30 now say per retrain window. The plan-price line is weekly because grades are per planned session; weeks with fewer than 5 graded tickets show n and no mean.
+6. **Cumulative uplift is take-R:** the sum over judged windows of rows x (retrained take-R per candidate minus frozen take-R per candidate), computed on the server (`CounterfactualUplift`); a window with the same model on both sides has a null uplift ("not judged") and adds nothing. A convention in R, not a strategy.
+7. **Read endpoints:** `GET /api/learning/counterfactual?id=` (404 `learning.counterfactual_not_found`), `GET /api/learning/counterfactuals?limit=` (1 to 50, 422 `learning.invalid`), `GET /api/learning/journey` (header of the newest, plan-price weeks, the live line `not_evaluable` whatever else is stored, the evidence). The phase-check endpoint already exists (P8-04, ADR 0103) and is not rebuilt.
+8. **The Journey tab is a lazy, read-only tab** added by one line in the tab registry. It computes no statistic, draws figures through the kit, and shows the headline "Inconclusive: N judged windows, 3 needed" below 3 judged windows, "No measurable difference on this data" as an ordinary answer, and "weak (n windows)" under 6.
+
+## Consequences
+- Re-running with other months is another stored row, and the screen lists how many rows exist for the same runs, so a cherry-picked window is visible.
+- Until the owner runs the verb with `--store`, the tab shows `empty` with the command. The expected answer on about 2.1 years of history is `Inconclusive`; that is the correct display.
+- The chart is a bar list plus a table with the same numbers; the paired gain and its standard error are in the table. A bar-with-error chart type can come later without a contract change.
+- Log events 4880 and 4881 (counts and codes only).
+- The real-data check (running the verb with `--store` on the owner's newest runs, outcome expected `Inconclusive`) is deferred to the owner's own CLI act; it was not run at build, so no real-data outcome is recorded here.
+- Same-runs counts and the Journey time axis read the newest 50 stored reports, lessons and models; past that, a count query is the upgrade (marked `shortcut:` in code). The stored `report_json` repeats the printed text, which is bounded (a handful of windows).

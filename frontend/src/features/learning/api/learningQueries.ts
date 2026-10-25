@@ -12,6 +12,9 @@ export type Hypothesis = Schemas['HypothesisView'];
 export type Model = Schemas['ModelView'];
 export type ModelDetail = Schemas['ModelDetailView'];
 export type Digest = Schemas['DigestView'];
+export type Counterfactual = Schemas['CounterfactualReportView'];
+export type CounterfactualWindow = Schemas['CounterfactualWindowView'];
+export type Journey = Schemas['JourneyView'];
 
 export type PlanVsActual = Schemas['PlanVsActualView'];
 export type MetricView = Schemas['MetricView'];
@@ -57,6 +60,8 @@ export const learningKeys = {
   models: (role: string) => ['learning', 'models', role] as const,
   model: (id: number) => ['learning', 'model', id] as const,
   digests: ['learning', 'digests'] as const,
+  journey: ['learning', 'journey'] as const,
+  counterfactual: (id: number) => ['learning', 'counterfactual', id] as const,
   digest: (week: string) => ['learning', 'digest', week] as const,
 
   planVsActual: (range: DateRange) => ['learning', 'plan-vs-actual', range.from, range.to] as const,
@@ -222,3 +227,17 @@ export const learningCheckQuery = queryOptions({
   queryKey: learningKeys.learningCheck,
   queryFn: async ({ signal }) => unwrap(await api.GET('/api/learning/phase-check', { signal })),
 });
+
+// P8-12: the Journey. The counterfactual is computed and stored by the verb; these only read it.
+export const journeyQuery = queryOptions({
+  queryKey: learningKeys.journey,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/learning/journey', { signal })),
+});
+
+export const counterfactualQuery = (id: number) =>
+  queryOptions({
+    queryKey: learningKeys.counterfactual(id),
+    staleTime: recordStaleTime,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/learning/counterfactual', { params: { query: { id } }, signal })),
+  });
