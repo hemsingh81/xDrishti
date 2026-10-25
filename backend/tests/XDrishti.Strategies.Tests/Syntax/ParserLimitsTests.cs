@@ -172,6 +172,7 @@ public sealed class ParserLimitsTests
             Nots(63) + " and a",
             "-" + Chain(63),
             string.Concat(Enumerable.Repeat("abs(", 63)) + "close[1]" + new string(')', 63),
+            string.Concat(Enumerable.Repeat("abs(", 62)) + "highest(20)[1]" + new string(')', 62),
         ];
         string[] refused =
         [
@@ -179,6 +180,7 @@ public sealed class ParserLimitsTests
             Nots(64) + " and a",
             "-" + Chain(64),
             string.Concat(Enumerable.Repeat("abs(", 64)) + "close[1]" + new string(')', 64),
+            string.Concat(Enumerable.Repeat("abs(", 63)) + "highest(20)[1]" + new string(')', 63),
         ];
 
         foreach (var source in accepted)

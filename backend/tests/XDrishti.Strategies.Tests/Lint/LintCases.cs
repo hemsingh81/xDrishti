@@ -267,6 +267,7 @@ internal static class LintCases
         ["never_true: supertrend direction above 1"] = C("supertrend_dir(10, 3) > 1", W(NeverTrue, "supertrend_dir(10, 3) > 1", "supertrend_dir(10, 3) >= 1")),
         ["never_true: breadth above 100"] = C("breadth > 100", W(NeverTrue, "breadth > 100", "breadth >= 100"), I(NeedsContext, "breadth")),
         ["never_true: day of week above 7"] = C("day_of_week > 7", W(NeverTrue, "day_of_week > 7", "day_of_week >= 7")),
+        ["never_true: a crossing of a bounded oscillator has no suggestion"] = C("crosses_above(rsi(14), 100)", W(NeverTrue, "crosses_above(rsi(14), 100)")),
         ["never_true: the number written first"] = C("0 > rsi(14)", W(NeverTrue, "0 > rsi(14)", "0 >= rsi(14)")),
         ["never_true: a parameter that decides"] = P("rsi(14) > rsi_hi", Params(("rsi_hi", 120)), W(NeverTrue, "rsi(14) > rsi_hi", "rsi(14) >= 100")),
         ["never_true: a bound that cannot be reached has no suggestion"] = C("gap_pct < -100", W(NeverTrue, "gap_pct < -100")),

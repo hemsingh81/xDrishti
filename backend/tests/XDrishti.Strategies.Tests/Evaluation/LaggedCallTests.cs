@@ -69,6 +69,47 @@ public sealed class LaggedCallTests
         later[1..].ShouldBe(now[..^1]);
     }
 
+    [Fact]
+    public void A_lagged_hourly_ema_is_known_from_the_21st_hourly_close_and_holds_the_value_of_the_20th()
+    {
+        // a session of 375 minutes holds 7 hourly bars (six of 60 minutes and one of 15), so the 20th hourly close is the last minute of the 6th bar of the 3rd day
+        // and the 21st is the last minute of that day; ema(20) is ready at the 20th close and its lag of one at the 21st
+        var bars = new List<Bar>();
+        var close = 100.0;
+        foreach (var day in new[] { Clock.Mon, Clock.Tue, Clock.Wed, Clock.Thu })
+        {
+            for (var m = 0; m < 375; m++)
+            {
+                close += (m % 7) - 3 + 0.25;
+                bars.Add(Clock.Close(day, Clock.Open + m, close));
+            }
+        }
+
+        var plain = Rig.Of(Timeframe.M1, "tf(\"1h\").ema(20) > 0");
+        var lagged = Rig.Of(Timeframe.M1, "tf(\"1h\").ema(20)[1] > 0");
+        var spec = Specs.Of("ema", Timeframe.H1, 20);
+        var valueAtTwentieth = double.NaN;
+        var firstPlain = -1;
+        var firstLagged = -1;
+        for (var i = 0; i < bars.Count; i++)
+        {
+            if (plain.Step(bars[i])[0] == Truth.True && firstPlain < 0)
+            {
+                firstPlain = i;
+                valueAtTwentieth = plain.Frame.At(plain.Frame.HandleOf(spec), 0);
+            }
+
+            if (lagged.Step(bars[i])[0] == Truth.True && firstLagged < 0)
+            {
+                firstLagged = i;
+                lagged.Frame.At(lagged.Frame.HandleOf(spec), 1).ShouldBe(valueAtTwentieth);
+            }
+        }
+
+        firstPlain.ShouldBe(2 * 375 + 359);
+        firstLagged.ShouldBe(2 * 375 + 374);
+    }
+
     [Theory]
     [InlineData("highest(20)[1]")]
     [InlineData("lowest(5)[2]")]

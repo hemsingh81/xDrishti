@@ -36,10 +36,10 @@ internal static class NeverTrueRule
         switch (left, right)
         {
             case (BoundFeature feature, not BoundFeature) when ConstantFolder.TryFold(right, out var value) && double.IsFinite(value):
-                CheckRange(op, feature, value, scope.Text(feature.Span), span, scope, featureFirst: true);
+                CheckRange(op, feature, value, scope.Text(feature.Span), span, scope, featureFirst: true, crossing);
                 break;
             case (not BoundFeature, BoundFeature feature) when ConstantFolder.TryFold(left, out var value) && double.IsFinite(value):
-                CheckRange(Flip(op), feature, value, scope.Text(feature.Span), span, scope, featureFirst: false);
+                CheckRange(Flip(op), feature, value, scope.Text(feature.Span), span, scope, featureFirst: false, crossing);
                 break;
             case (BoundFeature { Lag: 0 } a, BoundFeature { Lag: 0 } b) when IsImpossibleWindow(op, a, b) || IsImpossibleWindow(Flip(op), b, a):
                 ReportWindow(a, b, op, span, scope, crossing);
@@ -47,7 +47,7 @@ internal static class NeverTrueRule
         }
     }
 
-    private static void CheckRange(BinaryOperator op, BoundFeature feature, double value, string featureText, SourceSpan span, BindingScope scope, bool featureFirst)
+    private static void CheckRange(BinaryOperator op, BoundFeature feature, double value, string featureText, SourceSpan span, BindingScope scope, bool featureFirst, bool crossing)
     {
         if (feature.Type != BoundType.Number || !ValueRange.Table.TryGetValue(feature.Spec.Name, out var range) || !IsImpossible(op, range, value))
         {
@@ -62,7 +62,7 @@ internal static class NeverTrueRule
             _ => null,
         };
         string? suggestion = null;
-        if (nearest is { } near)
+        if (nearest is { } near && !crossing)
         {
             var literal = near.Limit.ToString("R", CultureInfo.InvariantCulture);
             suggestion = featureFirst ? featureText + " " + near.Op + " " + literal : literal + " " + (near.Op == ">=" ? "<=" : ">=") + " " + featureText;

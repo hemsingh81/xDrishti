@@ -671,6 +671,10 @@ internal static class LintMessages
         ["never_true: supertrend direction above 1"] = [Range("supertrend_dir(10, 3) > 1", "supertrend_dir", "between -1 and 1", "supertrend_dir(10, 3) >= 1")],
         ["never_true: breadth above 100"] = [Range("breadth > 100", "breadth", "between 0 and 100", "breadth >= 100"), Context("breadth")],
         ["never_true: day of week above 7"] = [Range("day_of_week > 7", "day_of_week", "between 1 and 7", "day_of_week >= 7")],
+        ["never_true: a crossing of a bounded oscillator has no suggestion"] =
+        [
+            "`crosses_above(rsi(14), 100)` can never be true: rsi is between 0 and 100, so the rule never fires. Remove the condition or change the number.",
+        ],
         ["never_true: the number written first"] = [Range("0 > rsi(14)", "rsi", "between 0 and 100", "0 >= rsi(14)")],
         ["never_true: a parameter that decides"] = [Range("rsi(14) > rsi_hi", "rsi", "between 0 and 100", "rsi(14) >= 100")],
         ["never_true: a bound that cannot be reached has no suggestion"] =
