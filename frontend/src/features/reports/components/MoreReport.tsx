@@ -2,8 +2,10 @@ import type { ReactNode } from 'react';
 import type { MoreView, ReportPanelProps } from '../lib/reportFilter';
 import { CalendarReport } from './CalendarReport';
 import { DistributionReport } from './DistributionReport';
+import { ExitComparison } from './ExitComparison';
 import { InstrumentScorecard } from './InstrumentScorecard';
 import { MaeMfeReport } from './MaeMfeReport';
+import { MonteCarloReport } from './MonteCarloReport';
 import { SectorReport } from './SectorReport';
 import { SideReport } from './SideReport';
 import { StrategiesReport } from './StrategiesReport';
@@ -16,6 +18,8 @@ const reports: Record<MoreView, (props: ReportPanelProps) => ReactNode> = {
   distribution: (p) => <DistributionReport {...p} />,
   instruments: (p) => <InstrumentScorecard {...p} />,
   sectors: (p) => <SectorReport {...p} />,
+  exits: (p) => <ExitComparison {...p} />,
+  montecarlo: (p) => <MonteCarloReport min={p.min} />,
 };
 
 /** The P8-10 report of a view. */

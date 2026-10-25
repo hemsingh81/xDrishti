@@ -10744,6 +10744,48 @@
         }
       }
     },
+    "/api/reports/comparisons": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "The stored comparisons of exits on identical entries, newest first: key, entries key, strategy, unit, common entries and each member run with the exit candidate it ran. Headers only; the figures come from the report endpoints over the member runs (runs=<member keys>, lens=exit). Takes no parameter. Read only.",
+        "operationId": "ListReportComparisons",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportComparisonsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/exit-selections": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "The stored out-of-sample exit choices (walk-forward, ADR 0054), newest first: per cell the chosen exit or why there is none, the default, the stability verdict with its reason and the chance-pass probability, the pooled out-of-sample figures (a number only for a value, insufficient below the minimum sample), the winner of each fold and the record's own caveats. Takes no parameter. Read only.",
+        "operationId": "ListReportExitSelections",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportExitSelectionsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/insights": {
       "get": {
         "tags": [
@@ -15463,6 +15505,72 @@
         },
         "description": "A clone (spec P5-01): the text with the new id, the hash of the version it came from (post it as `parentHash` to record the lineage) and the source."
       },
+      "ComparisonMemberView": {
+        "required": [
+          "runKey",
+          "candidateId"
+        ],
+        "type": "object",
+        "properties": {
+          "runKey": {
+            "type": "string",
+            "description": "The stored run key."
+          },
+          "candidateId": {
+            "type": "string",
+            "description": "The exit candidate id."
+          }
+        },
+        "description": "One member of a comparison."
+      },
+      "ComparisonView": {
+        "required": [
+          "comparisonKey",
+          "entriesKey",
+          "strategyId",
+          "unit",
+          "commonEntries",
+          "members",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "comparisonKey": {
+            "type": "string",
+            "description": "The comparison key."
+          },
+          "entriesKey": {
+            "type": "string",
+            "description": "The key of the common entries."
+          },
+          "strategyId": {
+            "type": "string",
+            "description": "The strategy."
+          },
+          "unit": {
+            "type": "string",
+            "description": "RFilled (gross) or RNet."
+          },
+          "commonEntries": {
+            "type": "integer",
+            "description": "Entries every member shares.",
+            "format": "int32"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComparisonMemberView"
+            },
+            "description": "The member runs, with the candidate each ran."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was stored.",
+            "format": "date-time"
+          }
+        },
+        "description": "A stored comparison."
+      },
       "CompletenessCheck": {
         "required": [
           "status",
@@ -19677,6 +19785,165 @@
           }
         },
         "description": "How a service is run: retries (0–5 after a failed attempt), the timeout of an attempt in minutes (1–240), whether a missed run is made up for when the application starts, and whether a failure raises a notice in the bell."
+      },
+      "ExitSelectionView": {
+        "required": [
+          "selectionKey",
+          "comparisonKey",
+          "strategyId",
+          "timeframe",
+          "side",
+          "style",
+          "regime",
+          "unit",
+          "defaultCandidateId",
+          "chosenCandidateId",
+          "noChoiceReason",
+          "stable",
+          "stabilityReason",
+          "usableFolds",
+          "agreeingFolds",
+          "positiveFolds",
+          "chancePass",
+          "lonePeaks",
+          "pooled",
+          "folds",
+          "banner",
+          "createdAt",
+          "unreadable",
+          "minTrades"
+        ],
+        "type": "object",
+        "properties": {
+          "selectionKey": {
+            "type": "string",
+            "description": "The selection key."
+          },
+          "comparisonKey": {
+            "type": "string",
+            "description": "The comparison it was made from."
+          },
+          "strategyId": {
+            "type": "string",
+            "description": "The strategy."
+          },
+          "timeframe": {
+            "type": "string",
+            "description": "The cell's timeframe."
+          },
+          "side": {
+            "type": "string",
+            "description": "The cell's side."
+          },
+          "style": {
+            "type": "string",
+            "description": "The cell's style."
+          },
+          "regime": {
+            "type": "string",
+            "description": "The cell's regime (* until a regime exists)."
+          },
+          "unit": {
+            "type": "string",
+            "description": "The unit of the scores."
+          },
+          "defaultCandidateId": {
+            "type": "string",
+            "description": "The exit used when no choice stands."
+          },
+          "chosenCandidateId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The walk-forward choice; null when there is none."
+          },
+          "noChoiceReason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why there is none; null when there is one."
+          },
+          "stable": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "True, false, or null for no statement."
+          },
+          "stabilityReason": {
+            "type": "string",
+            "description": "The reason of the verdict."
+          },
+          "usableFolds": {
+            "type": "integer",
+            "description": "Folds counted toward the verdict.",
+            "format": "int32"
+          },
+          "agreeingFolds": {
+            "type": "integer",
+            "description": "Of those, folds agreeing with the modal winner.",
+            "format": "int32"
+          },
+          "positiveFolds": {
+            "type": "integer",
+            "description": "Of the agreeing, folds positive out of sample.",
+            "format": "int32"
+          },
+          "chancePass": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Exact probability that random winners would pass; null when not computed.",
+            "format": "double"
+          },
+          "lonePeaks": {
+            "type": "integer",
+            "description": "Folds won by a lone peak.",
+            "format": "int32"
+          },
+          "pooled": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PooledFigureView"
+            },
+            "description": "Pooled out-of-sample figures, each a state."
+          },
+          "folds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SelectionFoldView"
+            },
+            "description": "The folds."
+          },
+          "banner": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The record's own caveats, verbatim."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When stored.",
+            "format": "date-time"
+          },
+          "unreadable": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why the stored record could not be read; then no figure is given. Null for a readable record."
+          },
+          "minTrades": {
+            "type": "integer",
+            "description": "The minimum sample the figures were judged against: the larger of the report minimum and the record's own.",
+            "format": "int32"
+          }
+        },
+        "description": "A stored exit choice for one cell. `Stable` is null when the record makes no statement, and `StabilityReason` says why."
       },
       "ExperimentView": {
         "required": [
@@ -27192,6 +27459,35 @@
         },
         "description": "Plan versus actual on the wire (P8-04)."
       },
+      "PooledFigureView": {
+        "required": [
+          "name",
+          "trades",
+          "meanR",
+          "score"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "What was pooled."
+          },
+          "trades": {
+            "type": "integer",
+            "description": "Out-of-sample trades.",
+            "format": "int32"
+          },
+          "meanR": {
+            "description": "Mean R.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "score": {
+            "description": "Score.",
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "A pooled out-of-sample figure: the number of trades and the mean and score as states (a number only for a value)."
+      },
       "PortfolioHistory": {
         "required": [
           "points",
@@ -29102,6 +29398,30 @@
         },
         "description": "What holding each basket, and the benchmark index, would have done over one window (P8-07)."
       },
+      "ReportComparisonsView": {
+        "required": [
+          "comparisons",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "comparisons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComparisonView"
+            },
+            "description": "Newest first. Empty is an ordinary answer."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What always holds: in-sample, modelled fills, the same entries."
+          }
+        },
+        "description": "The stored comparisons of exits on identical entries (spec P8-10 part b). Choosing one names its member runs as the run set of a report; the report must then be split by exit (`lens=exit`)."
+      },
       "ReportEvidenceView": {
         "required": [
           "basis",
@@ -29200,6 +29520,30 @@
           }
         },
         "description": "The evidence block every report carries (P8-00 D1): the basis, the population, the date range, what is not available and why, the runs behind the numbers (the \"Data used\" panel) and the honest limits as fields. A screen renders these; none of this wording\nis page prose."
+      },
+      "ReportExitSelectionsView": {
+        "required": [
+          "selections",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "selections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExitSelectionView"
+            },
+            "description": "Newest first. Empty is an ordinary answer."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What always holds, as text."
+          }
+        },
+        "description": "The stored out-of-sample exit choices (spec P8-10 part b, ADR 0054): which exit won each fold of a walk-forward, whether the choice is stable, and what the record itself says it is worth."
       },
       "ReportKpisView": {
         "required": [
@@ -30500,6 +30844,56 @@
           }
         },
         "description": "The Dhan API key and secret, write-only (app_id / app_secret). Surrounding spaces are\nremoved; the values are stored encrypted and never returned."
+      },
+      "SelectionFoldView": {
+        "required": [
+          "index",
+          "testStart",
+          "testEnd",
+          "winner",
+          "winnerTestTrades",
+          "winnerTestScore",
+          "thin"
+        ],
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "description": "1-based.",
+            "format": "int32"
+          },
+          "testStart": {
+            "type": "string",
+            "description": "First test day.",
+            "format": "date"
+          },
+          "testEnd": {
+            "type": "string",
+            "description": "Last test day.",
+            "format": "date"
+          },
+          "winner": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The winning candidate; null when none qualified."
+          },
+          "winnerTestTrades": {
+            "type": "integer",
+            "description": "Test trades of the winner.",
+            "format": "int32"
+          },
+          "winnerTestScore": {
+            "description": "The winner's out-of-sample score as a state.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "thin": {
+            "type": "boolean",
+            "description": "The fold does not count toward the verdict."
+          }
+        },
+        "description": "One fold of a choice."
       },
       "SensitivityView": {
         "required": [

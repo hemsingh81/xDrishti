@@ -70,6 +70,14 @@ internal sealed class ReportsEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        reports.MapGet("/comparisons", ComparisonsAsync)
+            .WithName("ListReportComparisons")
+            .WithSummary("The stored comparisons of exits on identical entries, newest first: key, entries key, strategy, unit, common entries and each member run with the exit candidate it ran. Headers only; the figures come from the report endpoints over the member runs (runs=<member keys>, lens=exit). Takes no parameter. Read only.");
+
+        reports.MapGet("/exit-selections", ExitSelectionsAsync)
+            .WithName("ListReportExitSelections")
+            .WithSummary("The stored out-of-sample exit choices (walk-forward, ADR 0054), newest first: per cell the chosen exit or why there is none, the default, the stability verdict with its reason and the chance-pass probability, the pooled out-of-sample figures (a number only for a value, insufficient below the minimum sample), the winner of each fold and the record's own caveats. Takes no parameter. Read only.");
+
         reports.MapGet("/insights", InsightsAsync)
             .WithName("GetReportInsights")
             .WithSummary("The eight auto-insights (best and weakest strategy, basket gap, side bias, best exit, weekday, regime, calibration) as fixed sentences. A figure is stated only when every group compared has at least 15 trades; otherwise the insight says why it states nothing. The insights compare fixed groupings, so there is no lens. Read only." + Common + Caps + Errors)
@@ -153,6 +161,24 @@ internal sealed class ReportsEndpoints : IEndpointModule
         IQueryHandler<GetReportMaeMfeQuery, Result<ReportMaeMfeView>> handler,
         CancellationToken cancellationToken) =>
         ReadAsync(input.ToInput(), http, q => handler.HandleAsync(new GetReportMaeMfeQuery(q), cancellationToken));
+
+    private static async Task<Results<Ok<ReportComparisonsView>, ProblemHttpResult>> ComparisonsAsync(
+        HttpContext http,
+        IQueryHandler<ListReportComparisonsQuery, Result<ReportComparisonsView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ListReportComparisonsQuery(), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<ReportExitSelectionsView>, ProblemHttpResult>> ExitSelectionsAsync(
+        HttpContext http,
+        IQueryHandler<ListReportExitSelectionsQuery, Result<ReportExitSelectionsView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ListReportExitSelectionsQuery(), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
 
     private static Task<Results<Ok<InsightsView>, ProblemHttpResult>> InsightsAsync(
         [AsParameters] ReportFilterParams input,

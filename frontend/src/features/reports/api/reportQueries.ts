@@ -14,6 +14,11 @@ export type InsightsView = Schemas['InsightsView'];
 export type WhatWorksView = Schemas['WhatWorksView'];
 export type BenchmarksView = Schemas['ReportBenchmarksView'];
 export type EvidenceView = Schemas['ReportEvidenceView'];
+export type ComparisonsView = Schemas['ReportComparisonsView'];
+export type ComparisonItem = Schemas['ComparisonView'];
+export type ExitSelectionsView = Schemas['ReportExitSelectionsView'];
+export type ExitSelectionItem = Schemas['ExitSelectionView'];
+export type MonteCarlo = Schemas['MonteCarloView'];
 
 /** Stored runs are insert-only, so a report stays valid for minutes (P8-08). */
 const staleTime = 5 * 60_000;
@@ -137,4 +142,34 @@ export const dimensionReasonQuery = (dimension: 'regime' | 'account') =>
       return result.response.status === 422 ? (result.error?.title ?? result.error?.detail ?? null) : null;
     },
     staleTime: Infinity,
+  });
+
+/** The stored comparisons of exits on identical entries (P8-10b). */
+export const comparisonsQuery = queryOptions({
+  queryKey: ['reports', 'comparisons'] as const,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/reports/comparisons', { signal })),
+  staleTime,
+});
+
+/** The stored walk-forward exit choices: the out-of-sample evidence for "which exit" (P8-10b). */
+export const exitSelectionsQuery = queryOptions({
+  queryKey: ['reports', 'exit-selections'] as const,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/reports/exit-selections', { signal })),
+  staleTime,
+});
+
+/** The Lab runs (read here, not through the Lab feature); the stored robustness of one run is read on demand only. */
+export const labRunsQuery = queryOptions({
+  queryKey: ['reports', 'lab-runs'] as const,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/lab/runs', { params: { query: { limit: 50 } }, signal })),
+  staleTime,
+});
+
+export const labReportQuery = (id: string) =>
+  queryOptions({
+    queryKey: ['reports', 'lab-report', id] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/lab/runs/{id}/report', { params: { path: { id } }, signal })),
+    staleTime,
+    retry: false,
   });

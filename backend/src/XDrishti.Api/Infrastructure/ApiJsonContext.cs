@@ -108,6 +108,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(EquityView))]
 [JsonSerializable(typeof(DistributionView))]
 [JsonSerializable(typeof(ReportMaeMfeView))]
+[JsonSerializable(typeof(ReportComparisonsView))]
+[JsonSerializable(typeof(ReportExitSelectionsView))]
 [JsonSerializable(typeof(InsightsView))]
 [JsonSerializable(typeof(WhatWorksView))]
 [JsonSerializable(typeof(TradesView))]
