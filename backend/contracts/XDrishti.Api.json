@@ -19740,7 +19740,9 @@
           "pooled",
           "folds",
           "banner",
-          "createdAt"
+          "createdAt",
+          "unreadable",
+          "minTrades"
         ],
         "type": "object",
         "properties": {
@@ -19858,6 +19860,18 @@
             "type": "string",
             "description": "When stored.",
             "format": "date-time"
+          },
+          "unreadable": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why the stored record could not be read; then no figure is given. Null for a readable record."
+          },
+          "minTrades": {
+            "type": "integer",
+            "description": "The minimum sample the figures were judged against: the larger of the report minimum and the record's own.",
+            "format": "int32"
           }
         },
         "description": "A stored exit choice for one cell. `Stable` is null when the record makes no statement, and `StabilityReason` says why."

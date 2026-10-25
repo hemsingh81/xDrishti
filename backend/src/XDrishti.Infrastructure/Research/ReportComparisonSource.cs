@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using XDrishti.Application.Abstractions.Reporting;
 
@@ -8,7 +9,7 @@ namespace XDrishti.Infrastructure.Research;
 /// <summary>
 /// The read side of the reports over the stored comparisons and exit choices (spec P8-10 part b, ADR 0114): comparison headers (never the CSV text) and the record of each exit choice, read with a plain reader. Read only. Never logs a record.
 /// </summary>
-internal sealed class ReportComparisonSource(NpgsqlDataSource dataSource) : IReportComparisonSource
+internal sealed partial class ReportComparisonSource(NpgsqlDataSource dataSource, ILogger<ReportComparisonSource> logger) : IReportComparisonSource
 {
     private const string ComparisonsSql = """
         SELECT comparison_key, entries_key, strategy_id, unit, common_entries, member_run_keys, member_candidate_ids, created_at
@@ -23,6 +24,7 @@ internal sealed class ReportComparisonSource(NpgsqlDataSource dataSource) : IRep
         ORDER BY s.created_at DESC, s.id DESC
         """;
 
+    // shortcut: both lists are read whole, no paging; one row per stored comparison or cell choice, tens at most.
     public async ValueTask<IReadOnlyList<ReportComparisonInfo>> ListComparisonsAsync(CancellationToken cancellationToken)
     {
         var list = new List<ReportComparisonInfo>();
@@ -54,17 +56,24 @@ internal sealed class ReportComparisonSource(NpgsqlDataSource dataSource) : IRep
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            using var record = JsonDocument.Parse(reader.GetString(7));
-            list.Add(Map(
-                record.RootElement,
-                reader.GetString(0).Trim(),
-                reader.GetString(1).Trim(),
-                reader.GetString(2),
-                reader.GetString(3),
-                reader.GetString(4),
-                reader.GetString(5),
-                reader.GetString(6),
-                reader.GetFieldValue<DateTimeOffset>(8)));
+            var key = reader.GetString(0).Trim();
+            var comparison = reader.GetString(1).Trim();
+            var strategy = reader.GetString(2);
+            var timeframe = reader.GetString(3);
+            var side = reader.GetString(4);
+            var style = reader.GetString(5);
+            var regime = reader.GetString(6);
+            var createdAt = reader.GetFieldValue<DateTimeOffset>(8);
+            try
+            {
+                using var record = JsonDocument.Parse(reader.GetString(7));
+                list.Add(Map(record.RootElement, key, comparison, strategy, timeframe, side, style, regime, createdAt));
+            }
+            catch (Exception e) when (e is JsonException or FormatException or InvalidOperationException)
+            {
+                LogUnreadable(key);
+                list.Add(new ReportExitSelectionInfo(key, comparison, strategy, timeframe, side, style, regime, string.Empty, string.Empty, null, null, null, "The stored record could not be read.", 0, 0, 0, null, 0, [], [], [], createdAt, "The stored record could not be read, so no figure of this choice is shown."));
+            }
         }
 
         return list;
@@ -96,21 +105,37 @@ internal sealed class ReportComparisonSource(NpgsqlDataSource dataSource) : IRep
             Array(r, "pooled", p => new ReportPooledFigure(Text(p, "name") ?? string.Empty, Int(p, "trades"), Number(p, "mean_r"), Number(p, "score"))),
             Array(r, "folds", f => new ReportSelectionFold(
                 Int(f, "index"),
-                DateOnly.ParseExact(Text(f, "test_start")!, "yyyy-MM-dd", CultureInfo.InvariantCulture),
-                DateOnly.ParseExact(Text(f, "test_end")!, "yyyy-MM-dd", CultureInfo.InvariantCulture),
+                Day(f, "test_start"),
+                Day(f, "test_end"),
                 Text(f, "winner"),
                 Int(f, "winner_test_trades"),
                 Number(f, "winner_test_score"),
                 f.TryGetProperty("thin", out var thin) && thin.ValueKind == JsonValueKind.True)),
-            Array(r, "banner", b => b.GetString() ?? string.Empty),
-            createdAt);
+            Array(r, "banner", b => b.ValueKind == JsonValueKind.String ? b.GetString() ?? string.Empty : throw new FormatException("A banner line is not text.")),
+            createdAt,
+            null,
+            r.TryGetProperty("inputs", out var inputs) ? Int(inputs, "min_trades") : 0);
     }
 
     private static string? Text(JsonElement e, string name) =>
         e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
-    private static int Int(JsonElement e, string name) =>
-        e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : 0;
+    /// <summary>A missing member is 0; a member that is not a whole 32-bit number makes the record unreadable.</summary>
+    private static int Int(JsonElement e, string name)
+    {
+        if (e.ValueKind != JsonValueKind.Object || !e.TryGetProperty(name, out var v) || v.ValueKind == JsonValueKind.Null)
+        {
+            return 0;
+        }
+
+        return v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var number) ? number : throw new FormatException("A count is not a whole number.");
+    }
+
+    private static DateOnly Day(JsonElement e, string name) =>
+        DateOnly.TryParseExact(Text(e, name), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day) ? day : throw new FormatException("A fold date is not a yyyy-MM-dd day.");
+
+    [LoggerMessage(EventId = 4460, Level = LogLevel.Warning, Message = "The stored exit choice {SelectionKey} could not be read; it is shown as unreadable")]
+    private partial void LogUnreadable(string selectionKey);
 
     private static double? Number(JsonElement e, string name) =>
         e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : null;

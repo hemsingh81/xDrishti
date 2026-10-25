@@ -6,6 +6,7 @@ namespace XDrishti.Application.Abstractions.Reporting;
 /// </summary>
 public interface IReportComparisonSource
 {
+    // shortcut: both lists are read whole (no paging); the tables hold one row per comparison or stored cell choice, tens at most. Page them if that ever changes.
     /// <summary>Every stored comparison, newest first.</summary>
     /// <param name="cancellationToken">Cancels the read.</param>
     ValueTask<IReadOnlyList<ReportComparisonInfo>> ListComparisonsAsync(CancellationToken cancellationToken);
@@ -53,6 +54,8 @@ public sealed record ReportComparisonMember(string RunKey, string CandidateId);
 /// <param name="Folds">The folds.</param>
 /// <param name="Banner">The sentences the record prints with the verdict.</param>
 /// <param name="CreatedAt">When it was stored.</param>
+/// <param name="Unreadable">Why the stored record could not be read (then no figure is given); null for a readable record.</param>
+/// <param name="MinTrades">The minimum sample the record itself was made with (its <c>inputs.min_trades</c>); 0 when it does not say.</param>
 public sealed record ReportExitSelectionInfo(
     string SelectionKey,
     string ComparisonKey,
@@ -75,7 +78,9 @@ public sealed record ReportExitSelectionInfo(
     IReadOnlyList<ReportPooledFigure> Pooled,
     IReadOnlyList<ReportSelectionFold> Folds,
     IReadOnlyList<string> Banner,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? Unreadable = null,
+    int MinTrades = 0);
 
 /// <summary>A pooled out-of-sample figure of a stored choice.</summary>
 /// <param name="Name">What was pooled (the walk-forward choice, the default, a candidate).</param>

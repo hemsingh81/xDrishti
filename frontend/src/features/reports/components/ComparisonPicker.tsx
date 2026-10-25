@@ -3,11 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { NonValue } from '@/shared/analytics';
 import { formatIstDate } from '@/shared/lib/format';
 import { comparisonsQuery, type ComparisonItem } from '../api/reportQueries';
+import { sameRunSet } from '../lib/runSet';
 import { useReportFilter } from '../hooks/useReportFilter';
 import { QueryPanel } from './Panel';
 
 const keysOf = (c: ComparisonItem) => c.members.map((m) => m.runKey);
-const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((k) => b.includes(k));
 
 /** R5: the stored comparisons of exits on identical entries. Choosing one puts its member runs in the address (`runs=`); nothing is written. */
 export function ComparisonPicker() {
@@ -24,7 +24,7 @@ export function ComparisonPicker() {
           <Box sx={{ display: 'grid', gap: 1 }}>
             <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gap: 1 }}>
               {view.comparisons.map((c) => {
-                const inUse = sameSet(keysOf(c), filter.runs);
+                const inUse = sameRunSet(keysOf(c), filter.runs);
                 const exits = c.members.map((m) => m.candidateId).join(' | ');
                 return (
                   <Box

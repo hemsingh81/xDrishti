@@ -1,10 +1,11 @@
 import { Alert, Box, Button, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { DataTable, formatCount, formatRatio, NonValue } from '@/shared/analytics';
+import { DataTable, formatCount, formatRatio, NonValue, type MetricState } from '@/shared/analytics';
 import { ApiError } from '@/shared/api';
 import { formatIstDate } from '@/shared/lib/format';
 import { labReportQuery, labRunsQuery, type MonteCarlo } from '../api/reportQueries';
+import type { ReportPanelProps } from '../lib/reportFilter';
 import { QueryPanel } from './Panel';
 
 interface Row {
@@ -25,7 +26,7 @@ const rows = (m: MonteCarlo): Row[] => [
 ];
 
 /** One run's stored robustness, read when asked for. A run with no report (409) or no bootstrap says so. */
-function RunRisk({ id, label }: { id: string; label: string }) {
+function RunRisk({ id, label, min }: { id: string; label: string; min: number | null }) {
   const result = useQuery(labReportQuery(id));
   if (result.isPending) return <Typography variant="body2">{`Loading the report of ${label}…`}</Typography>;
   if (result.isError) {
@@ -41,6 +42,8 @@ function RunRisk({ id, label }: { id: string; label: string }) {
   if (!mc) {
     return <NonValue state={{ kind: 'unavailable', reason: `${label} stored no Monte Carlo bootstrap.` }} />;
   }
+  // Every figure rests on mc.trades: below the minimum sample of the other panels it is insufficient, as everywhere (the minimum is unknown until what-works answers).
+  const thin = min === null || mc.trades < min;
   return (
     <Box sx={{ display: 'grid', gap: 1 }}>
       <Typography variant="body2">
@@ -56,7 +59,8 @@ function RunRisk({ id, label }: { id: string; label: string }) {
             kind: 'metric',
             id: 'value',
             header: 'Value',
-            metric: (r) => ({ kind: 'value', value: r.value }),
+            metric: (r): MetricState =>
+              thin ? { kind: 'insufficient', n: mc.trades, min: min ?? 0 } : { kind: 'value', value: r.value },
             format: formatRatio,
           },
         ]}
@@ -71,7 +75,7 @@ function RunRisk({ id, label }: { id: string; label: string }) {
 }
 
 /** R15: the Lab's stored bootstrap of its out-of-sample trades, as a table (percentiles only: the stored result has no paths, so no fan chart). */
-export function MonteCarloReport() {
+export function MonteCarloReport({ min }: Pick<ReportPanelProps, 'min'>) {
   const runs = useQuery(labRunsQuery);
   const [open, setOpen] = useState<readonly string[]>([]);
   return (
@@ -106,7 +110,7 @@ export function MonteCarloReport() {
                       {shown ? 'Hide' : 'Show Monte Carlo risk'}
                     </Button>
                   </Box>
-                  {shown && <RunRisk id={run.id} label={label} />}
+                  {shown && <RunRisk id={run.id} label={label} min={min} />}
                 </Box>
               );
             })}

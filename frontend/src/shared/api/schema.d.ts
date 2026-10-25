@@ -6329,6 +6329,13 @@ export interface components {
        * @description When stored.
        */
       createdAt: string;
+      /** @description Why the stored record could not be read; then no figure is given. Null for a readable record. */
+      unreadable: null | string;
+      /**
+       * Format: int32
+       * @description The minimum sample the figures were judged against: the larger of the report minimum and the record's own.
+       */
+      minTrades: number;
     };
     /** @description An experiment as the API shows it (P6-11, ADR 0072). The report text and the parameters are empty in a list and filled for one experiment. */
     ExperimentView: {

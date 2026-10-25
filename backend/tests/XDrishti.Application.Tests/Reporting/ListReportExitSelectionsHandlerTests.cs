@@ -45,4 +45,18 @@ public sealed class ListReportExitSelectionsHandlerTests
         view.Stable.ShouldBeNull();
         view.ChosenCandidateId.ShouldBeNull();
     }
+
+    [Theory]
+    [InlineData(40, 0, "value")]
+    [InlineData(40, 50, "insufficient")]
+    [InlineData(50, 50, "value")]
+    public async Task The_larger_of_the_report_minimum_and_the_records_own_applies(int trades, int recordMin, string state)
+    {
+        var info = Info([new ReportPooledFigure("p", trades, 0.2, 0.1)], []) with { MinTrades = recordMin };
+
+        var view = await RunAsync(info);
+
+        view.Pooled.Single().MeanR.State.ShouldBe(state);
+        view.MinTrades.ShouldBe(Math.Max(30, recordMin));
+    }
 }

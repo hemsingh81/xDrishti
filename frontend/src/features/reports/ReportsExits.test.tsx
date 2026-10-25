@@ -81,6 +81,8 @@ const selections = (over: Partial<Schemas['ExitSelectionView']> = {}): Selection
       ],
       banner: ['The choice is in-sample on the data shown and is not evidence of an edge.'],
       createdAt: '2026-10-21T04:00:00Z',
+      unreadable: null,
+      minTrades: 30,
       ...over,
     },
   ],
@@ -122,7 +124,7 @@ describe('exit comparison', () => {
     const table = await screen.findByRole('table', { name: 'Exits on identical entries' });
     expect(within(table).getByText('FIXED_RR{rr=2}')).toBeInTheDocument();
     expect(within(table).getByText('FIXED_RR{rr=3}')).toBeInTheDocument();
-    expect(screen.getByText(/n is the same for every row/)).toBeInTheDocument();
+    expect(screen.getByText(/n is the same in every row/)).toBeInTheDocument();
     const sent = calls.at(-1);
     expect(sent?.searchParams.get('runs')).toBe(`${runKeyA},${runKeyB}`);
     expect(sent?.searchParams.get('lens')).toBe('exit');
@@ -145,7 +147,46 @@ describe('exit comparison', () => {
     );
     renderReports(`?view=exits&runs=${runKeyA},${runKeyB}`);
     expect(await screen.findByText(/n differs between the rows/)).toBeInTheDocument();
-    expect(screen.queryByText(/n is the same for every row/)).toBeNull();
+    expect(screen.queryByText(/n is the same in every row/)).toBeNull();
+  });
+
+  it('does not claim like for like for runs that are not one stored comparison, or for one row', async () => {
+    reportServer();
+    exitServer();
+    server.use(
+      http.get('/api/reports/groups', ({ request }) =>
+        new URL(request.url).searchParams.get('lens') === 'exit'
+          ? HttpResponse.json(buildGroups('exit', [buildGroup({ key: 'a', parts: partsOf('exit', 'x'), n: 100 })]))
+          : HttpResponse.json(buildGroups('regime', [])),
+      ),
+    );
+    renderReports(`?view=exits&runs=${runKeyA}`);
+    expect(await screen.findByText(/there is only one row|n differs between the rows/)).toBeInTheDocument();
+    expect(screen.queryByText(/Same entries, different exits: n is the same/)).toBeNull();
+  });
+
+  it('says the runs are not a stored comparison when n is equal but the set is another', async () => {
+    reportServer();
+    exitServer();
+    renderReports(`?view=exits&runs=${runKeyA},${'d'.repeat(64)}`);
+    expect(await screen.findByText(/not the members of one stored comparison/)).toBeInTheDocument();
+    expect(screen.queryByText(/Same entries, different exits: n is the same/)).toBeNull();
+  });
+
+  it('shows a record that could not be read as unavailable, with no figure', async () => {
+    reportServer();
+    exitServer(
+      comparisons(),
+      selections({
+        unreadable: 'The stored record could not be read, so no figure of this choice is shown.',
+        pooled: [],
+        folds: [],
+        banner: [],
+      }),
+    );
+    renderReports('?view=exits');
+    expect(await screen.findByText(/could not be read, so no figure/)).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: /Pooled out-of-sample/ })).toBeNull();
   });
 
   it('says so when no comparison is stored, and prints strategy names as text', async () => {
@@ -243,6 +284,24 @@ describe('Monte Carlo risk', () => {
     expect(screen.getByRole('table', { name: /Monte Carlo risk/ })).toBeInTheDocument();
     expect(screen.getByText('A bootstrap assumes independent trades.')).toBeInTheDocument();
     expect(reads).toBe(1);
+  });
+
+  it.each([
+    [29, 'value', false],
+    [30, 'value', true],
+  ])('shows the figures as insufficient below the minimum sample (%i trades)', async (trades, _label, shown) => {
+    reportServer();
+    server.use(
+      http.get('/api/lab/runs', () => HttpResponse.json([labRun(runId)])),
+      http.get('/api/lab/runs/:id/report', () =>
+        HttpResponse.json({ robustness: { monteCarlo: { ...monteCarlo, trades }, limits: [] } }),
+      ),
+    );
+    renderReports('?view=montecarlo');
+    await userEvent.click(await screen.findByRole('button', { name: 'Show Monte Carlo risk' }));
+    const table = await screen.findByRole('table', { name: /Monte Carlo risk/ });
+    expect(within(table).queryAllByText(/at least 30/).length > 0).toBe(!shown);
+    expect(within(table).queryAllByText(/^\+?0\.20$/).length > 0).toBe(shown);
   });
 
   it('says a run without a robustness block has none', async () => {

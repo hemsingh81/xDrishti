@@ -16,6 +16,8 @@ public sealed class ReportComparisonsApiTests(ApiFactory factory) : DataTestBase
 
     private static readonly string SelectionKey = StoreKit.Sha256("report-fixture-selection");
 
+    private static readonly string BadKey = StoreKit.Sha256("report-fixture-selection-bad");
+
     private const string Record = """
         {"format":"x","schema":1,"cell":"RPTA 15m BUY intraday *","unit":"RFilled","default":"FIXED_RR{rr=2}","chosen":"FIXED_RR{rr=3}","no_choice_reason":null,
          "folds":[
@@ -44,6 +46,10 @@ public sealed class ReportComparisonsApiTests(ApiFactory factory) : DataTestBase
         insert.Parameters.AddWithValue("comparison", NpgsqlDbType.Char, ComparisonKey);
         insert.Parameters.AddWithValue("json", NpgsqlDbType.Text, Record);
         insert.Parameters.AddWithValue("sha", NpgsqlDbType.Char, StoreKit.Sha256(Record));
+        await insert.ExecuteNonQueryAsync(Ct);
+        insert.Parameters["key"].Value = BadKey;
+        insert.Parameters["json"].Value = "{not json";
+        insert.Parameters["sha"].Value = StoreKit.Sha256("{not json");
         await insert.ExecuteNonQueryAsync(Ct);
     }
 
@@ -103,6 +109,18 @@ public sealed class ReportComparisonsApiTests(ApiFactory factory) : DataTestBase
         folds[1].GetProperty("winnerTestScore").GetProperty("state").GetString().ShouldBe("insufficient", "12 test trades is below the minimum");
         folds[2].GetProperty("winnerTestScore").GetProperty("state").GetString().ShouldBe("empty");
         s.GetProperty("banner").GetArrayLength().ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_stored_record_that_cannot_be_read_is_listed_as_unreadable_with_no_figure_and_does_not_fail_the_list()
+    {
+        var view = await GetOkAsync("/api/reports/exit-selections");
+
+        var bad = view.GetProperty("selections").EnumerateArray().Single(x => x.GetProperty("selectionKey").GetString() == BadKey);
+        bad.GetProperty("unreadable").GetString().ShouldNotBeNullOrEmpty();
+        bad.GetProperty("pooled").GetArrayLength().ShouldBe(0);
+        bad.GetProperty("folds").GetArrayLength().ShouldBe(0);
+        view.GetProperty("selections").EnumerateArray().Any(x => x.GetProperty("selectionKey").GetString() == SelectionKey).ShouldBeTrue();
     }
 
     [Fact]

@@ -94,6 +94,11 @@ public sealed partial class ReportEndpointsArchitectureTests
         source.IsPublic.ShouldBeFalse();
         source.IsSealed.ShouldBeTrue();
         source.GetInterfaces().ShouldContain(typeof(IReportTradeSource));
+        var comparisons = Infrastructure.GetType("XDrishti.Infrastructure.Research.ReportComparisonSource");
+        comparisons.ShouldNotBeNull();
+        comparisons.IsPublic.ShouldBeFalse();
+        comparisons.IsSealed.ShouldBeTrue();
+        comparisons.GetInterfaces().ShouldContain(typeof(IReportComparisonSource));
         Infrastructure.GetType("XDrishti.Infrastructure.Reporting.ChargeSheetConfirmationStore")!.GetInterfaces().ShouldContain(typeof(IChargeSheetConfirmationSource));
     }
 
@@ -102,8 +107,9 @@ public sealed partial class ReportEndpointsArchitectureTests
     {
         var source = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Research", "ReportTradeSource.cs"));
         var confirmation = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Reporting", "ChargeSheetConfirmationStore.cs"));
+        var comparisons = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Research", "ReportComparisonSource.cs"));
 
-        foreach (var text in new[] { Code(source), Code(confirmation) })
+        foreach (var text in new[] { Code(source), Code(confirmation), Code(comparisons) })
         {
             Regex.IsMatch(text, @"\b(INSERT|UPDATE|DELETE|TRUNCATE|COPY)\b\s", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBeFalse();
             text.ShouldNotContain("SaveChanges");

@@ -39,4 +39,25 @@ public sealed class ReportComparisonSourceTests
         (info.UsableFolds, info.AgreeingFolds, info.PositiveFolds, info.LonePeaks).ShouldBe((4, 3, 3, 1));
         info.ChancePass.ShouldBe(0.25);
     }
+
+    [Theory]
+    [InlineData("""{"folds":[{"index":1,"test_start":"2025-13-45","test_end":"2025-03-31"}]}""")]
+    [InlineData("""{"folds":[{"index":1,"test_end":"2025-03-31"}]}""")]
+    [InlineData("""{"stability":{"folds":2.5}}""")]
+    [InlineData("""{"folds":[{"index":1.5,"test_start":"2025-01-01","test_end":"2025-03-31"}]}""")]
+    [InlineData("""{"banner":["ok",7]}""")]
+    public void A_record_with_a_bad_date_a_fractional_count_or_a_non_text_banner_line_is_refused_not_guessed(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+
+        Should.Throw<FormatException>(() => ReportComparisonSource.Map(doc.RootElement, "s", "c", "ORB", "15m", "BUY", "intraday", "*", DateTimeOffset.UnixEpoch));
+    }
+
+    [Fact]
+    public void The_minimum_sample_of_the_record_is_read()
+    {
+        using var doc = JsonDocument.Parse("""{"inputs":{"min_trades":50}}""");
+
+        ReportComparisonSource.Map(doc.RootElement, "s", "c", "ORB", "15m", "BUY", "intraday", "*", DateTimeOffset.UnixEpoch).MinTrades.ShouldBe(50);
+    }
 }

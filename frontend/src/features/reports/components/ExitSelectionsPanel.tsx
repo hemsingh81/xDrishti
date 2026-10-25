@@ -13,6 +13,16 @@ const verdict = (s: ExitSelectionItem) =>
 
 function Selection({ s }: { s: ExitSelectionItem }) {
   const cell = `${s.strategyId} ${s.timeframe} ${s.side} ${s.style} ${s.regime}`;
+  if (s.unreadable !== null) {
+    return (
+      <Box component="section" aria-label={`Exit choice for ${cell}`} sx={{ display: 'grid', gap: 1 }}>
+        <Typography variant="h3" component="h3">
+          {cell}
+        </Typography>
+        <NonValue state={{ kind: 'unavailable', reason: s.unreadable }} />
+      </Box>
+    );
+  }
   return (
     <Box component="section" aria-label={`Exit choice for ${cell}`} sx={{ display: 'grid', gap: 1 }}>
       <Typography variant="h3" component="h3">
@@ -43,7 +53,7 @@ function Selection({ s }: { s: ExitSelectionItem }) {
             kind: 'metric',
             id: 'mean',
             header: `Mean (${s.unit})`,
-            metric: (p) => metricFromApi(p.meanR, p.trades, null),
+            metric: (p) => metricFromApi(p.meanR, p.trades, s.minTrades),
             format: formatRatio,
             tone: 'gain-loss',
           },
@@ -51,7 +61,7 @@ function Selection({ s }: { s: ExitSelectionItem }) {
             kind: 'metric',
             id: 'score',
             header: 'Score',
-            metric: (p) => metricFromApi(p.score, p.trades, null),
+            metric: (p) => metricFromApi(p.score, p.trades, s.minTrades),
             format: formatRatio,
             tone: 'gain-loss',
           },
@@ -75,7 +85,7 @@ function Selection({ s }: { s: ExitSelectionItem }) {
             kind: 'metric',
             id: 'score',
             header: 'Out-of-sample score',
-            metric: (f) => metricFromApi(f.winnerTestScore, f.winnerTestTrades, null),
+            metric: (f) => metricFromApi(f.winnerTestScore, f.winnerTestTrades, s.minTrades),
             format: formatRatio,
             tone: 'gain-loss',
           },
@@ -87,6 +97,9 @@ function Selection({ s }: { s: ExitSelectionItem }) {
           },
         ]}
       />
+      <Typography variant="body2" color="text.secondary">
+        {`A fold counts toward the verdict by the record's own rule (a winner with enough test trades). A figure in these tables needs at least ${formatCount(s.minTrades)} trades behind it, so a fold can count and still show an insufficient score.`}
+      </Typography>
       {s.banner.map((line) => (
         <Typography key={line} variant="body2" color="text.secondary">
           {line}

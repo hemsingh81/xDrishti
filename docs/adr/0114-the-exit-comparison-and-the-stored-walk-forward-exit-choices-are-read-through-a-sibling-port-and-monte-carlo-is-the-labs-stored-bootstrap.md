@@ -12,6 +12,8 @@
 5. **Monte Carlo is the Lab's stored bootstrap** (decision 6 of the spec): the screen lists Lab runs (`GET /api/lab/runs`) and reads `GET /api/lab/runs/{id}/report` only when a run is chosen. A run without a robustness block, or without a report (409 `lab.no_report`), says so. A table of percentiles; no fan chart because the stored result holds no paths.
 6. **Pointer entries** for Regime, Calibration, Selector effectiveness, Decisions, Backtest/paper/live, Discipline, Execution gap and Account comparison are catalogue entries with the missing input and the supplying slice or phase. Regime and Account use the server's own refusal text (the 422 of a lens by them). Selector effectiveness and Decisions link to Learning, Decisions. They render no chart and no figure.
 
+7. **A stored record that cannot be read does not fail the list.** A bad date, a count that is not a whole number, a banner line that is not text or invalid JSON makes that one choice `unreadable` (a reason, no figure, empty tables); its selection key is logged, never the record. The minimum sample of a figure is the larger of the report minimum (30) and the record's own `inputs.min_trades`; Monte Carlo figures follow the same minimum and are `insufficient` below it. The screen says "n is the same in every row" only for at least two rows whose runs are exactly the members of one stored comparison.
+
 ## Consequences
 - The comparisons endpoint carries `limits` (text) instead of the full `ReportEvidenceView`: it lists headers and counts no trades, so a population block would be empty or invented.
 - The stored choice is in-sample inside the replayed history (a few folds); the screen and the endpoint say so and nothing is applied.

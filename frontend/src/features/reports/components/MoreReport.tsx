@@ -19,7 +19,7 @@ const reports: Record<MoreView, (props: ReportPanelProps) => ReactNode> = {
   instruments: (p) => <InstrumentScorecard {...p} />,
   sectors: (p) => <SectorReport {...p} />,
   exits: (p) => <ExitComparison {...p} />,
-  montecarlo: () => <MonteCarloReport />,
+  montecarlo: (p) => <MonteCarloReport min={p.min} />,
 };
 
 /** The P8-10 report of a view. */

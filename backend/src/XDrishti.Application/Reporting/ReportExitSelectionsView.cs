@@ -28,6 +28,8 @@ public sealed record ReportExitSelectionsView(IReadOnlyList<ExitSelectionView> S
 /// <param name="Folds">The folds.</param>
 /// <param name="Banner">The record's own caveats, verbatim.</param>
 /// <param name="CreatedAt">When stored.</param>
+/// <param name="Unreadable">Why the stored record could not be read; then no figure is given. Null for a readable record.</param>
+/// <param name="MinTrades">The minimum sample the figures were judged against: the larger of the report minimum and the record's own.</param>
 public sealed record ExitSelectionView(
     string SelectionKey,
     string ComparisonKey,
@@ -50,7 +52,9 @@ public sealed record ExitSelectionView(
     IReadOnlyList<PooledFigureView> Pooled,
     IReadOnlyList<SelectionFoldView> Folds,
     IReadOnlyList<string> Banner,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? Unreadable,
+    int MinTrades);
 
 /// <summary>A pooled out-of-sample figure: the number of trades and the mean and score as states (a number only for a value).</summary>
 /// <param name="Name">What was pooled.</param>

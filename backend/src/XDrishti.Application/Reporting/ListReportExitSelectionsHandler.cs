@@ -19,7 +19,8 @@ internal sealed class ListReportExitSelectionsHandler(IReportComparisonSource so
         "Nothing here is applied: no stored strategy takes the chosen exit by itself.",
     ];
 
-    private static readonly int MinTrades = new CellStatsOptions().MinTrades;
+    // shortcut: the report minimum is the default CellStatsOptions (30), the value every report panel uses; no IOptions<CellStatsOptions> is registered. The record's own min_trades raises it, never lowers it.
+    private static readonly int ReportMinTrades = new CellStatsOptions().MinTrades;
 
     public async ValueTask<Result<ReportExitSelectionsView>> HandleAsync(ListReportExitSelectionsQuery query, CancellationToken cancellationToken)
     {
@@ -30,7 +31,10 @@ internal sealed class ListReportExitSelectionsHandler(IReportComparisonSource so
             Limits));
     }
 
-    private static ExitSelectionView View(ReportExitSelectionInfo s) => new(
+    private static ExitSelectionView View(ReportExitSelectionInfo s)
+    {
+        var min = Math.Max(ReportMinTrades, s.MinTrades);
+        return new(
         s.SelectionKey,
         s.ComparisonKey,
         s.StrategyId,
@@ -49,22 +53,25 @@ internal sealed class ListReportExitSelectionsHandler(IReportComparisonSource so
         s.PositiveFolds,
         s.ChancePass,
         s.LonePeaks,
-        [.. s.Pooled.Select(p => new PooledFigureView(p.Name, p.Trades, Figure(p.MeanR, p.Trades), Figure(p.Score, p.Trades)))],
+        [.. s.Pooled.Select(p => new PooledFigureView(p.Name, p.Trades, Figure(p.MeanR, p.Trades, min), Figure(p.Score, p.Trades, min)))],
         [.. s.Folds.Select(f => new SelectionFoldView(
             f.Index,
             f.TestStart,
             f.TestEnd,
             f.Winner,
             f.WinnerTestTrades,
-            f.Winner is null ? new MetricView("empty", null, "no candidate qualified in this fold") : Figure(f.WinnerTestScore, f.WinnerTestTrades),
+            f.Winner is null ? new MetricView("empty", null, "no candidate qualified in this fold") : Figure(f.WinnerTestScore, f.WinnerTestTrades, min),
             f.Thin))],
         [.. s.Banner],
-        s.CreatedAt);
+        s.CreatedAt,
+        s.Unreadable,
+        min);
+    }
 
-    private static MetricView Figure(double? number, int trades) =>
+    private static MetricView Figure(double? number, int trades, int min) =>
         number is not { } value
             ? new MetricView("unavailable", null, "the stored record has no figure here")
-            : trades < MinTrades
-                ? new MetricView("insufficient", null, string.Create(CultureInfo.InvariantCulture, $"{trades} {(trades == 1 ? "trade" : "trades")}, at least {MinTrades} needed"))
+            : trades < min
+                ? new MetricView("insufficient", null, string.Create(CultureInfo.InvariantCulture, $"{trades} {(trades == 1 ? "trade" : "trades")}, at least {min} needed"))
                 : new MetricView("value", value, null);
 }
