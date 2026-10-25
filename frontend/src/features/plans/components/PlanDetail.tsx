@@ -4,7 +4,15 @@ import { useCallback, useState } from 'react';
 import { formatIstDayAndTime, formatWeekdayDate } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
-import { accountNamesQuery, autonomyQuery, planKeys, planQuery, reviewQuery, type PlanItem } from '../api/planQueries';
+import {
+  accountNamesQuery,
+  alertsQuery,
+  autonomyQuery,
+  planKeys,
+  planQuery,
+  reviewQuery,
+  type PlanItem,
+} from '../api/planQueries';
 import { useDecisions, type Notice } from '../hooks/useDecisions';
 import { decisionError, lapseWording, noOrderWording } from '../lib/planText';
 import { Countdown } from './Countdown';
@@ -24,6 +32,7 @@ export function PlanDetail({ planId }: { planId: number }) {
   const review = useQuery(reviewQuery(planId));
   const names = useQuery(accountNamesQuery);
   const autonomy = useQuery(autonomyQuery);
+  const alerts = useQuery(alertsQuery(planId)); // alerts only; a failure here never blocks the plan
   const [notice, setNotice] = useState<Notice | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
   const decisions = useDecisions(planId, setNotice);
@@ -46,6 +55,7 @@ export function PlanDetail({ planId }: { planId: number }) {
   const planOpen = ['published', 'inreview'].includes(p.state.toLowerCase());
   const eligible = rv.tickets.filter((t) => t.approveAllEligible).length;
   const eligibleSymbols = rv.tickets.filter((t) => t.approveAllEligible).map((t) => t.symbol);
+  const itemNames = Object.fromEntries(p.items.map((i) => [i.id, i.symbol]));
   const itemsOf = (key: string): PlanItem[] => p.items.filter((i) => i.group === key);
 
   return (
@@ -155,6 +165,8 @@ export function PlanDetail({ planId }: { planId: number }) {
                   planOpen={planOpen}
                   names={nameMap}
                   decisions={decisions}
+                  alerts={alerts.data}
+                  itemNames={itemNames}
                 />
               ))}
             </Stack>

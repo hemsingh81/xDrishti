@@ -410,6 +410,18 @@ public static class DependencyInjection
         services.AddSingleton<PortfolioRefreshRunner>();
     }
 
+    /// <summary>Registers the live-feed observer of the price-crossing alerts, only when <c>Planning:TicketAlerts:Enabled</c> is true (spec P7-20): with it OFF no observer exists and the flush does no alert work.</summary>
+    public static IServiceCollection AddTicketAlertObserver(this IServiceCollection services, bool enabled)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        if (enabled)
+        {
+            services.AddSingleton<ILiveTickObserver, TicketAlertObserver>();
+        }
+
+        return services;
+    }
+
     /// <summary>The report read endpoints over the stored runs (P8-06, ADR 0100): read only, the numbers come from the pure engine in the Domain.</summary>
     private static void AddReporting(this IServiceCollection services)
     {
@@ -553,6 +565,15 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RunReviewCycleCommand, ReviewCycleOutcome>, RunReviewCycleHandler>();
         services.AddScoped<ICommandHandler<RunPreOpenCheckCommand, PreOpenOutcome>, RunPreOpenCheckHandler>(); // arms or invalidates the approved tickets before the open (P7-11); approves nothing
         services.AddScoped<ICommandHandler<ExpireTicketsCommand, ExpiryOutcome>, ExpireTicketsHandler>(); // ends the day for armed tickets (P7-11)
+
+        // Price-crossing alerts and post-trade prompts (P7-20, ADR 0115): alerts and prompts only, no order; the observer is added by AddTicketAlertObserver when the setting is ON.
+        services.AddScoped<TicketAlertReader>();
+        services.AddScoped<ITicketNoticeSource, TicketNoticeSource>(); // the bell's carried notices (P8-15b); answers nothing while the setting is OFF
+        services.AddScoped<IQueryHandler<GetPlanAlertsQuery, Result<PlanAlertsView>>, GetPlanAlertsHandler>();
+        services.AddScoped<ICommandHandler<MuteTicketAlertsCommand>, MuteTicketAlertsHandler>();
+        services.AddScoped<ICommandHandler<SnoozeTicketNoticeCommand>, SnoozeTicketNoticeHandler>();
+        services.AddScoped<ICommandHandler<DismissTicketNoticeCommand>, DismissTicketNoticeHandler>();
+        services.AddSingleton<IScheduledService, TicketPromptsService>(); // one question per armed ticket after the session (P7-20); starts paused
         services.AddScoped<IChecklistSource, StoredChecklistSource>(); // the checklist the plan stored (P7-10, ADR 0095): a missing or unreadable record is no checklist, never a pass
         // the fail-closed nightly pipeline (P7-08, ADR 0086): the gates in the order they are read, the builder (the skeleton's null builder until P7-04/P7-09) and the run
         services.AddScoped<INightlyGate, CalendarGate>();

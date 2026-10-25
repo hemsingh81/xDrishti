@@ -114,6 +114,8 @@ services:
       Portfolio__Heal__PersistDays: ${XD_PORTFOLIO_HEAL_PERSIST_DAYS:-2}
       Portfolio__Heal__DeepenMaxYears: ${XD_PORTFOLIO_HEAL_DEEPEN_YEARS:-8}
       Portfolio__Heal__AttentionRetentionDays: ${XD_PORTFOLIO_HEAL_ATTENTION_DAYS:-30}
+      # Price-crossing alerts and post-trade prompts (P7-20, ADR 0115): alerts only, no order. OFF by default. xd-api (notice source, plan-screen read, the post-trade-prompts service) and xd-feed (the observer) must have the SAME value: set XD_TICKET_ALERTS once.
+      Planning__TicketAlerts__Enabled: ${XD_TICKET_ALERTS:-false}
       # Market data (ADR 0016): the folder with the <SYMBOL>_1m.csv[.gz] files, mounted read-only below. Dhan Data API fetch: first fetch goes this many days
       # back, at most this many requests per second.
       Data__CsvFolder: /data/csv
@@ -170,7 +172,10 @@ services:
       target: feed
       args: { VERSION: "${XD_VERSION:-0.1.0}" }
     restart: unless-stopped
-    environment: *dotnet-env
+    environment:
+      <<: *dotnet-env
+      # Must equal xd-api's value (same variable): the observer exists only while this is true (P7-20, ADR 0115).
+      Planning__TicketAlerts__Enabled: ${XD_TICKET_ALERTS:-false}
     secrets:
       - source: db_app_password
         target: Database__Password

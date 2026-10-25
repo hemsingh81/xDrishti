@@ -119,6 +119,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(PlanNotices))]
 [JsonSerializable(typeof(PaperEntryList))]
 [JsonSerializable(typeof(CaptureRunList))]
+[JsonSerializable(typeof(PlanAlertsView))]
+[JsonSerializable(typeof(SnoozeAlertRequest))]
 [JsonSerializable(typeof(PlanGradeView))]
 [JsonSerializable(typeof(PlanJournalView))]
 [JsonSerializable(typeof(GradeReportData))]

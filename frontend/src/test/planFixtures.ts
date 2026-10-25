@@ -5,6 +5,7 @@ import type { Schemas } from '@/shared/api';
 export const planHandlers = [
   http.get('/api/plans', () => HttpResponse.json([])),
   http.get('/api/plans/notices', () => HttpResponse.json({ items: [] })),
+  http.get('/api/plans/:id/alerts', () => HttpResponse.json(buildPlanAlerts())),
   http.get('/api/plan-runs', () => HttpResponse.json([])),
 ];
 
@@ -223,5 +224,48 @@ export const buildChart = (over: Partial<Schemas['TicketChartView']> = {}): Sche
   },
   rules: { trigger: 'Break of 100.0', stop: 'Stop 95.0', target: 'Target 110.0', validity: 'Today only' },
   limits: [],
+  ...over,
+});
+
+/** Alerts and prompts (P7-20): off by default, as the server answers when the switch is off. */
+export const buildPlanAlerts = (over: Partial<Schemas['PlanAlertsView']> = {}): Schemas['PlanAlertsView'] => ({
+  enabled: false,
+  crossings: [],
+  prompts: [],
+  mutedItems: [],
+  ...over,
+});
+
+export const buildCrossing = (over: Partial<Schemas['CrossingView']> = {}): Schemas['CrossingView'] => ({
+  id: 1,
+  noticeId: 'crossing:1',
+  planId: 7,
+  itemId: 11,
+  kind: 'stop_crossed',
+  level: 95,
+  stopAnchor: null,
+  price: 94.8,
+  tickAt: '2026-10-26T04:05:00Z',
+  text: 'Price crossed the stop.',
+  state: 'shown',
+  snoozedUntil: null,
+  snoozesLeft: 3,
+  ...over,
+});
+
+export const buildPrompt = (over: Partial<Schemas['PromptView']> = {}): Schemas['PromptView'] => ({
+  id: 1,
+  noticeId: 'prompt:1',
+  planId: 7,
+  itemId: 11,
+  accountId: '00000000-0000-4000-8000-0000000000a1',
+  session: '2026-10-26',
+  status: 'open',
+  via: null,
+  sameTradeItems: [],
+  text: 'Record what happened.',
+  state: 'shown',
+  snoozedUntil: null,
+  snoozesLeft: 3,
   ...over,
 });

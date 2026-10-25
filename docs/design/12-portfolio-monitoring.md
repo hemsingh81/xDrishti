@@ -437,6 +437,7 @@ move on a holding · data or token issue for an account.
 - Trades not matching any plan are tagged **discretionary**; their results are reported separately (and in the
   discipline report).
 - **Built in P7-14 ([ADR 0093](../adr/0093-auto-journal-reads-the-stored-fills-matches-them-to-approved-tickets-by-account-instrument-side-and-day-and-stores-a-fill-grade-beside-the-plan-grade.md)):** `portfolio.transactions` has no `plan_item_id`; the link lives in the journal's own insert-only tables (`trading.journal_entries`, `journal_fills`, `fill_grades`), so the portfolio is only read. `xd plan journal` and `GET /api/plans/{id}/journal`.
+- **Built in P7-20 ([ADR 0115](../adr/0115-crossing-alerts-on-armed-tickets-are-an-observer-in-the-feed-flush-prompts-are-stored-questions-with-a-derived-status-and-the-bell-reads-them-through-the-ticket-notice-port.md)):** a post-trade prompt asks once whether an armed ticket's trade was taken and closes by itself when a non-voided stored trade of the same account, normalised symbol, side and day exists, **of any source**. `via = journal` when the journal linked it, else `trade_on_record`: typed-in and file trades resolve the prompt but are **not journaled or graded** (the journal reads broker-synced rows only).
 - Long-term holdings are not managed by the system's exits unless you assign a strategy/exit to them.
 
 ## 9. Data model (`portfolio` schema)

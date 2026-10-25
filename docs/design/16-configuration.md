@@ -380,6 +380,22 @@ The window length (30 days), the page cap (200), the 30 s timeout and the 5 MB a
 
 These are ordinary deployment settings, read at start (not first-start settings): change them in the environment and restart `xd-api`. The quiet retries and the catch-up after a reconnect are done by the holdings refresh runner, so **`Portfolio:AutoRefresh:Enabled = false` also switches the healing off** (the scheduled runs, "Sync now" and the "Retry now" button keep working) - and with it the once-a-minute reconcile of the attention items and the retention above, because both are done by the same tick: the items are then refreshed only at the end of a holdings, trades or ledger attempt and after a Dhan sign-in, and no resolved item is deleted. The 1-minute look of the healer, the 24 hours a resolved item is kept in the bell and the 2 hours before a login runs out at which it is called "expiring" are fixed in the code. Details: [doc 12](12-portfolio-monitoring.md) §3 "Self-healing and attention items (P2-16)".
 
+### Ticket alerts (`Planning:TicketAlerts:*`, [ADR 0115](../adr/0115-crossing-alerts-on-armed-tickets-are-an-observer-in-the-feed-flush-prompts-are-stored-questions-with-a-derived-status-and-the-bell-reads-them-through-the-ticket-notice-port.md), P7-20)
+
+Read at start by `xd-feed` (the observer exists only when enabled) and `xd-api` (the notice source, the plan-screen read and the service); bounds are checked at start-up. No setting lets an order be placed.
+
+```yaml
+Planning:
+  TicketAlerts:
+    Enabled: false          # OFF: no observer, no watched list read, no row written by the feed, the bell source answers nothing, the service stores nothing
+    PromptTradingDays: 3    # 1-10: trading days after the session a prompt stays open
+    WatchedCacheSeconds: 30 # 5-120: how long the feed keeps its list of armed tickets with levels
+```
+
+**`xd-api` and `xd-feed` must have the same `Enabled` value** (compose passes one variable, `XD_TICKET_ALERTS`, to both): with the feed ON and the API OFF crossings are stored but nothing shows; with the feed OFF and the API ON nothing is stored.
+
+The service `post-trade-prompts` (daily 16:45, trading days, starts paused) is resumed on the Services screen after the owner has read one session's log.
+
 ### Live feed (`Live:*`, [ADR 0024](../adr/0024-live-feed-xd-feed-and-live-prices.md), P2-10)
 
 `appsettings.json` of `xd-feed` (and `Live:ManualRunMinutes` of `xd-api` too); bounds are checked at start-up. The window itself (09:00–15:35, trading days) is the schedule of the service `live-feed` on the Services screen, not a setting here.

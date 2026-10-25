@@ -1,8 +1,9 @@
 import { Card, CardContent, Chip, Stack, Typography } from '@mui/material';
-import type { PlanItem, ReviewTicket } from '../api/planQueries';
+import type { PlanAlerts, PlanItem, ReviewTicket } from '../api/planQueries';
 import type { Decisions } from '../hooks/useDecisions';
 import { stateLabel } from '../lib/planText';
 import { LevelsRow } from './LevelsRow';
+import { TicketAlerts } from './TicketAlerts';
 import { TicketActions } from './TicketActions';
 import { TicketChartPanel } from './TicketChartPanel';
 import { TicketChecklist } from './TicketChecklist';
@@ -16,10 +17,23 @@ interface Props {
   planOpen: boolean;
   names: Record<string, string>;
   decisions: Decisions;
+  /** The plan's alerts and prompts (one fetch in PlanDetail); absent while loading or when unreadable. */
+  alerts?: PlanAlerts;
+  itemNames?: Record<number, string>;
 }
 
 /** One candidate: what it is, the evidence with its limits, the sizes per paper account, the checks and the actions. */
-export function TicketCard({ planId, item, ticket, reviewOpen, planOpen, names, decisions }: Props) {
+export function TicketCard({
+  planId,
+  item,
+  ticket,
+  reviewOpen,
+  planOpen,
+  names,
+  decisions,
+  alerts,
+  itemNames = {},
+}: Props) {
   const e = item.evidence;
   const pWin = e.pWin === null ? 'not available' : `${Math.round(e.pWin * 100)}%`;
   return (
@@ -63,6 +77,9 @@ export function TicketCard({ planId, item, ticket, reviewOpen, planOpen, names, 
             </Typography>
           )}
           {item.state !== null && <TicketChartPanel planId={planId} itemId={item.id} symbol={item.symbol} />}
+          {item.state !== null && alerts && (
+            <TicketAlerts planId={planId} itemId={item.id} alerts={alerts} itemNames={itemNames} />
+          )}
           {ticket && <TicketChecklist accounts={ticket.accounts} names={names} />}
           {ticket?.modification && <Typography variant="body2">Your size change: {ticket.modification}</Typography>}
           {ticket?.confirmedDespite && (

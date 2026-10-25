@@ -15,6 +15,9 @@ export type PlanJournal = Schemas['PlanJournalView'];
 export type PlanRun = Schemas['PlanRunView'];
 export type TicketChart = Schemas['TicketChartView'];
 export type Digest = Schemas['DigestView'];
+export type PlanAlerts = Schemas['PlanAlertsView'];
+export type Crossing = Schemas['CrossingView'];
+export type Prompt = Schemas['PromptView'];
 export type AutonomySettings = Schemas['AutonomySettingsView'];
 export interface Confirmation {
   accountId: string;
@@ -32,6 +35,7 @@ export const planKeys = {
   journal: (id: number) => ['plans', 'journal', id] as const,
   runs: ['plans', 'runs'] as const,
   chart: (id: number, itemId: number) => ['plans', 'chart', id, itemId] as const,
+  alerts: (id: number) => ['plans', 'alerts', id] as const,
   notices: ['plans', 'notices'] as const, // read by the bell (shared/api/planNotices.ts)
   digests: ['plans', 'digests'] as const,
   autonomy: ['plans', 'autonomy'] as const,
@@ -65,6 +69,14 @@ export const ticketChartQuery = (id: number, itemId: number) =>
           signal,
         }),
       ),
+  });
+
+/** Price-crossing alerts and post-trade prompts of one plan (alerts only: no order is ever placed). */
+export const alertsQuery = (id: number) =>
+  queryOptions({
+    queryKey: planKeys.alerts(id),
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/plans/{id}/alerts', { params: { path: { id } }, signal })),
   });
 
 export const reviewQuery = (id: number) =>
@@ -151,4 +163,18 @@ export const markSeen = async (planId: number, suggestionId: number): Promise<vo
       params: { path: { id: planId, suggestionId } },
     }),
   );
+};
+
+export const muteAlerts = async (itemId: number): Promise<void> => {
+  ensureOk(await api.POST('/api/plans/items/{itemId}/alerts/mute', { params: { path: { itemId } } }));
+};
+
+export const snoozeAlert = async (noticeId: string, minutes: 15 | 30 | 60): Promise<void> => {
+  ensureOk(
+    await api.POST('/api/plans/alerts/{noticeId}/snooze', { params: { path: { noticeId } }, body: { minutes } }),
+  );
+};
+
+export const dismissAlert = async (noticeId: string): Promise<void> => {
+  ensureOk(await api.POST('/api/plans/alerts/{noticeId}/dismiss', { params: { path: { noticeId } } }));
 };

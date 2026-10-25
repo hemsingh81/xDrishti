@@ -13,4 +13,7 @@ internal static partial class LiveLog
 
     [LoggerMessage(EventId = 4083, Level = LogLevel.Information, Message = "feed.alert_triggered count={Count}")]
     public static partial void AlertsTriggered(ILogger logger, int count);
+
+    [LoggerMessage(EventId = 4894, Level = LogLevel.Warning, Message = "feed.observer_failed {ExceptionType}: prices were written")]
+    public static partial void ObserverFailed(ILogger logger, string exceptionType);
 }

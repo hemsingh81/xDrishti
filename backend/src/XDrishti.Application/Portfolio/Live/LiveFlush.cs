@@ -21,7 +21,7 @@ namespace XDrishti.Application.Portfolio.Live;
 /// Nothing is written, read or notified when nothing changed. A failure keeps the batch for the next flush (fail closed: the 5-minute quotes carry on). Lives for the lifetime of the feed process (a singleton); the ports
 /// are resolved per flush. Nothing secret is logged.
 /// </summary>
-internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock, ILogger<LiveFlush> logger) : ILiveFlush
+internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock, ILogger<LiveFlush> logger, IEnumerable<ILiveTickObserver>? observers = null) : ILiveFlush
 {
     /// <summary>The shortest time between two <c>live_prices</c> notifications.</summary>
     public static readonly TimeSpan NotifyInterval = TimeSpan.FromSeconds(1);
@@ -29,6 +29,10 @@ internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock,
     /// <summary>The shortest time between two reconciliations of the Action center's decisions (an alert that triggers does not wait).</summary>
     public static readonly TimeSpan ReconcileInterval = TimeSpan.FromMinutes(1);
 
+    /// <summary>The longest an observer may take per flush; reconcile and notify never wait longer for alert work.</summary>
+    private static readonly TimeSpan ObserverTimeout = TimeSpan.FromSeconds(2);
+
+    private readonly Dictionary<ILiveTickObserver, Task> _inFlight = [];
     private readonly TickCoalescer _ticks = new();
     private long _lastNotify = -1;
     private bool _notifyPending;
@@ -91,6 +95,7 @@ internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock,
             }
 
             var result = await NotifyIfDueAsync(services.GetRequiredService<ILiveNotifier>(), cancellationToken);
+            await ObserveAsync(batch, cancellationToken); // last: prices, alerts, reconcile and notify never wait for it
             result = result with { Ticks = batch.Count, HoldingsUpdated = updated, QuotesWritten = written, AlertsTriggered = triggered };
             var elapsedMs = (long)clock.GetElapsedTime(started).TotalMilliseconds;
             LiveLog.Flushed(logger, result.Ticks, updated, written, triggered, result.Notified, elapsedMs);
@@ -108,6 +113,55 @@ internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock,
             _ticks.Requeue(batch);
             LiveLog.FlushFailed(logger, batch.Count, ex);
             return new LiveFlushResult(batch.Count, 0, 0, 0, false, true);
+        }
+    }
+
+    /// <summary>
+    /// Hands the firm ticks to the registered observers (none unless a feature is enabled), after everything else of the flush. Each call is bounded by <see cref="ObserverTimeout"/> on the flush's own clock whatever the observer does with its token,
+    /// and an observer that is still running from an earlier flush is skipped, so a stuck observer holds neither the flush nor a growing pile of tasks. An observer's failure or timeout is logged (4894) and never reaches the flush.
+    /// </summary>
+    private async ValueTask ObserveAsync(IReadOnlyList<LivePrice> batch, CancellationToken cancellationToken)
+    {
+        if (observers is null)
+        {
+            return;
+        }
+
+        var firm = batch.Where(t => !LivePricePolicy.IsIndicative(t.TickAt)).ToList();
+        if (firm.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var observer in observers)
+        {
+            if (_inFlight.TryGetValue(observer, out var running) && !running.IsCompleted)
+            {
+                continue; // shortcut: a stuck observer misses these ticks; the next flush offers the latest ones again
+            }
+
+            using var bound = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            try
+            {
+                var task = observer.ObserveAsync(firm, bound.Token).AsTask();
+                _inFlight[observer] = task;
+                await task.WaitAsync(ObserverTimeout, clock, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (TimeoutException)
+            {
+                await bound.CancelAsync();
+                LiveLog.ObserverFailed(logger, nameof(TimeoutException));
+            }
+#pragma warning disable CA1031 // an observer must never cost a price: its failure is logged and the flush carries on
+            catch (Exception ex)
+#pragma warning restore CA1031
+            {
+                LiveLog.ObserverFailed(logger, ex.GetType().Name);
+            }
         }
     }
 

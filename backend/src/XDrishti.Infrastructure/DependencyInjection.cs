@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using XDrishti.Application;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Auth;
 using XDrishti.Application.Abstractions.Autonomy;
@@ -22,6 +23,7 @@ using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Market.Bars.Dhan;
+using XDrishti.Application.Planning;
 using XDrishti.Application.Reporting;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Auth;
@@ -147,7 +149,10 @@ public static class DependencyInjection
         services.AddScoped<IPlanStore, PlanStore>(); // the insert-only plan record (spec P7-03, ADR 0083); no order of any kind
         services.AddScoped<IGradeStore, GradeStore>(); // insert-only grades of tickets (P7-13, ADR 0090)
         services.AddScoped<IPaperStore, PaperStore>(); // insert-only paper record (P10-01, ADR 0116)
-        services.AddScoped<ITicketNoticeSource, NoTicketNoticeSource>(); // P8-15b: no ticket alerts until P7-20 is built and enabled (default OFF)
+        services.AddOptions<TicketAlertOptions>().Bind(configuration.GetSection(TicketAlertOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // price-crossing alerts and post-trade prompts, default OFF (P7-20, ADR 0115)
+        services.AddSingleton<ITicketAlertSettings>(sp => new TicketAlertSettings(sp.GetRequiredService<IOptions<TicketAlertOptions>>().Value));
+        services.AddScoped<ITicketAlertStore, TicketAlertStore>(); // insert-only alerts, prompts and the owner's acts (P7-20); no order, no ticket change
+        services.AddTicketAlertObserver(configuration.GetValue<bool>($"{TicketAlertOptions.SectionName}:Enabled")); // the live-feed observer exists only while the setting is ON
         services.AddScoped<IJournalStore, JournalStore>(); // insert-only journal of the stored fills (P7-14, ADR 0093)
         services.AddSingleton<IGradeSettings, GradeSettings>();
         services.AddScoped<IAutoApprovalStore>(sp => (PlanStore)sp.GetRequiredService<IPlanStore>()); // P7-12: the automatic approval is written by the same store, in the same lock order as an owner's decision
