@@ -19,6 +19,22 @@ public sealed class MirrorGoldenTests
 
     private static List<Expression?> Trees(ConditionList? list) => [.. (list?.Items ?? []).Select(i => ConditionParser.Parse(i).Tree)];
 
+    [Fact]
+    public void Orb_and_vwap_pullback_are_in_the_golden_set_and_their_sell_triggers_are_the_mirror_of_the_buy_triggers()
+    {
+        Ids.Select(r => r.Data).ShouldContain("ORB");
+        Ids.Select(r => r.Data).ShouldContain("VWAP_PULLBACK");
+        foreach (var id in new[] { "ORB", "VWAP_PULLBACK" })
+        {
+            var definition = Seed(id);
+            var names = definition.Params.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+
+            var mirrored = SideMirror.Mirror(definition.Buy!, names).Rules.ShouldNotBeNull();
+
+            mirrored.Trigger!.Items.ShouldBe(definition.Sell!.Trigger!.Items.Select(i => ExpressionPrinter.Print(ConditionParser.Parse(i).Tree!)), id);
+        }
+    }
+
     [Theory]
     [MemberData(nameof(Ids))]
     public void The_mirror_of_the_buy_side_equals_the_hand_written_sell_side(string id)

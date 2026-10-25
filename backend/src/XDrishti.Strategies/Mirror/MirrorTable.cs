@@ -3,7 +3,7 @@ using System.Collections.Frozen;
 namespace XDrishti.Strategies.Mirror;
 
 /// <summary>
-/// The closed table of the BUY to SELL mirror (spec P3-02e, ADR 0106): one row for every catalog name, the builtins and the constants, either with a mirror type and the name it mirrors to, or refused. Any change to a row
+/// The closed table of the BUY to SELL mirror (spec P3-02e, ADR 0107): one row for every catalog name, the builtins and the constants, either with a mirror type and the name it mirrors to, or refused. Any change to a row
 /// or a refusal bumps <see cref="Version"/>; a test pins <see cref="Fingerprint"/> so that a silent edit fails, and another fails when a catalog name has no row.
 /// </summary>
 public static class MirrorTable

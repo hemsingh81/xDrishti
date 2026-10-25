@@ -83,16 +83,45 @@ public static class RunLabels
     /// </summary>
     private static string[] SellLine(string? definitionJson)
     {
-        const string Marker = "\"sell_mirrored\":\"";
-        var start = definitionJson?.IndexOf(Marker, StringComparison.Ordinal) ?? -1;
-        if (definitionJson is null || start < 0)
+        // The canonical JSON has no white space. Scan it as JSON is read: strings (with their escapes) are skipped whole and only a member of the top-level object counts, so no text inside a condition can look like the member.
+        const string Member = "sell_mirrored";
+        if (definitionJson is null)
         {
             return [];
         }
 
-        start += Marker.Length;
-        var end = definitionJson.IndexOf('"', start);
-        return end < 0 ? [] : ["sell: mirrored (" + definitionJson[start..end] + ")"];
+        var depth = 0;
+        for (var i = 0; i < definitionJson.Length; i++)
+        {
+            var c = definitionJson[i];
+            if (c is '{' or '[')
+            {
+                depth++;
+            }
+            else if (c is '}' or ']')
+            {
+                depth--;
+            }
+            else if (c == '"')
+            {
+                var end = i + 1;
+                while (end < definitionJson.Length && definitionJson[end] != '"')
+                {
+                    end += definitionJson[end] == '\\' ? 2 : 1;
+                }
+
+                if (depth == 1 && end - i - 1 == Member.Length && string.CompareOrdinal(definitionJson, i + 1, Member, 0, Member.Length) == 0
+                    && end + 2 < definitionJson.Length && definitionJson[end + 1] == ':' && definitionJson[end + 2] == '"')
+                {
+                    var close = definitionJson.IndexOf('"', end + 3);
+                    return close < 0 ? [] : ["sell: mirrored (" + definitionJson[(end + 3)..close] + ")"];
+                }
+
+                i = end;
+            }
+        }
+
+        return [];
     }
 
     /// <summary>The data line from the instruments that ran: how many, the range of their first and of their last bars, and the shortest and longest length in years; <c>data: none</c> when none ran.</summary>

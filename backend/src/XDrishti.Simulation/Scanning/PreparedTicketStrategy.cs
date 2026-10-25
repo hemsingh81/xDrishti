@@ -48,8 +48,7 @@ public sealed class PreparedTicketStrategy
         ArgumentNullException.ThrowIfNull(sourceText);
         ArgumentNullException.ThrowIfNull(expectedHash);
         var sideText = side == Side.Buy ? "BUY" : "SELL";
-        var read = StrategyFile.Read(sourceText);
-        if (read.Definition is not { } definition || read.HasErrors)
+        if (StrategyFile.ReadForRun(sourceText) is not { } definition)
         {
             return new PreparedTicketStrategy(null, string.Empty, expectedHash, sideText, "the stored strategy text does not read", null, false);
         }

@@ -1,6 +1,7 @@
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 using XDrishti.Simulation.Replay;
+using XDrishti.Simulation.Scanning;
 using XDrishti.Simulation.Tests.Support;
 using XDrishti.Strategies.File;
 using XDrishti.Strategies.Mirror;
@@ -62,6 +63,29 @@ public sealed class MirroredSellTwinTests
         check.Description.ShouldBeNull();
         check.Issues.Single(i => i.Code == MirrorCodes.AbsoluteLevel).Path.ShouldBe("sell.trigger[0]");
         StoredStrategies.Inspect(text).Description.ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_ticket_for_a_mirrored_sell_cell_prepares_with_the_hash_that_inspect_gives()
+    {
+        var text = RemoveSell(Text("GAP_FILL"));
+        var hash = StoredStrategies.Inspect(text).Description.ShouldNotBeNull().Hash;
+
+        var prepared = PreparedTicketStrategy.Prepare(text, hash, Timeframe.M15, Side.Sell, "intraday", "FIXED_RR");
+
+        prepared.Problem.ShouldBeNull();
+        prepared.StrategyId.ShouldBe("GAP_FILL");
+    }
+
+    [Fact]
+    public void A_direction_specific_entry_kind_is_refused_for_the_mirrored_sell()
+    {
+        var text = RemoveSell(Text("GAP_FILL")).Replace("type: at_close", "type: stop_above_high", StringComparison.Ordinal);
+
+        var check = StoredStrategies.Check(text);
+
+        check.Issues.ShouldContain(i => i.Code == MirrorCodes.NotMirrorable && i.Path == "sell.entry");
+        check.Description.ShouldBeNull();
     }
 
     private static string RemoveSell(string text)

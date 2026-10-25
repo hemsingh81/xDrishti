@@ -1,3 +1,4 @@
+using XDrishti.Strategies.Mirror;
 using XDrishti.Strategies.Model;
 
 namespace XDrishti.Strategies.File;
@@ -22,6 +23,19 @@ public static class StrategyFile
 
     /// <summary>Writes the definition in the fixed layout (P3-02c D7). <c>Read(Write(d))</c> equals <c>d</c>.</summary>
     public static string Write(StrategyDefinition definition) => FileWriter.Write(definition);
+
+    /// <summary>The definition a run uses for a stored text: read, with the automatic SELL expanded (spec P3-02e); null when the text does not read or the mirror refuses it. Every hash of a stored text is taken from this definition.</summary>
+    public static StrategyDefinition? ReadForRun(string text)
+    {
+        var read = Read(text);
+        if (read.Definition is not { } definition || read.HasErrors)
+        {
+            return null;
+        }
+
+        var (expanded, problems) = StrategyMirror.Expand(definition);
+        return problems.Any(p => p.Problem.Severity == ProblemSeverity.Error) ? null : expanded;
+    }
 
     /// <summary>The <c>sell:</c> block of a side as the file writes it, for the Lab to show a mirrored SELL the author can copy.</summary>
     public static string WriteSell(SideRules sell) => FileWriter.WriteSell(sell);

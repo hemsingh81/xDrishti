@@ -49,7 +49,7 @@ public sealed class RunLabelsTests
     public void A_run_whose_sell_side_was_mirrored_carries_one_more_line_after_the_sample_line_and_no_other_run_does()
     {
         var run = TwoRan();
-        var mirrored = run with { Strategy = run.Strategy with { DefinitionJson = "{\"id\":\"X\",\"sell\":{},\"sell_mirrored\":\"mirror-1\"}" } };
+        var mirrored = run with { Strategy = run.Strategy with { DefinitionJson = "{\"id\":\"X\",\"buy\":{\"trigger\":{\"items\":[\"a > b\"]}},\"sell_mirrored\":\"mirror-1\"}" } };
 
         var plain = RunLabels.Of(run, FillRules.Default).Lines;
         var lines = RunLabels.Of(mirrored, FillRules.Default).Lines;
@@ -58,6 +58,15 @@ public sealed class RunLabelsTests
         lines.Count.ShouldBe(plain.Count + 1);
         lines[6].ShouldBe("sell: mirrored (mirror-1)");
         lines.Where(l => !l.StartsWith("sell:", StringComparison.Ordinal)).ShouldBe(plain);
+    }
+
+    [Fact]
+    public void Text_inside_a_condition_never_looks_like_the_mirror_member()
+    {
+        var run = TwoRan();
+        var tricky = run with { Strategy = run.Strategy with { DefinitionJson = "{\"buy\":{\"items\":[\"x\\\"sell_mirrored\\\":\\\"mirror-9\\\"\"]}}" } };
+
+        RunLabels.Of(tricky, FillRules.Default).Lines.ShouldNotContain(l => l.StartsWith("sell:", StringComparison.Ordinal));
     }
 
     [Fact]

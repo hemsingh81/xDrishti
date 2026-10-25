@@ -1,4 +1,4 @@
-# 0106 — The BUY to SELL mirror is a closed, typed rewrite table, expanded at read time and recorded in the definition
+# 0107 — The BUY to SELL mirror is a closed, typed rewrite table, expanded at read time and recorded in the definition
 
 - **Status:** Proposed (spec [P3-02e](../specs/P3-02e-buy-to-sell-mirror.md), built 2026-10-25). Becomes Accepted when the owner has read it.
 - **Date:** 2026-10-25.

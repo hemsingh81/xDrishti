@@ -66,6 +66,20 @@ public sealed class StrategyMirrorTests
         error.Problem.Code.ShouldBe(MirrorCodes.ContextName);
     }
 
+    [Theory]
+    [InlineData(EntryKind.StopAboveHigh)]
+    [InlineData(EntryKind.LimitPullback)]
+    public void A_direction_specific_entry_kind_is_refused_at_sell_entry(EntryKind kind)
+    {
+        var definition = Mirrored().WithBuy(b => b with { Entry = new EntrySpec(kind) });
+
+        var (expanded, problems) = StrategyMirror.Expand(definition);
+
+        expanded.Sell.ShouldBeNull();
+        problems.Single().Path.ShouldBe("sell.entry");
+        problems.Single().Problem.Code.ShouldBe(MirrorCodes.NotMirrorable);
+    }
+
     [Fact]
     public void A_buy_condition_that_does_not_compile_reports_no_mirror_problem()
     {

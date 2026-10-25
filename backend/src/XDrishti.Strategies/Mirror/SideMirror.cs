@@ -15,6 +15,16 @@ public static class SideMirror
         ArgumentNullException.ThrowIfNull(buy);
         ArgumentNullException.ThrowIfNull(parameters);
         var problems = new List<LocatedProblem>();
+        if (buy.Entry is { Kind: not EntryKind.AtClose } entry)
+        {
+            // stop-above-high and limit-pullback are written for a BUY; what they mean for a SELL is the author's call
+            problems.Add(new LocatedProblem("sell.entry", new Problem(
+                MirrorCodes.NotMirrorable,
+                "The entry kind `" + entry.Kind + "` is direction-specific and has no single mirror. Write a `sell:` block.",
+                new SourceSpan(0, 0, 1, 1),
+                "write a `sell:` block")));
+        }
+
         var setup = List(buy.Setup, "sell.setup", parameters, problems);
         var trigger = List(buy.Trigger, "sell.trigger", parameters, problems);
         var invalidate = List(buy.Invalidate, "sell.invalidate", parameters, problems);
