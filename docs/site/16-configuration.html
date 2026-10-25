@@ -544,6 +544,7 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
     Enabled: false          # OFF: no observer, no watched list read, no row written by the feed, the bell source answers nothing, the service stores nothing
     PromptTradingDays: 3    # 1-10: trading days after the session a prompt stays open
     WatchedCacheSeconds: 30 # 5-120: how long the feed keeps its list of armed tickets with levels</code></pre></div>
+<p><strong><code>xd-api</code> and <code>xd-feed</code> must have the same <code>Enabled</code> value</strong> (compose passes one variable, <code>XD_TICKET_ALERTS</code>, to both): with the feed ON and the API OFF crossings are stored but nothing shows; with the feed OFF and the API ON nothing is stored.</p>
 <p>The service <code>post-trade-prompts</code> (daily 16:45, trading days, starts paused) is resumed on the Services screen after the owner has read one session&#39;s log.</p>
 <h3 id="live-feed-live-adr-0024-p2-10">Live feed (<code>Live:*</code>, <a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a>, P2-10)<a class="hash" href="#live-feed-live-adr-0024-p2-10" aria-label="Link to this section">#</a></h3>
 <p><code>appsettings.json</code> of <code>xd-feed</code> (and <code>Live:ManualRunMinutes</code> of <code>xd-api</code> too); bounds are checked at start-up. The window itself (09:00–15:35, trading days) is the schedule of the service <code>live-feed</code> on the Services screen, not a setting here.</p>
@@ -631,7 +632,7 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-25 21:25</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-25 22:04</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>

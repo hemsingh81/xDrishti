@@ -40,10 +40,11 @@ internal sealed class TicketAlertStore(NpgsqlDataSource dataSource) : ITicketAle
     public async ValueTask<bool> AddCrossingAsync(NewCrossing crossing, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(crossing);
-        await using var insert = dataSource.CreateCommand("""
+        await using var insert = dataSource.CreateCommand($"""
             INSERT INTO trading.ticket_alerts (plan_id, item_id, session, kind, level, stop_anchor, price, tick_at)
             SELECT @plan, @item, @session, @kind, @level, @anchor, @price, @tick
             WHERE NOT EXISTS (SELECT 1 FROM trading.ticket_notice_acks a WHERE a.item_id = @item AND a.action = 'mute')
+              AND EXISTS (SELECT 1 FROM trading.plan_items i WHERE i.id = @item AND {ItemStateSql} = 'armed')
             ON CONFLICT (item_id, kind) DO NOTHING
             """);
         insert.Parameters.AddWithValue("plan", NpgsqlDbType.Bigint, crossing.PlanId);
@@ -57,6 +58,7 @@ internal sealed class TicketAlertStore(NpgsqlDataSource dataSource) : ITicketAle
         return await insert.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 
+    // shortcut: no paging; one row per ticket and kind per session, read for the sessions of the lookback only.
     public async ValueTask<IReadOnlyList<CrossingRow>> ListCrossingsAsync(DateOnly fromSession, long? planId, CancellationToken cancellationToken)
     {
         await using var select = dataSource.CreateCommand("""
@@ -95,6 +97,7 @@ internal sealed class TicketAlertStore(NpgsqlDataSource dataSource) : ITicketAle
         return rows;
     }
 
+    // shortcut: one insert per prompt; tickets x accounts x at most 3 sessions is a handful of rows a day.
     public async ValueTask<int> AddPromptsAsync(IReadOnlyList<NewPrompt> prompts, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prompts);
@@ -150,6 +153,7 @@ internal sealed class TicketAlertStore(NpgsqlDataSource dataSource) : ITicketAle
         return rows;
     }
 
+    // shortcut: reads every act; the table has one row per click of the owner. Filter by notice when it grows.
     public async ValueTask<IReadOnlyList<AckRow>> ListAcksAsync(CancellationToken cancellationToken)
     {
         await using var select = dataSource.CreateCommand("SELECT id, notice_kind, notice_id, item_id, action, until FROM trading.ticket_notice_acks ORDER BY id");
@@ -181,7 +185,7 @@ internal sealed class TicketAlertStore(NpgsqlDataSource dataSource) : ITicketAle
         var table = noticeKind switch
         {
             "crossing" => "trading.ticket_alerts",
-            "prompt" => "trading.ticket_prompts",
+            "prompt" or "prompt_ambiguous" => "trading.ticket_prompts",
             _ => throw new ArgumentOutOfRangeException(nameof(noticeKind)),
         };
         await using var select = dataSource.CreateCommand($"SELECT EXISTS (SELECT 1 FROM {table} WHERE id = @id)");

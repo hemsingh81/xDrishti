@@ -11,10 +11,19 @@ public static class TicketAlertErrors
     /// <summary>A notice was snoozed the most times it may be.</summary>
     public const string SnoozeLimitCode = "plans.snooze_limit";
 
-    /// <summary>Splits <c>crossing:{id}</c> or <c>prompt:{id}</c>; null for anything else.</summary>
+    /// <summary>The stored kind of an act on the ambiguous form of a prompt: its own notice, apart from the open one (ADR 0093: nothing is guessed).</summary>
+    public const string AmbiguousKind = "prompt_ambiguous";
+
+    /// <summary>Splits <c>crossing:{id}</c>, <c>prompt:{id}</c> or <c>prompt:{id}:ambiguous</c> into the stored kind and the row id; null for anything else.</summary>
     public static (string Kind, long Id)? ParseNotice(string? noticeId)
     {
         var parts = (noticeId ?? string.Empty).Split(':');
-        return parts is [var kind and ("crossing" or "prompt"), var number] && long.TryParse(number, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0 ? (kind, id) : null;
+        var valid = parts is ["crossing" or "prompt", _] or ["prompt", _, "ambiguous"];
+        if (!valid || !long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var id) || id <= 0)
+        {
+            return null;
+        }
+
+        return (parts.Length == 3 ? AmbiguousKind : parts[0], id);
     }
 }

@@ -85,6 +85,7 @@ internal sealed class SnoozeTicketNoticeHandler(ITicketAlertStore store, TimePro
             return Result.Failure(Error.Conflict(TicketAlertErrors.AlertClosedCode, "This notice was dismissed."));
         }
 
+        // shortcut: the snooze count is read, then the act is inserted, not one atomic statement; one owner clicking can exceed the cap of three by a double click at worst, which only hides a notice for another 15-60 minutes.
         if (!AlertAcks.CanSnooze(own, now))
         {
             return Result.Failure(Error.Conflict(TicketAlertErrors.SnoozeLimitCode, $"A notice can be snoozed {AlertAcks.MaxSnoozes} times; dismiss it instead."));

@@ -260,6 +260,37 @@ public sealed class TicketAlertsDatabaseTests(ApiFactory factory) : DataTestBase
     }
 
     [Fact]
+    public async Task An_ambiguous_prompt_is_its_own_notice_so_snoozing_the_open_one_does_not_hide_it()
+    {
+        var (plan, _) = await ArmedAsync(Buy(), Buy());
+        await StorePromptsAsync();
+        var openId = (await PromptsAsync(plan, Evening))[0].NoticeId;
+        openId.ShouldNotEndWith(":ambiguous");
+        (await WithAsync(p => p.GetRequiredService<ICommandHandler<SnoozeTicketNoticeCommand>>().HandleAsync(new SnoozeTicketNoticeCommand(openId, 60, OwnerActor), Ct).AsTask())).IsSuccess.ShouldBeTrue();
+
+        await InsertTradeAsync("manual");
+        var ambiguous = (await PromptsAsync(plan, Evening))[0];
+
+        ambiguous.Status.ShouldBe(PromptStatus.Ambiguous);
+        ambiguous.NoticeId.ShouldEndWith(":ambiguous");
+        ambiguous.State.ShouldBe("shown");
+        (await WithAsync(p => p.GetRequiredService<ICommandHandler<DismissTicketNoticeCommand>>().HandleAsync(new DismissTicketNoticeCommand(ambiguous.NoticeId, OwnerActor), Ct).AsTask())).IsSuccess.ShouldBeTrue();
+        (await PromptsAsync(plan, Evening))[0].State.ShouldBe("dismissed");
+    }
+
+    [Fact]
+    public async Task A_crossing_of_a_ticket_that_is_no_longer_armed_is_not_stored()
+    {
+        var (plan, items) = await ArmedAsync(Buy());
+        Factory.Clock.Pin(Evening);
+        (await WithAsync(p => p.GetRequiredService<ICommandHandler<MoveTicketCommand, TicketMoveOutcome>>().HandleAsync(new MoveTicketCommand(items[0], TicketState.Expired, "system:expiry", "over"), Ct).AsTask())).IsSuccess.ShouldBeTrue();
+
+        var stored = await WithAsync(p => p.GetRequiredService<ITicketAlertStore>().AddCrossingAsync(new NewCrossing(plan, items[0], Session, CrossingKinds.Stop, 95m, "level", 94m, Morning), Ct).AsTask());
+
+        stored.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task With_no_trade_after_the_window_the_prompt_expires_and_two_tickets_that_fit_one_trade_are_ambiguous()
     {
         var (plan, items) = await ArmedAsync(Buy(), Buy());

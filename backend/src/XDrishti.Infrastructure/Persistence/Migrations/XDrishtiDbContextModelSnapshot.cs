@@ -5927,8 +5927,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("NoticeKind")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
                         .HasColumnName("notice_kind");
 
                     b.Property<DateTimeOffset?>("Until")
@@ -5946,7 +5946,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("ticket_notice_acks", "trading", t =>
                         {
-                            t.HasCheckConstraint("ck_ticket_notice_acks_shape", "notice_kind IN ('crossing', 'prompt', 'ticket') AND action IN ('snooze', 'dismiss', 'mute') AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND ((action = 'snooze' AND notice_kind IN ('crossing', 'prompt') AND notice_id IS NOT NULL AND until IS NOT NULL AND item_id IS NULL) OR (action = 'dismiss' AND notice_kind IN ('crossing', 'prompt') AND notice_id IS NOT NULL AND until IS NULL AND item_id IS NULL) OR (action = 'mute' AND notice_kind = 'ticket' AND item_id IS NOT NULL AND notice_id IS NULL AND until IS NULL))");
+                            t.HasCheckConstraint("ck_ticket_notice_acks_shape", "notice_kind IN ('crossing', 'prompt', 'prompt_ambiguous', 'ticket') AND action IN ('snooze', 'dismiss', 'mute') AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND ((action = 'snooze' AND notice_kind IN ('crossing', 'prompt', 'prompt_ambiguous') AND notice_id IS NOT NULL AND until IS NOT NULL AND item_id IS NULL) OR (action = 'dismiss' AND notice_kind IN ('crossing', 'prompt', 'prompt_ambiguous') AND notice_id IS NOT NULL AND until IS NULL AND item_id IS NULL) OR (action = 'mute' AND notice_kind = 'ticket' AND item_id IS NOT NULL AND notice_id IS NULL AND until IS NULL))");
                         });
                 });
 

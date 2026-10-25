@@ -56,7 +56,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 {
                     id = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
-                    notice_kind = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    notice_kind = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
                     notice_id = table.Column<long>(type: "bigint", nullable: true),
                     item_id = table.Column<long>(type: "bigint", nullable: true),
                     action = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
@@ -67,7 +67,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_ticket_notice_acks", x => x.id);
-                    table.CheckConstraint("ck_ticket_notice_acks_shape", "notice_kind IN ('crossing', 'prompt', 'ticket') AND action IN ('snooze', 'dismiss', 'mute') AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND ((action = 'snooze' AND notice_kind IN ('crossing', 'prompt') AND notice_id IS NOT NULL AND until IS NOT NULL AND item_id IS NULL) OR (action = 'dismiss' AND notice_kind IN ('crossing', 'prompt') AND notice_id IS NOT NULL AND until IS NULL AND item_id IS NULL) OR (action = 'mute' AND notice_kind = 'ticket' AND item_id IS NOT NULL AND notice_id IS NULL AND until IS NULL))");
+                    table.CheckConstraint("ck_ticket_notice_acks_shape", "notice_kind IN ('crossing', 'prompt', 'prompt_ambiguous', 'ticket') AND action IN ('snooze', 'dismiss', 'mute') AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND ((action = 'snooze' AND notice_kind IN ('crossing', 'prompt', 'prompt_ambiguous') AND notice_id IS NOT NULL AND until IS NOT NULL AND item_id IS NULL) OR (action = 'dismiss' AND notice_kind IN ('crossing', 'prompt', 'prompt_ambiguous') AND notice_id IS NOT NULL AND until IS NULL AND item_id IS NULL) OR (action = 'mute' AND notice_kind = 'ticket' AND item_id IS NOT NULL AND notice_id IS NULL AND until IS NULL))");
                     table.ForeignKey(
                         name: "fk_ticket_notice_acks_plan_items_item_id",
                         column: x => x.item_id,

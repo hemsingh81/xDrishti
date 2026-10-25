@@ -32,14 +32,14 @@ internal sealed class TicketAlertsEndpoints : IEndpointModule
         group.MapPost("/alerts/{noticeId}/snooze", SnoozeAsync)
             .RequireRateLimiting(SessionAuthentication.PlanDecisionRateLimitPolicy)
             .WithName("SnoozePlanAlert")
-            .WithSummary("Hide a crossing or a prompt (noticeId crossing:{id} or prompt:{id}) for 15, 30 or 60 minutes; it reappears once, and can be snoozed three times. Session and CSRF token; insert-only. 422 plans.invalid, 409 plans.snooze_limit or plans.alert_closed (dismissed), 404 plans.not_found")
+            .WithSummary("Hide a crossing or a prompt (noticeId crossing:{id}, prompt:{id} or prompt:{id}:ambiguous, the ambiguous form being its own notice) for 15, 30 or 60 minutes; it reappears once, and can be snoozed three times. Session and CSRF token; insert-only. 422 plans.invalid, 409 plans.snooze_limit or plans.alert_closed (dismissed), 404 plans.not_found")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesRejections(conflict: true);
 
         group.MapPost("/alerts/{noticeId}/dismiss", DismissAsync)
             .RequireRateLimiting(SessionAuthentication.PlanDecisionRateLimitPolicy)
             .WithName("DismissPlanAlert")
-            .WithSummary("Hide a crossing or a prompt for good (noticeId crossing:{id} or prompt:{id}). Session and CSRF token; insert-only; repeating it changes nothing. 422 plans.invalid, 404 plans.not_found")
+            .WithSummary("Hide a crossing or a prompt for good (noticeId crossing:{id}, prompt:{id} or prompt:{id}:ambiguous, the ambiguous form being its own notice). Session and CSRF token; insert-only; repeating it changes nothing. 422 plans.invalid, 404 plans.not_found")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesRejections(conflict: false);
     }

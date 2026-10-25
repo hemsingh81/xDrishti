@@ -32,6 +32,7 @@ internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock,
     /// <summary>The longest an observer may take per flush; reconcile and notify never wait longer for alert work.</summary>
     private static readonly TimeSpan ObserverTimeout = TimeSpan.FromSeconds(2);
 
+    private readonly Dictionary<ILiveTickObserver, Task> _inFlight = [];
     private readonly TickCoalescer _ticks = new();
     private long _lastNotify = -1;
     private bool _notifyPending;
@@ -82,7 +83,6 @@ internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock,
             }
 
             var triggered = await CheckAlertsAsync(services, batch, cancellationToken);
-            await ObserveAsync(batch, cancellationToken);
             if (triggered > 0)
             {
                 LiveLog.AlertsTriggered(logger, triggered);
@@ -95,6 +95,7 @@ internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock,
             }
 
             var result = await NotifyIfDueAsync(services.GetRequiredService<ILiveNotifier>(), cancellationToken);
+            await ObserveAsync(batch, cancellationToken); // last: prices, alerts, reconcile and notify never wait for it
             result = result with { Ticks = batch.Count, HoldingsUpdated = updated, QuotesWritten = written, AlertsTriggered = triggered };
             var elapsedMs = (long)clock.GetElapsedTime(started).TotalMilliseconds;
             LiveLog.Flushed(logger, result.Ticks, updated, written, triggered, result.Notified, elapsedMs);
@@ -115,7 +116,10 @@ internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock,
         }
     }
 
-    /// <summary>Hands the firm ticks to the registered observers (none unless a feature is enabled). An observer's failure is logged and never reaches the flush.</summary>
+    /// <summary>
+    /// Hands the firm ticks to the registered observers (none unless a feature is enabled), after everything else of the flush. Each call is bounded by <see cref="ObserverTimeout"/> on the flush's own clock whatever the observer does with its token,
+    /// and an observer that is still running from an earlier flush is skipped, so a stuck observer holds neither the flush nor a growing pile of tasks. An observer's failure or timeout is logged (4894) and never reaches the flush.
+    /// </summary>
     private async ValueTask ObserveAsync(IReadOnlyList<LivePrice> batch, CancellationToken cancellationToken)
     {
         if (observers is null)
@@ -131,15 +135,26 @@ internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock,
 
         foreach (var observer in observers)
         {
+            if (_inFlight.TryGetValue(observer, out var running) && !running.IsCompleted)
+            {
+                continue; // shortcut: a stuck observer misses these ticks; the next flush offers the latest ones again
+            }
+
+            using var bound = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             try
             {
-                using var bound = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                bound.CancelAfter(ObserverTimeout);
-                await observer.ObserveAsync(firm, bound.Token);
+                var task = observer.ObserveAsync(firm, bound.Token).AsTask();
+                _inFlight[observer] = task;
+                await task.WaitAsync(ObserverTimeout, clock, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
+            }
+            catch (TimeoutException)
+            {
+                await bound.CancelAsync();
+                LiveLog.ObserverFailed(logger, nameof(TimeoutException));
             }
 #pragma warning disable CA1031 // an observer must never cost a price: its failure is logged and the flush carries on
             catch (Exception ex)

@@ -39,8 +39,10 @@ internal sealed class TicketAlertReader(ITicketAlertStore store, ITradingCalenda
             var results = PromptRules.Evaluate(facts, trades, today, await calendar.GetAsync(cancellationToken), windowDays);
             foreach (var (prompt, result) in prompts.Zip(results))
             {
-                var own = AcksOf("prompt", prompt.Id);
-                promptViews.Add(new PromptView(prompt.Id, $"prompt:{prompt.Id}", prompt.PlanId, prompt.ItemId, prompt.AccountId, prompt.Session, result.Status, result.Via, result.SameTradeItems, PromptRules.Text(result),
+                // An ambiguous prompt is its own notice (prompt:{id}:ambiguous) with its own acts: snoozing the open question does not hide it.
+                var ambiguous = result.Status == PromptStatus.Ambiguous;
+                var own = AcksOf(ambiguous ? TicketAlertErrors.AmbiguousKind : "prompt", prompt.Id);
+                promptViews.Add(new PromptView(prompt.Id, ambiguous ? $"prompt:{prompt.Id}:ambiguous" : $"prompt:{prompt.Id}", prompt.PlanId, prompt.ItemId, prompt.AccountId, prompt.Session, result.Status, result.Via, result.SameTradeItems, PromptRules.Text(result),
                     StateText(AlertAcks.Visibility(own, now)), AlertAcks.SnoozedUntil(own, now), Math.Max(0, AlertAcks.MaxSnoozes - own.Count(a => a.Action == AlertAcks.Snooze))));
             }
         }

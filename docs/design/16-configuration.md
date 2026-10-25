@@ -392,6 +392,8 @@ Planning:
     WatchedCacheSeconds: 30 # 5-120: how long the feed keeps its list of armed tickets with levels
 ```
 
+**`xd-api` and `xd-feed` must have the same `Enabled` value** (compose passes one variable, `XD_TICKET_ALERTS`, to both): with the feed ON and the API OFF crossings are stored but nothing shows; with the feed OFF and the API ON nothing is stored.
+
 The service `post-trade-prompts` (daily 16:45, trading days, starts paused) is resumed on the Services screen after the owner has read one session's log.
 
 ### Live feed (`Live:*`, [ADR 0024](../adr/0024-live-feed-xd-feed-and-live-prices.md), P2-10)

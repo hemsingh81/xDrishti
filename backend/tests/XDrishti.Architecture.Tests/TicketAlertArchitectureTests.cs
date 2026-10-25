@@ -87,4 +87,21 @@ public sealed class TicketAlertArchitectureTests
         on.Count(d => d.ServiceType == typeof(ILiveTickObserver)).ShouldBe(1);
         Application.GetTypes().Count(t => typeof(ILiveTickObserver).IsAssignableFrom(t) && t.IsClass).ShouldBe(1);
     }
+
+    [Fact]
+    public void The_store_writes_only_its_own_three_tables_and_never_plan_events()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "src", "XDrishti.Infrastructure", "Planning", "TicketAlertStore.cs")))
+        {
+            dir = dir.Parent;
+        }
+
+        var source = File.ReadAllText(Path.Combine(dir.ShouldNotBeNull().FullName, "src", "XDrishti.Infrastructure", "Planning", "TicketAlertStore.cs"));
+        var writes = System.Text.RegularExpressions.Regex.Matches(source, @"(INSERT\s+INTO|UPDATE|DELETE\s+FROM|TRUNCATE(?:\s+TABLE)?)\s+([a-z_]+\.[a-z_]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2))
+            .Select(m => $"{m.Groups[1].Value.Split(' ')[0].ToUpperInvariant()} {m.Groups[2].Value}").Distinct().Order().ToList();
+
+        writes.ShouldBe(["INSERT trading.ticket_alerts", "INSERT trading.ticket_notice_acks", "INSERT trading.ticket_prompts"]);
+        source.ShouldNotContain("INTO trading.plan_events", Case.Insensitive);
+    }
 }

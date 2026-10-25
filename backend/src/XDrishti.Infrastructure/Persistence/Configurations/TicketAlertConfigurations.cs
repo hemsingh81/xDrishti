@@ -47,13 +47,13 @@ internal sealed class TicketNoticeAckRecordConfiguration : IEntityTypeConfigurat
     {
         builder.ToTable("ticket_notice_acks", Schemas.Trading, t => t.HasCheckConstraint(
             "ck_ticket_notice_acks_shape",
-            "notice_kind IN ('crossing', 'prompt', 'ticket') AND action IN ('snooze', 'dismiss', 'mute') AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND ("
-            + "(action = 'snooze' AND notice_kind IN ('crossing', 'prompt') AND notice_id IS NOT NULL AND until IS NOT NULL AND item_id IS NULL) OR "
-            + "(action = 'dismiss' AND notice_kind IN ('crossing', 'prompt') AND notice_id IS NOT NULL AND until IS NULL AND item_id IS NULL) OR "
+            "notice_kind IN ('crossing', 'prompt', 'prompt_ambiguous', 'ticket') AND action IN ('snooze', 'dismiss', 'mute') AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND ("
+            + "(action = 'snooze' AND notice_kind IN ('crossing', 'prompt', 'prompt_ambiguous') AND notice_id IS NOT NULL AND until IS NOT NULL AND item_id IS NULL) OR "
+            + "(action = 'dismiss' AND notice_kind IN ('crossing', 'prompt', 'prompt_ambiguous') AND notice_id IS NOT NULL AND until IS NULL AND item_id IS NULL) OR "
             + "(action = 'mute' AND notice_kind = 'ticket' AND item_id IS NOT NULL AND notice_id IS NULL AND until IS NULL))"));
         builder.HasKey(x => x.Id).HasName("pk_ticket_notice_acks");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
-        builder.Property(x => x.NoticeKind).HasMaxLength(10).IsRequired();
+        builder.Property(x => x.NoticeKind).HasMaxLength(16).IsRequired();
         builder.Property(x => x.Action).HasMaxLength(10).IsRequired();
         builder.Property(x => x.Actor).HasMaxLength(100).IsRequired();
         builder.Property(x => x.At).HasDefaultValueSql("now()");

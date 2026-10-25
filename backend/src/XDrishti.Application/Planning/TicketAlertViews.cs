@@ -21,8 +21,8 @@ public sealed record PromptView(long Id, string NoticeId, long PlanId, long Item
 /// <summary>Mute the further crossings of a ticket for its session (a notification preference; the ticket does not change).</summary>
 public sealed record MuteTicketAlertsCommand(long ItemId, string Actor) : ICommand;
 
-/// <summary>Hide a notice (<c>crossing:{id}</c> or <c>prompt:{id}</c>) for 15, 30 or 60 minutes; at most three times.</summary>
+/// <summary>Hide a notice (<c>crossing:{id}</c>, <c>prompt:{id}</c> or <c>prompt:{id}:ambiguous</c>) for 15, 30 or 60 minutes; at most three times.</summary>
 public sealed record SnoozeTicketNoticeCommand(string NoticeId, int Minutes, string Actor) : ICommand;
 
-/// <summary>Hide a notice for good.</summary>
+/// <summary>Hide a notice for good (same ids as the snooze).</summary>
 public sealed record DismissTicketNoticeCommand(string NoticeId, string Actor) : ICommand;
