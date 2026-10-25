@@ -3037,7 +3037,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** What simply holding each basket would have done over a window (equal weight, bought at the first close and held, price return, dividends not included) beside the benchmark index in force, each with the instruments behind it and every instrument left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price). Takes basket (ids, comma separated, at most 12), from, to (default the window of the default run set; window.source says which) and membersAsOf (default the India date of the newest run of the basket, else today; members as of that date, not as of each trading day). Fewer than 3 included instruments gives no number. Baskets share instruments, so nonAdditive is true and there is no total. Read only. 422 reports.invalid; 404 reports.not_found. */
+    /** What simply holding each basket would have done over a window (equal weight, bought at the first close and held, price return, dividends not included) beside the benchmark index in force, each with the instruments behind it and every instrument left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price, too_few_bars). Takes basket (ids, comma separated, at most 12), from, to (default the window of the default run set; window.source says which) and membersAsOf (default the India date of the newest run of the basket, else today; members as of that date, not as of each trading day). Fewer than 3 included instruments gives no number. Baskets share instruments, so nonAdditive is true and there is no total. Read only. 422 reports.invalid; 404 reports.not_found. */
     get: operations['GetReportBenchmarks'];
     put?: never;
     post?: never;
@@ -3865,8 +3865,10 @@ export interface components {
       /** @description Inputs that do not exist, each with the reason. */
       unavailableInputs: string[];
     };
-    /** @description An instrument left out; Reason is no_bars, starts_late, ends_early, discontinuity or bad_price. */
+    /** @description An instrument left out; Reason is no_bars, too_few_bars, starts_late, ends_early, discontinuity or bad_price. */
     BenchmarkExclusionView: {
+      /** Format: uuid */
+      instrumentId: string;
       symbol: string;
       reason: string;
     };
@@ -3885,13 +3887,15 @@ export interface components {
       tracked: boolean;
       hasBars: boolean;
     };
-    /** @description The window; `Source` is `query` when both ends were given, else `runs` (taken from the default run set). */
+    /** @description The window. Each bound says where it came from, `query` or `runs` (the default run set); `Source` is `query` only when both did. */
     BenchmarkWindowView: {
       /** Format: date */
       from: string;
       /** Format: date */
       to: string;
       source: string;
+      fromSource: string;
+      toSource: string;
     };
     /** @description A security a name may mean: `Isin`, `Symbol`, `Name` and — when it is a holding of the account or a share of the instrument master — `HoldingId` or `InstrumentId`. */
     BillCandidate: {

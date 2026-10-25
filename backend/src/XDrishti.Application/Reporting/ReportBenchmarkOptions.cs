@@ -26,4 +26,12 @@ public sealed class ReportBenchmarkOptions
     /// <summary>Most baskets one call may name.</summary>
     [Range(1, 100)]
     public int MaxBaskets { get; set; } = 12;
+
+    /// <summary>Most distinct instruments one call reads (all baskets together).</summary>
+    [Range(1, 20000)]
+    public int MaxDistinctInstruments { get; set; } = 600;
+
+    /// <summary>Longest window in days.</summary>
+    [Range(2, 20000)]
+    public int MaxWindowDays { get; set; } = 3700;
 }

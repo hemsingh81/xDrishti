@@ -65,27 +65,12 @@ internal sealed class GetReportBenchmarksHandler(
             return Result.Failure<ReportBenchmarksView>(window.Error);
         }
 
-        var (first, last, windowSource) = window.Value;
-        var wanted = ids.Value.Select(id => "basket:" + id.ToString("D")).ToHashSet(StringComparer.Ordinal);
-        var newest = runs.Where(r => wanted.Contains(r.Universe)).OrderByDescending(r => r.CreatedAt).FirstOrDefault();
-        var asOf = asOfGiven.Value ?? (newest is null ? IndiaTime.Today(time.GetUtcNow()) : IndiaTime.Today(newest.CreatedAt));
-        var cutoff = BasketMember.CutoffAfter(asOf);
-
-        var loaded = new List<BasketMembers>();
-        foreach (var id in ids.Value)
+        var range = window.Value;
+        var asOf = asOfGiven.Value ?? MembersDate(ids.Value, runs);
+        var members = await LoadMembersAsync(ids.Value, asOf, cancellationToken);
+        if (members.IsFailure)
         {
-            var members = await baskets.MembersAsync(id, cutoff, asOf, cancellationToken);
-            if (members is null || members.ArchivedAt is not null)
-            {
-                return Result.Failure<ReportBenchmarksView>(Error.NotFound("reports.not_found", $"Basket '{id:D}' does not exist or is archived."));
-            }
-
-            if (members.Items.Count > settings.MaxInstruments)
-            {
-                return Result.Failure<ReportBenchmarksView>(ReportErrors.Invalid($"Basket '{members.Name}' holds {members.Items.Count} instruments; at most {settings.MaxInstruments} are read."));
-            }
-
-            loaded.Add(members);
+            return Result.Failure<ReportBenchmarksView>(members.Error);
         }
 
         // Each instrument is read once, however many baskets share it.
@@ -93,61 +78,31 @@ internal sealed class GetReportBenchmarksHandler(
         var options = new BuyAndHoldOptions(settings.MinMembers, settings.MaxStartGapDays, settings.DiscontinuityThreshold);
         var views = new List<BasketBenchmarkView>();
         var included = new HashSet<Guid>();
-        foreach (var basket in loaded)
+        foreach (var basket in members.Value)
         {
             var series = new List<InstrumentSeries>();
             foreach (var item in basket.Items)
             {
-                series.Add(new InstrumentSeries(item.Instrument.Symbol, await ReadAsync(item.Instrument.Id, cache, first, last, cancellationToken)));
+                series.Add(new InstrumentSeries(item.Instrument.Id, item.Instrument.Symbol, await ReadAsync(item.Instrument.Id, cache, range.From, range.To, cancellationToken)));
             }
 
-            var result = BuyAndHold.Compute(series, first, last, options);
-            var excludedSymbols = result.Excluded.Select(e => e.Symbol).ToHashSet(StringComparer.Ordinal);
-            foreach (var item in basket.Items.Where(i => !excludedSymbols.Contains(i.Instrument.Symbol)))
-            {
-                included.Add(item.Instrument.Id);
-            }
-
+            var result = BuyAndHold.Compute(series, range.From, range.To, options);
+            var excludedIds = result.Excluded.Select(e => e.Id).ToHashSet();
+            included.UnionWith(basket.Items.Select(i => i.Instrument.Id).Where(id => !excludedIds.Contains(id)));
             views.Add(new BasketBenchmarkView(
                 basket.BasketId,
                 basket.Name,
                 basket.Items.Count,
                 result.Included,
                 ReportViews.Metric(result.Return),
-                [.. result.Excluded.Select(e => new BenchmarkExclusionView(e.Symbol, e.Reason))]));
+                [.. result.Excluded.Select(e => new BenchmarkExclusionView(e.Id, e.Symbol, e.Reason))]));
         }
 
-        var configured = await benchmark.GetAsync(cancellationToken);
         var unavailable = new List<string>();
-        IndexBenchmarkView index;
-        if (configured is null)
-        {
-            const string none = "no benchmark index is in the master list; the owner can track one in Portfolio (this read tracks nothing)";
-            unavailable.Add("benchmark index: " + none);
-            index = new IndexBenchmarkView(null, null, true, new MetricView("unavailable", null, none));
-        }
-        else
-        {
-            var inst = configured.Instrument;
-            var closes = await ReadAsync(inst.Id, cache, first, last, cancellationToken);
-            var one = BuyAndHold.Compute([new InstrumentSeries(inst.Symbol, closes)], first, last, options with { MinMembers = 1 });
-            var metric = one.Excluded.Count == 0
-                ? ReportViews.Metric(one.Return)
-                : new MetricView("unavailable", null, closes.Count == 0
-                    ? $"{inst.Symbol} has no daily bars; the owner can track it in Portfolio (this read tracks nothing)"
-                    : $"{inst.Symbol} cannot be used over this window ({one.Excluded[0].Reason})");
-            if (metric.State == "unavailable")
-            {
-                unavailable.Add($"benchmark index {inst.Symbol}: {metric.Reason}");
-            }
-
-            index = new IndexBenchmarkView(inst.Id, inst.Symbol, configured.IsDefault, metric);
-        }
-
-        var range = new BenchmarkWindowView(first, last, windowSource);
+        var index = await IndexAsync(cache, range, options, unavailable, cancellationToken);
         var excludedCount = views.Sum(v => v.Excluded.Count);
         var elapsed = (long)time.GetElapsedTime(started).TotalMilliseconds;
-        ReportLog.Benchmark(logger, loaded.Count, cache.Count, excludedCount, elapsed);
+        ReportLog.Benchmark(logger, members.Value.Count, cache.Count, excludedCount, elapsed);
         return Result.Success(new ReportBenchmarksView(
             range,
             asOf,
@@ -156,6 +111,66 @@ internal sealed class GetReportBenchmarksHandler(
             true,
             settings.MinMembers,
             new BenchmarkEvidenceView(Basis, included.Count, range, [.. Limits], unavailable)));
+    }
+
+    /// <summary>The India date of the newest run (default run set, with trades) of the asked baskets, else today.</summary>
+    private DateOnly MembersDate(List<Guid> ids, List<ReportRunInfo> runs)
+    {
+        var wanted = ids.Select(id => "basket:" + id.ToString("D")).ToHashSet(StringComparer.Ordinal);
+        var newest = runs.Where(r => wanted.Contains(r.Universe)).OrderByDescending(r => r.CreatedAt).FirstOrDefault();
+        return IndiaTime.Today(newest?.CreatedAt ?? time.GetUtcNow());
+    }
+
+    private async ValueTask<Result<List<BasketMembers>>> LoadMembersAsync(List<Guid> ids, DateOnly asOf, CancellationToken cancellationToken)
+    {
+        var cutoff = BasketMember.CutoffAfter(asOf);
+        var loaded = new List<BasketMembers>();
+        foreach (var id in ids)
+        {
+            var members = await baskets.MembersAsync(id, cutoff, asOf, cancellationToken);
+            if (members is null || members.ArchivedAt is not null)
+            {
+                return Result.Failure<List<BasketMembers>>(Error.NotFound("reports.not_found", $"Basket '{id:D}' does not exist or is archived."));
+            }
+
+            if (members.Items.Count > settings.MaxInstruments)
+            {
+                return Result.Failure<List<BasketMembers>>(ReportErrors.Invalid($"Basket '{members.Name}' holds {members.Items.Count} instruments; at most {settings.MaxInstruments} are read."));
+            }
+
+            loaded.Add(members);
+        }
+
+        var distinct = loaded.SelectMany(m => m.Items).Select(i => i.Instrument.Id).Distinct().Count();
+        return distinct > settings.MaxDistinctInstruments
+            ? Result.Failure<List<BasketMembers>>(ReportErrors.Invalid($"The baskets hold {distinct} distinct instruments; at most {settings.MaxDistinctInstruments} are read in one call."))
+            : Result.Success(loaded);
+    }
+
+    private async ValueTask<IndexBenchmarkView> IndexAsync(Dictionary<Guid, IReadOnlyList<DailyClose>> cache, BenchmarkWindowView range, BuyAndHoldOptions options, List<string> unavailable, CancellationToken cancellationToken)
+    {
+        var configured = await benchmark.GetAsync(cancellationToken);
+        if (configured is null)
+        {
+            const string none = "no benchmark index is in the master list; the owner can track one in Portfolio (this read tracks nothing)";
+            unavailable.Add("benchmark index: " + none);
+            return new IndexBenchmarkView(null, null, true, new MetricView("unavailable", null, none));
+        }
+
+        var inst = configured.Instrument;
+        var closes = await ReadAsync(inst.Id, cache, range.From, range.To, cancellationToken);
+        var one = BuyAndHold.Compute([new InstrumentSeries(inst.Id, inst.Symbol, closes)], range.From, range.To, options with { MinMembers = 1 });
+        var metric = one.Excluded.Count == 0
+            ? ReportViews.Metric(one.Return)
+            : new MetricView("unavailable", null, closes.Count == 0
+                ? $"{inst.Symbol} has no daily bars; the owner can track it in Portfolio (this read tracks nothing)"
+                : $"{inst.Symbol} cannot be used over this window ({one.Excluded[0].Reason})");
+        if (metric.State == "unavailable")
+        {
+            unavailable.Add($"benchmark index {inst.Symbol}: {metric.Reason}");
+        }
+
+        return new IndexBenchmarkView(inst.Id, inst.Symbol, configured.IsDefault, metric);
     }
 
     private async ValueTask<IReadOnlyList<DailyClose>> ReadAsync(Guid id, Dictionary<Guid, IReadOnlyList<DailyClose>> cache, DateOnly from, DateOnly to, CancellationToken cancellationToken)
@@ -210,18 +225,27 @@ internal sealed class GetReportBenchmarksHandler(
             : Result.Failure<DateOnly?>(ReportErrors.Invalid($"{name} must be a date such as 2026-10-11."));
     }
 
-    private static Result<(DateOnly From, DateOnly To, string Source)> ResolveWindow(DateOnly? from, DateOnly? to, List<ReportRunInfo> runs)
+    private Result<BenchmarkWindowView> ResolveWindow(DateOnly? from, DateOnly? to, List<ReportRunInfo> runs)
     {
-        var source = from is not null && to is not null ? "query" : "runs";
         var start = from ?? (runs.Count == 0 ? null : runs.Min(r => r.WindowStart) as DateOnly?);
         var end = to ?? (runs.Count == 0 ? null : runs.Max(r => r.WindowEnd) as DateOnly?);
         if (start is null || end is null)
         {
-            return Result.Failure<(DateOnly, DateOnly, string)>(ReportErrors.Invalid("Give from and to: no run in the default run set holds trades to take the window from."));
+            return Result.Failure<BenchmarkWindowView>(ReportErrors.Invalid("Give from and to: no run in the default run set holds trades to take the window from."));
         }
 
-        return start > end
-            ? Result.Failure<(DateOnly, DateOnly, string)>(ReportErrors.Invalid("from must not be after to."))
-            : Result.Success((start.Value, end.Value, source));
+        if (start > end)
+        {
+            return Result.Failure<BenchmarkWindowView>(ReportErrors.Invalid("from must not be after to."));
+        }
+
+        if (end.Value.DayNumber - start.Value.DayNumber > settings.MaxWindowDays)
+        {
+            return Result.Failure<BenchmarkWindowView>(ReportErrors.Invalid($"The window is longer than {settings.MaxWindowDays} days."));
+        }
+
+        var fromSource = from is null ? "runs" : "query";
+        var toSource = to is null ? "runs" : "query";
+        return Result.Success(new BenchmarkWindowView(start.Value, end.Value, fromSource == "query" && toSource == "query" ? "query" : "runs", fromSource, toSource));
     }
 }

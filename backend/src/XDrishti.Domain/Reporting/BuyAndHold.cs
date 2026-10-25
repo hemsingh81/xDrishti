@@ -9,6 +9,9 @@ public static class BuyAndHold
     /// <summary>No daily bar in the window.</summary>
     public const string NoBars = "no_bars";
 
+    /// <summary>Fewer than two daily bars in the window: no return can be measured.</summary>
+    public const string TooFewBars = "too_few_bars";
+
     /// <summary>The first bar is more than the allowed gap after the window start.</summary>
     public const string StartsLate = "starts_late";
 
@@ -32,7 +35,7 @@ public static class BuyAndHold
 
         var returns = new List<double>();
         var excluded = new List<BuyAndHoldExclusion>();
-        foreach (var s in series.OrderBy(x => x.Symbol, StringComparer.Ordinal))
+        foreach (var s in series.OrderBy(x => x.Symbol, StringComparer.Ordinal).ThenBy(x => x.Id))
         {
             var reason = Evaluate(s, from, to, options, out var ret);
             if (reason is null)
@@ -41,7 +44,7 @@ public static class BuyAndHold
             }
             else
             {
-                excluded.Add(new BuyAndHoldExclusion(s.Symbol, reason));
+                excluded.Add(new BuyAndHoldExclusion(s.Id, s.Symbol, reason));
             }
         }
 
@@ -60,6 +63,11 @@ public static class BuyAndHold
         if (bars.Count == 0)
         {
             return NoBars;
+        }
+
+        if (bars.Count < 2)
+        {
+            return TooFewBars;
         }
 
         if (bars[0].Date.DayNumber - from.DayNumber > options.MaxStartGapDays)

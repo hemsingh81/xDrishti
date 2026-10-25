@@ -9,8 +9,10 @@ public sealed class BuyAndHoldTests
     private static readonly DateOnly To = new(2026, 3, 31);
     private static readonly BuyAndHoldOptions Options = new(3, 7, 0.25);
 
+    private static Guid Id(string symbol) => new(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(symbol)).AsSpan(0, 16));
+
     private static InstrumentSeries Series(string symbol, double first, double last, DateOnly? start = null, DateOnly? end = null) =>
-        new(symbol, [new DailyClose(start ?? From, first), new DailyClose(end ?? To, last)]);
+        new(Id(symbol), symbol, [new DailyClose(start ?? From, first), new DailyClose(end ?? To, last)]);
 
     private static InstrumentSeries Abc(string symbol, double first, double last) => Series(symbol, first, last);
 
@@ -49,22 +51,35 @@ public sealed class BuyAndHoldTests
     public void Each_exclusion_reason_is_named_alone_and_the_rest_is_used()
     {
         var series = Three();
-        series.Add(new InstrumentSeries("NOBARS", []));
+        series.Add(new InstrumentSeries(Id("NOBARS"), "NOBARS", []));
         series.Add(Series("LATE", 10, 11, start: From.AddDays(8)));
         series.Add(Series("EARLY", 10, 11, end: To.AddDays(-8)));
-        series.Add(new InstrumentSeries("SPLIT", [new DailyClose(From, 100), new DailyClose(From.AddDays(10), 50), new DailyClose(To, 55)]));
+        series.Add(new InstrumentSeries(Id("SPLIT"), "SPLIT", [new DailyClose(From, 100), new DailyClose(From.AddDays(10), 50), new DailyClose(To, 55)]));
 
         var result = BuyAndHold.Compute(series, From, To, Options);
 
         result.Included.ShouldBe(3);
         result.Return.Number!.Value.ShouldBe(25.0 / 3, 1e-9);
-        result.Excluded.ShouldBe(
+        result.Excluded.Select(e => (e.Symbol, e.Reason)).ShouldBe(
         [
-            new BuyAndHoldExclusion("EARLY", BuyAndHold.EndsEarly),
-            new BuyAndHoldExclusion("LATE", BuyAndHold.StartsLate),
-            new BuyAndHoldExclusion("NOBARS", BuyAndHold.NoBars),
-            new BuyAndHoldExclusion("SPLIT", BuyAndHold.Discontinuity),
+            ("EARLY", BuyAndHold.EndsEarly),
+            ("LATE", BuyAndHold.StartsLate),
+            ("NOBARS", BuyAndHold.NoBars),
+            ("SPLIT", BuyAndHold.Discontinuity),
         ]);
+    }
+
+    [Fact]
+    public void One_bar_is_not_enough_to_measure_a_return_and_exclusions_carry_the_instrument_id()
+    {
+        var series = Three();
+        series.Add(new InstrumentSeries(Id("ONE"), "ONE", [new DailyClose(From, 10)]));
+
+        var result = BuyAndHold.Compute(series, From, To, Options);
+
+        var excluded = result.Excluded.ShouldHaveSingleItem();
+        excluded.Reason.ShouldBe(BuyAndHold.TooFewBars);
+        excluded.Id.ShouldBe(Id("ONE"));
     }
 
     [Fact]
@@ -101,7 +116,7 @@ public sealed class BuyAndHoldTests
     [Fact]
     public void None_included_is_empty()
     {
-        var result = BuyAndHold.Compute([new InstrumentSeries("X", [])], From, To, Options);
+        var result = BuyAndHold.Compute([new InstrumentSeries(Id("X"), "X", [])], From, To, Options);
 
         result.Return.State.ShouldBe(MetricState.Empty);
         result.Return.Number.ShouldBeNull();
@@ -121,7 +136,7 @@ public sealed class BuyAndHoldTests
     [Fact]
     public void The_start_is_the_first_bar_on_or_after_the_window_start_and_the_end_the_last_on_or_before_the_window_end()
     {
-        var inside = new InstrumentSeries("IN", [new DailyClose(From.AddDays(-5), 1), new DailyClose(From.AddDays(2), 100), new DailyClose(To.AddDays(-2), 120), new DailyClose(To.AddDays(5), 1)]);
+        var inside = new InstrumentSeries(Id("IN"), "IN", [new DailyClose(From.AddDays(-5), 1), new DailyClose(From.AddDays(2), 100), new DailyClose(To.AddDays(-2), 120), new DailyClose(To.AddDays(5), 1)]);
 
         var result = BuyAndHold.Compute([inside], From, To, Options with { MinMembers = 1 });
 

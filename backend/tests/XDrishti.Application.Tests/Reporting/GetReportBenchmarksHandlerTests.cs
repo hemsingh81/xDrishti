@@ -43,8 +43,8 @@ public sealed class GetReportBenchmarksHandlerTests
         });
     }
 
-    private GetReportBenchmarksHandler Handler() =>
-        new(_baskets, _bars, _benchmark, _source, new ReportBenchmarkOptions(), new FakeTimeProvider(Now), NullLogger<GetReportBenchmarksHandler>.Instance);
+    private GetReportBenchmarksHandler Handler(ReportBenchmarkOptions? options = null) =>
+        new(_baskets, _bars, _benchmark, _source, options ?? new ReportBenchmarkOptions(), new FakeTimeProvider(Now), NullLogger<GetReportBenchmarksHandler>.Instance);
 
     private static BarRow Bar(DateOnly day, double close) =>
         new(new DateTimeOffset(day.Year, day.Month, day.Day, 0, 0, 0, TimeSpan.FromMinutes(330)), close, close, close, close, 1, 1, true, null);
@@ -80,9 +80,9 @@ public sealed class GetReportBenchmarksHandlerTests
         return result.Value;
     }
 
-    private async Task<Error> RefusedAsync(GetReportBenchmarksQuery query)
+    private async Task<Error> RefusedAsync(GetReportBenchmarksQuery query, ReportBenchmarkOptions? options = null)
     {
-        var result = await Handler().HandleAsync(query, Ct);
+        var result = await Handler(options).HandleAsync(query, Ct);
         result.IsFailure.ShouldBeTrue();
         return result.Error;
     }
@@ -112,13 +112,15 @@ public sealed class GetReportBenchmarksHandlerTests
     [Fact]
     public async Task Members_without_bars_are_named_and_too_few_left_gives_no_number()
     {
-        Basket(B1, "Banks", null, Instrument("A", 100, 110), Instrument("GONE"), Instrument("B", 50, 45));
+        var gone = Instrument("GONE");
+        Basket(B1, "Banks", null, Instrument("A", 100, 110), gone, Instrument("B", 50, 45));
 
         var basket = (await OkAsync(Query(B1.ToString()))).Baskets.Single();
 
         basket.BuyAndHold.State.ShouldBe("insufficient");
         basket.BuyAndHold.Number.ShouldBeNull();
-        basket.Excluded.ShouldBe([new BenchmarkExclusionView("GONE", "no_bars")]);
+        basket.Excluded.Select(e => (e.Symbol, e.Reason)).ShouldBe([("GONE", "no_bars")]);
+        basket.Excluded[0].InstrumentId.ShouldBe(gone);
     }
 
     [Fact]
@@ -163,7 +165,7 @@ public sealed class GetReportBenchmarksHandlerTests
 
         var view = await OkAsync(Query(B1.ToString(), from: null, to: null));
 
-        view.Window.ShouldBe(new BenchmarkWindowView(From, To, "runs"));
+        view.Window.ShouldBe(new BenchmarkWindowView(From, To, "runs", "runs", "runs"));
         view.MembersAsOf.ShouldBe(new DateOnly(2026, 4, 3));
     }
 
@@ -222,5 +224,79 @@ public sealed class GetReportBenchmarksHandlerTests
         var ids = string.Join(',', Enumerable.Range(0, 13).Select(_ => Guid.NewGuid()));
 
         (await RefusedAsync(Query(ids))).Code.ShouldBe("reports.invalid");
+    }
+
+    [Fact]
+    public async Task A_basket_above_the_instrument_cap_or_the_distinct_cap_or_a_too_long_window_is_refused()
+    {
+        Basket(B1, "Big", null, Instrument("A", 100, 110), Instrument("B", 100, 110), Instrument("C", 100, 110));
+
+        (await RefusedAsync(Query(B1.ToString()), new ReportBenchmarkOptions { MaxInstruments = 2 })).Code.ShouldBe("reports.invalid");
+        (await RefusedAsync(Query(B1.ToString()), new ReportBenchmarkOptions { MaxDistinctInstruments = 2 })).Code.ShouldBe("reports.invalid");
+        (await RefusedAsync(Query(B1.ToString()), new ReportBenchmarkOptions { MaxWindowDays = 30 })).Code.ShouldBe("reports.invalid");
+    }
+
+    [Fact]
+    public async Task Each_bound_of_the_window_says_where_it_came_from()
+    {
+        var run = new ReportRunInfo("k", "ORB", "basket", "label", "basket:" + B1.ToString("D"), From, To, null, null, null, null, null, 10, 0, Now);
+        _source.ListRunsAsync(Arg.Any<CancellationToken>()).Returns(new ValueTask<IReadOnlyList<ReportRunInfo>>([run]));
+        Basket(B1, "Banks", null, Instrument("A", 100, 110));
+
+        var view = await OkAsync(Query(B1.ToString(), from: "2026-01-06", to: null));
+
+        view.Window.FromSource.ShouldBe("query");
+        view.Window.ToSource.ShouldBe("runs");
+        view.Window.Source.ShouldBe("runs");
+    }
+
+    [Fact]
+    public async Task The_same_stored_bars_give_identical_bytes()
+    {
+        Basket(B1, "Banks", null, Instrument("A", 100, 110), Instrument("B", 50, 45), Instrument("C", 200, 250), Instrument("GONE"));
+
+        var first = System.Text.Json.JsonSerializer.Serialize(await OkAsync(Query(B1.ToString())));
+        var second = System.Text.Json.JsonSerializer.Serialize(await OkAsync(Query(B1.ToString())));
+
+        second.ShouldBe(first);
+    }
+
+    [Fact]
+    public async Task Every_response_shape_carries_the_evidence_block()
+    {
+        Basket(B1, "Three", null, Instrument("A", 100, 110), Instrument("B", 50, 45), Instrument("C", 200, 250));
+        Basket(B2, "Empty", null, Instrument("X"));
+
+        foreach (var query in new[] { Query(B1.ToString()), Query(B2.ToString()), Query($"{B1},{B2}") })
+        {
+            var evidence = (await OkAsync(query)).Evidence;
+
+            evidence.Basis.ShouldBe("price return, dividends not included");
+            evidence.Limits.ShouldNotBeEmpty();
+            evidence.Range.ShouldNotBeNull();
+        }
+    }
+
+    [Theory]
+    [InlineData(nameof(ReportBenchmarkOptions.MinMembers), 0)]
+    [InlineData(nameof(ReportBenchmarkOptions.MaxStartGapDays), 61)]
+    [InlineData(nameof(ReportBenchmarkOptions.MaxInstruments), 0)]
+    [InlineData(nameof(ReportBenchmarkOptions.MaxBaskets), 101)]
+    [InlineData(nameof(ReportBenchmarkOptions.MaxDistinctInstruments), 0)]
+    [InlineData(nameof(ReportBenchmarkOptions.MaxWindowDays), 1)]
+    public void Settings_out_of_range_are_rejected(string name, int value)
+    {
+        var options = new ReportBenchmarkOptions();
+        typeof(ReportBenchmarkOptions).GetProperty(name)!.SetValue(options, value);
+
+        System.ComponentModel.DataAnnotations.Validator.TryValidateObject(options, new System.ComponentModel.DataAnnotations.ValidationContext(options), [], true).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_default_settings_are_valid()
+    {
+        var options = new ReportBenchmarkOptions();
+
+        System.ComponentModel.DataAnnotations.Validator.TryValidateObject(options, new System.ComponentModel.DataAnnotations.ValidationContext(options), [], true).ShouldBeTrue();
     }
 }
