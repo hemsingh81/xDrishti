@@ -4,16 +4,17 @@ import { EvidenceBlock, formatAsOf, formatCount, NonValue } from '@/shared/analy
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { changelogLimit, changelogQuery, type ChangelogEntry, type ChangelogScope } from '../api/learningQueries';
 
+/** Rows shown; the rest are counted, never hidden silently. */
+const show = 25;
+
 interface ChangelogTimelineProps {
   scope?: ChangelogScope;
   /** Names the list; unique on a page that shows two. */
   label: string;
-  /** Rows shown; the rest are counted, never hidden silently. */
-  show?: number;
 }
 
 /** The learning changelog, newest first. Every field is the server's text, drawn as text. Rows are never changed here. */
-export function ChangelogTimeline({ scope = {}, label, show = 25 }: ChangelogTimelineProps) {
+export function ChangelogTimeline({ scope = {}, label }: ChangelogTimelineProps) {
   const query = useQuery(changelogQuery(scope));
   if (query.isPending) return <LoadingState label="Loading the changelog…" />;
   if (query.isError) return <ErrorState error={query.error} />;

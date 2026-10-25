@@ -16,7 +16,7 @@ const countOf = async (stage: string) => {
     .getAllByRole('listitem')
     .find((li) => within(li).queryByText(stage));
   if (!item) throw new Error(`No stage named ${stage}`);
-  return item.lastElementChild?.textContent;
+  return item.children[2]?.textContent;
 };
 
 describe('Cell lifecycle funnel', () => {
@@ -108,7 +108,55 @@ describe('Cell lifecycle funnel', () => {
 
     const evidence = await screen.findByRole('region', { name: 'Lifecycle evidence' });
     expect(evidence).toHaveTextContent('n 4');
-    expect(evidence).toHaveTextContent('4 cell rows of the newest snapshot (window all)');
+    expect(evidence).toHaveTextContent('4 cells of the newest snapshot (window all)');
+  });
+
+  it('says the research count is an upper bound when the changelog read hit its limit', async () => {
+    // 200 rows about one cell; the other three cells show no row, but older rows may exist.
+    mountLearning({
+      cells: { all: cells() },
+      changelog: Array.from({ length: 200 }, (_, i) => buildEntry({ id: 200 - i, subject: keyOf('a') })),
+      states: { [keyOf('a')]: buildCellState({ cell: keyOf('a'), state: 'paper', rows: 200 }) },
+    });
+    renderLearning('?tab=setups');
+
+    expect(await countOf('Research')).toBe('3');
+    const list = screen.getByRole('list', { name: 'Cells by lifecycle state' });
+    const research = within(list)
+      .getAllByRole('listitem')
+      .find((li) => within(li).queryByText('Research'));
+    expect(research).toHaveTextContent('Provisional');
+    expect(research).toHaveTextContent(/At most this many: only the newest 200 changelog rows were read/);
+    // The other stages carry no caveat.
+    expect(screen.getAllByText('Provisional')).toHaveLength(1);
+    expect(screen.getByRole('region', { name: 'Lifecycle evidence' })).toHaveTextContent('upper bound');
+  });
+
+  it('prints no caveat on the research count when the changelog was read whole', async () => {
+    mountLearning({
+      cells: { all: cells() },
+      changelog: [buildEntry({ id: 1, subject: keyOf('a') })],
+      states: { [keyOf('a')]: buildCellState({ cell: keyOf('a'), state: 'paper', rows: 1 }) },
+    });
+    renderLearning('?tab=setups');
+
+    expect(await countOf('Research')).toBe('3');
+    expect(screen.queryByText('Provisional')).not.toBeInTheDocument();
+  });
+
+  it('does not count a cell the changelog names but the snapshot does not hold, and says so', async () => {
+    mountLearning({
+      cells: { all: cells() },
+      changelog: [buildEntry({ id: 1, subject: keyOf('gone') })],
+      states: { [keyOf('gone')]: buildCellState({ cell: keyOf('gone'), state: 'active', rows: 1 }) },
+    });
+    renderLearning('?tab=setups');
+
+    expect(await countOf('Research')).toBe('4');
+    expect(await countOf('Active')).toBe('0');
+    expect(
+      screen.getByText(/1 cell named in the changelog is not in the newest snapshot and not counted above/),
+    ).toBeInTheDocument();
   });
 
   it('shows the error of a failed changelog read and no counts', async () => {

@@ -48,9 +48,9 @@ export function OverviewTab({ onOpenSetups }: { onOpenSetups: () => void }) {
     : { kind: 'value', value: o.cellRows };
   const tiles: { label: string; state: MetricState; hint?: string }[] = [
     {
-      label: 'Cell rows',
+      label: 'Cell rows (three windows per cell)',
       state: snapshotState,
-      hint: o.cellsAsOf ? `Snapshot as of ${formatDate(o.cellsAsOf)}` : undefined,
+      hint: o.cellsAsOf ? `Snapshot as of ${formatDate(o.cellsAsOf)}; all, 250d and 60d rows are counted` : undefined,
     },
     { label: 'Models', state: countState(o.models, 'models'), hint: splitText(o.models) },
     { label: 'Experiments', state: countState(o.experiments, 'experiments'), hint: splitText(o.experiments) },

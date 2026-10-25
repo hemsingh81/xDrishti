@@ -18,7 +18,14 @@ describe('Learning overview', () => {
     renderLearning();
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Learning' })).toBeInTheDocument();
-    for (const name of ['Cell rows', 'Models', 'Experiments', 'Hypotheses', 'Lessons', 'Changelog rows']) {
+    for (const name of [
+      'Cell rows (three windows per cell)',
+      'Models',
+      'Experiments',
+      'Hypotheses',
+      'Lessons',
+      'Changelog rows',
+    ]) {
       const t = await tile(name);
       expect(t.getByText('No records yet')).toBeInTheDocument();
       expect(t.queryByText(/\d/)).not.toBeInTheDocument();
@@ -83,9 +90,9 @@ describe('Learning overview', () => {
     });
     renderLearning();
 
-    const cells = await tile('Cell rows');
+    const cells = await tile('Cell rows (three windows per cell)');
     expect(cells.getByText('12')).toBeInTheDocument();
-    expect(cells.getByText('Snapshot as of 20 Oct 2026')).toBeInTheDocument();
+    expect(cells.getByText('Snapshot as of 20 Oct 2026; all, 250d and 60d rows are counted')).toBeInTheDocument();
     expect(screen.queryByText(/No snapshot yet/)).not.toBeInTheDocument();
 
     const experiments = await tile('Experiments');

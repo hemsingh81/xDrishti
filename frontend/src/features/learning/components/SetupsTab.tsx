@@ -2,15 +2,13 @@ import { Box, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useUrlState } from '@/shared/analytics';
 import { ErrorState, LoadingState } from '@/shared/ui';
-import { cellsQuery, cellWindows, type CellWindow } from '../api/learningQueries';
+import { cellsQuery, cellWindows, windowLabels, type CellWindow } from '../api/learningQueries';
 import { CellDrawer } from './CellDrawer';
 import { ChangelogTimeline } from './ChangelogTimeline';
 import { Heatmap } from './Heatmap';
 import { LifecycleFunnel } from './LifecycleFunnel';
 import { NoSnapshot } from './NoSnapshot';
 import { Panel } from './Panel';
-
-const windowLabel: Record<CellWindow, string> = { all: 'All', '250d': 'Last 250 days', '60d': 'Last 60 days' };
 
 /** Setups: the cell heatmap with a window selector, the lifecycle funnel, the changelog and the open cell. All view state is in the URL. */
 export function SetupsTab() {
@@ -40,7 +38,7 @@ export function SetupsTab() {
           >
             {cellWindows.map((code) => (
               <ToggleButton key={code} value={code} sx={{ minHeight: 44 }}>
-                {windowLabel[code]}
+                {windowLabels[code]}
               </ToggleButton>
             ))}
           </ToggleButtonGroup>

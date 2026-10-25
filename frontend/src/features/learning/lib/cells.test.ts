@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildCell, buildThinCell } from '@/test/learningFixtures';
 import { basisOf, buildGrid, cellsEvidence, expectancyOf, lowerBoundOf, statState, timeframeMinutes } from './cells';
-import { cellsToRead, countFunnel, maxStateReads } from './funnel';
+import { cellsToRead, countFunnel, maxStateReads, rowCellsInSnapshot } from './funnel';
 import { countState } from './overview';
 
 describe('timeframeMinutes', () => {
@@ -82,13 +82,34 @@ describe('countFunnel', () => {
     ['c', { state: 'weird', problems: ['x'] }],
   ]);
 
-  it('counts research for cells without rows, the replayed state for the rest, and never places an unread cell', () => {
-    expect(countFunnel({ snapshotCells: ['a', 'b', 'c', 'd'], cellsWithRows: ['b', 'c', 'e'], read })).toEqual({
+  it('counts research for cells without rows, the replayed state for the rest, and leaves out cells outside the snapshot', () => {
+    expect(
+      countFunnel({ snapshotCells: ['a', 'b', 'c', 'd'], cellsWithRows: ['b', 'c', 'e'], truncated: false, read }),
+    ).toEqual({
       stages: { research: 2, candidate: 0, paper: 0, active: 1, paused: 0, retired: 0 },
       other: { weird: 1 },
-      notRead: 1,
+      notRead: 0,
       inconsistent: 1,
+      outsideSnapshot: 1,
+      researchIsUpperBound: false,
     });
+  });
+
+  it('never places a cell with rows whose state was not read, and the stages never exceed the snapshot', () => {
+    const counts = countFunnel({ snapshotCells: ['a', 'b', 'd'], cellsWithRows: ['a', 'b'], truncated: false, read });
+    expect(counts.notRead).toBe(1);
+    const placed = Object.values(counts.stages).reduce((a, b) => a + b, 0) + counts.notRead;
+    expect(placed).toBe(3);
+  });
+
+  it('says the research count is an upper bound when the changelog was cut at its limit', () => {
+    expect(
+      countFunnel({ snapshotCells: ['a', 'd'], cellsWithRows: [], truncated: true, read }).researchIsUpperBound,
+    ).toBe(true);
+  });
+
+  it('keeps only the cells of the snapshot, newest first, for reading', () => {
+    expect(rowCellsInSnapshot(['x', 'b', 'y', 'a'], ['a', 'b', 'c'])).toEqual(['b', 'a']);
   });
 
   it('reads the newest thirty cells with rows', () => {

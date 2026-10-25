@@ -70,7 +70,9 @@ export function HeatTile({ cell, selected, onOpen }: HeatTileProps) {
       </Typography>
       {cell.enough && (
         <Typography component="span" variant="caption" sx={{ display: 'block', color: 'text.primary', ...numeric }}>
-          n {formatCount(cell.n)} · Win-rate low <MetricValue state={lowerBoundOf(cell)} format={formatRate} />
+          n {formatCount(cell.n)}
+          <br />
+          Win-rate lower bound <MetricValue state={lowerBoundOf(cell)} format={formatRate} />
         </Typography>
       )}
     </ButtonBase>

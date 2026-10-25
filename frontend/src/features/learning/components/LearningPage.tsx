@@ -19,7 +19,8 @@ const tabs: readonly ButtonTab<Tab>[] = [
  */
 export function LearningPage() {
   const url = useUrlState();
-  const tab = url.choice('tab', tabValues, 'overview');
+  // A cell in the address belongs to Setups, so a link with `?cell=` opens that tab even without `tab=setups`.
+  const tab = url.text('cell') === null ? url.choice('tab', tabValues, 'overview') : 'setups';
   const select = (next: Tab) => {
     // A cell belongs to the Setups tab; leaving it closes the cell.
     url.update({ tab: next === 'overview' ? null : next, cell: null });

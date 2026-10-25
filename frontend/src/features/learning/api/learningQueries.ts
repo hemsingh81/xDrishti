@@ -10,6 +10,7 @@ export type CellState = Schemas['CellStateView'];
 /** The windows the server computes for every cell (`CellWindow` codes). */
 export const cellWindows = ['all', '250d', '60d'] as const;
 export type CellWindow = (typeof cellWindows)[number];
+export const windowLabels: Record<CellWindow, string> = { all: 'All', '250d': 'Last 250 days', '60d': 'Last 60 days' };
 
 /** The most changelog rows one request returns (the server's cap). */
 export const changelogLimit = 200;

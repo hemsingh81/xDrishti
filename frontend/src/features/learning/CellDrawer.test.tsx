@@ -127,6 +127,31 @@ describe('Cell drawer', () => {
     expect(await view.findByRole('table', { name: 'Cell statistics by window' })).toBeInTheDocument();
   });
 
+  it('opens Setups for a link with a cell and no tab', async () => {
+    mountLearning({ cells: { all: [buildCell()] } });
+    renderLearning(`?cell=${encodeURIComponent(key)}`);
+
+    await dialog();
+    // The page behind a modal is hidden from the accessibility tree, so the tabs are looked up with `hidden`.
+    expect(screen.getByRole('tab', { name: 'Setups', selected: true, hidden: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Overview', selected: false, hidden: true })).toBeInTheDocument();
+  });
+
+  it('returns focus to the tile that opened the cell when Escape closes it', async () => {
+    mountLearning({ cells: { all: [buildCell(), buildCell({ timeframe: '5m' })] } });
+    renderLearning('?tab=setups');
+
+    const tile = await screen.findByRole('button', { name: /orb, 15m, BUY.*enough evidence/ });
+    await userEvent.click(tile);
+    await dialog();
+    await userEvent.keyboard('{Escape}');
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /orb, 15m, BUY.*enough evidence/ })).toHaveFocus();
+  });
+
   it('leaving the Setups tab closes the cell', async () => {
     mountLearning({ cells: { all: [buildCell()] } });
     const { router } = renderLearning(`?tab=setups&cell=${encodeURIComponent(key)}`);

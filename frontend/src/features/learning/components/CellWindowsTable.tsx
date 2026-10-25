@@ -9,10 +9,9 @@ import {
   type MetricState,
 } from '@/shared/analytics';
 import { formatDate } from '@/shared/lib/format';
-import { cellWindows, type CellStats } from '../api/learningQueries';
+import { cellWindows, windowLabels, type CellStats } from '../api/learningQueries';
 import { basisOf, statState } from '../lib/cells';
 
-const windowLabel = { all: 'All', '250d': 'Last 250 days', '60d': 'Last 60 days' } as const;
 const finiteCount = (value: number): MetricState => ({ kind: 'value', value });
 
 interface Line {
@@ -81,10 +80,13 @@ const lines: readonly Line[] = [
 
 /** One cell in its windows: metrics down, windows across, every figure in its honest state. */
 export function CellWindowsTable({ cells }: { cells: readonly CellStats[] }) {
-  const windows = cellWindows.flatMap((code) => cells.find((cell) => cell.window === code) ?? []);
-  const first = windows[0];
+  const windows = cellWindows.flatMap((code) => {
+    const cell = cells.find((candidate) => candidate.window === code);
+    return cell ? [{ code, cell }] : [];
+  });
+  const first = windows[0]?.cell;
   if (!first) return null;
-  const all = windows.find((cell) => cell.window === 'all');
+  const all = windows.find((entry) => entry.code === 'all')?.cell;
   return (
     <Box>
       <TableContainer role="region" aria-label="Cell statistics by window, scrolls sideways" tabIndex={0}>
@@ -92,9 +94,9 @@ export function CellWindowsTable({ cells }: { cells: readonly CellStats[] }) {
           <TableHead>
             <TableRow>
               <TableCell>Statistic</TableCell>
-              {windows.map((cell) => (
-                <TableCell key={cell.window} align="right">
-                  {windowLabel[cell.window as keyof typeof windowLabel]}
+              {windows.map(({ code }) => (
+                <TableCell key={code} align="right">
+                  {windowLabels[code]}
                 </TableCell>
               ))}
             </TableRow>
@@ -104,8 +106,8 @@ export function CellWindowsTable({ cells }: { cells: readonly CellStats[] }) {
               <TableCell component="th" scope="row">
                 Evidence
               </TableCell>
-              {windows.map((cell) => (
-                <TableCell key={cell.window} align="right">
+              {windows.map(({ code, cell }) => (
+                <TableCell key={code} align="right">
                   {cell.enough ? 'Enough' : 'Not enough'}
                 </TableCell>
               ))}
@@ -115,8 +117,8 @@ export function CellWindowsTable({ cells }: { cells: readonly CellStats[] }) {
                 <TableCell component="th" scope="row">
                   {line.label}
                 </TableCell>
-                {windows.map((cell) => (
-                  <MetricCell key={cell.window} state={line.state(cell)} format={line.format} tone={line.tone} />
+                {windows.map(({ code, cell }) => (
+                  <MetricCell key={code} state={line.state(cell)} format={line.format} tone={line.tone} />
                 ))}
               </TableRow>
             ))}
@@ -133,7 +135,7 @@ export function CellWindowsTable({ cells }: { cells: readonly CellStats[] }) {
           label="Cell evidence"
           n={all?.n ?? null}
           range={null}
-          basis={basisOf(windows)}
+          basis={basisOf(windows.map((entry) => entry.cell))}
           population={[`snapshot ${first.snapshotKey}, as of ${formatDate(first.asOf)}`]}
           limits={[first.limits]}
         />

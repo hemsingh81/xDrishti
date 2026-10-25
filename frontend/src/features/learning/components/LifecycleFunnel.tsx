@@ -5,7 +5,7 @@ import { EvidenceBlock, formatCount, NonValue } from '@/shared/analytics';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { cellsQuery, cellStateQuery, changelogLimit, changelogQuery } from '../api/learningQueries';
 import { basisOf } from '../lib/cells';
-import { cellsToRead, countFunnel, lifecycleStages, maxStateReads } from '../lib/funnel';
+import { cellsToRead, countFunnel, lifecycleStages, maxStateReads, rowCellsInSnapshot } from '../lib/funnel';
 import { NoSnapshot } from './NoSnapshot';
 import { Panel } from './Panel';
 
@@ -31,7 +31,12 @@ export function LifecycleFunnel() {
     () => [...new Set((rows.data ?? []).filter((row) => row.subjectKind === 'cell').map((row) => row.subject))],
     [rows.data],
   );
-  const toRead = useMemo(() => cellsToRead(cellsWithRows), [cellsWithRows]);
+  const snapshotCells = useMemo(() => [...new Set((cells.data ?? []).map((cell) => cell.cellKey))], [cells.data]);
+  const toRead = useMemo(
+    () => cellsToRead(rowCellsInSnapshot(cellsWithRows, snapshotCells)),
+    [cellsWithRows, snapshotCells],
+  );
+  const truncated = (rows.data?.length ?? 0) >= changelogLimit;
   const states = useQueries({ queries: toRead.map((cell) => cellStateQuery(cell)) });
 
   const loading = cells.isPending || rows.isPending || states.some((state) => state.isPending);
@@ -40,9 +45,7 @@ export function LifecycleFunnel() {
     const key = toRead[index];
     if (key !== undefined && state.data) read.set(key, state.data);
   });
-  const funnel = cells.data
-    ? countFunnel({ snapshotCells: [...new Set(cells.data.map((cell) => cell.cellKey))], cellsWithRows, read })
-    : undefined;
+  const funnel = cells.data ? countFunnel({ snapshotCells, cellsWithRows, truncated, read }) : undefined;
   const max = funnel ? Math.max(1, ...Object.values(funnel.stages), ...Object.values(funnel.other), funnel.notRead) : 1;
 
   return (
@@ -59,13 +62,25 @@ export function LifecycleFunnel() {
             sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 1 }}
           >
             {lifecycleStages.map((stage) => (
-              <Step key={stage} label={stageLabel[stage]} count={funnel.stages[stage]} max={max} />
+              <Step
+                key={stage}
+                label={stageLabel[stage]}
+                count={funnel.stages[stage]}
+                max={max}
+                provisional={stage === 'research' && funnel.researchIsUpperBound ? researchCaveat : undefined}
+              />
             ))}
             {Object.entries(funnel.other).map(([code, count]) => (
               <Step key={code} label={`Other state: ${code}`} count={count} max={max} />
             ))}
             {funnel.notRead > 0 && <Step label="State not read" count={funnel.notRead} max={max} />}
           </Box>
+          {funnel.outsideSnapshot > 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              {formatCount(funnel.outsideSnapshot)} {funnel.outsideSnapshot === 1 ? 'cell' : 'cells'} named in the
+              changelog {funnel.outsideSnapshot === 1 ? 'is' : 'are'} not in the newest snapshot and not counted above.
+            </Typography>
+          )}
           {funnel.notRead > 0 && (
             <Box sx={{ mt: 1 }}>
               <NonValue
@@ -89,17 +104,17 @@ export function LifecycleFunnel() {
           <Box sx={{ mt: 1 }}>
             <EvidenceBlock
               label="Lifecycle evidence"
-              n={cells.data.length}
+              n={snapshotCells.length}
               range={null}
               basis={basisOf(cells.data)}
               population={[
-                `${formatCount(cells.data.length)} cell rows of the newest snapshot (window all)`,
+                `${formatCount(snapshotCells.length)} cells of the newest snapshot (window all)`,
                 `changelog rows of cells, newest ${formatCount(changelogLimit)}`,
               ]}
               limits={
-                rows.data.length >= changelogLimit
+                truncated
                   ? [
-                      'The newest 200 changelog rows were read; there may be more, and older cells may be missing from the counts.',
+                      'The newest 200 changelog rows were read; there may be older rows, so the research count is an upper bound.',
                     ]
                   : []
               }
@@ -111,7 +126,20 @@ export function LifecycleFunnel() {
   );
 }
 
-function Step({ label, count, max }: { label: string; count: number; max: number }) {
+const researchCaveat = `At most this many: only the newest ${String(changelogLimit)} changelog rows were read, so a cell whose rows are all older is counted here by mistake. Older rows can only move a cell out of research.`;
+
+function Step({
+  label,
+  count,
+  max,
+  provisional,
+}: {
+  label: string;
+  count: number;
+  max: number;
+  /** The reason the count is not exact: printed with the word Provisional under the step. */
+  provisional?: string;
+}) {
   return (
     <Box
       component="li"
@@ -134,6 +162,11 @@ function Step({ label, count, max }: { label: string; count: number; max: number
       <Typography component="span" variant="body2" sx={{ fontWeight: 700, minWidth: '2ch', textAlign: 'right' }}>
         {formatCount(count)}
       </Typography>
+      {provisional && (
+        <Box sx={{ gridColumn: '1 / -1' }}>
+          <NonValue state={{ kind: 'provisional', value: count, reason: provisional }} />
+        </Box>
+      )}
     </Box>
   );
 }
