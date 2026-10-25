@@ -21,13 +21,16 @@ namespace XDrishti.Application.Portfolio.Live;
 /// Nothing is written, read or notified when nothing changed. A failure keeps the batch for the next flush (fail closed: the 5-minute quotes carry on). Lives for the lifetime of the feed process (a singleton); the ports
 /// are resolved per flush. Nothing secret is logged.
 /// </summary>
-internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock, ILogger<LiveFlush> logger) : ILiveFlush
+internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock, ILogger<LiveFlush> logger, IEnumerable<ILiveTickObserver>? observers = null) : ILiveFlush
 {
     /// <summary>The shortest time between two <c>live_prices</c> notifications.</summary>
     public static readonly TimeSpan NotifyInterval = TimeSpan.FromSeconds(1);
 
     /// <summary>The shortest time between two reconciliations of the Action center's decisions (an alert that triggers does not wait).</summary>
     public static readonly TimeSpan ReconcileInterval = TimeSpan.FromMinutes(1);
+
+    /// <summary>The longest an observer may take per flush; reconcile and notify never wait longer for alert work.</summary>
+    private static readonly TimeSpan ObserverTimeout = TimeSpan.FromSeconds(2);
 
     private readonly TickCoalescer _ticks = new();
     private long _lastNotify = -1;
@@ -79,6 +82,7 @@ internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock,
             }
 
             var triggered = await CheckAlertsAsync(services, batch, cancellationToken);
+            await ObserveAsync(batch, cancellationToken);
             if (triggered > 0)
             {
                 LiveLog.AlertsTriggered(logger, triggered);
@@ -108,6 +112,41 @@ internal sealed class LiveFlush(IServiceScopeFactory scopes, TimeProvider clock,
             _ticks.Requeue(batch);
             LiveLog.FlushFailed(logger, batch.Count, ex);
             return new LiveFlushResult(batch.Count, 0, 0, 0, false, true);
+        }
+    }
+
+    /// <summary>Hands the firm ticks to the registered observers (none unless a feature is enabled). An observer's failure is logged and never reaches the flush.</summary>
+    private async ValueTask ObserveAsync(IReadOnlyList<LivePrice> batch, CancellationToken cancellationToken)
+    {
+        if (observers is null)
+        {
+            return;
+        }
+
+        var firm = batch.Where(t => !LivePricePolicy.IsIndicative(t.TickAt)).ToList();
+        if (firm.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var observer in observers)
+        {
+            try
+            {
+                using var bound = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                bound.CancelAfter(ObserverTimeout);
+                await observer.ObserveAsync(firm, bound.Token);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+#pragma warning disable CA1031 // an observer must never cost a price: its failure is logged and the flush carries on
+            catch (Exception ex)
+#pragma warning restore CA1031
+            {
+                LiveLog.ObserverFailed(logger, ex.GetType().Name);
+            }
         }
     }
 

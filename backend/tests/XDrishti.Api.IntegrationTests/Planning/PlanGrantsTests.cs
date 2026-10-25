@@ -43,7 +43,7 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             }
         }
 
-        names.ShouldBe(["trading.fill_grades", "trading.grades", "trading.journal_entries", "trading.journal_fills", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "workflow.approvals", "workflow.autonomy_settings", "workflow.suggestion_seen", "workflow.suggestions"]);
+        names.ShouldBe(["trading.fill_grades", "trading.grades", "trading.journal_entries", "trading.journal_fills", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "trading.ticket_alerts", "trading.ticket_notice_acks", "trading.ticket_prompts", "workflow.approvals", "workflow.autonomy_settings", "workflow.suggestion_seen", "workflow.suggestions"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -90,6 +90,15 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             "UPDATE trading.fill_grades SET r = 1 WHERE false",
             "DELETE FROM trading.fill_grades WHERE false",
             "TRUNCATE trading.fill_grades",
+            "UPDATE trading.ticket_alerts SET price = 1 WHERE false",
+            "DELETE FROM trading.ticket_alerts WHERE false",
+            "TRUNCATE trading.ticket_alerts",
+            "UPDATE trading.ticket_prompts SET session = current_date WHERE false",
+            "DELETE FROM trading.ticket_prompts WHERE false",
+            "TRUNCATE trading.ticket_prompts",
+            "UPDATE trading.ticket_notice_acks SET action = 'dismiss' WHERE false",
+            "DELETE FROM trading.ticket_notice_acks WHERE false",
+            "TRUNCATE trading.ticket_notice_acks",
             "UPDATE workflow.approvals SET decision = 'approve' WHERE false",
             "DELETE FROM workflow.approvals WHERE false",
             "TRUNCATE workflow.approvals",

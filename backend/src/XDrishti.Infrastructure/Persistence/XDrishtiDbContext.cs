@@ -190,6 +190,9 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<JournalFillRecord> JournalFills => Set<JournalFillRecord>();
     internal DbSet<FillGradeRecord> FillGrades => Set<FillGradeRecord>();
     internal DbSet<AutonomySettingRecord> AutonomySettings => Set<AutonomySettingRecord>();
+    internal DbSet<TicketAlertRecord> TicketAlerts => Set<TicketAlertRecord>();
+    internal DbSet<TicketPromptRecord> TicketPrompts => Set<TicketPromptRecord>();
+    internal DbSet<TicketNoticeAckRecord> TicketNoticeAcks => Set<TicketNoticeAckRecord>();
 
     internal DbSet<SuggestionRecord> Suggestions => Set<SuggestionRecord>();
 

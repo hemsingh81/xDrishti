@@ -5819,6 +5819,184 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.TicketAlertRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<decimal>("Level")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("level");
+
+                    b.Property<long>("PlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_id");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("price");
+
+                    b.Property<DateOnly>("Session")
+                        .HasColumnType("date")
+                        .HasColumnName("session");
+
+                    b.Property<string>("StopAnchor")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("stop_anchor");
+
+                    b.Property<DateTimeOffset>("TickAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("tick_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ticket_alerts");
+
+                    b.HasIndex("PlanId")
+                        .HasDatabaseName("ix_ticket_alerts_plan_id");
+
+                    b.HasIndex("Session")
+                        .HasDatabaseName("ix_ticket_alerts_session");
+
+                    b.HasIndex("ItemId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("uq_ticket_alerts_item_kind");
+
+                    b.ToTable("ticket_alerts", "trading", t =>
+                        {
+                            t.HasCheckConstraint("ck_ticket_alerts_shape", "kind IN ('stop_crossed', 'target_crossed') AND level > 0 AND price > 0 AND (stop_anchor IS NULL OR stop_anchor IN ('level', 'close_of_d'))");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.TicketNoticeAckRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset>("At")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long?>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<long?>("NoticeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("notice_id");
+
+                    b.Property<string>("NoticeKind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("notice_kind");
+
+                    b.Property<DateTimeOffset?>("Until")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("until");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ticket_notice_acks");
+
+                    b.HasIndex("ItemId")
+                        .HasDatabaseName("ix_ticket_notice_acks_item_id");
+
+                    b.HasIndex("NoticeKind", "NoticeId")
+                        .HasDatabaseName("ix_ticket_notice_acks_notice");
+
+                    b.ToTable("ticket_notice_acks", "trading", t =>
+                        {
+                            t.HasCheckConstraint("ck_ticket_notice_acks_shape", "notice_kind IN ('crossing', 'prompt', 'ticket') AND action IN ('snooze', 'dismiss', 'mute') AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND ((action = 'snooze' AND notice_kind IN ('crossing', 'prompt') AND notice_id IS NOT NULL AND until IS NOT NULL AND item_id IS NULL) OR (action = 'dismiss' AND notice_kind IN ('crossing', 'prompt') AND notice_id IS NOT NULL AND until IS NULL AND item_id IS NULL) OR (action = 'mute' AND notice_kind = 'ticket' AND item_id IS NOT NULL AND notice_id IS NULL AND until IS NULL))");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.TicketPromptRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<long>("PlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_id");
+
+                    b.Property<DateOnly>("Session")
+                        .HasColumnType("date")
+                        .HasColumnName("session");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ticket_prompts");
+
+                    b.HasIndex("PlanId")
+                        .HasDatabaseName("ix_ticket_prompts_plan_id");
+
+                    b.HasIndex("Session")
+                        .HasDatabaseName("ix_ticket_prompts_session");
+
+                    b.HasIndex("ItemId", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_ticket_prompts_item_account");
+
+                    b.ToTable("ticket_prompts", "trading");
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionFoldRow", b =>
                 {
                     b.Property<long>("SelectionId")
@@ -7780,6 +7958,49 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_suggestion_seen_suggestions_suggestion_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.TicketAlertRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanItemRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ticket_alerts_plan_items_item_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ticket_alerts_plans_plan_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.TicketNoticeAckRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanItemRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ticket_notice_acks_plan_items_item_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.TicketPromptRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanItemRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ticket_prompts_plan_items_item_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ticket_prompts_plans_plan_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionFoldRow", b =>
