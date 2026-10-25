@@ -1,8 +1,11 @@
 import { http, HttpResponse } from 'msw';
 import type { Schemas } from '@/shared/api';
 
-/** Default handlers: the plan list only, empty. Everything else of a plan is mocked by the test that needs it. */
-export const planHandlers = [http.get('/api/plans', () => HttpResponse.json([]))];
+/** Default handlers: the plan list and the plan notices of the bell, both empty. Everything else of a plan is mocked by the test that needs it. */
+export const planHandlers = [
+  http.get('/api/plans', () => HttpResponse.json([])),
+  http.get('/api/plans/notices', () => HttpResponse.json({ items: [] })),
+];
 
 /** Builders for the plan screen tests (P7-17). The ids are made up. */
 export const accountA = '00000000-0000-4000-8000-0000000000a1';
@@ -145,5 +148,17 @@ export const buildOutcome = (
   notice: 'Approved for watching: no order is placed and none exists.',
   overriddenCodes: [],
   ignored: [],
+  ...over,
+});
+
+/** A plan notice of the bell (P8-15): a plan awaiting review, with a route and no command. */
+export const buildPlanNotice = (over: Partial<Schemas['PlanNotice']> = {}): Schemas['PlanNotice'] => ({
+  id: 'plan:review:7',
+  kind: 'plan_awaiting_review',
+  severity: 'info',
+  text: 'The plan for 26 Oct awaits your review: 3 tickets undecided, 40 minutes to the cutoff at 09:10. Unreviewed tickets lapse.',
+  route: '/plans?plan=7',
+  planId: 7,
+  at: cutoffIso,
   ...over,
 });

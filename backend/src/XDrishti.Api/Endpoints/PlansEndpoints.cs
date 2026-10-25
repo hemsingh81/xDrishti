@@ -19,6 +19,10 @@ internal sealed class PlansEndpoints : IEndpointModule
             .WithSummary("The plans, newest session first, each in its current state; optional session date and account filters, limit 1 to 200 (default 50). Empty before the first. No order is placed by any plan. 422 plans.invalid")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
+        group.MapGet("/notices", NoticesAsync)
+            .WithName("GetPlanNotices")
+            .WithSummary("What the owner should know about the plan for the notification bell, derived at read time from the stored plan record, runs and fills: a plan awaiting review with the minutes to its stored cutoff, the nightly run that failed closed (gate and reason), tickets that lapsed, tickets armed or invalidated at pre-open, and approved tickets whose fills are not matched yet. Each item has an in-app route and no command, carries counts and no symbol, and is gone once the stored state changes. Read only; in-app only");
+
         group.MapGet("/{id:long}", GetAsync)
             .WithName("GetPlan")
             .WithSummary("One plan with its tickets (primary, reserve, rejected with reasons and evidence), size per account, the states they may move to and the trail of every state change. Armed means watched, never an order. 404 plans.not_found")
@@ -50,6 +54,9 @@ internal sealed class PlansEndpoints : IEndpointModule
             .WithSummary("The P7 phase check from stored records: the last ten trading sessions (scheduled or manual run, gates, published or failed closed, tickets, manual runs), then each acceptance criterion as MET, NOT MET or NOT EVALUABLE with its numbers, the services and owner switches that are still off, and the honest limits. The exit is never MET on fewer than ten consecutive scheduled sessions. Optional 'through' planned-session date. Read only; writes nothing. 422 plans.invalid")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
     }
+
+    private static async Task<Ok<PlanNotices>> NoticesAsync(IQueryHandler<GetPlanNoticesQuery, PlanNotices> handler, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await handler.HandleAsync(new GetPlanNoticesQuery(), cancellationToken));
 
     private static async Task<Results<Ok<PlanPhaseCheckView>, ProblemHttpResult>> PhaseCheckAsync(
         DateOnly? through,

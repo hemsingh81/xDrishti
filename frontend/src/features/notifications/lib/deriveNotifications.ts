@@ -18,7 +18,13 @@ export type NotificationKind =
   | 'trades_unexplained'
   | 'dividends_pending'
   | 'securities_unmatched'
-  | 'rows_dropped';
+  | 'rows_dropped'
+  | 'plan_awaiting_review'
+  | 'plan_nightly_failed'
+  | 'plan_tickets_lapsed'
+  | 'plan_tickets_armed'
+  | 'plan_tickets_invalidated'
+  | 'plan_fills_unmatched';
 export type NotificationSeverity = 'error' | 'warn' | 'info';
 
 /**
