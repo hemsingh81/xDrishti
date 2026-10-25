@@ -485,8 +485,8 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<TrainModelCommand, TrainModelOutcome>, TrainModelHandler>(); // train, validate and register a model (P6-07, ADR 0070)
         services.AddScoped<ICommandHandler<DesignateModelCommand, DesignationOutcome>, DesignateModelHandler>(); // champion / challenger / retired, appended (P6-07)
         services.AddScoped<IQueryHandler<GetLearningOverviewQuery, Result<LearningOverviewView>>, GetLearningOverviewHandler>(); // counts and newest stored verdicts for the Learning screen (P6-18, ADR 0080)
-        services.AddScoped<IQueryHandler<EvaluatePhaseCheckQuery, Result<PhaseCheckView>>, EvaluatePhaseCheckHandler>();
-        services.AddScoped<IQueryHandler<GetLearningPhaseCheckQuery, Result<LearningPhaseCheckView>>, GetLearningPhaseCheckHandler>(); // the same check as a read-only GET, no replay seconds from a client (P8-04, ADR 0103) // the P6 exit criteria from stored records (P6-18, ADR 0080)
+        services.AddScoped<IQueryHandler<EvaluatePhaseCheckQuery, Result<PhaseCheckView>>, EvaluatePhaseCheckHandler>(); // the P6 exit criteria from stored records (P6-18, ADR 0080)
+        services.AddScoped<IQueryHandler<GetLearningPhaseCheckQuery, Result<LearningPhaseCheckView>>, GetLearningPhaseCheckHandler>(); // the same check as a read-only GET, no replay seconds from a client (P8-04, ADR 0103)
         services.AddScoped<ICommandHandler<BuildDigestCommand, DigestView>, BuildDigestHandler>(); // the weekly digest from stored records; its only write is the digest (P7-15, ADR 0094)
         services.AddScoped<IQueryHandler<GetDigestQuery, Result<DigestView>>, GetDigestHandler>();
         services.AddScoped<IQueryHandler<ListDigestsQuery, Result<IReadOnlyList<DigestView>>>, ListDigestsHandler>();

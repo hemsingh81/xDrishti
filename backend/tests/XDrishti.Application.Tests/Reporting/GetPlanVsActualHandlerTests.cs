@@ -31,7 +31,7 @@ public sealed class GetPlanVsActualHandlerTests
             new ApprovalRow(2, 12, "auto", "approve", "rule:autonomy", "auto", null, null, At),
         ]);
         var graded = new FillGrade(FillGrade.Graded, 100, 500.1, 510, 500, 490, 2.0, 0.01, 0.10, 1000m, 40m, 1.8, "d");
-        _journal.EntriesAsync(1, Ct).Returns([new StoredEntry(1, 1, 11, Account, Day, [], graded)]);
+        _journal.EntriesForPlansAsync(Arg.Any<IReadOnlyList<long>>(), Ct).Returns([new StoredEntry(1, 1, 11, Account, Day, [], graded)]);
         var triggered = new TicketGrade(GradeStatus.Graded, 1.0, null, null, "target", 500, 510, "gross", "d");
         _grades.ForPlansAsync(Arg.Any<IReadOnlyList<long>>(), Ct).Returns(new Dictionary<long, StoredGrade>
         {
@@ -77,6 +77,75 @@ public sealed class GetPlanVsActualHandlerTests
 
         result.Value.Plans.ShouldBe(0);
         result.Value.Chain.ShouldAllBe(s => s.Metric.State == "empty");
+    }
+
+    [Fact]
+    public async Task Many_plans_are_read_with_one_grade_read_and_one_journal_read()
+    {
+        var rows = Enumerable.Range(1, 30).Select(i => new PlanRow(i, new NewPlan("k" + i, Day.AddDays(-i), At, 1, new string('b', 64), "b", false, "test", At, []), PlanState.Published, 0, 0, 0)).ToList();
+        _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns(rows);
+        _plans.ItemsAsync(Arg.Any<long>(), Ct).Returns([]);
+        _plans.ApprovalsAsync(Arg.Any<long>(), Ct).Returns([]);
+        _grades.ClearReceivedCalls();
+        _journal.ClearReceivedCalls();
+
+        var result = await Handler().HandleAsync(new GetPlanVsActualQuery(null, null), Ct);
+
+        result.Value.Plans.ShouldBe(30);
+        await _grades.Received(1).ForPlansAsync(Arg.Any<IReadOnlyList<long>>(), Ct);
+        await _journal.Received(1).EntriesForPlansAsync(Arg.Any<IReadOnlyList<long>>(), Ct);
+        await _journal.DidNotReceive().EntriesAsync(Arg.Any<long>(), Ct);
+    }
+
+    [Fact]
+    public async Task The_newest_version_of_a_session_wins()
+    {
+        var older = new PlanRow(1, new NewPlan("k", Day, At, 1, new string('b', 64), "b", false, "test", At, []), PlanState.Published, 2, 0, 0);
+        var newer = new PlanRow(2, new NewPlan("k2", Day, At, 2, new string('c', 64), "b", false, "test", At, []), PlanState.Published, 0, 0, 0);
+        _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns([older, newer]);
+        _plans.ItemsAsync(2, Ct).Returns([]);
+        _plans.ApprovalsAsync(2, Ct).Returns([]);
+
+        var result = await Handler().HandleAsync(new GetPlanVsActualQuery(null, null), Ct);
+
+        result.Value.Plans.ShouldBe(1);
+        result.Value.Counts.ApprovedLines.ShouldBe(0);
+        await _plans.DidNotReceive().ItemsAsync(1, Ct);
+    }
+
+    [Fact]
+    public async Task An_approval_of_a_ticket_that_is_not_a_line_is_not_counted()
+    {
+        _plans.ApprovalsAsync(1, Ct).Returns([new ApprovalRow(9, 99, "auto", "approve", "rule:autonomy", "x", null, null, At)]);
+
+        var result = await Handler().HandleAsync(new GetPlanVsActualQuery(null, null), Ct);
+
+        result.Value.Approvals.ShouldBe([new ApprovalCountView("owner", 0), new ApprovalCountView("auto", 0)]);
+    }
+
+    [Fact]
+    public async Task The_limit_line_appears_only_when_the_oldest_plan_read_is_after_from()
+    {
+        var rows = Enumerable.Range(0, 200).Select(i => new PlanRow(i + 1, new NewPlan("k" + i, Day.AddDays(-i), At, 1, new string('b', 64), "b", false, "test", At, []), PlanState.Published, 0, 0, 0)).ToList();
+        _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns(rows);
+        _plans.ItemsAsync(Arg.Any<long>(), Ct).Returns([]);
+        _plans.ApprovalsAsync(Arg.Any<long>(), Ct).Returns([]);
+
+        var within = await Handler().HandleAsync(new GetPlanVsActualQuery(Day.AddDays(-100), null), Ct);
+        var before = await Handler().HandleAsync(new GetPlanVsActualQuery(Day.AddDays(-300), null), Ct);
+
+        within.Value.Evidence.Limits.ShouldNotContain(l => l.Contains("older part of the range"));
+        before.Value.Evidence.Limits.ShouldContain(l => l.Contains("older part of the range"));
+    }
+
+    [Fact]
+    public async Task A_range_of_366_days_is_allowed_and_367_is_refused()
+    {
+        var allowed = await Handler().HandleAsync(new GetPlanVsActualQuery(Day, Day.AddDays(366)), Ct);
+        var refused = await Handler().HandleAsync(new GetPlanVsActualQuery(Day, Day.AddDays(367)), Ct);
+
+        allowed.IsSuccess.ShouldBeTrue();
+        refused.Error.Code.ShouldBe("reports.invalid");
     }
 
     [Fact]

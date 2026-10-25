@@ -39,6 +39,25 @@ public sealed class PlanVsActualApiTests(ApiFactory factory) : DataTestBase(fact
     }
 
     [Fact]
+    public async Task Reading_either_endpoint_writes_nothing()
+    {
+        string[] tables = ["research.experiments", "research.model_versions", "research.model_designations", "trading.plans", "trading.plan_runs", "trading.grades", "trading.journal_entries", "workflow.approvals"];
+        var before = new List<long>();
+        foreach (var table in tables)
+        {
+            before.Add(await ScalarAsync<long>("SELECT count(*) FROM " + table));
+        }
+
+        (await Client.GetAsync(new Uri("/api/learning/phase-check", UriKind.Relative), Ct)).EnsureSuccessStatusCode();
+        (await Client.GetAsync(new Uri("/api/reports/plan-vs-actual", UriKind.Relative), Ct)).EnsureSuccessStatusCode();
+
+        for (var i = 0; i < tables.Length; i++)
+        {
+            (await ScalarAsync<long>("SELECT count(*) FROM " + tables[i])).ShouldBe(before[i], tables[i]);
+        }
+    }
+
+    [Fact]
     public async Task The_learning_phase_check_is_not_evaluable_without_a_model_and_prints_the_limits()
     {
         using var response = await Client.GetAsync(new Uri("/api/learning/phase-check", UriKind.Relative), Ct);

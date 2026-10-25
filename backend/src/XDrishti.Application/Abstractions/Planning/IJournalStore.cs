@@ -70,6 +70,9 @@ public interface IJournalStore
     /// <summary>The entries of a plan with their fills and fill grades.</summary>
     ValueTask<IReadOnlyList<StoredEntry>> EntriesAsync(long planId, CancellationToken cancellationToken);
 
+    /// <summary>The entries of several plans with their fills and fill grades, in one read (P8-04).</summary>
+    ValueTask<IReadOnlyList<StoredEntry>> EntriesForPlansAsync(IReadOnlyList<long> planIds, CancellationToken cancellationToken);
+
     /// <summary>The discretionary fills journaled for a session.</summary>
     ValueTask<IReadOnlyList<StoredFill>> DiscretionaryAsync(DateOnly forDate, CancellationToken cancellationToken);
 }

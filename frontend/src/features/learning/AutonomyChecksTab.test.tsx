@@ -1,5 +1,8 @@
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { buildAutonomy, buildLearningCheck, buildPlanCheck, mountLearning } from '@/test/learningFixtures';
+import { server } from '@/test/server';
 import { renderLearning } from './testing';
 
 describe('Autonomy', () => {
@@ -75,11 +78,34 @@ describe('Phase checks', () => {
     expect(await screen.findByText(/MET \(COUNT ONLY/)).toBeInTheDocument();
     const p7 = screen.getByRole('list', { name: 'P7 criteria' });
     expect(p7).toHaveTextContent('Caveat: count only');
+    await userEvent.click(screen.getByRole('button', { name: 'Read the P6 check' }));
     const p6 = await screen.findByRole('list', { name: 'P6 criteria' });
     expect(within(p6).getAllByText('NOT EVALUABLE')).toHaveLength(2);
     expect(screen.getByRole('list', { name: 'P6 limits' })).toHaveTextContent('stored records only');
     expect(screen.getByRole('list', { name: 'P7 limits' })).toBeInTheDocument();
     expect(screen.getByText(/Read in 12 ms/)).toBeInTheDocument();
+  });
+
+  it('does not read the P6 check until the button is pressed, and keeps its title meanwhile', async () => {
+    let reads = 0;
+    mountLearning();
+    server.use(
+      http.get('/api/learning/phase-check', () => {
+        reads += 1;
+        return HttpResponse.json(buildLearningCheck({ elapsedMs: 4321 }));
+      }),
+    );
+    renderLearning('?tab=checks');
+
+    expect(await screen.findByRole('heading', { name: 'P6 phase check (learning)' })).toBeInTheDocument();
+    expect(screen.getByText(/Not read yet/)).toBeInTheDocument();
+    expect(reads).toBe(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Read the P6 check' }));
+
+    expect(await screen.findByText(/Read in 4,321 ms/)).toBeInTheDocument();
+    expect(reads).toBe(1);
+    expect(screen.getByRole('heading', { name: 'P6 phase check (learning)' })).toBeInTheDocument();
   });
 
   it('renders server text as text', async () => {
@@ -90,6 +116,7 @@ describe('Phase checks', () => {
     });
     renderLearning('?tab=checks');
 
+    await userEvent.click(await screen.findByRole('button', { name: 'Read the P6 check' }));
     expect(await screen.findByText(/<b>bold<\/b> detail/)).toBeInTheDocument();
     expect(document.querySelector('b')).toBeNull();
   });

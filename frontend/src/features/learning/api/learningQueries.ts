@@ -91,6 +91,8 @@ export const planVsActualQuery = (range: DateRange) =>
     queryKey: learningKeys.planVsActual(range),
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/reports/plan-vs-actual', { params: { query: rangeQuery(range) }, signal })),
+    // The Overview tile reads this on every Learning open and the server joins several stores for it: keep it for 5 minutes.
+    staleTime: 5 * 60 * 1000,
   });
 
 /** The decisions report (simulated on plan prices) of the graded plans of a range. */

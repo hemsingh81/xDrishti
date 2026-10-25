@@ -36,6 +36,7 @@ internal sealed class GetPlanVsActualHandler(IPlanStore plans, IJournalStore jou
         }
 
         var started = Stopwatch.GetTimestamp();
+        // Shortcut: IPlanStore.ListAsync has no date-range parameter, so the newest MaxPlans plans are read and filtered here; a range older than them is incomplete (the limit line says so). A range parameter on the store would remove this.
         var listed = await plans.ListAsync(null, null, MaxPlans, cancellationToken);
         var inRange = listed
             .Where(p => (query.From is null || p.Plan.ForDate >= query.From) && (query.To is null || p.Plan.ForDate <= query.To))
@@ -43,15 +44,20 @@ internal sealed class GetPlanVsActualHandler(IPlanStore plans, IJournalStore jou
             .Select(g => g.OrderByDescending(p => p.Plan.Version).First())
             .OrderBy(p => p.Plan.ForDate)
             .ToList();
+        // One grade read and one journal read for all plans; items and approvals are per plan (the store has no batch for them).
+        var ids = inRange.Select(p => p.Id).ToList();
+        var stored = await grades.ForPlansAsync(ids, cancellationToken);
+        var entries = (await journal.EntriesForPlansAsync(ids, cancellationToken)).ToLookup(e => e.PlanId);
         var lines = new List<PlanVsActualLine>();
         var approvals = new Dictionary<string, int> { ["owner"] = 0, ["auto"] = 0 };
         foreach (var plan in inRange)
         {
-            lines.AddRange(await LinesAsync(plan, approvals, cancellationToken));
+            lines.AddRange(await LinesAsync(plan, entries[plan.Id], stored, approvals, cancellationToken));
         }
 
         var result = PlanVsActual.Build(lines, new PlanVsActualOptions(settings.MinTickets));
-        var limits = listed.Count >= MaxPlans ? [.. Limits, $"Only the newest {MaxPlans} plans are read; an older part of the range may be missing."] : Limits;
+        var maybeTruncated = listed.Count >= MaxPlans && (query.From is null || listed.Min(p => p.Plan.ForDate) > query.From);
+        var limits = maybeTruncated ? [.. Limits, $"Only the newest {MaxPlans} plans are read; an older part of the range may be missing."] : Limits;
         var view = new PlanVsActualView(
             query.From,
             query.To,
@@ -69,12 +75,13 @@ internal sealed class GetPlanVsActualHandler(IPlanStore plans, IJournalStore jou
         return Result.Success(view);
     }
 
-    private async ValueTask<List<PlanVsActualLine>> LinesAsync(PlanRow plan, Dictionary<string, int> approvals, CancellationToken cancellationToken)
+    private async ValueTask<List<PlanVsActualLine>> LinesAsync(PlanRow plan, IEnumerable<StoredEntry> entries, IReadOnlyDictionary<long, StoredGrade> stored, Dictionary<string, int> approvals, CancellationToken cancellationToken)
     {
         var items = await plans.ItemsAsync(plan.Id, cancellationToken);
-        var entries = await journal.EntriesAsync(plan.Id, cancellationToken);
-        var stored = await grades.ForPlansAsync([plan.Id], cancellationToken);
-        var approved = (await plans.ApprovalsAsync(plan.Id, cancellationToken)).Where(a => a.Decision == "approve").ToList();
+        var counted = items.Where(i => i.Item.Group != TicketGroup.Rejected && i.State is TicketState.Approved or TicketState.Armed or TicketState.Triggered or TicketState.Closed).ToList();
+        var countedIds = counted.Select(i => i.Id).ToHashSet();
+        // Approvals are counted only for the tickets that are lines here, so the owner/auto split adds up to the approved lines.
+        var approved = (await plans.ApprovalsAsync(plan.Id, cancellationToken)).Where(a => a.Decision == "approve" && countedIds.Contains(a.ItemId)).ToList();
         foreach (var a in approved)
         {
             if (approvals.TryGetValue(a.Kind, out var n))
@@ -86,7 +93,7 @@ internal sealed class GetPlanVsActualHandler(IPlanStore plans, IJournalStore jou
         var kinds = approved.GroupBy(a => a.ItemId).ToDictionary(g => g.Key, g => g.OrderBy(a => a.Id).Last().Kind);
         var byKey = entries.GroupBy(e => (e.ItemId, e.AccountId)).ToDictionary(g => g.Key, g => g.First());
         var lines = new List<PlanVsActualLine>();
-        foreach (var item in items.Where(i => i.Item.Group != TicketGroup.Rejected && i.State is TicketState.Approved or TicketState.Armed or TicketState.Triggered or TicketState.Closed))
+        foreach (var item in counted)
         {
             var plan1 = stored.TryGetValue(item.Id, out var s) ? s.Grade.Grade : null;
             var triggered = plan1 is { Status: GradeStatus.Graded };
