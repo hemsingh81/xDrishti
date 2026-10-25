@@ -39,7 +39,7 @@ public sealed partial class ReportEndpointsArchitectureTests
         var code = Code(EndpointsSource);
 
         WritingRoute().IsMatch(code).ShouldBeFalse();
-        ReadingRoute().Count(code).ShouldBe(10);
+        ReadingRoute().Count(code).ShouldBe(11); // P8-04 added plan-vs-actual (GET)
         code.ShouldNotContain("ICommandHandler");
         WritingRoute().IsMatch("reports.MapPost(\"/x\", Handler)").ShouldBeTrue("the scan does see a write route");
         WritingRoute().IsMatch("reports.MapDelete(\"/x\", Handler)").ShouldBeTrue();

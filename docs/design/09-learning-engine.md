@@ -191,6 +191,8 @@ and two actions: **Revert** and **Re-run with a different value** (opens §12 pr
 
 Built (P6-16, [ADR 0078](../adr/0078-lessons-a-finding-a-linked-fix-and-a-result-read-from-the-stored-experiment.md)): a lesson is a monitor finding from replayed history (growing loss tag, rolling expectancy below the band, CUSUM, calibration), opened once per finding (monitor, subject, evidence key; a growing tag by monitor, subject and tag kind while its lesson is open or linked), optionally linked to a hypothesis or experiment, and closed with the before and after numbers read from that fix's stored experiment (`improved` only when it was Better, otherwise `no measurable change`, which is a legitimate result). States open, linked, closed, dismissed; all moves are the owner's; nothing is applied. Stored in the insert-only `research.lessons`; `xd learn lesson`, `GET /api/lessons`. Not built: `execution_gap` and `decision_drag` (need real fills and decisions, P10/P11), `data_quality`, drawdown beyond the Monte Carlo band, tail losses, generated diagnoses (P9), the Learning screen chart (P8). The JSON example above is the intended shape; the stored lesson carries the finding text, the fix link and the experiment numbers instead of `diagnosis` and `fix.how`.
 
+> **As built (P8-04, ADR 0103).** The weekly decomposition is shown on the Learning screen as *Plan vs actual*: plan prices, entry slippage, charges, a remainder "not attributed" (exit slippage and anything else; the plan grade stores no simulated exit price) and the actual R after recorded charges, as means over the same tickets, `insufficient` below 15 graded tickets. Missed triggers are a count outside the chain. Exit slippage and the effect of overrides are listed as not decomposed. Nothing is graded on fills before paper and live trading, so today the chain is empty.
+
 ## 11. Making learning visible (Learning screen)
 
 | View | Question it answers |
@@ -234,6 +236,8 @@ Rules that keep experiments honest:
    is audited, and is monitored for 60 trades with **automatic rollback** if live results fall below the old version.
 
 ## 13. Autonomy: less intervention, same control
+
+> **As built (P8-04).** The Learning screen shows the autonomy switches, their history and the owner/auto approval counts read only; no control exists there (changing them needs a fresh password, P8-19).
 
 | Level | Plan tickets | Learning changes | Always asks you |
 |-------|--------------|------------------|-----------------|

@@ -1,11 +1,12 @@
 import { Box, Button, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { DataTable, formatAsOf, formatCount, MetricTile, type MetricState } from '@/shared/analytics';
+import { DataTable, formatAsOf, formatCount, formatR, MetricTile, type MetricState } from '@/shared/analytics';
 import { formatDate } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
-import { overviewQuery, type LearningOverview, type OverviewSection } from '../api/learningQueries';
+import { overviewQuery, planVsActualQuery, type LearningOverview, type OverviewSection } from '../api/learningQueries';
 import { plannedText, type TabProps } from '../lib/tabs';
 import { countState } from '../lib/overview';
+import { executionGapState } from '../lib/executionGap';
 import { NoSnapshot } from './NoSnapshot';
 import { Panel } from './Panel';
 
@@ -40,6 +41,7 @@ function newestRows(overview: LearningOverview): NewestRow[] {
 /** Overview: what the learning engine holds. Counts and the newest stored verdicts; nothing is computed or scored here. */
 export function OverviewTab({ open }: TabProps) {
   const query = useQuery(overviewQuery);
+  const gap = useQuery(planVsActualQuery({ from: null, to: null }));
   if (query.isPending) return <LoadingState label="Loading the overview…" />;
   if (query.isError) return <ErrorState error={query.error} />;
   const o = query.data;
@@ -47,7 +49,7 @@ export function OverviewTab({ open }: TabProps) {
   const snapshotState: MetricState = noSnapshot
     ? { kind: 'empty', reason: 'No snapshot yet; run `xd learn cells`.' }
     : { kind: 'value', value: o.cellRows };
-  const tiles: { label: string; state: MetricState; hint?: string }[] = [
+  const tiles: { label: string; state: MetricState; hint?: string; format?: (value: number) => string }[] = [
     {
       label: 'Cell rows (three windows per cell)',
       state: snapshotState,
@@ -58,6 +60,12 @@ export function OverviewTab({ open }: TabProps) {
     { label: 'Hypotheses', state: countState(o.hypotheses, 'hypotheses'), hint: splitText(o.hypotheses) },
     { label: 'Lessons', state: countState(o.lessons, 'lessons'), hint: splitText(o.lessons) },
     { label: 'Changelog rows', state: countState(o.changelog, 'changelog rows'), hint: splitText(o.changelog) },
+    {
+      label: 'Execution gap (actual minus plan, R)',
+      state: executionGapState(gap.data, gap.isError),
+      hint: 'Realised fills beside plan prices; see Plan vs actual',
+      format: formatR,
+    },
   ];
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 2 }}>
@@ -73,13 +81,19 @@ export function OverviewTab({ open }: TabProps) {
           gridTemplateColumns: {
             xs: 'repeat(2, minmax(0, 1fr))',
             md: 'repeat(3, minmax(0, 1fr))',
-            xl: 'repeat(6, minmax(0, 1fr))',
+            xl: 'repeat(7, minmax(0, 1fr))',
           },
           '--stat-tile-label-min': '2.5em',
         }}
       >
         {tiles.map((tile) => (
-          <MetricTile key={tile.label} label={tile.label} state={tile.state} format={formatCount} hint={tile.hint} />
+          <MetricTile
+            key={tile.label}
+            label={tile.label}
+            state={tile.state}
+            format={tile.format ?? formatCount}
+            hint={tile.hint}
+          />
         ))}
       </Box>
       <Panel title="Newest stored record of each kind">

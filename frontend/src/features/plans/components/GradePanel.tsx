@@ -1,5 +1,6 @@
-import { Card, CardContent, Typography } from '@mui/material';
+import { Card, CardContent, Link, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { Link as RouterLink } from 'react-router';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { gradeQuery } from '../api/planQueries';
 
@@ -49,6 +50,9 @@ export function GradePanel({ planId }: { planId: number }) {
                 </tbody>
               </table>
             )}
+            <Link component={RouterLink} to="/learning?tab=plan" sx={{ display: 'inline-block', mt: 1 }}>
+              Plan vs actual in Learning
+            </Link>
           </>
         )}
       </CardContent>

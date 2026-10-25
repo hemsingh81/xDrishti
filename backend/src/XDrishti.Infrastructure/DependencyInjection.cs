@@ -131,6 +131,8 @@ public static class DependencyInjection
         services.AddScoped<ITrainingSetStore, TrainingSetStore>(); // the training-set records (spec P6-04)
         services.AddOptions<ReportBenchmarkOptions>().Bind(configuration.GetSection(ReportBenchmarkOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // basket benchmarks (spec P8-07)
         services.AddScoped(sp => sp.GetRequiredService<IOptions<ReportBenchmarkOptions>>().Value);
+        services.AddOptions<PlanVsActualSettings>().Bind(configuration.GetSection(PlanVsActualSettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // plan versus actual (spec P8-04)
+        services.AddScoped(sp => sp.GetRequiredService<IOptions<PlanVsActualSettings>>().Value);
         services.AddOptions<ModelStoreOptions>().Bind(configuration.GetSection(ModelStoreOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
         services.AddScoped<ILearningChangelog, LearningChangelog>(); // the insert-only learning changelog (spec P6-08)
         services.AddScoped<IModelRegistry, ModelRegistry>(); // the registered models and their designations (spec P6-07)

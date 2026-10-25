@@ -19,11 +19,13 @@ export interface EvidenceProps {
   limits?: readonly string[];
   /** The landmark name when a page holds more than one block ("Evidence" by default). */
   label?: string;
+  /** Replaces the gross / net wording when the figures are neither (realised fills): the server's text, shown as is. */
+  basisText?: string;
   /** One line, for beside a tile or a table cell, instead of the labelled block. */
   compact?: boolean;
 }
 
-const basisText = {
+const basisWords = {
   gross: 'Gross R (before costs)',
   net: 'Net R (after the stored charge sheet)',
   unknown: 'Basis not stated',
@@ -41,13 +43,15 @@ export function EvidenceBlock({
   provisional = false,
   population,
   limits,
+  basisText,
   compact = false,
   label = 'Evidence',
 }: EvidenceProps) {
+  const basisLine = basisText ?? basisWords[basis];
   const nText = n === null ? 'n not reported' : `n ${formatCount(n)}`;
   const rangeText = range ? formatRange(range) : 'range not stated';
   if (compact) {
-    const parts = [nText, rangeText, basisText[basis], ...(provisional ? ['Provisional'] : [])];
+    const parts = [nText, rangeText, basisLine, ...(provisional ? ['Provisional'] : [])];
     return (
       <Typography component="p" variant="caption" color="text.secondary" sx={{ m: 0, ...numeric }}>
         {parts.join(' · ')}
@@ -79,7 +83,7 @@ export function EvidenceBlock({
         </Box>
         <Box className="item">
           <dt>Basis</dt>
-          <dd>{basisText[basis]}</dd>
+          <dd>{basisLine}</dd>
         </Box>
         {provisional && (
           <Box className="item">

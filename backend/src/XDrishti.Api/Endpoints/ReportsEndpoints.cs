@@ -83,6 +83,11 @@ internal sealed class ReportsEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        reports.MapGet("/plan-vs-actual", PlanVsActualAsync)
+            .WithName("GetPlanVsActual")
+            .WithSummary("Where the edge goes between the plan and the fills: the plan's R, then entry slippage, charges, a remainder 'not attributed' (exit slippage and anything else) and the realised R after the charges the sync recorded, as means over the tickets graded on fills; the counts of approved lines (with fills, uncertain, without fills), triggered tickets that had no fill (outside the chain), the parts not decomposed with the reason, per strategy, and the approvals by kind (owner, auto). Each figure below the minimum number of graded tickets is insufficient with no number. Takes from and to (planned sessions, at most 366 days apart). Read only. 422 reports.invalid.")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
         reports.MapGet("/trades", TradesAsync)
             .WithName("ListReportTrades")
             .WithSummary("A page of the closed trades the report counts, in the order of the exits (limit 1 to 1,000, default 100; cursor from the previous page, which belongs to that report and is refused for another): the very set the figures were computed from, open-at-end trades excluded. Every page recomputes the population. There is no lens. Read only." + Common + Caps + Errors)
@@ -156,6 +161,17 @@ internal sealed class ReportsEndpoints : IEndpointModule
         CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(new GetReportBenchmarksQuery(input.Basket, input.From, input.To, input.MembersAsOf), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<PlanVsActualView>, ProblemHttpResult>> PlanVsActualAsync(
+        DateOnly? from,
+        DateOnly? to,
+        HttpContext http,
+        IQueryHandler<GetPlanVsActualQuery, Result<PlanVsActualView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetPlanVsActualQuery(from, to), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 

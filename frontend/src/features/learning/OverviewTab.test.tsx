@@ -177,7 +177,14 @@ describe('Learning overview', () => {
     renderLearning();
 
     expect(await screen.findByText(/Not built yet: Journey \(P8-12\), Smart rules \(P8-13\)/)).toBeInTheDocument();
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Overview', 'Setups']);
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Overview',
+      'Setups',
+      'Plan vs actual',
+      'Decisions',
+      'Autonomy',
+      'Phase checks',
+    ]);
   });
 
   it('serves a hand-edited address: an unknown tab falls back to the overview', async () => {

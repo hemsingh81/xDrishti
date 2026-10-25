@@ -13,4 +13,7 @@ internal static partial class ReportLog
 
     [LoggerMessage(EventId = 4801, Level = LogLevel.Information, Message = "reports.refused kind {Kind}: {Code}")]
     public static partial void Refused(ILogger logger, string kind, string code);
+
+    [LoggerMessage(EventId = 4803, Level = LogLevel.Information, Message = "report.read kind {Kind}: {Plans} plans, {Lines} lines, {Milliseconds} ms")]
+    public static partial void Read(ILogger logger, string kind, int plans, int lines, long milliseconds);
 }
