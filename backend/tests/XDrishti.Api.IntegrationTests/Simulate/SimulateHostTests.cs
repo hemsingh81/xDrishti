@@ -136,5 +136,7 @@ public sealed class SimulateHostTests
         public ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input) => throw new NotSupportedException();
 
         public InstrumentReplay Replay(IPreparedStrategy strategy, InstrumentReplayInput input) => throw new NotSupportedException();
+
+        public ExplainResult Explain(IPreparedStrategy strategy, InstrumentReplayInput input, IReadOnlyList<ExplainRequest> requests) => throw new NotSupportedException();
     }
 }

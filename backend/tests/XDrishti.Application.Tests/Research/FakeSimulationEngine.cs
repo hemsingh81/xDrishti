@@ -71,6 +71,18 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
         return new ComparisonReplay(members, members.Select(_ => 0L).ToList());
     }
 
+    /// <summary>The inputs of <see cref="Explain"/>, in order.</summary>
+    public List<(InstrumentReplayInput Input, IReadOnlyList<ExplainRequest> Requests)> Explains { get; } = [];
+
+    /// <summary>The answer of <see cref="Explain"/>; null means the scripted replay and no explanation.</summary>
+    public Func<InstrumentReplayInput, IReadOnlyList<ExplainRequest>, ExplainResult>? ExplainScript { get; set; }
+
+    public ExplainResult Explain(IPreparedStrategy strategy, InstrumentReplayInput input, IReadOnlyList<ExplainRequest> requests)
+    {
+        Explains.Add((input, requests));
+        return ExplainScript?.Invoke(input, requests) ?? new ExplainResult(Script?.Invoke(input) ?? Default(input), new Dictionary<string, TradeExplanation>());
+    }
+
     public InstrumentReplay Replay(IPreparedStrategy strategy, InstrumentReplayInput input)
     {
         Replays.Add(input);

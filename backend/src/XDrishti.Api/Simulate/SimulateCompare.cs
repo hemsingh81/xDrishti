@@ -19,8 +19,8 @@ namespace XDrishti.Api.Simulate;
 /// </summary>
 internal static class SimulateCompare
 {
-    /// <summary>The format string of a comparison folder: the files of <c>xd-sim-export-3</c> plus the comparison and one pair of trade files and one run record for each candidate.</summary>
-    public const string ExportFormat = "xd-sim-export-4";
+    /// <summary>The format string of a comparison folder: the one constant of the verb (<see cref="SimulateCommand.ExportFormat"/>, <c>xd-sim-export-4</c>); a comparison folder holds the files of a run folder plus the comparison and one pair of trade files and one run record for each candidate, and has no cards.</summary>
+    public const string ExportFormat = SimulateCommand.ExportFormat;
 
     /// <summary>The names of the files of one candidate: the first keeps the plain names; the others carry the index and a cleaned id.</summary>
     public static (string Trades, string Open, string Run) Names(int index, string id)

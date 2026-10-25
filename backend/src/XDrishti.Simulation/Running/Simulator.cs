@@ -53,6 +53,9 @@ public sealed class Simulator
     /// <summary>The sides this simulator runs, Buy first.</summary>
     public IReadOnlyList<Side> Sides => _sides.Select(s => s.Compiled.Side).ToList().AsReadOnly();
 
+    /// <summary>The compiled side that decides entries for <paramref name="side"/>, or null when the strategy has none (P3-04d).</summary>
+    internal CompiledSide? CompiledOf(Side side) => _sides.FirstOrDefault(s => s.Compiled.Side == side)?.Compiled;
+
     /// <summary>
     /// Compiles every side the definition lists for the evaluation timeframe (<see cref="StrategyCompiler"/>), refuses by name what this simulator cannot run, and returns the simulator or the located problems. The problems of the
     /// compile are passed on unchanged, with their paths and spans; a <c>simulation.*</c> refusal carries the path of the field and the span of a model problem (0, 0, line 1, column 1). When a simulator exists, the problems are the

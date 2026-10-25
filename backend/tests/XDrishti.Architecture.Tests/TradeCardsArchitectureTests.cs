@@ -42,7 +42,7 @@ public sealed class TradeCardsArchitectureTests
     {
         ShapeProblems(Handler()).ShouldBeEmpty();
         var ports = Handler().GetConstructors().Single().GetParameters().Select(p => p.ParameterType.Name).ToList();
-        ports.ShouldBe(["IBarStore", "IBarQueries", "IAdjustmentFactors"]);
+        ports.ShouldBe(["IBarStore", "IBarQueries", "IAdjustmentFactors", "ISimulationEngine"]);
     }
 
     [Fact]

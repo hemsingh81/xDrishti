@@ -56,4 +56,10 @@ public interface ISimulationEngine
     /// Replays a prepared comparison (two or more candidates) over one instrument with one scan (P4-05): the replay of each candidate in order and the gated counts. Pure and synchronous; the errors of <see cref="Replay"/> apply.
     /// </summary>
     ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input);
+
+    /// <summary>
+    /// Replays as <see cref="Replay"/> does and explains the requested trades (P3-04d): for each request whose decision is a candidate of the scan, the conditions of its side at the decision bar with the values they read, from the replay's
+    /// own frame. A request that matches no candidate has no entry in the answer. Pure and synchronous; the errors of <see cref="Replay"/> apply.
+    /// </summary>
+    ExplainResult Explain(IPreparedStrategy strategy, InstrumentReplayInput input, IReadOnlyList<ExplainRequest> requests);
 }

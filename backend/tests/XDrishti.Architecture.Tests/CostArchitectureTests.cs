@@ -59,7 +59,7 @@ public sealed partial class CostArchitectureTests
     {
         Domain.GetType("XDrishti.Domain.Research.CostField")!.IsPublic.ShouldBeFalse();
         Domain.GetType("XDrishti.Domain.Research.MiniJson")!.IsPublic.ShouldBeFalse();
-        Domain.GetExportedTypes().Where(t => t.Namespace == "XDrishti.Domain.Research" && CostFamily().IsMatch(t.Name) && t.Name is not ("CostBasis" or "TradeCardData"))
+        Domain.GetExportedTypes().Where(t => t.Namespace == "XDrishti.Domain.Research" && CostFamily().IsMatch(t.Name) && t.Name is not ("CostBasis" or "TradeCardData" or "TradeExplanation"))
             .Select(t => t.Name).Order().ShouldBe([.. NewTypes.Order()]);
     }
 

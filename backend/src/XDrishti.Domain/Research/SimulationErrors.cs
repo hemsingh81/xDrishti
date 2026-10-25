@@ -66,6 +66,21 @@ public static class SimulationErrors
     /// <summary>The tick of the instrument master differs from the one the run used.</summary>
     public const string StaleTick = "tick_changed";
 
+    /// <summary>The recomputation for the trade cards did not give the recorded trade, or the recorded decision does not hold its conditions (P3-04d); the export is refused and nothing is written.</summary>
+    public const string CardsMismatchCode = "simulation.cards_mismatch";
+
+    /// <summary>The replay of <paramref name="symbol"/> does not reproduce a recorded trade; <paramref name="field"/> names the first field that differs (or the condition list that does not hold) and <paramref name="detail"/> says how. A conflict, like stale.</summary>
+    public static Error CardsMismatch(string symbol, string field, string detail)
+    {
+        ArgumentNullException.ThrowIfNull(symbol);
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(detail);
+        return Error.Conflict(CardsMismatchCode, "The recomputation of the trade for its card does not give the recorded trade, so the export is refused; the engine or the data changed since the run.") with
+        {
+            Fields = [new FieldError(symbol, detail, null, field)],
+        };
+    }
+
     public static Error SlippageInvalid(string field, string reason) =>
         Error.Validation(SlippageInvalidCode, $"The slippage setting '{field}' is invalid: {reason}.");
 

@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Globalization;
 using System.Text;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Research;
 using XDrishti.Domain.Research;
 using XDrishti.SimExport.Cards;
 using XDrishti.SimExport.Manifest;
@@ -96,17 +97,20 @@ internal static class VerifyPackCommand
         phaseStart = time.GetTimestamp();
         var rules = SimulatePipeline.Rules(FillsMode.Modelled);
         var runs = new List<SimulationRun>(options.Strategies.Count);
+        var bases = new List<ExplainBasis>(options.Strategies.Count);
         foreach (var strategy in options.Strategies)
         {
             // the registered defaults and the timeframe of the built-in: a pack checks the rule set as it ships
             var request = SimulatePipeline.Request(strategy, new Dictionary<string, double>(), null, options.From, options.To, gate.Universe, engine, rules, options.Costs, options.AcknowledgeCsvAdjusted, options.Exits);
-            var ran = await SimulatePipeline.RunAsync(provider, request, cancellationToken);
+            var sink = new ExplainBasisSink();
+            var ran = await SimulatePipeline.RunAsync(provider, request, cancellationToken, sink);
             if (ran.IsFailure)
             {
                 return await SimulatePipeline.RefuseAsync(console, logger, ran.Error.Code, SimulatePipeline.Problems(ran.Error));
             }
 
             runs.Add(ran.Value);
+            bases.Add(SimulatePipeline.RequireBasis(sink));
         }
 
         var runTime = time.GetElapsedTime(phaseStart);
@@ -122,7 +126,7 @@ internal static class VerifyPackCommand
         for (var r = 0; r < runs.Count; r++)
         {
             var rows = plan.Rows.Where(row => row.RunIndex == r).ToList();
-            var read = await SimulatePipeline.CardsAsync(provider, runs[r], [.. rows.Select(row => row.Trade.Trade.Key)], cancellationToken);
+            var read = await SimulatePipeline.CardsAsync(provider, runs[r], [.. rows.Select(row => row.Trade.Trade.Key)], bases[r], cancellationToken);
             if (read.IsFailure)
             {
                 SimulatePipeline.LogStale(logger, read.Error);

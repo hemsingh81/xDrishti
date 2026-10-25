@@ -21,6 +21,8 @@ public sealed class CompiledCondition
 
     private Decision? _decision;
 
+    private ReadList? _reads;
+
     internal CompiledCondition(
         string source,
         Timeframe evaluationTimeframe,
@@ -64,6 +66,18 @@ public sealed class CompiledCondition
 
     /// <summary>Whether the condition reads the clock (the <c>time</c> keyword). Such a condition, like one that reads an intraday feature, says nothing about tomorrow from the close of today (P7-04, ADR 0088).</summary>
     public bool ReadsClock => XDrishti.Strategies.Binding.BoundTree.ReadsClock(_tree);
+
+    /// <summary>
+    /// Every feature read of the condition in the order of the text, each with the lag it is read at (P3-04d, D5): <c>close[1]</c> is <c>close</c> at lag 1, the previous pair of <c>crosses_above(a, b)</c> is read at the lag the call adds, a
+    /// <c>rising(x, n)</c> at the lags 1 to n. A feature written twice is listed twice. At most <see cref="MaxReads"/> reads are listed; <see cref="ReadsTruncated"/> says when more were cut. Computed on first use.
+    /// </summary>
+    public IReadOnlyList<ConditionRead> Reads => (_reads ??= ReadList.Of(_tree, Features)).Items;
+
+    /// <summary>Whether <see cref="Reads"/> was cut at <see cref="MaxReads"/>.</summary>
+    public bool ReadsTruncated => (_reads ??= ReadList.Of(_tree, Features)).Truncated;
+
+    /// <summary>The most reads a condition lists.</summary>
+    public const int MaxReads = 64;
 
     /// <summary>The bound tree: every name resolved, every node typed.</summary>
     internal IBoundExpression Tree => _tree;

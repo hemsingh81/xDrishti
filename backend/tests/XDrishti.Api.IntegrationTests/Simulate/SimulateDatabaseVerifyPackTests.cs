@@ -128,12 +128,12 @@ public sealed partial class SimulateDatabaseTests
         var folder = PackFolder(packRoot);
         var manifest = ExportManifest.ParseBytes(File.ReadAllBytes(Path.Combine(folder, "manifest.json"))).Value;
         var packKey = PackFiles.PackKey("t1", 3, basket, [run]);
-        manifest.Format.ShouldBe("xd-verify-pack-1");
+        manifest.Format.ShouldBe("xd-verify-pack-2");
         manifest.RunKey.ShouldBe(packKey);
         manifest.BasketId.ShouldBe(basket);
         manifest.Entries.Select(e => e.Name).Order(StringComparer.Ordinal).ShouldBe([.. FilesOfPack(folder).Keys.Where(k => k != "manifest.json").Order(StringComparer.Ordinal)]);
         manifest.ExtraLines.ShouldBe(PackFiles.ExtraLines("t1", 3, [run], plan));
-        manifest.ExportKey.ShouldBe(ExportKey.Of("xd-verify-pack-1", packKey, basket, manifest.Entries, manifest.ExtraLines));
+        manifest.ExportKey.ShouldBe(ExportKey.Of("xd-verify-pack-2", packKey, basket, manifest.Entries, manifest.ExtraLines));
         foreach (var entry in manifest.Entries)
         {
             Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(Path.Combine(folder, entry.Name)))).ShouldBe(entry.Sha256, entry.Name);

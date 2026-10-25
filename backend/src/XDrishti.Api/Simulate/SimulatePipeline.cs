@@ -69,10 +69,10 @@ internal static class SimulatePipeline
     }
 
     /// <summary>Runs the handler.</summary>
-    public static async Task<Result<SimulationRun>> RunAsync(IServiceProvider provider, SimulationRequest request, CancellationToken cancellationToken)
+    public static async Task<Result<SimulationRun>> RunAsync(IServiceProvider provider, SimulationRequest request, CancellationToken cancellationToken, ExplainBasisSink? basisSink = null)
     {
         var handler = provider.GetRequiredService<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>();
-        return await handler.HandleAsync(new RunSimulationQuery(request), cancellationToken);
+        return await handler.HandleAsync(new RunSimulationQuery(request, null, basisSink), cancellationToken);
     }
 
     /// <summary>Runs the comparison handler (P4-05): the same request with two exit candidates or more.</summary>
@@ -83,7 +83,7 @@ internal static class SimulatePipeline
     }
 
     /// <summary>The second read for the chosen trades (spec P3-04c, C2); nothing is read when no card is wanted.</summary>
-    public static async Task<Result<IReadOnlyList<TradeCardData>>> CardsAsync(IServiceProvider provider, SimulationRun run, IReadOnlyList<string> tradeKeys, CancellationToken cancellationToken)
+    public static async Task<Result<IReadOnlyList<TradeCardData>>> CardsAsync(IServiceProvider provider, SimulationRun run, IReadOnlyList<string> tradeKeys, ExplainBasis? basis, CancellationToken cancellationToken)
     {
         if (tradeKeys.Count == 0)
         {
@@ -91,15 +91,28 @@ internal static class SimulatePipeline
         }
 
         var handler = provider.GetRequiredService<IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>>();
-        return await handler.HandleAsync(new BuildTradeCardsQuery(run, tradeKeys), cancellationToken);
+        return await handler.HandleAsync(new BuildTradeCardsQuery(run, tradeKeys, basis), cancellationToken);
     }
 
-    /// <summary>Logs the first stale difference of a refused second read, if the error is one.</summary>
+    /// <summary>
+    /// The basis a successful live run left in its sink (P3-04d). A live run always sets it, so a null here is a defect, not a stored run: it fails the verb (exit 3) instead of writing cards that say "not recomputed".
+    /// </summary>
+    public static ExplainBasis RequireBasis(ExplainBasisSink sink) =>
+        sink.Basis ?? throw new InvalidOperationException("A successful run left no basis for the trade cards (internal error): the cards would not be recomputed.");
+
+    /// <summary>Logs the first stale difference, or the first mismatch, of a refused second read, if the error is one.</summary>
     public static void LogStale(ILogger logger, Error error)
     {
-        if (error.Fields is [{ } field, ..] && error.Code == SimulationErrors.CardsStaleCode)
+        if (error.Fields is [{ } field, ..])
         {
-            SimulateLog.CardsStale(logger, field.Field, field.Code ?? string.Empty);
+            if (error.Code == SimulationErrors.CardsStaleCode)
+            {
+                SimulateLog.CardsStale(logger, field.Field, field.Code ?? string.Empty);
+            }
+            else if (error.Code == SimulationErrors.CardsMismatchCode)
+            {
+                SimulateLog.CardsMismatch(logger, field.Field, field.Code ?? string.Empty);
+            }
         }
     }
 

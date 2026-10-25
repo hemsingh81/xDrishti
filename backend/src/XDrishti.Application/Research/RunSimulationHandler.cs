@@ -36,10 +36,12 @@ internal sealed class RunSimulationHandler(
     TimeProvider time,
     ILogger<RunSimulationHandler> logger) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>
 {
+    private readonly InstrumentInputReader _reader = new(bars, barQueries, adjustments);
+
     public async ValueTask<Result<SimulationRun>> HandleAsync(RunSimulationQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var executed = await ExecuteAsync(query.Request, query.Progress, cancellationToken);
+        var executed = await ExecuteAsync(query.Request, query.Progress, cancellationToken, query.BasisSink);
         if (executed.IsFailure)
         {
             return Result.Failure<SimulationRun>(executed.Error);
@@ -79,7 +81,7 @@ internal sealed class RunSimulationHandler(
     /// <summary>What a run produced: one run record per candidate (one for a plain run), the gated counts and the entries key.</summary>
     private sealed record Executed(IReadOnlyList<SimulationRun> Runs, IReadOnlyList<CandidateRecord> Candidates, IReadOnlyList<long> Gated, string EntriesKey, bool HoldsOvernight);
 
-    private async ValueTask<Result<Executed>> ExecuteAsync(SimulationRequest request, IProgress<int>? progress, CancellationToken cancellationToken)
+    private async ValueTask<Result<Executed>> ExecuteAsync(SimulationRequest request, IProgress<int>? progress, CancellationToken cancellationToken, ExplainBasisSink? basisSink = null)
     {
 
         // (1) the request, (2) the fill rules, (3) the strategy: no port is read until all three pass.
@@ -121,6 +123,11 @@ internal sealed class RunSimulationHandler(
         SimulationLog.RunStarted(logger, request.StrategyId, targets.Label, targets.Ids.Count, request.From, request.To, prepared.Value.Warnings.Count, request.Costs is CostChoice.SheetChoice named ? named.SheetId : "gross");
         var calendar = await calendars.GetAsync(cancellationToken);
         var csvThrough = targets.Ids.Count == 0 ? new Dictionary<Guid, DateOnly>() : await actions.ListCsvAdjustedThroughAsync(targets.Ids, cancellationToken);
+
+        if (basisSink is not null)
+        {
+            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough);
+        }
 
         var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext);
         var readTime = time.GetElapsedTime(started);
@@ -319,52 +326,21 @@ internal sealed class RunSimulationHandler(
     }
 
     /// <summary>
-    /// Reads one instrument (spec D3, steps 1 to 5) and builds what the engine takes; null when the instrument has no row. The list of bars is local to the call, so only one instrument's bars are held at a time.
+    /// Reads one instrument (spec D3, steps 1 to 5) and builds what the engine takes; null when the instrument has no row. The list of bars is local to the call, so only one instrument's bars are held at a time. The reading is
+    /// <see cref="InstrumentInputReader"/>, which the trade cards use too.
     /// </summary>
     private async ValueTask<InstrumentReplayInput?> ReadInstrumentAsync(RunContext context, Guid id, CancellationToken cancellationToken)
     {
-        var instrument = context.Targets.Known is { } known
-            ? known.GetValueOrDefault(id)
-            : await barQueries.FindInstrumentAsync(id, cancellationToken);
+        var instrument = await _reader.FindAsync(id, context.Targets.Known, cancellationToken);
         if (instrument is null)
         {
             return null;
         }
 
         var request = context.Request;
-        var raw = await bars.ReadAsync(id, SimulationBounds.From, SimulationBounds.Until(request.To), cancellationToken);
-        var factors = await adjustments.GetAsync(id, cancellationToken);
-
-        var tick = TickSpec.FromMasterPaise(instrument.TickSize);
-        var twice = !request.AcknowledgeCsvAdjusted && AdjustsCsvTwice(raw, factors, context.CsvThrough, id);
-        SkipReason? preset = twice ? SkipReason.CsvAdjustedTwice : tick.IsFailure ? SkipReason.TickSizeInvalid : null;
-        var detail = twice
-            ? "An applied corporate action falls into the CSV prices, which are already adjusted at source; acknowledge to run it."
-                + (tick.IsFailure ? " " + tick.Error.Message : string.Empty)
-            : tick.IsFailure ? tick.Error.Message : null;
-
-        // Both skips can apply: the precedence keeps csv_adjusted_twice; nothing is scanned, so the record has no tick and the detail says the master's tick is refused too.
-        return new InstrumentReplayInput(
-            id,
-            instrument.Symbol,
-            raw,
-            factors,
-            context.CsvThrough.TryGetValue(id, out var through) ? through : null,
-            context.Calendar,
-            context.Options,
-            request.From,
-            request.To,
-            tick.IsSuccess ? tick.Value : null,
-            preset,
-            detail,
-            context.Costs);
+        var (raw, factors) = await _reader.ReadAsync(id, request.To, cancellationToken);
+        return InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs);
     }
-
-    /// <summary>The guard of ADR 0017 §5 in the run: an applied action that changes the bars read and falls on or before the date the loaded CSV files reach would adjust their prices a second time.</summary>
-    private static bool AdjustsCsvTwice(IReadOnlyList<Bar> raw, AdjustmentFactors factors, IReadOnlyDictionary<Guid, DateOnly> through, Guid id) =>
-        raw.Count > 0
-        && through.ContainsKey(id)
-        && factors.ActionsAfter(SessionClock.DateOf(raw[0].EpochSeconds)).Any(a => CsvAdjustment.AdjustsTwice(a.ExDate, through, id));
 
     private sealed record Universe(UniverseKind Kind, Guid? BasketId, string? BasketName, string Label, IReadOnlyList<Guid> Ids, IReadOnlyDictionary<Guid, BarsInstrument>? Known);
 
