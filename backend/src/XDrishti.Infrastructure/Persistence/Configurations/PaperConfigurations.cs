@@ -19,6 +19,7 @@ internal sealed class PaperEpochRecordConfiguration : IEntityTypeConfiguration<P
         builder.Property(x => x.FingerprintHash).HasColumnType("char(64)");
         builder.Property(x => x.Reason).HasMaxLength(500).IsRequired();
         builder.Property(x => x.Actor).HasMaxLength(100).IsRequired();
+        builder.HasIndex(x => x.Kind).IsUnique().HasFilter("kind = 'first'").HasDatabaseName("uq_epochs_first"); // one first epoch, so two racing first captures store one
         builder.HasOne<PaperEpochRecord>().WithMany().HasForeignKey(x => x.PrevEpochId).HasConstraintName("fk_epochs_epochs_prev_epoch_id").OnDelete(DeleteBehavior.Restrict);
     }
 }

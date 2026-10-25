@@ -12,7 +12,7 @@ using XDrishti.Infrastructure.Persistence;
 namespace XDrishti.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(XDrishtiDbContext))]
-    [Migration("20261025204437_AddPaperCapture")]
+    [Migration("20261025212329_AddPaperCapture")]
     partial class AddPaperCapture
     {
         /// <inheritdoc />
@@ -5162,6 +5162,11 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_epochs");
+
+                    b.HasIndex("Kind")
+                        .IsUnique()
+                        .HasDatabaseName("uq_epochs_first")
+                        .HasFilter("kind = 'first'");
 
                     b.HasIndex("PrevEpochId")
                         .HasDatabaseName("ix_epochs_prev_epoch_id");

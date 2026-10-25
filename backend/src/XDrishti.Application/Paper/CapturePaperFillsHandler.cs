@@ -77,7 +77,8 @@ internal sealed class CapturePaperFillsHandler(
             catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
 #pragma warning restore CA1031
             {
-                var reason = Clip(failure.GetType().Name + ": " + failure.Message);
+                // Only the exception type is kept: a database or simulator message can carry values (symbols, prices), and neither the log nor the stored row may.
+                var reason = failure.GetType().Name + ": the session failed; the capture will try it again";
                 PaperLog.SessionFailed(logger, session, reason);
                 one = new Totals { Failed = 1 };
                 await TryRecordFailureAsync(epoch.Id, session, began, command.Manual, reason, cancellationToken);
@@ -178,7 +179,7 @@ internal sealed class CapturePaperFillsHandler(
 
                     if (step.Pending)
                     {
-                        PaperLog.Pending(logger, plan.Id, item.Id, replay.Pending ?? step.Why);
+                        PaperLog.Pending(logger, plan.Id, item.Id, step.Why);
                     }
 
                     if (step.Integrity)
@@ -245,7 +246,7 @@ internal sealed class CapturePaperFillsHandler(
 
         if (replay.Trade is not { } trade)
         {
-            return new StepResult { Pending = !hasEntry, Why = replay.Pending ?? string.Empty };
+            return new StepResult { Pending = !hasEntry, Why = "replay_pending" };
         }
 
         var entryAt = DateTimeOffset.FromUnixTimeSeconds(trade.EntryEpochSeconds);
@@ -287,14 +288,14 @@ internal sealed class CapturePaperFillsHandler(
     private static StepResult ExitStep(SimTrade trade, int qty, CostSheet? sheet)
     {
         var exit = PaperPnl.Exit(trade, qty, sheet);
-        return exit.IsFailure ? new StepResult { Pending = true, Why = "the stored sheet has no rates for a leg's date: " + exit.Error.Code } : new StepResult { Exit = exit.Value };
+        return exit.IsFailure ? new StepResult { Pending = true, Why = "sheet_has_no_rates_for_date" } : new StepResult { Exit = exit.Value };
     }
 
     private async Task TryRecordFailureAsync(long epochId, DateOnly session, DateTimeOffset began, bool manual, string reason, CancellationToken cancellationToken)
     {
         try
         {
-            var run = new NewCaptureRun(session, began, time.GetUtcNow(), "failed", 0, 0, 0, manual, Clip(reason, 500));
+            var run = new NewCaptureRun(session, began, time.GetUtcNow(), "failed", 0, 0, 0, manual, reason);
             await paper.WriteSessionAsync(new SessionWrite(epochId, [], [], [], [], run), cancellationToken);
         }
 #pragma warning disable CA1031 // The failure is already logged and returned; a second failure to record it must not hide the others.
@@ -305,7 +306,7 @@ internal sealed class CapturePaperFillsHandler(
         }
     }
 
-    private static string Clip(string text, int max = 300) => text.Length <= max ? text : string.Concat(text.AsSpan(0, max - 1), "…");
+    private static string Clip(string text, int max) => text.Length <= max ? text : string.Concat(text.AsSpan(0, max - 1), "…");
 
     private sealed class StepResult
     {
@@ -319,6 +320,7 @@ internal sealed class CapturePaperFillsHandler(
 
         public bool Integrity { get; init; }
 
+        /// <summary>A fixed reason code for the log; never simulator text or a symbol.</summary>
         public string Why { get; init; } = string.Empty;
     }
 

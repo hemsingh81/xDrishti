@@ -34,6 +34,7 @@ internal sealed class PaperStore(NpgsqlDataSource dataSource) : IPaperStore
             INSERT INTO paper.epochs (started_on, started_at, kind, reason, actor)
             SELECT @on, @at, 'first', 'the default epoch, started with the first capture', 'system:paper-capture'
             WHERE NOT EXISTS (SELECT 1 FROM paper.epochs)
+            ON CONFLICT DO NOTHING
             """);
         insert.Parameters.AddWithValue("on", NpgsqlDbType.Date, startedOn);
         insert.Parameters.AddWithValue("at", NpgsqlDbType.TimestampTz, at);
@@ -94,6 +95,7 @@ internal sealed class PaperStore(NpgsqlDataSource dataSource) : IPaperStore
         }
 
         // A session is looked at again when its newest row is not done, or an entry of it has no exit yet (an open swing position).
+        // Shortcut: a session that stays pending for good (an instrument that left every basket, a replay that is never mended) is replayed on every run and never leaves this list; there is no give-up age. The cost is bounded by the 30-session cap per run.
         await using var again = dataSource.CreateCommand("""
             SELECT session_date FROM (SELECT DISTINCT ON (session_date) session_date, outcome FROM paper.capture_runs ORDER BY session_date, id DESC) r WHERE outcome <> 'done'
             UNION
@@ -130,7 +132,8 @@ internal sealed class PaperStore(NpgsqlDataSource dataSource) : IPaperStore
             await using var insert = new NpgsqlCommand("""
                 INSERT INTO paper.entries (plan_id, plan_item_id, account_id, epoch_id, measure_status, ticket_group, approval_id, approval_kind, symbol, side, strategy_id, strategy_hash, cell_key, trade_key, qty_allocated, qty,
                                            armed_at, entry_at, entry_price, entry_exact, stop_price, target_price, swing, run_key, engine_version, basis)
-                VALUES (@plan, @item, @account, @epoch, @measure, @group, @approval, @kind, @symbol, @side, @strategy, @hash, @cell, @tradekey, @alloc, @qty, @armed, @entry, @price, @exact, @stop, @target, @swing, @run, @engine, @basis)
+                SELECT @plan, @item, @account, @epoch, @measure, @group, @approval, @kind, @symbol, @side, @strategy, @hash, @cell, @tradekey, @alloc, @qty, @armed, @entry, @price, @exact, @stop, @target, @swing, @run, @engine, @basis
+                WHERE NOT EXISTS (SELECT 1 FROM paper.skips s WHERE s.plan_item_id = @item AND s.account_id = @account)
                 ON CONFLICT (plan_item_id, account_id) DO NOTHING
                 RETURNING id
                 """, connection, transaction);
@@ -180,7 +183,7 @@ internal sealed class PaperStore(NpgsqlDataSource dataSource) : IPaperStore
 
         foreach (var s in write.Skips)
         {
-            await using var skip = new NpgsqlCommand("INSERT INTO paper.skips (plan_id, plan_item_id, account_id, epoch_id, code, detail) VALUES (@plan, @item, @account, @epoch, @code, @detail) ON CONFLICT (plan_item_id, account_id) DO NOTHING", connection, transaction);
+            await using var skip = new NpgsqlCommand("INSERT INTO paper.skips (plan_id, plan_item_id, account_id, epoch_id, code, detail) SELECT @plan, @item, @account, @epoch, @code, @detail WHERE NOT EXISTS (SELECT 1 FROM paper.entries e WHERE e.plan_item_id = @item AND e.account_id = @account) ON CONFLICT (plan_item_id, account_id) DO NOTHING", connection, transaction);
             skip.Parameters.AddWithValue("plan", NpgsqlDbType.Bigint, s.PlanId);
             skip.Parameters.AddWithValue("item", NpgsqlDbType.Bigint, s.PlanItemId);
             skip.Parameters.AddWithValue("account", NpgsqlDbType.Uuid, s.AccountId);

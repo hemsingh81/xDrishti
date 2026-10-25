@@ -18,4 +18,8 @@
 - Paper adds the operating chain (approved and armed), the owner's size and a forward-only record; it adds no execution realism (touch is fill, no queue, no latency). Every response says so.
 - A strategy that fires twice in a session is captured once, as graded. Trades with legs are skipped.
 - The epoch starts when the first capture runs, not before; the owner's pre-flight (P10-00) restarts it later through P10-05.
-- Log ids 5200 to 5206 are used; P10 keeps 5200 to 5254.
+- Log ids 5200 to 5205 are used; P10 keeps 5200 to 5254. Logs and the stored run reason carry ids, counts and fixed reason codes only: never a symbol, a price, simulator text or an exception message.
+- ADR 0115 is reserved for P7-20 (price alerts), which is why this decision is numbered 0116.
+- The paper `exit_price` (and `entry_price`) is the **filled** price (modelled slippage and the tick grid); the grade stores the exact simulated `ExitPrice`. The two may differ (equal on a target, different on a stop); R is identical (`r_sim` = the grade's R). A test pins the relation.
+- A session that stays pending for good is replayed on every run (no give-up age); the cap of 30 sessions with armed tickets per run bounds the cost.
+- The entry/skip pair of a ticket and account can never coexist: each insert is guarded by `WHERE NOT EXISTS` on the other table, and the first epoch is unique (`uq_epochs_first`) so racing first captures store one.

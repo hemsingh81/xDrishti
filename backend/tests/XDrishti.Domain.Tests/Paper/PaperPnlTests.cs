@@ -51,6 +51,18 @@ public sealed class PaperPnlTests
     }
 
     [Fact]
+    public void The_paper_exit_price_is_the_fill_and_may_differ_from_the_exact_price_the_grade_stores_while_r_is_the_same()
+    {
+        var trade = PaperFixture.Trade(Guid.Empty) with { ExitReason = ExitReason.Stop, ExitPrice = 99.00, ExitFilledPrice = 98.95, RFilled = -1.045 };
+
+        var exit = PaperPnl.Exit(trade, 60, null).Value;
+
+        exit.ExitPrice.ShouldBe(98.95m);
+        exit.ExitPrice.ShouldNotBe((decimal)trade.ExitPrice);
+        exit.RSim.ShouldBe(trade.RFilled);
+    }
+
+    [Fact]
     public void Charges_fail_when_the_sheet_has_no_rates_for_the_date()
     {
         var charges = PaperPnl.Charges(PaperFixture.FlatSheet, CostSegment.IntradayEquity, Side.Buy, 60, 100m, 101m, new DateOnly(2025, 1, 1), new DateOnly(2025, 1, 1));

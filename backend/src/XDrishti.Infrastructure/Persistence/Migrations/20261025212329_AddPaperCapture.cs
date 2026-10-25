@@ -289,6 +289,14 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 column: "prev_epoch_id");
 
             migrationBuilder.CreateIndex(
+                name: "uq_epochs_first",
+                schema: "paper",
+                table: "epochs",
+                column: "kind",
+                unique: true,
+                filter: "kind = 'first'");
+
+            migrationBuilder.CreateIndex(
                 name: "uq_exits_entry_id",
                 schema: "paper",
                 table: "exits",

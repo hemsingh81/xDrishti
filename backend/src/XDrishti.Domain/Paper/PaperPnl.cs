@@ -48,7 +48,7 @@ public static class PaperPnl
         string? sheetId = null;
         double? rNet = null;
         var basis = PaperWording.Gross;
-        if (sheet is not null && trade.Costing is { } costing)
+        if (sheet is not null && trade.Costs == CostBasis.Charged && trade.Costing is { } costing) // the grader's own condition for "charged"
         {
             var paid = Charges(sheet, costing.Segment, trade.Side, qty, entry, exit, trade.TradeDate, SessionClock.DateOf(trade.ExitEpochSeconds));
             if (paid.IsFailure)
