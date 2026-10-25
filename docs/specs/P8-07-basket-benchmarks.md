@@ -74,3 +74,6 @@ None. The default benchmark is Nifty 50 until the owner picks another in Portfol
 ## Review fixes 2026-10-25
 - Aligned to the BUILT P8-06 (ADR 0100): `basket` not `baskets`; `MetricView` reused; the evidence block is a benchmark-specific `BenchmarkEvidenceView` because `ReportEvidenceView` is run/trade shaped; the default window comes from `IReportTradeSource.ListRunsAsync` + the built default run set.
 - No dependency on P8-02b (no frontend).
+
+## Built 2026-10-25
+Branch feature/p8-07, [ADR 0102](../adr/0102-basket-benchmarks-are-an-equal-weight-price-return-hold-over-members-as-of-one-stated-date-with-every-exclusion-named.md). Deviations: `Compute` takes the window (`from`, `to`) as parameters; the default window is the run headers' windows of the default run set (runs with closed trades), not the trades' first entry / last exit; a portfolio (system) basket is 404 because only `IBasketQueries` is used; p95 not measured.

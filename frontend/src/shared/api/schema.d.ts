@@ -3030,6 +3030,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/reports/benchmarks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What simply holding each basket would have done over a window (equal weight, bought at the first close and held, price return, dividends not included) beside the benchmark index in force, each with the instruments behind it and every instrument left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price, too_few_bars). Takes basket (ids, comma separated, at most 12), from, to (default the window of the default run set; window.source says which) and membersAsOf (default the India date of the newest run of the basket, else today; members as of that date, not as of each trading day). Fewer than 3 included instruments gives no number. Baskets share instruments, so nonAdditive is true and there is no total. Read only. 422 reports.invalid; 404 reports.not_found. */
+    get: operations['GetReportBenchmarks'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/reports/trades': {
     parameters: {
       query?: never;
@@ -3710,6 +3727,30 @@ export interface components {
       daysBehind: null | number;
       stale: boolean;
     };
+    /** @description The buy-and-hold of one basket with the instruments left out. */
+    BasketBenchmarkView: {
+      /**
+       * Format: uuid
+       * @description The basket.
+       */
+      basketId: string;
+      /** @description Its name. */
+      basketName: string;
+      /**
+       * Format: int32
+       * @description Members as of the stated date.
+       */
+      members: number;
+      /**
+       * Format: int32
+       * @description Members the figure rests on.
+       */
+      included: number;
+      /** @description Mean price return in percent, equal weight, no rebalancing. */
+      buyAndHold: components['schemas']['MetricView'];
+      /** @description Members left out, each with its reason. */
+      excluded: components['schemas']['BenchmarkExclusionView'][];
+    };
     /** @description The newest additions and removals of a basket, newest first. */
     BasketHistory: {
       /** Format: uuid */
@@ -3808,6 +3849,29 @@ export interface components {
       accountId: null | string;
       accountName: null | string;
     };
+    /** @description The evidence of a benchmark read: it has no runs or trades, so it states its basis, the instruments behind it, its range, its limits and what is unavailable. */
+    BenchmarkEvidenceView: {
+      /** @description Always `price return, dividends not included`. */
+      basis: string;
+      /**
+       * Format: int32
+       * @description Distinct instruments included in a basket figure.
+       */
+      n: number;
+      /** @description The window. */
+      range: components['schemas']['BenchmarkWindowView'];
+      /** @description The honest limits, as text. */
+      limits: string[];
+      /** @description Inputs that do not exist, each with the reason. */
+      unavailableInputs: string[];
+    };
+    /** @description An instrument left out; Reason is no_bars, too_few_bars, starts_late, ends_early, discontinuity or bad_price. */
+    BenchmarkExclusionView: {
+      /** Format: uuid */
+      instrumentId: string;
+      symbol: string;
+      reason: string;
+    };
     /** @description Sets the benchmark: the id of a master-list index. */
     BenchmarkInput: {
       /** Format: uuid */
@@ -3822,6 +3886,16 @@ export interface components {
       isDefault: boolean;
       tracked: boolean;
       hasBars: boolean;
+    };
+    /** @description The window. Each bound says where it came from, `query` or `runs` (the default run set); `Source` is `query` only when both did. */
+    BenchmarkWindowView: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      source: string;
+      fromSource: string;
+      toSource: string;
     };
     /** @description A security a name may mean: `Isin`, `Symbol`, `Name` and — when it is a holding of the account or a share of the instrument master — `HoldingId` or `InstrumentId`. */
     BillCandidate: {
@@ -6723,6 +6797,14 @@ export interface components {
       /** Format: date */
       ledgerChargesFrom: null | string;
     };
+    /** @description The price return of the benchmark index over the same window. */
+    IndexBenchmarkView: {
+      /** Format: uuid */
+      instrumentId: null | string;
+      symbol: null | string;
+      isDefault: boolean;
+      return: components['schemas']['MetricView'];
+    };
     /** @description One auto-insight (doc 15 section 6): a fixed-template sentence. string InsightView.State is `value` when the sentence states something; otherwise the text says why it states nothing and carries no figure. */
     InsightView: {
       /** @description The rule: best_strategy, weakest_strategy, basket_gap, side_bias, best_exit, weekday, regime or calibration. */
@@ -8779,6 +8861,29 @@ export interface components {
       notMembers: number;
       /** Format: int32 */
       memberCount: number;
+    };
+    /** @description What holding each basket, and the benchmark index, would have done over one window (P8-07). */
+    ReportBenchmarksView: {
+      /** @description The window and where it came from. */
+      window: components['schemas']['BenchmarkWindowView'];
+      /**
+       * Format: date
+       * @description The India date the members are as of; members as of that date, not as of each trading day (survivorship, ISS-22).
+       */
+      membersAsOf: string;
+      /** @description One entry per basket asked for, in the order asked. */
+      baskets: components['schemas']['BasketBenchmarkView'][];
+      /** @description The benchmark index in force. */
+      index: components['schemas']['IndexBenchmarkView'];
+      /** @description An instrument may be in several baskets, so the baskets cannot be added; true always. */
+      nonAdditive: boolean;
+      /**
+       * Format: int32
+       * @description Fewest included instruments for a basket number.
+       */
+      minMembers: number;
+      /** @description The evidence block. */
+      evidence: components['schemas']['BenchmarkEvidenceView'];
     };
     /**
      * @description The evidence block every report carries (P8-00 D1): the basis, the population, the date range, what is not available and why, the runs behind the numbers (the "Data used" panel) and the honest limits as fields. A screen renders these; none of this wording
@@ -17800,6 +17905,49 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReportBenchmarks: {
+    parameters: {
+      query?: {
+        basket?: string;
+        from?: string;
+        to?: string;
+        membersAsOf?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReportBenchmarksView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

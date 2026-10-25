@@ -10574,6 +10574,77 @@
         }
       }
     },
+    "/api/reports/benchmarks": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "What simply holding each basket would have done over a window (equal weight, bought at the first close and held, price return, dividends not included) beside the benchmark index in force, each with the instruments behind it and every instrument left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price, too_few_bars). Takes basket (ids, comma separated, at most 12), from, to (default the window of the default run set; window.source says which) and membersAsOf (default the India date of the newest run of the basket, else today; members as of that date, not as of each trading day). Fewer than 3 included instruments gives no number. Baskets share instruments, so nonAdditive is true and there is no total. Read only. 422 reports.invalid; 404 reports.not_found.",
+        "operationId": "GetReportBenchmarks",
+        "parameters": [
+          {
+            "name": "basket",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "membersAsOf",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportBenchmarksView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/trades": {
       "get": {
         "tags": [
@@ -12799,6 +12870,50 @@
         },
         "description": "The stored 1-minute bars: instruments with bars, the first bar and the last bar (the \"last tick\"), how many trading days (by the trading calendar: weekdays without the holidays, with the special sessions) the last bar is behind the last\nclosed session (`expectedSession`: 15:30 India time, or the end of a special session, has passed), `stale` (behind) and how many instruments are behind or still empty (tracked without bars)."
       },
+      "BasketBenchmarkView": {
+        "required": [
+          "basketId",
+          "basketName",
+          "members",
+          "included",
+          "buyAndHold",
+          "excluded"
+        ],
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": "string",
+            "description": "The basket.",
+            "format": "uuid"
+          },
+          "basketName": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "members": {
+            "type": "integer",
+            "description": "Members as of the stated date.",
+            "format": "int32"
+          },
+          "included": {
+            "type": "integer",
+            "description": "Members the figure rests on.",
+            "format": "int32"
+          },
+          "buyAndHold": {
+            "description": "Mean price return in percent, equal weight, no rebalancing.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "excluded": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkExclusionView"
+            },
+            "description": "Members left out, each with its reason."
+          }
+        },
+        "description": "The buy-and-hold of one basket with the instruments left out."
+      },
       "BasketHistory": {
         "required": [
           "basketId",
@@ -13115,6 +13230,67 @@
         },
         "description": "A basket. `purpose`: trading · long_term · watch. `position` = place among the active baskets (0 first; the system baskets count on their own, in their group).\n`memberCount` = instruments in it now. `archivedAt` is null for an active basket (archived ones are only listed on request).\n`kind`: manual (the owner's) · portfolio (an account's portfolio bucket, ADR 0014); `system` = true for the latter: read-only, never archived, its members are the\nbucket's current holdings. `accountId`/`accountName` are set for the default bucket of an account."
       },
+      "BenchmarkEvidenceView": {
+        "required": [
+          "basis",
+          "n",
+          "range",
+          "limits",
+          "unavailableInputs"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "Always `price return, dividends not included`."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Distinct instruments included in a basket figure.",
+            "format": "int32"
+          },
+          "range": {
+            "description": "The window.",
+            "$ref": "#/components/schemas/BenchmarkWindowView"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honest limits, as text."
+          },
+          "unavailableInputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Inputs that do not exist, each with the reason."
+          }
+        },
+        "description": "The evidence of a benchmark read: it has no runs or trades, so it states its basis, the instruments behind it, its range, its limits and what is unavailable."
+      },
+      "BenchmarkExclusionView": {
+        "required": [
+          "instrumentId",
+          "symbol",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "An instrument left out; Reason is no_bars, too_few_bars, starts_late, ends_early, discontinuity or bad_price."
+      },
       "BenchmarkInput": {
         "required": [
           "instrumentId"
@@ -13172,6 +13348,36 @@
           }
         },
         "description": "The benchmark in force (all null when the master list has no such index yet). `IsDefault`: the owner has not chosen one, Nifty 50 applies."
+      },
+      "BenchmarkWindowView": {
+        "required": [
+          "from",
+          "to",
+          "source",
+          "fromSource",
+          "toSource"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "source": {
+            "type": "string"
+          },
+          "fromSource": {
+            "type": "string"
+          },
+          "toSource": {
+            "type": "string"
+          }
+        },
+        "description": "The window. Each bound says where it came from, `query` or `runs` (the default run set); `Source` is `query` only when both did."
       },
       "BillCandidate": {
         "required": [
@@ -21097,6 +21303,37 @@
         },
         "description": "What a scope (a holding, a group, an account, the portfolio) received and paid beyond its price return (ADR 0026, P2-14). Money is rupees, percentages are percent numbers (16.1 = 16.1 %), dates are India dates. `Dividends` are the\ndividends the owner entered (not voided) and `Charges` the trade charges of the stored trades plus, for an account and the portfolio only, the ledger's costs of the account as such (DP charges, annual maintenance, delayed-payment interest ...;\nnever the costs of trades, which the trade rows already carry). `LedgerCharges` is that ledger part of `Charges` (0 when the account has none; null when the scope does not include account-level items: a holding, a bucket), so the screen can show\nthe ledger's costs apart from the charges of trades. `Unallocated` is the part of the dividends not allocated to a holding (set for an account and the portfolio only, otherwise null). `TotalReturnPct` is (realised + unrealised +\ndividends) over invested, `NetTotalReturnPct` the same minus the charges; both are null when nothing is invested or the scope has no usable price. `NetXirr` is the XIRR of the lot cash flows plus the dividends (in) and the charges (out) on\ntheir dates, with `NetXirrState` as for the gross XIRR (`ok`, `insufficient`, `n_m`, `no_data`, `no_price`).\nOnly what was entered or read is counted, and the dates say from when each source is known (null: the source has nothing for the scope): `DividendsFrom` is the first dividend the owner entered, `TradeChargesFrom` the first stored trade that\ncarries charges (trades read before charges were stored, and CSV or manual trades, carry none — so a trade without charges is \"unknown\", not \"free\"), `LedgerChargesFrom` the first ledger date stored. `ChargesFrom` is the later of\n`TradeChargesFrom` and `LedgerChargesFrom` when both exist, otherwise the one that does. `CoverageFrom` is the LATER start of the sources that exist for the scope: the date from which every kind of income that is counted at all is known, so\nthe net figures are never presented as complete from before any of their sources begins. The whole object is null when the scope has no dividend and no charge recorded."
       },
+      "IndexBenchmarkView": {
+        "required": [
+          "instrumentId",
+          "symbol",
+          "isDefault",
+          "return"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "return": {
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "The price return of the benchmark index over the same window."
+      },
       "InsightView": {
         "required": [
           "kind",
@@ -26673,6 +26910,54 @@
           }
         },
         "description": "What a removal did: `removed` were members, `notMembers` were not. Untracking never happens. `memberCount` = members now."
+      },
+      "ReportBenchmarksView": {
+        "required": [
+          "window",
+          "membersAsOf",
+          "baskets",
+          "index",
+          "nonAdditive",
+          "minMembers",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "window": {
+            "description": "The window and where it came from.",
+            "$ref": "#/components/schemas/BenchmarkWindowView"
+          },
+          "membersAsOf": {
+            "type": "string",
+            "description": "The India date the members are as of; members as of that date, not as of each trading day (survivorship, ISS-22).",
+            "format": "date"
+          },
+          "baskets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BasketBenchmarkView"
+            },
+            "description": "One entry per basket asked for, in the order asked."
+          },
+          "index": {
+            "description": "The benchmark index in force.",
+            "$ref": "#/components/schemas/IndexBenchmarkView"
+          },
+          "nonAdditive": {
+            "type": "boolean",
+            "description": "An instrument may be in several baskets, so the baskets cannot be added; true always."
+          },
+          "minMembers": {
+            "type": "integer",
+            "description": "Fewest included instruments for a basket number.",
+            "format": "int32"
+          },
+          "evidence": {
+            "description": "The evidence block.",
+            "$ref": "#/components/schemas/BenchmarkEvidenceView"
+          }
+        },
+        "description": "What holding each basket, and the benchmark index, would have done over one window (P8-07)."
       },
       "ReportEvidenceView": {
         "required": [

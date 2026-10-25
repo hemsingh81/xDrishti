@@ -39,7 +39,7 @@ public sealed partial class ReportEndpointsArchitectureTests
         var code = Code(EndpointsSource);
 
         WritingRoute().IsMatch(code).ShouldBeFalse();
-        ReadingRoute().Count(code).ShouldBe(9);
+        ReadingRoute().Count(code).ShouldBe(10);
         code.ShouldNotContain("ICommandHandler");
         WritingRoute().IsMatch("reports.MapPost(\"/x\", Handler)").ShouldBeTrue("the scan does see a write route");
         WritingRoute().IsMatch("reports.MapDelete(\"/x\", Handler)").ShouldBeTrue();
