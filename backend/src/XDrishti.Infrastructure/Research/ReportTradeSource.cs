@@ -36,10 +36,12 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
     private const string RunIdsSql = "SELECT id, run_key FROM research.sim_runs WHERE run_key = ANY(@keys)";
 
     private const string TradesSelect = """
-        SELECT t.run_id, t.trade_key, t.strategy_id, t.trigger_timeframe, t.side, t.instrument_id, t.symbol, t.basket_ids, t.trade_date, t.exit_epoch_seconds, t.r_filled, t.r_net, t.sessions_held, t.mae_r, t.mfe_r, t.entry_epoch_seconds, t.exit_reason
+        SELECT t.run_id, t.trade_key, t.strategy_id, t.trigger_timeframe, t.side, t.instrument_id, t.symbol, t.basket_ids, t.trade_date, t.exit_epoch_seconds, t.r_filled, t.r_net, t.sessions_held
         FROM research.sim_trades t
         WHERE t.run_id = ANY(@run_ids) AND t.open_at_end = false
         """;
+
+    private const string ExcursionColumns = ", t.mae_r, t.mfe_r, t.entry_epoch_seconds, t.exit_reason";
 
     private static readonly ValueList<string> NoBaskets = new([]);
 
@@ -110,7 +112,7 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
         }
 
         await using var command = new NpgsqlCommand { Connection = connection };
-        var sql = new StringBuilder(TradesSelect);
+        var sql = new StringBuilder(filter.WithExcursions ? TradesSelect.Replace("t.sessions_held", "t.sessions_held" + ExcursionColumns, StringComparison.Ordinal) : TradesSelect);
         command.Parameters.AddWithValue("run_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint, runs.Keys.ToArray());
         AnyOf(sql, command, "strategy_id", filter.Strategies);
         AnyOf(sql, command, "trigger_timeframe", [.. filter.Timeframes.Select(CodeToName)]);
@@ -142,11 +144,11 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
         var singleBasket = new Dictionary<Guid, ValueList<string>>();
         while (await reader.ReadAsync(cancellationToken))
         {
-            yield return Read(reader, runs, timeframes, strings, singleBasket);
+            yield return Read(reader, runs, timeframes, strings, singleBasket, filter.WithExcursions);
         }
     }
 
-    private static ReportTrade Read(NpgsqlDataReader reader, Dictionary<long, string> runs, Dictionary<string, string> timeframes, Dictionary<string, string> strings, Dictionary<Guid, ValueList<string>> singleBasket)
+    private static ReportTrade Read(NpgsqlDataReader reader, Dictionary<long, string> runs, Dictionary<string, string> timeframes, Dictionary<string, string> strings, Dictionary<Guid, ValueList<string>> singleBasket, bool excursions)
     {
         var timeframeName = reader.GetString(3);
         if (!timeframes.TryGetValue(timeframeName, out var timeframe))
@@ -194,10 +196,10 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
             reader.GetDouble(10),
             reader.IsDBNull(11) ? null : reader.GetDouble(11),
             reader.GetInt32(12),
-            reader.GetDouble(13),
-            reader.GetDouble(14),
-            SessionClock.MinuteOfDay(reader.GetInt64(15)),
-            Intern(strings, reader.GetString(16)));
+            excursions ? reader.GetDouble(13) : null,
+            excursions ? reader.GetDouble(14) : null,
+            excursions ? SessionClock.MinuteOfDay(reader.GetInt64(15)) : null,
+            excursions ? Intern(strings, reader.GetString(16)) : null);
     }
 
     private static string Intern(Dictionary<string, string> strings, string value)

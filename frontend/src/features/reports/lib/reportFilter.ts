@@ -1,10 +1,7 @@
 import { isRealDay } from '@/shared/lib/dates';
 
-export const views = [
-  'overview',
-  'what-works',
-  'baskets',
-  'pivot',
+/** The P8-10 reports (each a body of `MoreReport`, which has one entry per name here: the compiler holds the two together). */
+export const moreViews = [
   'strategies',
   'side',
   'calendar',
@@ -13,6 +10,9 @@ export const views = [
   'instruments',
   'sectors',
 ] as const;
+export type MoreView = (typeof moreViews)[number];
+
+export const views = ['overview', 'what-works', 'baskets', 'pivot', ...moreViews] as const;
 export type ReportView = (typeof views)[number];
 
 /** The timeframe codes of the engine and the two sides: fixed lists (P8-08 decision 7). */

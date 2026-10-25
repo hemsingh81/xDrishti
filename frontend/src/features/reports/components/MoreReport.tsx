@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { ReportPanelProps, ReportView } from '../lib/reportFilter';
+import type { MoreView, ReportPanelProps } from '../lib/reportFilter';
 import { CalendarReport } from './CalendarReport';
 import { DistributionReport } from './DistributionReport';
 import { InstrumentScorecard } from './InstrumentScorecard';
@@ -8,7 +8,7 @@ import { SectorReport } from './SectorReport';
 import { SideReport } from './SideReport';
 import { StrategiesReport } from './StrategiesReport';
 
-const reports: Partial<Record<ReportView, (props: ReportPanelProps) => ReactNode>> = {
+const reports: Record<MoreView, (props: ReportPanelProps) => ReactNode> = {
   strategies: (p) => <StrategiesReport {...p} />,
   side: (p) => <SideReport {...p} />,
   calendar: (p) => <CalendarReport {...p} />,
@@ -19,6 +19,6 @@ const reports: Partial<Record<ReportView, (props: ReportPanelProps) => ReactNode
 };
 
 /** The P8-10 report of a view. */
-export function MoreReport({ view, ...props }: ReportPanelProps & { view: ReportView }) {
-  return <>{reports[view]?.(props)}</>;
+export function MoreReport({ view, ...props }: ReportPanelProps & { view: MoreView }) {
+  return <>{reports[view](props)}</>;
 }

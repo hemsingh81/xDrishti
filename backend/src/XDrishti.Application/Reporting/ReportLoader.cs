@@ -15,7 +15,7 @@ internal sealed class ReportLoader(IReportTradeSource source, IChargeSheetConfir
 {
     /// <summary>
     /// The most closed trades (by the run headers, before any filter) one request reads. Chosen from the measured peak of one request (ADR 0100): the population of 500,000 trades takes about the figure the ADR states above the idle process, which, with one report in memory at a
-    /// time, stays well inside the 1 GB limit of the API container. A run above it is refused with 422 <c>reports.too_large</c>, never cut.
+    /// time, stays well inside the 1 GB limit of the API container. A run above it is refused with 422 <c>reports.too_large</c>, never cut. P8-10 added five optional fields to each trade (about 56 bytes a trade, 28 MB at the limit, by the field sizes; the columns behind them are read only by the excursion report and an hour lens, see ReportTradeFilter.WithExcursions); the peak was not re-measured.
     /// </summary>
     public const int MaxClosedTrades = 500_000;
 
@@ -31,6 +31,9 @@ internal sealed class ReportLoader(IReportTradeSource source, IChargeSheetConfir
 
         return result;
     }
+
+    /// <summary>Only the excursion report and a lens by entry hour read the extra columns of a trade.</summary>
+    private static bool NeedsExcursions(ReportQuery query, string kind) => kind == "mae_mfe" || query.Lens.Contains(ReportDimension.Hour);
 
     private async ValueTask<Result<LoadedReport>> BuildAsync(ReportQuery query, long started, string kind, CancellationToken cancellationToken)
     {
@@ -94,7 +97,7 @@ internal sealed class ReportLoader(IReportTradeSource source, IChargeSheetConfir
             var trades = new List<ReportTrade>();
             if (used.Count > 0)
             {
-                await foreach (var trade in source.StreamTradesAsync([.. used.Select(r => r.RunKey)], query.Filters.ToTradeFilter(), cancellationToken))
+                await foreach (var trade in source.StreamTradesAsync([.. used.Select(r => r.RunKey)], query.Filters.ToTradeFilter() with { WithExcursions = NeedsExcursions(query, kind) }, cancellationToken))
                 {
                     trades.Add(trade);
                 }

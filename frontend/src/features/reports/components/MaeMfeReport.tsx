@@ -20,22 +20,30 @@ import { QueryPanel } from './Panel';
 
 type Group = MaeMfeView['groups'][number];
 type Grid = NonNullable<Group['grid']>;
-const noop = () => undefined;
 const r = (value: number) => String(value);
 
 /** Band names from edges: one between each pair, then "or more"; `openFirst` adds a "below" band. */
 const bands = (edges: readonly number[], openFirst: boolean): string[] => {
-  const labels = openFirst ? [`below ${r(edges[0] ?? 0)}`] : [];
-  for (let i = 0; i + 1 < edges.length; i++) labels.push(`${r(edges[i] ?? 0)} to ${r(edges[i + 1] ?? 0)}`);
-  labels.push(`${r(edges[edges.length - 1] ?? 0)} or more`);
-  return labels.map((label) => `${label} R`);
+  const labels = openFirst ? [`below ${r(edges[0] ?? 0)} R`] : [];
+  for (let i = 0; i + 1 < edges.length; i++) labels.push(`${r(edges[i] ?? 0)} to ${r(edges[i + 1] ?? 0)} R`);
+  labels.push(`${r(edges[edges.length - 1] ?? 0)} R or more`);
+  return labels;
 };
 
 function GridView({ grid }: { grid: Grid }) {
   const rows = bands(grid.maeEdges, false).map((label, i) => ({ id: String(i), label }));
   const columns = bands(grid.resultEdges, true).map((label, i) => ({ id: String(i), label }));
   const peak = Math.max(1, ...grid.counts.flat());
-  const winnersFrom = grid.resultEdges.findIndex((edge) => edge >= 0) + 1;
+  // columns: 0 is the open bin below the first edge, then one per edge; a column is a loss when it ends at or below 0, a win when it starts at 0.5 R or more
+  const columnTone = (column: number) => {
+    const lower = column === 0 ? null : grid.resultEdges[column - 1];
+    const upper = grid.resultEdges[column];
+    return upper !== undefined && upper <= 0
+      ? 'error'
+      : lower !== null && lower !== undefined && lower >= 0.5
+        ? 'success'
+        : null;
+  };
   const cell = (rowId: string, columnId: string): HeatGridCell | null => {
     const count = grid.counts[Number(rowId)]?.[Number(columnId)] ?? 0;
     const row = rows[Number(rowId)]?.label ?? rowId;
@@ -45,8 +53,8 @@ function GridView({ grid }: { grid: Grid }) {
       name: `Adverse excursion ${row}, result ${column}: ${formatCount(count)} trades`,
       state: { kind: 'value', value: count },
       shade:
-        count > 0
-          ? { tone: Number(columnId) >= winnersFrom ? 'success' : 'error', alpha: 0.08 + 0.3 * (count / peak) }
+        count > 0 && columnTone(Number(columnId))
+          ? { tone: columnTone(Number(columnId)) ?? 'error', alpha: 0.08 + 0.3 * (count / peak) }
           : undefined,
       content: <span>{formatCount(count)}</span>,
     };
@@ -59,16 +67,15 @@ function GridView({ grid }: { grid: Grid }) {
       rows={rows}
       columns={columns}
       cell={cell}
-      onOpen={noop}
       emptyText="0"
-      legend="Trades by their worst move against the entry (rows) and their result (columns). Counts, shaded by size; green columns are winners."
+      legend="Trades by their worst move against the entry (rows) and their result (columns). Counts, shaded by size; green columns are results of +0.5 R or more, red columns losses; the column from 0 to 0.5 R is not shaded."
     />
   );
 }
 
 function GroupBlock({ group, min }: { group: Group; min: number | null }) {
   const p90 = metricFromApi(group.winnersMaeP90, group.excursionN, min);
-  if (!group.grid || !group.mfe) {
+  if (!group.grid || !group.mfe || group.excursionN === 0) {
     return <NonValue state={asNonValue(p90.kind === 'value' ? { kind: 'empty' } : p90)} />;
   }
   const edges = group.mfe.edges;

@@ -50,6 +50,14 @@ describe('HeatGrid', () => {
     expect(screen.getByText('No cell')).toBeInTheDocument();
   });
 
+  it('without an opener is read only: named cells, no buttons', () => {
+    renderWithProviders(
+      <HeatGrid label="Demo" regionLabel="Demo region" rowHeader="Name" rows={rows} columns={columns} cell={cell} />,
+    );
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(screen.getByRole('gridcell', { name: /cell b\|15m/ })).toBeInTheDocument();
+  });
+
   it('opens a cell by its key', async () => {
     const onOpen = show();
     await userEvent.click(screen.getByRole('button', { name: 'cell b|15m' }));

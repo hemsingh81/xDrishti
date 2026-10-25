@@ -8,6 +8,13 @@ import { metricFromApi } from '../lib/metricFromApi';
 import type { ReportPanelProps } from '../lib/reportFilter';
 import { QueryPanel } from './Panel';
 
+const labelOf = (lens: string, value: string | null, part: (dimension: string, value: string | null) => string) =>
+  lens === 'sector'
+    ? (value ?? 'Unclassified')
+    : lens === 'hour' && value
+      ? `${value}:00 to ${value}:59`
+      : part(lens, value);
+
 interface GroupBarsProps extends ReportPanelProps, Pick<MetricValueProps, 'format'> {
   title: string;
   lens: 'month' | 'basket' | 'weekday' | 'hour' | 'sector';
@@ -27,10 +34,7 @@ export function GroupBars({ query, min, title, lens, figure, format, diverging, 
         const ordered = sort ? [...groups].sort(sort) : groups;
         const rows: BarRow[] = ordered.map((group) => ({
           id: group.key,
-          label:
-            lens === 'sector'
-              ? (group.parts[0]?.value ?? 'Unclassified')
-              : baskets.part(lens, group.parts[0]?.value ?? null),
+          label: labelOf(lens, group.parts[0]?.value ?? null, baskets.part),
           state: metricFromApi(figure(group), group.n, min),
           n: group.n,
         }));

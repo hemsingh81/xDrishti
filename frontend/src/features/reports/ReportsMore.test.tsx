@@ -13,7 +13,7 @@ describe('MAE and MFE', () => {
     expect(screen.getByText(/14 of 40 trades reached \+2 R/)).toBeInTheDocument();
     const grid = await screen.findByRole('grid', { name: 'Adverse excursion by result' });
     expect(
-      within(grid).getByRole('button', { name: /0\.25 to 0\.5 R, result 1 to 1\.5 R: 40 trades/ }),
+      within(grid).getByRole('gridcell', { name: /0\.25 to 0\.5 R, result 1 to 1\.5 R: 40 trades/ }),
     ).toBeInTheDocument();
   });
 
@@ -35,6 +35,25 @@ describe('MAE and MFE', () => {
     renderReports('?view=maemfe');
     expect(await screen.findByText(/4 trades, at least 30 needed/)).toBeInTheDocument();
     expect(screen.queryByRole('grid')).toBeNull();
+  });
+
+  it('prints no grid and no share when no trade has a recorded excursion', async () => {
+    reportServer();
+    server.use(
+      http.get('/api/reports/mae-mfe', () =>
+        HttpResponse.json(
+          buildMaeMfe({
+            excursionN: 0,
+            reachedMfe: [{ atR: 1, count: 0, share: 0 }],
+            winnersMaeP90: nonValue('unavailable', 'no excursion is recorded'),
+          }),
+        ),
+      ),
+    );
+    renderReports('?view=maemfe');
+    expect(await screen.findByText(/no excursion is recorded/)).toBeInTheDocument();
+    expect(screen.queryByRole('grid')).toBeNull();
+    expect(screen.queryByText(/reached/)).toBeNull();
   });
 });
 
@@ -83,5 +102,20 @@ describe('side, sector and calendar reports', () => {
     reportServer();
     renderReports('?view=calendar');
     expect(await screen.findByRole('region', { name: /intraday trades only/ })).toBeInTheDocument();
+  });
+
+  it('names an entry hour as the whole hour', async () => {
+    reportServer();
+    server.use(
+      http.get('/api/reports/groups', ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.get('lens') === 'hour'
+            ? buildGroups('hour', [buildGroup({ key: 'h', parts: partsOf('hour', '09'), expectancyR: value(0.2) })])
+            : buildGroups('weekday', []),
+        ),
+      ),
+    );
+    renderReports('?view=calendar');
+    expect(await screen.findByText('09:00 to 09:59')).toBeInTheDocument();
   });
 });

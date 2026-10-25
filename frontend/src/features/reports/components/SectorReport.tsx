@@ -11,6 +11,7 @@ import { QueryPanel } from './Panel';
 const TOP = 10;
 
 /** The ten best and ten worst instruments by total R, among those that reach the minimum; the rest are not ranked here. */
+// The instrument lens can have more groups than the endpoint's cap (2,000); the server then refuses with 422 and the panel prints its message (QueryPanel), by design.
 function Symbols({ query, min }: ReportPanelProps) {
   const result = useQuery(groupsQuery(query, 'instrument'));
   return (

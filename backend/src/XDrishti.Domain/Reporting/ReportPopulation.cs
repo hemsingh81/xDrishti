@@ -420,6 +420,12 @@ public sealed class ReportPopulation
             }
 
             var (grid, mfe, reached, n, p90) = MaeMfeBuilder.Build(bucket.Rows, Options.MinWins);
+            if (n == 0)
+            {
+                groups.Add(new ReportMaeMfeGroup(bucket.Key, bucket.Rows.Count, 0, Metric.Unavailable("no excursion is recorded for these trades"), null, null, new ValueList<ReachedLevel>([]), evidence));
+                continue;
+            }
+
             groups.Add(new ReportMaeMfeGroup(bucket.Key, bucket.Rows.Count, n, p90, grid, mfe, reached, evidence));
         }
 

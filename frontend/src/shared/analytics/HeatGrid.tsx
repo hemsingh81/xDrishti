@@ -9,7 +9,8 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, type Theme } from '@mui/material/styles';
+import { visuallyHidden } from '@mui/utils';
 import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { numeric } from '@/theme';
 import type { MetricState } from './metric';
@@ -54,7 +55,8 @@ interface HeatGridProps {
   /** The cell of a row and a column, or null where there is none. */
   cell: (rowId: string, columnId: string) => HeatGridCell | null;
   selectedKey?: string | null;
-  onOpen: (key: string) => void;
+  /** Opens a cell. Without it the grid is read-only: cells are plain text with their accessible name, not buttons. */
+  onOpen?: (key: string) => void;
   /** Printed where a row has no cell for a column. */
   emptyText?: string;
   /** Legend text above the grid. */
@@ -62,6 +64,35 @@ interface HeatGridProps {
 }
 
 type At = readonly [row: number, column: number];
+
+/** The look of a cell tile: hatched when insufficient, shaded only for a value, outlined when open. */
+function tileSx(theme: Theme, item: HeatGridCell, open: boolean) {
+  return {
+    display: 'block',
+    width: '100%',
+    minWidth: 128,
+    minHeight: 44,
+    textAlign: 'left',
+    p: 1,
+    borderRadius: 1,
+    border: 1,
+    borderColor: open ? 'primary.main' : 'divider',
+    color: 'text.primary',
+    fontSize: 'caption.fontSize',
+    ...numeric,
+    ...(item.state.kind === 'insufficient'
+      ? {
+          backgroundColor: theme.palette.background.default,
+          backgroundImage: `repeating-linear-gradient(135deg, transparent 0 6px, ${alpha(theme.palette.text.secondary, HATCH_ALPHA)} 6px 8px)`,
+        }
+      : {
+          backgroundColor:
+            item.state.kind === 'value' && item.shade
+              ? alpha(theme.palette[item.shade.tone].main, item.shade.alpha)
+              : theme.palette.background.paper,
+        }),
+  } as const;
+}
 
 const refKey = (rowId: string, columnId: string) => `${rowId}\u0000${columnId}`;
 
@@ -173,50 +204,37 @@ export function HeatGrid({
                   return (
                     <TableCell key={column.id} role="gridcell" sx={{ verticalAlign: 'top', p: 0.5 }}>
                       {item ? (
-                        <ButtonBase
-                          ref={(element: HTMLButtonElement | null) => {
-                            if (element) refs.current.set(key, element);
-                            else refs.current.delete(key);
-                          }}
-                          onClick={() => {
-                            setActive([r, c]);
-                            onOpen(item.key);
-                          }}
-                          onKeyDown={(event) => {
-                            onKeyDown(event, [r, c]);
-                          }}
-                          tabIndex={tabStop?.[0] === r && tabStop[1] === c ? 0 : -1}
-                          aria-label={item.name}
-                          aria-haspopup="dialog"
-                          aria-expanded={item.key === selectedKey}
-                          sx={(theme) => ({
-                            display: 'block',
-                            width: '100%',
-                            minWidth: 128,
-                            minHeight: 44,
-                            textAlign: 'left',
-                            p: 1,
-                            borderRadius: 1,
-                            border: 1,
-                            borderColor: item.key === selectedKey ? 'primary.main' : 'divider',
-                            color: 'text.primary',
-                            fontSize: 'caption.fontSize',
-                            ...numeric,
-                            ...(item.state.kind === 'insufficient'
-                              ? {
-                                  backgroundColor: theme.palette.background.default,
-                                  backgroundImage: `repeating-linear-gradient(135deg, transparent 0 6px, ${alpha(theme.palette.text.secondary, HATCH_ALPHA)} 6px 8px)`,
-                                }
-                              : {
-                                  backgroundColor:
-                                    item.state.kind === 'value' && item.shade
-                                      ? alpha(theme.palette[item.shade.tone].main, item.shade.alpha)
-                                      : theme.palette.background.paper,
-                                }),
-                          })}
-                        >
-                          {item.content}
-                        </ButtonBase>
+                        onOpen ? (
+                          <ButtonBase
+                            ref={(element: HTMLButtonElement | null) => {
+                              if (element) refs.current.set(key, element);
+                              else refs.current.delete(key);
+                            }}
+                            onClick={() => {
+                              setActive([r, c]);
+                              onOpen(item.key);
+                            }}
+                            onKeyDown={(event) => {
+                              onKeyDown(event, [r, c]);
+                            }}
+                            tabIndex={tabStop?.[0] === r && tabStop[1] === c ? 0 : -1}
+                            aria-label={item.name}
+                            aria-haspopup="dialog"
+                            aria-expanded={item.key === selectedKey}
+                            sx={(theme) => tileSx(theme, item, item.key === selectedKey)}
+                          >
+                            {item.content}
+                          </ButtonBase>
+                        ) : (
+                          <Box sx={(theme) => tileSx(theme, item, false)}>
+                            <Box component="span" sx={visuallyHidden}>
+                              {item.name}
+                            </Box>
+                            <Box component="span" aria-hidden>
+                              {item.content}
+                            </Box>
+                          </Box>
+                        )
                       ) : (
                         <Typography variant="caption" color="text.secondary" sx={{ px: 1 }}>
                           {emptyText}

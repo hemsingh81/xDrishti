@@ -61,6 +61,17 @@ public sealed class ReportMaeMfeTests
     }
 
     [Fact]
+    public void A_group_with_no_recorded_excursion_has_no_counts_and_no_share()
+    {
+        var group = One([Ex("a", 1, null, null), Ex("b", -1, null, null, 1), Ex("c", 1, null, null, 2)]);
+
+        group.ExcursionN.ShouldBe(0);
+        group.Grid.ShouldBeNull();
+        group.ReachedMfe.ShouldBeEmpty();
+        group.WinnersMaeP90.State.ShouldBe(MetricState.Unavailable);
+    }
+
+    [Fact]
     public void A_thin_group_has_only_the_reason()
     {
         var group = Population([Run("r1")], [Ex("a", 1, 0.1, 1), Ex("b", 1, 0.1, 1, 1)]).MaeMfe([]).Value.Groups.Single();
@@ -86,6 +97,115 @@ public sealed class ReportMaeMfeTests
         groups.Select(g => (g.Key.Text, g.N)).ShouldContain(("Hour=14|Style=intraday", 1));
         groups.Single(g => g.Key.ValueOf(ReportDimension.Style) == "swing").Key.ValueOf(ReportDimension.Hour).ShouldBeNull();
     }
+
+    private static ReportMaeMfeGroup One(IEnumerable<ReportTrade> trades) =>
+        Population([Run("r1")], [.. trades], Small(1)).MaeMfe([]).Value.Groups.Single();
+
+    [Theory]
+    [InlineData(0.0, 0)]
+    [InlineData(0.24, 0)]
+    [InlineData(0.25, 1)]
+    [InlineData(1.99, 7)]
+    [InlineData(2.0, 8)]
+    [InlineData(9.0, 8)]
+    public void A_MAE_on_a_bin_edge_belongs_to_the_bin_that_starts_there(double mae, int row)
+    {
+        var grid = One([Ex("a", 0.3, mae, 0)]).Grid!;
+
+        grid.Counts[row].Sum().ShouldBe(1);
+        grid.Counts.Sum(r => r.Sum()).ShouldBe(1);
+    }
+
+    [Theory]
+    [InlineData(-9.0, 0)]
+    [InlineData(-5.01, 0)]
+    [InlineData(-5.0, 1)]
+    [InlineData(-0.5, 10)]
+    [InlineData(0.0, 11)]
+    [InlineData(0.49, 11)]
+    [InlineData(0.5, 12)]
+    [InlineData(4.99, 20)]
+    [InlineData(5.0, 21)]
+    public void A_result_on_a_bin_edge_belongs_to_the_column_that_starts_there(double result, int column)
+    {
+        var grid = One([Ex("a", result, 0.3, 0)]).Grid!;
+
+        grid.Counts[1][column].ShouldBe(1);
+        grid.Counts.Sum(r => r.Sum()).ShouldBe(1);
+        grid.BelowCount.ShouldBe(column == 0 ? 1 : 0);
+        grid.AboveCount.ShouldBe(column == 21 ? 1 : 0);
+    }
+
+    [Theory]
+    [InlineData(0.0, 0)]
+    [InlineData(0.49, 0)]
+    [InlineData(0.5, 1)]
+    [InlineData(4.99, 9)]
+    public void An_MFE_on_a_bin_edge_belongs_to_the_bin_that_starts_there(double mfe, int bin)
+    {
+        var histogram = One([Ex("a", 0.3, 0.1, mfe)]).Mfe!;
+
+        histogram.Counts[bin].ShouldBe(1);
+        histogram.Counts.Sum().ShouldBe(1);
+        histogram.AboveCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public void An_MFE_of_five_r_is_in_the_open_bin()
+    {
+        var histogram = One([Ex("a", 0.3, 0.1, 5.0)]).Mfe!;
+
+        histogram.AboveCount.ShouldBe(1);
+        histogram.Counts.Sum().ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData(9 * 60 + 59, "09")]
+    [InlineData(10 * 60, "10")]
+    [InlineData(15 * 60 + 29, "15")]
+    public void The_hour_changes_on_the_hour(int minute, string hour)
+    {
+        var groups = Group(Population([Run("r1")], [Ex("a", 1, 0, 0, 0, minute)], Small(1)), ReportDimension.Hour).Groups;
+
+        groups.Single().Key.ValueOf(ReportDimension.Hour).ShouldBe(hour);
+    }
+
+    [Fact]
+    public void The_distribution_of_the_spec_hand_table_has_the_hand_counted_bins()
+    {
+        double[] rs = [-1.0, -0.7, -0.2, 0.0, 0.3, 0.5, 1.9, 2.0, 6.0, -7.0];
+        var population = Population([Run("r1")], [.. rs.Select((r, i) => Trade("r1", $"k{i}", r, day: i))], Small(1));
+
+        var bins = population.Distribution([], 0.5).Value.Groups.Single().Bins;
+
+        int Count(double? lower) => bins.Single(b => b.LowerR == lower).Count;
+        Count(null).ShouldBe(1);
+        Count(-1.0).ShouldBe(2);
+        Count(-0.5).ShouldBe(1);
+        Count(0.0).ShouldBe(2);
+        Count(0.5).ShouldBe(1);
+        Count(1.5).ShouldBe(1);
+        Count(2.0).ShouldBe(1);
+        Count(6.0).ShouldBe(1);
+        bins.Sum(b => b.Count).ShouldBe(10);
+    }
+
+    [Fact]
+    public void The_order_of_the_trades_does_not_change_the_counts_and_one_group_does_not_change_another()
+    {
+        var trades = Enumerable.Range(0, 24).Select(i => Ex($"k{i}", (i % 7) - 3.0, (i % 5) * 0.3, (i % 9) * 0.7, i) with { Side = i % 2 == 0 ? "BUY" : "SELL" }).ToList();
+        var shuffled = trades.OrderBy(t => (t.TradeKey.GetHashCode(StringComparison.Ordinal) * 31) % 17).ThenBy(t => t.TradeKey, StringComparer.Ordinal).Reverse().ToList();
+
+        var one = Population([Run("r1")], trades, Small(1)).MaeMfe([ReportDimension.Side]).Value.Groups;
+        var two = Population([Run("r1")], shuffled, Small(1)).MaeMfe([ReportDimension.Side]).Value.Groups;
+        var buyOnly = Population([Run("r1")], [.. trades.Where(t => t.Side == "BUY")], Small(1)).MaeMfe([ReportDimension.Side]).Value.Groups;
+
+        Signature(two).ShouldBe(Signature(one));
+        Signature(one.Where(g => g.Key.Text == "Side=BUY")).ShouldBe(Signature(buyOnly));
+    }
+
+    private static string Signature(IEnumerable<ReportMaeMfeGroup> groups) =>
+        string.Join(';', groups.Select(g => $"{g.Key.Text}:{g.N}:{string.Join(',', g.Grid!.Counts.SelectMany(r => r))}:{string.Join(',', g.Mfe!.Counts)}:{g.Mfe.AboveCount}"));
 
     [Fact]
     public void An_unclassified_sector_is_not_recorded_not_a_value()

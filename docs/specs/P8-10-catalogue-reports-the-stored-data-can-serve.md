@@ -1,6 +1,6 @@
 # P8-10 — Catalogue reports the stored data can serve
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Draft; **part a built 2026-10-25** ([ADR 0106](../adr/0106-the-report-engine-gains-excursions-entry-hour-and-sector-additively-and-mae-mfe-is-served-as-counts-in-bins.md)): AC 1-8 and 12-13 for those reports; **part b open** (AC 9 exit comparison and the `comparisons` endpoint, AC 10 Monte Carlo, AC 11 pointer entries) (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-10 of [P8-00](P8-00-reports-and-ui-plan.md)
 - **Design refs:** docs/design/13-reports-and-ui.md §1c (catalogue), §2 (R5, R6, R7, R8, R9, R10, R11, R12, R13, R15, R21, R26) · docs/design/08-exits-and-risk.md (MAE/MFE) · docs/design/09-learning-engine.md · ADR 0053/0054 (same-entries comparison), 0062 (robustness), 0090 (decisions report), 0099 · prototype `docs/prototype/assets/app-pages-3.js` (views strategies, exits, sideregime, calendar, maemfe, calibration, instruments) · P8-00 D3, D5
 - **Needs:** P8-08 (frame, catalogue registry, panels), P8-09 (lens use), **P8-02b** (extracts `HeatGrid` into `shared/analytics`; it does not exist there today), P8-06 (built, ADR 0100: `ReportsEndpoints`, `ReportQuery`, `ReportLoader`, `IReportTradeSource`, run labels), P8-05 (built). Reads existing `GET /api/lab/runs` and `GET /api/lab/runs/{id}/report` and `GET /api/reports/decisions`.
@@ -77,3 +77,9 @@ None.
 - Aligned to the BUILT P8-06 (ADR 0100): `lens` replaces `by`; there is no `comparison` or `facets`; the comparison run set is passed as `runs`; the reader returns domain `ReportTrade`, so MAE/MFE/exit reason/entry minute need a reader and engine extension here (not "already read").
 - Prerequisite P8-02b (`HeatGrid` extraction) added; the instrument scorecard and strategy grid use it.
 - The built default run set will skip experiment candidate runs once P8-18 adds that rule; comparisons use explicit `runs`, unaffected.
+
+## Part a build note 2026-10-25
+- Built: engine fields, `Sector` and `Hour` lenses, `GET /api/reports/mae-mfe`, the strategies, side, calendar, MAE/MFE, distribution, instruments and sectors views. Not built: `ListComparisonsAsync`, `GET /api/reports/comparisons`, `ComparisonPicker`, `ExitComparison`, `MonteCarloReport`, `PointerEntry` (part b).
+- The grid `Counts` holds the two tail result columns; `BelowCount` and `AboveCount` repeat their totals. Trades without a recorded excursion are left out and counted (`excursionN`).
+- The sector is read per request (no cache exists in the loader); the extra trade columns are read only for the excursion report and an hour lens.
+- The instrument and sector lenses over a large universe can be refused 422 by the 2,000-group cap; the panels print the server's message.

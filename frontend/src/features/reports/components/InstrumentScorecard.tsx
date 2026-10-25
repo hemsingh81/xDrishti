@@ -11,6 +11,7 @@ const partOf = (parts: readonly { dimension: string; value: string | null }[], d
   parts.find((part) => part.dimension === dimension)?.value ?? null;
 
 /** R21: instruments ranked by the credible lower bound of expectancy; those below the minimum follow with their n, never hidden. */
+// A universe above the endpoint's cap (2,000 cells) is refused 422 by the server; the panel prints that message (QueryPanel) instead of a cut list, by design.
 export function InstrumentScorecard({ query }: ReportPanelProps) {
   const result = useQuery(whatWorksQuery(query, 'instrument'));
   const byStrategy = useQuery(whatWorksQuery(query, 'instrument,strategy'));

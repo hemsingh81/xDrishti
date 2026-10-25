@@ -13,4 +13,5 @@
 
 ## Consequences
 - Result tail columns are inside `Counts`; `BelowCount` and `AboveCount` repeat their totals.
-- The reader now selects four more columns per trade; the cost is the same single pass.
+- The reader selects the four extra columns (`mae_r`, `mfe_r`, `entry_epoch_seconds`, `exit_reason`) only when `ReportTradeFilter.WithExcursions` is set, which the loader does for the excursion report and for a lens by hour; every other report reads the columns it read before. The trade record still carries five more fields (null for those reports), about 56 bytes a trade by field size, about 28 MB at the 500,000-trade limit. This is a calculation, not a measurement: the peak of ADR 0100 was not re-measured.
+- The instrument and sector lenses can exceed the caps of the groups endpoints (2,000 groups; a very large instrument universe is refused with 422 `reports.invalid`, never cut); this is deliberate, not an omission.
