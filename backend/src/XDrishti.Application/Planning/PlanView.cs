@@ -22,6 +22,7 @@ namespace XDrishti.Application.Planning;
 /// <param name="Rejected">Rejected candidates.</param>
 /// <param name="Items">The candidates; empty in a list.</param>
 /// <param name="History">The trail, oldest first; empty in a list.</param>
+/// <param name="Flags">The smart-rule and data states stored with the plan (P8-14); null for a plan stored before them.</param>
 public sealed record PlanView(
     long Id,
     string PlanKey,
@@ -40,14 +41,15 @@ public sealed record PlanView(
     int Reserve,
     int Rejected,
     IReadOnlyList<PlanItemView> Items,
-    IReadOnlyList<PlanEventView> History)
+    IReadOnlyList<PlanEventView> History,
+    PlanFlagsView? Flags = null)
 {
     /// <summary>Builds the view from the stored row.</summary>
     public static PlanView Of(PlanRow row, IReadOnlyList<PlanItemView> items, IReadOnlyList<PlanEventView> history)
     {
         ArgumentNullException.ThrowIfNull(row);
         var p = row.Plan;
-        return new PlanView(row.Id, p.PlanKey, p.ForDate, p.ReviewCutoff, p.Version, row.State.Code(), [.. PlanLifecycle.Next(row.State).Select(s => s.Code())], p.Basis, p.Provisional, p.Notice, p.Limits, p.CreatedAt, p.CreatedBy, row.Primary, row.Reserve, row.Rejected, items, history);
+        return new PlanView(row.Id, p.PlanKey, p.ForDate, p.ReviewCutoff, p.Version, row.State.Code(), [.. PlanLifecycle.Next(row.State).Select(s => s.Code())], p.Basis, p.Provisional, p.Notice, p.Limits, p.CreatedAt, p.CreatedBy, row.Primary, row.Reserve, row.Rejected, items, history, PlanFlagsView.Of(p.BasisFlags));
     }
 }
 
@@ -144,4 +146,34 @@ public sealed record TicketLevelsView(decimal EntryRef, DateOnly Session, decima
 {
     /// <summary>The fixed basis sentence.</summary>
     public const string BasisText = "indicative from the close of the session; not tomorrow's price";
+}
+
+/// <summary>The smart-rule and data states of a plan as stored facts (spec P8-14, ADR 0113). The banner holds the full text of every flag line as it was written when the plan was published.</summary>
+/// <param name="SchemaVersion">1.</param>
+/// <param name="Gate">normal, reduced, no_trade, unavailable or off.</param>
+/// <param name="GateMissing">Gate inputs that were not known.</param>
+/// <param name="Throttle">clear, cut, unavailable or off.</param>
+/// <param name="Correlation">applied, unavailable or off.</param>
+/// <param name="CorrelationUnavailablePairs">Pairs not checked.</param>
+/// <param name="OpenBook">known, assumed_empty or unavailable.</param>
+/// <param name="RiskMultiplier">Gate times throttle.</param>
+/// <param name="RuleRemovedHalf">Whether a rule removed half or more of the candidates it saw.</param>
+/// <param name="CostBasis">gross, costed_unconfirmed, net_confirmed, mixed or unknown.</param>
+/// <param name="Banner">The flag lines, full text.</param>
+public sealed record PlanFlagsView(
+    int SchemaVersion,
+    string Gate,
+    IReadOnlyList<string> GateMissing,
+    string Throttle,
+    string Correlation,
+    int CorrelationUnavailablePairs,
+    string OpenBook,
+    double RiskMultiplier,
+    bool RuleRemovedHalf,
+    string CostBasis,
+    IReadOnlyList<string> Banner)
+{
+    /// <summary>The view of the stored flags, or null.</summary>
+    public static PlanFlagsView? Of(PlanBasisFlags? f) =>
+        f is null ? null : new PlanFlagsView(f.SchemaVersion, f.Gate, f.GateMissing, f.Throttle, f.Correlation, f.CorrelationUnavailablePairs, f.OpenBook, f.RiskMultiplier, f.RuleRemovedHalf, f.CostBasis, f.Banner);
 }

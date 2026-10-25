@@ -20,6 +20,9 @@ public sealed record NewPlan(string PlanKey, DateOnly ForDate, DateTimeOffset Re
 
     /// <summary>The honest-limits sentence, stored with the plan.</summary>
     public string Limits { get; init; } = PlanWording.HonestLimits;
+
+    /// <summary>The smart-rule and data states as stored facts (P8-14); null for a plan stored before them or built without the smart rules.</summary>
+    public PlanBasisFlags? BasisFlags { get; init; }
 }
 
 /// <summary>One candidate of a plan: levels as text rules, evidence as data, size per account.</summary>

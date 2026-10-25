@@ -9606,6 +9606,75 @@
         }
       }
     },
+    "/api/plans/{id}/items/{itemId}/chart": {
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "The daily context of one ticket: the last 10 to 250 (default 60) daily bars up to the plan's last closed session, adjusted by the corporate actions applied as of that session, the ticket's indicative levels as stored (source 'none' when it has none) and its rule texts. A symbol that matches no instrument or more than one active share returns resolution not_found or ambiguous and no bars. No bar after the session is ever returned. Read only. 404 plans.not_found, plans.item_not_found; 422 plans.invalid",
+        "operationId": "GetPlanItemChart",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "bars",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketChartView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/plans/{id}/grade": {
       "get": {
         "tags": [
@@ -25987,6 +26056,78 @@
         },
         "description": "The evidence of a ticket, with its limits."
       },
+      "PlanFlagsView": {
+        "required": [
+          "schemaVersion",
+          "gate",
+          "gateMissing",
+          "throttle",
+          "correlation",
+          "correlationUnavailablePairs",
+          "openBook",
+          "riskMultiplier",
+          "ruleRemovedHalf",
+          "costBasis",
+          "banner"
+        ],
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "description": "1.",
+            "format": "int32"
+          },
+          "gate": {
+            "type": "string",
+            "description": "normal, reduced, no_trade, unavailable or off."
+          },
+          "gateMissing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Gate inputs that were not known."
+          },
+          "throttle": {
+            "type": "string",
+            "description": "clear, cut, unavailable or off."
+          },
+          "correlation": {
+            "type": "string",
+            "description": "applied, unavailable or off."
+          },
+          "correlationUnavailablePairs": {
+            "type": "integer",
+            "description": "Pairs not checked.",
+            "format": "int32"
+          },
+          "openBook": {
+            "type": "string",
+            "description": "known, assumed_empty or unavailable."
+          },
+          "riskMultiplier": {
+            "type": "number",
+            "description": "Gate times throttle.",
+            "format": "double"
+          },
+          "ruleRemovedHalf": {
+            "type": "boolean",
+            "description": "Whether a rule removed half or more of the candidates it saw."
+          },
+          "costBasis": {
+            "type": "string",
+            "description": "gross, costed_unconfirmed, net_confirmed, mixed or unknown."
+          },
+          "banner": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The flag lines, full text."
+          }
+        },
+        "description": "The smart-rule and data states of a plan as stored facts (spec P8-14, ADR 0113). The banner holds the full text of every flag line as it was written when the plan was published."
+      },
       "PlanGradeView": {
         "required": [
           "planId",
@@ -26751,6 +26892,17 @@
               "$ref": "#/components/schemas/PlanEventView"
             },
             "description": "The trail, oldest first; empty in a list."
+          },
+          "flags": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The smart-rule and data states stored with the plan (P8-14); null for a plan stored before them.",
+                "$ref": "#/components/schemas/PlanFlagsView"
+              }
+            ]
           }
         },
         "description": "A plan as the API shows it (P7-03, ADR 0083): header, current state, the sentences it carries as data, and for one plan the tickets and the trail."
@@ -32032,6 +32184,215 @@
           }
         },
         "description": "A tag kind in a cell."
+      },
+      "TicketChartBar": {
+        "required": [
+          "t",
+          "o",
+          "h",
+          "l",
+          "c",
+          "v"
+        ],
+        "type": "object",
+        "properties": {
+          "t": {
+            "type": "string",
+            "description": "The India date.",
+            "format": "date"
+          },
+          "o": {
+            "type": "number",
+            "description": "Open.",
+            "format": "double"
+          },
+          "h": {
+            "type": "number",
+            "description": "High.",
+            "format": "double"
+          },
+          "l": {
+            "type": "number",
+            "description": "Low.",
+            "format": "double"
+          },
+          "c": {
+            "type": "number",
+            "description": "Close.",
+            "format": "double"
+          },
+          "v": {
+            "type": "integer",
+            "description": "Volume.",
+            "format": "int64"
+          }
+        },
+        "description": "One daily bar."
+      },
+      "TicketChartLevels": {
+        "required": [
+          "entryRef",
+          "stop",
+          "stopAnchor",
+          "target",
+          "rewardRisk",
+          "session",
+          "basis",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "entryRef": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "stop": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "stopAnchor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "target": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "rewardRisk": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "session": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "basis": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "description": "The numbers of the ticket (P7-19) as the chart draws them; `Source` is `none` when the ticket carries none."
+      },
+      "TicketChartRules": {
+        "required": [
+          "trigger",
+          "stop",
+          "target",
+          "validity"
+        ],
+        "type": "object",
+        "properties": {
+          "trigger": {
+            "type": "string"
+          },
+          "stop": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "validity": {
+            "type": "string"
+          }
+        },
+        "description": "The text rules of the ticket."
+      },
+      "TicketChartView": {
+        "required": [
+          "symbol",
+          "resolution",
+          "instrumentId",
+          "session",
+          "timeframe",
+          "adjusted",
+          "barCount",
+          "bars",
+          "levels",
+          "rules",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "The ticket's symbol."
+          },
+          "resolution": {
+            "type": "string",
+            "description": "exact, ambiguous or not_found (the symbol against the instrument master)."
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The instrument when exact.",
+            "format": "uuid"
+          },
+          "session": {
+            "type": "string",
+            "description": "The last closed session of the plan: the levels' session, else the trading day before the plan date.",
+            "format": "date"
+          },
+          "timeframe": {
+            "type": "string",
+            "description": "1D."
+          },
+          "adjusted": {
+            "type": "boolean",
+            "description": "True: adjusted by the corporate actions applied as of the session."
+          },
+          "barCount": {
+            "type": "integer",
+            "description": "Bars returned (fewer than asked when the history is short; never padded).",
+            "format": "int32"
+          },
+          "bars": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketChartBar"
+            },
+            "description": "Oldest first."
+          },
+          "levels": {
+            "description": "The ticket's numbers, a straight copy.",
+            "$ref": "#/components/schemas/TicketChartLevels"
+          },
+          "rules": {
+            "description": "The three rule texts and the validity.",
+            "$ref": "#/components/schemas/TicketChartRules"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Honest limits in words."
+          }
+        },
+        "description": "The daily context of one ticket (spec P8-14, ADR 0113): the last bars up to the planning session, the levels the ticket carries, and its rule texts. Read only; never a price after the session."
       },
       "TicketGradeView": {
         "required": [

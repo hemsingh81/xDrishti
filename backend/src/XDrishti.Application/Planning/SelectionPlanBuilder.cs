@@ -132,7 +132,10 @@ internal sealed class SelectionPlanBuilder(
         PlanWiringLog.Wired(logger, request.ForDate, smart.Flags.Count, ctx.Accounts.Count, allocationRows);
 
         var basis = BasisText(smart, ctx);
-        var plan = new NewPlan(NightlyRules.PlanKey(request.ForDate, BuilderId), request.ForDate, request.ReviewCutoff, 1, Hash(request, basis, items), basis, true, CreatedBy, request.Now, items);
+        var plan = new NewPlan(NightlyRules.PlanKey(request.ForDate, BuilderId), request.ForDate, request.ReviewCutoff, 1, Hash(request, basis, items), basis, true, CreatedBy, request.Now, items)
+        {
+            BasisFlags = PlanBasisFlags.From(smart, ctx.Book is null ? PlanBasisFlags.OpenBookUnavailable : ctx.Book.Count == 0 ? PlanBasisFlags.OpenBookAssumedEmpty : PlanBasisFlags.OpenBookKnown, [.. fill.Primary.Select(d => d.Candidate.Ranked)]),
+        };
         return Result.Success(plan);
     }
 

@@ -28,6 +28,12 @@ internal sealed class PlansEndpoints : IEndpointModule
             .WithSummary("One plan with its tickets (primary, reserve, rejected with reasons and evidence), size per account, the states they may move to and the trail of every state change. Armed means watched, never an order. 404 plans.not_found")
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/{id:long}/items/{itemId:long}/chart", ChartAsync)
+            .WithName("GetPlanItemChart")
+            .WithSummary("The daily context of one ticket: the last 10 to 250 (default 60) daily bars up to the plan's last closed session, adjusted by the corporate actions applied as of that session, the ticket's indicative levels as stored (source 'none' when it has none) and its rule texts. A symbol that matches no instrument or more than one active share returns resolution not_found or ambiguous and no bars. No bar after the session is ever returned. Read only. 404 plans.not_found, plans.item_not_found; 422 plans.invalid")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
         group.MapGet("/{id:long}/grade", GradeAsync)
             .WithName("GetPlanGrade")
             .WithSummary("The grade of every ticket of a plan (primary, reserve, rejected), each walked through the stored bars of its session and labelled 'simulated on plan prices', with the day's top-1/3/5/all curves and decision groups. A ticket without a stored grade is pending. Read only. 404 plans.not_found")
@@ -98,6 +104,18 @@ internal sealed class PlansEndpoints : IEndpointModule
         CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(new GetPlanQuery(id), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<TicketChartView>, ProblemHttpResult>> ChartAsync(
+        long id,
+        long itemId,
+        int? bars,
+        HttpContext http,
+        IQueryHandler<GetPlanItemChartQuery, Result<TicketChartView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetPlanItemChartQuery(id, itemId, bars ?? 60), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 

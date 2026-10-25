@@ -2911,6 +2911,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/plans/{id}/items/{itemId}/chart': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The daily context of one ticket: the last 10 to 250 (default 60) daily bars up to the plan's last closed session, adjusted by the corporate actions applied as of that session, the ticket's indicative levels as stored (source 'none' when it has none) and its rule texts. A symbol that matches no instrument or more than one active share returns resolution not_found or ambiguous and no bars. No bar after the session is ever returned. Read only. 404 plans.not_found, plans.item_not_found; 422 plans.invalid */
+    get: operations['GetPlanItemChart'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/plans/{id}/grade': {
     parameters: {
       query?: never;
@@ -8610,6 +8627,40 @@ export interface components {
       /** @description A model's figure, labelled advisory, or null. */
       advisoryNote: null | string;
     };
+    /** @description The smart-rule and data states of a plan as stored facts (spec P8-14, ADR 0113). The banner holds the full text of every flag line as it was written when the plan was published. */
+    PlanFlagsView: {
+      /**
+       * Format: int32
+       * @description 1.
+       */
+      schemaVersion: number;
+      /** @description normal, reduced, no_trade, unavailable or off. */
+      gate: string;
+      /** @description Gate inputs that were not known. */
+      gateMissing: string[];
+      /** @description clear, cut, unavailable or off. */
+      throttle: string;
+      /** @description applied, unavailable or off. */
+      correlation: string;
+      /**
+       * Format: int32
+       * @description Pairs not checked.
+       */
+      correlationUnavailablePairs: number;
+      /** @description known, assumed_empty or unavailable. */
+      openBook: string;
+      /**
+       * Format: double
+       * @description Gate times throttle.
+       */
+      riskMultiplier: number;
+      /** @description Whether a rule removed half or more of the candidates it saw. */
+      ruleRemovedHalf: boolean;
+      /** @description gross, costed_unconfirmed, net_confirmed, mixed or unknown. */
+      costBasis: string;
+      /** @description The flag lines, full text. */
+      banner: string[];
+    };
     /** @description The grades of one plan (P7-13). */
     PlanGradeView: {
       /**
@@ -8971,6 +9022,7 @@ export interface components {
       items: components['schemas']['PlanItemView'][];
       /** @description The trail, oldest first; empty in a list. */
       history: components['schemas']['PlanEventView'][];
+      flags?: null | components['schemas']['PlanFlagsView'];
     };
     /** @description How the approved ticket lines divide (P8-04). A graded line with a zero or missing planned risk per share is counted under `NoPlanLevels`. */
     PlanVsActualCounts: {
@@ -10858,6 +10910,96 @@ export interface components {
        * @description Sum of the (negative) R of the losses carrying the tag; null when the analyzer did not compute it (never shown as 0).
        */
       lostR: null | number;
+    };
+    /** @description One daily bar. */
+    TicketChartBar: {
+      /**
+       * Format: date
+       * @description The India date.
+       */
+      t: string;
+      /**
+       * Format: double
+       * @description Open.
+       */
+      o: number;
+      /**
+       * Format: double
+       * @description High.
+       */
+      h: number;
+      /**
+       * Format: double
+       * @description Low.
+       */
+      l: number;
+      /**
+       * Format: double
+       * @description Close.
+       */
+      c: number;
+      /**
+       * Format: int64
+       * @description Volume.
+       */
+      v: number;
+    };
+    /** @description The numbers of the ticket (P7-19) as the chart draws them; `Source` is `none` when the ticket carries none. */
+    TicketChartLevels: {
+      /** Format: double */
+      entryRef: null | number;
+      /** Format: double */
+      stop: null | number;
+      stopAnchor: null | string;
+      /** Format: double */
+      target: null | number;
+      /** Format: double */
+      rewardRisk: null | number;
+      /** Format: date */
+      session: null | string;
+      basis: null | string;
+      source: string;
+    };
+    /** @description The text rules of the ticket. */
+    TicketChartRules: {
+      trigger: string;
+      stop: string;
+      target: string;
+      validity: string;
+    };
+    /** @description The daily context of one ticket (spec P8-14, ADR 0113): the last bars up to the planning session, the levels the ticket carries, and its rule texts. Read only; never a price after the session. */
+    TicketChartView: {
+      /** @description The ticket's symbol. */
+      symbol: string;
+      /** @description exact, ambiguous or not_found (the symbol against the instrument master). */
+      resolution: string;
+      /**
+       * Format: uuid
+       * @description The instrument when exact.
+       */
+      instrumentId: null | string;
+      /**
+       * Format: date
+       * @description The last closed session of the plan: the levels' session, else the trading day before the plan date.
+       */
+      session: string;
+      /** @description 1D. */
+      timeframe: string;
+      /** @description True: adjusted by the corporate actions applied as of the session. */
+      adjusted: boolean;
+      /**
+       * Format: int32
+       * @description Bars returned (fewer than asked when the history is short; never padded).
+       */
+      barCount: number;
+      /** @description Oldest first. */
+      bars: components['schemas']['TicketChartBar'][];
+      /** @description The ticket's numbers, a straight copy. */
+      levels: components['schemas']['TicketChartLevels'];
+      /** @description The three rule texts and the validity. */
+      rules: components['schemas']['TicketChartRules'];
+      /** @description Honest limits in words. */
+      limits: string[];
     };
     /** @description One ticket with its grade as the API shows it. */
     TicketGradeView: {
@@ -18550,6 +18692,49 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPlanItemChart: {
+    parameters: {
+      query?: {
+        bars?: number;
+      };
+      header?: never;
+      path: {
+        id: number;
+        itemId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TicketChartView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };

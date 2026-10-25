@@ -4,9 +4,11 @@ import type { Decisions } from '../hooks/useDecisions';
 import { stateLabel } from '../lib/planText';
 import { LevelsRow } from './LevelsRow';
 import { TicketActions } from './TicketActions';
+import { TicketChartPanel } from './TicketChartPanel';
 import { TicketChecklist } from './TicketChecklist';
 
 interface Props {
+  planId: number;
   item: PlanItem;
   /** The review row of a primary or reserve ticket; absent for a rejected candidate. */
   ticket: ReviewTicket | undefined;
@@ -17,7 +19,7 @@ interface Props {
 }
 
 /** One candidate: what it is, the evidence with its limits, the sizes per paper account, the checks and the actions. */
-export function TicketCard({ item, ticket, reviewOpen, planOpen, names, decisions }: Props) {
+export function TicketCard({ planId, item, ticket, reviewOpen, planOpen, names, decisions }: Props) {
   const e = item.evidence;
   const pWin = e.pWin === null ? 'not available' : `${Math.round(e.pWin * 100)}%`;
   return (
@@ -60,6 +62,7 @@ export function TicketCard({ item, ticket, reviewOpen, planOpen, names, decision
               {item.allocations.map((a) => `${names[a.accountId] ?? a.accountId} (${a.mode}) ${a.quantity}`).join('; ')}
             </Typography>
           )}
+          {item.state !== null && <TicketChartPanel planId={planId} itemId={item.id} symbol={item.symbol} />}
           {ticket && <TicketChecklist accounts={ticket.accounts} names={names} />}
           {ticket?.modification && <Typography variant="body2">Your size change: {ticket.modification}</Typography>}
           {ticket?.confirmedDespite && (

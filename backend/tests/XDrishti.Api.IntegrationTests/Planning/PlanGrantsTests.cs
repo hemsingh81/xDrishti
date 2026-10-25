@@ -59,7 +59,7 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
     [Fact]
     public async Task As_xd_app_inserting_works_and_updating_deleting_and_truncating_fail_with_insufficient_privilege()
     {
-        const string plan = "INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at) VALUES ('grants-probe', '2026-10-13', '2026-10-13 03:35:00+00', 1, repeat('a', 64), 'b', true, 'n', 'l', 'probe', now())";
+        const string plan = "INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at, basis_flags_json) VALUES ('grants-probe', '2026-10-13', '2026-10-13 03:35:00+00', 1, repeat('a', 64), 'b', true, 'n', 'l', 'probe', now(), '{}')";
 
         (await SqlStateAsync(server.App, plan)).ShouldBeNull();
         (await SqlStateAsync(server.App, "INSERT INTO workflow.approvals (plan_id, kind, decision, actor, reason, decided_at) VALUES (1, 'owner', 'approve', 'owner:a', 'r', now())")).ShouldNotBe(PostgresErrorCodes.InsufficientPrivilege, "the privilege to insert an approval is there");

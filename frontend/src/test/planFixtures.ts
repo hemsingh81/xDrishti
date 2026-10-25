@@ -5,6 +5,7 @@ import type { Schemas } from '@/shared/api';
 export const planHandlers = [
   http.get('/api/plans', () => HttpResponse.json([])),
   http.get('/api/plans/notices', () => HttpResponse.json({ items: [] })),
+  http.get('/api/plan-runs', () => HttpResponse.json([])),
 ];
 
 /** Builders for the plan screen tests (P7-17). The ids are made up. */
@@ -161,5 +162,66 @@ export const buildPlanNotice = (over: Partial<Schemas['PlanNotice']> = {}): Sche
   planId: 7,
   at: cutoffIso,
   resolved: false,
+  ...over,
+});
+
+export const buildFlags = (over: Partial<Schemas['PlanFlagsView']> = {}): Schemas['PlanFlagsView'] => ({
+  schemaVersion: 1,
+  gate: 'normal',
+  gateMissing: [],
+  throttle: 'clear',
+  correlation: 'applied',
+  correlationUnavailablePairs: 0,
+  openBook: 'known',
+  riskMultiplier: 1,
+  ruleRemovedHalf: false,
+  costBasis: 'costed_unconfirmed',
+  banner: [],
+  ...over,
+});
+
+export const buildRun = (over: Partial<Schemas['PlanRunView']> = {}): Schemas['PlanRunView'] => ({
+  id: 3,
+  attempt: 2,
+  forDate: '2026-10-28',
+  planKey: null,
+  outcome: 'failed_closed',
+  failedGate: 'data_quality',
+  reason: 'Bars of the last session are missing.',
+  planId: null,
+  manual: false,
+  startedAt: '2026-10-27T13:11:00Z',
+  finishedAt: '2026-10-27T13:12:00Z',
+  ...over,
+});
+
+export const buildChart = (over: Partial<Schemas['TicketChartView']> = {}): Schemas['TicketChartView'] => ({
+  symbol: 'AAA',
+  resolution: 'exact',
+  instrumentId: '00000000-0000-4000-8000-0000000000c1',
+  session: '2026-10-23',
+  timeframe: '1D',
+  adjusted: true,
+  barCount: 12,
+  bars: Array.from({ length: 12 }, (_, i) => ({
+    t: `2026-10-${String(i + 5).padStart(2, '0')}`,
+    o: 100 + i,
+    h: 103 + i,
+    l: 98 + i,
+    c: 101 + i,
+    v: 1000 + i,
+  })),
+  levels: {
+    entryRef: null,
+    stop: null,
+    stopAnchor: null,
+    target: null,
+    rewardRisk: null,
+    session: null,
+    basis: null,
+    source: 'none',
+  },
+  rules: { trigger: 'Break of 100.0', stop: 'Stop 95.0', target: 'Target 110.0', validity: 'Today only' },
+  limits: [],
   ...over,
 });

@@ -77,6 +77,18 @@ public sealed class SelectionPlanBuilderTests
     }
 
     [Fact]
+    public async Task The_plan_carries_its_smart_rule_flags_as_stored_facts_with_the_banner_unclamped()
+    {
+        var result = await Builder([Candidate("AAA", "S1")], Loose).BuildAsync(Request, CancellationToken.None);
+
+        var flags = result.Value.BasisFlags;
+        Assert.NotNull(flags);
+        Assert.Equal(1, flags.SchemaVersion);
+        Assert.False(string.IsNullOrEmpty(flags.Gate));
+        Assert.Equal(PlanBasisFlags.OpenBookAssumedEmpty, flags.OpenBook);
+    }
+
+    [Fact]
     public async Task Every_item_says_the_stats_may_belong_to_an_older_strategy_version()
     {
         var result = await Builder([Candidate("AAA", "S1")], Loose).BuildAsync(Request, CancellationToken.None);

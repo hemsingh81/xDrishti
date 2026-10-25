@@ -26,6 +26,8 @@ internal sealed class PlanRecord
     public string CreatedBy { get; set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; set; }
+
+    public string? BasisFlagsJson { get; set; }
 }
 
 /// <summary>A row of <c>trading.plan_items</c>. Insert-only.</summary>

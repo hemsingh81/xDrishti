@@ -1,5 +1,6 @@
 using System.Data.Common;
 using System.Globalization;
+using System.Text.Json;
 using Npgsql;
 using NpgsqlTypes;
 using XDrishti.Application.Abstractions.Autonomy;
@@ -15,6 +16,8 @@ namespace XDrishti.Infrastructure.Planning;
 /// </summary>
 internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) : IPlanStore, IAutoApprovalStore, IArmedTicketReader
 {
+    private static readonly JsonSerializerOptions FlagsJson = new(JsonSerializerDefaults.Web);
+
     private const string PlanStateSql = "COALESCE((SELECT e.to_state FROM trading.plan_events e WHERE e.plan_id = p.id AND e.item_id IS NULL ORDER BY e.id DESC LIMIT 1), 'draft')";
 
     private const string ItemStateSql = "COALESCE((SELECT e.to_state FROM trading.plan_events e WHERE e.item_id = i.id ORDER BY e.id DESC LIMIT 1), 'proposed')";
@@ -23,7 +26,8 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
         p.id, p.plan_key, p.for_date, p.version, p.input_hash, p.basis, p.provisional, p.notice, p.limits, p.created_by, p.created_at, p.review_cutoff, {PlanStateSql},
         (SELECT count(*) FROM trading.plan_items x WHERE x.plan_id = p.id AND x.item_group = 'primary'),
         (SELECT count(*) FROM trading.plan_items x WHERE x.plan_id = p.id AND x.item_group = 'reserve'),
-        (SELECT count(*) FROM trading.plan_items x WHERE x.plan_id = p.id AND x.item_group = 'rejected')
+        (SELECT count(*) FROM trading.plan_items x WHERE x.plan_id = p.id AND x.item_group = 'rejected'),
+        p.basis_flags_json
         """;
 
     private const string ItemColumns = $"""
@@ -72,8 +76,8 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
 
         long planId;
         await using (var insert = new NpgsqlCommand("""
-            INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at)
-            VALUES (@key, @date, @cutoff, @version, @hash, @basis, @prov, @notice, @limits, @by, @at) RETURNING id
+            INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at, basis_flags_json)
+            VALUES (@key, @date, @cutoff, @version, @hash, @basis, @prov, @notice, @limits, @by, @at, @flags) RETURNING id
             """, connection, transaction))
         {
             var p = insert.Parameters;
@@ -88,6 +92,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
             p.AddWithValue("limits", NpgsqlDbType.Varchar, plan.Limits);
             p.AddWithValue("by", NpgsqlDbType.Varchar, plan.CreatedBy);
             p.AddWithValue("at", NpgsqlDbType.TimestampTz, plan.CreatedAt);
+            p.Add(new NpgsqlParameter("flags", NpgsqlDbType.Text) { Value = plan.BasisFlags is { } flags ? JsonSerializer.Serialize(flags, FlagsJson) : DBNull.Value });
             planId = (long)(await insert.ExecuteScalarAsync(cancellationToken))!;
         }
 
@@ -642,6 +647,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
             {
                 Notice = reader.GetString(7),
                 Limits = reader.GetString(8),
+                BasisFlags = reader.IsDBNull(16) ? null : JsonSerializer.Deserialize<PlanBasisFlags>(reader.GetString(16), FlagsJson),
             };
             rows.Add(new PlanRow(reader.GetInt64(0), plan, PlanStateText.TryParse(reader.GetString(12)) ?? PlanState.Draft, (int)reader.GetInt64(13), (int)reader.GetInt64(14), (int)reader.GetInt64(15)));
         }
