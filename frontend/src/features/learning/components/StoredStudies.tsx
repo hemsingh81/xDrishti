@@ -37,7 +37,7 @@ const outcomeText: Record<string, string> = {
 };
 
 const stamp = (by: string | null | undefined, at: string | null | undefined, id: number | null | undefined) =>
-  `Stored study #${formatCount(id)} by ${by ?? 'unknown'}${at ? ` on ${formatDate(at.slice(0, 10))}` : ''}.`;
+  `Stored study #${id ?? 'n/a'} by ${by ?? 'unknown'}${at ? ` on ${formatDate(at.slice(0, 10))}` : ''}.`;
 
 function Missing({ rule, command }: { rule: SmartRule; command: string }) {
   return (
@@ -53,8 +53,8 @@ function Missing({ rule, command }: { rule: SmartRule; command: string }) {
 function Limits({ items }: { items: readonly string[] }) {
   return (
     <Box component="ul" aria-label="Study limits" sx={{ m: 0, pl: 2.5 }}>
-      {items.map((limit) => (
-        <li key={limit}>
+      {items.map((limit, index) => (
+        <li key={`${index}-${limit}`}>
           <Typography variant="caption">{limit}</Typography>
         </li>
       ))}
@@ -94,8 +94,8 @@ function WindowsStudy({ study }: { study: EntryWindowStudy }) {
               </Typography>
             )}
             <Box component="ul" aria-label={`${c.cellKey} reasons`} sx={{ m: 0, pl: 2 }}>
-              {c.reasons.map((reason) => (
-                <li key={reason}>
+              {c.reasons.map((reason, index) => (
+                <li key={`${index}-${reason}`}>
                   <Typography variant="caption">{reason}</Typography>
                 </li>
               ))}
@@ -117,8 +117,8 @@ function MetaStudy({ study }: { study: MetaPolicyStudy }) {
         <strong>{outcomeText[study.outcome] ?? study.outcome}</strong>. Basis: {study.basis}.
       </Typography>
       <Box component="ul" aria-label="Policy reasons" sx={{ m: 0, pl: 2.5 }}>
-        {study.reasons.map((reason) => (
-          <li key={reason}>
+        {study.reasons.map((reason, index) => (
+          <li key={`${index}-${reason}`}>
             <Typography variant="body2">{reason}</Typography>
           </li>
         ))}

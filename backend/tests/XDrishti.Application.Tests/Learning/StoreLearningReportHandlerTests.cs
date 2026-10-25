@@ -41,6 +41,11 @@ public sealed class StoreLearningReportHandlerTests
         _runs.FindAsync(KeyA, Arg.Any<CancellationToken>()).Returns(new StoredRunHeader(1, KeyA, "sim", 5, 5, "ORB", new string('b', 64), new DateOnly(2025, 1, 1), new DateOnly(2026, 8, 1), "basket", "x", 1, 1, 0, 0, 0, 0, false, "{}", null, null, 0, new string('c', 64), new string('d', 64), DateTimeOffset.UnixEpoch, "t"));
     }
 
+    private static readonly string KeyB = new('b', 64);
+
+    private static StoredRunHeader Header(string key, string? sheet) =>
+        new(1, key, "sim", 5, 5, "ORB", new string('b', 64), new DateOnly(2025, 1, 1), new DateOnly(2026, 8, 1), "basket", "x", 1, 1, 0, 0, 0, 0, false, "{}", sheet, sheet is null ? null : new string('e', 64), 0, new string('c', 64), new string('d', 64), DateTimeOffset.UnixEpoch, "t");
+
     private static IReadOnlyList<CellSource> Sources => [new CellSource(KeyA, "intraday", "x")];
 
     private static EntryWindowReport Windows(EntryWindowStatus status = EntryWindowStatus.Proposed, double? lift = 0.08)
@@ -159,6 +164,22 @@ public sealed class StoreLearningReportHandlerTests
         policy.Error.Code.ShouldBe("learning.meta_policy_not_found");
         refused.IsFailure.ShouldBeTrue();
         _store.Rows.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Gross_and_costed_runs_are_never_mixed_for_either_kind()
+    {
+        _runs.FindAsync(KeyB, Arg.Any<CancellationToken>()).Returns(Header(KeyB, "sheet-1"));
+        IReadOnlyList<CellSource> both = [new CellSource(KeyA, "intraday", "x"), new CellSource(KeyB, "intraday", "x")];
+
+        var windows = await WindowsHandler().HandleAsync(new StoreEntryWindowsCommand(new ProposeEntryWindowsQuery(both, new EntryWindowOptions(), new ValidationOptions(), 6), "cli:xd"), Ct);
+        var policy = await PolicyHandler().HandleAsync(new StoreMetaPolicyCommand(new EvaluateMetaPolicyQuery(both, new CellStatsOptions(), null, new ValidationOptions(), new MetaPolicyOptions(), 6), "cli:xd"), Ct);
+
+        windows.Error.Code.ShouldBe(LearningErrors.InvalidCode);
+        policy.Error.Code.ShouldBe(LearningErrors.InvalidCode);
+        _store.Rows.ShouldBeEmpty();
+        await _propose.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+        await _evaluate.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
     }
 
     [Fact]

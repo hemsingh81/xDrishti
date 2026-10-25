@@ -32,6 +32,7 @@ internal sealed class StoreEntryWindowsHandler(
     public async ValueTask<Result<StoredReport>> HandleAsync(StoreEntryWindowsCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(command.Query);
         var query = command.Query;
         if (string.IsNullOrWhiteSpace(command.Actor) || command.Actor.Length > 100)
         {
@@ -43,7 +44,7 @@ internal sealed class StoreEntryWindowsHandler(
             return Result.Failure<StoredReport>(LearningErrors.Invalid([new FieldError("sources", "Name at least one run; the options are required.")]));
         }
 
-        var basis = await ReportBasis.ResolveAsync(runs, confirmations, sources, cancellationToken);
+        var basis = await RunCostBasis.ResolveAsync(runs, confirmations, sources, cancellationToken);
         if (basis.IsFailure)
         {
             StoredReportLog.Refused(logger, StoredReportKinds.EntryWindows, basis.Error.Code);
@@ -58,7 +59,7 @@ internal sealed class StoreEntryWindowsHandler(
         }
 
         var report = result.Value;
-        var ordered = sources.OrderBy(s => s.RunKey, StringComparer.Ordinal).ThenBy(s => s.Style, StringComparer.Ordinal).ThenBy(s => s.Exit, StringComparer.Ordinal).ToList();
+        var ordered = StoredReportKinds.Ordered(sources);
         var text = StoredReportKinds.TextOf(report.ToText());
         var view = EntryWindowReportView.Of(report, query.HoldOutMonths, basis.Value, ordered, text);
         var row = new NewLearningReport(
@@ -85,6 +86,7 @@ internal sealed class StoreMetaPolicyHandler(
     public async ValueTask<Result<StoredReport>> HandleAsync(StoreMetaPolicyCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(command.Query);
         var query = command.Query;
         if (string.IsNullOrWhiteSpace(command.Actor) || command.Actor.Length > 100)
         {
@@ -96,7 +98,7 @@ internal sealed class StoreMetaPolicyHandler(
             return Result.Failure<StoredReport>(LearningErrors.Invalid([new FieldError("sources", "Name at least one run; the options are required.")]));
         }
 
-        var basis = await ReportBasis.ResolveAsync(runs, confirmations, sources, cancellationToken);
+        var basis = await RunCostBasis.ResolveAsync(runs, confirmations, sources, cancellationToken);
         if (basis.IsFailure)
         {
             StoredReportLog.Refused(logger, StoredReportKinds.MetaPolicy, basis.Error.Code);
@@ -111,7 +113,7 @@ internal sealed class StoreMetaPolicyHandler(
         }
 
         var report = result.Value;
-        var ordered = sources.OrderBy(s => s.RunKey, StringComparer.Ordinal).ThenBy(s => s.Style, StringComparer.Ordinal).ThenBy(s => s.Exit, StringComparer.Ordinal).ToList();
+        var ordered = StoredReportKinds.Ordered(sources);
         var text = StoredReportKinds.TextOf(report.ToText());
         var view = MetaPolicyReportView.Of(report, query.HoldOutMonths, basis.Value, ordered, text);
         var recipe = $"{trainer.Candidate.Name} ({trainer.Parameters})";

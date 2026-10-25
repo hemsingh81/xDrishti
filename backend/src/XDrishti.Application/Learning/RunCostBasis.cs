@@ -5,7 +5,7 @@ using XDrishti.Domain.Common;
 namespace XDrishti.Application.Learning;
 
 /// <summary>The cost basis of a set of runs from their headers (P8-12, ADR 0110; shared by the stored kinds): gross, costed_unconfirmed or net_confirmed. Gross and costed runs are never mixed.</summary>
-internal static class ReportBasis
+internal static class RunCostBasis
 {
     public static async ValueTask<Result<string>> ResolveAsync(IRunStore runs, IChargeSheetConfirmationSource confirmations, IReadOnlyList<CellSource> sources, CancellationToken cancellationToken)
     {

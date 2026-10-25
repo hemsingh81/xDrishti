@@ -34,7 +34,7 @@ internal sealed class StoreCounterfactualHandler(
             return Result.Failure<StoredCounterfactual>(LearningErrors.Invalid([new FieldError("sources", "Name at least one run; the options are required.")]));
         }
 
-        var basis = await ReportBasis.ResolveAsync(runs, confirmations, sources, cancellationToken);
+        var basis = await RunCostBasis.ResolveAsync(runs, confirmations, sources, cancellationToken);
         if (basis.IsFailure)
         {
             CounterfactualStoreLog.Refused(logger, basis.Error.Code);

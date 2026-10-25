@@ -53,8 +53,13 @@ internal static class StoredReportKinds
 
     public static string Sources(IReadOnlyList<CellSource> sources) => string.Join(',', sources.Select(s => $"{s.RunKey}:{s.Style}:{s.Exit}").Order(StringComparer.Ordinal));
 
+    /// <summary>The sources in the order they are stored and hashed: by run key, then style, then exit.</summary>
+    public static List<CellSource> Ordered(IReadOnlyList<CellSource> sources) =>
+        [.. sources.OrderBy(s => s.RunKey, StringComparer.Ordinal).ThenBy(s => s.Style, StringComparer.Ordinal).ThenBy(s => s.Exit, StringComparer.Ordinal)];
+
     private static string Sha(string text) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
 
+    // shortcut: the fold options Trials, HoldOutStart, MinFoldsForVerdict and the margins are not hashed; the verbs pass the defaults, so they cannot differ. Hash them if a caller ever sets them.
     public static string WindowsHash(ProposeEntryWindowsQuery q)
     {
         var o = q.Options;
