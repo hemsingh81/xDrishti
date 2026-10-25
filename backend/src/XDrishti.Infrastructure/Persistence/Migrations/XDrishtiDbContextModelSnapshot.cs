@@ -5350,6 +5350,11 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("data_range");
 
+                    b.Property<decimal?>("EntryRefPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("entry_ref_price");
+
                     b.Property<string>("ItemGroup")
                         .IsRequired()
                         .HasMaxLength(8)
@@ -5359,6 +5364,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.Property<int>("ItemRank")
                         .HasColumnType("integer")
                         .HasColumnName("item_rank");
+
+                    b.Property<DateOnly?>("LevelsSession")
+                        .HasColumnType("date")
+                        .HasColumnName("levels_session");
 
                     b.Property<double?>("PWin")
                         .HasColumnType("double precision")
@@ -5383,11 +5392,26 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("text[]")
                         .HasColumnName("reasons");
 
+                    b.Property<decimal?>("RewardRisk")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("reward_risk");
+
                     b.Property<string>("Side")
                         .IsRequired()
                         .HasMaxLength(4)
                         .HasColumnType("character varying(4)")
                         .HasColumnName("side");
+
+                    b.Property<string>("StopAnchor")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("stop_anchor");
+
+                    b.Property<decimal?>("StopLevel")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("stop_level");
 
                     b.Property<string>("StopText")
                         .IsRequired()
@@ -5412,6 +5436,11 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("symbol");
+
+                    b.Property<decimal?>("TargetLevel")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("target_level");
 
                     b.Property<string>("TargetText")
                         .IsRequired()
@@ -5450,6 +5479,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("plan_items", "trading", t =>
                         {
                             t.HasCheckConstraint("ck_plan_items_group", "item_group IN ('primary', 'reserve', 'rejected') AND (item_group = 'primary' OR cardinality(reasons) > 0)");
+
+                            t.HasCheckConstraint("ck_plan_items_levels", "(entry_ref_price IS NULL AND levels_session IS NULL AND stop_level IS NULL AND stop_anchor IS NULL AND target_level IS NULL AND reward_risk IS NULL) OR (entry_ref_price IS NOT NULL AND entry_ref_price > 0 AND levels_session IS NOT NULL AND (stop_level IS NULL) = (stop_anchor IS NULL) AND (stop_anchor IS NULL OR stop_anchor IN ('level', 'close_of_d')) AND (stop_level IS NULL OR (stop_level > 0 AND ((side = 'BUY' AND stop_level < entry_ref_price) OR (side = 'SELL' AND stop_level > entry_ref_price)))) AND (target_level IS NULL) = (reward_risk IS NULL) AND (target_level IS NULL OR (stop_level IS NOT NULL AND target_level > 0 AND reward_risk > 0 AND ((side = 'BUY' AND target_level > entry_ref_price) OR (side = 'SELL' AND target_level < entry_ref_price)))))");
 
                             t.HasCheckConstraint("ck_plan_items_p_win_lower", "p_win_lower IS NULL OR (p_win_lower >= 0 AND p_win_lower <= 1)");
 

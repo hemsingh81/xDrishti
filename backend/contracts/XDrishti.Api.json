@@ -24945,6 +24945,17 @@
               "$ref": "#/components/schemas/PlanAllocationView"
             },
             "description": "Size per account."
+          },
+          "levels": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Indicative numbers as of the close of D (P7-19), or null for a plan stored without them or a ticket with no numeric level.",
+                "$ref": "#/components/schemas/TicketLevelsView"
+              }
+            ]
           }
         },
         "description": "One candidate of a plan."
@@ -30704,6 +30715,66 @@
           }
         },
         "description": "One ticket with its grade as the API shows it."
+      },
+      "TicketLevelsView": {
+        "required": [
+          "entryRef",
+          "session",
+          "stop",
+          "stopAnchor",
+          "target",
+          "rewardRisk",
+          "basis"
+        ],
+        "type": "object",
+        "properties": {
+          "entryRef": {
+            "type": "number",
+            "description": "The close of the session.",
+            "format": "double"
+          },
+          "session": {
+            "type": "string",
+            "description": "The session D.",
+            "format": "date"
+          },
+          "stop": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The stop level, or null when the stop has no number.",
+            "format": "double"
+          },
+          "stopAnchor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "\"level\" (a market level) or \"close_of_d\" (a distance from the close); null with no stop."
+          },
+          "target": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The target level of a fixed reward-to-risk exit, or null.",
+            "format": "double"
+          },
+          "rewardRisk": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "That reward-to-risk, or null.",
+            "format": "double"
+          },
+          "basis": {
+            "type": "string",
+            "description": "The pinned sentence on what the numbers are."
+          }
+        },
+        "description": "The indicative numbers of a ticket (spec P7-19, ADR 0109): rupees as of the close of the session, not tomorrow's price and not an order."
       },
       "TimeframeCheck": {
         "required": [

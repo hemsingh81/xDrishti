@@ -491,4 +491,58 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
         (await ScalarAsync<long>("SELECT count(*) FROM trading.plan_runs")).ShouldBe(3);
         (await ScalarAsync<string>("SELECT failed_gate FROM trading.plan_runs WHERE outcome = 'failed_closed'")).ShouldBe("eod_incomplete");
     }
+
+    [Fact]
+    public async Task A_legacy_row_inserted_without_the_levels_columns_reads_null_levels_over_the_endpoint()
+    {
+        var (plan, _, _, _) = await StoredAsync();
+        (await StateOfAsync("INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons, cell_key, trades, data_range, p_win_basis, unavailable) VALUES (@p, 30, 'primary', 's', 'BUY', 'x', 'h', 't', 's', 't', 'v', '{}', 'c', 1, 'd', 'b', '{}')", ("p", plan))).ShouldBeNull();
+
+        var view = await Client.GetFromJsonAsync<JsonElement>(new Uri($"/api/plans/{plan}", UriKind.Relative), Ct);
+
+        var legacy = view.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("rank").GetInt32() == 30);
+        legacy.GetProperty("levels").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Levels_round_trip_through_the_store_and_the_endpoint_and_an_item_without_them_reads_null()
+    {
+        var levels = TicketLevels.Create("BUY", 100.5m, Session, 95m, StopAnchor.Level, 111.5m, 2m).Value;
+        var published = await PublishAsync(Plan("plan-levels", 1, Item(1, TicketGroup.Primary) with { Levels = levels }, Item(2, TicketGroup.Reserve)));
+
+        var stored = await ItemsAsync(published.Id);
+        var view = await Client.GetFromJsonAsync<JsonElement>(new Uri($"/api/plans/{published.Id}", UriKind.Relative), Ct);
+
+        stored[0].Item.Levels.ShouldBe(levels);
+        stored[1].Item.Levels.ShouldBeNull();
+        var items = view.GetProperty("items");
+        items[0].GetProperty("levels").GetProperty("stop").GetDecimal().ShouldBe(95m);
+        items[0].GetProperty("levels").GetProperty("stopAnchor").GetString().ShouldBe("level");
+        items[0].GetProperty("levels").GetProperty("basis").GetString().ShouldBe(TicketLevelsView.BasisText);
+        items[1].TryGetProperty("levels", out var none).ShouldBeTrue();
+        none.ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task The_database_refuses_levels_on_the_wrong_side_without_an_anchor_or_a_session_and_a_target_without_a_stop()
+    {
+        var (plan, _, _, _) = await StoredAsync();
+        var n = 20;
+
+        async Task<string?> InsertAsync(string side, string columns, string values) =>
+            await StateOfAsync($"INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons, cell_key, trades, data_range, p_win_basis, unavailable, {columns}) VALUES (@p, {n++}, 'primary', 's', '{side}', 'x', 'h', 't', 's', 't', 'v', '{{}}', 'c', 1, 'd', 'b', '{{}}', {values})", ("p", plan));
+
+        const string All = "entry_ref_price, levels_session, stop_level, stop_anchor, target_level, reward_risk";
+        (await InsertAsync("BUY", All, "100, '2099-01-02', 95, 'level', 110, 2")).ShouldBeNull();
+        (await InsertAsync("SELL", All, "100, '2099-01-02', 105, 'close_of_d', 90, 2")).ShouldBeNull();
+        (await InsertAsync("BUY", "entry_ref_price, levels_session", "100, '2099-01-02'")).ShouldBeNull();
+        (await InsertAsync("SELL", All, "100, '2099-01-02', 95, 'level', 90, 2")).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await InsertAsync("BUY", All, "100, '2099-01-02', 95, 'level', 90, 2")).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await InsertAsync("BUY", All, "100, '2099-01-02', 0, 'level', null, null")).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await InsertAsync("BUY", All, "100, '2099-01-02', 95, null, null, null")).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await InsertAsync("BUY", All, "100, '2099-01-02', 95, 'weird', null, null")).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await InsertAsync("BUY", All, "100, '2099-01-02', null, null, 110, 2")).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await InsertAsync("BUY", "entry_ref_price", "100")).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await InsertAsync("BUY", "levels_session", "'2099-01-02'")).ShouldBe(PostgresErrorCodes.CheckViolation);
+    }
 }

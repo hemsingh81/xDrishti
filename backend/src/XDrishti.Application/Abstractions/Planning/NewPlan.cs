@@ -36,7 +36,8 @@ public sealed record NewPlan(string PlanKey, DateOnly ForDate, DateTimeOffset Re
 /// <param name="Reasons">Reason codes; required for reserve and rejected.</param>
 /// <param name="Evidence">The evidence block.</param>
 /// <param name="Allocations">Size per Trading account.</param>
-public sealed record NewPlanItem(int Rank, TicketGroup Group, string Symbol, string Side, string StrategyId, string StrategyVersionHash, string Trigger, string Stop, string Target, string Validity, IReadOnlyList<string> Reasons, PlanEvidence Evidence, IReadOnlyList<NewAllocation> Allocations);
+/// <param name="Levels">The indicative numbers as of the close of D (P7-19); null when the builder had none. Never read by approval, modification, grading or journal.</param>
+public sealed record NewPlanItem(int Rank, TicketGroup Group, string Symbol, string Side, string StrategyId, string StrategyVersionHash, string Trigger, string Stop, string Target, string Validity, IReadOnlyList<string> Reasons, PlanEvidence Evidence, IReadOnlyList<NewAllocation> Allocations, TicketLevels? Levels = null);
 
 /// <summary>The evidence on a ticket as data, with its honest limits.</summary>
 /// <param name="CellKey">The cell the numbers come from.</param>

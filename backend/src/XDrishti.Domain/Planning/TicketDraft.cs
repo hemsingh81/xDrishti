@@ -25,6 +25,8 @@ namespace XDrishti.Domain.Planning;
 /// <param name="RewardRisk">Planned reward to risk of the first fixed-RR exit, when there is one.</param>
 /// <param name="AverageDailyTurnover">Mean of close times volume over the last 20 sessions up to D, rupees; null when fewer than 20 sessions.</param>
 /// <param name="Unavailable">Inputs that were not available; never a pass.</param>
+/// <param name="TargetLevel">Target price as of the close of D, for a fixed reward-to-risk exit with a numeric stop (the same number the target text states); null otherwise (P7-19).</param>
+/// <param name="StopAnchor">What <paramref name="StopLevel"/> is measured from; null when the stop has no number the plan may store (P7-19).</param>
 public sealed record TicketDraft(
     TicketVerdict Verdict,
     string Symbol,
@@ -46,4 +48,6 @@ public sealed record TicketDraft(
     double? IndicativeEntry,
     double? RewardRisk,
     double? AverageDailyTurnover,
-    IReadOnlyList<string> Unavailable);
+    IReadOnlyList<string> Unavailable,
+    double? TargetLevel = null,
+    StopAnchor? StopAnchor = null);

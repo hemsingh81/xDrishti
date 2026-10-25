@@ -2,6 +2,7 @@ import { Card, CardContent, Chip, Stack, Typography } from '@mui/material';
 import type { PlanItem, ReviewTicket } from '../api/planQueries';
 import type { Decisions } from '../hooks/useDecisions';
 import { stateLabel } from '../lib/planText';
+import { LevelsRow } from './LevelsRow';
 import { TicketActions } from './TicketActions';
 import { TicketChecklist } from './TicketChecklist';
 
@@ -36,6 +37,7 @@ export function TicketCard({ item, ticket, reviewOpen, planOpen, names, decision
           <Typography variant="body2">
             Trigger: {item.trigger} · Stop: {item.stop} · Target: {item.target} · Valid: {item.validity}
           </Typography>
+          <LevelsRow levels={item.levels} />
           <Typography variant="body2">
             <strong>Evidence:</strong> cell {e.cellKey}, {e.trades} trades. {e.dataRange}. Win probability {pWin}
             {e.conservativeExpectancyR === null

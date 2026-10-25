@@ -112,6 +112,34 @@ public sealed class TicketBuilderTests
     }
 
     [Fact]
+    public void A_swing_low_stop_with_a_fixed_rr_exit_carries_a_level_anchor_and_a_target_that_matches_the_text()
+    {
+        var draft = BaseBreakout(Days(100), 100);
+
+        Assert.Equal(StopAnchor.Level, draft.StopAnchor);
+        var entry = draft.IndicativeEntry!.Value;
+        Assert.Equal(entry + (2 * (entry - draft.StopLevel!.Value)), draft.TargetLevel!.Value, 9);
+        var number = draft.TargetLevel.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Contains("indicative level " + number, draft.TargetText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_percentage_stop_is_anchored_to_the_close_and_no_fixed_exit_gives_no_target_level()
+    {
+        var pct = Swing(["close > 0"], ["close > 0"]) with { };
+        var rules = pct.Buy! with { Stop = new StopSpec(StopKind.FixedPct, Pct: Quantity.Of(5)) };
+        var definition = pct with { Buy = rules };
+
+        var fixedRr = Run(definition);
+        var rule = Run(definition, exit: "NOT_AN_EXIT");
+
+        Assert.Equal(StopAnchor.CloseOfD, fixedRr.StopAnchor);
+        Assert.Equal(fixedRr.IndicativeEntry!.Value * 0.95, fixedRr.StopLevel!.Value, 9);
+        Assert.Null(rule.TargetLevel);
+        Assert.Null(rule.RewardRisk);
+    }
+
+    [Fact]
     public void A_part_false_at_the_close_rejects_and_unknown_is_not_true()
     {
         var draft = BaseBreakout(Days(100, lastVolume: 1000), 100);
@@ -171,6 +199,51 @@ public sealed class TicketBuilderTests
         Assert.Equal(
             JsonSerializer.Serialize(TicketBuilder.Build(orb, "AAA", "h", "intraday", "FIXED_RR", Day(99), Day(100), baseBars, Calendar)),
             JsonSerializer.Serialize(TicketBuilder.Build(orb, "AAA", "h", "intraday", "FIXED_RR", Day(99), Day(100), mixed, Calendar)));
+    }
+
+    [Fact]
+    public void Adding_changing_or_removing_bars_after_the_close_of_D_leaves_the_levels_unchanged()
+    {
+        var baseBars = Days(100);
+        var baseline = BaseBreakout(baseBars, 100);
+        var added = baseBars.Concat(Days(103, lastVolume: 1, lastJump: 50).Where(b => b.EpochSeconds >= Epoch(Day(100), 0))).ToList();
+        var changed = baseBars.Concat(Days(101, lastJump: -40).Where(b => b.EpochSeconds >= Epoch(Day(100), 0))).ToList();
+
+        foreach (var bars in new[] { baseBars, added, changed })
+        {
+            var d = BaseBreakout(bars, 100);
+            Assert.Equal(baseline.StopLevel, d.StopLevel);
+            Assert.Equal(baseline.TargetLevel, d.TargetLevel);
+            Assert.Equal(baseline.StopAnchor, d.StopAnchor);
+            Assert.Equal(baseline.IndicativeEntry, d.IndicativeEntry);
+            Assert.Equal(baseline.RewardRisk, d.RewardRisk);
+        }
+
+        Assert.NotNull(baseline.TargetLevel);
+    }
+
+    [Fact]
+    public void An_opening_range_stop_has_no_anchor_and_no_target_level()
+    {
+        var draft = Run(Swing([Up], ["tf(\"15m\").close > 0"]).WithIntraday(), tf: Timeframe.M15);
+
+        Assert.Null(draft.StopAnchor);
+        Assert.Null(draft.TargetLevel);
+        Assert.NotNull(draft.IndicativeEntry);
+    }
+
+    [Fact]
+    public void An_atr_stop_whose_atr_is_not_ready_has_no_level_anchor_or_target()
+    {
+        var definition = Swing([Up], [Up]);
+        definition = definition with { Buy = definition.Buy! with { Stop = new StopSpec(StopKind.AtrMult, Mult: Quantity.Of(2), AtrPeriod: Quantity.Of(200)) } };
+
+        var draft = Run(definition);
+
+        Assert.Null(draft.StopLevel);
+        Assert.Null(draft.StopAnchor);
+        Assert.Null(draft.TargetLevel);
+        Assert.Contains("level set on tomorrow's data", draft.StopText, StringComparison.Ordinal);
     }
 
     [Fact]

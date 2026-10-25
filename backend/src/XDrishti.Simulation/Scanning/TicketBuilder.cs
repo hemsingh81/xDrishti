@@ -163,8 +163,17 @@ public static class TicketBuilder
         var unavailable = exit is null ? new[] { "target" } : [];
         return new TicketDraft(
             verdict, c.Symbol, c.Side, c.StrategyId, c.Hash, c.Session, c.Setup, c.Trigger, c.Invalidate, c.Overall, c.Parts, reason,
-            trigger, stopText + (stopLevel is null ? string.Empty : levels), targetText + (targetLevel is null ? string.Empty : levels), Validity(side, forDate), stopLevel, entry, rr, bars.Turnover, unavailable);
+            trigger, stopText + (stopLevel is null ? string.Empty : levels), targetText + (targetLevel is null ? string.Empty : levels), Validity(side, forDate), stopLevel, entry, rr, bars.Turnover, unavailable,
+            targetLevel, StopAnchorOf(side.Stop.Kind, stopLevel));
     }
+
+    // Percent and ATR stops hang on the close of D; structure stops are market levels; the opening range is intraday and has no number to store (P7-19).
+    private static StopAnchor? StopAnchorOf(StopKind kind, double? level) => level is null ? null : kind switch
+    {
+        StopKind.FixedPct or StopKind.AtrMult => StopAnchor.CloseOfD,
+        StopKind.OrOpposite => null,
+        _ => StopAnchor.Level,
+    };
 
     private static (string Text, double? Level) Stop(CompiledSide side, FeatureFrame frame, bool buy, double entry)
     {
