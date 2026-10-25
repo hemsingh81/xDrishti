@@ -3115,6 +3115,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/reports/comparisons': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored comparisons of exits on identical entries, newest first: key, entries key, strategy, unit, common entries and each member run with the exit candidate it ran. Headers only; the figures come from the report endpoints over the member runs (runs=<member keys>, lens=exit). Takes no parameter. Read only. */
+    get: operations['ListReportComparisons'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/exit-selections': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored out-of-sample exit choices (walk-forward, ADR 0054), newest first: per cell the chosen exit or why there is none, the default, the stability verdict with its reason and the chance-pass probability, the pooled out-of-sample figures (a number only for a value, insufficient below the minimum sample), the winner of each fold and the record's own caveats. Takes no parameter. Read only. */
+    get: operations['ListReportExitSelections'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/reports/insights': {
     parameters: {
       query?: never;
@@ -4654,6 +4688,36 @@ export interface components {
       sourceId: string;
       /** Format: int32 */
       sourceVersion: number;
+    };
+    /** @description One member of a comparison. */
+    ComparisonMemberView: {
+      /** @description The stored run key. */
+      runKey: string;
+      /** @description The exit candidate id. */
+      candidateId: string;
+    };
+    /** @description A stored comparison. */
+    ComparisonView: {
+      /** @description The comparison key. */
+      comparisonKey: string;
+      /** @description The key of the common entries. */
+      entriesKey: string;
+      /** @description The strategy. */
+      strategyId: string;
+      /** @description RFilled (gross) or RNet. */
+      unit: string;
+      /**
+       * Format: int32
+       * @description Entries every member shares.
+       */
+      commonEntries: number;
+      /** @description The member runs, with the candidate each ran. */
+      members: components['schemas']['ComparisonMemberView'][];
+      /**
+       * Format: date-time
+       * @description When it was stored.
+       */
+      createdAt: string;
     };
     /**
      * @description Completeness: the 1-minute bars the trading calendar expects in the window against the ones stored. `missingPercent` is of the expected minutes; `unfillableMinutes` are missing
@@ -6200,6 +6264,71 @@ export interface components {
       timeoutMinutes: number;
       catchUp: boolean;
       notifyOnFailure: boolean;
+    };
+    /** @description A stored exit choice for one cell. `Stable` is null when the record makes no statement, and `StabilityReason` says why. */
+    ExitSelectionView: {
+      /** @description The selection key. */
+      selectionKey: string;
+      /** @description The comparison it was made from. */
+      comparisonKey: string;
+      /** @description The strategy. */
+      strategyId: string;
+      /** @description The cell's timeframe. */
+      timeframe: string;
+      /** @description The cell's side. */
+      side: string;
+      /** @description The cell's style. */
+      style: string;
+      /** @description The cell's regime (* until a regime exists). */
+      regime: string;
+      /** @description The unit of the scores. */
+      unit: string;
+      /** @description The exit used when no choice stands. */
+      defaultCandidateId: string;
+      /** @description The walk-forward choice; null when there is none. */
+      chosenCandidateId: null | string;
+      /** @description Why there is none; null when there is one. */
+      noChoiceReason: null | string;
+      /** @description True, false, or null for no statement. */
+      stable: null | boolean;
+      /** @description The reason of the verdict. */
+      stabilityReason: string;
+      /**
+       * Format: int32
+       * @description Folds counted toward the verdict.
+       */
+      usableFolds: number;
+      /**
+       * Format: int32
+       * @description Of those, folds agreeing with the modal winner.
+       */
+      agreeingFolds: number;
+      /**
+       * Format: int32
+       * @description Of the agreeing, folds positive out of sample.
+       */
+      positiveFolds: number;
+      /**
+       * Format: double
+       * @description Exact probability that random winners would pass; null when not computed.
+       */
+      chancePass: null | number;
+      /**
+       * Format: int32
+       * @description Folds won by a lone peak.
+       */
+      lonePeaks: number;
+      /** @description Pooled out-of-sample figures, each a state. */
+      pooled: components['schemas']['PooledFigureView'][];
+      /** @description The folds. */
+      folds: components['schemas']['SelectionFoldView'][];
+      /** @description The record's own caveats, verbatim. */
+      banner: string[];
+      /**
+       * Format: date-time
+       * @description When stored.
+       */
+      createdAt: string;
     };
     /** @description An experiment as the API shows it (P6-11, ADR 0072). The report text and the parameters are empty in a list and filled for one experiment. */
     ExperimentView: {
@@ -9118,6 +9247,20 @@ export interface components {
       /** @description The basis and the limits. */
       evidence: components['schemas']['PlanVsActualEvidenceView'];
     };
+    /** @description A pooled out-of-sample figure: the number of trades and the mean and score as states (a number only for a value). */
+    PooledFigureView: {
+      /** @description What was pooled. */
+      name: string;
+      /**
+       * Format: int32
+       * @description Out-of-sample trades.
+       */
+      trades: number;
+      /** @description Mean R. */
+      meanR: components['schemas']['MetricView'];
+      /** @description Score. */
+      score: components['schemas']['MetricView'];
+    };
     /**
      * @description The value history of a scope (all accounts that count in totals, one account, one bucket). `Points` are in date order at `Resolution` (`day`, `week` or `month`: the last trading day of the period); `Value` is what the
      *     lots held that day were worth at that day's close (adjusted for splits and bonuses), `Invested` what they cost, `BenchmarkValue` the same cash flows in the benchmark index, `Nav` and `BenchmarkNav` unit values starting at 100
@@ -9781,6 +9924,13 @@ export interface components {
       /** @description The evidence block. */
       evidence: components['schemas']['BenchmarkEvidenceView'];
     };
+    /** @description The stored comparisons of exits on identical entries (spec P8-10 part b). Choosing one names its member runs as the run set of a report; the report must then be split by exit (`lens=exit`). */
+    ReportComparisonsView: {
+      /** @description Newest first. Empty is an ordinary answer. */
+      comparisons: components['schemas']['ComparisonView'][];
+      /** @description What always holds: in-sample, modelled fills, the same entries. */
+      limits: string[];
+    };
     /**
      * @description The evidence block every report carries (P8-00 D1): the basis, the population, the date range, what is not available and why, the runs behind the numbers (the "Data used" panel) and the honest limits as fields. A screen renders these; none of this wording
      *     is page prose.
@@ -9827,6 +9977,13 @@ export interface components {
       openAtEndLeftOut: number;
       /** @description What the owner confirmed, for a net report; null for a gross one. */
       netBasisConfirmation: null | string;
+    };
+    /** @description The stored out-of-sample exit choices (spec P8-10 part b, ADR 0054): which exit won each fold of a walk-forward, whether the choice is stable, and what the record itself says it is worth. */
+    ReportExitSelectionsView: {
+      /** @description Newest first. Empty is an ordinary answer. */
+      selections: components['schemas']['ExitSelectionView'][];
+      /** @description What always holds, as text. */
+      limits: string[];
     };
     /** @description The headline figures of the out-of-sample evidence; a figure that is not finite is null. */
     ReportKpisView: {
@@ -10271,6 +10428,35 @@ export interface components {
     SecretsInput: {
       apiKey: null | string;
       apiSecret: null | string;
+    };
+    /** @description One fold of a choice. */
+    SelectionFoldView: {
+      /**
+       * Format: int32
+       * @description 1-based.
+       */
+      index: number;
+      /**
+       * Format: date
+       * @description First test day.
+       */
+      testStart: string;
+      /**
+       * Format: date
+       * @description Last test day.
+       */
+      testEnd: string;
+      /** @description The winning candidate; null when none qualified. */
+      winner: null | string;
+      /**
+       * Format: int32
+       * @description Test trades of the winner.
+       */
+      winnerTestTrades: number;
+      /** @description The winner's out-of-sample score as a state. */
+      winnerTestScore: components['schemas']['MetricView'];
+      /** @description The fold does not count toward the verdict. */
+      thin: boolean;
     };
     /** @description The parameter sensitivity (spec P5-05): the exit and timeframe every point used, the base and the parameters. */
     SensitivityView: {
@@ -19092,6 +19278,46 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListReportComparisons: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReportComparisonsView'];
+        };
+      };
+    };
+  };
+  ListReportExitSelections: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReportExitSelectionsView'];
         };
       };
     };

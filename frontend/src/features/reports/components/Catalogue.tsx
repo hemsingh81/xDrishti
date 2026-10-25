@@ -1,4 +1,5 @@
 import { Box, Button, Typography } from '@mui/material';
+import { PointerEntry } from './PointerEntry';
 import { reportCatalogue } from '../lib/reportCatalogue';
 import type { ReportView } from '../lib/reportFilter';
 
@@ -30,12 +31,7 @@ export function Catalogue({ view, onOpen }: CatalogueProps) {
                 {entry.label}
               </Button>
             ) : (
-              <Box sx={{ px: 1, py: 0.5, color: 'text.secondary' }}>
-                <Typography variant="body2">{entry.label}</Typography>
-                <Typography variant="caption">
-                  {entry.status === 'unavailable' ? 'Not available' : 'Planned'}, {entry.slice}: {entry.reason}
-                </Typography>
-              </Box>
+              <PointerEntry entry={entry} />
             )}
           </li>
         ))}

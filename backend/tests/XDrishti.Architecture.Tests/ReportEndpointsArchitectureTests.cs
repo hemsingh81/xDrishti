@@ -39,7 +39,7 @@ public sealed partial class ReportEndpointsArchitectureTests
         var code = Code(EndpointsSource);
 
         WritingRoute().IsMatch(code).ShouldBeFalse();
-        ReadingRoute().Count(code).ShouldBe(12); // P8-04 added plan-vs-actual (GET); P8-10 added mae-mfe (GET)
+        ReadingRoute().Count(code).ShouldBe(14); // P8-04 added plan-vs-actual (GET); P8-10 added mae-mfe (GET); P8-10b added comparisons and exit-selections (GET)
         code.ShouldNotContain("ICommandHandler");
         WritingRoute().IsMatch("reports.MapPost(\"/x\", Handler)").ShouldBeTrue("the scan does see a write route");
         WritingRoute().IsMatch("reports.MapDelete(\"/x\", Handler)").ShouldBeTrue();
@@ -71,7 +71,7 @@ public sealed partial class ReportEndpointsArchitectureTests
     [Fact]
     public void The_report_handlers_are_internal_sealed_and_registered_and_the_source_is_internal_and_implements_the_port()
     {
-        foreach (var name in new[] { "ListReportRunsHandler", "GetReportSummaryHandler", "GetReportGroupsHandler", "GetReportPivotHandler", "GetReportEquityHandler", "GetReportDistributionHandler", "GetReportMaeMfeHandler", "GetReportInsightsHandler", "GetReportWhatWorksHandler", "PageReportTradesHandler", "ReportLoader" })
+        foreach (var name in new[] { "ListReportRunsHandler", "GetReportSummaryHandler", "GetReportGroupsHandler", "GetReportPivotHandler", "GetReportEquityHandler", "GetReportDistributionHandler", "GetReportMaeMfeHandler", "ListReportComparisonsHandler", "ListReportExitSelectionsHandler", "GetReportInsightsHandler", "GetReportWhatWorksHandler", "PageReportTradesHandler", "ReportLoader" })
         {
             var type = Application.GetType("XDrishti.Application.Reporting." + name);
 
@@ -81,7 +81,7 @@ public sealed partial class ReportEndpointsArchitectureTests
         }
 
         var registration = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Application", "DependencyInjection.cs"));
-        foreach (var name in new[] { "ListReportRunsHandler", "GetReportSummaryHandler", "GetReportGroupsHandler", "GetReportPivotHandler", "GetReportEquityHandler", "GetReportDistributionHandler", "GetReportMaeMfeHandler", "GetReportInsightsHandler", "GetReportWhatWorksHandler", "PageReportTradesHandler" })
+        foreach (var name in new[] { "ListReportRunsHandler", "GetReportSummaryHandler", "GetReportGroupsHandler", "GetReportPivotHandler", "GetReportEquityHandler", "GetReportDistributionHandler", "GetReportMaeMfeHandler", "ListReportComparisonsHandler", "ListReportExitSelectionsHandler", "GetReportInsightsHandler", "GetReportWhatWorksHandler", "PageReportTradesHandler" })
         {
             registration.ShouldContain(name + ">()");
         }

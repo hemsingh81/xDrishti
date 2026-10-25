@@ -121,6 +121,7 @@ public static class DependencyInjection
         services.AddPortfolio(configuration);
         services.AddScoped<ICostSheetStore, CostSheetStore>(); // the owner's charge sheets over platform.app_settings (spec P3-03f)
         services.AddScoped<IRunStore, RunStore>(); // the result store of the simulation runs (spec P3-10)
+        services.AddScoped<IReportComparisonSource, ReportComparisonSource>(); // stored exit comparisons and walk-forward exit choices, read only (P8-10 part b, ADR 0114)
         services.AddScoped<IReportTradeSource, ReportTradeSource>(); // the read side of the reports over the stored runs, a streamed projection (P8-06, ADR 0100)
         services.AddScoped<IChargeSheetConfirmationSource, ChargeSheetConfirmationStore>(); // the owner's stored confirmation of the charge sheet; the only source of one (P8-06)
         services.AddScoped<IExitSelectionStore, ExitSelectionStore>(); // the exit choices (spec P4-06)

@@ -9,6 +9,8 @@ export const moreViews = [
   'distribution',
   'instruments',
   'sectors',
+  'exits',
+  'montecarlo',
 ] as const;
 export type MoreView = (typeof moreViews)[number];
 
