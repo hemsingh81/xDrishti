@@ -1,6 +1,6 @@
 using System.Data.Common;
 using System.Globalization;
-using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using XDrishti.Application.Abstractions.Autonomy;
@@ -14,10 +14,8 @@ namespace XDrishti.Infrastructure.Planning;
 /// The plan record behind <see cref="IPlanStore"/> (spec P7-03, ADR 0083): raw SQL, insert and select only (the runtime role has no more). A state change is a new row in <c>trading.plan_events</c>, written under a transaction advisory lock
 /// per plan or item after checking that the newest state is still the one the caller saw. Nothing here talks to a broker.
 /// </summary>
-internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) : IPlanStore, IAutoApprovalStore, IArmedTicketReader
+internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, ILogger<PlanStore> logger) : IPlanStore, IAutoApprovalStore, IArmedTicketReader
 {
-    private static readonly JsonSerializerOptions FlagsJson = new(JsonSerializerDefaults.Web);
-
     private const string PlanStateSql = "COALESCE((SELECT e.to_state FROM trading.plan_events e WHERE e.plan_id = p.id AND e.item_id IS NULL ORDER BY e.id DESC LIMIT 1), 'draft')";
 
     private const string ItemStateSql = "COALESCE((SELECT e.to_state FROM trading.plan_events e WHERE e.item_id = i.id ORDER BY e.id DESC LIMIT 1), 'proposed')";
@@ -92,7 +90,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
             p.AddWithValue("limits", NpgsqlDbType.Varchar, plan.Limits);
             p.AddWithValue("by", NpgsqlDbType.Varchar, plan.CreatedBy);
             p.AddWithValue("at", NpgsqlDbType.TimestampTz, plan.CreatedAt);
-            p.Add(new NpgsqlParameter("flags", NpgsqlDbType.Text) { Value = plan.BasisFlags is { } flags ? JsonSerializer.Serialize(flags, FlagsJson) : DBNull.Value });
+            p.Add(new NpgsqlParameter("flags", NpgsqlDbType.Text) { Value = plan.BasisFlags is { } flags ? PlanFlagsJson.Write(flags) : DBNull.Value });
             planId = (long)(await insert.ExecuteScalarAsync(cancellationToken))!;
         }
 
@@ -637,7 +635,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
         return [.. rows.Select(r => byItem.TryGetValue(r.Id, out var list) ? r with { Item = r.Item with { Allocations = list } } : r)];
     }
 
-    private static async Task<IReadOnlyList<PlanRow>> ReadPlansAsync(NpgsqlCommand select, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<PlanRow>> ReadPlansAsync(NpgsqlCommand select, CancellationToken cancellationToken)
     {
         await using var reader = await select.ExecuteReaderAsync(cancellationToken);
         var rows = new List<PlanRow>();
@@ -647,7 +645,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
             {
                 Notice = reader.GetString(7),
                 Limits = reader.GetString(8),
-                BasisFlags = reader.IsDBNull(16) ? null : JsonSerializer.Deserialize<PlanBasisFlags>(reader.GetString(16), FlagsJson),
+                BasisFlags = reader.IsDBNull(16) ? null : PlanFlagsJson.Read(reader.GetString(16), logger),
             };
             rows.Add(new PlanRow(reader.GetInt64(0), plan, PlanStateText.TryParse(reader.GetString(12)) ?? PlanState.Draft, (int)reader.GetInt64(13), (int)reader.GetInt64(14), (int)reader.GetInt64(15)));
         }

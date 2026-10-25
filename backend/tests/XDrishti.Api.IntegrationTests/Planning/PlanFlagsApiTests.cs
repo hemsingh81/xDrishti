@@ -23,13 +23,13 @@ public sealed class PlanFlagsApiTests(ApiFactory factory) : DataTestBase(factory
         new string('x', 700),
     ];
 
-    private static NewPlanItem Item() =>
-        new(1, TicketGroup.Primary, "NSE:NOSUCHSYMBOL", "BUY", "ORB", new string('a', 64), "t", "s", "g", "v", [], new PlanEvidence("cell", 41, "range", "basis", 0.5, 0.1, [], null), []);
+    private static NewPlanItem Item(string symbol = "NSE:NOSUCHSYMBOL") =>
+        new(1, TicketGroup.Primary, symbol, "BUY", "ORB", new string('a', 64), "t", "s", "g", "v", [], new PlanEvidence("cell", 41, "range", "basis", 0.5, 0.1, [], null), []);
 
-    private async Task<long> PublishAsync(string key, int version, PlanBasisFlags? flags)
+    private async Task<long> PublishAsync(string key, int version, PlanBasisFlags? flags, string symbol = "NSE:NOSUCHSYMBOL")
     {
         using var scope = Factory.Services.CreateScope();
-        var plan = new NewPlan(key, Session, ReviewCutoff, version, new string('c', 64), "basis", true, "test", DateTimeOffset.UnixEpoch, [Item()]) { BasisFlags = flags };
+        var plan = new NewPlan(key, Session, ReviewCutoff, version, new string('c', 64), "basis", true, "test", DateTimeOffset.UnixEpoch, [Item(symbol)]) { BasisFlags = flags };
         return (await scope.ServiceProvider.GetRequiredService<IPlanStore>().PublishAsync(plan, Ct)).Id;
     }
 
@@ -82,5 +82,36 @@ public sealed class PlanFlagsApiTests(ApiFactory factory) : DataTestBase(factory
         ok.GetProperty("barCount").GetInt32().ShouldBe(0);
         ok.GetProperty("levels").GetProperty("source").GetString().ShouldBe("none");
         ok.GetProperty("rules").GetProperty("trigger").GetString().ShouldBe("t");
+    }
+
+    [Fact]
+    public async Task The_chart_of_a_resolved_symbol_returns_the_stored_bars_up_to_the_session_and_none_after()
+    {
+        var id = await SeedAsync("BARTEST");
+        await using (var connection = await OpenAsync())
+        {
+            foreach (var (day, close) in new[] { (new DateOnly(2098, 12, 30), 100.0), (new DateOnly(2098, 12, 31), 101.0), (new DateOnly(2099, 1, 2), 102.0), (new DateOnly(2099, 1, 5), 150.0) })
+            {
+                await ExecuteAsync(
+                    connection,
+                    "INSERT INTO market.bars_agg (instrument_id, timeframe, ts, open, high, low, close, volume, bars, complete) VALUES (@id, '1D', @ts, @c, @c, @c, @c, 1000, 375, true)",
+                    ("id", id), ("ts", new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.FromMinutes(330)).ToUniversalTime()), ("c", close));
+            }
+        }
+
+        var plan = await PublishAsync("chart-bars", 3, null, "NSE:BARTEST");
+        long item;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            item = (await scope.ServiceProvider.GetRequiredService<IPlanStore>().ItemsAsync(plan, Ct))[0].Id;
+        }
+
+        var chart = await Client.GetFromJsonAsync<JsonElement>(new Uri($"/api/plans/{plan}/items/{item}/chart", UriKind.Relative), Ct);
+
+        chart.GetProperty("resolution").GetString().ShouldBe("exact");
+        chart.GetProperty("session").GetString().ShouldBe("2099-01-02");
+        chart.GetProperty("barCount").GetInt32().ShouldBe(3);
+        chart.GetProperty("bars").EnumerateArray().Select(b => b.GetProperty("t").GetString()).ShouldBe(["2098-12-30", "2098-12-31", "2099-01-02"]);
+        chart.GetProperty("bars").EnumerateArray().Select(b => b.GetProperty("c").GetDouble()).ShouldBe([100.0, 101.0, 102.0]);
     }
 }

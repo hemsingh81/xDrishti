@@ -56,7 +56,7 @@ public sealed class GetPlanItemChartHandlerTests
     public async Task The_session_is_the_trading_day_before_the_plan_date_and_no_bar_after_it_is_asked_for()
     {
         Store();
-        _bars.ReadDailyBarsAsync(Instrument, Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Ct).Returns([Bar(Friday.AddDays(-1), 99), Bar(Friday, 100)]);
+        _bars.ReadDailyBarsAsync(Instrument, Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Ct).Returns([Bar(Friday.AddDays(-1), 99), Bar(Friday, 100), Bar(Monday, 150)]); // a fake that returns a bar after the session: it must not be drawn
 
         var result = await Handler().HandleAsync(new GetPlanItemChartQuery(7, 70, 60), Ct);
 

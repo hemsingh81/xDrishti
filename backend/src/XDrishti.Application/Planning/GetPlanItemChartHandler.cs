@@ -77,6 +77,7 @@ internal sealed class GetPlanItemChartHandler(
         var rows = await bars.ReadDailyBarsAsync(id, from, session.AddDays(1), cancellationToken);
         var factors = await adjustments.GetAsync(id, cancellationToken);
         var asOf = AdjustmentFactors.From(factors.Actions.Where(a => a.ExDate <= session));
+        // Shortcut: a day bar flagged incomplete (a minute missing in its session) is still drawn, as the bar readers show it; the chart does not hide it or mark it.
         var result = rows
             .Select(r => (Date: IndiaTime.Today(r.Ts), Bar: r))
             .Where(x => x.Date <= session)
@@ -109,6 +110,6 @@ internal sealed class GetPlanItemChartHandler(
 
     private static string[] Limits(string resolution) =>
         resolution == "exact"
-            ? ["Daily bars up to the planning session, adjusted as of that session; nothing after it is shown.", "A level is indicative from the close, not tomorrow's price. No order is placed."]
+            ? ["Daily bars up to the planning session, adjusted as of that session; nothing after it is shown.", "Adjustment uses the ex-date of each applied corporate action, not the announcement date.", "A level is indicative from the close, not tomorrow's price. No order is placed."]
             : [resolution == "ambiguous" ? "The symbol matches more than one active instrument, so no chart is shown." : "The symbol matches no active instrument, so no chart is shown."];
 }
