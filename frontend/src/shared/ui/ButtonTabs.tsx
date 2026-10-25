@@ -23,13 +23,18 @@ interface ButtonTabsProps<T extends string> {
  * panel (see the Alerts panel's tabs). Import it by path (`@/shared/ui/ButtonTabs`).
  */
 export function ButtonTabs<T extends string>({ tabs, value, onChange, label }: ButtonTabsProps<T>) {
+  const stripRef = useRef<HTMLDivElement>(null);
   const refs = useRef(new Map<T, HTMLButtonElement>());
 
-  // On a phone the strip scrolls sideways: keep the selected tab in view.
+  // On a phone the strip scrolls sideways: keep the selected tab in view by moving the strip only, never the page.
   useEffect(() => {
+    const strip = stripRef.current;
     const tab = refs.current.get(value);
-    // jsdom has no scrollIntoView.
-    if (tab && typeof tab.scrollIntoView === 'function') tab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (!strip || !tab) return;
+    if (tab.offsetLeft < strip.scrollLeft) strip.scrollLeft = tab.offsetLeft;
+    else if (tab.offsetLeft + tab.offsetWidth > strip.scrollLeft + strip.clientWidth) {
+      strip.scrollLeft = tab.offsetLeft + tab.offsetWidth - strip.clientWidth;
+    }
   }, [value]);
 
   function onKeyDown(event: KeyboardEvent) {
@@ -54,10 +59,11 @@ export function ButtonTabs<T extends string>({ tabs, value, onChange, label }: B
   return (
     <Stack
       direction="row"
+      ref={stripRef}
       role="tablist"
       aria-label={label}
       onKeyDown={onKeyDown}
-      sx={{ borderBottom: 1, borderColor: 'divider', mb: 1.5, gap: 0.5, overflowX: 'auto' }}
+      sx={{ borderBottom: 1, borderColor: 'divider', mb: 1.5, gap: 0.5, overflowX: 'auto', position: 'relative' }}
     >
       {tabs.map((tab) => {
         const selected = tab.value === value;

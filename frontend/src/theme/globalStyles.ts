@@ -25,6 +25,16 @@ const interactive = [
 /** Items packed edge to edge in menus, lists and tab strips: the ring goes inside so it is not clipped by the container. */
 const packed = '[role="menuitem"], [role="option"], [role="tab"], .MuiListItemButton-root, .MuiMenuItem-root';
 
+/** The controls that reach 44 px on phones, and those left at their dense size. */
+export const touchControls = '.MuiButton-root, .MuiIconButton-root, .MuiTab-root, .MuiChip-clickable, [role="button"]';
+export const touchExempt = [
+  '.MuiButton-sizeSmall',
+  '.MuiIconButton-sizeSmall',
+  '.MuiChip-sizeSmall',
+  '[data-dense]',
+  ...['.MuiTableCell-root', '.MuiInputBase-root', '.MuiAutocomplete-root', '[data-dense]'].map((c) => `${c} *`),
+].join(', ');
+
 /** CssBaseline overrides: focus ring, reduced motion, antialiasing, body font features, `.numeric` / `.mono`. */
 export function createGlobalStyles(theme: Theme) {
   const ring = `${focusRing.width}px solid ${theme.palette.primary.main}`;
@@ -43,12 +53,12 @@ export function createGlobalStyles(theme: Theme) {
     [`@media (min-width:${pagePadding.ultra.minWidth}px)`]: {
       html: { fontSize: `${(rootFontSizeLarge.ultra / 16) * 100}%` },
     },
-    // Phones: controls are at least 44 px (doc 13 §1d); inline links in a sentence are not listed here.
+    // Phones: controls are at least 44 px (doc 13 §1d). The `:not()` list doubles the specificity so the rule beats the
+    // components' own single-class rules whatever the insertion order, and exempts the dense controls: small buttons,
+    // icon buttons and chips, anything inside a table cell, a text field or an autocomplete, and `data-dense`. Inline
+    // links are not listed.
     [`@media (max-width:${touchTarget.phoneMaxWidth}px)`]: {
-      '.MuiButton-root, .MuiIconButton-root, .MuiTab-root, .MuiChip-clickable, [role="button"]': {
-        minHeight: touchTarget.phone,
-        minWidth: touchTarget.phone,
-      },
+      [`:is(${touchControls}):not(${touchExempt})`]: { minHeight: touchTarget.phone, minWidth: touchTarget.phone },
     },
     body: {
       WebkitFontSmoothing: 'antialiased',

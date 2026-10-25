@@ -33,13 +33,14 @@ export function AppShell() {
         sx={(theme) => ({
           position: 'absolute',
           left: theme.spacing(1),
-          top: theme.spacing(-8),
+          top: theme.spacing(1),
+          // Hidden (still focusable) until it has focus.
+          '&:not(:focus)': { clipPath: 'inset(50%)', width: 1, height: 1, overflow: 'hidden', whiteSpace: 'nowrap' },
           zIndex: theme.zIndex.tooltip,
           padding: theme.spacing(1, 2),
           borderRadius: 1,
           bgcolor: 'background.paper',
           boxShadow: theme.shadows[4],
-          '&:focus': { top: theme.spacing(1) },
         })}
       >
         Skip to content
@@ -89,7 +90,6 @@ export function AppShell() {
               },
               width: '100%',
               outline: 'none',
-              scrollPaddingTop: `${layout.topBarHeight + 16}px`,
               flex: 1,
               minHeight: 0,
               overflowY: { md: 'auto' },
