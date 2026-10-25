@@ -29,6 +29,7 @@ internal static class CounterfactualStore
             ? new CounterfactualHeaderView(stored.Id, v.Outcome, stored.Report.AsOf, v.Basis, stored.Report.CreatedAt, stored.Report.BuiltBy, v.Windows.Count, v.JudgedWindows, sameRunsStored)
             : null;
 
+    // shortcut: the same-runs count reads the newest 50 stored reports (JSON included) on every read; past about 50 stored reports add a COUNT(*) by sources_json to the port.
     public static int SameRuns(StoredLearningReport of, IEnumerable<StoredLearningReport> all) => all.Count(r => string.Equals(r.Report.SourcesJson, of.Report.SourcesJson, StringComparison.Ordinal));
 
     /// <summary>
@@ -39,7 +40,8 @@ internal static class CounterfactualStore
         var c = CultureInfo.InvariantCulture;
         var o = q.Counterfactual;
         var v = q.Validation;
-        var recipe = report.Limits.FirstOrDefault(l => l.StartsWith("Model recipe:", StringComparison.Ordinal)) ?? string.Empty;
+        var recipe = report.Limits.FirstOrDefault(l => l.StartsWith("Model recipe:", StringComparison.Ordinal))
+            ?? throw new InvalidOperationException("The counterfactual report has no 'Model recipe:' limit; the input hash cannot name the trainer and the training set.");
         var sources = string.Join(',', q.Sources.Select(s => $"{s.RunKey}:{s.Style}:{s.Exit}").Order(StringComparer.Ordinal));
         var text = string.Create(c, $"counterfactual|v1|{sources}|{o.FrozenMonths}|{o.RetrainMonths}|{o.MinWindowRows}|{o.MinJudgedWindows}|{o.MinGainLogLoss:R}|{o.SignificanceZ:R}|{o.Trials}|{o.PolicyTolerance:R}|holdout {q.HoldOutMonths}|{v.MinTrainMonths}|{v.EmbargoDays}|{v.MinTrainTrades}|{recipe}");
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));

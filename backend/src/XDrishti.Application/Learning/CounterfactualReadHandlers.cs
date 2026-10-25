@@ -18,6 +18,7 @@ internal sealed class GetCounterfactualHandler(ILearningReportStore store) : IQu
             return Result.Failure<CounterfactualReportView>(Error.NotFound(LearningErrors.CounterfactualNotFoundCode, query.Id is { } n ? $"No stored counterfactual #{n}." : "No counterfactual is stored yet."));
         }
 
+        // shortcut: reads the newest 50 rows to count the same runs; past ~50 stored reports use a COUNT(*) port method.
         var all = await store.ListAsync(CounterfactualStore.Kind, ListCounterfactualsHandler.Max, cancellationToken);
         var view = CounterfactualStore.ViewOf(stored, CounterfactualStore.SameRuns(stored, all));
         return view is null ? Result.Failure<CounterfactualReportView>(Error.NotFound(LearningErrors.CounterfactualNotFoundCode, "The stored counterfactual cannot be read.")) : Result.Success(view);

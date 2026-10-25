@@ -80,6 +80,17 @@ public sealed class StoreCounterfactualHandlerTests
     }
 
     [Fact]
+    public async Task A_report_without_the_model_recipe_line_fails_loudly_and_stores_nothing()
+    {
+        Runs(Header(KeyA));
+        _evaluate.HandleAsync(Arg.Any<EvaluateCounterfactualQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Report() with { Limits = ["Replayed history."] }));
+
+        await Should.ThrowAsync<InvalidOperationException>(async () => await Handler().HandleAsync(Command(KeyA), Ct));
+
+        _store.Rows.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Any_changed_knob_is_another_row()
     {
         Runs(Header(KeyA));

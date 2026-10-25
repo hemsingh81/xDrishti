@@ -20,3 +20,5 @@
 - Until the owner runs the verb with `--store`, the tab shows `empty` with the command. The expected answer on about 2.1 years of history is `Inconclusive`; that is the correct display.
 - The chart is a bar list plus a table with the same numbers; the paired gain and its standard error are in the table. A bar-with-error chart type can come later without a contract change.
 - Log events 4880 and 4881 (counts and codes only).
+- The real-data check (running the verb with `--store` on the owner's newest runs, outcome expected `Inconclusive`) is deferred to the owner's own CLI act; it was not run at build, so no real-data outcome is recorded here.
+- Same-runs counts and the Journey time axis read the newest 50 stored reports, lessons and models; past that, a count query is the upgrade (marked `shortcut:` in code). The stored `report_json` repeats the printed text, which is bounded (a handful of windows).

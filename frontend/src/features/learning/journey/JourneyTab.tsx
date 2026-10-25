@@ -107,6 +107,7 @@ export function JourneyTab() {
     ...counterfactualQuery(id ?? 0),
     queryFn: id === undefined ? skipToken : counterfactualQuery(id).queryFn,
   });
+  // shortcut: lessons and models are the newest 50 of each (the list queries' cap); older ones are not drawn on the time axis.
   const lessons = useQuery(lessonsQuery('all'));
   const models = useQuery(modelsQuery('all'));
   const changelog = useQuery(changelogQuery());

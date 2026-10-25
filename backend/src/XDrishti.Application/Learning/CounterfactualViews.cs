@@ -78,7 +78,7 @@ public sealed record CounterfactualKnobsView(int FrozenMonths, int RetrainMonths
 /// <param name="Limits">Sentences that must be shown with the result.</param>
 /// <param name="Basis">gross, costed_unconfirmed or net_confirmed.</param>
 /// <param name="Sources">The runs behind the report.</param>
-/// <param name="Text">The printed text.</param>
+/// <param name="Text">The printed text (also kept in the stored JSON; bounded: a handful of windows, one line each).</param>
 /// <param name="BuiltBy">Who built it; null inside the stored JSON.</param>
 /// <param name="CreatedAt">When it was stored; null inside the stored JSON.</param>
 /// <param name="SameRunsStored">How many stored counterfactuals use the same runs (every re-run is another trial); 0 inside the stored JSON.</param>
