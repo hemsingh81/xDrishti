@@ -4,6 +4,7 @@ import { DataTable, formatAsOf, formatCount, MetricTile, type MetricState } from
 import { formatDate } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { overviewQuery, type LearningOverview, type OverviewSection } from '../api/learningQueries';
+import { plannedText, type TabProps } from '../lib/tabs';
 import { countState } from '../lib/overview';
 import { NoSnapshot } from './NoSnapshot';
 import { Panel } from './Panel';
@@ -37,7 +38,7 @@ function newestRows(overview: LearningOverview): NewestRow[] {
 }
 
 /** Overview: what the learning engine holds. Counts and the newest stored verdicts; nothing is computed or scored here. */
-export function OverviewTab({ onOpenSetups }: { onOpenSetups: () => void }) {
+export function OverviewTab({ open }: TabProps) {
   const query = useQuery(overviewQuery);
   if (query.isPending) return <LoadingState label="Loading the overview…" />;
   if (query.isError) return <ErrorState error={query.error} />;
@@ -105,10 +106,16 @@ export function OverviewTab({ onOpenSetups }: { onOpenSetups: () => void }) {
       </Panel>
       <Typography variant="body2" color="text.secondary">
         Each tile is a count of stored records; there is no combined health score. Lessons, experiments, hypotheses and
-        models get their own tabs in later slices (P8-03 to P8-13).
+        models get their own tabs in later slices. {plannedText()}.
       </Typography>
       <Box>
-        <Button variant="outlined" onClick={onOpenSetups} sx={{ minHeight: 44 }}>
+        <Button
+          variant="outlined"
+          onClick={() => {
+            open('setups');
+          }}
+          sx={{ minHeight: 44 }}
+        >
           Open Setups
         </Button>
       </Box>

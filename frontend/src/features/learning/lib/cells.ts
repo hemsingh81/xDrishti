@@ -1,9 +1,17 @@
-import { formatCount, formatR, formatRate, metricOf, type EvidenceProps, type MetricState } from '@/shared/analytics';
+import {
+  formatCount,
+  formatR,
+  formatRate,
+  HATCH_ALPHA,
+  metricOf,
+  type EvidenceProps,
+  type MetricState,
+} from '@/shared/analytics';
 import { formatDate } from '@/shared/lib/format';
 import type { CellStats } from '../api/learningQueries';
 
 /** Presentation constants of the heatmap. Tints are alpha over the card; `heat.test.ts` holds their contrast. */
-export const heat = { hatchAlpha: 0.15, tintMin: 0.08, tintMax: 0.28, fullAtR: 0.5 } as const;
+export const heat = { hatchAlpha: HATCH_ALPHA, tintMin: 0.08, tintMax: 0.28, fullAtR: 0.5 } as const;
 
 const unitMinutes: Readonly<Record<string, number>> = { m: 1, h: 60, d: 1440, w: 10080 };
 

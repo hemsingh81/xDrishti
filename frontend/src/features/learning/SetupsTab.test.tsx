@@ -5,7 +5,7 @@ import { buildCell, buildThinCell, mountLearning } from '@/test/learningFixtures
 import { problemResponse, server } from '@/test/server';
 import { renderLearning } from './testing';
 
-const heatmap = async () => within(await screen.findByRole('table', { name: 'Setups by strategy and timeframe' }));
+const heatmap = async () => within(await screen.findByRole('grid', { name: 'Setups by strategy and timeframe' }));
 
 describe('Learning, Setups tab', () => {
   it('says there is no snapshot yet, and shows no heatmap and no row of zeros', async () => {
@@ -14,7 +14,7 @@ describe('Learning, Setups tab', () => {
 
     expect(await screen.findByRole('heading', { name: 'Setups by timeframe' })).toBeInTheDocument();
     expect((await screen.findAllByText(/No snapshot yet; run `xd learn cells`/)).length).toBe(2);
-    expect(screen.queryByRole('table', { name: 'Setups by strategy and timeframe' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('grid', { name: 'Setups by strategy and timeframe' })).not.toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Cells by lifecycle state' })).not.toBeInTheDocument();
     expect(screen.getByText('No cell move or model designation has been recorded.')).toBeInTheDocument();
   });
@@ -181,7 +181,7 @@ describe('Learning, Setups tab', () => {
     renderLearning('?tab=setups');
 
     expect(await screen.findByLabelText('Loading the cells…')).toBeInTheDocument();
-    expect(screen.queryByRole('table', { name: 'Setups by strategy and timeframe' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('grid', { name: 'Setups by strategy and timeframe' })).not.toBeInTheDocument();
   });
 
   it('has no control that writes: only tabs, window choices and tiles that open a cell', async () => {

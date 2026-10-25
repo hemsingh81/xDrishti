@@ -172,6 +172,14 @@ describe('Learning overview', () => {
     expect(screen.getByRole('tab', { name: 'Setups', selected: true })).toBeInTheDocument();
   });
 
+  it('names the planned tabs in one line from the registry and does not render them as tabs', async () => {
+    mountLearning();
+    renderLearning();
+
+    expect(await screen.findByText(/Not built yet: Journey \(P8-12\), Smart rules \(P8-13\)/)).toBeInTheDocument();
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Overview', 'Setups']);
+  });
+
   it('serves a hand-edited address: an unknown tab falls back to the overview', async () => {
     server.use(http.get('/api/learning/overview', () => HttpResponse.json(buildOverview())));
     renderLearning('?tab=bogus');
