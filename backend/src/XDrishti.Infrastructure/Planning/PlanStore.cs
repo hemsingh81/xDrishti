@@ -649,7 +649,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
         return rows;
     }
 
-    // Columns 23-28; a row stored before P7-19 has none (levels: null). The database check guarantees the combination, so a row that does not parse is read as no levels.
+    // Columns 23-28; a row stored before P7-19 has none (levels: null). The database check guarantees the combination, so a row that fails TicketLevels.Create (a shortcut: the store has no logger, and a row the check passed but the domain refuses, for example a stop over the 30 % cap inserted by hand, is read as no levels rather than failing the read).
     private static TicketLevels? LevelsOf(DbDataReader r, string? side)
     {
         if (r.IsDBNull(23) || side is null)

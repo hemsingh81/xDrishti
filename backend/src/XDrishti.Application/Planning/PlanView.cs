@@ -132,7 +132,7 @@ public sealed record PlanAllocationView(Guid AccountId, string Mode, int Quantit
 /// <param name="At">When.</param>
 public sealed record PlanEventView(long Id, long? ItemId, string From, string To, string Actor, string Reason, long? ApprovalId, DateTimeOffset At);
 
-/// <summary>The indicative numbers of a ticket (spec P7-19, ADR 0108): rupees as of the close of the session, not tomorrow's price and not an order.</summary>
+/// <summary>The indicative numbers of a ticket (spec P7-19, ADR 0109): rupees as of the close of the session, not tomorrow's price and not an order.</summary>
 /// <param name="EntryRef">The close of the session.</param>
 /// <param name="Session">The session D.</param>
 /// <param name="Stop">The stop level, or null when the stop has no number.</param>

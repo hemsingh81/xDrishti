@@ -2,7 +2,7 @@
 
 - **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P7 — Selection, accounts & nightly plan; follow-up of P7-04 and P7-11 (not a row of the original P7-00 table). Consumed by P7-20 (alerts) and P8-14 (ticket charts).
-- **Design refs:** docs/design/10-trade-selection.md (ticket anatomy), 07 §1 and §2 (setup versus trigger), 11 (stops, exits), 13 (Trade Plan: entry / stop / target overlays), 19 §4 · ADR 0083 (plan record: insert-only, text-only levels), 0088 (ticket builder: levels indicative from the close), 0096 (pre-open: "the trigger and stop are text, so a price crossing cannot be evaluated"). New ADR at build time: **next free ADR number at build time**.
+- **Design refs:** docs/design/10-trade-selection.md (ticket anatomy), 07 §1 and §2 (setup versus trigger), 11 (stops, exits), 13 (Trade Plan: entry / stop / target overlays), 19 §4 · ADR 0083 (plan record: insert-only, text-only levels), 0088 (ticket builder: levels indicative from the close), 0096 (pre-open: "the trigger and stop are text, so a price crossing cannot be evaluated"). New ADR: [0109](../adr/0109-plan-tickets-store-indicative-entry-stop-and-target-as-numbers-beside-the-text-rules.md).
 - **Needs:** P7-03, P7-04, P7-09 (built). **Needed by:** P7-20, P8-14(d).
 - **Size:** 2 agent-days (estimate; pure type 0.5, builder/mapping 0.5, migration + store + API 0.5, UI row + tests 0.5).
 - **Safety:** no. It adds numbers to a stored record and shows them; it touches no order, credential, setting, approval or autonomy path, and no UI write. The no-order tripwire (ADR 0083) stays green.

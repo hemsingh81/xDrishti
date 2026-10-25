@@ -1,6 +1,6 @@
 namespace XDrishti.Domain.Planning;
 
-/// <summary>What a stored stop level is measured from (spec P7-19, ADR 0108).</summary>
+/// <summary>What a stored stop level is measured from (spec P7-19, ADR 0109).</summary>
 public enum StopAnchor
 {
     /// <summary>A market structure level (swing, bar) that does not depend on where the owner enters.</summary>

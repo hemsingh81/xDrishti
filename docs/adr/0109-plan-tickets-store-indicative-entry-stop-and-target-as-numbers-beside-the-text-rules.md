@@ -1,4 +1,4 @@
-# 0108 — Plan tickets store the indicative entry, stop and target as numbers beside the text rules
+# 0109 — Plan tickets store the indicative entry, stop and target as numbers beside the text rules
 
 - **Status:** Proposed (spec [P7-19](../specs/P7-19-numeric-ticket-levels.md), built 2026-10-25). Becomes Accepted when the owner has read it.
 - **Date:** 2026-10-25.

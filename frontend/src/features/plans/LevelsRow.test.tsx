@@ -33,8 +33,14 @@ describe('LevelsRow', () => {
     expect(screen.getByText('Levels: rules only (see the stop and target text)')).toBeInTheDocument();
   });
 
-  it('renders markup in the numbers context as text', () => {
+  it('says rule only for a stop and a target with no number', () => {
     render(<LevelsRow levels={{ ...base, stop: null, stopAnchor: null, target: null, rewardRisk: null }} />);
     expect(screen.getByText(/stop: rule only · target: rule only/)).toBeInTheDocument();
+  });
+
+  it('renders markup in a server string as text, never as elements', () => {
+    const { container } = render(<LevelsRow levels={{ ...base, session: '<b>x</b>' }} />);
+    expect(screen.getByText(/read at the close of <b>x<\/b>/)).toBeInTheDocument();
+    expect(container.querySelector('b')).toBeNull();
   });
 });

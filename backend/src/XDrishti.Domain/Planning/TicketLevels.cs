@@ -3,7 +3,7 @@ using XDrishti.Domain.Common;
 namespace XDrishti.Domain.Planning;
 
 /// <summary>
-/// The indicative numbers of a ticket as of the close of <see cref="Session"/> (spec P7-19, ADR 0108): entry reference, stop, target. Rupees, four decimals. A reading of the close, not tomorrow's price and not an order.
+/// The indicative numbers of a ticket as of the close of <see cref="Session"/> (spec P7-19, ADR 0109): entry reference, stop, target. Rupees, four decimals. A reading of the close, not tomorrow's price and not an order.
 /// Built only through <see cref="Create"/>, which refuses a wrong orientation, a non-positive level and an implausible stop distance.
 /// </summary>
 /// <param name="EntryRef">The close of D.</param>

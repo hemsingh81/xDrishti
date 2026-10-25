@@ -10228,7 +10228,7 @@ export interface components {
       /** @description Why, in words. */
       detail: null | string;
     };
-    /** @description The indicative numbers of a ticket (spec P7-19, ADR 0108): rupees as of the close of the session, not tomorrow's price and not an order. */
+    /** @description The indicative numbers of a ticket (spec P7-19, ADR 0109): rupees as of the close of the session, not tomorrow's price and not an order. */
     TicketLevelsView: {
       /**
        * Format: double

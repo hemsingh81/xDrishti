@@ -491,6 +491,19 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
         (await ScalarAsync<long>("SELECT count(*) FROM trading.plan_runs")).ShouldBe(3);
         (await ScalarAsync<string>("SELECT failed_gate FROM trading.plan_runs WHERE outcome = 'failed_closed'")).ShouldBe("eod_incomplete");
     }
+
+    [Fact]
+    public async Task A_legacy_row_inserted_without_the_levels_columns_reads_null_levels_over_the_endpoint()
+    {
+        var (plan, _, _, _) = await StoredAsync();
+        (await StateOfAsync("INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons, cell_key, trades, data_range, p_win_basis, unavailable) VALUES (@p, 30, 'primary', 's', 'BUY', 'x', 'h', 't', 's', 't', 'v', '{}', 'c', 1, 'd', 'b', '{}')", ("p", plan))).ShouldBeNull();
+
+        var view = await Client.GetFromJsonAsync<JsonElement>(new Uri($"/api/plans/{plan}", UriKind.Relative), Ct);
+
+        var legacy = view.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("rank").GetInt32() == 30);
+        legacy.GetProperty("levels").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
     [Fact]
     public async Task Levels_round_trip_through_the_store_and_the_endpoint_and_an_item_without_them_reads_null()
     {
