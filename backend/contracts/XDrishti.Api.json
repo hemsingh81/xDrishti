@@ -9983,6 +9983,120 @@
         }
       }
     },
+    "/api/paper/entries": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The paper trades captured from armed tickets, newest entry first, one per ticket and account at the owner's quantity, each with its exit (instant, filled price, reason, rupees gross and net, R) once the replay closes it. Optional entry day range, account and epoch, limit 1 to 200 (default 50). Every response says: simulated on the official 1-minute bars; no order was placed or exists. Read only. 422 paper.invalid",
+        "operationId": "ListPaperEntries",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "account",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "epoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperEntryList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/capture-runs": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The sessions the paper capture processed, newest first, one row per session and run, empty sessions included: what it saw, wrote, left pending and found inconsistent. Limit 1 to 200 (default 50). Read only. 422 paper.invalid",
+        "operationId": "ListPaperCaptureRuns",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaptureRunList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/runs": {
       "get": {
         "tags": [
@@ -14943,6 +15057,118 @@
           }
         },
         "description": "One point of the calibration table of a model: a raw score and the probability it maps to."
+      },
+      "CaptureRunList": {
+        "required": [
+          "basis",
+          "limits",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "The label."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honest limits."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaptureRunView"
+            },
+            "description": "The rows, newest first."
+          }
+        },
+        "description": "The capture runs with the label and the limits."
+      },
+      "CaptureRunView": {
+        "required": [
+          "id",
+          "sessionDate",
+          "startedAt",
+          "finishedAt",
+          "outcome",
+          "seen",
+          "entriesWritten",
+          "exitsWritten",
+          "skipsWritten",
+          "pending",
+          "integrity",
+          "manual",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row id.",
+            "format": "int64"
+          },
+          "sessionDate": {
+            "type": "string",
+            "description": "The session.",
+            "format": "date"
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "Start.",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "description": "End.",
+            "format": "date-time"
+          },
+          "outcome": {
+            "type": "string",
+            "description": "done, partial or failed."
+          },
+          "seen": {
+            "type": "integer",
+            "description": "Armed allocations of the session.",
+            "format": "int32"
+          },
+          "entriesWritten": {
+            "type": "integer",
+            "description": "Entries written.",
+            "format": "int32"
+          },
+          "exitsWritten": {
+            "type": "integer",
+            "description": "Exits written.",
+            "format": "int32"
+          },
+          "skipsWritten": {
+            "type": "integer",
+            "description": "Skips written.",
+            "format": "int32"
+          },
+          "pending": {
+            "type": "integer",
+            "description": "Pairs left for a later run.",
+            "format": "int32"
+          },
+          "integrity": {
+            "type": "integer",
+            "description": "Stored entries a later replay disagreed with.",
+            "format": "int32"
+          },
+          "manual": {
+            "type": "boolean",
+            "description": "Whether a person started it."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why, in words."
+          }
+        },
+        "description": "One session processed by a capture run."
       },
       "CellLossTagsView": {
         "required": [
@@ -26611,6 +26837,254 @@
         },
         "description": "One kind of learning record in the overview (P6-18): how many were counted, the split by role, outcome or state, and the newest record."
       },
+      "PaperEntryList": {
+        "required": [
+          "basis",
+          "limits",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "The label."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honest limits."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaperEntryView"
+            },
+            "description": "The entries, newest first."
+          }
+        },
+        "description": "The paper entries with the label and the limits every paper response carries."
+      },
+      "PaperEntryView": {
+        "required": [
+          "id",
+          "planId",
+          "planItemId",
+          "accountId",
+          "epochId",
+          "symbol",
+          "side",
+          "strategyId",
+          "cellKey",
+          "ticketGroup",
+          "approvalKind",
+          "qtyAllocated",
+          "qty",
+          "armedAt",
+          "entryAt",
+          "entryPrice",
+          "stopPrice",
+          "targetPrice",
+          "exit",
+          "basis",
+          "costBasis"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The entry id.",
+            "format": "int64"
+          },
+          "planId": {
+            "type": "integer",
+            "description": "The plan.",
+            "format": "int64"
+          },
+          "planItemId": {
+            "type": "integer",
+            "description": "The ticket.",
+            "format": "int64"
+          },
+          "accountId": {
+            "type": "string",
+            "description": "The paper account.",
+            "format": "uuid"
+          },
+          "epochId": {
+            "type": "integer",
+            "description": "The epoch.",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string",
+            "description": "The symbol."
+          },
+          "side": {
+            "type": "string",
+            "description": "BUY or SELL."
+          },
+          "strategyId": {
+            "type": "string",
+            "description": "The strategy."
+          },
+          "cellKey": {
+            "type": "string",
+            "description": "The cell."
+          },
+          "ticketGroup": {
+            "type": "string",
+            "description": "primary or reserve."
+          },
+          "approvalKind": {
+            "type": "string",
+            "description": "owner or auto."
+          },
+          "qtyAllocated": {
+            "type": "integer",
+            "description": "The allocated quantity.",
+            "format": "int32"
+          },
+          "qty": {
+            "type": "integer",
+            "description": "The owner's quantity after any size-down.",
+            "format": "int32"
+          },
+          "armedAt": {
+            "type": "string",
+            "description": "When the ticket was armed.",
+            "format": "date-time"
+          },
+          "entryAt": {
+            "type": "string",
+            "description": "The start of the fill minute.",
+            "format": "date-time"
+          },
+          "entryPrice": {
+            "type": "number",
+            "description": "The filled entry.",
+            "format": "double"
+          },
+          "stopPrice": {
+            "type": "number",
+            "description": "The initial stop.",
+            "format": "double"
+          },
+          "targetPrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The target, or null.",
+            "format": "double"
+          },
+          "exit": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The exit, or null while the trade is open.",
+                "$ref": "#/components/schemas/PaperExitView"
+              }
+            ]
+          },
+          "basis": {
+            "type": "string",
+            "description": "The label of the record."
+          },
+          "costBasis": {
+            "type": "string",
+            "description": "What the exit's rupees and R are net of; the gross label while the trade is open."
+          }
+        },
+        "description": "One paper trade of one account. It is a replay: no order was placed or exists (string PaperEntryView.Basis)."
+      },
+      "PaperExitView": {
+        "required": [
+          "exitAt",
+          "exitPrice",
+          "exitReason",
+          "heldSessions",
+          "grossPnl",
+          "charges",
+          "netPnl",
+          "rExact",
+          "rSim",
+          "rBasis",
+          "maeR",
+          "mfeR"
+        ],
+        "type": "object",
+        "properties": {
+          "exitAt": {
+            "type": "string",
+            "description": "The start of the exit minute.",
+            "format": "date-time"
+          },
+          "exitPrice": {
+            "type": "number",
+            "description": "The filled exit.",
+            "format": "double"
+          },
+          "exitReason": {
+            "type": "string",
+            "description": "Why the trade ended."
+          },
+          "heldSessions": {
+            "type": "integer",
+            "description": "Sessions held, entry and exit session included.",
+            "format": "int32"
+          },
+          "grossPnl": {
+            "type": "number",
+            "description": "Rupees before charges at the owner's quantity.",
+            "format": "double"
+          },
+          "charges": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Rupees of charges; null without a sheet.",
+            "format": "double"
+          },
+          "netPnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Gross less charges; null without a sheet.",
+            "format": "double"
+          },
+          "rExact": {
+            "type": "number",
+            "description": "R from the exact prices.",
+            "format": "double"
+          },
+          "rSim": {
+            "type": "number",
+            "description": "R of the trade: net when charged, else gross (the grade's R).",
+            "format": "double"
+          },
+          "rBasis": {
+            "type": "string",
+            "description": "net or gross."
+          },
+          "maeR": {
+            "type": "number",
+            "description": "Maximum adverse excursion in R.",
+            "format": "double"
+          },
+          "mfeR": {
+            "type": "number",
+            "description": "Maximum favourable excursion in R.",
+            "format": "double"
+          }
+        },
+        "description": "The exit of a paper trade as the API shows it (spec P10-01)."
+      },
       "ParameterSensitivityView": {
         "required": [
           "param",
@@ -35445,6 +35919,9 @@
     },
     {
       "name": "Plans"
+    },
+    {
+      "name": "Paper"
     },
     {
       "name": "Reports"

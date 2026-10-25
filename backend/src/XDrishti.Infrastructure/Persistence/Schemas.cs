@@ -24,4 +24,7 @@ public static class Schemas
 
     /// <summary>Decisions (spec P7-03): <c>approvals</c>, insert-only for the runtime role, owner decisions only.</summary>
     public const string Workflow = "workflow";
+
+    /// <summary>The paper record (spec P10-01, ADR 0116): epochs, entries, exits, skips and capture runs, all insert-only for the runtime role.</summary>
+    public const string Paper = "paper";
 }

@@ -5,6 +5,7 @@ using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Research;
@@ -30,6 +31,7 @@ using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Tracking;
+using XDrishti.Application.Paper;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Platform.Heartbeats;
 using XDrishti.Application.Platform.Services;
@@ -144,6 +146,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, ReviewCutoffService>(); // lapses unreviewed tickets at the plan's cutoff; the optional auto pass runs only when the owner's setting is ON; starts paused (P7-10)
         services.AddSingleton<IScheduledService, PreOpenService>(); // arms the approved tickets at 09:10 (P7-11); starts paused, no order, no promotion
         services.AddSingleton<IScheduledService, PlanExpiryService>(); // expires the day's armed tickets after the close (P7-11); starts paused
+        services.AddSingleton<IScheduledService, PaperCaptureService>(); // paper fills of armed tickets after the end-of-day run (P10-01); starts paused, no order
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<ServiceRegistry>();
@@ -569,6 +572,12 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<GradePlansCommand, GradeOutcome>, GradePlansHandler>(); // grading (P7-13, ADR 0090): insert-only grades on stored bars, no order
         services.AddScoped<IQueryHandler<GetPlanGradeQuery, Result<PlanGradeView>>, GetPlanGradeHandler>();
         services.AddScoped<IQueryHandler<GetDecisionsReportQuery, Result<GradeReportData>>, GetDecisionsReportHandler>();
+        services.AddScoped<TicketReplayer>(); // the one replay path of grading and paper capture (P10-01, ADR 0116)
+        services.AddScoped<IEpochGate, SingleEpochGate>(); // one default epoch until P10-05 replaces it
+        services.AddScoped<ICommandHandler<CapturePaperFillsCommand, PaperCaptureOutcome>, CapturePaperFillsHandler>(); // paper fills of armed tickets: insert-only, replayed on stored bars, no order (P10-01)
+        services.AddScoped<IQueryHandler<ListPaperEntriesQuery, Result<PaperEntryList>>, ListPaperEntriesHandler>();
+        services.AddScoped<IQueryHandler<ListCaptureRunsQuery, Result<CaptureRunList>>, ListCaptureRunsHandler>();
+        services.AddScoped<IQueryHandler<GetPaperEpochQuery, Result<PaperEpochView>>, GetPaperEpochHandler>();
         services.AddScoped<ICommandHandler<JournalPlansCommand, JournalOutcome>, JournalPlansHandler>(); // auto-journal (P7-14, ADR 0093): reads stored fills, insert-only links, no order
         services.AddScoped<IQueryHandler<GetPlanJournalQuery, Result<PlanJournalView>>, GetPlanJournalHandler>();
     }

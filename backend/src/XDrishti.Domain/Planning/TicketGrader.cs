@@ -69,12 +69,12 @@ public static class TicketGrader
             var costed = t.Costs == CostBasis.Charged && t.Costing is not null;
             var r = costed ? t.Costing!.RNet : t.RFilled;
             var detail = string.Create(CultureInfo.InvariantCulture, $"entered {Date(t.TradeDate)}, left {Date(SessionClock.DateOf(t.ExitEpochSeconds))} ({t.ExitReason})");
-            return new GraderResult(new TicketGrade(GradeStatus.Graded, r, t.MaeR, t.MfeR, t.ExitReason.ToString(), t.EntryPrice, t.ExitPrice, costed ? basis : gross, detail, t.StopPrice), null);
+            return new GraderResult(new TicketGrade(GradeStatus.Graded, r, t.MaeR, t.MfeR, t.ExitReason.ToString(), t.EntryPrice, t.ExitPrice, costed ? basis : gross, detail, t.StopPrice), null, t);
         }
 
-        if (main.OpenAtEnd.Any(t => Mine(t.Trade)))
+        if (main.OpenAtEnd.FirstOrDefault(t => Mine(t.Trade)) is { } open)
         {
-            return Pending("the position is still open at the end of the stored bars");
+            return new GraderResult(null, "the position is still open at the end of the stored bars", open.Trade);
         }
 
         // The counters that are cut to the window by the day of the decision: the window of the main run starts on the decision day, the tail's on the day after, so the difference is the decision day alone.
@@ -89,7 +89,7 @@ public static class TicketGrader
 
         if (dropped > 0)
         {
-            return Done(GradeStatus.NotGradable, basis, "the replay dropped the trade of the decision day: the sizing or cost rule refused it");
+            return Done(GradeStatus.NotGradable, basis, DroppedDetail);
         }
 
         if (restsOvernight && inst.LastBar <= decisionDay)
@@ -100,6 +100,9 @@ public static class TicketGrader
         var day = daily ? "the decision at the close of " + Date(informationDate) : "the decision on " + Date(forDate);
         return Done(GradeStatus.NotTriggered, basis, "no entry was taken for " + day + ": the entry condition did not hold or the order did not fill (the replay's no-trade reasons cover its whole history and are not attributed to one day)");
     }
+
+    /// <summary>The detail of a grade whose trade the replay dropped by its sizing or cost rule (the paper capture names it by this text).</summary>
+    public const string DroppedDetail = "the replay dropped the trade of the decision day: the sizing or cost rule refused it";
 
     /// <summary>A grade for a ticket that cannot be replayed, for a final reason.</summary>
     public static TicketGrade NotGradable(string reason) => new(GradeStatus.NotGradable, null, null, null, null, null, null, "none", reason);

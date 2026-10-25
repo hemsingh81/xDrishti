@@ -15,6 +15,7 @@ using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Quality;
+using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
@@ -33,6 +34,7 @@ using XDrishti.Infrastructure.Market.Bars;
 using XDrishti.Infrastructure.Market.Calendar;
 using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Market.Quality;
+using XDrishti.Infrastructure.Paper;
 using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Planning;
 using XDrishti.Infrastructure.Platform;
@@ -144,6 +146,7 @@ public static class DependencyInjection
         services.AddScoped<IDigestStore, DigestStore>(); // the insert-only weekly digests (spec P7-15, ADR 0094)
         services.AddScoped<IPlanStore, PlanStore>(); // the insert-only plan record (spec P7-03, ADR 0083); no order of any kind
         services.AddScoped<IGradeStore, GradeStore>(); // insert-only grades of tickets (P7-13, ADR 0090)
+        services.AddScoped<IPaperStore, PaperStore>(); // insert-only paper record (P10-01, ADR 0116)
         services.AddScoped<ITicketNoticeSource, NoTicketNoticeSource>(); // P8-15b: no ticket alerts until P7-20 is built and enabled (default OFF)
         services.AddScoped<IJournalStore, JournalStore>(); // insert-only journal of the stored fills (P7-14, ADR 0093)
         services.AddSingleton<IGradeSettings, GradeSettings>();

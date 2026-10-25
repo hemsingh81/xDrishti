@@ -15,6 +15,7 @@ using XDrishti.Infrastructure.Learning;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Bars;
 using XDrishti.Infrastructure.Market.Live;
+using XDrishti.Infrastructure.Paper;
 using XDrishti.Infrastructure.Planning;
 using XDrishti.Infrastructure.Research;
 
@@ -186,6 +187,12 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<PlanRunRecord> PlanRuns => Set<PlanRunRecord>();
 
     internal DbSet<GradeRecord> Grades => Set<GradeRecord>();
+    internal DbSet<PaperEpochRecord> PaperEpochs => Set<PaperEpochRecord>();
+    internal DbSet<PaperEpochAccountRecord> PaperEpochAccounts => Set<PaperEpochAccountRecord>();
+    internal DbSet<PaperEntryRecord> PaperEntries => Set<PaperEntryRecord>();
+    internal DbSet<PaperExitRecord> PaperExits => Set<PaperExitRecord>();
+    internal DbSet<PaperSkipRecord> PaperSkips => Set<PaperSkipRecord>();
+    internal DbSet<PaperCaptureRunRecord> PaperCaptureRuns => Set<PaperCaptureRunRecord>();
     internal DbSet<JournalEntryRecord> JournalEntries => Set<JournalEntryRecord>();
     internal DbSet<JournalFillRecord> JournalFills => Set<JournalFillRecord>();
     internal DbSet<FillGradeRecord> FillGrades => Set<FillGradeRecord>();

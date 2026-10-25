@@ -26,6 +26,7 @@ using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Tracking;
+using XDrishti.Application.Paper;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Platform.SystemStatus;
@@ -116,6 +117,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(WhatWorksView))]
 [JsonSerializable(typeof(TradesView))]
 [JsonSerializable(typeof(PlanNotices))]
+[JsonSerializable(typeof(PaperEntryList))]
+[JsonSerializable(typeof(CaptureRunList))]
 [JsonSerializable(typeof(PlanGradeView))]
 [JsonSerializable(typeof(PlanJournalView))]
 [JsonSerializable(typeof(GradeReportData))]

@@ -1,0 +1,103 @@
+using System.Globalization;
+using XDrishti.Api.Simulate;
+using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Paper;
+using XDrishti.Domain.Common;
+
+namespace XDrishti.Api.Cli;
+
+/// <summary><c>xd paper capture</c> and <c>xd paper epoch show</c> (spec P10-01, ADR 0116): call the use cases. No decision lives here; nothing is an order.</summary>
+internal static class PaperCommand
+{
+    public const string Usage = """
+        usage:
+          xd paper capture [--date YYYY-MM-DD]
+            replays every armed ticket of closed sessions on the stored bars with the grading rules and records one paper trade per account at your size
+            without --date: every session of the epoch without a finished capture (newest 30 with work); a session is refused until it has closed
+            the record is labelled 'simulated on the official 1-minute bars; no order was placed or exists'; nothing is approved, no ticket changes state
+          xd paper epoch show
+            the epoch in force (read only; it starts with the first capture)
+        exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
+
+        """;
+
+    public static async Task<int> RunAsync(IReadOnlyList<string> args, IServiceProvider services, SimulateConsole console, CancellationToken cancellationToken)
+    {
+        if (args.Count >= 1 && args[0] == "capture")
+        {
+            return await CaptureAsync([.. args.Skip(1)], services, console, cancellationToken);
+        }
+
+        if (args.Count == 2 && args[0] == "epoch" && args[1] == "show")
+        {
+            return await GuardedAsync(console, async () =>
+            {
+                await using var scope = services.CreateAsyncScope();
+                var result = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetPaperEpochQuery, Result<PaperEpochView>>>().HandleAsync(new GetPaperEpochQuery(), cancellationToken);
+                if (result.IsFailure)
+                {
+                    await console.Error.WriteLineAsync(SimulateOptions.Show(result.Error.Code + ": " + result.Error.Message));
+                    return XdCommand.Refused;
+                }
+
+                var e = result.Value;
+                await console.Out.WriteLineAsync(e.Id is null
+                    ? SimulateOptions.Show(e.Reason ?? string.Empty)
+                    : string.Create(CultureInfo.InvariantCulture, $"epoch {e.Id} ({e.Kind}) started on {e.StartedOn:yyyy-MM-dd}: {SimulateOptions.Show(e.Reason ?? string.Empty)}"));
+                await console.Out.WriteLineAsync("basis: " + e.Basis);
+                return XdCommand.Done;
+            }, cancellationToken);
+        }
+
+        await console.Error.WriteAsync(Usage);
+        return XdCommand.UsageError;
+    }
+
+    private static async Task<int> CaptureAsync(IReadOnlyList<string> args, IServiceProvider services, SimulateConsole console, CancellationToken cancellationToken)
+    {
+        var (options, errors) = PlanGradeOptions.Parse(args);
+        if (options is null)
+        {
+            foreach (var error in errors)
+            {
+                await console.Error.WriteLineAsync(SimulateOptions.Show(error));
+            }
+
+            await console.Error.WriteAsync(Usage);
+            return XdCommand.UsageError;
+        }
+
+        return await GuardedAsync(console, async () =>
+        {
+            await using var scope = services.CreateAsyncScope();
+            var result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<CapturePaperFillsCommand, PaperCaptureOutcome>>()
+                .HandleAsync(new CapturePaperFillsCommand(options.Date, true), cancellationToken);
+            if (result.IsFailure)
+            {
+                await console.Error.WriteLineAsync(SimulateOptions.Show(result.Error.Code + ": " + result.Error.Message));
+                return XdCommand.Refused;
+            }
+
+            await console.Out.WriteLineAsync(result.Value.Summary);
+            return result.Value.FailedSessions > 0 ? XdCommand.Failed : XdCommand.Done;
+        }, cancellationToken);
+    }
+
+    private static async Task<int> GuardedAsync(SimulateConsole console, Func<Task<int>> run, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await run();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await console.Error.WriteLineAsync("cancelled");
+            return XdCommand.Cancelled;
+        }
+        catch (Exception failure) when (failure is not OutOfMemoryException)
+        {
+            await console.Error.WriteLineAsync("failed: " + SimulateCommand.Describe(failure));
+            return XdCommand.Failed;
+        }
+    }
+}

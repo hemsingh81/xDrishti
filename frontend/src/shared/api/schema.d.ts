@@ -3047,6 +3047,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/paper/entries': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The paper trades captured from armed tickets, newest entry first, one per ticket and account at the owner's quantity, each with its exit (instant, filled price, reason, rupees gross and net, R) once the replay closes it. Optional entry day range, account and epoch, limit 1 to 200 (default 50). Every response says: simulated on the official 1-minute bars; no order was placed or exists. Read only. 422 paper.invalid */
+    get: operations['ListPaperEntries'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/paper/capture-runs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The sessions the paper capture processed, newest first, one row per session and run, empty sessions included: what it saw, wrote, left pending and found inconsistent. Limit 1 to 200 (default 50). Read only. 422 paper.invalid */
+    get: operations['ListPaperCaptureRuns'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/reports/runs': {
     parameters: {
       query?: never;
@@ -4502,6 +4536,74 @@ export interface components {
        * @description The calibrated probability.
        */
       probability: number;
+    };
+    /** @description The capture runs with the label and the limits. */
+    CaptureRunList: {
+      /** @description The label. */
+      basis: string;
+      /** @description The honest limits. */
+      limits: string[];
+      /** @description The rows, newest first. */
+      items: components['schemas']['CaptureRunView'][];
+    };
+    /** @description One session processed by a capture run. */
+    CaptureRunView: {
+      /**
+       * Format: int64
+       * @description The row id.
+       */
+      id: number;
+      /**
+       * Format: date
+       * @description The session.
+       */
+      sessionDate: string;
+      /**
+       * Format: date-time
+       * @description Start.
+       */
+      startedAt: string;
+      /**
+       * Format: date-time
+       * @description End.
+       */
+      finishedAt: string;
+      /** @description done, partial or failed. */
+      outcome: string;
+      /**
+       * Format: int32
+       * @description Armed allocations of the session.
+       */
+      seen: number;
+      /**
+       * Format: int32
+       * @description Entries written.
+       */
+      entriesWritten: number;
+      /**
+       * Format: int32
+       * @description Exits written.
+       */
+      exitsWritten: number;
+      /**
+       * Format: int32
+       * @description Skips written.
+       */
+      skipsWritten: number;
+      /**
+       * Format: int32
+       * @description Pairs left for a later run.
+       */
+      pending: number;
+      /**
+       * Format: int32
+       * @description Stored entries a later replay disagreed with.
+       */
+      integrity: number;
+      /** @description Whether a person started it. */
+      manual: boolean;
+      /** @description Why, in words. */
+      reason: string;
     };
     /** @description One cell. */
     CellLossTagsView: {
@@ -8867,6 +8969,152 @@ export interface components {
       split: components['schemas']['OverviewCount'][];
       newest: null | components['schemas']['OverviewHeadline'];
       champion: null | components['schemas']['OverviewHeadline'];
+    };
+    /** @description The paper entries with the label and the limits every paper response carries. */
+    PaperEntryList: {
+      /** @description The label. */
+      basis: string;
+      /** @description The honest limits. */
+      limits: string[];
+      /** @description The entries, newest first. */
+      items: components['schemas']['PaperEntryView'][];
+    };
+    /** @description One paper trade of one account. It is a replay: no order was placed or exists (string PaperEntryView.Basis). */
+    PaperEntryView: {
+      /**
+       * Format: int64
+       * @description The entry id.
+       */
+      id: number;
+      /**
+       * Format: int64
+       * @description The plan.
+       */
+      planId: number;
+      /**
+       * Format: int64
+       * @description The ticket.
+       */
+      planItemId: number;
+      /**
+       * Format: uuid
+       * @description The paper account.
+       */
+      accountId: string;
+      /**
+       * Format: int64
+       * @description The epoch.
+       */
+      epochId: number;
+      /** @description The symbol. */
+      symbol: string;
+      /** @description BUY or SELL. */
+      side: string;
+      /** @description The strategy. */
+      strategyId: string;
+      /** @description The cell. */
+      cellKey: string;
+      /** @description primary or reserve. */
+      ticketGroup: string;
+      /** @description owner or auto. */
+      approvalKind: string;
+      /**
+       * Format: int32
+       * @description The allocated quantity.
+       */
+      qtyAllocated: number;
+      /**
+       * Format: int32
+       * @description The owner's quantity after any size-down.
+       */
+      qty: number;
+      /**
+       * Format: date-time
+       * @description When the ticket was armed.
+       */
+      armedAt: string;
+      /**
+       * Format: date-time
+       * @description The start of the fill minute.
+       */
+      entryAt: string;
+      /**
+       * Format: double
+       * @description The filled entry.
+       */
+      entryPrice: number;
+      /**
+       * Format: double
+       * @description The initial stop.
+       */
+      stopPrice: number;
+      /**
+       * Format: double
+       * @description The target, or null.
+       */
+      targetPrice: null | number;
+      exit: null | components['schemas']['PaperExitView'];
+      /** @description The label of the record. */
+      basis: string;
+      /** @description What the exit's rupees and R are net of; the gross label while the trade is open. */
+      costBasis: string;
+    };
+    /** @description The exit of a paper trade as the API shows it (spec P10-01). */
+    PaperExitView: {
+      /**
+       * Format: date-time
+       * @description The start of the exit minute.
+       */
+      exitAt: string;
+      /**
+       * Format: double
+       * @description The filled exit.
+       */
+      exitPrice: number;
+      /** @description Why the trade ended. */
+      exitReason: string;
+      /**
+       * Format: int32
+       * @description Sessions held, entry and exit session included.
+       */
+      heldSessions: number;
+      /**
+       * Format: double
+       * @description Rupees before charges at the owner's quantity.
+       */
+      grossPnl: number;
+      /**
+       * Format: double
+       * @description Rupees of charges; null without a sheet.
+       */
+      charges: null | number;
+      /**
+       * Format: double
+       * @description Gross less charges; null without a sheet.
+       */
+      netPnl: null | number;
+      /**
+       * Format: double
+       * @description R from the exact prices.
+       */
+      rExact: number;
+      /**
+       * Format: double
+       * @description R of the trade: net when charged, else gross (the grade's R).
+       */
+      rSim: number;
+      /** @description net or gross. */
+      rBasis: string;
+      /**
+       * Format: double
+       * @description Maximum adverse excursion in R.
+       */
+      maeR: number;
+      /**
+       * Format: double
+       * @description Maximum favourable excursion in R.
+       */
+      mfeR: number;
     };
     /** @description The sweep of one parameter and its judgement (`stable`, `fragile`, `no_base_edge`, `inconclusive`). */
     ParameterSensitivityView: {
@@ -19408,6 +19656,72 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['PlanPhaseCheckView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListPaperEntries: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+        account?: string;
+        epoch?: number;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PaperEntryList'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListPaperCaptureRuns: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CaptureRunList'];
         };
       };
       /** @description Unprocessable Entity */

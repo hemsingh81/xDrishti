@@ -154,7 +154,7 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
 
         var list = await response.ReadAsync<ServiceList>(Ct);
 
-        list.Items.Select(s => s.Id).ShouldBe(["eod", "instrument-master", "holdings-quotes", "portfolio-broker-history", "nightly", "suggestions", "review-cutoff", "preopen", "plan-expiry", "weekly", "live-feed", "fake-job", "account-sync"]);
+        list.Items.Select(s => s.Id).ShouldBe(["eod", "instrument-master", "holdings-quotes", "portfolio-broker-history", "nightly", "suggestions", "review-cutoff", "preopen", "plan-expiry", "paper-capture", "weekly", "live-feed", "fake-job", "account-sync"]);
         var feed = list.Items.Single(s => s.Id == "live-feed");
         (feed.Name, feed.RunsAs, feed.Enabled, feed.Schedule.Type, feed.Schedule.From, feed.Schedule.To).ShouldBe(("Live feed", "xd-feed", true, "window", "09:00", "15:35")); // run by xd-feed, shown and edited here
         feed.Live.ShouldNotBeNull();
