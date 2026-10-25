@@ -10,6 +10,9 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Shortcut (ADR 0117): plain CREATE INDEX takes a SHARE lock and blocks writes to these four insert-only tables while it builds.
+            // The tables are small (tens of rows a day, single owner, migrations run with the stack stopped), so CREATE INDEX CONCURRENTLY
+            // (which cannot run inside the migration transaction) is not worth its cost here. Revisit if a store passes millions of rows.
             migrationBuilder.CreateIndex(
                 name: "ix_plan_events_created_at",
                 schema: "trading",

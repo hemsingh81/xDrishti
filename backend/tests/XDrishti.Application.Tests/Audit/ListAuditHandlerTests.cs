@@ -71,6 +71,32 @@ public sealed class ListAuditHandlerTests
         seen.ShouldAllBe(id => id.StartsWith("approval:", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(10)]
+    [InlineData(7)]
+    [InlineData(200)]
+    public async Task Two_capped_stores_of_different_density_lose_and_repeat_nothing(int limit)
+    {
+        var dense = new FakeSource(AuditSource.Auth, Enumerable.Range(0, 12_000).Select(i => Now.AddSeconds(-i)), "nothing here");
+        var sparse = new FakeSource(AuditSource.Account, Enumerable.Range(0, 12_000).Select(i => Now.AddSeconds(-i * 4)), "nothing here");
+        var loud = new FakeSource(AuditSource.Approval, Enumerable.Range(0, 60).Select(i => Now.AddSeconds(-i * 700)), "needle in text");
+
+        // Matches of the dense store lie beyond its own scan cap (row 5,000), between the horizons of the two capped stores.
+        for (var i = 6000; i < 6010; i++)
+        {
+            dense.Rows[i] = dense.Rows[i] with { Text = "needle" };
+        }
+
+        var filters = new AuditFilters("2026-10-01", null, null, null, null, null, null, null, "needle");
+        var expected = dense.Rows.Concat(loud.Rows).Where(r => r.Text!.Contains("needle", StringComparison.Ordinal)).OrderByDescending(r => r.At).ThenByDescending(r => r.Source).Select(r => AuditSources.Code(r.Source) + ":" + r.Id).ToList();
+
+        var seen = await AllAsync(Handler([dense, sparse, loud]), limit, filters);
+
+        seen.Count.ShouldBe(70);
+        seen.Distinct().Count().ShouldBe(70);
+        seen.ShouldBe(expected);
+    }
+
     [Fact]
     public async Task The_capped_page_says_so()
     {

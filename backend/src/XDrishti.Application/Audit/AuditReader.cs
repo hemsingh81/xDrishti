@@ -34,10 +34,11 @@ internal sealed class AuditReader(IEnumerable<IAuditSource> sources, ILogger<Aud
         var merged = scans.SelectMany(s => s.Hits).OrderByDescending(h => h.Position.At).ThenByDescending(h => h.Position.Source).ToList();
 
         // A store that hit the cap may hold more matches further down than it showed: nothing older than the last row it looked at is certain.
+        // With several capped stores the cut is the NEWEST of their horizons: a row between two horizons can still be preceded by an unseen match of the store with the newer one.
         AuditPosition? horizon = null;
         foreach (var scan in scans.Where(s => s.Horizon is not null))
         {
-            if (horizon is null || horizon.Value.IsNotAfter(scan.Horizon!.Value))
+            if (horizon is null || scan.Horizon!.Value.IsNotAfter(horizon.Value))
             {
                 horizon = scan.Horizon;
             }
@@ -52,7 +53,7 @@ internal sealed class AuditReader(IEnumerable<IAuditSource> sources, ILogger<Aud
         }
         else if (horizon is { } stop)
         {
-            next = page.Count > 0 ? page[^1].Position : stop;
+            next = stop; // everything up to the horizon is shown; the next page starts after it
         }
 
         return new AuditMerged(page, next, scans);
