@@ -13,8 +13,8 @@ public sealed class PlanNoticeRulesTests
 
     private static DateTimeOffset MinutesBeforeCutoff(double minutes) => Cutoff.AddMinutes(-minutes);
 
-    private static PlanNoticePlan Plan(long id = 7, PlanState state = PlanState.Published, int undecided = 0, int lapsed = 0, int armed = 0, int invalidated = 0, int fills = 0, DateOnly? date = null, DateTimeOffset? cutoff = null, int ambiguous = 0, int crossings = 0, int prompts = 0) =>
-        new(id, date ?? Session, cutoff ?? Cutoff, state, undecided, lapsed, armed, invalidated, fills, ambiguous, crossings, prompts);
+    private static PlanNoticePlan Plan(long id = 7, PlanState state = PlanState.Published, int undecided = 0, int lapsed = 0, int armed = 0, int invalidated = 0, int fills = 0, DateOnly? date = null, DateTimeOffset? cutoff = null, int ambiguous = 0) =>
+        new(id, date ?? Session, cutoff ?? Cutoff, state, undecided, lapsed, armed, invalidated, fills, ambiguous);
 
     private static PlanNoticeRun Run(string outcome = "failed_closed", string? gate = "eod", string reason = "the EOD run has not finished for 2026-10-12", DateOnly? date = null, int attempt = 1) =>
         new(date ?? Session, outcome, gate, reason, new DateTimeOffset(2026, 10, 12, 13, 5, 0, TimeSpan.Zero), attempt);
@@ -168,7 +168,7 @@ public sealed class PlanNoticeRulesTests
         items.Count.ShouldBe(6);
         items.ShouldAllBe(i => i.Route.StartsWith("/plans", StringComparison.Ordinal));
         items.ShouldAllBe(i => !i.Text.Contains("RELIANCE", StringComparison.Ordinal) && !i.Text.Contains("POST ", StringComparison.Ordinal));
-        typeof(PlanNotice).GetProperties().Select(p => p.Name).ShouldBe(["Id", "Kind", "Severity", "Text", "Route", "PlanId", "At"], ignoreOrder: true); // no action or command member
+        typeof(PlanNotice).GetProperties().Select(p => p.Name).ShouldBe(["Id", "Kind", "Severity", "Text", "Route", "PlanId", "At", "Since", "Resolved"], ignoreOrder: true); // no action or command member
     }
 
     [Fact]
@@ -209,29 +209,5 @@ public sealed class PlanNoticeRulesTests
         text.ShouldContain("{0} %s $" + "{x}"); // shown as it is, never formatted
         text.ShouldContain(new string('g', 40) + "… gate");
         text.ShouldNotContain(new string('g', 41));
-    }
-
-    [Fact]
-    public void Crossings_and_prompts_are_route_only_counts_with_no_symbol_and_an_id_that_carries_the_count()
-    {
-        var items = Derive(MinutesBeforeCutoff(600), [Plan(crossings: 2, prompts: 1)]);
-
-        var crossed = items.Single(i => i.Kind == "ticket_level_crossed");
-        crossed.Id.ShouldBe("plan:crossed:7:2");
-        crossed.Severity.ShouldBe("warning");
-        crossed.Route.ShouldBe("/plans?plan=7");
-        crossed.Text.ShouldContain("2 watched tickets");
-        crossed.Text.ShouldContain("no order is placed");
-        var prompt = items.Single(i => i.Kind == "post_trade_prompt");
-        prompt.Id.ShouldBe("plan:prompt:7:1");
-        prompt.Severity.ShouldBe("info");
-        prompt.Text.ShouldContain("1 armed ticket");
-        items[0].Kind.ShouldBe("ticket_level_crossed"); // warning before info
-    }
-
-    [Fact]
-    public void No_crossings_or_prompts_adds_nothing()
-    {
-        Derive(MinutesBeforeCutoff(600), [Plan()]).ShouldBeEmpty();
     }
 }

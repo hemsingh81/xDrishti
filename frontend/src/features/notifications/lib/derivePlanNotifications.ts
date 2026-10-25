@@ -57,7 +57,8 @@ export function derivePlanNotifications(notices: readonly PlanNotice[]): AppNoti
             at: timeOf(notice.at),
             title: null,
             actions: [],
-            resolved: false,
+            since: notice.since ?? null,
+            resolved: notice.resolved,
           },
         ]
       : [],

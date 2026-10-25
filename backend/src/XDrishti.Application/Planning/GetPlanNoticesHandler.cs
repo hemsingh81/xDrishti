@@ -45,7 +45,6 @@ internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore jour
         }
 
         var unmatched = await UnmatchedAsync(withItems, today, cancellationToken);
-        var counts = (await ticketNotices.CountsAsync([.. withItems.Select(p => p.Row.Id)], now, cancellationToken)).ToDictionary(c => c.PlanId);
         var facts = withItems.Select(p => new PlanNoticePlan(
             p.Row.Id,
             p.Row.Plan.ForDate,
@@ -56,10 +55,20 @@ internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore jour
             p.Items.Count(i => i.State == TicketState.Armed),
             p.Items.Count(i => i.State == TicketState.Invalidated),
             unmatched.GetValueOrDefault(p.Row.Id).Would,
-            unmatched.GetValueOrDefault(p.Row.Id).Ambiguous,
-            counts.TryGetValue(p.Row.Id, out var c) ? c.Crossings : 0,
-            counts.TryGetValue(p.Row.Id, out c) ? c.Prompts : 0)).ToList();
-        return new PlanNotices(PlanNoticeRules.Derive(now, facts, latestRun));
+            unmatched.GetValueOrDefault(p.Row.Id).Ambiguous)).ToList();
+        var own = PlanNoticeRules.Derive(now, facts, latestRun);
+        var carried = await ticketNotices.ListAsync(now, cancellationToken);
+        return new PlanNotices(carried.Count == 0 ? own : Merge(own, carried));
+    }
+
+    /// <summary>
+    /// The plan items first, then P7-20's items (newest first), by severity; the sort is stable, so within a level the plan items keep their order. An id that a plan item already has is not repeated (P7-20 ids are <c>crossing:</c>/<c>prompt:</c>, so none should).
+    /// </summary>
+    private static List<PlanNotice> Merge(IReadOnlyList<PlanNotice> own, IReadOnlyList<PlanNotice> carried)
+    {
+        var ids = own.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+        var extra = carried.Where(n => ids.Add(n.Id)).OrderByDescending(n => n.At ?? n.Since).ThenBy(n => n.Id, StringComparer.Ordinal);
+        return [.. own.Concat(extra).OrderBy(n => n.Severity switch { "error" => 0, "warning" => 1, _ => 2 })];
     }
 
     /// <summary>

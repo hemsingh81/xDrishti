@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using XDrishti.Api.IntegrationTests.Data;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Application.Abstractions.Planning;
+using XDrishti.Application.Planning;
 using XDrishti.Domain.Planning;
 
 namespace XDrishti.Api.IntegrationTests.Planning;
@@ -131,5 +132,44 @@ public sealed class PlanNoticesApiTests(ApiFactory factory) : DataTestBase(facto
         }
 
         (await NoticesAsync()).GetArrayLength().ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task The_default_source_adds_nothing_so_the_answer_is_the_plan_items_alone()
+    {
+        await StoredAsync(Item(1, "NSE:RELIANCE"));
+        Factory.Services.GetRequiredService<TicketNoticeSwitch>().Items.ShouldBeNull(); // the registered default is in charge
+
+        var items = (await NoticesAsync()).EnumerateArray().ToList();
+
+        items.Select(i => i.GetProperty("kind").GetString()).ShouldBe(["plan_awaiting_review"]);
+    }
+
+    [Fact]
+    public async Task Carried_ticket_notices_appear_with_their_own_ids_since_and_resolved_sorted_with_the_plan_items()
+    {
+        var (plan, _) = await StoredAsync(Item(1, "NSE:RELIANCE"));
+        var switcher = Factory.Services.GetRequiredService<TicketNoticeSwitch>();
+        var since = new DateTimeOffset(2099, 1, 4, 5, 0, 0, TimeSpan.Zero);
+        switcher.Items =
+        [
+            new PlanNotice("crossing:41", "ticket_level_crossed", "warning", "1 watched ticket crossed its indicative stop level; open the plan.", $"/plans?plan={plan}", plan, since, since, false),
+            new PlanNotice("prompt:9", "post_trade_prompt", "info", "1 armed ticket has a trade on record.", $"/plans?plan={plan}", plan, null, since, true),
+        ];
+        try
+        {
+            var items = (await NoticesAsync()).EnumerateArray().ToList();
+
+            items.Select(i => i.GetProperty("id").GetString()).ShouldBe(["crossing:41", $"plan:review:{plan}:info", "prompt:9"]);
+            items[0].GetProperty("severity").GetString().ShouldBe("warning");
+            items[0].GetProperty("resolved").GetBoolean().ShouldBeFalse();
+            items[2].GetProperty("resolved").GetBoolean().ShouldBeTrue();
+            items[2].GetProperty("since").GetDateTimeOffset().ShouldBe(since);
+            items.Select(i => i.GetProperty("id").GetString()).Distinct().Count().ShouldBe(3);
+        }
+        finally
+        {
+            switcher.Items = null;
+        }
     }
 }

@@ -29,7 +29,7 @@ public sealed class GetPlanNoticesHandlerTests
         _journal.FillsAsync(Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Ct).Returns([]);
         _journal.EntriesAsync(Arg.Any<long>(), Ct).Returns([]);
         _plans.HistoryAsync(Arg.Any<long>(), Ct).Returns([]);
-        _tickets.CountsAsync(Arg.Any<IReadOnlyList<long>>(), Arg.Any<DateTimeOffset>(), Ct).Returns([]);
+        _tickets.ListAsync(Arg.Any<DateTimeOffset>(), Ct).Returns([]);
     }
 
     // Approved on the evening before the session, before any fill of the session day.
@@ -219,14 +219,28 @@ public sealed class GetPlanNoticesHandlerTests
     }
 
     [Fact]
-    public async Task Ticket_alert_counts_of_the_source_become_items_of_their_plan()
+    public async Task Ticket_notices_of_the_source_are_carried_as_they_are_and_sorted_with_the_plan_items()
     {
-        Store(Row(1), Item(1, 1, TicketState.Armed));
-        _tickets.CountsAsync(Arg.Is<IReadOnlyList<long>>(ids => ids.SequenceEqual(new long[] { 1 })), Arg.Any<DateTimeOffset>(), Ct).Returns([new TicketNoticeCount(1, 1, 2)]);
+        Store(Row(1), Item(1, 1, TicketState.Proposed));
+        var crossed = new PlanNotice("crossing:5", "ticket_level_crossed", "warning", "crossed", "/plans?plan=1", 1, null, Cutoff, false);
+        var prompt = new PlanNotice("prompt:2", "post_trade_prompt", "info", "ambiguous", "/plans?plan=1", 1, null, Cutoff, true);
+        var clash = new PlanNotice("plan:review:1:info", "post_trade_prompt", "info", "same id", "/plans?plan=1", 1, null, null, false);
+        _tickets.ListAsync(Arg.Any<DateTimeOffset>(), Ct).Returns([prompt, clash, crossed]);
 
         var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
 
-        result.Items.Select(i => i.Kind).ShouldContain("ticket_level_crossed");
-        result.Items.Select(i => i.Kind).ShouldContain("post_trade_prompt");
+        result.Items.Select(i => i.Id).ShouldBe(["crossing:5", "plan:review:1:info", "prompt:2"]);
+        result.Items[0].ShouldBe(crossed);
+        result.Items[2].Resolved.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Without_ticket_notices_the_answer_is_the_plan_items_alone()
+    {
+        Store(Row(1), Item(1, 1, TicketState.Proposed));
+
+        var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
+
+        result.Items.Select(i => i.Kind).ShouldBe(["plan_awaiting_review"]);
     }
 }
