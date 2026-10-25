@@ -84,7 +84,7 @@ high/low) · `VWAP_PULLBACK` · `VWAP_RECLAIM` · `EMA_PULLBACK` (9/21 EMA with 
 | Side | Trigger (one condition) | Stop |
 |------|-------------------------|------|
 | BUY | `close > or_high(or_min) and close[1] <= or_high(or_min)` | `or_low(or_min)` |
-| SELL (written out by hand, the automatic mirror is P3-02e) | `close < or_low(or_min) and close[1] >= or_low(or_min)` | `or_high(or_min)` |
+| SELL (written out by hand; without a `sell:` block the mirror of doc 11 P3-02e would give the same text) | `close < or_low(or_min) and close[1] >= or_low(or_min)` | `or_high(or_min)` |
 
 A 15-minute bar closes above the high of the first 15 minutes while the bar before it did not (SELL: below the low). The level form is used because `or_high` keeps the history of the session only (above): the level is read at lag 0 and
 the lagged series is the close, so the condition is known from the first bar of the day, and a trigger that is false on the first bar is False, not unknown. On 15m the opening range is the first bar; `or_min = 30` is two bars, and

@@ -29,12 +29,15 @@ public sealed record StrategyDefinition(
     /// <summary>The most items in one condition list.</summary>
     public const int MaxItemsPerList = 100;
 
+    /// <summary>The version of the mirror table that produced <see cref="Sell"/> from the BUY side (spec P3-02e), or null when SELL is hand-written or absent. Part of the canonical definition, so a new table is a new hash.</summary>
+    public string? SellMirroredWith { get; init; }
+
     /// <inheritdoc />
     public bool Equals(StrategyDefinition? other) =>
         other is not null
         && Schema == other.Schema && Id == other.Id && Style == other.Style
         && ListEquality.Equal(Timeframes, other.Timeframes) && ListEquality.Equal(Sides, other.Sides) && ListEquality.Equal(Params, other.Params)
-        && Equals(Buy, other.Buy) && Equals(Sell, other.Sell) && Equals(TimeRules, other.TimeRules) && ListEquality.Equal(Filters, other.Filters);
+        && SellMirroredWith == other.SellMirroredWith && Equals(Buy, other.Buy) && Equals(Sell, other.Sell) && Equals(TimeRules, other.TimeRules) && ListEquality.Equal(Filters, other.Filters);
 
     /// <inheritdoc />
     public override int GetHashCode()
@@ -48,6 +51,7 @@ public sealed record StrategyDefinition(
         hash.Add(ListEquality.Hash(Params));
         hash.Add(Buy);
         hash.Add(Sell);
+        hash.Add(SellMirroredWith);
         hash.Add(TimeRules);
         hash.Add(ListEquality.Hash(Filters));
         return hash.ToHashCode();

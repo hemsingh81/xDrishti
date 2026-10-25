@@ -44,7 +44,7 @@ public static class RunLabels
 
     /// <summary>
     /// The labels of a run, in this order: exploration; fills; entry limit; costs (<see cref="CostDescription.Label"/> of the run's <see cref="SimulationRun.Costs"/>: <c>costs: none</c> for a gross run); the sizing line (a costed run only);
-    /// portfolio limits; sample; universe; data; engine verification; tick; opening bar. The not-modelled list is <see cref="FillLimits.NotModelled"/> as it is for a gross run, followed by <see cref="CostLimits.NotModelled"/> for a costed one.
+    /// portfolio limits; sample; universe; data; engine verification; tick; opening bar. A mirrored SELL adds <c>sell: mirrored (version)</c> after the sample line. The not-modelled list is <see cref="FillLimits.NotModelled"/> as it is for a gross run, followed by <see cref="CostLimits.NotModelled"/> for a costed one.
     /// </summary>
     /// <exception cref="ArgumentNullException">An argument is null.</exception>
     /// <exception cref="ArgumentException"><paramref name="rules"/> are not the rules the run recorded (<see cref="SimulationRun.Fills"/>).</exception>
@@ -67,6 +67,7 @@ public static class RunLabels
             .. (run.Costs is null ? Array.Empty<string>() : [CostDescription.SizingLabel(run.Costs)]),
             FixedLabels[1],
             FixedLabels[2],
+            .. SellLine(run.Strategy.DefinitionJson),
             "universe: " + run.Universe.Label + SurvivorshipNote,
             DataLine(run),
             EngineLine(run.EngineVersion),
@@ -75,6 +76,23 @@ public static class RunLabels
         ];
 
         return new RunLabelSet(Array.AsReadOnly(lines), run.Costs is null ? FillLimits.NotModelled : Array.AsReadOnly([.. FillLimits.NotModelled, .. CostLimits.NotModelled]));
+    }
+
+    /// <summary>
+    /// The line <c>sell: mirrored (mirror-1)</c> for a run whose SELL side was made by the BUY to SELL mirror (spec P3-02e): the canonical definition carries <c>sell_mirrored</c>. No line for any other run.
+    /// </summary>
+    private static string[] SellLine(string? definitionJson)
+    {
+        const string Marker = "\"sell_mirrored\":\"";
+        var start = definitionJson?.IndexOf(Marker, StringComparison.Ordinal) ?? -1;
+        if (definitionJson is null || start < 0)
+        {
+            return [];
+        }
+
+        start += Marker.Length;
+        var end = definitionJson.IndexOf('"', start);
+        return end < 0 ? [] : ["sell: mirrored (" + definitionJson[start..end] + ")"];
     }
 
     /// <summary>The data line from the instruments that ran: how many, the range of their first and of their last bars, and the shortest and longest length in years; <c>data: none</c> when none ran.</summary>

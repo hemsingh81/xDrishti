@@ -46,6 +46,21 @@ public sealed class RunLabelsTests
     }
 
     [Fact]
+    public void A_run_whose_sell_side_was_mirrored_carries_one_more_line_after_the_sample_line_and_no_other_run_does()
+    {
+        var run = TwoRan();
+        var mirrored = run with { Strategy = run.Strategy with { DefinitionJson = "{\"id\":\"X\",\"sell\":{},\"sell_mirrored\":\"mirror-1\"}" } };
+
+        var plain = RunLabels.Of(run, FillRules.Default).Lines;
+        var lines = RunLabels.Of(mirrored, FillRules.Default).Lines;
+
+        plain.ShouldNotContain(l => l.StartsWith("sell:", StringComparison.Ordinal));
+        lines.Count.ShouldBe(plain.Count + 1);
+        lines[6].ShouldBe("sell: mirrored (mirror-1)");
+        lines.Where(l => !l.StartsWith("sell:", StringComparison.Ordinal)).ShouldBe(plain);
+    }
+
+    [Fact]
     public void The_engine_label_says_what_was_compared_for_which_version_and_what_was_not_never_verified_alone()
     {
         var label = RunLabels.EngineVerification;

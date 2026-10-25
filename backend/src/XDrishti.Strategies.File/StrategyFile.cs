@@ -22,4 +22,7 @@ public static class StrategyFile
 
     /// <summary>Writes the definition in the fixed layout (P3-02c D7). <c>Read(Write(d))</c> equals <c>d</c>.</summary>
     public static string Write(StrategyDefinition definition) => FileWriter.Write(definition);
+
+    /// <summary>The <c>sell:</c> block of a side as the file writes it, for the Lab to show a mirrored SELL the author can copy.</summary>
+    public static string WriteSell(SideRules sell) => FileWriter.WriteSell(sell);
 }

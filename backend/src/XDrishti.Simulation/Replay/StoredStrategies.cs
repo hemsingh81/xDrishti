@@ -7,6 +7,7 @@ using XDrishti.Strategies;
 using XDrishti.Strategies.Canonical;
 using XDrishti.Strategies.Compilation;
 using XDrishti.Strategies.File;
+using XDrishti.Strategies.Mirror;
 using XDrishti.Strategies.Model;
 
 namespace XDrishti.Simulation.Replay;
@@ -59,6 +60,22 @@ public static class StoredStrategies
             return new StoredCheck(null, read.Envelope.Version, issues);
         }
 
+        var (expanded, mirror) = StrategyMirror.Expand(definition, StrategyFile.WriteSell);
+        foreach (var located in mirror)
+        {
+            // a mirror problem sits in the SELL block that is not in the file, so it is placed at the BUY item it came from
+            var problem = located.Problem;
+            var at = Locate(read, located.Path.StartsWith("sell.", StringComparison.Ordinal) ? "buy" + located.Path[4..] : located.Path);
+            var item = problem.Span.Length > 0;
+            issues.Add(new StoredIssue(located.Path, problem.Code, problem.Message, SeverityName(problem.Severity), at?.Line, at?.Column, at?.EndLine, at?.EndColumn, item ? problem.Span.Start : null, item ? problem.Span.Length : null, problem.Suggestion));
+        }
+
+        if (mirror.Any(m => m.Problem.Severity == ProblemSeverity.Error))
+        {
+            return new StoredCheck(null, read.Envelope.Version, issues);
+        }
+
+        definition = expanded;
         var compiled = new List<StoredIssue>();
         foreach (var timeframe in definition.Timeframes)
         {
@@ -84,7 +101,7 @@ public static class StoredStrategies
     {
         ArgumentNullException.ThrowIfNull(sourceText);
         ArgumentNullException.ThrowIfNull(newId);
-        var (definition, _) = Read(sourceText);
+        var (definition, _) = Read(sourceText, expand: false);
         return definition is null ? null : StrategyFile.Write(definition with { Id = newId });
     }
 
@@ -140,7 +157,12 @@ public static class StoredStrategies
     {
         ArgumentNullException.ThrowIfNull(sourceText);
         ArgumentNullException.ThrowIfNull(expectedHash);
-        var (definition, _) = Read(sourceText);
+        var (definition, readProblems) = Read(sourceText);
+        if (definition is null && readProblems.Any(p => p.Problem.Code.StartsWith("strategy.mirror.", StringComparison.Ordinal)))
+        {
+            return new PreparedBuild(null, readProblems);
+        }
+
         if (definition is null)
         {
             return new PreparedBuild(null, [Located(string.Empty, HashMismatchCode, "The stored text no longer reads; the library that reads it has changed. Nothing ran.")]);
@@ -181,12 +203,20 @@ public static class StoredStrategies
 
     private static string NameList(IEnumerable<string> names) => string.Join(", ", names.Order(StringComparer.Ordinal).Select(n => "`" + n + "`"));
 
-    private static (StrategyDefinition? Definition, List<LocatedProblem> Problems) Read(string sourceText)
+    private static (StrategyDefinition? Definition, List<LocatedProblem> Problems) Read(string sourceText, bool expand = true)
     {
         var read = StrategyFile.Read(sourceText);
         if (read.Definition is { } definition && !read.HasErrors)
         {
-            return (definition, []);
+            if (!expand)
+            {
+                return (definition, []);
+            }
+
+            // the automatic SELL (spec P3-02e): the run sees the mirrored block, so the hash and the run key hold it; the stored text is not changed
+            var (expanded, mirror) = StrategyMirror.Expand(definition);
+            var errors = mirror.Where(m => m.Problem.Severity == ProblemSeverity.Error).ToList();
+            return errors.Count > 0 ? (null, errors) : (expanded, []);
         }
 
         return (null, [.. read.Problems.Where(p => p.Severity == ProblemSeverity.Error).Select(p => Located(p.Path, p.Code, "line " + p.Line.ToString(CultureInfo.InvariantCulture) + ": " + p.Message))]);

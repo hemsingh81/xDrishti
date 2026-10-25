@@ -337,7 +337,7 @@ public sealed class StrategiesArchitectureTests
     {
         var namespaces = Strategies.GetExportedTypes().Select(t => t.Namespace).Distinct().ToList();
 
-        namespaces.ShouldBeSubsetOf(["XDrishti.Strategies", "XDrishti.Strategies.Syntax", "XDrishti.Strategies.Binding", "XDrishti.Strategies.Lint", "XDrishti.Strategies.Compilation", "XDrishti.Strategies.Model", "XDrishti.Strategies.BuiltIn", "XDrishti.Strategies.Canonical"]);
+        namespaces.ShouldBeSubsetOf(["XDrishti.Strategies", "XDrishti.Strategies.Syntax", "XDrishti.Strategies.Binding", "XDrishti.Strategies.Lint", "XDrishti.Strategies.Compilation", "XDrishti.Strategies.Model", "XDrishti.Strategies.BuiltIn", "XDrishti.Strategies.Canonical", "XDrishti.Strategies.Mirror"]);
         namespaces.ShouldContain("XDrishti.Strategies.Canonical", "the canonical text and the hash of P3-02c (ADR 0055) are a documented public namespace");
         namespaces.ShouldContain("XDrishti.Strategies.Model", "the typed strategy model of P3-02b (ADR 0036) is a documented public namespace");
         namespaces.ShouldContain("XDrishti.Strategies.BuiltIn", "the built-in strategies (ORB v1, P3-03a) are a documented public namespace");
