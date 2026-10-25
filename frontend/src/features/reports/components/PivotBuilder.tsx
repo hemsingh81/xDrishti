@@ -8,7 +8,6 @@ import { NON_ADDITIVE_NOTE } from '../lib/evidence';
 import { readPivot } from '../lib/compareState';
 import type { ReportPanelProps } from '../lib/reportFilter';
 import { CellPanel, type CellInfo } from './CellPanel';
-import { LensSelector } from './LensSelector';
 import { readLens } from '../lib/lensToQuery';
 import { LensTable } from './LensTable';
 import { Panel } from './Panel';
@@ -53,19 +52,7 @@ export function PivotBuilder({ query, min }: ReportPanelProps) {
           )}
         </Box>
       </Panel>
-      <Panel title="Lens">
-        <Box sx={{ display: 'grid', gap: 1.5 }}>
-          <Box>
-            <LensSelector
-              lens={lens}
-              onChange={(next) => {
-                url.update({ lens: next === 'all' ? null : next });
-              }}
-            />
-          </Box>
-          <LensTable lens={lens} query={query} min={min} onOpen={setOpen} />
-        </Box>
-      </Panel>
+      <LensTable lens={lens} query={query} min={min} onOpen={setOpen} />
       <CellPanel
         info={open}
         onClose={() => {

@@ -12,7 +12,7 @@ const sizeCodes = new Set(['reports.invalid', 'reports.too_large']);
 
 /**
  * A refused pivot: the server's message and a way back to the default valid pivot. A double count offers to group by exit as
- * well (the columns become exit); a too-large pivot adds "Choose a smaller dimension". Run-set and net refusals stay with
+ * well (the columns become exit, as a pivot has two dimensions at most); a too-large pivot adds "Choose a smaller dimension". Run-set and net refusals stay with
  * `ReportState`.
  */
 export function PivotError({ error, set }: PivotErrorProps) {
@@ -39,7 +39,7 @@ export function PivotError({ error, set }: PivotErrorProps) {
               }}
               sx={{ minHeight: 44 }}
             >
-              Group by exit as well
+              Group by exit as well (replaces the columns)
             </Button>
           )}
           <Button color="inherit" size="small" onClick={back} sx={{ minHeight: 44 }}>

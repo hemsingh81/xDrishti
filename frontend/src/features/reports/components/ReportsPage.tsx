@@ -6,6 +6,8 @@ import { useState } from 'react';
 import { NonValue } from '@/shared/analytics';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
 import { runsQuery, whatWorksQuery } from '../api/reportQueries';
+import { useUrlState } from '@/shared/analytics';
+import { readLens } from '../lib/lensToQuery';
 import { useReportFilter } from '../hooks/useReportFilter';
 import { queryString, toQuery, type ReportView } from '../lib/reportFilter';
 import { BasketComparison } from './BasketComparison';
@@ -13,6 +15,7 @@ import { Catalogue } from './Catalogue';
 import { DataUsedPanel } from './DataUsedPanel';
 import { DistributionPanel } from './DistributionPanel';
 import { EquityPanel } from './EquityPanel';
+import { LensSelector } from './LensSelector';
 import { FilterBar } from './FilterBar';
 import { GroupBars } from './GroupBars';
 import { InsightsList } from './InsightsList';
@@ -47,6 +50,7 @@ const dayIndex = (value: string | undefined) => {
  */
 export function ReportsPage() {
   const { view, filter, set } = useReportFilter();
+  const lens = readLens(useUrlState().text('lens'));
   const runs = useQuery(runsQuery);
   const net = runs.data?.net;
   const netRefused = filter.basis === 'net' && net?.state !== 'value';
@@ -119,6 +123,16 @@ export function ReportsPage() {
         {updates > 0 && <span key={updates}>Report updated</span>}
       </Box>
       <FilterBar runs={runs.data} filter={filter} set={set} />
+      {view === 'pivot' && (
+        <Box sx={{ mb: 2 }}>
+          <LensSelector
+            lens={lens}
+            onChange={(next) => {
+              set({ lens: next === 'all' ? null : next });
+            }}
+          />
+        </Box>
+      )}
       {netRefused && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           {net?.reason ?? 'Net R is not available.'} The figures stay gross.

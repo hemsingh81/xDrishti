@@ -42,13 +42,16 @@ export function CellPanel({ info, onClose }: { info: CellInfo | null; onClose: (
       ] as const)
     : [];
   return (
-    <Drawer anchor="right" open={info !== null} onClose={onClose}>
+    <Drawer
+      anchor="right"
+      open={info !== null}
+      onClose={onClose}
+      slotProps={{
+        paper: { role: 'dialog', 'aria-modal': true, 'aria-label': info ? `Cell ${info.title}` : undefined },
+      }}
+    >
       {info && (
-        <Box
-          role="dialog"
-          aria-label={`Cell ${info.title}`}
-          sx={{ width: { xs: '100vw', sm: 380 }, p: 2, display: 'grid', gap: 1.5 }}
-        >
+        <Box sx={{ width: { xs: '100vw', sm: 380 }, p: 2, display: 'grid', gap: 1.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Typography variant="h2" component="h2">
               {info.title}

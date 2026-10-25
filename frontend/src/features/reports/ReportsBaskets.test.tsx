@@ -171,7 +171,7 @@ describe('Basket comparison', () => {
     expect(rows).toHaveLength(3); // header + two baskets, no total
     // The basket with a lower bound comes first even though the thin one was sent first.
     expect(rows[1]).toHaveTextContent('MyChoice');
-    expect(rows[1]).toHaveTextContent('Best by credible bound');
+    expect(rows[1]).toHaveTextContent('Top ranked cell: orb');
     expect(rows[1]).toHaveTextContent('orb (rank 1)');
     expect(rows[2]).toHaveTextContent('MyLongTerm');
     expect(rows[2]).toHaveTextContent('None ranked: Only 12 trades; 45 are needed.');
@@ -268,5 +268,44 @@ describe('Basket comparison', () => {
     await user.click(await screen.findByRole('combobox', { name: 'Baskets to compare' }));
     expect(await screen.findByRole('option', { name: 'Basket 7' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByText(/limit 6/)).toBeInTheDocument();
+  });
+
+  it('makes at most six requests for the comparison, asking What works once', async () => {
+    const requests = setup();
+    renderReports(cmp);
+    await screen.findByRole('grid', { name: 'Expectancy by basket and style' });
+    await screen.findByRole('list', { name: 'Expectancy of orb per basket' });
+    const named = requests.filter((u) => u.searchParams.get('basket') === `${b1},${b2}`);
+    expect(named.length).toBeLessThanOrEqual(6);
+    expect(named.filter((u) => u.pathname.endsWith('/what-works'))).toHaveLength(1);
+  });
+
+  it('takes only the first six baskets of a hand-edited address', async () => {
+    const requests = setup();
+    const ids = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => `00000000-0000-4000-8000-00000000060${String(i)}`);
+    renderReports(`?view=baskets&cmp=${ids.join(',')}`);
+    await screen.findByRole('table', { name: 'Basket comparison' });
+    const groups = requests.find((u) => u.pathname.endsWith('/groups') && u.searchParams.get('lens') === 'basket');
+    expect(groups?.searchParams.get('basket')).toBe(ids.slice(0, 6).join(','));
+  });
+
+  it.each(['insufficient', 'unavailable', 'not_evaluable', 'empty'] as const)(
+    'prints a %s basket figure without a number',
+    async (state) => {
+      setup({
+        groups: [allFigures(nonValue(state, 'Reason.'), { key: `basket=${b1}`, parts: partsOf('basket', b1), n: 12 })],
+      });
+      renderReports(cmp);
+      const table = await screen.findByRole('table', { name: 'Basket comparison' });
+      const row = (await within(table).findAllByRole('row'))[1];
+      const figures = within(row!).getAllByRole('cell').slice(2, 7);
+      for (const figure of figures) expect(figure.textContent).not.toMatch(/[+-]\d|\d\.\d|%/);
+    },
+  );
+
+  it('says when the compared baskets replace the basket filter', async () => {
+    setup();
+    renderReports(`${cmp}&basket=${b3}`);
+    expect(await screen.findByText(/compared baskets replace the Baskets filter/)).toBeInTheDocument();
   });
 });

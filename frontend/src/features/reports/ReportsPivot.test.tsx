@@ -161,7 +161,7 @@ describe('Pivot builder', () => {
     const user = userEvent.setup();
     renderReports(open);
     expect(await screen.findByText(/group by Exit as well/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Group by exit as well' }));
+    await user.click(screen.getByRole('button', { name: /Group by exit as well/ }));
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: 'Columns' })).toHaveTextContent('Exit');
     });
@@ -208,5 +208,12 @@ describe('Pivot builder', () => {
         true,
       );
     });
+  });
+
+  it('shows the lens selector in the page header and the non-additive note for a basket lens', async () => {
+    setup();
+    renderReports(`${open}&lens=basket`);
+    expect(await screen.findByRole('combobox', { name: 'Lens' })).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Groups by basket' })).toBeInTheDocument();
   });
 });

@@ -23,6 +23,7 @@ export function BasketComparison({ query, min }: ReportPanelProps) {
   const cmpQuery = { ...query, basket: joined(compared) ?? '' };
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
+      {query.basket && <Alert severity="info">The compared baskets replace the Baskets filter on this view.</Alert>}
       <Box>
         <BasketPicker value={compared} onChange={setCompared} />
       </Box>

@@ -2,7 +2,7 @@ import { Box, Typography } from '@mui/material';
 import { formatCount, HeatGrid, MetricValue, type HeatGridCell } from '@/shared/analytics';
 import type { PivotView } from '../api/reportQueries';
 import { NOT_RECORDED, type useBasketNames } from '../hooks/useBasketNames';
-import { isShaded, metricFormat, shadeOf, stateText } from '../lib/heatCell';
+import { isShaded, metricFormat, peakOf, shadeOf, stateText } from '../lib/heatCell';
 import { metricFromApi } from '../lib/metricFromApi';
 import { dimensionLabel, TALL_GRID_ROWS, type PivotMetric } from '../lib/pivotLimits';
 import type { CellInfo } from './CellPanel';
@@ -28,9 +28,7 @@ export function PivotGrid({ pivot, min, names, label, onOpen, selectedKey }: Piv
   const rowName = (value: string) => names.part(pivot.rowDimension, value);
   const columnName = (value: string) => names.part(pivot.columnDimension, value);
   const cells = new Map(pivot.cells.filter((cell) => cell.n > 0).map((cell) => [at(cell.row, cell.column), cell]));
-  const peak = isShaded(metric)
-    ? Math.max(0, ...pivot.cells.map((c) => (c.value.state === 'value' ? Math.abs(c.value.number ?? 0) : 0)))
-    : 0;
+  const peak = isShaded(metric) ? peakOf(pivot.cells) : 0;
   const cellOf = (rowId: string, columnId: string): HeatGridCell | null => {
     const cell = cells.get(at(rowId, columnId));
     if (!cell) return null;

@@ -1,4 +1,4 @@
-import { Alert, Box } from '@mui/material';
+import { Alert, Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { DataTable, formatCount, formatR, formatRate } from '@/shared/analytics';
 import {
@@ -9,7 +9,8 @@ import {
   type GroupView,
 } from '../api/reportQueries';
 import { useBasketNames } from '../hooks/useBasketNames';
-import { evidenceOf } from '../lib/evidence';
+import { evidenceOf, NON_ADDITIVE_NOTE } from '../lib/evidence';
+import { dimensionLabel } from '../lib/pivotLimits';
 import { lensToQuery, type Lens } from '../lib/lensToQuery';
 import { metricFromApi } from '../lib/metricFromApi';
 import type { ReportQuery } from '../lib/reportFilter';
@@ -23,71 +24,82 @@ interface TableProps {
   evidence: EvidenceView;
   min: number | null;
   dimension: string;
+  nonAdditive?: boolean;
   onOpen: (info: CellInfo) => void;
 }
 
-function GroupTable({ title, groups, evidence, min, dimension, onOpen }: TableProps) {
+function GroupTable({ title, groups, evidence, min, dimension, nonAdditive, onOpen }: TableProps) {
   const names = useBasketNames();
   const nameOf = (g: GroupView) =>
     g.parts.length === 0 ? 'All trades' : names.part(dimension, g.parts[0]?.value ?? null);
   return (
-    <DataTable
-      label={title}
-      rows={groups}
-      rowKey={(g) => g.key}
-      evidence={evidenceOf(evidence)}
-      columns={[
-        {
-          kind: 'text',
-          id: 'group',
-          header: dimension === 'all' ? 'Group' : dimension,
-          render: (g) => (
-            <Button
-              size="small"
-              sx={{ minHeight: 44, textAlign: 'left' }}
-              onClick={() => {
-                onOpen({
-                  key: g.key,
-                  title: nameOf(g),
-                  n: g.n,
-                  state: metricFromApi(g.expectancyR, g.n, min),
-                  format: formatR,
-                  evidence,
-                  group: g,
-                  min,
-                });
-              }}
-            >
-              {nameOf(g)}
-            </Button>
-          ),
-        },
-        { kind: 'text', id: 'n', header: 'Trades', align: 'right', render: (g) => formatCount(g.n) },
-        {
-          kind: 'metric',
-          id: 'win',
-          header: 'Win rate',
-          metric: (g) => metricFromApi(g.winRate, g.n, min),
-          format: formatRate,
-        },
-        {
-          kind: 'metric',
-          id: 'exp',
-          header: 'Expectancy',
-          metric: (g) => metricFromApi(g.expectancyR, g.n, min),
-          format: formatR,
-          tone: 'gain-loss',
-        },
-        {
-          kind: 'metric',
-          id: 'tot',
-          header: 'Total R',
-          metric: (g) => metricFromApi(g.totalR, g.n, min),
-          format: formatR,
-          tone: 'gain-loss',
-        },
-      ]}
-    />
+    <Box>
+      <DataTable
+        label={title}
+        rows={groups}
+        rowKey={(g) => g.key}
+        evidence={evidenceOf(evidence)}
+        columns={[
+          {
+            kind: 'text',
+            id: 'group',
+            header: dimension === 'all' ? 'Group' : dimensionLabel(dimension),
+            render: (g) => (
+              <Button
+                size="small"
+                sx={{ minHeight: 44, textAlign: 'left' }}
+                onClick={() => {
+                  onOpen({
+                    key: g.key,
+                    title: nameOf(g),
+                    n: g.n,
+                    state: metricFromApi(g.expectancyR, g.n, min),
+                    format: formatR,
+                    evidence,
+                    group: g,
+                    min,
+                  });
+                }}
+              >
+                {nameOf(g)}
+              </Button>
+            ),
+          },
+          { kind: 'text', id: 'n', header: 'Trades', align: 'right', render: (g) => formatCount(g.n) },
+          {
+            kind: 'metric',
+            id: 'win',
+            header: 'Win rate',
+            metric: (g) => metricFromApi(g.winRate, g.n, min),
+            n: (g) => g.n,
+            format: formatRate,
+          },
+          {
+            kind: 'metric',
+            id: 'exp',
+            header: 'Expectancy',
+            metric: (g) => metricFromApi(g.expectancyR, g.n, min),
+            n: (g) => g.n,
+            format: formatR,
+            tone: 'gain-loss',
+          },
+          {
+            kind: 'metric',
+            id: 'tot',
+            header: 'Total R',
+            metric: (g) => metricFromApi(g.totalR, g.n, min),
+            n: (g) => g.n,
+            format: formatR,
+            tone: 'gain-loss',
+          },
+        ]}
+      />
+      {nonAdditive && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          {NON_ADDITIVE_NOTE}
+        </Typography>
+      )}
+    </Box>
   );
 }
 
@@ -120,6 +132,7 @@ function ByDimension({ query, min, onOpen, by }: Omit<LensTableProps, 'lens'> & 
           evidence={g.evidence}
           min={min}
           dimension={by}
+          nonAdditive={g.nonAdditive}
           onOpen={onOpen}
         />
       )}

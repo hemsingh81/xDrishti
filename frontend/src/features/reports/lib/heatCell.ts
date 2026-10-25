@@ -28,7 +28,11 @@ export const metricFormat = (metric: PivotMetric): ((value: number) => string) =
 
 /** Only the R metrics are shaded (symmetric around zero); the others stay plain so no colour implies a sign. */
 export const isShaded = (metric: PivotMetric): boolean =>
-  metric !== 'win_rate' && metric !== 'profit_factor' && metric !== 'trades';
+  metric !== 'win_rate' && metric !== 'profit_factor' && metric !== 'trades' && metric !== 'max_drawdown_r';
+
+/** The largest absolute figure among VALUE cells only: a masked, empty or unavailable cell never feeds the colour scale. */
+export const peakOf = (cells: readonly { value: { state: string; number: number | null } }[]): number =>
+  Math.max(0, ...cells.map((c) => (c.value.state === 'value' ? Math.abs(c.value.number ?? 0) : 0)));
 
 /**
  * The shade of a value cell from the largest absolute value among VALUE cells only (a masked cell never feeds the scale).

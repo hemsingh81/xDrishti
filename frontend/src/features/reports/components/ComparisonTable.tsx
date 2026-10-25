@@ -73,6 +73,7 @@ export function ComparisonTable({ query, onOpen }: ComparisonTableProps) {
   const names = useBasketNames();
   const min = works.data?.minTrades ?? null;
   const top = works.data?.ranked[0];
+  const topStrategy = top?.group.parts.find((p) => p.dimension === 'strategy')?.value ?? 'Not recorded';
   const bestBasket = top?.lowerBoundPositive ? basketOf(top.group) : undefined;
   const hold = (id: string | null): MetricState => {
     const entry = bench.data?.baskets.find((b) => b.basketId === id);
@@ -122,7 +123,7 @@ export function ComparisonTable({ query, onOpen }: ComparisonTableProps) {
                         {names.part('basket', basketOf(g))}
                       </Button>
                       {bestBasket !== undefined && basketOf(g) === bestBasket && (
-                        <Chip size="small" label="Best by credible bound" sx={{ ml: 0.5 }} />
+                        <Chip size="small" label={`Top ranked cell: ${topStrategy}`} sx={{ ml: 0.5 }} />
                       )}
                     </>
                   ),
