@@ -539,7 +539,7 @@ expected R and the AI briefing. You review it in the evening or morning (phone w
 <li>Every decision is recorded. Reports compare <strong>system proposal vs your decision</strong> — e.g. &quot;rejected tickets would
 have made +4.2R this month&quot; — so you can see whether your overrides add value.</li>
 <li><strong>As built (P7-03, <a href="../adr/0083-the-plan-record-insert-only-state-trails-owner-only-approvals-lapse-by-default-and-no-order-by-name.html">ADR 0083</a>):</strong> the state of a ticket or plan is the newest row of an insert-only trail (<code>trading.plan_events</code>); approvals (<code>workflow.approvals</code>) have one kind, <code>owner</code>; at the cutoff every undecided ticket lapses; Modified can also be rejected or lapse, Approved can expire before arming; the only automatic moves are lapse, arm, invalidate, expire, trigger and close, never approve. No member of the code base may be named for placing, modifying or cancelling an order (architecture test).</li>
-<li><strong>As built (P7-11, <a href="../adr/0096-the-pre-open-check-arms-only-approved-tickets-as-a-service-move-a-missing-input-invalidates-and-armed-tickets-join-the-feed-set-last.html">ADR 0096</a>):</strong> Approved to Armed is made by the paused <code>preopen</code> service (09:10) as <code>system:preopen</code>, only for tickets already Approved by the owner (or by the optional rule); the instrument joins the live feed set through <code>ArmedTicketsProvider</code> (ranked after holdings, so the feed cap never displaces another member) and leaves when the ticket expires (<code>plan-expiry</code>, 15:40) or is invalidated. Price-crossing alerts are a follow-up.</li>
+<li><strong>As built (P7-11, <a href="../adr/0096-the-pre-open-check-arms-only-approved-tickets-as-a-service-move-a-missing-input-invalidates-and-armed-tickets-join-the-feed-set-last.html">ADR 0096</a>):</strong> Approved to Armed is made by the paused <code>preopen</code> service (09:10) as <code>system:preopen</code>, only for tickets already Approved by the owner (or by the optional rule); the instrument joins the live feed set through <code>ArmedTicketsProvider</code> (ranked after holdings, so the feed cap never displaces another member) and leaves when the ticket expires (<code>plan-expiry</code>, 15:40) or is invalidated. Price-crossing alerts and post-trade prompts: built in P7-20 (<a href="../adr/0115-crossing-alerts-on-armed-tickets-are-an-observer-in-the-feed-flush-prompts-are-stored-questions-with-a-derived-status-and-the-bell-reads-them-through-the-ticket-notice-port.html">ADR 0115</a>), default OFF, alerts only; the service <code>post-trade-prompts</code> runs at 16:45 after <code>plan-expiry</code> and the 16:30 portfolio sync.</li>
 </ul>
 <h3 id="43-ai-suggestions-inbox">4.3 AI suggestions inbox<a class="hash" href="#43-ai-suggestions-inbox" aria-label="Link to this section">#</a></h3>
 <p>The assistant and learning engine post suggestions to an <strong>inbox</strong>; each has a reason, evidence and an expiry:</p>
@@ -598,8 +598,8 @@ have made +4.2R this month&quot; — so you can see whether your overrides add v
 <td>Desired-state changes and requested actions, status, actor, timestamps</td>
 </tr>
 <tr>
-<td><code>ops.audit_log</code></td>
-<td>Every login, configuration change, approval and service action</td>
+<td><del><code>ops.audit_log</code></del> (not built; <a href="../adr/0117-the-audit-log-screen-is-a-read-model-over-the-six-insert-only-stores-merged-by-keyset-in-memory-with-pattern-redaction.html">ADR 0117</a>)</td>
+<td>The audit is six insert-only stores (<code>auth.audit_events</code>, <code>accounts.account_events</code>, <code>workflow.approvals</code>, <code>trading.plan_events</code>, <code>workflow.autonomy_settings</code>, <code>research.learning_changelog</code>); the Audit log screen reads them (<code>GET /api/audit/*</code>)</td>
 </tr>
 <tr>
 <td><code>workflow.approvals</code></td>
@@ -620,7 +620,7 @@ have made +4.2R this month&quot; — so you can see whether your overrides add v
     <a class="prev" href="03-target-architecture.html"><small>← Previous  [</small>03 · Target architecture</a>
     <a class="next" href="05-data-and-brokers.html"><small>Next  ] →</small>05 · Data &amp; brokers</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-25 21:26</footer>
+  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-25 22:30</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-broker-accounts-and-their-roles" class="d2">1. Broker accounts and their roles</a>
 <a href="#11-accounts-screen" class="d3">1.1 Accounts screen</a>

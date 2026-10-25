@@ -3149,6 +3149,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/plans/{id}/alerts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The price crossings of the plan's watched tickets (stop or target level reached, once each), the post-trade prompts with their derived status (open, matched with via journal or trade_on_record, expired_no_fill, ambiguous) and which tickets the owner muted. 'enabled' is false while Planning:TicketAlerts:Enabled is off and the lists are then empty. Alerts only: no order is placed and none exists. Read only. 404 plans.not_found */
+    get: operations['GetPlanAlerts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/plans/items/{itemId}/alerts/mute': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Stop further crossing alerts of one ticket for its session (an insert-only owner act; earlier crossings stay visible; the ticket does not change). Session and CSRF token; the owner is the session. 409 plans.alert_closed after the session, 404 plans.not_found */
+    post: operations['MutePlanItemAlerts'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/plans/alerts/{noticeId}/snooze': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Hide a crossing or a prompt (noticeId crossing:{id}, prompt:{id} or prompt:{id}:ambiguous, the ambiguous form being its own notice) for 15, 30 or 60 minutes; it reappears once, and can be snoozed three times. Session and CSRF token; insert-only. 422 plans.invalid, 409 plans.snooze_limit or plans.alert_closed (dismissed), 404 plans.not_found */
+    post: operations['SnoozePlanAlert'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/plans/alerts/{noticeId}/dismiss': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Hide a crossing or a prompt for good (noticeId crossing:{id}, prompt:{id} or prompt:{id}:ambiguous, the ambiguous form being its own notice). Session and CSRF token; insert-only; repeating it changes nothing. 422 plans.invalid, 404 plans.not_found */
+    post: operations['DismissPlanAlert'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/reports/runs': {
     parameters: {
       query?: never;
@@ -5471,6 +5539,30 @@ export interface components {
       hash: string;
       parentHash: null | string;
       created: boolean;
+    };
+    /** @description One stored crossing. `noticeId` is `crossing:{id}`; `state` is shown, snoozed or dismissed; `text` is built by the server and is plain text. */
+    CrossingView: {
+      /** Format: int64 */
+      id: number;
+      noticeId: string;
+      /** Format: int64 */
+      planId: number;
+      /** Format: int64 */
+      itemId: number;
+      kind: string;
+      /** Format: double */
+      level: number;
+      stopAnchor: null | string;
+      /** Format: double */
+      price: number;
+      /** Format: date-time */
+      tickAt: string;
+      text: string;
+      state: string;
+      /** Format: date-time */
+      snoozedUntil: null | string;
+      /** Format: int32 */
+      snoozesLeft: number;
     };
     /** @description The files by state over the whole folder (not narrowed by `state`, but by `q`), and how many cannot be loaded (`unmapped`: unknown, ambiguous or invalid name). */
     CsvFileCounts: {
@@ -9353,6 +9445,16 @@ export interface components {
       /** @description The evidence of the report. */
       evidence: components['schemas']['ReportEvidenceView'];
     };
+    /**
+     * @description The alerts of a plan. `enabled` is the setting `Planning:TicketAlerts:Enabled`; when false the lists are empty. `mutedItems` are the tickets whose further crossings the owner stopped. Armed means watched; every text ends with
+     *     the fact that no order is placed.
+     */
+    PlanAlertsView: {
+      enabled: boolean;
+      crossings: components['schemas']['CrossingView'][];
+      prompts: components['schemas']['PromptView'][];
+      mutedItems: number[];
+    };
     /** @description Size for one account. */
     PlanAllocationView: {
       /**
@@ -10238,6 +10340,29 @@ export interface components {
        * @description Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.
        */
       wouldClose?: number;
+    };
+    /** @description One post-trade prompt with its derived status (open, matched, expired_no_fill, ambiguous) and, when matched, how (journal or trade_on_record). `sameTradeItems` names the other tickets of an ambiguous prompt. */
+    PromptView: {
+      /** Format: int64 */
+      id: number;
+      noticeId: string;
+      /** Format: int64 */
+      planId: number;
+      /** Format: int64 */
+      itemId: number;
+      /** Format: uuid */
+      accountId: string;
+      /** Format: date */
+      session: string;
+      status: string;
+      via: null | string;
+      sameTradeItems: number[];
+      text: string;
+      state: string;
+      /** Format: date-time */
+      snoozedUntil: null | string;
+      /** Format: int32 */
+      snoozesLeft: number;
     };
     /** @description A bucket stored and recomputed side by side; `fields` name what differs (open, high, low, close, volume, bars) or `missing` / `unexpected`; `stored` or `recomputed` is null when there is none. */
     QualityBucketRow: {
@@ -11461,6 +11586,11 @@ export interface components {
       flaggedPlans: components['schemas']['FlaggedPlanView'][];
       /** @description What the counts do not say. */
       limits: string[];
+    };
+    /** @description The body of a snooze: 15, 30 or 60. */
+    SnoozeAlertRequest: {
+      /** Format: int32 */
+      minutes: number;
     };
     /**
      * @description Spikes: a 1-minute move greater than `spikeMultiple` times the median move and greater than 1 %. One the next bar takes back (at least half) is a spike (a warning); one that is not
@@ -19997,6 +20127,191 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['CaptureRunList'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPlanAlerts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanAlertsView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  MutePlanItemAlerts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        itemId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SnoozePlanAlert: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        noticeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['SnoozeAlertRequest'];
+      };
+    };
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DismissPlanAlert: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        noticeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
       /** @description Unprocessable Entity */

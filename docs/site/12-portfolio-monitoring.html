@@ -700,6 +700,7 @@ move on a holding · data or token issue for an account.</p>
 <li>Trades not matching any plan are tagged <strong>discretionary</strong>; their results are reported separately (and in the
 discipline report).</li>
 <li><strong>Built in P7-14 (<a href="../adr/0093-auto-journal-reads-the-stored-fills-matches-them-to-approved-tickets-by-account-instrument-side-and-day-and-stores-a-fill-grade-beside-the-plan-grade.html">ADR 0093</a>):</strong> <code>portfolio.transactions</code> has no <code>plan_item_id</code>; the link lives in the journal&#39;s own insert-only tables (<code>trading.journal_entries</code>, <code>journal_fills</code>, <code>fill_grades</code>), so the portfolio is only read. <code>xd plan journal</code> and <code>GET /api/plans/{id}/journal</code>.</li>
+<li><strong>Built in P7-20 (<a href="../adr/0115-crossing-alerts-on-armed-tickets-are-an-observer-in-the-feed-flush-prompts-are-stored-questions-with-a-derived-status-and-the-bell-reads-them-through-the-ticket-notice-port.html">ADR 0115</a>):</strong> a post-trade prompt asks once whether an armed ticket&#39;s trade was taken and closes by itself when a non-voided stored trade of the same account, normalised symbol, side and day exists, <strong>of any source</strong>. <code>via = journal</code> when the journal linked it, else <code>trade_on_record</code>: typed-in and file trades resolve the prompt but are <strong>not journaled or graded</strong> (the journal reads broker-synced rows only).</li>
 <li>Long-term holdings are not managed by the system&#39;s exits unless you assign a strategy/exit to them.</li>
 </ul>
 <h2 id="9-data-model-portfolio-schema">9. Data model (<code>portfolio</code> schema)<a class="hash" href="#9-data-model-portfolio-schema" aria-label="Link to this section">#</a></h2>
@@ -781,7 +782,7 @@ Nifty 50 (API built in P2-07), XIRR by group. <strong>P2-08:</strong> the data o
     <a class="prev" href="11-strategy-lab.html"><small>← Previous  [</small>11 · Strategy Lab</a>
     <a class="next" href="13-reports-and-ui.html"><small>Next  ] →</small>13 · Reports &amp; UI</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/12-portfolio-monitoring.md</code> · 2026-10-25 21:26</footer>
+  <footer class="foot">Generated from <code>docs/12-portfolio-monitoring.md</code> · 2026-10-25 22:30</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources" class="d2">1. Data sources</a>
 <a href="#2-domain-model" class="d2">2. Domain model</a>
