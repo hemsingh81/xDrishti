@@ -1,18 +1,12 @@
 import { Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { ColumnBars, EvidenceBlock, formatCount, formatSigned, NonValue, type ColumnBin } from '@/shared/analytics';
+import { ColumnBars, EvidenceBlock, formatCount, NonValue, type ColumnBin } from '@/shared/analytics';
 import { distributionQuery } from '../api/reportQueries';
+import { edge } from '../lib/binLabel';
 import { evidenceOf } from '../lib/evidence';
 import { asNonValue, metricFromApi } from '../lib/metricFromApi';
 import type { ReportPanelProps } from '../lib/reportFilter';
 import { QueryPanel } from './Panel';
-
-const edge = (lower: number | null, upper: number | null): string =>
-  lower === null
-    ? `below ${formatSigned(upper)}`
-    : upper === null
-      ? `${formatSigned(lower)} and above`
-      : `${formatSigned(lower)} to ${formatSigned(upper)}`;
 
 /** How many trades ended at each R (bins of half an R; an open bin at each end). A group too small for bins says why instead. */
 export function DistributionPanel({ query, min }: ReportPanelProps) {

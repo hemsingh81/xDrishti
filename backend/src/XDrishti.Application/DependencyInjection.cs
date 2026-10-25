@@ -418,6 +418,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetReportPivotQuery, Result<PivotView>>, GetReportPivotHandler>();
         services.AddScoped<IQueryHandler<GetReportEquityQuery, Result<EquityView>>, GetReportEquityHandler>();
         services.AddScoped<IQueryHandler<GetReportDistributionQuery, Result<DistributionView>>, GetReportDistributionHandler>();
+        services.AddScoped<IQueryHandler<GetReportMaeMfeQuery, Result<ReportMaeMfeView>>, GetReportMaeMfeHandler>();
         services.AddScoped<IQueryHandler<GetReportInsightsQuery, Result<InsightsView>>, GetReportInsightsHandler>();
         services.AddScoped<IQueryHandler<GetReportWhatWorksQuery, Result<WhatWorksView>>, GetReportWhatWorksHandler>();
         services.AddScoped<IQueryHandler<PageReportTradesQuery, Result<TradesView>>, PageReportTradesHandler>();

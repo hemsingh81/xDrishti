@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Reporting;
@@ -10,11 +11,11 @@ namespace XDrishti.Application.Reporting;
 /// A net basis is allowed only by the owner's stored confirmation of the charge sheet (<see cref="IChargeSheetConfirmationSource"/>), read here and nowhere else; nothing in the query can supply it. The load is bounded: the closed trades of the runs, from their stored
 /// headers, may not exceed <see cref="MaxClosedTrades"/> (refused before one trade is read), and one report at a time holds a population in memory (<see cref="ReportGate"/>).
 /// </summary>
-internal sealed class ReportLoader(IReportTradeSource source, IChargeSheetConfirmationSource confirmations, ReportGate gate, TimeProvider time, ILogger<ReportLoader> logger)
+internal sealed class ReportLoader(IReportTradeSource source, IChargeSheetConfirmationSource confirmations, IHoldingClassifications classifications, ReportGate gate, TimeProvider time, ILogger<ReportLoader> logger)
 {
     /// <summary>
     /// The most closed trades (by the run headers, before any filter) one request reads. Chosen from the measured peak of one request (ADR 0100): the population of 500,000 trades takes about the figure the ADR states above the idle process, which, with one report in memory at a
-    /// time, stays well inside the 1 GB limit of the API container. A run above it is refused with 422 <c>reports.too_large</c>, never cut.
+    /// time, stays well inside the 1 GB limit of the API container. A run above it is refused with 422 <c>reports.too_large</c>, never cut. P8-10 added five optional fields to each trade (about 56 bytes a trade, 28 MB at the limit, by the field sizes; the columns behind them are read only by the excursion report and an hour lens, see ReportTradeFilter.WithExcursions); the peak was not re-measured.
     /// </summary>
     public const int MaxClosedTrades = 500_000;
 
@@ -30,6 +31,9 @@ internal sealed class ReportLoader(IReportTradeSource source, IChargeSheetConfir
 
         return result;
     }
+
+    /// <summary>Only the excursion report and a lens by entry hour read the extra columns of a trade.</summary>
+    private static bool NeedsExcursions(ReportQuery query, string kind) => kind == "mae_mfe" || query.Lens.Contains(ReportDimension.Hour);
 
     private async ValueTask<Result<LoadedReport>> BuildAsync(ReportQuery query, long started, string kind, CancellationToken cancellationToken)
     {
@@ -93,10 +97,15 @@ internal sealed class ReportLoader(IReportTradeSource source, IChargeSheetConfir
             var trades = new List<ReportTrade>();
             if (used.Count > 0)
             {
-                await foreach (var trade in source.StreamTradesAsync([.. used.Select(r => r.RunKey)], query.Filters.ToTradeFilter(), cancellationToken))
+                await foreach (var trade in source.StreamTradesAsync([.. used.Select(r => r.RunKey)], query.Filters.ToTradeFilter() with { WithExcursions = NeedsExcursions(query, kind) }, cancellationToken))
                 {
                     trades.Add(trade);
                 }
+            }
+
+            if (trades.Count > 0 && query.Lens.Contains(ReportDimension.Sector))
+            {
+                await AttachSectorsAsync(trades, cancellationToken);
             }
 
             var population = ReportPopulation.Create([.. used.Select(r => r.ToReportRun())], trades, options);
@@ -115,6 +124,19 @@ internal sealed class ReportLoader(IReportTradeSource source, IChargeSheetConfir
         {
             lease.Dispose();
             throw;
+        }
+    }
+
+    /// <summary>The sector of the instrument master as of today (the master keeps one current sector, so this is not the sector at the time of the trade), one read for all instruments of the trades; an instrument with none stays not recorded.</summary>
+    private async ValueTask AttachSectorsAsync(List<ReportTrade> trades, CancellationToken cancellationToken)
+    {
+        var sectors = await classifications.SectorsAsync([.. trades.Select(t => t.InstrumentId).Distinct()], cancellationToken);
+        for (var i = 0; i < trades.Count; i++)
+        {
+            if (sectors.TryGetValue(trades[i].InstrumentId, out var sector))
+            {
+                trades[i] = trades[i] with { Sector = sector };
+            }
         }
     }
 }

@@ -264,3 +264,39 @@ export const buildPivot = (): Schemas['PivotView'] => ({
   nonAdditive: false,
   evidence: buildEvidence(),
 });
+
+export const buildMaeMfe = (over: Partial<Schemas['MaeMfeGroupView']> = {}): Schemas['ReportMaeMfeView'] => ({
+  dimensions: [],
+  nonAdditive: false,
+  groups: [
+    {
+      key: 'all',
+      parts: [],
+      n: 40,
+      excursionN: 40,
+      winnersMaeP90: value(0.75),
+      grid: {
+        maeEdges: [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+        resultEdges: [-5, -4.5, -4, -3.5, -3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5],
+        counts: Array.from({ length: 9 }, (_, row) =>
+          Array.from({ length: 22 }, (_, col) => (row === 1 && col === 13 ? 40 : 0)),
+        ),
+        belowCount: 0,
+        aboveCount: 0,
+      },
+      mfe: {
+        edges: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5],
+        counts: [2, 5, 10, 8, 6, 4, 2, 1, 1, 0],
+        aboveCount: 1,
+      },
+      reachedMfe: [
+        { atR: 1, count: 32, share: 0.8 },
+        { atR: 2, count: 14, share: 0.35 },
+        { atR: 3, count: 5, share: 0.125 },
+      ],
+      evidence: { n: 40, firstDate: '2024-04-02', lastDate: '2026-04-30', provisional: false, runKeys: [runKeyA] },
+      ...over,
+    },
+  ],
+  evidence: buildEvidence(),
+});

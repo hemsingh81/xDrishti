@@ -35,4 +35,10 @@ public enum ReportDimension
 
     /// <summary>Account: unavailable, a simulated trade has no account.</summary>
     Account,
+
+    /// <summary>The sector of the instrument as of the read (the master keeps one current sector); not recorded when the master has none.</summary>
+    Sector,
+
+    /// <summary>The India-time hour of the entry (09 to 15), for intraday runs only; a swing or unlabelled run has no hour.</summary>
+    Hour,
 }

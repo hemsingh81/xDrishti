@@ -9,7 +9,7 @@ import { runsQuery, whatWorksQuery } from '../api/reportQueries';
 import { useUrlState } from '@/shared/analytics';
 import { readLens } from '../lib/lensToQuery';
 import { useReportFilter } from '../hooks/useReportFilter';
-import { queryString, toQuery, type ReportView } from '../lib/reportFilter';
+import { moreViews, queryString, toQuery, type MoreView, type ReportView } from '../lib/reportFilter';
 import { BasketComparison } from './BasketComparison';
 import { Catalogue } from './Catalogue';
 import { DataUsedPanel } from './DataUsedPanel';
@@ -20,6 +20,7 @@ import { FilterBar } from './FilterBar';
 import { GroupBars } from './GroupBars';
 import { InsightsList } from './InsightsList';
 import { KpiTiles } from './KpiTiles';
+import { MoreReport } from './MoreReport';
 import { Panel } from './Panel';
 import { PivotBuilder } from './PivotBuilder';
 import { StrategyTimeframePanel } from './StrategyTimeframePanel';
@@ -38,6 +39,7 @@ const panelTitles = [
   'Win rate by weekday',
 ];
 const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const isMoreView = (view: ReportView): view is MoreView => (moreViews as readonly string[]).includes(view);
 const dayIndex = (value: string | undefined) => {
   const at = weekdays.indexOf(value ?? '');
   return at < 0 ? weekdays.length : at;
@@ -149,6 +151,8 @@ export function ReportsPage() {
             <BasketComparison {...panel} />
           ) : view === 'pivot' ? (
             <PivotBuilder {...panel} />
+          ) : isMoreView(view) ? (
+            <MoreReport view={view} {...panel} />
           ) : (
             <>
               <WhatWorksCard

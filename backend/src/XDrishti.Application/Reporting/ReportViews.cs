@@ -105,6 +105,21 @@ internal static class ReportViews
         [.. distribution.Groups.Select(g => new DistributionGroupView(g.Key.Text, Parts(g.Key), g.N, Metric(g.MeanR), [.. g.Bins.Select(b => new DistributionBinView(b.LowerR, b.UpperR, b.Count))], GroupEvidence(g.Evidence)))],
         Evidence(distribution.Evidence, report));
 
+    public static ReportMaeMfeView MaeMfe(ReportMaeMfe answer, LoadedReport report) => new(
+        [.. answer.Dimensions.Select(ReportNames.Name)],
+        answer.NonAdditive,
+        [.. answer.Groups.Select(g => new MaeMfeGroupView(
+            g.Key.Text,
+            Parts(g.Key),
+            g.N,
+            g.ExcursionN,
+            Metric(g.WinnersMaeP90),
+            g.Grid is null ? null : new MaeGridView([.. g.Grid.MaeEdges], [.. g.Grid.ResultEdges], [.. g.Grid.Counts.Select(row => (IReadOnlyList<int>)[.. row])], g.Grid.BelowCount, g.Grid.AboveCount),
+            g.Mfe is null ? null : new MfeHistogramView([.. g.Mfe.Edges], [.. g.Mfe.Counts], g.Mfe.AboveCount),
+            [.. g.ReachedMfe.Select(l => new ReachedMfeView(l.AtR, l.Count, l.Share))],
+            GroupEvidence(g.Evidence)))],
+        Evidence(answer.Evidence, report));
+
     public static InsightsView Insights(IReadOnlyList<Insight> insights, LoadedReport report) => new(
         [.. insights.Select(i => new InsightView(KindName(i.Kind), ReportNames.Name(i.State), i.Text, [.. i.Cells]))],
         Evidence(report.Population.Evidence, report));

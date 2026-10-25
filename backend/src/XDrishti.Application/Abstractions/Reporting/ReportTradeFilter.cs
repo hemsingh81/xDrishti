@@ -20,6 +20,9 @@ public sealed record ReportTradeFilter(
     DateOnly? From,
     DateOnly? To)
 {
+    /// <summary>Also read the excursions, the exit reason and the entry minute of each trade (a few columns more per trade); false for the reports that do not use them.</summary>
+    public bool WithExcursions { get; init; }
+
     /// <summary>No filter at all.</summary>
     public static ReportTradeFilter None { get; } = new([], [], [], [], [], null, null);
 

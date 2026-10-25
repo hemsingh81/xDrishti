@@ -396,6 +396,42 @@ public sealed class ReportPopulation
         return Result.Success(new ReportDistribution(binWidthR, new ValueList<ReportDimension>(dimensions), new ValueList<ReportDistributionGroup>(groups), bucketed.Value.NonAdditive, Evidence));
     }
 
+    /// <summary>
+    /// The excursions (MAE by result grid, MFE histogram, levels reached, p90 of the MAE of winners) of every group of the dimensions, as counts. A group below the minimum sample or with a coordinate no run recorded carries only the reason.
+    /// </summary>
+    /// <param name="dimensions">The dimensions; empty is the whole population as one group.</param>
+    /// <param name="maxGroups">The most groups the caller will take; refused at the first group past it.</param>
+    public Result<ReportMaeMfe> MaeMfe(IReadOnlyList<ReportDimension> dimensions, int maxGroups = int.MaxValue)
+    {
+        var bucketed = Bucketise(dimensions, maxGroups);
+        if (bucketed.IsFailure)
+        {
+            return Result.Failure<ReportMaeMfe>(bucketed.Error);
+        }
+
+        var groups = new List<ReportMaeMfeGroup>(bucketed.Value.Buckets.Count);
+        foreach (var bucket in bucketed.Value.Buckets)
+        {
+            var (nonValue, evidence) = SeriesState(bucket);
+            if (nonValue is not null)
+            {
+                groups.Add(new ReportMaeMfeGroup(bucket.Key, bucket.Rows.Count, 0, nonValue, null, null, new ValueList<ReachedLevel>([]), evidence));
+                continue;
+            }
+
+            var (grid, mfe, reached, n, p90) = MaeMfeBuilder.Build(bucket.Rows, Options.MinWins);
+            if (n == 0)
+            {
+                groups.Add(new ReportMaeMfeGroup(bucket.Key, bucket.Rows.Count, 0, Metric.Unavailable("no excursion is recorded for these trades"), null, null, new ValueList<ReachedLevel>([]), evidence));
+                continue;
+            }
+
+            groups.Add(new ReportMaeMfeGroup(bucket.Key, bucket.Rows.Count, n, p90, grid, mfe, reached, evidence));
+        }
+
+        return Result.Success(new ReportMaeMfe(new ValueList<ReportDimension>(dimensions), new ValueList<ReportMaeMfeGroup>(groups), bucketed.Value.NonAdditive, Evidence));
+    }
+
     /// <summary>A slice of the trades of the population in the order of the exits (date, run key, trade key), each once, with the figures a screen lists. An offset past the end gives an empty slice.</summary>
     /// <param name="offset">How many trades to skip.</param>
     /// <param name="count">How many to return at most.</param>
@@ -760,8 +796,14 @@ public sealed class ReportPopulation
         ReportDimension.Exit => row.Exit,
         ReportDimension.Month => Month(row.Trade.EntryDate, months),
         ReportDimension.Weekday => GroupMath.WeekdayOf(row.Trade.EntryDate),
+        ReportDimension.Sector => row.Trade.Sector,
+        ReportDimension.Hour => HourOf(row),
         _ => throw new ArgumentOutOfRangeException(nameof(dimension)),
     };
+
+    /// <summary>The entry hour (two digits) of an intraday trade; a swing or unlabelled run, or an entry with no recorded minute, has none.</summary>
+    private static string? HourOf(ReportRow row) =>
+        row.Style == "intraday" && row.Trade.EntryMinuteIst is { } minute ? (minute / 60).ToString("D2", CultureInfo.InvariantCulture) : null;
 
     private static string Month(DateOnly date, Dictionary<int, string> months)
     {

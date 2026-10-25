@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Reporting;
 using XDrishti.Domain.Common;
@@ -8,8 +9,17 @@ using XDrishti.Domain.Reporting;
 namespace XDrishti.Application.Tests.Reporting;
 
 /// <summary>A report world for the handler tests: stored runs and trades in memory behind the ports, the owner's stored confirmation as a field, and the loader built over them. The fake source applies the same filters a store does.</summary>
-internal sealed class ReportWorld : IReportTradeSource, IChargeSheetConfirmationSource
+internal sealed class ReportWorld : IReportTradeSource, IChargeSheetConfirmationSource, IHoldingClassifications
 {
+    /// <summary>The sector of each instrument in the master.</summary>
+    public Dictionary<Guid, string> Sectors { get; } = [];
+
+    public ValueTask<IReadOnlyDictionary<Guid, string>> SectorsAsync(IReadOnlyCollection<Guid> instrumentIds, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyDictionary<Guid, string>>(Sectors);
+
+    public ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<BasketRef>>> BasketsAsync(IReadOnlyCollection<Guid> instrumentIds, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyDictionary<Guid, IReadOnlyList<BasketRef>>>(new Dictionary<Guid, IReadOnlyList<BasketRef>>());
+
     public static readonly DateOnly Day0 = new(2026, 1, 5);
 
     public static readonly DateTimeOffset T0 = new(2026, 10, 20, 9, 0, 0, TimeSpan.Zero);
@@ -26,7 +36,7 @@ internal sealed class ReportWorld : IReportTradeSource, IChargeSheetConfirmation
     /// <summary>The one gate of the world: loaders made by <see cref="Loader"/> share it, as the scoped loaders of the host share the singleton.</summary>
     public ReportGate Gate { get; } = new();
 
-    public ReportLoader Loader => new(this, this, Gate, new FakeTimeProvider(T0), NullLogger<ReportLoader>.Instance);
+    public ReportLoader Loader => new(this, this, this, Gate, new FakeTimeProvider(T0), NullLogger<ReportLoader>.Instance);
 
     /// <summary>A stand-in for the hash of the rates of a sheet: stable per name, 64 lower-case hex characters.</summary>
     public static string Rates(string sheet) => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(sheet)));

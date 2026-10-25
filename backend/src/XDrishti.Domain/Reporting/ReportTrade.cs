@@ -19,6 +19,11 @@ namespace XDrishti.Domain.Reporting;
 /// <param name="RGross">R from the filled prices.</param>
 /// <param name="RNet">R net of charges; null for a gross trade.</param>
 /// <param name="SessionsHeld">Sessions from the entry to the exit, both included.</param>
+/// <param name="MaeR">Maximum adverse excursion in R (never below 0); null when not recorded.</param>
+/// <param name="MfeR">Maximum favourable excursion in R; null when not recorded.</param>
+/// <param name="EntryMinuteIst">Minutes after midnight, India time, of the entry fill; null when not recorded.</param>
+/// <param name="ExitReason">Why the trade closed (the stored reason); null when not recorded.</param>
+/// <param name="Sector">The sector of the instrument as of the read (not as of the trade); null when the master has none.</param>
 public sealed record ReportTrade(
     string RunKey,
     string TradeKey,
@@ -32,4 +37,9 @@ public sealed record ReportTrade(
     DateOnly ExitDate,
     double RGross,
     double? RNet,
-    int SessionsHeld);
+    int SessionsHeld,
+    double? MaeR = null,
+    double? MfeR = null,
+    int? EntryMinuteIst = null,
+    string? ExitReason = null,
+    string? Sector = null);
