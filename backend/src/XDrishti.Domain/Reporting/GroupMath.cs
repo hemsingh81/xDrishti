@@ -133,13 +133,44 @@ internal static class GroupMath
         return Wrap(key, n, wins, m => values[m], priors, evidence);
     }
 
-    public static EvidenceBlock EvidenceOf(IReadOnlyList<ReportRow> rows, ReportBasis basis) => new(
-        rows.Count,
-        rows.Count == 0 ? null : rows.Min(r => r.Trade.EntryDate),
-        rows.Count == 0 ? null : rows.Max(r => r.Trade.ExitDate),
-        basis,
-        rows.Any(r => r.Provisional),
-        new ValueList<string>(rows.Select(r => r.Trade.RunKey).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)));
+    /// <summary>The evidence block of some rows in one pass (a 500,000-trade population is walked once, not once per figure).</summary>
+    public static EvidenceBlock EvidenceOf(IReadOnlyList<ReportRow> rows, ReportBasis basis)
+    {
+        DateOnly first = default;
+        DateOnly last = default;
+        var provisional = false;
+        var runs = new HashSet<string>(StringComparer.Ordinal);
+        string? lastRun = null;
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            var trade = row.Trade;
+            if (i == 0 || trade.EntryDate < first)
+            {
+                first = trade.EntryDate;
+            }
+
+            if (i == 0 || trade.ExitDate > last)
+            {
+                last = trade.ExitDate;
+            }
+
+            provisional |= row.Provisional;
+            if (!ReferenceEquals(lastRun, trade.RunKey))
+            {
+                lastRun = trade.RunKey;
+                runs.Add(trade.RunKey);
+            }
+        }
+
+        return new EvidenceBlock(
+            rows.Count,
+            rows.Count == 0 ? null : first,
+            rows.Count == 0 ? null : last,
+            basis,
+            provisional,
+            new ValueList<string>(runs.Order(StringComparer.Ordinal)));
+    }
 
     private static ReportGroup Wrap(GroupKey key, int n, int wins, Func<ReportMetric, Metric> metric, GroupPriors? priors, EvidenceBlock evidence) => new(
         key,

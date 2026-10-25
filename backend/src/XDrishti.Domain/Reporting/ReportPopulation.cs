@@ -106,10 +106,18 @@ public sealed class ReportPopulation
             }
         }
 
-        var kept = new List<ReportTrade>(trades.Count);
+        // sorted once by run key, trade key and timeframe (a total order: the input order does not matter); a plain array sort, since this is the one place a 500,000-trade population is sorted twice
+        var sorted = new ReportTrade[trades.Count];
+        for (var i = 0; i < sorted.Length; i++)
+        {
+            sorted[i] = trades[i] ?? throw new ArgumentException("A trade is null.", nameof(trades));
+        }
+
+        Array.Sort(sorted, CompareByKey);
+        var kept = new List<ReportTrade>(sorted.Length);
         var dropped = 0;
         ReportTrade? previous = null;
-        foreach (var trade in trades.OrderBy(t => t.RunKey, StringComparer.Ordinal).ThenBy(t => t.TradeKey, StringComparer.Ordinal))
+        foreach (var trade in sorted)
         {
             var bad = TradeProblem(trade, byKey);
             if (bad is not null)
@@ -149,16 +157,22 @@ public sealed class ReportPopulation
             return Fail(signalError);
         }
 
-        var rows = kept
-            .Select(t =>
+        var rows = new ReportRow[kept.Count];
+        ReportRun? current = null;
+        string? lastKey = null;
+        for (var i = 0; i < rows.Length; i++)
+        {
+            var t = kept[i];
+            if (current is null || !ReferenceEquals(lastKey, t.RunKey))
             {
-                var run = byKey[t.RunKey];
-                return new ReportRow(t, run.Style, run.Exit, options.Basis == ReportBasis.Net ? t.RNet!.Value : t.RGross, run.Provisional);
-            })
-            .OrderBy(r => r.Trade.ExitDate)
-            .ThenBy(r => r.Trade.RunKey, StringComparer.Ordinal)
-            .ThenBy(r => r.Trade.TradeKey, StringComparer.Ordinal)
-            .ToList();
+                current = byKey[t.RunKey];
+                lastKey = t.RunKey;
+            }
+
+            rows[i] = new ReportRow(t, current.Style, current.Exit, options.Basis == ReportBasis.Net ? t.RNet!.Value : t.RGross, current.Provisional);
+        }
+
+        Array.Sort(rows, CompareByExit);
 
         var population = GroupMath.EvidenceOf(rows, options.Basis);
         population = population with { RunKeys = new ValueList<string>(sortedRuns.Select(r => r.RunKey)), Provisional = sortedRuns.Any(r => r.Provisional) };
@@ -170,13 +184,15 @@ public sealed class ReportPopulation
 
     /// <summary>Groups the trades by the dimensions, in order. A trade is in exactly one group, except under the basket dimension where it is in one per basket (then <see cref="ReportGrouping.NonAdditive"/> says so). Refused when a dimension has no data or when the grouping would add one signal once per label.</summary>
     /// <param name="dimensions">The dimensions; empty is the whole population as one group.</param>
-    public Result<ReportGrouping> GroupBy(IReadOnlyList<ReportDimension> dimensions) => GroupAtMinimum(dimensions, Options.Stats.MinTrades);
+    /// <param name="maxGroups">The most groups the caller will take; the pass over the trades stops at the first group past it and refuses, before any figure is built.</param>
+    public Result<ReportGrouping> GroupBy(IReadOnlyList<ReportDimension> dimensions, int maxGroups = int.MaxValue) => GroupAtMinimum(dimensions, Options.Stats.MinTrades, maxGroups);
 
     /// <summary>A pivot of two different dimensions by one figure. Cells with no trade are empty and cells below the minimum are masked, never zero.</summary>
     /// <param name="rows">The row dimension.</param>
     /// <param name="columns">The column dimension.</param>
     /// <param name="metric">The figure.</param>
-    public Result<ReportPivot> Pivot(ReportDimension rows, ReportDimension columns, ReportMetric metric)
+    /// <param name="maxCells">The most cells (rows times columns) the caller will take; refused before any figure or cell is built when the pass over the trades finds more non-empty cells than that, or the grid itself would be larger.</param>
+    public Result<ReportPivot> Pivot(ReportDimension rows, ReportDimension columns, ReportMetric metric, int maxCells = int.MaxValue)
     {
         if (rows == columns)
         {
@@ -188,7 +204,7 @@ public sealed class ReportPopulation
             return Result.Failure<ReportPivot>(ReportErrors.Invalid("Unknown figure."));
         }
 
-        var grouped = GroupBy([rows, columns]);
+        var grouped = GroupBy([rows, columns], maxCells);
         if (grouped.IsFailure)
         {
             return Result.Failure<ReportPivot>(grouped.Error);
@@ -197,6 +213,11 @@ public sealed class ReportPopulation
         var grouping = grouped.Value;
         var rowValues = grouping.Groups.Select(g => g.Key.Parts[0].Value).Distinct().OrderBy(v => v, Comparer<string?>.Create((a, b) => GroupMath.CompareValues(rows, a, b))).ToList();
         var columnValues = grouping.Groups.Select(g => g.Key.Parts[1].Value).Distinct().OrderBy(v => v, Comparer<string?>.Create((a, b) => GroupMath.CompareValues(columns, a, b))).ToList();
+        if ((long)rowValues.Count * columnValues.Count > maxCells)
+        {
+            return Result.Failure<ReportPivot>(ReportErrors.TooManyGroups((long)rowValues.Count * columnValues.Count, maxCells, "cells"));
+        }
+
         var index = grouping.Groups.ToDictionary(g => (g.Key.Parts[0].Value, g.Key.Parts[1].Value));
         var cells = new List<PivotCell>(rowValues.Count * columnValues.Count);
         foreach (var r in rowValues)
@@ -217,7 +238,8 @@ public sealed class ReportPopulation
     /// the others follow with the reason. When none qualifies the answer says so with the counts. A dimension no run or trade recorded (the exit, the basket) is left out of the default cell and named in the answer.
     /// </summary>
     /// <param name="dimensions">The dimensions of a cell, or null for the default.</param>
-    public Result<WhatWorks> FindWhatWorks(IReadOnlyList<ReportDimension>? dimensions = null)
+    /// <param name="maxCells">The most cells the caller will take; refused at the first cell past it, before any figure is built.</param>
+    public Result<WhatWorks> FindWhatWorks(IReadOnlyList<ReportDimension>? dimensions = null, int maxCells = int.MaxValue)
     {
         var left = new List<string>();
         List<ReportDimension> dims;
@@ -253,7 +275,7 @@ public sealed class ReportPopulation
             dims = [.. dimensions];
         }
 
-        var grouped = GroupBy(dims);
+        var grouped = GroupBy(dims, maxCells);
         if (grouped.IsFailure)
         {
             return Result.Failure<WhatWorks>(grouped.Error);
@@ -265,19 +287,193 @@ public sealed class ReportPopulation
     /// <summary>The auto-insights of doc 15 section 6, always the same eight in the same order; each states a figure only when every group it compares has the minimum number of trades.</summary>
     public IReadOnlyList<Insight> Insights() => InsightBuilder.Build(this);
 
-    internal Result<ReportGrouping> GroupAtMinimum(IReadOnlyList<ReportDimension> dimensions, int minTrades)
+    /// <summary>
+    /// The equity curve (running R and its drawdown from the running peak, one point per exit date in the order of the exits) of every group of the dimensions, empty for the whole population. A group below the minimum sample or with a coordinate no run recorded
+    /// has no points: its total is <see cref="MetricState.Insufficient"/> or <see cref="MetricState.Unavailable"/>, never a flat line.
+    /// </summary>
+    /// <param name="dimensions">The dimensions; empty is the whole population as one series.</param>
+    /// <param name="maxGroups">The most curves the caller will take; refused at the first group past it, before any point is built.</param>
+    public Result<ReportEquity> Equity(IReadOnlyList<ReportDimension> dimensions, int maxGroups = int.MaxValue)
+    {
+        var bucketed = Bucketise(dimensions, maxGroups);
+        if (bucketed.IsFailure)
+        {
+            return Result.Failure<ReportEquity>(bucketed.Error);
+        }
+
+        var series = new List<ReportEquitySeries>(bucketed.Value.Buckets.Count);
+        foreach (var bucket in bucketed.Value.Buckets)
+        {
+            var (nonValue, evidence) = SeriesState(bucket);
+            if (nonValue is not null)
+            {
+                series.Add(new ReportEquitySeries(bucket.Key, bucket.Rows.Count, nonValue, new ValueList<EquityPoint>([]), evidence));
+                continue;
+            }
+
+            var points = new List<EquityPoint>();
+            double running = 0;
+            double peak = 0;
+            foreach (var row in bucket.Rows)
+            {
+                running += row.R;
+                peak = Math.Max(peak, running);
+                var drawdown = peak - running;
+                if (points.Count > 0 && points[^1].Date == row.Trade.ExitDate)
+                {
+                    // the point of a date carries the running R at the end of the date and the deepest fall reached during it, so the deepest point of the curve is the maximum drawdown of the group whatever the order within a date
+                    points[^1] = new EquityPoint(row.Trade.ExitDate, running, Math.Max(points[^1].DrawdownR, drawdown), points[^1].Trades + 1);
+                }
+                else
+                {
+                    points.Add(new EquityPoint(row.Trade.ExitDate, running, drawdown, 1));
+                }
+            }
+
+            var total = Metric.Of(running);
+            series.Add(new ReportEquitySeries(bucket.Key, bucket.Rows.Count, evidence.Provisional ? total.AsProvisional(ProvisionalReason(bucket.Rows)) : total, new ValueList<EquityPoint>(points), evidence));
+        }
+
+        return Result.Success(new ReportEquity(new ValueList<ReportDimension>(dimensions), new ValueList<ReportEquitySeries>(series), bucketed.Value.NonAdditive, Evidence));
+    }
+
+    /// <summary>
+    /// The distribution of R (the count of trades in each bin of <paramref name="binWidthR"/>, from <see cref="DistributionLowerR"/> to <see cref="DistributionUpperR"/> with an open bin below and above) of every group of the dimensions. A group below the minimum
+    /// sample or with a coordinate no run recorded has no bins; its mean is <see cref="MetricState.Insufficient"/> or <see cref="MetricState.Unavailable"/>.
+    /// </summary>
+    /// <param name="dimensions">The dimensions; empty is the whole population as one group.</param>
+    /// <param name="binWidthR">The width of a bin in R, 0.1 to 5.</param>
+    /// <param name="maxGroups">The most distributions the caller will take; refused at the first group past it, before any bin is built.</param>
+    public Result<ReportDistribution> Distribution(IReadOnlyList<ReportDimension> dimensions, double binWidthR, int maxGroups = int.MaxValue)
+    {
+        if (!double.IsFinite(binWidthR) || binWidthR is < 0.1 or > 5)
+        {
+            return Fail<ReportDistribution>(ReportErrors.Invalid("The bin width is 0.1 to 5 R."));
+        }
+
+        var bucketed = Bucketise(dimensions, maxGroups);
+        if (bucketed.IsFailure)
+        {
+            return Result.Failure<ReportDistribution>(bucketed.Error);
+        }
+
+        var edges = new List<double>();
+        for (var i = 0; DistributionLowerR + (i * binWidthR) < DistributionUpperR - 1e-9; i++)
+        {
+            edges.Add(DistributionLowerR + (i * binWidthR));
+        }
+
+        edges.Add(edges[^1] + binWidthR);
+        var groups = new List<ReportDistributionGroup>(bucketed.Value.Buckets.Count);
+        foreach (var bucket in bucketed.Value.Buckets)
+        {
+            var (nonValue, evidence) = SeriesState(bucket);
+            if (nonValue is not null)
+            {
+                groups.Add(new ReportDistributionGroup(bucket.Key, bucket.Rows.Count, nonValue, new ValueList<DistributionBin>([]), evidence));
+                continue;
+            }
+
+            var counts = new int[edges.Count + 1];
+            double sum = 0;
+            foreach (var row in bucket.Rows)
+            {
+                sum += row.R;
+                var index = row.R < edges[0] ? 0 : (int)Math.Floor((row.R - edges[0]) / binWidthR) + 1;
+                counts[Math.Min(index, edges.Count)]++;
+            }
+
+            var bins = new List<DistributionBin>(counts.Length);
+            for (var i = 0; i < counts.Length; i++)
+            {
+                bins.Add(new DistributionBin(i == 0 ? null : edges[i - 1], i == counts.Length - 1 ? null : edges[i], counts[i]));
+            }
+
+            var mean = Metric.Of(sum / bucket.Rows.Count);
+            groups.Add(new ReportDistributionGroup(bucket.Key, bucket.Rows.Count, evidence.Provisional ? mean.AsProvisional(ProvisionalReason(bucket.Rows)) : mean, new ValueList<DistributionBin>(bins), evidence));
+        }
+
+        return Result.Success(new ReportDistribution(binWidthR, new ValueList<ReportDimension>(dimensions), new ValueList<ReportDistributionGroup>(groups), bucketed.Value.NonAdditive, Evidence));
+    }
+
+    /// <summary>A slice of the trades of the population in the order of the exits (date, run key, trade key), each once, with the figures a screen lists. An offset past the end gives an empty slice.</summary>
+    /// <param name="offset">How many trades to skip.</param>
+    /// <param name="count">How many to return at most.</param>
+    public IReadOnlyList<ReportTradeLine> Trades(int offset, int count)
+    {
+        if (offset < 0 || count < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(offset), "The offset and the count are not negative.");
+        }
+
+        var end = (int)Math.Min((long)offset + count, _rows.Count);
+        var lines = new List<ReportTradeLine>(Math.Max(0, end - offset));
+        for (var i = offset; i < end; i++)
+        {
+            var row = _rows[i];
+            var t = row.Trade;
+            lines.Add(new ReportTradeLine(t.RunKey, t.TradeKey, t.Strategy, t.Timeframe, t.Side, t.Symbol, t.BasketIds, t.EntryDate, t.ExitDate, row.R, t.SessionsHeld, row.Style, row.Exit, row.Provisional));
+        }
+
+        return lines.AsReadOnly();
+    }
+
+    /// <summary>The lower edge of the distribution in R; trades below it are in the open bin.</summary>
+    public const double DistributionLowerR = -4;
+
+    /// <summary>The upper edge of the distribution in R; trades at or above it are in the open bin.</summary>
+    public const double DistributionUpperR = 6;
+
+    private (Metric? NonValue, EvidenceBlock Evidence) SeriesState(Bucket bucket)
+    {
+        var evidence = GroupMath.EvidenceOf(bucket.Rows, Options.Basis);
+        var missing = bucket.Key.Parts.Where(p => p.Value is null).Select(p => p.Dimension).ToList();
+        if (missing.Count > 0)
+        {
+            var runs = string.Join(", ", bucket.Rows.Select(r => r.Trade.RunKey).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
+            return (Metric.Unavailable($"{string.Join(" and ", missing.Select(d => d.ToString().ToLowerInvariant()))} not recorded for run {runs}"), evidence);
+        }
+
+        var n = bucket.Rows.Count;
+        return n < Options.Stats.MinTrades
+            ? (Metric.Insufficient(string.Create(CultureInfo.InvariantCulture, $"{n} {(n == 1 ? "trade" : "trades")}, at least {Options.Stats.MinTrades} needed")), evidence)
+            : (null, evidence);
+    }
+
+    private static string ProvisionalReason(List<ReportRow> rows) =>
+        "rests on a provisional run: " + string.Join(", ", rows.Where(r => r.Provisional).Select(r => r.Trade.RunKey).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
+
+    internal Result<ReportGrouping> GroupAtMinimum(IReadOnlyList<ReportDimension> dimensions, int minTrades, int maxGroups = int.MaxValue)
+    {
+        var bucketed = Bucketise(dimensions, maxGroups);
+        if (bucketed.IsFailure)
+        {
+            return Result.Failure<ReportGrouping>(bucketed.Error);
+        }
+
+        var groups = new List<ReportGroup>(bucketed.Value.Buckets.Count);
+        foreach (var bucket in bucketed.Value.Buckets)
+        {
+            groups.Add(GroupMath.Build(bucket.Key, bucket.Rows, PriorsFor(bucket.Key, bucket.Rows[0]), Options, minTrades));
+        }
+
+        return Result.Success(new ReportGrouping(new ValueList<ReportDimension>(dimensions), new ValueList<ReportGroup>(groups), bucketed.Value.NonAdditive, Evidence));
+    }
+
+    /// <summary>One pass over the trades into buckets, one per combination of the dimensions' values (the basket dimension puts a trade into one bucket per basket), in the fixed order of the keys.</summary>
+    private Result<Bucketed> Bucketise(IReadOnlyList<ReportDimension> dimensions, int maxBuckets = int.MaxValue)
     {
         ArgumentNullException.ThrowIfNull(dimensions);
         if (dimensions.Distinct().Count() != dimensions.Count || dimensions.Any(d => !Enum.IsDefined(d)))
         {
-            return Fail<ReportGrouping>(ReportErrors.Invalid("The dimensions are repeated or unknown."));
+            return Fail<Bucketed>(ReportErrors.Invalid("The dimensions are repeated or unknown."));
         }
 
         foreach (var dimension in dimensions)
         {
             if (dimension is ReportDimension.Regime or ReportDimension.Account)
             {
-                return Fail<ReportGrouping>(ReportErrors.DimensionUnavailable(dimension));
+                return Fail<Bucketed>(ReportErrors.DimensionUnavailable(dimension));
             }
         }
 
@@ -294,7 +490,7 @@ public sealed class ReportPopulation
 
         if (required.Count > 0)
         {
-            return Fail<ReportGrouping>(ReportErrors.DoubleCount(required));
+            return Fail<Bucketed>(ReportErrors.DoubleCount(required));
         }
 
         // one pass, no LINQ and no string per trade: every dimension but the basket has one value per trade; a trade in several baskets is added once under each
@@ -312,6 +508,12 @@ public sealed class ReportPopulation
         var nonAdditive = false;
         foreach (var row in _rows)
         {
+            // the work is bounded, not only the answer: the pass stops at the first group past the cap, before a figure, a point or a bin is built
+            if (bucketer.Count > maxBuckets)
+            {
+                return Fail<Bucketed>(ReportErrors.TooManyGroups(null, maxBuckets, "groups"));
+            }
+
             for (var i = 0; i < dimensions.Count; i++)
             {
                 if (i != basketIndex)
@@ -343,14 +545,50 @@ public sealed class ReportPopulation
             }
         }
 
-        var groups = new List<ReportGroup>(bucketer.Count);
-        foreach (var bucket in bucketer.Buckets.OrderBy(b => b.Key, Comparer<GroupKey>.Create(GroupMath.CompareKeys)))
+        if (bucketer.Count > maxBuckets)
         {
-            groups.Add(GroupMath.Build(bucket.Key, bucket.Rows, PriorsFor(bucket.Key, bucket.Rows[0]), Options, minTrades));
+            return Fail<Bucketed>(ReportErrors.TooManyGroups(null, maxBuckets, "groups"));
         }
 
-        return Result.Success(new ReportGrouping(new ValueList<ReportDimension>(dimensions), new ValueList<ReportGroup>(groups), nonAdditive, Evidence));
+        var ordered = bucketer.Buckets.OrderBy(b => b.Key, Comparer<GroupKey>.Create(GroupMath.CompareKeys)).ToList();
+        return Result.Success(new Bucketed(ordered, nonAdditive));
     }
+
+    private sealed record Bucketed(List<Bucket> Buckets, bool NonAdditive);
+
+    /// <summary>Run key, trade key, then timeframe, all ordinal; the run key of the trades of one run is usually one string instance, which the equality shortcut of the reference check uses.</summary>
+    private static int CompareByKey(ReportTrade a, ReportTrade b)
+    {
+        var c = CompareRunKeys(a.RunKey, b.RunKey);
+        if (c != 0)
+        {
+            return c;
+        }
+
+        c = string.CompareOrdinal(a.TradeKey, b.TradeKey);
+        return c != 0 ? c : string.CompareOrdinal(a.Timeframe, b.Timeframe);
+    }
+
+    /// <summary>Exit date, run key, trade key, then timeframe: the order of the exits.</summary>
+    private static int CompareByExit(ReportRow a, ReportRow b)
+    {
+        var c = a.Trade.ExitDate.CompareTo(b.Trade.ExitDate);
+        if (c != 0)
+        {
+            return c;
+        }
+
+        c = CompareRunKeys(a.Trade.RunKey, b.Trade.RunKey);
+        if (c != 0)
+        {
+            return c;
+        }
+
+        c = string.CompareOrdinal(a.Trade.TradeKey, b.Trade.TradeKey);
+        return c != 0 ? c : string.CompareOrdinal(a.Trade.Timeframe, b.Trade.Timeframe);
+    }
+
+    private static int CompareRunKeys(string a, string b) => ReferenceEquals(a, b) ? 0 : string.CompareOrdinal(a, b);
 
     private static Result<T> Fail<T>(Error error) => Result.Failure<T>(error);
 
@@ -409,7 +647,24 @@ public sealed class ReportPopulation
 
     private static Error? RunOverlapOf(List<ReportRun> runs, List<ReportTrade> trades)
     {
-        var strategies = trades.GroupBy(t => t.RunKey, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Select(t => t.Strategy).ToHashSet(StringComparer.Ordinal), StringComparer.Ordinal);
+        var strategies = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        string? lastKey = null;
+        HashSet<string>? current = null;
+        foreach (var t in trades)
+        {
+            if (current is null || !ReferenceEquals(lastKey, t.RunKey))
+            {
+                lastKey = t.RunKey;
+                if (!strategies.TryGetValue(t.RunKey, out current))
+                {
+                    current = new HashSet<string>(StringComparer.Ordinal);
+                    strategies[t.RunKey] = current;
+                }
+            }
+
+            current.Add(t.Strategy);
+        }
+
         for (var i = 0; i < runs.Count; i++)
         {
             for (var j = i + 1; j < runs.Count; j++)
@@ -437,9 +692,25 @@ public sealed class ReportPopulation
 
     private static (Error? Error, bool StyleVaries, bool ExitVaries) SignalsOf(List<ReportTrade> trades, Dictionary<string, ReportRun> runs)
     {
+        // a signal can only repeat across runs (a repeat inside one run was dropped or refused above); find the ones that do without building a string per trade, and look only at those
+        var seen = new HashSet<(string, string)>(trades.Count);
+        HashSet<(string, string)>? repeated = null;
+        foreach (var t in trades)
+        {
+            if (!seen.Add((t.TradeKey, t.Timeframe)))
+            {
+                (repeated ??= []).Add((t.TradeKey, t.Timeframe));
+            }
+        }
+
         var styleVaries = false;
         var exitVaries = false;
-        foreach (var signal in trades.GroupBy(t => t.TradeKey + "\u0001" + t.Timeframe, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal))
+        if (repeated is null)
+        {
+            return (null, styleVaries, exitVaries);
+        }
+
+        foreach (var signal in trades.Where(t => repeated.Contains((t.TradeKey, t.Timeframe))).GroupBy(t => t.TradeKey + "\u0001" + t.Timeframe, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal))
         {
             var members = signal.OrderBy(t => t.RunKey, StringComparer.Ordinal).ToList();
             for (var i = 0; i < members.Count; i++)
@@ -462,7 +733,7 @@ public sealed class ReportPopulation
         return (null, styleVaries, exitVaries);
     }
 
-    private static List<string> UnavailableInputs(List<ReportRun> runs, List<ReportRow> rows)
+    private static List<string> UnavailableInputs(List<ReportRun> runs, IReadOnlyList<ReportRow> rows)
     {
         var list = new List<string>();
         list.AddRange(runs.Where(r => r.Style is null).Select(r => $"style not recorded for run {r.RunKey}"));

@@ -10,7 +10,7 @@ internal static class ReportFixtures
 {
     public static readonly DateOnly Day0 = new(2026, 1, 5);
 
-    public static readonly ChargeSheetConfirmation Confirmed = new("sheet-1", new DateOnly(2026, 10, 1));
+    public static readonly ChargeSheetConfirmation Confirmed = new("sheet-1", new string('a', 64), new DateOnly(2026, 10, 1));
 
     /// <summary>Small minimums, so a hand table of a few trades is a value: 3 trades, 1 win and 1 non-win, no prior strength.</summary>
     public static ReportOptions Small(int minTrades = 3, double strength = 0) => new() { Stats = new CellStatsOptions(PriorStrength: strength, MinTrades: minTrades), MinWins = 1, MinNonWins = 1 };

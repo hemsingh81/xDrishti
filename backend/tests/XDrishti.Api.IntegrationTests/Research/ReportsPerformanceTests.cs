@@ -1,0 +1,201 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using XDrishti.Api.IntegrationTests.Infrastructure;
+using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Reporting;
+using XDrishti.Domain.Common;
+
+namespace XDrishti.Api.IntegrationTests.Research;
+
+/// <summary>
+/// Spec P8-06, non-functional: the report endpoints are measured on a synthetic run, not assumed. A run of 20,000 trades always runs (the figures are summed by hand from the run and compared). The 500,000-trade measurement is explicit (run with the explicit
+/// filter of the runner): it stores the run in a scratch database, then takes <c>XD_REPORT_SAMPLES</c> (default 20) samples of every report, each in a scope of its own like a request, and prints the median, the 95th percentile and the largest in milliseconds. A sample is the use
+/// case plus the JSON of its answer; the HTTP hop, the session check and the network are not in it. The target of 1 s p95 is the plan's UNVERIFIED target; the result is written in ADR 0100, met or not.
+/// </summary>
+[Collection(ApiTestSuite.Name)]
+public sealed class ReportsPerformanceTests(ApiFactory factory)
+{
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    private static void Say(string line)
+    {
+        TestContext.Current.TestOutputHelper?.WriteLine(line);
+        Console.WriteLine(line);
+    }
+
+    [Fact]
+    public async Task A_run_of_20000_trades_gives_the_figures_summed_by_hand()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_report_small", Ct);
+        var run = StoredRunFixtures.Synthetic(20_000, costed: false);
+        (await StoreKit.WithStoreAsync(scratch.Host.Services, s => s.StoreAsync(StoreKit.ToStore(run), Ct).AsTask())).IsSuccess.ShouldBeTrue();
+
+        using var scope = scratch.Host.Services.CreateScope();
+        var summary = await Ok(scope.ServiceProvider.GetRequiredService<IQueryHandler<GetReportSummaryQuery, Result<SummaryView>>>().HandleAsync(new GetReportSummaryQuery(ReportQuery.Default), Ct));
+        var groups = await Ok(scope.ServiceProvider.GetRequiredService<IQueryHandler<GetReportGroupsQuery, Result<GroupsView>>>().HandleAsync(new GetReportGroupsQuery(ReportQuery.Default with { Lens = [XDrishti.Domain.Reporting.ReportDimension.Side] }), Ct));
+
+        summary.All.N.ShouldBe(run.Trades.Count);
+        summary.All.TotalR.Number!.Value.ShouldBe(run.Trades.Sum(t => t.Trade.RFilled), 1e-6);
+        summary.Evidence.DefaultRunSet.ShouldBeTrue();
+        groups.Groups.Sum(g => g.N).ShouldBe(run.Trades.Count);
+
+        // a lens with more groups than the cap is refused at the first group past it: the error cannot know the total, which shows the pass stopped
+        var refused = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetReportGroupsQuery, Result<GroupsView>>>().HandleAsync(
+            new GetReportGroupsQuery(ReportQuery.Default with { Lens = [XDrishti.Domain.Reporting.ReportDimension.Instrument, XDrishti.Domain.Reporting.ReportDimension.Month, XDrishti.Domain.Reporting.ReportDimension.Weekday] }), Ct);
+        refused.IsFailure.ShouldBeTrue();
+        refused.Error.Code.ShouldBe("reports.invalid");
+        refused.Error.Message.ShouldContain("more than 2000 groups");
+    }
+
+    [Fact(Explicit = true)]
+    public async Task A_run_of_500000_trades_is_measured_for_the_95th_percentile_of_every_report()
+    {
+        var samples = int.Parse(Environment.GetEnvironmentVariable("XD_REPORT_SAMPLES") ?? "20", CultureInfo.InvariantCulture);
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_report_p95", Ct);
+        var stored = await StoreSyntheticAsync(scratch, 500_000);
+        Say($"report-p95: {stored} trades stored; {samples} samples per report");
+
+        // the fixture is gone (a helper made it and returned a count), so what is measured is the report and nothing it does not hold
+        await MemoryAsync(scratch.Host.Services);
+        await StagesAsync(scratch.Host.Services);
+        var lens = ReportQuery.Default with { Lens = [XDrishti.Domain.Reporting.ReportDimension.Strategy, XDrishti.Domain.Reporting.ReportDimension.Side] };
+        var pivot = ReportQuery.Default with { Lens = [XDrishti.Domain.Reporting.ReportDimension.Instrument, XDrishti.Domain.Reporting.ReportDimension.Month] };
+        var cases = new (string Name, Func<IServiceProvider, Task<string>> Call)[]
+        {
+            ("summary", sp => Json(sp.GetRequiredService<IQueryHandler<GetReportSummaryQuery, Result<SummaryView>>>().HandleAsync(new GetReportSummaryQuery(ReportQuery.Default), Ct))),
+            ("groups strategy,side", sp => Json(sp.GetRequiredService<IQueryHandler<GetReportGroupsQuery, Result<GroupsView>>>().HandleAsync(new GetReportGroupsQuery(lens), Ct))),
+            ("groups month", sp => Json(sp.GetRequiredService<IQueryHandler<GetReportGroupsQuery, Result<GroupsView>>>().HandleAsync(new GetReportGroupsQuery(ReportQuery.Default with { Lens = [XDrishti.Domain.Reporting.ReportDimension.Month] }), Ct))),
+            ("pivot instrument x month", sp => Json(sp.GetRequiredService<IQueryHandler<GetReportPivotQuery, Result<PivotView>>>().HandleAsync(new GetReportPivotQuery(pivot), Ct))),
+            ("equity all", sp => Json(sp.GetRequiredService<IQueryHandler<GetReportEquityQuery, Result<EquityView>>>().HandleAsync(new GetReportEquityQuery(ReportQuery.Default), Ct))),
+            ("distribution all", sp => Json(sp.GetRequiredService<IQueryHandler<GetReportDistributionQuery, Result<DistributionView>>>().HandleAsync(new GetReportDistributionQuery(ReportQuery.Default), Ct))),
+            ("insights", sp => Json(sp.GetRequiredService<IQueryHandler<GetReportInsightsQuery, Result<InsightsView>>>().HandleAsync(new GetReportInsightsQuery(ReportQuery.Default), Ct))),
+            ("what-works", sp => Json(sp.GetRequiredService<IQueryHandler<GetReportWhatWorksQuery, Result<WhatWorksView>>>().HandleAsync(new GetReportWhatWorksQuery(ReportQuery.Default), Ct))),
+            ("trades page of 100", sp => Json(sp.GetRequiredService<IQueryHandler<PageReportTradesQuery, Result<TradesView>>>().HandleAsync(new PageReportTradesQuery(ReportQuery.Default), Ct))),
+            ("runs", sp => Json(sp.GetRequiredService<IQueryHandler<ListReportRunsQuery, Result<RunsView>>>().HandleAsync(new ListReportRunsQuery(), Ct))),
+        };
+        foreach (var (name, call) in cases)
+        {
+            using (var warm = scratch.Host.Services.CreateScope())
+            {
+                await call(warm.ServiceProvider);
+            }
+
+            var times = new List<double>();
+            long bytes = 0;
+            for (var i = 0; i < samples; i++)
+            {
+                using var scope = scratch.Host.Services.CreateScope();
+                var timer = Stopwatch.StartNew();
+                bytes = (await call(scope.ServiceProvider)).Length;
+                timer.Stop();
+                times.Add(timer.Elapsed.TotalMilliseconds);
+            }
+
+            times.Sort();
+            var p95 = times[Math.Min(times.Count - 1, (int)Math.Ceiling(times.Count * 0.95) - 1)];
+            Say(string.Create(CultureInfo.InvariantCulture, $"report-p95: {name,-26} median {times[times.Count / 2],8:F0} ms   p95 {p95,8:F0} ms   max {times[^1],8:F0} ms   answer {bytes / 1024.0,9:F1} KiB"));
+        }
+    }
+
+    private static async Task<int> StoreSyntheticAsync(ScratchDatabase scratch, int trades)
+    {
+        var run = StoredRunFixtures.Synthetic(trades, costed: false);
+        var toStore = StoreKit.ToStore(run);
+        (await StoreKit.WithStoreAsync(scratch.Host.Services, s => s.StoreAsync(toStore, Ct).AsTask())).IsSuccess.ShouldBeTrue();
+        await StoreKit.ExecuteAsync(scratch.ConnectionString, "VACUUM (ANALYZE) research.sim_trades", Ct);
+        return run.Trades.Count;
+    }
+
+    /// <summary>
+    /// The real memory of the reports, not the heap at the end of a test: the heap is collected before, then ONE request (and, second, six requests fired at once, which the gate serialises) runs while a timer samples the working set and the managed heap every 10 ms.
+    /// Printed as the peak above the idle process (working set and committed managed heap) and the bytes allocated during the request. Run with <c>DOTNET_GCHeapHardLimit</c> set to what the container allows the GC (75 % of 1 GB) to prove it fits, not only to read it.
+    /// </summary>
+    private static async Task MemoryAsync(IServiceProvider services)
+    {
+        for (var round = 0; round < 3; round++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            var baseHeap = GC.GetTotalMemory(forceFullCollection: true);
+            var baseSet = Process.GetCurrentProcess().WorkingSet64;
+            var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
+            long peakSet = baseSet;
+            long peakHeap = baseHeap;
+            using var stop = new CancellationTokenSource();
+            var sampler = Task.Run(
+                async () =>
+                {
+                    using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(10));
+                    while (await timer.WaitForNextTickAsync(stop.Token).ConfigureAwait(false))
+                    {
+                        peakSet = Math.Max(peakSet, Process.GetCurrentProcess().WorkingSet64);
+                        peakHeap = Math.Max(peakHeap, GC.GetGCMemoryInfo().TotalCommittedBytes);
+                    }
+                },
+                CancellationToken.None);
+            var started = Stopwatch.StartNew();
+            if (round < 2)
+            {
+                using var scope = services.CreateScope();
+                await Json(scope.ServiceProvider.GetRequiredService<IQueryHandler<GetReportSummaryQuery, Result<SummaryView>>>().HandleAsync(new GetReportSummaryQuery(ReportQuery.Default), Ct));
+            }
+            else
+            {
+                await Task.WhenAll(Enumerable.Range(0, 6).Select(async i =>
+                {
+                    using var scope = services.CreateScope();
+                    return i % 2 == 0
+                        ? await Json(scope.ServiceProvider.GetRequiredService<IQueryHandler<GetReportSummaryQuery, Result<SummaryView>>>().HandleAsync(new GetReportSummaryQuery(ReportQuery.Default), Ct))
+                        : await Json(scope.ServiceProvider.GetRequiredService<IQueryHandler<GetReportInsightsQuery, Result<InsightsView>>>().HandleAsync(new GetReportInsightsQuery(ReportQuery.Default), Ct));
+                }));
+            }
+
+            started.Stop();
+            await stop.CancelAsync();
+            await sampler.ContinueWith(_ => { }, TaskScheduler.Default);
+            var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
+            Say(string.Create(CultureInfo.InvariantCulture, $"report-memory: {(round == 0 ? "ONE request (warm-up, fixture residue still in the heap)" : round == 1 ? "ONE request" : "SIX requests at once")} in {started.ElapsedMilliseconds} ms: peak working set +{(peakSet - baseSet) / 1048576.0:F0} MiB, peak committed managed heap +{(peakHeap - baseHeap) / 1048576.0:F0} MiB, allocated {allocated / 1048576.0:F0} MiB (idle process {baseSet / 1048576.0:F0} MiB working set, {baseHeap / 1048576.0:F0} MiB heap)"));
+        }
+    }
+
+    /// <summary>Where one report spends its time: the list of runs, the stream of trades, the population rule, one grouping.</summary>
+    private static async Task StagesAsync(IServiceProvider services)
+    {
+        for (var round = 0; round < 3; round++)
+        {
+            using var scope = services.CreateScope();
+            var source = scope.ServiceProvider.GetRequiredService<XDrishti.Application.Abstractions.Reporting.IReportTradeSource>();
+            var timer = Stopwatch.StartNew();
+            var runs = await source.ListRunsAsync(Ct);
+            var listed = timer.Elapsed.TotalMilliseconds;
+            timer.Restart();
+            var trades = new List<XDrishti.Domain.Reporting.ReportTrade>();
+            await foreach (var trade in source.StreamTradesAsync([.. runs.Select(r => r.RunKey)], XDrishti.Application.Abstractions.Reporting.ReportTradeFilter.None, Ct))
+            {
+                trades.Add(trade);
+            }
+
+            var streamed = timer.Elapsed.TotalMilliseconds;
+            timer.Restart();
+            var population = XDrishti.Domain.Reporting.ReportPopulation.Create([.. runs.Select(r => r.ToReportRun())], trades, new XDrishti.Domain.Reporting.ReportOptions());
+            var created = timer.Elapsed.TotalMilliseconds;
+            timer.Restart();
+            var grouped = population.Value.GroupBy([]);
+            var grouping = timer.Elapsed.TotalMilliseconds;
+            grouped.IsSuccess.ShouldBeTrue();
+            Say(string.Create(CultureInfo.InvariantCulture, $"report-p95: stages round {round}: list runs {listed:F0} ms, stream {trades.Count} trades {streamed:F0} ms, population rule {created:F0} ms, one grouping {grouping:F0} ms"));
+        }
+    }
+
+    private static async Task<T> Ok<T>(ValueTask<Result<T>> call)
+    {
+        var result = await call;
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Code + ": " + result.Error.Message : string.Empty);
+        return result.Value;
+    }
+
+    private static async Task<string> Json<T>(ValueTask<Result<T>> call) => JsonSerializer.Serialize(await Ok(call), JsonSerializerOptions.Web);
+}

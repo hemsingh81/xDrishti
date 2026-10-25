@@ -9580,6 +9580,1123 @@
         }
       }
     },
+    "/api/reports/runs": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "The stored simulation runs a report may use, newest first: strategy, universe, window, costed or gross, the style and exit labels and where they come from, closed and open-at-end trades, whether the default run set takes the run (and why not), and whether net figures are possible at all (unavailable with the reason until the owner has confirmed the stored charge sheet). Takes no parameter. Read only.",
+        "operationId": "ListReportRuns",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/summary": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "The headline figures of the whole report population: trades, win rate, average win and loss R, expectancy, profit factor, total R, maximum drawdown, longest loss streak, holding sessions, the shrunk win rate with its credible lower bound. Each figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) and carries a number only for a value; the evidence block says what stands behind it. Read only. Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis.",
+        "operationId": "GetReportSummary",
+        "parameters": [
+          {
+            "name": "runs",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "style",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basket",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/groups": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "The report grouped by the lens, in a fixed order (a value that was not recorded last). A trade in several baskets appears under each, so basket totals are not additive (nonAdditive says so). Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis.",
+        "operationId": "GetReportGroups",
+        "parameters": [
+          {
+            "name": "runs",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lens",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "style",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basket",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupsView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/pivot": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "A pivot of the two dimensions of the lens (rows first; exactly two) by one figure (metric, snake case, default expectancy_r): every cell of the grid, empty where no trade fell and masked (insufficient, with its count) below the minimum sample, never a zero. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis.",
+        "operationId": "GetReportPivot",
+        "parameters": [
+          {
+            "name": "runs",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lens",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "metric",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "style",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basket",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PivotView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/equity": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "The equity curve (running R at the end of each exit date) and the deepest drawdown of each date for each group of the lens. A group below the minimum sample has no curve, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis.",
+        "operationId": "GetReportEquity",
+        "parameters": [
+          {
+            "name": "runs",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lens",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "style",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basket",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquityView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/distribution": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "The distribution of R of each group of the lens in bins of half an R from -4 R to 6 R with an open bin at each end. A group below the minimum sample has no bins, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis.",
+        "operationId": "GetReportDistribution",
+        "parameters": [
+          {
+            "name": "runs",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lens",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "style",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basket",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistributionView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/insights": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "The eight auto-insights (best and weakest strategy, basket gap, side bias, best exit, weekday, regime, calibration) as fixed sentences. A figure is stated only when every group compared has at least 15 trades; otherwise the insight says why it states nothing. The insights compare fixed groupings, so there is no lens. Read only. Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis.",
+        "operationId": "GetReportInsights",
+        "parameters": [
+          {
+            "name": "runs",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "style",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basket",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightsView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/what-works": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "What works, in which basket, on which timeframe, with which exit: the cells (the dimensions of the lens, or basket, strategy, timeframe, side and exit by default) ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and the answer 'nothing has enough evidence yet' when no cell qualifies (a 200, not an error). Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis.",
+        "operationId": "GetReportWhatWorks",
+        "parameters": [
+          {
+            "name": "runs",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lens",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "style",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basket",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatWorksView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/trades": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "A page of the closed trades the report counts, in the order of the exits (limit 1 to 1,000, default 100; cursor from the previous page, which belongs to that report and is refused for another): the very set the figures were computed from, open-at-end trades excluded. Every page recomputes the population. There is no lens. Read only. Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis.",
+        "operationId": "ListReportTrades",
+        "parameters": [
+          {
+            "name": "runs",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "style",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "basket",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradesView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/autonomy/settings": {
       "get": {
         "tags": [
@@ -15811,6 +16928,123 @@
         },
         "description": "The weekly digest as the API and the verb show it."
       },
+      "DistributionBinView": {
+        "required": [
+          "lowerR",
+          "upperR",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "lowerR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The lower edge; null for the open bin below the range.",
+            "format": "double"
+          },
+          "upperR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The upper edge; null for the open bin above the range.",
+            "format": "double"
+          },
+          "count": {
+            "type": "integer",
+            "description": "Trades in the bin.",
+            "format": "int32"
+          }
+        },
+        "description": "One bin of an R distribution: trades with R from LowerR (included) to UpperR (excluded); a null edge is open."
+      },
+      "DistributionGroupView": {
+        "required": [
+          "key",
+          "parts",
+          "n",
+          "meanR",
+          "bins",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The coordinates as text."
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupPartView"
+            },
+            "description": "The coordinates."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Trades in the group.",
+            "format": "int32"
+          },
+          "meanR": {
+            "description": "The mean R, or the reason there is no distribution.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "bins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DistributionBinView"
+            },
+            "description": "The bins in order, the open bin below first and the open bin above last."
+          },
+          "evidence": {
+            "description": "The evidence of the group.",
+            "$ref": "#/components/schemas/GroupEvidenceView"
+          }
+        },
+        "description": "The R distribution of one group. The bins exist only when MetricView DistributionGroupView.MeanR is a value or provisional; otherwise it holds the reason there are none."
+      },
+      "DistributionView": {
+        "required": [
+          "binWidthR",
+          "dimensions",
+          "nonAdditive",
+          "groups",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "binWidthR": {
+            "type": "number",
+            "description": "The width of a bin in R.",
+            "format": "double"
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The dimensions grouped by."
+          },
+          "nonAdditive": {
+            "type": "boolean",
+            "description": "A trade is in more than one group."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DistributionGroupView"
+            },
+            "description": "The distributions."
+          },
+          "evidence": {
+            "description": "The evidence of the report.",
+            "$ref": "#/components/schemas/ReportEvidenceView"
+          }
+        },
+        "description": "The R distributions of a report for a lens, one per group, with the evidence of the report."
+      },
       "DividendBadRow": {
         "required": [
           "line",
@@ -16941,6 +18175,117 @@
         },
         "description": "An automatic (scheduled) run as the Data screen shows it. `status`: running · succeeded · failed · skipped; `message` is the reason a run failed or was skipped\n(for example the Data account was not connected). `trigger` is always `daily` here."
       },
+      "EquityPointView": {
+        "required": [
+          "date",
+          "cumulativeR",
+          "drawdownR",
+          "trades"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "The India date of the exits.",
+            "format": "date"
+          },
+          "cumulativeR": {
+            "type": "number",
+            "description": "The running R.",
+            "format": "double"
+          },
+          "drawdownR": {
+            "type": "number",
+            "description": "The running peak minus the running R.",
+            "format": "double"
+          },
+          "trades": {
+            "type": "integer",
+            "description": "Trades that exited on the date.",
+            "format": "int32"
+          }
+        },
+        "description": "One point of an equity curve: the running R after the exits of a date and its fall from the running peak."
+      },
+      "EquitySeriesView": {
+        "required": [
+          "key",
+          "parts",
+          "n",
+          "totalR",
+          "points",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The coordinates as text."
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupPartView"
+            },
+            "description": "The coordinates."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Trades in the group.",
+            "format": "int32"
+          },
+          "totalR": {
+            "description": "The final running R, or the reason there is no curve.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquityPointView"
+            },
+            "description": "One point per exit date."
+          },
+          "evidence": {
+            "description": "The evidence of the group.",
+            "$ref": "#/components/schemas/GroupEvidenceView"
+          }
+        },
+        "description": "The equity curve of one group. The points exist only when MetricView EquitySeriesView.TotalR is a value or provisional; a group below the minimum sample has no curve, so no flat line can be drawn for it."
+      },
+      "EquityView": {
+        "required": [
+          "dimensions",
+          "nonAdditive",
+          "series",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The dimensions grouped by."
+          },
+          "nonAdditive": {
+            "type": "boolean",
+            "description": "A trade is in more than one curve."
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquitySeriesView"
+            },
+            "description": "The curves."
+          },
+          "evidence": {
+            "description": "The evidence of the report.",
+            "$ref": "#/components/schemas/ReportEvidenceView"
+          }
+        },
+        "description": "The equity curves of a report for a lens, one per group, with the evidence of the report. At most int EquityView.MaxSeries groups are drawn; a lens with more is refused rather than cut silently."
+      },
       "EvidenceView": {
         "required": [
           "oosTrades",
@@ -17861,6 +19206,51 @@
         },
         "description": "Two sets compared by mean R per triggered ticket (P7-13): what the second would have added or avoided."
       },
+      "GroupEvidenceView": {
+        "required": [
+          "n",
+          "firstDate",
+          "lastDate",
+          "provisional",
+          "runKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "n": {
+            "type": "integer",
+            "description": "Trades in the group.",
+            "format": "int32"
+          },
+          "firstDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Earliest entry date; null without a trade.",
+            "format": "date"
+          },
+          "lastDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Latest exit date; null without a trade.",
+            "format": "date"
+          },
+          "provisional": {
+            "type": "boolean",
+            "description": "A contributing run is marked provisional."
+          },
+          "runKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The runs behind the trades, sorted."
+          }
+        },
+        "description": "What stands behind the figures of one group: its trades, the dates they span, whether any contributing run is provisional and which runs they came from."
+      },
       "GroupPart": {
         "required": [
           "key",
@@ -17881,6 +19271,164 @@
           }
         },
         "description": "The value of the holdings of a group that fall in one part of the second dimension (an account for sectors, a sector for accounts); the parts sum to the group's value."
+      },
+      "GroupPartView": {
+        "required": [
+          "dimension",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "description": "The dimension name."
+          },
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The value; null when the run or trade did not record it."
+          }
+        },
+        "description": "One coordinate of a group: the dimension (lower case) and its value; a null value is \"not recorded\"."
+      },
+      "GroupView": {
+        "required": [
+          "key",
+          "parts",
+          "n",
+          "wins",
+          "winRate",
+          "avgWinR",
+          "avgLossR",
+          "expectancyR",
+          "profitFactor",
+          "totalR",
+          "maxDrawdownR",
+          "longestLossStreak",
+          "avgHoldingSessions",
+          "shrunkWinRate",
+          "winRateLower",
+          "shrunkExpectancyR",
+          "expectancyLowerR",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The coordinates as text, `strategy=ORB|side=BUY`; `all` for the whole population."
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupPartView"
+            },
+            "description": "The coordinates."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Trades in the group.",
+            "format": "int32"
+          },
+          "wins": {
+            "type": "integer",
+            "description": "Trades with R above 0.",
+            "format": "int32"
+          },
+          "winRate": {
+            "description": "Wins over trades.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "avgWinR": {
+            "description": "Mean R of the winners.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "avgLossR": {
+            "description": "Mean R of the losers.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "expectancyR": {
+            "description": "Mean R per trade.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "profitFactor": {
+            "description": "Winning R over absolute losing R.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "totalR": {
+            "description": "Sum of R.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "maxDrawdownR": {
+            "description": "Largest peak-to-trough fall of the running R.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "longestLossStreak": {
+            "description": "Most losing trades in a row.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "avgHoldingSessions": {
+            "description": "Mean sessions held.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "shrunkWinRate": {
+            "description": "The win rate shrunk toward its parent group.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "winRateLower": {
+            "description": "Lower end of the credible interval of the shrunk win rate.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "shrunkExpectancyR": {
+            "description": "Expectancy from the shrunk win rate and payoffs.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "expectancyLowerR": {
+            "description": "Expectancy from the lower credible win rate and the shrunk payoffs: the ranking figure.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "evidence": {
+            "description": "The evidence of the group.",
+            "$ref": "#/components/schemas/GroupEvidenceView"
+          }
+        },
+        "description": "One group of a report on the wire: who it is, its trade count and every figure as a MetricView (a number only for value or provisional), with the evidence of the group."
+      },
+      "GroupsView": {
+        "required": [
+          "dimensions",
+          "nonAdditive",
+          "groups",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The dimensions grouped by, in order."
+          },
+          "nonAdditive": {
+            "type": "boolean",
+            "description": "A trade appears in more than one group."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupView"
+            },
+            "description": "The groups."
+          },
+          "evidence": {
+            "description": "The evidence of the report.",
+            "$ref": "#/components/schemas/ReportEvidenceView"
+          }
+        },
+        "description": "The groups of a report for a lens, in a fixed order (a value that was not recorded last), with the evidence of the report. bool GroupsView.NonAdditive is true when the basket dimension put a trade into more than one group, so the groups must not be summed."
       },
       "HistoryBenchmark": {
         "required": [
@@ -19527,6 +21075,58 @@
           }
         },
         "description": "What a scope (a holding, a group, an account, the portfolio) received and paid beyond its price return (ADR 0026, P2-14). Money is rupees, percentages are percent numbers (16.1 = 16.1 %), dates are India dates. `Dividends` are the\ndividends the owner entered (not voided) and `Charges` the trade charges of the stored trades plus, for an account and the portfolio only, the ledger's costs of the account as such (DP charges, annual maintenance, delayed-payment interest ...;\nnever the costs of trades, which the trade rows already carry). `LedgerCharges` is that ledger part of `Charges` (0 when the account has none; null when the scope does not include account-level items: a holding, a bucket), so the screen can show\nthe ledger's costs apart from the charges of trades. `Unallocated` is the part of the dividends not allocated to a holding (set for an account and the portfolio only, otherwise null). `TotalReturnPct` is (realised + unrealised +\ndividends) over invested, `NetTotalReturnPct` the same minus the charges; both are null when nothing is invested or the scope has no usable price. `NetXirr` is the XIRR of the lot cash flows plus the dividends (in) and the charges (out) on\ntheir dates, with `NetXirrState` as for the gross XIRR (`ok`, `insufficient`, `n_m`, `no_data`, `no_price`).\nOnly what was entered or read is counted, and the dates say from when each source is known (null: the source has nothing for the scope): `DividendsFrom` is the first dividend the owner entered, `TradeChargesFrom` the first stored trade that\ncarries charges (trades read before charges were stored, and CSV or manual trades, carry none — so a trade without charges is \"unknown\", not \"free\"), `LedgerChargesFrom` the first ledger date stored. `ChargesFrom` is the later of\n`TradeChargesFrom` and `LedgerChargesFrom` when both exist, otherwise the one that does. `CoverageFrom` is the LATER start of the sources that exist for the scope: the date from which every kind of income that is counted at all is known, so\nthe net figures are never presented as complete from before any of their sources begins. The whole object is null when the scope has no dividend and no charge recorded."
+      },
+      "InsightView": {
+        "required": [
+          "kind",
+          "state",
+          "text",
+          "cells"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "The rule: best_strategy, weakest_strategy, basket_gap, side_bias, best_exit, weekday, regime or calibration."
+          },
+          "state": {
+            "type": "string",
+            "description": "value, insufficient, unavailable or not_evaluable."
+          },
+          "text": {
+            "type": "string",
+            "description": "The sentence."
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The keys of the cells the figures were read from."
+          }
+        },
+        "description": "One auto-insight (doc 15 section 6): a fixed-template sentence. string InsightView.State is `value` when the sentence states something; otherwise the text says why it states nothing and carries no figure."
+      },
+      "InsightsView": {
+        "required": [
+          "insights",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "insights": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InsightView"
+            },
+            "description": "The insights."
+          },
+          "evidence": {
+            "description": "The evidence of the report.",
+            "$ref": "#/components/schemas/ReportEvidenceView"
+          }
+        },
+        "description": "The eight auto-insights, always in the same order, with the evidence of the report."
       },
       "InstrumentBars": {
         "required": [
@@ -21559,6 +23159,36 @@
         },
         "description": "Every member of the basket exactly once, in the wanted order."
       },
+      "MetricView": {
+        "required": [
+          "state",
+          "number",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "One of value, provisional, insufficient, unavailable, not_evaluable, empty."
+          },
+          "number": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The number; null unless the state is value or provisional.",
+            "format": "double"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why the figure is not a plain value; null for a value."
+          }
+        },
+        "description": "One reported figure on the wire (P8-00 D3): a state and, only for `value` and `provisional`, a number. For every other state (`insufficient`, `unavailable`, `not_evaluable`, `empty`) the number is absent and the reason says why; a screen draws a word, never a digit."
+      },
       "MissingMinute": {
         "required": [
           "date",
@@ -21894,6 +23524,35 @@
         },
         "description": "Names a depository or demat file teaches: `Known` are remembered already, `New` would be remembered by an import."
       },
+      "NetBasisView": {
+        "required": [
+          "state",
+          "reason",
+          "confirmed"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "value or unavailable."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why net figures are unavailable; null when they are not."
+          },
+          "confirmed": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the owner confirmed, as text; null when nothing is confirmed."
+          }
+        },
+        "description": "Whether a net report can be made at all (P8-00 question 19): `value` when the owner's stored confirmation of the charge sheet exists, otherwise `unavailable` with the reason. The confirmation is read from storage; a request cannot supply it."
+      },
       "OfficialDailyCheck": {
         "required": [
           "status",
@@ -22192,6 +23851,98 @@
           }
         },
         "description": "One of the owner's switches."
+      },
+      "PivotCellView": {
+        "required": [
+          "row",
+          "column",
+          "n",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The row value; null when not recorded."
+          },
+          "column": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The column value; null when not recorded."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Trades in the cell.",
+            "format": "int32"
+          },
+          "value": {
+            "description": "The figure.",
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "One cell of a pivot: the trade count and one figure. A cell with no trade is `empty`, a cell below the minimum is `insufficient` (masked, with its count), never a zero."
+      },
+      "PivotView": {
+        "required": [
+          "rowDimension",
+          "columnDimension",
+          "metric",
+          "rows",
+          "columns",
+          "cells",
+          "nonAdditive",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "rowDimension": {
+            "type": "string",
+            "description": "The dimension of the rows."
+          },
+          "columnDimension": {
+            "type": "string",
+            "description": "The dimension of the columns."
+          },
+          "metric": {
+            "type": "string",
+            "description": "The figure shown (snake case)."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The row values, sorted; null is \"not recorded\" (last)."
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The column values, sorted."
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PivotCellView"
+            },
+            "description": "The cells, row by row."
+          },
+          "nonAdditive": {
+            "type": "boolean",
+            "description": "A trade appears in more than one cell."
+          },
+          "evidence": {
+            "description": "The evidence of the report.",
+            "$ref": "#/components/schemas/ReportEvidenceView"
+          }
+        },
+        "description": "A pivot of two dimensions by one figure: the row and column values and every cell of the grid, row by row, empty cells included so no gap reads as a zero."
       },
       "PlanAllocationView": {
         "required": [
@@ -24577,6 +26328,30 @@
         },
         "description": "A lower size for one account of the ticket."
       },
+      "RankedCellView": {
+        "required": [
+          "rank",
+          "group",
+          "lowerBoundPositive"
+        ],
+        "type": "object",
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "description": "1 for the best.",
+            "format": "int32"
+          },
+          "group": {
+            "description": "The cell.",
+            "$ref": "#/components/schemas/GroupView"
+          },
+          "lowerBoundPositive": {
+            "type": "boolean",
+            "description": "The lower bound of expectancy is above 0: the only reading of \"works\" the engine allows."
+          }
+        },
+        "description": "A cell with enough sample in its place in the ranking by the credible lower bound of expectancy."
+      },
       "RefreshRunView": {
         "required": [
           "id",
@@ -24818,6 +26593,105 @@
           }
         },
         "description": "What a removal did: `removed` were members, `notMembers` were not. Untracking never happens. `memberCount` = members now."
+      },
+      "ReportEvidenceView": {
+        "required": [
+          "basis",
+          "n",
+          "firstDate",
+          "lastDate",
+          "provisional",
+          "runKeys",
+          "runs",
+          "defaultRunSet",
+          "limits",
+          "unavailableInputs",
+          "duplicateTradesDropped",
+          "openAtEndLeftOut",
+          "netBasisConfirmation"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "gross or net R."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Trades in the population.",
+            "format": "int32"
+          },
+          "firstDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Earliest entry date; null without a trade.",
+            "format": "date"
+          },
+          "lastDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Latest exit date; null without a trade.",
+            "format": "date"
+          },
+          "provisional": {
+            "type": "boolean",
+            "description": "A contributing run is marked provisional."
+          },
+          "runKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The runs behind the numbers, sorted."
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunUsedView"
+            },
+            "description": "The same runs with their facts (the Data used panel)."
+          },
+          "defaultRunSet": {
+            "type": "boolean",
+            "description": "The run set was not named by the caller: the newest run of each strategy and universe."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The limits that always apply, as text."
+          },
+          "unavailableInputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Inputs a figure would need that do not exist, each with the reason."
+          },
+          "duplicateTradesDropped": {
+            "type": "integer",
+            "description": "Identical repeated records of one trade in one run, counted once.",
+            "format": "int32"
+          },
+          "openAtEndLeftOut": {
+            "type": "integer",
+            "description": "Trades still open at the end of the data in the runs used, which no report counts; counted over the whole runs from their stored headers, before any date, symbol or basket filter of the report.",
+            "format": "int32"
+          },
+          "netBasisConfirmation": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the owner confirmed, for a net report; null for a gross one."
+          }
+        },
+        "description": "The evidence block every report carries (P8-00 D1): the basis, the population, the date range, what is not available and why, the runs behind the numbers (the \"Data used\" panel) and the honest limits as fields. A screen renders these; none of this wording\nis page prose."
       },
       "ReportKpisView": {
         "required": [
@@ -25665,6 +27539,229 @@
             "$ref": "#/components/schemas/PortfolioRoleView"
           }
         }
+      },
+      "RunListItemView": {
+        "required": [
+          "runKey",
+          "strategyId",
+          "universeKind",
+          "universeLabel",
+          "windowStart",
+          "windowEnd",
+          "costed",
+          "costsSheetId",
+          "style",
+          "styleSource",
+          "exit",
+          "exitSource",
+          "closedTrades",
+          "openAtEnd",
+          "netPossible",
+          "inDefaultSet",
+          "defaultSetNote",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "runKey": {
+            "type": "string",
+            "description": "The stored run key."
+          },
+          "strategyId": {
+            "type": "string",
+            "description": "The strategy."
+          },
+          "universeKind": {
+            "type": "string",
+            "description": "How the universe was chosen (instrumentlist or basket)."
+          },
+          "universeLabel": {
+            "type": "string",
+            "description": "What the universe is, as stored."
+          },
+          "windowStart": {
+            "type": "string",
+            "description": "First India date of the run window.",
+            "format": "date"
+          },
+          "windowEnd": {
+            "type": "string",
+            "description": "Last India date of the run window.",
+            "format": "date"
+          },
+          "costed": {
+            "type": "boolean",
+            "description": "The run carries net R."
+          },
+          "costsSheetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The charge sheet id; null for a gross run."
+          },
+          "style": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The style of the stored strategy; null when not recorded."
+          },
+          "styleSource": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Where the style comes from; null when not recorded."
+          },
+          "exit": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The exit candidate of the stored comparison the run belongs to; null when not recorded."
+          },
+          "exitSource": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Where the exit comes from; null when not recorded."
+          },
+          "closedTrades": {
+            "type": "integer",
+            "description": "Closed trades the run holds.",
+            "format": "int32"
+          },
+          "openAtEnd": {
+            "type": "integer",
+            "description": "Trades still open at the end of the data, never counted.",
+            "format": "int32"
+          },
+          "netPossible": {
+            "type": "boolean",
+            "description": "A net report over this run is possible: it was costed with the very charge sheet, with the very rates, the owner confirmed."
+          },
+          "inDefaultSet": {
+            "type": "boolean",
+            "description": "The default run set takes this run."
+          },
+          "defaultSetNote": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why the default set leaves the run out; null when it takes it."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the run was stored.",
+            "format": "date-time"
+          }
+        },
+        "description": "A stored run a report may use, with whether the default run set takes it and, if not, why."
+      },
+      "RunUsedView": {
+        "required": [
+          "runKey",
+          "strategyId",
+          "universe",
+          "windowStart",
+          "windowEnd",
+          "costed",
+          "costsSheetId",
+          "style",
+          "exit",
+          "closedTrades",
+          "openAtEnd"
+        ],
+        "type": "object",
+        "properties": {
+          "runKey": {
+            "type": "string",
+            "description": "The stored run key."
+          },
+          "strategyId": {
+            "type": "string",
+            "description": "The strategy."
+          },
+          "universe": {
+            "type": "string",
+            "description": "How the universe was chosen and what it is."
+          },
+          "windowStart": {
+            "type": "string",
+            "description": "First India date of the run window.",
+            "format": "date"
+          },
+          "windowEnd": {
+            "type": "string",
+            "description": "Last India date of the run window.",
+            "format": "date"
+          },
+          "costed": {
+            "type": "boolean",
+            "description": "The run carries net R."
+          },
+          "costsSheetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The charge sheet id; null for a gross run."
+          },
+          "style": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The style label; null when not recorded."
+          },
+          "exit": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The exit label; null when not recorded."
+          },
+          "closedTrades": {
+            "type": "integer",
+            "description": "Closed trades the run holds (before the filters of the query).",
+            "format": "int32"
+          },
+          "openAtEnd": {
+            "type": "integer",
+            "description": "Trades still open at the end of the data, left out of every report.",
+            "format": "int32"
+          }
+        },
+        "description": "One run in the \"Data used\" panel of a report (P8-00 D2): the run key, what it replayed, its window, whether it was costed and the labels a report took from it."
+      },
+      "RunsView": {
+        "required": [
+          "runs",
+          "net",
+          "defaultSetRule"
+        ],
+        "type": "object",
+        "properties": {
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunListItemView"
+            },
+            "description": "The runs."
+          },
+          "net": {
+            "description": "Whether a net report can be made.",
+            "$ref": "#/components/schemas/NetBasisView"
+          },
+          "defaultSetRule": {
+            "type": "string",
+            "description": "How the default run set is chosen, as text."
+          }
+        },
+        "description": "The stored runs a report may use, newest first, and whether net figures are possible (P8-06). With no stored run the list is empty, which is an ordinary answer."
       },
       "SanityCheck": {
         "required": [
@@ -27058,6 +29155,24 @@
         },
         "description": "A suggestion in the inbox."
       },
+      "SummaryView": {
+        "required": [
+          "all",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "all": {
+            "description": "The whole population as one group.",
+            "$ref": "#/components/schemas/GroupView"
+          },
+          "evidence": {
+            "description": "The evidence of the report.",
+            "$ref": "#/components/schemas/ReportEvidenceView"
+          }
+        },
+        "description": "The headline figures of the whole population (the KPIs of doc 13 section 2) with the evidence of the report. A population below the minimum sample has no figure, only the count and the reason."
+      },
       "SweepPointView": {
         "required": [
           "param",
@@ -27914,6 +30029,97 @@
         },
         "description": "What an import did. `Batch` is null when the file had nothing new. `Imported` trades were stored, `AlreadyImported` were there already. With `Rebuilt` the lots of `HoldingsRebuilt` holdings were replaced\n(`LotsReplaced` lots removed); `Report` is the preview the owner confirmed (statuses before the rebuild)."
       },
+      "TradeLineView": {
+        "required": [
+          "runKey",
+          "tradeKey",
+          "strategy",
+          "timeframe",
+          "side",
+          "symbol",
+          "basketIds",
+          "entryDate",
+          "exitDate",
+          "r",
+          "sessionsHeld",
+          "style",
+          "exit",
+          "provisional"
+        ],
+        "type": "object",
+        "properties": {
+          "runKey": {
+            "type": "string",
+            "description": "The run it came from."
+          },
+          "tradeKey": {
+            "type": "string",
+            "description": "The stored signal key."
+          },
+          "strategy": {
+            "type": "string",
+            "description": "The strategy id."
+          },
+          "timeframe": {
+            "type": "string",
+            "description": "The timeframe code."
+          },
+          "side": {
+            "type": "string",
+            "description": "BUY or SELL."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "The symbol."
+          },
+          "basketIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The baskets the instrument was in when the run was made; empty when not recorded."
+          },
+          "entryDate": {
+            "type": "string",
+            "description": "India date of the entry.",
+            "format": "date"
+          },
+          "exitDate": {
+            "type": "string",
+            "description": "India date of the exit.",
+            "format": "date"
+          },
+          "r": {
+            "type": "number",
+            "description": "R on the basis of the report.",
+            "format": "double"
+          },
+          "sessionsHeld": {
+            "type": "integer",
+            "description": "Sessions held, both ends included.",
+            "format": "int32"
+          },
+          "style": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The run's style label; null when not recorded."
+          },
+          "exit": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The run's exit label; null when not recorded."
+          },
+          "provisional": {
+            "type": "boolean",
+            "description": "The run is marked provisional."
+          }
+        },
+        "description": "One closed trade of a report: what it was, when, and its R on the basis of the report (gross or net)."
+      },
       "TradeNotRebuilt": {
         "required": [
           "symbol",
@@ -28390,6 +30596,41 @@
         },
         "description": "A trade. `Side` is `buy` or `sell`, `Source` is `csv` or `manual`. A voided trade does not count."
       },
+      "TradesView": {
+        "required": [
+          "items",
+          "total",
+          "nextCursor",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeLineView"
+            },
+            "description": "The trades of the page."
+          },
+          "total": {
+            "type": "integer",
+            "description": "All trades the report counts.",
+            "format": "int32"
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The cursor of the next page; null at the end."
+          },
+          "evidence": {
+            "description": "The evidence of the report.",
+            "$ref": "#/components/schemas/ReportEvidenceView"
+          }
+        },
+        "description": "A page of the closed trades a report counts, in the order of the exits, with the evidence of the report. Never more than one page: the largest page is 1,000 trades."
+      },
       "TradingInput": {
         "required": [
           "mode",
@@ -28645,6 +30886,24 @@
         },
         "description": "An entry that named no instrument. `reason`: `not_found` · `ambiguous` (an ISIN of several instruments) · `invalid` (too long or with control characters)."
       },
+      "UnrankedCellView": {
+        "required": [
+          "group",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "group": {
+            "description": "The cell (its figures are non-values; only its count is a number).",
+            "$ref": "#/components/schemas/GroupView"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why it is not ranked."
+          }
+        },
+        "description": "A cell that was looked at and is not in the ranking, listed after the ranked ones with the reason, never hidden."
+      },
       "UntrackResult": {
         "required": [
           "requested",
@@ -28839,6 +31098,113 @@
         },
         "description": "A stored version in the list of a family: number, hash, parent hash, note and creation time."
       },
+      "WhatWorksView": {
+        "required": [
+          "kind",
+          "dimensions",
+          "ranked",
+          "notRanked",
+          "cellsLookedAt",
+          "cellsComparable",
+          "minTrades",
+          "requiredTrades",
+          "largestN",
+          "positiveLowerBound",
+          "expectedChancePositives",
+          "headline",
+          "selectionNote",
+          "unavailableDimensions",
+          "nonAdditive",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "ranked or nothing_qualifies."
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The dimensions a cell is made of."
+          },
+          "ranked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RankedCellView"
+            },
+            "description": "Cells with enough sample whose lower bound could be formed, best first."
+          },
+          "notRanked": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnrankedCellView"
+            },
+            "description": "Every other cell, most trades first."
+          },
+          "cellsLookedAt": {
+            "type": "integer",
+            "description": "All cells.",
+            "format": "int32"
+          },
+          "cellsComparable": {
+            "type": "integer",
+            "description": "Cells that compete: every coordinate recorded and the base minimum of trades.",
+            "format": "int32"
+          },
+          "minTrades": {
+            "type": "integer",
+            "description": "The base minimum sample.",
+            "format": "int32"
+          },
+          "requiredTrades": {
+            "type": "integer",
+            "description": "The sample a cell needs to be ranked, raised with the number of cells compared.",
+            "format": "int32"
+          },
+          "largestN": {
+            "type": "integer",
+            "description": "The most trades in any cell.",
+            "format": "int32"
+          },
+          "positiveLowerBound": {
+            "type": "integer",
+            "description": "Ranked cells with a positive lower bound.",
+            "format": "int32"
+          },
+          "expectedChancePositives": {
+            "type": "number",
+            "description": "About how many positive lower bounds chance alone gives among the ranked cells.",
+            "format": "double"
+          },
+          "headline": {
+            "type": "string",
+            "description": "The answer in one sentence."
+          },
+          "selectionNote": {
+            "type": "string",
+            "description": "The selection-effect sentence that always accompanies a ranking."
+          },
+          "unavailableDimensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Dimensions left out of the cells because nothing recorded them, with the reason."
+          },
+          "nonAdditive": {
+            "type": "boolean",
+            "description": "A trade is in more than one cell."
+          },
+          "evidence": {
+            "description": "The evidence of the report.",
+            "$ref": "#/components/schemas/ReportEvidenceView"
+          }
+        },
+        "description": "\"What works, in which basket, on which timeframe, with which exit\": the cells with enough sample ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and when no cell qualifies the answer\n`nothing_qualifies` with the counts. An answer, not an error."
+      },
       "YearView": {
         "required": [
           "year",
@@ -28947,6 +31313,9 @@
     },
     {
       "name": "Plans"
+    },
+    {
+      "name": "Reports"
     },
     {
       "name": "Autonomy"
