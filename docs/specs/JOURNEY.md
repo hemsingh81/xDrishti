@@ -18,7 +18,7 @@ Sizes are agent-days, uncalibrated estimates (earlier phases overran). Total of 
 | P11 small live | P11-00 plan, 01 manual-live fill capture, 02 execution feedback, 03 live vs paper slippage, 04 scale-up and risk ramp, 05 static IP and SEBI runbook, 06 phase check | 20 |
 | P12 execution | P12-00 plan (build order 01 to 06, then 07, 11, 08, 09, 10, 12), 01 state machine, 02 Dhan adapter and sandbox, 03 pre-trade checks, 04 broker-side stops, 05 kill switch, 06 order stream and reconciliation, 07 modes, 08 semi-auto, 09 auto-live, 10 screens, 11 daily login and static IP ops, 12 phase check | 34.5 |
 | P13 to P15 (plans) | P13-00 tick and depth (10 slices, about 23 d), P14-00 options and stat-arb (17 slices, about 44.5 d), P15-00 fundamentals and events (12 slices, about 30 d) | about 97 |
-| System baskets (BK) | BK-00 plan; BK-01 index catalogue and fetcher (SAFETY), 02 derived engine, 03 derived job (SAFETY), 04 Baskets screen cards, 05 broker flags and F&O (SAFETY) = 18 d; BK-06 profile engine, 07 profile endpoints and screen (7 d), 08 clusters and gate breadth (SAFETY), 09 relative strength, 10 vol-targeted sizing (SAFETY), 11 universe cell dimension, 12 AI basket tools (SAFETY) = 33 d | 51 |
+| System baskets (BK) | BK-00 plan; BK-01 index catalogue and fetcher (SAFETY), 02 derived engine, 03 derived job (SAFETY), 04 Baskets screen cards, 05 broker flags and F&O (SAFETY) = 20 d; BK-06 profile engine, 07 profile endpoints and screen (7 d), 08 clusters and gate breadth (SAFETY), 09 relative strength, 10 vol-targeted sizing (SAFETY), 11 universe cell dimension, 12 AI basket tools (SAFETY) = 33 d | 51 |
 | **Total** | | about 348 |
 
 P8-00, P8-01, P8-05 and all P0 to P7 specs already existed, and P8-02, P8-06 and P8-15 are built.
