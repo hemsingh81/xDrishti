@@ -2,7 +2,7 @@
 
 All files below are **Draft**: written under the owner's delegation ("do your own research for the best answers and write them into the specs"). Every design question was answered inside its spec under **Decisions (researched)** with reason, rejected alternative and source. An agent builds a slice only after the owner sets it **Approved**. SAFETY slices keep every new setting default OFF.
 
-Sizes are agent-days, uncalibrated estimates (earlier phases overran). Total of the new specs: about **295 agent-days** from the specs' own Size lines (P8 rest about 66, P3 leftovers 13, P7 leftovers 9, P9 33.5, P10 20, P11 20, P12 34.5, P13 to P15 about 97 as plans).
+Sizes are agent-days, uncalibrated estimates (earlier phases overran). Total of the new specs: about **348 agent-days** (295 plus the system-baskets programme BK-01..BK-12, 51 days) from the specs' own Size lines (P8 rest about 66, P3 leftovers 13, P7 leftovers 9, P9 33.5, P10 20, P11 20, P12 34.5, P13 to P15 about 97 as plans).
 
 **Built while these were written (2026-10-25):** the parallel build session merged **P8-02** (Learning screen), **P8-06** (report endpoints, ADR 0100) and **P8-15** (plan notices, ADR 0101) from their own Approved specs `P8-02-learning-screen.md`, `P8-06-report-read-endpoints.md`, `P8-15-plan-notifications.md`. The Drafts with the longer names for those three are marked SUPERSEDED and are not counted. Downstream Drafts were re-aligned to the built shapes.
 
@@ -18,7 +18,8 @@ Sizes are agent-days, uncalibrated estimates (earlier phases overran). Total of 
 | P11 small live | P11-00 plan, 01 manual-live fill capture, 02 execution feedback, 03 live vs paper slippage, 04 scale-up and risk ramp, 05 static IP and SEBI runbook, 06 phase check | 20 |
 | P12 execution | P12-00 plan (build order 01 to 06, then 07, 11, 08, 09, 10, 12), 01 state machine, 02 Dhan adapter and sandbox, 03 pre-trade checks, 04 broker-side stops, 05 kill switch, 06 order stream and reconciliation, 07 modes, 08 semi-auto, 09 auto-live, 10 screens, 11 daily login and static IP ops, 12 phase check | 34.5 |
 | P13 to P15 (plans) | P13-00 tick and depth (10 slices, about 23 d), P14-00 options and stat-arb (17 slices, about 44.5 d), P15-00 fundamentals and events (12 slices, about 30 d) | about 97 |
-| **Total** | | about 295 |
+| System baskets (BK) | BK-00 plan; BK-01 index catalogue and fetcher (SAFETY), 02 derived engine, 03 derived job (SAFETY), 04 Baskets screen cards, 05 broker flags and F&O (SAFETY) = 18 d; BK-06 profile engine, 07 profile endpoints and screen (7 d), 08 clusters and gate breadth (SAFETY), 09 relative strength, 10 vol-targeted sizing (SAFETY), 11 universe cell dimension, 12 AI basket tools (SAFETY) = 33 d | 51 |
+| **Total** | | about 348 |
 
 P8-00, P8-01, P8-05 and all P0 to P7 specs already existed, and P8-02, P8-06 and P8-15 are built.
 
@@ -31,6 +32,7 @@ Wall-clock items cannot be sped up by agents, so they start first:
 4. **P7-19 numeric levels** before P8-14, P12-08 and P12-09.
 
 Build waves:
+- **BK. System baskets** (specs BK-00..BK-12; fits beside waves A and B). **BK-01 and BK-02 early and in parallel (no shared files)**, because membership history only accrues from the first fetch (and the fetch needs the owner's terms-read and ADR first, section 5). Then BK-03, BK-05, BK-04 (BK-04 last so it shows every kind); then BK-06, BK-07 (BK-06 needs only P8-07, built); then BK-08 to BK-11 (BK-08 before P7 goes live on a basket gate; BK-11 before P6 cell reports grow; BK-10 needs BK-08); BK-12 last, after P9-05.
 - **A. P8 exit path** (P8-00 cut line): P8-06 is built, so next **P8-02b** (extract `HeatGrid` and the tab registry that P8-03/08/09/10/12/13 assume), then P8-07, 08, 09; P8-03/04 in parallel worktrees (small merge in `router.tsx`/`navigation.ts`); then P8-10 to P8-14 and P8-15b; P8-16 per screen; P8-17 last. P8-19, 20 and 21 depend only on P8-18 Part A (the 1 d capability gate), not on its job half.
 - **B. Before P6/P7 features go live:** P3-01d probe, then P3-01d, P3-01e (regime and market gate), P3-02e, P3-02f part A, P3-04d.
 - **C. P9:** P9-01 then P9-02 (both edit `compose.yaml`/`xd-up.sh`: not parallel), P9-03, P9-05, P9-04, then P9-06 to P9-09, P9-10 last (default verdict: reject).
@@ -66,7 +68,11 @@ Suggested splits when a slice overruns (all 3 d or more): P8-06 (A spike, reader
 | Doc 09 §11 / doc 13 R30 "weekly" counterfactual | windows are quarterly (P8-12) | design change |
 | Roadmap "Monte Carlo 90th pct" for P10 | Lab stores P50/P95 at the backtest N; P10-04 uses a seeded bootstrap at paper n | accepted in P10-04 |
 | `max_hold_sessions` 1 to 5 vs PEAD weeks | P15-09 proposes 20 for event families | design change + ADR |
-| Doc 06 §2.1 options skipped; doc 09 seventh cell-key part `expression` | P14 plan | design change + ADR |
+| Doc 06 §2.1 options skipped; doc 09 seventh cell-key part `expression` | P14 plan; BK-11 takes the **7th** part (`universe`), so P14's `expression` becomes the **8th** (P14-00 edited; `TryParse` accepts 6, 7 or 8) | design change + ADR |
+| P8-07 Decision 5 (one benchmark, ADR 0102) vs BK-06 "difference to the index" | BK-06 shows basket minus index as a difference, not as alpha; the one app-wide benchmark stays | accept wording at BK-06 Approval |
+| P9-05 schema budget 2,200 tokens | BK-12 raises it to 2,300 (or one older description is cut) | owner (BK-12 Q1) |
+| Basket entity has no `kind`/`system` | BK-01 adds both (`kind` in manual, portfolio, index, list, derived); ADR 0014 protection reused | at BK-01 build |
+| Roadmap/ISS-22 "members as of today" | BK-01/03 store dated versions forward-only; no back-filled history | none |
 | ADR 0005 "Proposed", names the eval "P9-07" | eval is P9-09 | accept ADR 0005 at P9-01 |
 | `Microsoft.Extensions.*` pinned 10.0.12 vs `Microsoft.Extensions.AI` 10.11.0 needs 10.0.13+ | bump in P9-03 | pin change |
 | P7-18 refuses `GET /v2/orders`; allow-list pinned | P11-01 changes the pin (owner's security act) | owner |
@@ -80,10 +86,21 @@ Log event ids (existing code ends at 4801): P8-18 4900-4919, P8-19 4920-4939, P8
 ## 5. What only the owner can do (the specs cannot decide these)
 
 - Approve each spec before it is built. Slices marked `Safety: yes` in their own header (at least P7-16, P7-20, P8-18 to P8-21, P9-01, P9-02, P9-03, P9-05, P9-07, P9-08, P9-10, P10-01, P10-02, P10-05, P11-01, P11-04, P11-05 and every P12-01 to P12-11) keep their settings OFF until a deliberate act. Every UI write that starts a job or changes research or book state needs a **fresh password per action plus a capability gate**; switching the assistant OFF needs no password.
+- **System baskets (BK):** read the NSE terms (niftyindices.com, nseindia.com) and record the ADR **before** turning `Baskets:System:Fetch:Enabled` on (fetches stay OFF until then); confirm the eight pre-registered baskets; choose the benchmark (stay Nifty 50, or Nifty 500 once tracked); accept or change the thresholds of the 14 derived baskets; set each BK slice Approved.
 - Security acts: allow-list entries (index/VIX history, option chain, expired options, depth, `GET /v2/orders`), switching services ON, the private-tunnel phone path (P8-21), any live mode promotion with password (P12-07).
 - Facts only Dhan or the ISP can give: does static IP apply to data calls or only orders; whether an under-10-orders/second personal algo needs registration or an algo tag (sources disagree); sandbox behaviour; ISP static IP.
 - Evidence only wall-clock gives: 60 graded paper trades, 8+ live weeks, 30 semi-auto sessions, the owner's stopwatch for P8-17, labelling 200 announcements (P15), confirming the charge sheet (ISS-25), the 5-year backfill (ISS-19) that options and PEAD need.
 - Recommendation noted in P12-00: a **dedicated Dhan account for execution**, so manual trades do not cause reconciliation breaks.
+
+## 5b. System baskets: merged owner questions (from BK-00 and BK-06..BK-12)
+BK-00: (1) May the system fetch NSE index files (terms read, ADR; until then OFF)? (2) Confirm the eight pre-registered baskets. (3) Track all Nifty 500 members so derived universes are market-wide (about 500 instruments of history)? (4) Benchmark: stay Nifty 50 or move to Nifty 500 once tracked? (5) Dhan MIS/MTF lists as baskets now (BK-05) or only in P12? (6) Accept the numeric thresholds of the 14 derived baskets as pre-registered, or change them before build?
+BK-06/07: (7) Default index for broad baskets (same as 4; recommended one app-wide benchmark). (8) Is "difference to the index" acceptable wording? (9) Route `/baskets/:basketId/profile` or under Reports (`/reports/baskets/:id`)?
+BK-08: (10) Gate breadth basket: Nifty 50 or the liquid-100 derived basket (recommended liquid-100 once dated, else Nifty 50)? (11) Default `max_risk_per_cluster_pct` (recommended 40 % of total open risk limit; the number is the owner's). (12) Tightening without the password (CLI only)? Recommended no.
+BK-09: (13) Pre-registered rank universes (recommended Nifty 100 and liquid-100; F&O third). (14) Test `RS_ROTATION` only after 6 months of dated membership, or build now with the survivorship label (recommended build now, Lab study later)?
+BK-10: (15) Down-scaling only, or also study up-scaling (recommended not now)? (16) `sizing.vol_target.enabled` default OFF (recommended) or ON? (17) Min or product when the gate is reduced? (18) Capacity default 1 % of ADV20? (19) Settings form (BK-10b) in the same wave or API plus CLI first?
+BK-11: (20) Is liquidity the right single dimension (vs volatility tiers or F&O split)? (21) Terciles by count (recommended) or fixed top-100 / next-200 / rest? (22) Which eight baskets are pre-registered (same as 2)?
+BK-12: (23) Token budget 2,300 (from 2,200) acceptable? (24) May the assistant quote the BK-10 sizing study (recommended out)?
+Duplicates (2 and 22; 4 and 7) are answered once.
 
 ## 6. Honest limits of this journey
 - Specs were checked against the repo by reading; nothing was built or run. Anything not opened is marked UNVERIFIED in the spec.

@@ -1,0 +1,88 @@
+# BK-08 — Correlation clusters and caps, and basket breadth in the market gate
+
+- **Status:** Draft (written 2026-10-25; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Phase / roadmap row:** P7 extension (selection) and P3-01e follow-up (context) — uses U8 and U6 of `docs/research/basket-leverage-uses.md`
+- **Design refs:** docs/design/10-selection-and-portfolio.md §4 (smart rules: gate, correlation), §5 (limits), §11 (as built, ADR 0085) · docs/design/09-learning-engine.md §14 (market gate) · docs/design/05-data-and-brokers.md · P7-02, P7-05, P7-06, P7-09 · P3-01e · ADR 0085, 0091
+- **Needs:** [BK-06](BK-06-basket-index-and-profile-metrics-engine-pure.md) (`BasketBreadth`, `Dispersion`, `PairwiseCorrelation` kernels); built P7-06 (`CorrelationTable`, `ReturnSeries`, `MarketGate`, `MarketGateInput`, `SmartRulesEngine`, VERIFIED in `Domain/Selection`) and P7-02 (`PortfolioFiller`, `FillConstraints`, `FillCodes`, VERIFIED); P3-01d (`market.context_daily`); BK-01..BK-05 for a gate basket with dated membership (Nifty 50 or the liquid-100 derived basket; without one the gate keeps the tracked-set breadth and this slice's context table has only manual baskets).
+- **Size:** 5 agent-days (cluster kernel 1, cluster cap in the fill and the ticket text 1.2, `market.basket_context_daily` table and daily job 1.3, gate source switch and owner-act path 0.8, tests 0.7)
+- **Safety:** yes. It changes which candidates survive the fill and what breadth the gate reads. Every new limit is default OFF (no behaviour change); a **tighter** rule needs no approval beyond the setting; anything that could **loosen** the gate (a different breadth source) is an owner act with a fresh password; no order is placed; `unavailable` never counts as a pass.
+
+## Goal
+The plan stops counting five banking longs as five independent bets (a cap on open risk per correlation cluster), and the market gate can read the breadth of a stated, liquid basket instead of the owner's own tracked set, with per-basket breadth, dispersion and average correlation stored point in time each day.
+
+## Scope
+**In:** (1) pure `CorrelationClusters` (average-linkage on 1 - rho, cut at `ClusterRho`), (2) a cluster cap in `PortfolioFiller` (`FillConstraints.MaxClusterRiskPct`, new fill code `cluster_cap`, `cluster_id` on `FillCandidate`), (3) cluster id and cluster risk in the ticket's reasons text, (4) `market.basket_context_daily` (insert-once) and a daily upkeep step computing it with the BK-06 kernels, (5) a gate breadth source setting (`tracked` default, or `basket:<id>`), owner act with password, (6) tests, ADR, doc 10 and doc 09 §14 text.
+**Out:** DSL features `basket_breadth`/`basket_disp`/`basket_corr` (a later P3-01c addition, descriptive context first); using dispersion or rho_bar to change any limit (research §U6: descriptive until our own out-of-sample test); Hierarchical Risk Parity weights; midcap and smallcap index relative strength in the gate (a separate loader; BK-09 keeps `rs_vs_index` to the Nifty 50); sizing by cluster (BK-10); a UI form for the settings (owner-act forms follow the P8-19 pattern; this slice ships the API and the read-only display); any order.
+
+## Acceptance criteria
+1. **Cluster by hand.** Given four symbols with 60-day Pearson A-B 0.85, C-D 0.75, B-C 0.72, A-C 0.40, A-D 0.30, B-D 0.20 and `ClusterRho` 0.70 (distance 1 - rho cut at 0.30), then average linkage merges A-B (d 0.15) and C-D (d 0.25), and the two groups would join at average rho (0.40 + 0.30 + 0.72 + 0.20)/4 = 0.405 (d 0.595 > 0.30), so the clusters are {A, B} and {C, D}. Single linkage on the same data would give one cluster (B-C d 0.28), which the test shows is **not** used. Cluster ids are the smallest member symbol, stable under input order.
+2. **Unknown is not zero.** Given a symbol with fewer than `MinCommonSessions` common sessions with every other symbol, then it is a singleton cluster flagged `correlation_unknown`; a pair with no figure is treated as unknown, never as 0 or 1; the fill reports the cluster check for that candidate as `unavailable` (never a pass), exactly as the built pair rule does (ADR 0085; read it at build).
+3. **Cap off is no change.** Given `MaxClusterRiskPct` null (default), then `PortfolioFiller` returns byte-identical results to today on the existing P7-02 fixtures (a regression test), and cluster ids are still computed and shown.
+4. **Cap on, by hand.** Given total capital 1,000,000, cluster cap 1.0 % (10,000), the open book holding B with risk 6,000 in cluster {A, B}, and a candidate A with risk 5,000, then 6,000 + 5,000 = 11,000 > 10,000, so A is moved to reserve with code `cluster_cap` and the numbers (11,000 of 10,000); a candidate C in cluster {C, D} with risk 5,000 is taken. A candidate whose risk makes the total exactly 10,000 is taken (the cap is "not above").
+5. **Existing rules keep their order.** The cluster cap runs after the pair-correlation rule and the per-sector and per-basket counts; the reserve reason shows the first limit that failed; the order is pinned by a test.
+6. **Ticket text.** Given a taken or reserved ticket, then its reasons carry "cluster {A, B}: open risk 6,000 of cap 10,000" (or "cap off" or "unknown correlation"); no checklist check is added (the 13-check count of P7-05 is unchanged).
+7. **Basket context table.** Given the daily upkeep with a gate basket of 10 members of which 8 have 20 bars and 5 close above their SMA20, then the row for the date holds `n_members 10, n_voters 8, b20 0.625, b50 …, b200 …, ad_share, new_high_share, dispersion, rho_bar, state value` and `membership_basis`; with 4 voters `state insufficient`, number null. A second run for the same date inserts nothing (insert-once, rows are never updated; the app role has insert and select only).
+8. **No look-ahead.** The row for date D uses closes up to D and membership as of D; a property test shows that appending bars after D changes no stored row for D and earlier. A backfill of earlier dates uses the dated membership where it exists and writes `membership_basis single_snapshot` otherwise (never presented as point in time).
+9. **Gate source switch.** Given `gate.breadth_source = tracked` (default), then `MarketGateInput.Breadth` is the P3-01e/context value exactly as today. Given `basket:<id>` and a stored row for the prior session, then `Breadth` is that row's `b20` and the gate result names the source ("breadth of Nifty 50: 0.62"); given no row, a stale row (older than `GateMaxAgeDays`) or an `insufficient` row, the gate reads `unavailable` for breadth (never a pass, never a fall-back to the tracked set, which would hide the change).
+10. **Owner act.** Given a request to change `gate.breadth_source`, the cluster cap or `ClusterRho`, then it needs a session, the CSRF token and a fresh password in the body for every change; an actor that is not `owner:<name>` (rule, system, cli, empty) is refused before the store; each change appends a row with the database's time and a hash; the response never echoes the password. With the setting OFF or unset nothing changes.
+11. **Safe direction is explicit.** A change that lowers `MaxClusterRiskPct` or sets one from null is recorded `direction tighten`; a change that raises it or clears it, or any change of the breadth source, is recorded `direction loosen` (raising `ClusterRho` = loosen, lowering it = tighten; a change that alters nothing in effect is `neutral`); both need the password (the owner's rule for settings), and a loosening is also listed in the next day's plan banner "gate source changed" until the owner dismisses it.
+12. **Performance.** Cluster computation for 60 symbols under 20 ms (pairs already in the `CorrelationTable`); the daily context job for one gate basket of 100 members under 3 s on the fixture; the plan build time rises by under 5 % (measured on the P7-09 fixture).
+13. **No order.** No code path in this slice references an order port; the architecture test for "no order-named member" passes; the setting names carry no execution word.
+
+## Contract
+- **Domain (pure):** `Domain/Selection/CorrelationClusters.Compute(CorrelationMatrix, IReadOnlyList<string> symbols, ClusterOptions) → ClusterResult(Clusters[{Id, Members}], Unknown[])`; `ClusterOptions(ClusterRho 0.70, MinCommonSessions)`. `FillConstraints` gains `MaxClusterRiskPct` (decimal?, default null) and `FillCandidate` gains `ClusterId`; `FillCodes` gains `ClusterCap`. `BasketContext` row type in `Domain/Market` (uses BK-06 `BasketBreadth`, `Dispersion`, `PairwiseCorrelation`).
+- **Application:** the plan context source (P7-09) builds clusters over candidates plus book symbols from the table it already builds; a `BasketContextUpkeep` step in the nightly context path; `IBasketContextStore`; the gate input builder reads the source setting.
+- **Data:** `market.basket_context_daily (basket_id uuid, as_of date, n_members int, n_voters int, b20 numeric, b50 numeric, b200 numeric, ad_share numeric, new_high_share numeric, dispersion numeric, rho_bar numeric, state text, membership_basis text, created_at timestamptz, primary key (basket_id, as_of))`, insert and select only for `xd_app` (`MakeAppendOnlyForAppRole`-style grant, as `sim_runs`); a `Down` migration `AddBasketContextDaily`. Settings: new keys in the owner-act settings store of P7-12 if that store is key-typed (UNVERIFIED), otherwise one sibling table `selection.basket_settings_changes` (insert-only history with hash, as the autonomy changes).
+- **API:** `GET /api/selection/basket-settings` and `PUT /api/selection/basket-settings` (keys `gate.breadth_source`, `selection.max_cluster_risk_pct`, `selection.cluster_rho`), tag `Selection`; errors `selection.invalid` 422, `auth.password_required` 401/403 as the autonomy endpoint. `GET /api/market/basket-context?basket=&from=&to=` (read, newest 400 rows).
+- **Events/jobs:** the context step runs once per trading day after the EOD aggregation; idempotent by primary key; failure leaves the previous rows and the gate reads `unavailable`. Log events: cluster built (symbols, clusters, unknown), context row written (basket, state), gate source used; counts only; next free id block at build time.
+
+## Non-functional
+Plan build +5 % at most; context job under 3 s per basket; the table grows 1 row per basket per trading day (about 250 rows a year per basket); retention keep.
+
+## Test plan
+- **Unit:** criteria 1 to 5 with the numbers above; ties and order independence; a 1-symbol and a 0-symbol input; `ClusterRho` 1.0 gives all singletons; NaN or out-of-range correlations are treated as unknown.
+- **Properties:** cluster ids stable under shuffling; at every merge the average inter-group rho is at least the cut; the fill never exceeds the cap when it is on.
+- **Application (fakes):** the source switch (tracked, basket with row, stale, missing, insufficient); the owner-act refusals (non-owner actor, missing password); direction recording.
+- **Integration (Testcontainers):** the migration up and down; insert-once and the app role's grants; a two-day upkeep with a member that leaves the basket on day 2 (day 1 row unchanged); the endpoint; contract snapshot.
+- **Regression:** P7-02, P7-06 and P7-09 suites unchanged with the cap off.
+- **Architecture:** no Infrastructure type in Domain; pure `Domain/Selection`.
+
+## Decisions (researched)
+1. **Average linkage cut at rho 0.70, not single linkage.** Question: how are clusters formed? Chosen: average linkage on 1 - rho, cut where the average pair correlation inside a cluster is at least the design's pair limit 0.70 (doc 10 §5, `FillConstraints.MaxPairCorrelation` 0.70, VERIFIED). Reason: one number for "same bet" in the pair rule and the cluster rule; single linkage chains (criterion 1: one 0.72 pair would merge four unrelated names into one cap and make the cap unusable). Rejected: single linkage (the research note's first sketch) and full HRP (a weighting method, no covariance inversion needed, but nothing here weights). Source: research note §U8; HRP is cited from a secondary page, UNVERIFIED.
+2. **Cluster only the plan-day symbols.** Candidates plus the open book (tens of symbols), from the correlations the plan already computes (60 sessions, `CorrelationTable.FromReturns`). Reason: no new data read and the cap only matters for names that can meet in one plan. Rejected: clustering the whole tracked set nightly (a table and a stability problem: cluster labels flip between runs; the system-baskets note's own "stability score" warning).
+3. **Cap as a percent of capital, off by default, block-and-reserve.** Chosen: a candidate that breaks the cap goes to reserve with a number, like every other fill limit (doc 10 §5). Reason: one behaviour for every limit; the user sees why. Down-scaling a candidate to fit is BK-10's job and is not done here.
+4. **Tighten versus loosen both need the password; the direction is recorded.** The repo's standing rule is that owner-controlled settings change by owner act with a fresh password (ADR 0091); a lower-risk direction is still a setting change with side effects on the plan. The record marks the direction so a later review can see all loosenings. Rejected: unauthenticated tightening (a script could silently starve the plan of tickets).
+5. **No silent fall-back for breadth.** If the chosen basket's breadth is missing the gate says `unavailable`, not the tracked-set number. Reason: a fall-back would make a bad data day look like a normal day under a different definition; `unavailable` already reduces the plan in the built gate (ADR 0085, VERIFIED title: "unavailable never a pass").
+6. **Gate uses b20, as P3-01e.** Chosen: the same SMA20 definition and the same `BreadthMin` setting. Reason: the stored `BreadthMin` was reasoned on the 20-day figure; b50 and b200 are stored for display and later out-of-sample work, not read by the gate. Rejected: re-tuning `BreadthMin` for a new basket without data (no thresholds tuned on P&L).
+7. **Participation > 50 % and the Zweig breadth thrust are not rules here.** The sources are practitioner and small-sample (research §U6); breadth is stored descriptively and the gate keeps its existing numbers.
+
+## Risks and honest limits
+- Sixty sessions of daily returns give a noisy correlation; clusters near the cut flip between nights. The ticket text shows the average rho so the owner can see a borderline case.
+- Correlation rises in a sell-off (when it matters most); a calm-period estimate under-protects. This is a risk reducer, not a guarantee.
+- A basket's breadth carries membership bias exactly as its membership does (single snapshot); the `membership_basis` column keeps the difference visible.
+- The cap can starve a plan of tickets on a one-factor day; that is its purpose and the plan says "reserve: cluster cap".
+
+## UNVERIFIED
+- P3-01e is Draft and no `BreadthCalculator` was found in `backend/src`: the context table and `breadth` feature may or may not exist when this builds; the spec works either way (the tracked-set breadth becomes `BasketBreadth` called with the tracked set).
+- Whether the P7-12 settings store is key-typed (extensible by key) or fixed-column.
+- ADR 0085's exact `unavailable` behaviour for an unknown pair (to be read at build; the spec requires the same).
+- Gate basket id and the Nifty 50 / liquid-100 baskets' existence (BK-01..BK-05).
+- Primary text of the HRP and Ledoit-Wolf papers.
+
+## Alignment with BK-01..BK-05 (read 2026-10-25)
+BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `kind` in `manual|portfolio|index|list|derived` and `system` (BK-01); `GET /api/baskets/{id}/members?asOf=` with `membersKnownSince` (BK-01); derived baskets stored as immutable dated versions in `market.basket_versions` (`as_of`, `effective_from`, `params_hash`, member rows with `valid_from`/`valid_to`) written by a job that is OFF by default (BK-03); list baskets for F&O, ASM/GSM and MTF (BK-05). Wherever this spec says `rule_version` it means the basket's version id plus `params_hash` (null for manual and index baskets, whose history starts at the first fetch). Index baskets are point in time only from the first fetch; the screens say so. Re-check names and ids at Approval; nothing here edits BK-00..BK-05.
+
+## Open questions
+1. Gate breadth basket: Nifty 50 (clean, 50 voters, large caps only) or a liquid-100 derived basket (broader, our own definition)? Recommended: the liquid-100 once dated, else Nifty 50.
+2. Default `max_risk_per_cluster_pct` when the owner first turns it on: recommended 40 % of the total open risk limit; the number is the owner's.
+3. Should tightening also be doable without the password (CLI only)? Recommended no.
+
+## Done when
+- [ ] All acceptance criteria have evidence; `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any path that loosens the gate or a limit without the owner act, and for `unavailable` counted as a pass)
+- [ ] `scripts/gen-api.sh` run; migration added with `Down`; grants test updated
+- [ ] ADR (next free number at build time); doc 10 §5 and §11 and doc 09 §14 updated; `scripts/build-docs.sh`
+
+## Review fixes 2026-10-25
+- Property test corrected: at every merge the average inter-group rho is at least the cut (not "no pair below the cut", which average linkage does not guarantee).
+- Criterion 11 direction rule: raising `ClusterRho` = loosen (clusters shrink, caps bind less); lowering = tighten; raising/clearing `MaxClusterRiskPct` and any breadth-source change = loosen; `loosen` and `neutral` are two separate recorded values (the value `loosen_or_neutral` is removed).
+- Size unchanged: 5 agent-days.
