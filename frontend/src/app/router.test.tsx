@@ -5,6 +5,7 @@ import { createAccountFake } from '@/test/accountFake';
 import { createDataFake } from '@/test/dataFake';
 import { createQualityFake } from '@/test/qualityFake';
 import { createServicesFake } from '@/test/servicesFake';
+import { mountLearning } from '@/test/learningFixtures';
 import { buildProblem, buildSystemStatus } from '@/test/fixtures';
 import { renderRoutes } from '@/test/render';
 import { problemResponse, server } from '@/test/server';
@@ -38,6 +39,17 @@ describe('app routes', () => {
 
     const note = await screen.findByText(/This screen is planned for roadmap phase/);
     expect(within(note).getByText('P8')).toBeInTheDocument();
+  });
+
+  it('opens the Learning screen (no longer a placeholder) and marks it in the navigation', async () => {
+    mountLearning();
+    renderRoutes(routes, { initialPath: '/learning' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Learning' })).toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: 'Overview', selected: true })).toBeInTheDocument();
+    expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
+    const nav = screen.getAllByRole('navigation', { name: 'Main' })[0]!;
+    expect(within(nav).getByRole('link', { name: 'Learning' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('opens the Data quality screen (no longer a placeholder) and marks it in the navigation', async () => {

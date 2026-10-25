@@ -1,4 +1,6 @@
+import { Box } from '@mui/material';
 import type { ReactNode } from 'react';
+import { rem } from '@/theme';
 import { StatTile } from '@/shared/ui/StatTile';
 import { EvidenceBlock, type EvidenceProps } from './EvidenceBlock';
 import { MetricValue, type MetricValueProps } from './MetricValue';
@@ -18,7 +20,12 @@ export function MetricTile({ label, hint, evidence, ...metric }: MetricTileProps
   return (
     <StatTile
       label={label}
-      value={<MetricValue {...metric} />}
+      value={
+        // The figure is large; the word and reason of a non-value (and of a provisional figure) are read at body size.
+        <Box component="span" sx={{ '& .xd-non-value': { fontSize: rem(14), fontWeight: 600 } }}>
+          <MetricValue {...metric} />
+        </Box>
+      }
       hint={
         hint || evidence ? (
           <>
