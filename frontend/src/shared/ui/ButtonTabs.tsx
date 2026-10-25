@@ -1,5 +1,5 @@
 import { Button, Stack } from '@mui/material';
-import { useRef, type KeyboardEvent } from 'react';
+import { useEffect, useRef, type KeyboardEvent } from 'react';
 
 export interface ButtonTab<T extends string> {
   value: T;
@@ -24,6 +24,13 @@ interface ButtonTabsProps<T extends string> {
  */
 export function ButtonTabs<T extends string>({ tabs, value, onChange, label }: ButtonTabsProps<T>) {
   const refs = useRef(new Map<T, HTMLButtonElement>());
+
+  // On a phone the strip scrolls sideways: keep the selected tab in view.
+  useEffect(() => {
+    const tab = refs.current.get(value);
+    // jsdom has no scrollIntoView.
+    if (tab && typeof tab.scrollIntoView === 'function') tab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [value]);
 
   function onKeyDown(event: KeyboardEvent) {
     const at = tabs.findIndex((tab) => tab.value === value);
@@ -50,7 +57,7 @@ export function ButtonTabs<T extends string>({ tabs, value, onChange, label }: B
       role="tablist"
       aria-label={label}
       onKeyDown={onKeyDown}
-      sx={{ borderBottom: 1, borderColor: 'divider', mb: 1.5, gap: 0.5 }}
+      sx={{ borderBottom: 1, borderColor: 'divider', mb: 1.5, gap: 0.5, overflowX: 'auto' }}
     >
       {tabs.map((tab) => {
         const selected = tab.value === value;
@@ -76,6 +83,8 @@ export function ButtonTabs<T extends string>({ tabs, value, onChange, label }: B
               borderBottom: 2,
               borderColor: selected ? 'primary.main' : 'transparent',
               fontWeight: selected ? 700 : 500,
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
             }}
           >
             {tab.label}

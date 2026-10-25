@@ -241,4 +241,12 @@ describe.each(['light', 'dark'] as const)('%s theme', (mode) => {
     renderThemed(mode, <span>x</span>);
     expect(injectedCss()).toMatch(/prefers-reduced-motion:reduce\)\{[^}]*\{[^}]*transition-duration:0\.01ms!important/);
   });
+
+  it('grows the root font on large monitors (15 px from 1680, 16 px from 2560) and sets 44 px targets on phones', () => {
+    renderThemed(mode, <span>x</span>);
+    const css = injectedCss();
+    expect(css).toMatch(/@media\(min-width:1680px\)\{html\{font-size:93\.75%/);
+    expect(css).toMatch(/@media\(min-width:2560px\)\{html\{font-size:100%/);
+    expect(css).toMatch(/@media\(max-width:479\.95px\)\{[^}]*\.MuiButton-root[^}]*\{min-height:44px;min-width:44px/);
+  });
 });

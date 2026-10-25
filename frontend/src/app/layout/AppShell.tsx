@@ -1,4 +1,4 @@
-import { Box, Drawer } from '@mui/material';
+import { Box, Drawer, Link } from '@mui/material';
 import { Suspense, useState } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { AttentionPopups } from '@/features/notifications';
@@ -8,6 +8,8 @@ import { layout, pagePadding } from '@/theme';
 import { allNavItems, routeTitles } from '../navigation';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+
+const mainId = 'main-content';
 
 /**
  * Persistent layout: sidebar (permanent on desktop, drawer on mobile), top bar and the routed page (full width). It owns the
@@ -21,6 +23,27 @@ export function AppShell() {
 
   return (
     <ToastProvider>
+      {/* First tab stop: jumps over the navigation to the page. Hidden until it has focus. */}
+      <Link
+        href={`#${mainId}`}
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById(mainId)?.focus();
+        }}
+        sx={(theme) => ({
+          position: 'absolute',
+          left: theme.spacing(1),
+          top: theme.spacing(-8),
+          zIndex: theme.zIndex.tooltip,
+          padding: theme.spacing(1, 2),
+          borderRadius: 1,
+          bgcolor: 'background.paper',
+          boxShadow: theme.shadows[4],
+          '&:focus': { top: theme.spacing(1) },
+        })}
+      >
+        Skip to content
+      </Link>
       <Box sx={{ display: 'flex', minHeight: '100dvh', height: { md: '100dvh' } }}>
         <Box sx={{ width: { md: layout.sidebarWidth }, flexShrink: { md: 0 } }}>
           <Drawer
@@ -52,6 +75,8 @@ export function AppShell() {
             a screen can fill it (`height: 100%`) and scroll a region of its own; below `md` the document scrolls. */}
           <Box
             component="main"
+            id={mainId}
+            tabIndex={-1}
             sx={(theme) => ({
               // The prototype's `.page` padding: 14 px on phones, 24 from the sidebar breakpoint, more room on wide monitors.
               padding: `${pagePadding.compact}px`,
@@ -63,6 +88,8 @@ export function AppShell() {
                 padding: `${pagePadding.ultra.y}px ${pagePadding.ultra.x}px`,
               },
               width: '100%',
+              outline: 'none',
+              scrollPaddingTop: `${layout.topBarHeight + 16}px`,
               flex: 1,
               minHeight: 0,
               overflowY: { md: 'auto' },

@@ -173,6 +173,12 @@ export const table = {
 /** Sidebar: selected item sits on `accentSoft` with an accent marker of this width (px). */
 export const sidebar = { markerWidth: 3, paddingX: 12, linkPadding: '6px 8px', linkGap: 11 } as const;
 
+/** Root font size (px) on large screens (doc 13 §1d): 15 from `pagePadding.wide`, 16 from `pagePadding.ultra`. */
+export const rootFontSizeLarge = { wide: 15, ultra: 16 } as const;
+
+/** Smallest touch target (px) on phones (below `phoneMaxWidth`); WCAG 2.5.8 needs only 24. */
+export const touchTarget = { phone: 44, phoneMaxWidth: 479.95 } as const;
+
 export const layout = { sidebarWidth: 248, topBarHeight: 60 } as const;
 
 /**

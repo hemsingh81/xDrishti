@@ -1,5 +1,15 @@
 import { alpha, type Theme } from '@mui/material/styles';
-import { focusRing, monoFontFamily, numeric, palettes, rootFontSize } from './tokens';
+import {
+  focusRing,
+  layout,
+  monoFontFamily,
+  numeric,
+  pagePadding,
+  palettes,
+  rootFontSize,
+  rootFontSizeLarge,
+  touchTarget,
+} from './tokens';
 
 /** Elements that take keyboard focus; they all get the same ring. */
 const interactive = [
@@ -20,7 +30,26 @@ export function createGlobalStyles(theme: Theme) {
   const ring = `${focusRing.width}px solid ${theme.palette.primary.main}`;
   return {
     // The prototype's body text is 14 px; every rem in the theme is relative to it. A percentage keeps the browser's text-size setting.
-    html: { WebkitTextSizeAdjust: '100%', fontSize: `${(rootFontSize / 16) * 100}%` },
+    // Doc 13 §1d: the base grows on large monitors (15 px from 1680, 16 px from 2560); every rem size follows.
+    html: {
+      WebkitTextSizeAdjust: '100%',
+      fontSize: `${(rootFontSize / 16) * 100}%`,
+      // A focused element is never hidden under the sticky top bar (WCAG 2.4.11).
+      scrollPaddingTop: `${layout.topBarHeight + 16}px`,
+    },
+    [`@media (min-width:${pagePadding.wide.minWidth}px)`]: {
+      html: { fontSize: `${(rootFontSizeLarge.wide / 16) * 100}%` },
+    },
+    [`@media (min-width:${pagePadding.ultra.minWidth}px)`]: {
+      html: { fontSize: `${(rootFontSizeLarge.ultra / 16) * 100}%` },
+    },
+    // Phones: controls are at least 44 px (doc 13 §1d); inline links in a sentence are not listed here.
+    [`@media (max-width:${touchTarget.phoneMaxWidth}px)`]: {
+      '.MuiButton-root, .MuiIconButton-root, .MuiTab-root, .MuiChip-clickable, [role="button"]': {
+        minHeight: touchTarget.phone,
+        minWidth: touchTarget.phone,
+      },
+    },
     body: {
       WebkitFontSmoothing: 'antialiased',
       MozOsxFontSmoothing: 'grayscale',

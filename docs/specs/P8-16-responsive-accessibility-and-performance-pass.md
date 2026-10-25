@@ -106,3 +106,10 @@ None blocking. For the owner (an owner act, default until then): if Chrome is no
 
 ## Review fixes 2026-10-25
 - P8-15 row rewritten for the built slice (ADR 0101): no absorbed P7-20 source, `plan_fills_unmatched` exists. P8-02 row: heatmap is the built `Heatmap`/`HeatTile` (P8-02b extracts `HeatGrid`).
+
+## Build note 2026-10-26 (partial, global fixes only)
+Built: criteria 3 and 4 (touch-target and root-font rules, pinned in `theme.test.tsx`), the skip link and focusable `main` with
+scroll padding (criterion 6, in part; test in `AppShell.test.tsx`), and `ButtonTabs` sideways scroll with the selected tab kept
+in view (P8-02 S1; heatmap token contrast was already pinned in `heat.test.ts`). Not built: the Playwright and axe runner
+(criteria 1, 2, 5, 8 to 13, 15; adds dev dependencies and needs the owner's Chrome decision), `data-ready` markers, the
+evidence files and the owner sheet. No ADR was needed (no decision beyond the spec's Decisions 4 to 6).

@@ -72,4 +72,15 @@ describe('ButtonTabs', () => {
 
     expect(seen).toEqual([]);
   });
+
+  it('scrolls sideways inside its own strip instead of widening the page, and keeps the selected tab in view', async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    render(<Harness />);
+    expect(screen.getByRole('tablist', { name: 'Letters' })).toHaveStyle({ overflowX: 'auto' });
+    await userEvent.click(screen.getByRole('tab', { name: 'Tab C' }));
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ block: 'nearest', inline: 'nearest' });
+    // @ts-expect-error restore jsdom's absence of the method
+    delete Element.prototype.scrollIntoView;
+  });
 });

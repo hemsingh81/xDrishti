@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { appliedCss } from '@/test/css';
 import { renderRoutes } from '@/test/render';
 import { routes } from '../router';
@@ -86,5 +87,15 @@ describe('Instruments layout', () => {
     }
     expect(wrapper).toBe(page);
     expect(depth).toBeGreaterThan(0);
+  });
+
+  it('has a skip link as the first tab stop that moves focus to the main region', async () => {
+    renderRoutes(routes, { initialPath: '/system' });
+    await screen.findByRole('heading', { level: 1, name: 'System status' });
+    await userEvent.tab();
+    const skip = screen.getByRole('link', { name: 'Skip to content' });
+    expect(skip).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+    expect(screen.getByRole('main')).toHaveFocus();
   });
 });
