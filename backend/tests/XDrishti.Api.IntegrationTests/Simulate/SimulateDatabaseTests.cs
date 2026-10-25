@@ -557,6 +557,8 @@ public sealed partial class SimulateDatabaseTests(ApiFactory factory) : DataTest
             return replay;
         }
 
+        public ExplainResult Explain(ResearchPort.IPreparedStrategy strategy, InstrumentReplayInput input, IReadOnlyList<ExplainRequest> requests) => inner.Explain(strategy, input, requests);
+
         public InstrumentReplay Replay(ResearchPort.IPreparedStrategy strategy, InstrumentReplayInput input)
         {
             var replay = inner.Replay(strategy, input);

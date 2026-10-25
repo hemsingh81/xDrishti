@@ -9,6 +9,9 @@ internal static class CardFormat
     /// <summary>A price: at most 4 decimals, trailing zeros trimmed.</summary>
     public static string Price(double value) => Trimmed(value, 4, "0.####");
 
+    /// <summary>A value with up to 6 significant digits, invariant culture (the values a condition read).</summary>
+    public static string Significant(double value) => value.ToString("G6", CultureInfo.InvariantCulture);
+
     /// <summary>A coordinate of the chart: at most 2 decimals, trailing zeros trimmed.</summary>
     public static string Coord(double value) => Trimmed(value, 2, "0.##");
 

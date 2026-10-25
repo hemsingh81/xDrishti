@@ -23,6 +23,10 @@ scripts/verify-pack.sh --strategies ORB --basket <name> --from <yyyy-MM-dd> --to
 
 `data/exports/verify/<pack-id>/`: `README.txt` (the banner of every run first), `index.html` (the trades with a link to the card of each, and the spot checks), `cards/…` (one page per trade; the file name has no exit reason), `check-log.csv` (**your** log, the one file you edit), `engine-values.csv` (the engine's side, with the source and categories of each row, **kept closed until your row is written**), `pack.json` (identity and sources), `manifest.json` (size and SHA-256 of every file).
 
+## 2a. The conditions on each card (P3-04d)
+
+Each card has a section "conditions at the decision bar": the decision time, the evaluation timeframe and, for the setup, trigger and invalidate lists that exist, each condition with its truth and the value of every feature it read, with its lag (`close[1]` is `close` at lag 1). It is recomputed by the engine that made the trade; if the recomputation does not reproduce the recorded trade the export stops with `simulation.cards_mismatch` and writes nothing. Use it to check the intent of a rule by reading the values against your chart (a value is shown to 6 significant digits; an unknown condition never fires). It shows what the rule read, not whether the rule is a good idea. A pack written before this section exists is a different format (`xd-sim-export-4`).
+
 ## 3. Conventions
 
 - **Bar label.** A bar is labelled by its **start**, in India time. The card, the log and the stored data agree on it. An external chart must be set to the same; whether it is for each vendor is for the owner to confirm on the first trade.

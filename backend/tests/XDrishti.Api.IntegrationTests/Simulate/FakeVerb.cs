@@ -234,5 +234,7 @@ internal sealed class FakeVerb : IDisposable
         public ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input) => throw new NotSupportedException("the handler is a fake in these tests");
 
         public InstrumentReplay Replay(IPreparedStrategy strategy, InstrumentReplayInput input) => throw new NotSupportedException("the handler is a fake in these tests");
+
+        public ExplainResult Explain(IPreparedStrategy strategy, InstrumentReplayInput input, IReadOnlyList<ExplainRequest> requests) => throw new NotSupportedException("the handler is a fake in these tests");
     }
 }

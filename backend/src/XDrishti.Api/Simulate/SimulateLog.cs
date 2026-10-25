@@ -27,6 +27,9 @@ internal static partial class SimulateLog
     [LoggerMessage(EventId = 4411, Level = LogLevel.Warning, Message = "Simulate verb: the trade cards are stale for instrument {Symbol}: {Difference}")]
     public static partial void CardsStale(ILogger logger, string symbol, string difference);
 
+    [LoggerMessage(EventId = 4486, Level = LogLevel.Warning, Message = "Simulate verb: the recomputation for the trade cards does not give the recorded trade of instrument {Symbol}: first difference {Difference}")]
+    public static partial void CardsMismatch(ILogger logger, string symbol, string difference);
+
     [LoggerMessage(EventId = 4419, Level = LogLevel.Information, Message = "Verify-pack verb wrote pack {PackId}: {Rows} rows, {Bytes} bytes")]
     public static partial void PackWritten(ILogger logger, string packId, int rows, long bytes);
 

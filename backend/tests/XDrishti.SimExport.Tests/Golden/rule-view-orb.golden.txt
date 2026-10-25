@@ -1,4 +1,4 @@
-export xd-sim-export-3
+export xd-sim-export-4
 BUY
 strategy: ORB (or_min = 15, rr = 2)
 trigger: all of:

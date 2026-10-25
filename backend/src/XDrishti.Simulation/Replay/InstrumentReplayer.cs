@@ -2,6 +2,8 @@ using System.Globalization;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 using XDrishti.Simulation.Running;
+using XDrishti.Strategies.Compilation;
+using XDrishti.Strategies.Model;
 
 namespace XDrishti.Simulation.Replay;
 
@@ -41,6 +43,74 @@ public static class InstrumentReplayer
     /// <exception cref="ArgumentException">As <see cref="Replay"/>.</exception>
     /// <exception cref="InvalidOperationException">As <see cref="Replay"/>.</exception>
     public static ComparisonReplay ReplayAll(PreparedStrategy strategy, InstrumentReplayInput input) => ReplayMembers(strategy, input, null);
+
+    /// <summary>
+    /// The replay of <see cref="Replay"/> and, for each request whose decision is a candidate of the scan (same decision instant and side), the conditions of the side at that decision with the values they read, taken from the trace the scanner
+    /// made when it decided (P3-04d, D2): the same frame and the same bar list as the trade, no second evaluation. A request that matches no candidate has no entry.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">An argument is null.</exception>
+    public static ExplainResult Explain(PreparedStrategy strategy, InstrumentReplayInput input, IReadOnlyList<ExplainRequest> requests)
+    {
+        ArgumentNullException.ThrowIfNull(strategy);
+        ArgumentNullException.ThrowIfNull(requests);
+        var found = new Dictionary<string, TradeExplanation>(StringComparer.Ordinal);
+        var replay = ReplayMembers(strategy, input, (_, result) =>
+        {
+            foreach (var outcome in result.Outcomes)
+            {
+                var candidate = outcome.Candidate;
+                foreach (var request in requests)
+                {
+                    if (request.DecisionEpochSeconds == candidate.DecisionEpochSeconds && request.Side == candidate.Side && !found.ContainsKey(request.TradeKey)
+                        && strategy.Simulator.CompiledOf(candidate.Side) is { } side && ExplanationOf(side, candidate) is { } explained)
+                    {
+                        found[request.TradeKey] = explained;
+                    }
+                }
+            }
+        }).Members[0];
+        return new ExplainResult(replay, found);
+    }
+
+    private static TradeExplanation? ExplanationOf(CompiledSide side, EntryCandidate candidate)
+    {
+        var items = candidate.Trace.Items;
+        if (items.Count != side.Items.Count)
+        {
+            return null;
+        }
+
+        var sections = new List<ConditionSectionTrace>(3);
+        var at = 0;
+        foreach (var (name, list) in new (string, CompiledList?)[] { ("setup", side.Setup), ("trigger", side.Trigger), ("invalidate", side.Invalidate) })
+        {
+            if (list is null)
+            {
+                continue;
+            }
+
+            var traced = new List<ConditionItemTrace>(list.Items.Count);
+            foreach (var item in list.Items)
+            {
+                var trace = items[at++];
+                var condition = item.Condition;
+                var reads = new List<FeatureReadTrace>(condition.Reads.Count);
+                foreach (var read in condition.Reads)
+                {
+                    var lags = read.FeatureIndex >= 0 && read.FeatureIndex < trace.Values.Count ? trace.Values[read.FeatureIndex].Lags : [];
+                    var value = read.Lag < lags.Count && !double.IsNaN(lags[read.Lag]) ? lags[read.Lag] : (double?)null;
+                    reads.Add(new FeatureReadTrace(read.Name, read.Timeframe, read.Lag, value));
+                }
+
+                var truth = trace.Truth switch { TraceTruth.True => TruthState.True, TraceTruth.False => TruthState.False, _ => TruthState.Unknown };
+                traced.Add(new ConditionItemTrace(item.Path, item.Condition.Source, truth, reads, condition.ReadsTruncated));
+            }
+
+            sections.Add(new ConditionSectionTrace(name, list.Mode == ListMode.Any ? "any" : "all", traced));
+        }
+
+        return new TradeExplanation(candidate.DecisionEpochSeconds, candidate.TriggerTimeframe, sections);
+    }
 
     /// <summary>The replay with an observer that is given the list and the result of every call of <see cref="Simulator.Run"/>, for the tests of the decision index (criterion 1b).</summary>
     internal static InstrumentReplay ReplayCore(PreparedStrategy strategy, InstrumentReplayInput input, Action<IReadOnlyList<Bar>, SimulationResult>? observer) => ReplayMembers(strategy, input, observer).Members[0];

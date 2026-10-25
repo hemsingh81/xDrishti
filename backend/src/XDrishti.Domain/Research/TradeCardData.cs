@@ -10,5 +10,6 @@ namespace XDrishti.Domain.Research;
 /// <param name="Instrument">The record of the instrument the trade came from (adjustments, discontinuities, sessions left out, the tick, the bar-stream hash).</param>
 /// <param name="DayBars">The adjusted bars of the trade date from 09:15 to 15:29 India time, oldest first; a missing minute is not in the list.</param>
 /// <param name="OpeningBar">The adjusted bar whose minute is 09:15; null when the day has no such bar (a card then says so and prints no other minute under that heading).</param>
+/// <param name="Explanation">The conditions at the decision bar, recomputed with the engine (P3-04d); null for a stored run, which has no strategy handle to recompute with.</param>
 /// <param name="OpeningBarRaw">The stored 09:15 bar; set only when the adjustment factor of the day is not 1.</param>
-public sealed record TradeCardData(RunTrade Trade, InstrumentRun Instrument, IReadOnlyList<Bar> DayBars, Bar? OpeningBar, Bar? OpeningBarRaw);
+public sealed record TradeCardData(RunTrade Trade, InstrumentRun Instrument, IReadOnlyList<Bar> DayBars, Bar? OpeningBar, Bar? OpeningBarRaw, TradeExplanation? Explanation = null);

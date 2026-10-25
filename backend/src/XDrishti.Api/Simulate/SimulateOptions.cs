@@ -39,7 +39,7 @@ internal sealed record SimulateOptions(
         "usage:\n"
         + "  simulate (--strategy <id> [--strategy-version <n>] | --strategy-hash <64 hex>) (--symbols <a,b,...> | --basket <name|id>) --from <yyyy-MM-dd> --to <yyyy-MM-dd>\n"
         + "           [--timeframe <5m|10m|15m|30m|1h|1D>] [--param <name>=<number>]... [--fills modelled|no-slippage] [--acknowledge-csv-adjusted] [--force]\n"
-        + "           [--cards <0..500>]   (trade cards and index.html; default 200, 0 writes none)\n"
+        + "           [--cards <0..500>]   (trade cards with their conditions at the decision bar, and index.html; default 200, 0 writes none)\n"
         + "           [--store]   (keep the run in the database as well as in the export folder; default off, P3-10)\n"
         + "           [--exit <POLICY[:name=value,...]>]... [--time-stop min_progress_rr=<n>,(intraday_bars|swing_sessions)=<n>]   (the exits to run in place of the strategy's own; a|b makes candidates, two candidates or more are compared on the same entries, P4-05)\n"
         + "           [--select-exit [--min-train-months <n>] [--test-months <n>] [--embargo-sessions <n>] [--lambda <n>] [--min-trades <n>] [--no-plateau]]   (choose among the --exit candidates by walk-forward, P4-06; needs two candidates or more)\n"

@@ -1,5 +1,6 @@
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
@@ -15,8 +16,10 @@ namespace XDrishti.Application.Research;
 /// basket is never resolved again and nothing is merged. The day bars are adjusted by the rule of the replay (<see cref="AdjustmentFactors.FactorAt"/>, <see cref="AdjustmentFactors.Price"/>, <see cref="AdjustmentFactors.Volume"/>),
 /// re-stated here because the replay's own type is internal to the simulation library (ADR 0039); an equivalence test pins the two together. The trade is not recomputed here (P3-04d does that).
 /// </summary>
-internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQueries, IAdjustmentFactors adjustments) : IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>
+internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQueries, IAdjustmentFactors adjustments, ISimulationEngine engine) : IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>
 {
+    private readonly InstrumentInputReader _reader = new(bars, barQueries, adjustments);
+
     private const int OpenMinute = SessionClock.OpenMinute;
 
     public async ValueTask<Result<IReadOnlyList<TradeCardData>>> HandleAsync(BuildTradeCardsQuery query, CancellationToken cancellationToken)
@@ -47,7 +50,7 @@ internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQuer
                 return Result.Failure<IReadOnlyList<TradeCardData>>(SimulationErrors.Invalid([new FieldError("run.instruments", "A member of the universe has no instrument record in the run: " + member.Symbol + ".", null, "missing_instrument_record")]));
             }
 
-            var read = await ReadInstrumentAsync(run, record, trades, cancellationToken);
+            var read = await ReadInstrumentAsync(run, record, trades, query.Basis, cancellationToken);
             if (read.IsFailure)
             {
                 return Result.Failure<IReadOnlyList<TradeCardData>>(read.Error);
@@ -106,16 +109,15 @@ internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQuer
     }
 
     /// <summary>Reads one instrument, guards it and cuts the days. The list of bars is local to this call, so it can be collected as soon as the call returns.</summary>
-    private async ValueTask<Result<List<TradeCardData>>> ReadInstrumentAsync(SimulationRun run, InstrumentRun record, List<RunTrade> trades, CancellationToken cancellationToken)
+    private async ValueTask<Result<List<TradeCardData>>> ReadInstrumentAsync(SimulationRun run, InstrumentRun record, List<RunTrade> trades, ExplainBasis? basis, CancellationToken cancellationToken)
     {
-        var instrument = await barQueries.FindInstrumentAsync(record.InstrumentId, cancellationToken);
+        var instrument = await _reader.FindAsync(record.InstrumentId, null, cancellationToken);
         if (instrument is null)
         {
             return Stale(record, SimulationErrors.StaleInstrumentMissing, "the instrument is no longer in the master");
         }
 
-        var raw = await bars.ReadAsync(record.InstrumentId, SimulationBounds.From, SimulationBounds.Until(run.To), cancellationToken);
-        var factors = await adjustments.GetAsync(record.InstrumentId, cancellationToken);
+        var (raw, factors) = await _reader.ReadAsync(record.InstrumentId, run.To, cancellationToken);
 
         if (!string.Equals(BarStreamHash.Compute(raw), record.BarsSha256, StringComparison.Ordinal))
         {
@@ -134,6 +136,22 @@ internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQuer
             return Stale(record, SimulationErrors.StaleTick, "the tick of the instrument master differs from the one the run used");
         }
 
+        IReadOnlyDictionary<string, TradeExplanation>? explained = null;
+        if (basis is not null)
+        {
+            // P3-04d: the same input the run had, gross, replayed once with the chosen trades asked for; the answer must be the recorded trades.
+            var input = InstrumentInputReader.Build(record.InstrumentId, instrument, raw, factors, run.AcknowledgeCsvAdjusted, basis.Calendar, basis.CsvThrough, run.Options, run.From, run.To, null);
+            var requests = trades.Select(t => new ExplainRequest(t.Trade.Key, t.Trade.DecisionEpochSeconds, t.Trade.Side)).ToList();
+            var answer = engine.Explain(basis.Strategy, input, requests);
+            var mismatch = Verify(record.Symbol, trades, answer);
+            if (mismatch is not null)
+            {
+                return Result.Failure<List<TradeCardData>>(mismatch);
+            }
+
+            explained = answer.ByTradeKey;
+        }
+
         var adjusts = applied.Count > 0;
         var days = new Dictionary<DateOnly, Day>();
         var cards = new List<TradeCardData>(trades.Count);
@@ -145,10 +163,75 @@ internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQuer
                 days[date] = day = CutDay(raw, date, adjusts ? factors.FactorAt(date) : 1.0);
             }
 
-            cards.Add(new TradeCardData(trade, record, day.Bars, day.Opening, day.OpeningRaw));
+            cards.Add(new TradeCardData(trade, record, day.Bars, day.Opening, day.OpeningRaw, explained?[trade.Trade.Key]));
         }
 
         return Result.Success(cards);
+    }
+
+    /// <summary>The guard of P3-04d (D3, D4): each chosen trade must be among the recomputed ones with every field equal but <c>Costs</c> and <c>Costing</c>, and its decision must hold: setup true, trigger true, invalidate not true.</summary>
+    private static Error? Verify(string symbol, List<RunTrade> trades, ExplainResult answer)
+    {
+        var recomputed = new Dictionary<string, SimTrade>(StringComparer.Ordinal);
+        foreach (var trade in answer.Replay.Trades.Concat(answer.Replay.OpenAtEnd))
+        {
+            recomputed.TryAdd(trade.Key, trade);
+        }
+
+        foreach (var chosen in trades)
+        {
+            var key = chosen.Trade.Key;
+            if (!recomputed.TryGetValue(key, out var again))
+            {
+                return SimulationErrors.CardsMismatch(symbol, "trade", "the replay does not make the trade " + key);
+            }
+
+            if (SimTradeDifference.First(chosen.Trade, again) is { } field)
+            {
+                return SimulationErrors.CardsMismatch(symbol, field, "the replay gives another " + field + " for the trade " + key);
+            }
+
+            if (!answer.ByTradeKey.TryGetValue(key, out var explanation))
+            {
+                return SimulationErrors.CardsMismatch(symbol, "decision", "the replay has no entry decision at the recorded instant for the trade " + key);
+            }
+
+            foreach (var (name, want) in new[] { ("setup", TruthState.True), ("trigger", TruthState.True), ("invalidate", TruthState.False) })
+            {
+                var section = explanation.Sections.FirstOrDefault(s => s.SectionName == name);
+                if (section is null)
+                {
+                    continue;
+                }
+
+                var truth = Fold(section);
+                var holds = name == "invalidate" ? truth != TruthState.True : truth == want;
+                if (!holds)
+                {
+                    return SimulationErrors.CardsMismatch(symbol, name, "the " + name + " list is " + truth.ToString().ToLowerInvariant() + " at the recorded decision of the trade " + key);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The value of a list (Kleene): all of its items, or any one of them.</summary>
+    private static TruthState Fold(ConditionSectionTrace section)
+    {
+        var any = section.Mode == "any";
+        var unknown = false;
+        foreach (var item in section.Items)
+        {
+            if (item.Truth == (any ? TruthState.True : TruthState.False))
+            {
+                return item.Truth;
+            }
+
+            unknown |= item.Truth == TruthState.Unknown;
+        }
+
+        return unknown ? TruthState.Unknown : any ? TruthState.False : TruthState.True;
     }
 
     private static Result<List<TradeCardData>> Stale(InstrumentRun record, string difference, string detail) =>

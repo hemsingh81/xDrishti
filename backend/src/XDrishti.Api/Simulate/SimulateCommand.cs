@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Text;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Research;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 using XDrishti.SimExport.Cards;
@@ -28,8 +29,8 @@ internal static class SimulateCommand
 
     public const int Cancelled = 130;
 
-    /// <summary>The format string of the files this verb writes: <c>xd-sim-export-1</c> was the five files of P3-04b2; the cards and the extra manifest lines of P3-04c make it <c>xd-sim-export-2</c>, with or without cards; the legs of P4-01 (a <c>legs</c> column and members of the trade in run.json) make it <c>xd-sim-export-3</c>.</summary>
-    public const string ExportFormat = "xd-sim-export-3";
+    /// <summary>The format string of the files this verb writes: <c>xd-sim-export-1</c> was the five files of P3-04b2; the cards and the extra manifest lines of P3-04c make it <c>xd-sim-export-2</c>, with or without cards; the legs of P4-01 (a <c>legs</c> column and members of the trade in run.json) make it <c>xd-sim-export-3</c>; the conditions at the decision bar of P3-04d (a section on every card) make it <c>xd-sim-export-4</c>.</summary>
+    public const string ExportFormat = "xd-sim-export-4";
 
     /// <summary>The longest exception message printed on an unexpected failure.</summary>
     public const int MaxFailureMessage = 300;
@@ -111,7 +112,8 @@ internal static class SimulateCommand
         phaseStart = time.GetTimestamp();
         var rules = SimulatePipeline.Rules(options.Fills);
         var request = SimulatePipeline.Request(options.StrategyId, options.Parameters, options.Timeframe, options.From, options.To, universe, engine, rules, options.Costs, options.AcknowledgeCsvAdjusted, options.Exits, options.StrategyVersion, options.StrategyHash);
-        var ran = await SimulatePipeline.RunAsync(provider, request, cancellationToken);
+        var basis = new ExplainBasisSink();
+        var ran = await SimulatePipeline.RunAsync(provider, request, cancellationToken, basis);
         if (ran.IsFailure)
         {
             return await SimulatePipeline.RefuseAsync(console, logger, ran.Error.Code, SimulatePipeline.Problems(ran.Error));
@@ -126,7 +128,7 @@ internal static class SimulateCommand
 
         // selection, then the second read (a stale read refuses with nothing written), then render and write
         var choices = CardSelection.Choose(run, options.Cards);
-        var cards = await SimulatePipeline.CardsAsync(provider, run, [.. choices.Select(c => c.Trade.Trade.Key)], cancellationToken);
+        var cards = await SimulatePipeline.CardsAsync(provider, run, [.. choices.Select(c => c.Trade.Trade.Key)], basis.Basis, cancellationToken);
         if (cards.IsFailure)
         {
             SimulatePipeline.LogStale(logger, cards.Error);

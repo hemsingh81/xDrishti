@@ -46,13 +46,15 @@ public sealed class BuildTradeCardsHandlerTests
 
         public RunFixture Fixture { get; } = new();
 
+        public FakeSimulationEngine Engine { get; } = new();
+
         public List<Guid> Ids { get; } = [];
 
         public List<string> Symbols { get; } = [];
 
         public SimulationRun Run { get; }
 
-        public BuildTradeCardsHandler Handler(IBarStore? store = null) => new(store ?? Fixture.Store, Fixture.BarQueries, Fixture.Factors);
+        public BuildTradeCardsHandler Handler(IBarStore? store = null) => new(store ?? Fixture.Store, Fixture.BarQueries, Fixture.Factors, Engine);
 
         public string[] Keys(params int[] positions) => [.. positions.Select(p => Run.Trades.Single(t => t.Trade.InstrumentId == Ids[p]).Trade.Key)];
 
@@ -115,7 +117,7 @@ public sealed class BuildTradeCardsHandlerTests
         var sell = new RunTrade(FabricatedRun.Trade(world.Ids[0], world.Symbols[0], Side.Sell, D2), []);
         var run = world.Run with { Trades = [.. world.Run.Trades, sell] };
 
-        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors).HandleAsync(new BuildTradeCardsQuery(run, [.. run.Trades.Select(t => t.Trade.Key)]), Ct);
+        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine()).HandleAsync(new BuildTradeCardsQuery(run, [.. run.Trades.Select(t => t.Trade.Key)]), Ct);
 
         result.Value.Count.ShouldBe(2);
         world.Fixture.Store.Reads.Count.ShouldBe(1);
@@ -254,7 +256,7 @@ public sealed class BuildTradeCardsHandlerTests
         var world = new World();
         var run = world.Run with { Instruments = [.. world.Run.Instruments.Where(i => i.InstrumentId != world.Ids[2])] };
 
-        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors).HandleAsync(new BuildTradeCardsQuery(run, world.Keys(2)), Ct);
+        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine()).HandleAsync(new BuildTradeCardsQuery(run, world.Keys(2)), Ct);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("simulation.invalid");
@@ -272,6 +274,139 @@ public sealed class BuildTradeCardsHandlerTests
         await Should.ThrowAsync<OperationCanceledException>(async () => await world.Ask(world.Keys(0, 2, 4), cancel.Token));
 
         world.Fixture.Store.Reads.Count.ShouldBe(1, "the second instrument was not read");
+    }
+
+    // P3-04d: the recomputation and its guard
+
+    private static TradeExplanation Explained(SimTrade trade, TruthState setup = TruthState.True, TruthState trigger = TruthState.True, TruthState invalidate = TruthState.False) => new(
+        trade.DecisionEpochSeconds,
+        Timeframe.M15,
+        [
+            new ConditionSectionTrace("setup", "all", [new ConditionItemTrace("buy.setup[0]", "close > ema(10)", setup, [new FeatureReadTrace("close", Timeframe.M15, 0, 101.5)])]),
+            new ConditionSectionTrace("trigger", "all", [new ConditionItemTrace("buy.trigger[0]", "close > 1", trigger, [new FeatureReadTrace("close", Timeframe.M15, 0, 101.5)])]),
+            new ConditionSectionTrace("invalidate", "any", [new ConditionItemTrace("buy.invalidate[0]", "close < 1", invalidate, [new FeatureReadTrace("close", Timeframe.M15, 0, 101.5)])]),
+        ]);
+
+    /// <summary>The engine reproduces the recorded trades of the instrument (with the edit given) and explains each.</summary>
+    private static void Reproduce(World world, Func<SimTrade, SimTrade>? edit = null, Func<SimTrade, TradeExplanation>? explain = null)
+    {
+        world.Engine.ExplainScript = (input, requests) =>
+        {
+            var trades = world.Run.Trades.Where(t => t.Trade.InstrumentId == input.InstrumentId).Select(t => edit?.Invoke(t.Trade) ?? t.Trade).ToList();
+            var byKey = world.Run.Trades.Where(t => t.Trade.InstrumentId == input.InstrumentId).ToDictionary(t => t.Trade.Key, t => (explain ?? (x => Explained(x)))(t.Trade));
+            return new ExplainResult(new InstrumentReplay(FabricatedRun.Ran(input.InstrumentId, input.Symbol, D1, D3), trades, []), byKey);
+        };
+    }
+
+    private static ExplainBasis Basis(World world) =>
+        new(world.Engine.Prepare("ORB", new Dictionary<string, double>(), Timeframe.M15, null).Value, new XDrishti.Domain.Market.Calendar.TradingCalendar(), new Dictionary<Guid, DateOnly>());
+
+    private static ValueTask<Result<IReadOnlyList<TradeCardData>>> AskExplained(World world, params int[] positions) =>
+        world.Handler().HandleAsync(new BuildTradeCardsQuery(world.Run, world.Keys(positions), Basis(world)), Ct);
+
+    [Fact]
+    public async Task With_a_basis_each_instrument_is_replayed_once_with_all_its_chosen_trades_asked_for_and_each_card_carries_its_explanation()
+    {
+        var world = new World();
+        Reproduce(world);
+
+        var result = await AskExplained(world, 0, 2, 4);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : string.Empty);
+        world.Engine.Explains.Count.ShouldBe(3, "one replay per instrument that has a chosen trade");
+        world.Fixture.Store.Reads.Count.ShouldBe(3, "one bar read per instrument: the explanation shares the chart's read");
+        world.Engine.Explains.ShouldAllBe(e => e.Requests.Count == 1 && e.Input.Costs == null && e.Input.From == D1 && e.Input.To == D3);
+        result.Value.ShouldAllBe(c => c.Explanation != null && c.Explanation.Sections.Count == 3);
+    }
+
+    [Fact]
+    public async Task Without_a_basis_nothing_is_recomputed_and_the_cards_have_no_explanation()
+    {
+        var world = new World();
+
+        var result = await world.Ask(world.Keys(0, 2), Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        world.Engine.Explains.ShouldBeEmpty();
+        result.Value.ShouldAllBe(c => c.Explanation == null);
+    }
+
+    [Fact]
+    public async Task A_trade_that_differs_in_one_field_is_cards_mismatch_naming_the_instrument_and_the_first_field()
+    {
+        var world = new World();
+        Reproduce(world, t => t.Symbol == world.Symbols[2] ? t with { StopPrice = t.StopPrice + 1, ExitPrice = t.ExitPrice + 1 } : t);
+
+        var result = await AskExplained(world, 0, 2, 4);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("simulation.cards_mismatch");
+        result.Error.Kind.ShouldBe(ErrorKind.Conflict);
+        var field = result.Error.Fields!.Single();
+        field.Field.ShouldBe(world.Symbols[2]);
+        field.Code.ShouldBe("StopPrice");
+    }
+
+    [Fact]
+    public async Task Costs_and_costing_are_not_compared_because_they_are_applied_after_the_window_cut()
+    {
+        var world = new World();
+        Reproduce(world, t => t with { Costs = CostBasis.Charged });
+
+        var result = await AskExplained(world, 0);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : string.Empty);
+    }
+
+    [Fact]
+    public async Task A_missing_trade_or_a_missing_decision_is_a_mismatch()
+    {
+        var world = new World();
+        world.Engine.ExplainScript = (input, _) => new ExplainResult(new InstrumentReplay(FabricatedRun.Ran(input.InstrumentId, input.Symbol, D1, D3), [], []), new Dictionary<string, TradeExplanation>());
+
+        var result = await AskExplained(world, 0);
+
+        result.Error.Code.ShouldBe("simulation.cards_mismatch");
+        result.Error.Fields!.Single().Code.ShouldBe("trade");
+    }
+
+    [Theory]
+    [InlineData(TruthState.False, TruthState.True, TruthState.False, "setup")]
+    [InlineData(TruthState.True, TruthState.Unknown, TruthState.False, "trigger")]
+    [InlineData(TruthState.True, TruthState.True, TruthState.True, "invalidate")]
+    public async Task A_decision_whose_conditions_do_not_hold_is_a_mismatch_naming_the_list(TruthState setup, TruthState trigger, TruthState invalidate, string list)
+    {
+        var world = new World();
+        Reproduce(world, explain: t => Explained(t, setup, trigger, invalidate));
+
+        var result = await AskExplained(world, 0);
+
+        result.Error.Code.ShouldBe("simulation.cards_mismatch");
+        result.Error.Fields!.Single().Code.ShouldBe(list);
+    }
+
+    [Fact]
+    public async Task An_unknown_invalidate_item_in_an_any_list_is_not_a_true_invalidate()
+    {
+        var world = new World();
+        Reproduce(world, explain: t => Explained(t, invalidate: TruthState.Unknown));
+
+        var result = await AskExplained(world, 0);
+
+        result.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Changed_bars_are_cards_stale_before_any_recomputation_is_made()
+    {
+        var world = new World();
+        Reproduce(world);
+        var run = world.Run with { Instruments = [.. world.Run.Instruments.Select(i => i with { BarsSha256 = new string('0', 64) })] };
+
+        var result = await world.Handler().HandleAsync(new BuildTradeCardsQuery(run, world.Keys(0), Basis(world)), Ct);
+
+        result.Error.Code.ShouldBe("simulation.cards_stale");
+        world.Engine.Explains.ShouldBeEmpty();
     }
 
     // the adjustment of the chart bars
@@ -293,7 +428,7 @@ public sealed class BuildTradeCardsHandlerTests
             Trades = [world.Run.Trades[0], new RunTrade(FabricatedRun.Trade(world.Ids[0], world.Symbols[0], Side.Sell, D3), [])],
         };
 
-        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors).HandleAsync(new BuildTradeCardsQuery(run, [.. run.Trades.Select(t => t.Trade.Key)]), Ct);
+        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine()).HandleAsync(new BuildTradeCardsQuery(run, [.. run.Trades.Select(t => t.Trade.Key)]), Ct);
 
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : string.Empty);
         var (beforeSplit, onSplitDay) = (result.Value[0], result.Value[1]);
@@ -316,7 +451,7 @@ public sealed class BuildTradeCardsHandlerTests
         list.RemoveAll(b => b.EpochSeconds == Day.Epoch(D2, 555));
         var run = world.Run with { Instruments = [.. world.Run.Instruments.Select(i => i.InstrumentId == world.Ids[0] ? i with { BarsSha256 = BarStreamHash.Compute(list) } : i)] };
 
-        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors).HandleAsync(new BuildTradeCardsQuery(run, [run.Trades[0].Trade.Key]), Ct);
+        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine()).HandleAsync(new BuildTradeCardsQuery(run, [run.Trades[0].Trade.Key]), Ct);
 
         var card = result.Value.Single();
         card.OpeningBar.ShouldBeNull();
@@ -335,7 +470,7 @@ public sealed class BuildTradeCardsHandlerTests
         list.Sort((a, b) => a.EpochSeconds.CompareTo(b.EpochSeconds));
         var run = world.Run with { Instruments = [.. world.Run.Instruments.Select(i => i.InstrumentId == world.Ids[0] ? i with { BarsSha256 = BarStreamHash.Compute(list) } : i)] };
 
-        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors).HandleAsync(new BuildTradeCardsQuery(run, [run.Trades[0].Trade.Key]), Ct);
+        var result = await new BuildTradeCardsHandler(world.Fixture.Store, world.Fixture.BarQueries, world.Fixture.Factors, new FakeSimulationEngine()).HandleAsync(new BuildTradeCardsQuery(run, [run.Trades[0].Trade.Key]), Ct);
 
         result.Value.Single().DayBars.Count.ShouldBe(375);
     }

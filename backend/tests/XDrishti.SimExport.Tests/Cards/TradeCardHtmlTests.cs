@@ -69,7 +69,7 @@ public sealed partial class TradeCardHtmlTests
     // the sections
 
     [Fact]
-    public void The_card_has_the_banner_then_the_title_the_chart_the_timeline_the_arithmetic_the_rule_the_p3_04d_line_the_opening_bar_the_data_notes_and_the_run_key()
+    public void The_card_has_the_banner_then_the_title_the_chart_the_timeline_the_arithmetic_the_rule_the_conditions_the_opening_bar_the_data_notes_and_the_run_key()
     {
         var (_, run, data) = CardFixtures.Goldens()[0];
 
@@ -78,7 +78,7 @@ public sealed partial class TradeCardHtmlTests
         var order = new[]
         {
             "<header class=\"banner\">", "exploration: signal-level mechanics", "<details>", "not modelled: ", "</header>", "<h1>NSE:KESTREL BUY 2026-03-03, target, exact result R +2.000</h1>", "<h2>chart</h2>", "<svg viewBox",
-            "<h2>timeline</h2>", "<h2>arithmetic</h2>", "<h2>rule (BUY)</h2>", "strategy: ORB (or_min = 15, rr = 2)", "conditions at the decision bar: not in this export (P3-04d)", "<h2>stored 09:15 bar</h2>", "(ISS-21)",
+            "<h2>timeline</h2>", "<h2>arithmetic</h2>", "<h2>rule (BUY)</h2>", "strategy: ORB (or_min = 15, rr = 2)", "conditions: not recomputed for a stored run", "<h2>stored 09:15 bar</h2>", "(ISS-21)",
             "<h2>data notes</h2>", "<h2>run</h2>", "run key: " + run.RunKey,
         };
         var at = -1;

@@ -1,4 +1,4 @@
-export xd-sim-export-3
+export xd-sim-export-4
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -884,7 +884,7 @@ stop: or_opposite (minutes = or_min)
 exits: FIXED_RR (rr = 2)
 time rules: first entry 09:30, last entry 11:30, square off 15:15</pre>
 <h2>conditions at the decision bar</h2>
-<p>conditions at the decision bar: not in this export (P3-04d)</p>
+<p>conditions: not recomputed for a stored run</p>
 <h2>stored 09:15 bar</h2>
 <table>
 <thead><tr><th>prices</th><th>open</th><th>high</th><th>low</th><th>close</th><th>volume</th></tr>

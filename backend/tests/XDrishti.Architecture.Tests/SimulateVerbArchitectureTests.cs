@@ -81,12 +81,12 @@ public sealed class SimulateVerbArchitectureTests
     }
 
     [Fact]
-    public void The_verb_logs_with_the_ids_4405_to_4411_and_4419_to_4424_and_no_other()
+    public void The_verb_logs_with_the_ids_4405_to_4411_and_4419_to_4424_and_4486_and_no_other()
     {
         var ids = Verb("SimulateLog").GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
             .SelectMany(m => m.GetCustomAttributes<LoggerMessageAttribute>().Select(a => a.EventId)).Order().ToList();
 
-        ids.ShouldBe([4405, 4406, 4407, 4408, 4409, 4410, 4411, 4419, 4420, 4421, 4422, 4423, 4424]);
+        ids.ShouldBe([4405, 4406, 4407, 4408, 4409, 4410, 4411, 4419, 4420, 4421, 4422, 4423, 4424, 4486]);
     }
 
     [Fact]

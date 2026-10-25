@@ -6,12 +6,15 @@ using XDrishti.Domain.Research;
 namespace XDrishti.SimExport.Cards;
 
 /// <summary>
-/// One trade card as a static HTML file (spec P3-04c, C3 and C5): the banner of the run, the title, the chart, the timeline, the arithmetic of R with every operand printed, the costs when the run was costed, the rule, the line saying that
-/// the conditions at the decision bar come with P3-04d, the stored 09:15 bar, the data notes of the instrument and the run key. No script, no network reference, every dynamic string through <see cref="Html.Text"/>, no clock, no culture: two
+/// One trade card as a static HTML file (spec P3-04c, C3 and C5): the banner of the run, the title, the chart, the timeline, the arithmetic of R with every operand printed, the costs when the run was costed, the rule, the conditions at the decision
+/// bar (P3-04d: each condition with its truth and the value of every feature it read, recomputed by the engine that made the trade), the stored 09:15 bar, the data notes of the instrument and the run key. No script, no network reference, every dynamic string through <see cref="Html.Text"/>, no clock, no culture: two
 /// calls with equal arguments write the same bytes. The card prints no figure about the whole run: only the numbers of its own trade (a performance statistic is a claim a single trade cannot support).
 /// </summary>
 public static class TradeCardHtml
 {
+    /// <summary>The most reads of one condition a card lists; the compiler allows 64 and a page may not pass 150 KB, so a longer list is cut and says so.</summary>
+    private const int MaxReadsShown = 12;
+
     /// <summary>Writes the card of <paramref name="data"/> as UTF-8 to the sink.</summary>
     /// <param name="sink">Where the bytes go.</param>
     /// <param name="data">The trade and the bars of its day.</param>
@@ -42,7 +45,7 @@ public static class TradeCardHtml
         }
 
         Rule(page, run.Strategy, trade.Side);
-        page.Append("<h2>conditions at the decision bar</h2>\n<p>conditions at the decision bar: not in this export (P3-04d)</p>\n");
+        Conditions(page, data.Explanation);
         OpeningBar(page, data);
         DataNotes(page, data.Instrument);
         Identity(page, run, trade);
@@ -187,6 +190,39 @@ public static class TradeCardHtml
         }
 
         page.Append("<pre>").Append(Html.Lines(view.Lines)).Append("</pre>\n");
+    }
+
+    /// <summary>The conditions of the side at the decision bar (P3-04d): one table for each list that exists, with the truth of every condition and the value of each feature it read at its lag; "unknown never fires" is stated once.</summary>
+    private static void Conditions(StringBuilder page, TradeExplanation? explanation)
+    {
+        page.Append("<h2>conditions at the decision bar</h2>\n");
+        if (explanation is null)
+        {
+            page.Append("<p>conditions: not recomputed for a stored run</p>\n");
+            return;
+        }
+
+        page.Append("<p class=\"note\">decision at ").Append(Html.Text(CardFormat.Clock(explanation.DecisionEpochSeconds))).Append(" India time, evaluated on ").Append(Html.Text(ExportSpellings.Of(explanation.Timeframe)))
+            .Append(" bars. Recomputed by the engine that made the trade, from the same bars. A condition that is unknown never fires. A lag is the number of closed bars of the feature's own timeframe back from the latest.</p>\n");
+        foreach (var section in explanation.Sections)
+        {
+            page.Append("<h3>").Append(Html.Text(section.SectionName)).Append(" (").Append(section.Mode == "any" ? "any of" : "all of").Append(")</h3>\n<table>\n<thead>");
+            CardPage.Row(page, "th", "condition", "truth", "reads");
+            page.Append("</thead>\n<tbody>\n");
+            foreach (var item in section.Items)
+            {
+                var omitted = item.ReadsOmitted || item.Reads.Count > MaxReadsShown;
+                var reads = string.Join("; ", item.Reads.Take(MaxReadsShown).Select(r => r.Name + " (" + ExportSpellings.Of(r.Timeframe) + ", lag " + CardFormat.Int(r.Lag) + ") = " + (r.Value is { } v ? CardFormat.Significant(v) : "not ready")));
+                if (omitted)
+                {
+                    reads += (reads.Length == 0 ? string.Empty : "; ") + "more reads not listed";
+                }
+
+                CardPage.Row(page, "td", item.Text, item.Truth.ToString().ToLowerInvariant(), reads.Length == 0 ? "no feature read" : reads);
+            }
+
+            page.Append("</tbody>\n</table>\n");
+        }
     }
 
     private static void OpeningBar(StringBuilder page, TradeCardData data)

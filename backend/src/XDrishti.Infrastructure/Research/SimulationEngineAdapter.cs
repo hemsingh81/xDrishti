@@ -69,6 +69,19 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine
         return InstrumentReplayer.Replay(handle.Strategy, input);
     }
 
+    public ExplainResult Explain(IPreparedStrategy strategy, InstrumentReplayInput input, IReadOnlyList<ExplainRequest> requests)
+    {
+        ArgumentNullException.ThrowIfNull(strategy);
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(requests);
+        if (strategy is not PreparedHandle handle)
+        {
+            throw new ArgumentException("The strategy was not prepared by this engine.", nameof(strategy));
+        }
+
+        return InstrumentReplayer.Explain(handle.Strategy, input, requests);
+    }
+
     public ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input)
     {
         ArgumentNullException.ThrowIfNull(strategy);
