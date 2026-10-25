@@ -5,7 +5,8 @@ import { ErrorState, LoadingState } from '@/shared/ui';
 import { experimentQuery, lessonQuery, type Lesson } from '../api/learningQueries';
 import { outcomeWords, wordsOf } from '../lib/outcomeText';
 import { lessonResultWord, moveNote } from '../lib/roleText';
-import { DrawerSection, RecordDrawer, StepList } from './RecordDrawer';
+import { DrawerSection, StepList } from './DrawerSection';
+import { RecordDrawer } from './RecordDrawer';
 import { RValue } from './RValue';
 import { TermRow } from './TermRow';
 

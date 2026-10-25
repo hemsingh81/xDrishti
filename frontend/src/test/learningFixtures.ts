@@ -319,7 +319,7 @@ export const buildDigest = (over: Partial<Digest> = {}): Digest => ({
   weekEnd: '2026-10-25',
   sections: [
     { key: 'cells', title: 'Cells', lines: ['2 new cells.'] },
-    { key: 'plans', title: 'Plan outcomes', lines: ['3 plans graded.'] },
+    { key: 'plans', title: 'Plan outcomes (simulated on plan prices)', lines: ['3 plans graded.'] },
   ],
   text: 'Digest',
   builtBy: 'service:weekly',

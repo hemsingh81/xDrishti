@@ -4,7 +4,8 @@ import { ErrorState, LoadingState } from '@/shared/ui';
 import { experimentQuery } from '../api/learningQueries';
 import { OutcomeBadge } from './OutcomeBadge';
 import { PreformattedText } from './PreformattedText';
-import { DrawerSection, RecordDrawer } from './RecordDrawer';
+import { DrawerSection } from './DrawerSection';
+import { RecordDrawer } from './RecordDrawer';
 
 /** One experiment: the stored report (with its honest limits) and the rules used, as text. */
 export function ExperimentDrawer({ id, onClose }: { id: number; onClose: () => void }) {

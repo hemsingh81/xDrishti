@@ -130,3 +130,29 @@ describe('Learning, Hypotheses section', () => {
     expect(dialog.getByText(/May move to: approved, rejected/)).toBeInTheDocument();
   });
 });
+
+describe('Learning, markup in experiment and hypothesis text', () => {
+  const markup = '<b onmouseover=alert(1)>x</b>';
+
+  it('draws experiment reasons as text', async () => {
+    mountRecords({ experiments: [buildExperiment({ reasons: [markup] })] });
+    renderLearning('?tab=experiments');
+    const reasons = within(await screen.findByRole('list', { name: 'Reasons for experiment 7' }));
+    expect(reasons.getByText(markup)).toBeInTheDocument();
+  });
+
+  it('draws the hypothesis rationale and the server note as text', async () => {
+    mountRecords({ hypotheses: [buildHypothesis({ rationale: markup, note: markup })] });
+    renderLearning('?tab=experiments');
+    expect(await screen.findAllByText(markup)).toHaveLength(2);
+    expect(document.querySelector('b')).toBeNull();
+  });
+
+  it('shows a hypothesis in every state', async () => {
+    const states = ['proposed', 'approved', 'running', 'judged', 'accepted', 'rejected', 'expired'];
+    mountRecords({ hypotheses: states.map((state, index) => buildHypothesis({ id: index + 1, state })) });
+    renderLearning('?tab=experiments');
+    const list = within(await screen.findByRole('list', { name: 'Hypotheses, newest first' }));
+    for (const state of states) expect(list.getByText(`State: ${state}`)).toBeInTheDocument();
+  });
+});

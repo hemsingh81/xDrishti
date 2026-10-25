@@ -96,7 +96,7 @@ describe('Learning, Digest tab', () => {
         buildDigest({
           sections: [
             { key: 'cells', title: 'Cells', lines: ['<b>2</b> new cells.'] },
-            { key: 'plans', title: 'Plan outcomes', lines: ['3 graded.'] },
+            { key: 'plans', title: 'Plan outcomes (simulated on plan prices)', lines: ['3 graded.'] },
           ],
         }),
         buildDigest({
@@ -112,7 +112,7 @@ describe('Learning, Digest tab', () => {
     const weeks = within(await screen.findByRole('list', { name: 'Stored digests, newest week first' }));
     expect(weeks.getByText(/2026-W43/)).toBeInTheDocument();
     expect(await screen.findByText('<b>2</b> new cells.')).toBeInTheDocument();
-    expect(screen.getByText('simulated on plan prices')).toBeInTheDocument();
+    expect(screen.getByText('Plan outcomes (simulated on plan prices)')).toBeInTheDocument();
     expect(screen.getByText('Every section says nothing was applied.')).toBeInTheDocument();
 
     await userEvent.click(weeks.getByRole('button', { name: /2026-W42/ }));
@@ -123,6 +123,55 @@ describe('Learning, Digest tab', () => {
   it('says no digest is stored for a week the list lacks', async () => {
     mountRecords({ digests: [buildDigest()] });
     renderLearning('?tab=digest&week=2026-W01');
+    expect(await screen.findByText('No digest stored for this week')).toBeInTheDocument();
+  });
+});
+
+describe('Learning, markup in server text', () => {
+  const markup = '<img src=x onerror=alert(1)>';
+
+  it('draws model reasons, designation reasons and an empty designation list as text', async () => {
+    mountRecords({
+      models: [buildModel({ reasons: [markup] })],
+      modelDetails: [
+        buildModelDetail({
+          designations: [
+            { id: 1, role: 'champion', reason: markup, createdAt: '2026-10-19T04:30:00Z', createdBy: 'cli' },
+          ],
+        }),
+      ],
+    });
+    renderLearning('?tab=models&model=2');
+    const dialog = within(await screen.findByRole('dialog', { name: 'Model #2' }));
+    expect(await dialog.findByText(markup)).toBeInTheDocument();
+    expect(document.querySelector('img')).toBeNull();
+    expect(screen.getByRole('list', { name: 'Reasons for model 2', hidden: true })).toHaveTextContent(markup);
+  });
+
+  it('says no designation is stored', async () => {
+    mountRecords({ modelDetails: [buildModelDetail({ designations: [] })] });
+    renderLearning('?tab=models&model=2');
+    expect(await screen.findByText('No designation stored')).toBeInTheDocument();
+  });
+
+  it('gives each verdict its own icon and its word', async () => {
+    mountRecords({
+      models: [
+        buildModel(),
+        buildModel({ id: 1, verdict: 'CannotBeatBaselines' }),
+        buildModel({ id: 3, verdict: 'Inconclusive' }),
+      ],
+    });
+    renderLearning('?tab=models');
+    const chip = async (word: string) => (await screen.findByText(word)).closest<HTMLElement>('.MuiChip-root')!;
+    expect(within(await chip('Eligible')).getByTestId('CheckOutlinedIcon')).toBeInTheDocument();
+    expect(within(await chip('Cannot beat baselines')).getByTestId('CancelOutlinedIcon')).toBeInTheDocument();
+    expect(within(await chip('Inconclusive')).getByTestId('HelpOutlineOutlinedIcon')).toBeInTheDocument();
+  });
+
+  it('treats a malformed week in the address as no digest, asking the server nothing', async () => {
+    mountRecords({ digests: [buildDigest()] });
+    renderLearning('?tab=digest&week=../etc');
     expect(await screen.findByText('No digest stored for this week')).toBeInTheDocument();
   });
 });

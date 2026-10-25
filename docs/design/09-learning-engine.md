@@ -205,6 +205,8 @@ Built (P6-16, [ADR 0078](../adr/0078-lessons-a-finding-a-linked-fix-and-a-result
 
 Built (P6-18, [ADR 0080](../adr/0080-the-phase-check-exit-criteria-from-stored-records-and-never-met-on-thin-data.md)): the first read for this screen is `GET /api/learning/overview` (counts and newest stored verdicts, nothing computed), and the phase's exit criteria are judged by `xd learn phase-check` from stored records as MET, NOT MET or NOT EVALUABLE with the limits printed; MET needs the champion record, 6 folds and a replay time, so on 2.1 years most answers are NOT EVALUABLE. The Journey view and the screen itself are P8.
 
+Built (P8-02, P8-03): the Learning screen has the tabs Overview and Setups (P8-02) and Lessons, Experiments (with Hypotheses), Models and Digest (P8-03), all read only over the GET endpoints: no control moves a lesson, hypothesis, model or cell, and the states a record "may move to" are text that names the `xd learn` verb. "No measurable change", "Inconclusive", "Not better" and "no model stored" are ordinary neutral results; a before or after figure appears only in a lesson's drawer and only with the trade count of its experiment. Journey, Smart rules and the rest of this table are later P8 slices.
+
 The frozen-model line is what makes progress honest: improvement is measured against "what would have happened
 if the system had stopped learning", on the same days and instruments.
 

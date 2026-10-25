@@ -5,7 +5,8 @@ import { ErrorState, LoadingState } from '@/shared/ui';
 import { modelQuery, type ModelDetail } from '../api/learningQueries';
 import { CalibrationTable } from './CalibrationTable';
 import { PreformattedText } from './PreformattedText';
-import { DrawerSection, RecordDrawer } from './RecordDrawer';
+import { DrawerSection } from './DrawerSection';
+import { RecordDrawer } from './RecordDrawer';
 
 const topFeatures = 15;
 const weight = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
@@ -67,25 +68,29 @@ function Body({ detail }: { detail: ModelDetail }) {
         )}
       </DrawerSection>
       <DrawerSection title="Designations">
-        <Box
-          component="ol"
-          aria-label="Designations, oldest first"
-          sx={{ m: 0, p: 0, listStyle: 'none', display: 'grid', gap: 1.5 }}
-        >
-          {detail.designations.map((d) => (
-            <Box key={d.id} component="li" sx={{ borderLeft: 3, borderColor: 'divider', pl: 1.5 }}>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                {d.role}{' '}
-                <Typography component="span" variant="caption" color="text.secondary">
-                  by {d.createdBy}, {formatAsOf(d.createdAt)}
+        {detail.designations.length === 0 ? (
+          <NonValue state={{ kind: 'empty', reason: 'No designation stored' }} />
+        ) : (
+          <Box
+            component="ol"
+            aria-label="Designations, oldest first"
+            sx={{ m: 0, p: 0, listStyle: 'none', display: 'grid', gap: 1.5 }}
+          >
+            {detail.designations.map((d) => (
+              <Box key={d.id} component="li" sx={{ borderLeft: 3, borderColor: 'divider', pl: 1.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  {d.role}{' '}
+                  <Typography component="span" variant="caption" color="text.secondary">
+                    by {d.createdBy}, {formatAsOf(d.createdAt)}
+                  </Typography>
                 </Typography>
-              </Typography>
-              <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
-                {d.reason}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
+                <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
+                  {d.reason}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
       </DrawerSection>
       <DrawerSection title="Limits">
         <Box component="ul" sx={{ m: 0, pl: 2.5 }}>

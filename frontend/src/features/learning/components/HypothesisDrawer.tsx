@@ -4,7 +4,8 @@ import { formatAsOf } from '@/shared/analytics';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { hypothesisQuery } from '../api/learningQueries';
 import { moveNote } from '../lib/roleText';
-import { DrawerSection, RecordDrawer, StepList } from './RecordDrawer';
+import { DrawerSection, StepList } from './DrawerSection';
+import { RecordDrawer } from './RecordDrawer';
 import { TermRow } from './TermRow';
 
 /** One hypothesis with its history. The states it may move to are text; the move is not made here. */

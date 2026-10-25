@@ -330,6 +330,7 @@ and two actions: <strong>Revert</strong> and <strong>Re-run with a different val
 </tr>
 </tbody></table>
 <p>Built (P6-18, <a href="../adr/0080-the-phase-check-exit-criteria-from-stored-records-and-never-met-on-thin-data.html">ADR 0080</a>): the first read for this screen is <code>GET /api/learning/overview</code> (counts and newest stored verdicts, nothing computed), and the phase&#39;s exit criteria are judged by <code>xd learn phase-check</code> from stored records as MET, NOT MET or NOT EVALUABLE with the limits printed; MET needs the champion record, 6 folds and a replay time, so on 2.1 years most answers are NOT EVALUABLE. The Journey view and the screen itself are P8.</p>
+<p>Built (P8-02, P8-03): the Learning screen has the tabs Overview and Setups (P8-02) and Lessons, Experiments (with Hypotheses), Models and Digest (P8-03), all read only over the GET endpoints: no control moves a lesson, hypothesis, model or cell, and the states a record &quot;may move to&quot; are text that names the <code>xd learn</code> verb. &quot;No measurable change&quot;, &quot;Inconclusive&quot;, &quot;Not better&quot; and &quot;no model stored&quot; are ordinary neutral results; a before or after figure appears only in a lesson&#39;s drawer and only with the trade count of its experiment. Journey, Smart rules and the rest of this table are later P8 slices.</p>
 <p>The frozen-model line is what makes progress honest: improvement is measured against &quot;what would have happened
 if the system had stopped learning&quot;, on the same days and instruments.</p>
 <h2 id="12-tweak-re-run-experiments">12. Tweak &amp; re-run (experiments)<a class="hash" href="#12-tweak-re-run-experiments" aria-label="Link to this section">#</a></h2>
@@ -523,7 +524,7 @@ the last 100 trades, is flagged for review instead of being trusted blindly.</p>
     <a class="prev" href="08-exits-and-risk.html"><small>← Previous  [</small>08 · Exits &amp; risk</a>
     <a class="next" href="10-trade-selection.html"><small>Next  ] →</small>10 · Trade selection</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-25 09:45</footer>
+  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-25 12:01</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-four-layers" class="d2">1. Four layers</a>
 <a href="#2-validation-purged-walk-forward" class="d2">2. Validation: purged walk-forward</a>

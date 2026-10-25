@@ -28,6 +28,7 @@ export const modelRoles = ['all', 'challenger', 'champion', 'retired'] as const;
 export const moveNote = (verb: string): string =>
   `This screen cannot make the move; it is made with the CLI (xd learn ${verb}).`;
 
+// shortcut: a pipe in the subject means a cell key; monitors name a model without one. A typed field would need an API change.
 /** A cell key has pipes; a model subject does not. */
 export const isCellKey = (subject: string): boolean => subject.includes('|');
 

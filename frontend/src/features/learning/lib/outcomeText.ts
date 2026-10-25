@@ -21,9 +21,6 @@ export const verdictWords: Record<string, Words> = {
 };
 
 /** A name the map lacks is shown as sent, with a note, never hidden. */
-export function wordsOf(map: Record<string, Words>, name: string): Words & { known: boolean } {
-  const found = map[name];
-  return found
-    ? { ...found, known: true }
-    : { word: name, meaning: 'Unknown outcome: this screen has no wording for it.', known: false };
+export function wordsOf(map: Record<string, Words>, name: string): Words {
+  return map[name] ?? { word: name, meaning: 'Unknown outcome: this screen has no wording for it.' };
 }

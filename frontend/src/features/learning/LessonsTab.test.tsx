@@ -112,3 +112,12 @@ describe('Learning, Lessons tab', () => {
     expect(dialog.queryByText(/Pooled mean R/)).not.toBeInTheDocument();
   });
 });
+
+describe('Learning, markup in lesson text', () => {
+  it('draws the server note as text', async () => {
+    mountRecords({ lessons: [buildLesson({ note: '<i>nothing</i> applied' })] });
+    renderLearning('?tab=lessons');
+    expect(await screen.findByText('<i>nothing</i> applied')).toBeInTheDocument();
+    expect(document.querySelector('i')).toBeNull();
+  });
+});

@@ -1,4 +1,5 @@
 import CheckIcon from '@mui/icons-material/CheckOutlined';
+import CancelIcon from '@mui/icons-material/CancelOutlined';
 import HelpIcon from '@mui/icons-material/HelpOutlineOutlined';
 import RemoveIcon from '@mui/icons-material/RemoveCircleOutlineOutlined';
 import SavingsIcon from '@mui/icons-material/SavingsOutlined';
@@ -8,6 +9,8 @@ import { outcomeWords, verdictWords, wordsOf, type Words } from '../lib/outcomeT
 
 const icons: Record<string, SvgIconComponent> = {
   Better: CheckIcon,
+  Eligible: CheckIcon,
+  CannotBeatBaselines: CancelIcon,
   NotBetter: RemoveIcon,
   CheaperAssumption: SavingsIcon,
 };
