@@ -2826,6 +2826,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/audit/entries': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The audit, newest first, merged from the sign-in, account, approval, plan, autonomy and learning records (limit 1 to 200, default 50; from/to India dates, default the last 30 days; source, category, kind, outcome, actor take comma lists; account; q 3 to 64 characters, matched against the redacted summary only). Cursor paging. A record that cannot be read is named in sources. 422 audit.invalid */
+    get: operations['ListAuditEntries'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/audit/entries/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One audit entry with its detail fields (id as in the list, such as auth:<uuid> or approval:12). A sign-in entry adds the IP address and user agent. 404 audit.not_found */
+    get: operations['GetAuditEntry'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/audit/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Counts of the window per record, category and outcome, with the same per-record read states. 422 audit.invalid */
+    get: operations['GetAuditSummary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/audit/kinds': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The kinds each record can hold, with category and outcome, for the filter lists. */
+    get: operations['ListAuditKinds'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/hypotheses': {
     parameters: {
       query?: never;
@@ -3868,6 +3936,38 @@ export interface components {
       kind: string;
       target: string;
     };
+    /** @description A count under a key (source, category or outcome). */
+    AuditCount: {
+      key: string;
+      /** Format: int32 */
+      count: number;
+    };
+    /** @description One row with its detail fields (IP address and user agent for a sign-in row; confirm reason, modification and cutoff for an approval). */
+    AuditEntryDetailView: {
+      entry: components['schemas']['AuditEntryView'];
+      fields: components['schemas']['AuditFieldView'][];
+    };
+    /** @description One row of the audit, redacted. ActorKind is owner, system, rule, cli, other or other_address (a sign-in address that is not the owner's; no address is shown then). */
+    AuditEntryView: {
+      id: string;
+      /** Format: date-time */
+      at: string;
+      source: string;
+      category: string;
+      kind: string;
+      outcome: string;
+      actorKind: string;
+      actor: null | string;
+      /** Format: uuid */
+      accountId: null | string;
+      accountName: null | string;
+      summary: string;
+      redacted: boolean;
+      /** Format: int64 */
+      planId: null | number;
+      /** Format: int64 */
+      itemId: null | number;
+    };
     AuditEventResponse: {
       /** Format: date-time */
       at: string;
@@ -3875,6 +3975,57 @@ export interface components {
       email: null | string;
       ip: null | string;
       userAgent: null | string;
+    };
+    /** @description A labelled plain-text value. */
+    AuditFieldView: {
+      label: string;
+      value: string;
+    };
+    /** @description A kind a store can hold, with its category, outcome and words. */
+    AuditKindView: {
+      source: string;
+      kind: string;
+      label: string;
+      category: string;
+      outcome: string;
+    };
+    /** @description Every kind per source, for the filter lists. */
+    AuditKindsView: {
+      kinds: components['schemas']['AuditKindView'][];
+      categories: string[];
+      outcomes: string[];
+      actors: string[];
+    };
+    /** @description A page of the merged audit. NextCursor is null at the end. Limits are sentences the screen must show. */
+    AuditPageView: {
+      window: components['schemas']['AuditWindowView'];
+      items: components['schemas']['AuditEntryView'][];
+      nextCursor: null | string;
+      sources: components['schemas']['AuditSourceState'][];
+      limits: string[];
+    };
+    /** @description What happened to one store in this request: `value` (rows read), `empty` (none; the reason says whether it was not asked for or had none) or `unavailable` (the read failed; the reason is a fixed code). */
+    AuditSourceState: {
+      source: string;
+      state: string;
+      reason: null | string;
+    };
+    /** @description Counts of the window; Total is every row of the window, before any filter other than the dates. */
+    AuditSummaryView: {
+      window: components['schemas']['AuditWindowView'];
+      /** Format: int32 */
+      total: number;
+      bySource: components['schemas']['AuditCount'][];
+      byCategory: components['schemas']['AuditCount'][];
+      byOutcome: components['schemas']['AuditCount'][];
+      sources: components['schemas']['AuditSourceState'][];
+    };
+    /** @description The days a response covers (India dates, inclusive). */
+    AuditWindowView: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
     };
     /** @description The daily automatic refresh: whether it is on, at what India time, and when it runs next. */
     AutoRefreshView: {
@@ -19255,6 +19406,130 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListAuditEntries: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+        source?: string;
+        category?: string;
+        kind?: string;
+        outcome?: string;
+        actor?: string;
+        account?: string;
+        q?: string;
+        limit?: number;
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuditPageView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAuditEntry: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuditEntryDetailView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAuditSummary: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuditSummaryView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListAuditKinds: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuditKindsView'];
         };
       };
     };

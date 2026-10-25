@@ -382,7 +382,7 @@ The labels, the banner and the readme carry the roadmap's "what a P3 number mean
 | `trading` | `accounts`, `account_roles`, `account_snapshots`, `plans`, `plan_items` (primary/reserve/rejected; indicative entry, stop, stop anchor, target, reward-to-risk and session as nullable numeric columns, P7-19), `outcomes`, `journal_entries`, `fills`, (later) `orders`, `order_events` |
 | `lab` | `strategies`, `strategy_versions`, `lab_runs`, `lab_results`, `test_ledger` |
 | `config` | `config_versions` (YAML, hash, author, activated_at), `active_config` |
-| `ops` | `commands`, `service_schedules`, `service_runs`, `validation_runs`, `validation_results`, `data_quality_issues`, `audit_log`, `notifications` |
+| `ops` | `commands`, `service_schedules`, `service_runs`, `validation_runs`, `validation_results`, `data_quality_issues`, `notifications` (no `audit_log`: the audit is six insert-only stores read by the Audit log screen, [ADR 0117](../adr/0117-the-audit-log-screen-is-a-read-model-over-the-six-insert-only-stores-merged-by-keyset-in-memory-with-pattern-redaction.md)) |
 | `insights` | `alerts`, `action_items` (status: open / snoozed / done), `action_thresholds` |
 | `workflow` | `approvals`, `suggestions` |
 | `auth` | ASP.NET Core Identity tables (owner user, password hash, lockout) |

@@ -15,6 +15,7 @@ internal sealed class AccountEventConfiguration : IEntityTypeConfiguration<Accou
         builder.Property(x => x.AccountId);
         builder.HasOne<BrokerAccount>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.AccountId, x.At });
+        builder.HasIndex(x => x.At).HasDatabaseName("ix_account_events_at"); // the audit screen reads the newest rows of all accounts (spec P8-22)
         builder.Property(x => x.Event).HasColumnName("event").HasConversion<string>().HasMaxLength(48).IsRequired();
         builder.Property(x => x.Detail).HasMaxLength(AccountEvent.MaxDetailLength);
         builder.Property(x => x.Actor).HasMaxLength(AccountEvent.MaxActorLength).IsRequired();

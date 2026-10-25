@@ -294,7 +294,7 @@ Rejected suggestions are not repeated for a configurable number of days.
 | `trading.account_roles` | account_id, role (data/trading/portfolio), is_primary/standby, enabled, settings |
 | `auth.*` | ASP.NET Core Identity tables (user, password hash, lockout) |
 | `ops.commands` | Desired-state changes and requested actions, status, actor, timestamps |
-| `ops.audit_log` | Every login, configuration change, approval and service action |
+| ~~`ops.audit_log`~~ (not built; [ADR 0117](../adr/0117-the-audit-log-screen-is-a-read-model-over-the-six-insert-only-stores-merged-by-keyset-in-memory-with-pattern-redaction.md)) | The audit is six insert-only stores (`auth.audit_events`, `accounts.account_events`, `workflow.approvals`, `trading.plan_events`, `workflow.autonomy_settings`, `research.learning_changelog`); the Audit log screen reads them (`GET /api/audit/*`) |
 | `workflow.approvals` | Item type, item id, decision, modifications, actor, decided_at, cutoff |
 | `workflow.suggestions` | Source (AI / engine), type, payload, reason, expiry, status |
 | `ops.service_runs` | Service/job runs with schedule, start/end, outcome, catch-up flag |

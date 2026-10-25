@@ -58,6 +58,9 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_account_events");
 
+                    b.HasIndex("At")
+                        .HasDatabaseName("ix_account_events_at");
+
                     b.HasIndex("AccountId", "At")
                         .HasDatabaseName("ix_account_events_account_id_at");
 
@@ -3704,6 +3707,9 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_learning_changelog");
 
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_learning_changelog_created_at");
+
                     b.HasIndex("RevertsId")
                         .IsUnique()
                         .HasDatabaseName("uq_learning_changelog_reverts_id")
@@ -5420,6 +5426,9 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_approvals");
 
+                    b.HasIndex("DecidedAt")
+                        .HasDatabaseName("ix_approvals_decided_at");
+
                     b.HasIndex("ItemId")
                         .HasDatabaseName("ix_approvals_item_id");
 
@@ -5859,6 +5868,9 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ApprovalId")
                         .HasDatabaseName("ix_plan_events_approval_id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_plan_events_created_at");
 
                     b.HasIndex("ItemId", "FromState")
                         .IsUnique()

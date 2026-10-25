@@ -68,7 +68,7 @@ export const navigation: NavSection[] = [
       { path: '/accounts', label: 'Accounts', icon: PeopleIcon, badge: 'accounts-attention' },
       { path: '/services', label: 'Services', icon: DnsIcon },
       { path: '/settings', label: 'Settings', icon: TuneIcon },
-      { path: '/audit', label: 'Audit log', icon: HistoryIcon, phase: 'P8' },
+      { path: '/audit', label: 'Audit log', icon: HistoryIcon },
       { path: '/system', label: 'System status', icon: MonitorHeartIcon },
     ],
   },

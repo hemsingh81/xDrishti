@@ -13,6 +13,7 @@ using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
+using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
 using XDrishti.Application.Lab;
@@ -81,6 +82,11 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ChangePasswordCommand>, ChangePasswordHandler>();
         services.AddScoped<ICommandHandler<UpdateProfileCommand, AccountResponse>, UpdateProfileHandler>();
         services.AddScoped<IQueryHandler<GetAuditQuery, IReadOnlyList<AuditEventResponse>>, GetAuditHandler>();
+        services.AddScoped<AuditReader>(); // the merged, keyset-paged read of the six audit stores (spec P8-22, ADR 0117)
+        services.AddScoped<IQueryHandler<ListAuditQuery, Result<AuditPageView>>, ListAuditHandler>();
+        services.AddScoped<IQueryHandler<GetAuditEntryQuery, Result<AuditEntryDetailView>>, GetAuditEntryHandler>();
+        services.AddScoped<IQueryHandler<GetAuditSummaryQuery, Result<AuditSummaryView>>, GetAuditSummaryHandler>();
+        services.AddScoped<IQueryHandler<ListAuditKindsQuery, AuditKindsView>, ListAuditKindsHandler>();
         services.AddScoped<ICommandHandler<ProvisionOwnerCommand, ProvisionOutcome>, ProvisionOwnerHandler>();
         services.AddScoped<ICommandHandler<ResetOwnerPasswordCommand>, ResetOwnerPasswordHandler>();
 

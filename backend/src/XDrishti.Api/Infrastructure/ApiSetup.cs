@@ -92,6 +92,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, ModelsEndpoints>();
         services.AddSingleton<IEndpointModule, ExperimentsEndpoints>();
         services.AddSingleton<IEndpointModule, ChangelogEndpoints>();
+        services.AddSingleton<IEndpointModule, AuditEndpoints>();
         services.AddSingleton<IEndpointModule, HypothesesEndpoints>();
         services.AddSingleton<IEndpointModule, LessonsEndpoints>();
         services.AddSingleton<IEndpointModule, PlansEndpoints>();

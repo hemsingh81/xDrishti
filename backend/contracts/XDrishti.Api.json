@@ -9379,6 +9379,226 @@
         }
       }
     },
+    "/api/audit/entries": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "The audit, newest first, merged from the sign-in, account, approval, plan, autonomy and learning records (limit 1 to 200, default 50; from/to India dates, default the last 30 days; source, category, kind, outcome, actor take comma lists; account; q 3 to 64 characters, matched against the redacted summary only). Cursor paging. A record that cannot be read is named in sources. 422 audit.invalid",
+        "operationId": "ListAuditEntries",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "account",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPageView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audit/entries/{id}": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "One audit entry with its detail fields (id as in the list, such as auth:<uuid> or approval:12). A sign-in entry adds the IP address and user agent. 404 audit.not_found",
+        "operationId": "GetAuditEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntryDetailView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audit/summary": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Counts of the window per record, category and outcome, with the same per-record read states. 422 audit.invalid",
+        "operationId": "GetAuditSummary",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditSummaryView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audit/kinds": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "The kinds each record can hold, with category and outcome, for the filter lists.",
+        "operationId": "ListAuditKinds",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditKindsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/hypotheses": {
       "get": {
         "tags": [
@@ -13303,6 +13523,125 @@
         },
         "description": "What the owner can do about an item (ADR 0027), at most two per item. `Kind``route`: `Target` is an in-app path with its query (`/accounts?account=…&amp;tab=connection`) to navigate to. `Kind``command`: `Target` is an existing\nendpoint as `METHOD /api/path` (`POST /api/accounts/{id}/sync/broker-history`), which the browser calls with its session and CSRF token like any other call of the app - no new surface."
       },
+      "AuditCount": {
+        "required": [
+          "key",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A count under a key (source, category or outcome)."
+      },
+      "AuditEntryDetailView": {
+        "required": [
+          "entry",
+          "fields"
+        ],
+        "type": "object",
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/AuditEntryView"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditFieldView"
+            }
+          }
+        },
+        "description": "One row with its detail fields (IP address and user agent for a sign-in row; confirm reason, modification and cutoff for an approval)."
+      },
+      "AuditEntryView": {
+        "required": [
+          "id",
+          "at",
+          "source",
+          "category",
+          "kind",
+          "outcome",
+          "actorKind",
+          "actor",
+          "accountId",
+          "accountName",
+          "summary",
+          "redacted",
+          "planId",
+          "itemId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "actorKind": {
+            "type": "string"
+          },
+          "actor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          },
+          "redacted": {
+            "type": "boolean"
+          },
+          "planId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "itemId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "One row of the audit, redacted. ActorKind is owner, system, rule, cli, other or other_address (a sign-in address that is not the owner's; no address is shown then)."
+      },
       "AuditEventResponse": {
         "required": [
           "at",
@@ -13339,6 +13678,212 @@
             ]
           }
         }
+      },
+      "AuditFieldView": {
+        "required": [
+          "label",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "description": "A labelled plain-text value."
+      },
+      "AuditKindView": {
+        "required": [
+          "source",
+          "kind",
+          "label",
+          "category",
+          "outcome"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          }
+        },
+        "description": "A kind a store can hold, with its category, outcome and words."
+      },
+      "AuditKindsView": {
+        "required": [
+          "kinds",
+          "categories",
+          "outcomes",
+          "actors"
+        ],
+        "type": "object",
+        "properties": {
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditKindView"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "actors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "Every kind per source, for the filter lists."
+      },
+      "AuditPageView": {
+        "required": [
+          "window",
+          "items",
+          "nextCursor",
+          "sources",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "window": {
+            "$ref": "#/components/schemas/AuditWindowView"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEntryView"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditSourceState"
+            }
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "A page of the merged audit. NextCursor is null at the end. Limits are sentences the screen must show."
+      },
+      "AuditSourceState": {
+        "required": [
+          "source",
+          "state",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "What happened to one store in this request: `value` (rows read), `empty` (none; the reason says whether it was not asked for or had none) or `unavailable` (the read failed; the reason is a fixed code)."
+      },
+      "AuditSummaryView": {
+        "required": [
+          "window",
+          "total",
+          "bySource",
+          "byCategory",
+          "byOutcome",
+          "sources"
+        ],
+        "type": "object",
+        "properties": {
+          "window": {
+            "$ref": "#/components/schemas/AuditWindowView"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bySource": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditCount"
+            }
+          },
+          "byCategory": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditCount"
+            }
+          },
+          "byOutcome": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditCount"
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditSourceState"
+            }
+          }
+        },
+        "description": "Counts of the window; Total is every row of the window, before any filter other than the dates."
+      },
+      "AuditWindowView": {
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "description": "The days a response covers (India dates, inclusive)."
       },
       "AutoRefreshView": {
         "required": [
@@ -35916,6 +36461,9 @@
     },
     {
       "name": "Learning"
+    },
+    {
+      "name": "Audit"
     },
     {
       "name": "Plans"

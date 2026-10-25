@@ -10,6 +10,7 @@ using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
+using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
 using XDrishti.Application.Lab;
@@ -125,6 +126,10 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(PlanJournalView))]
 [JsonSerializable(typeof(GradeReportData))]
 [JsonSerializable(typeof(IReadOnlyList<PlanRunView>))]
+[JsonSerializable(typeof(AuditPageView))]
+[JsonSerializable(typeof(AuditEntryDetailView))]
+[JsonSerializable(typeof(AuditSummaryView))]
+[JsonSerializable(typeof(AuditKindsView))]
 [JsonSerializable(typeof(ChangelogEntryView))]
 [JsonSerializable(typeof(IReadOnlyList<ChangelogEntryView>))]
 [JsonSerializable(typeof(CellStateView))]

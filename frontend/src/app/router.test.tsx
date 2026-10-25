@@ -35,10 +35,10 @@ describe('app routes', () => {
   });
 
   it('shows the roadmap phase for screens that are not built yet', async () => {
-    renderRoutes(routes, { initialPath: '/audit' });
+    renderRoutes(routes, { initialPath: '/suggestions' });
 
     const note = await screen.findByText(/This screen is planned for roadmap phase/);
-    expect(within(note).getByText('P8')).toBeInTheDocument();
+    expect(within(note).getByText('P9')).toBeInTheDocument();
   });
 
   it('opens the Learning screen (no longer a placeholder) and marks it in the navigation', async () => {
