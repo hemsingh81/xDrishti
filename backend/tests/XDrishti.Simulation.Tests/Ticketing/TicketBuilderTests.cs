@@ -112,6 +112,34 @@ public sealed class TicketBuilderTests
     }
 
     [Fact]
+    public void A_swing_low_stop_with_a_fixed_rr_exit_carries_a_level_anchor_and_a_target_that_matches_the_text()
+    {
+        var draft = BaseBreakout(Days(100), 100);
+
+        Assert.Equal(StopAnchor.Level, draft.StopAnchor);
+        var entry = draft.IndicativeEntry!.Value;
+        Assert.Equal(entry + (2 * (entry - draft.StopLevel!.Value)), draft.TargetLevel!.Value, 9);
+        var number = draft.TargetLevel.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Contains("indicative level " + number, draft.TargetText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_percentage_stop_is_anchored_to_the_close_and_no_fixed_exit_gives_no_target_level()
+    {
+        var pct = Swing(["close > 0"], ["close > 0"]) with { };
+        var rules = pct.Buy! with { Stop = new StopSpec(StopKind.FixedPct, Pct: Quantity.Of(5)) };
+        var definition = pct with { Buy = rules };
+
+        var fixedRr = Run(definition);
+        var rule = Run(definition, exit: "NOT_AN_EXIT");
+
+        Assert.Equal(StopAnchor.CloseOfD, fixedRr.StopAnchor);
+        Assert.Equal(fixedRr.IndicativeEntry!.Value * 0.95, fixedRr.StopLevel!.Value, 9);
+        Assert.Null(rule.TargetLevel);
+        Assert.Null(rule.RewardRisk);
+    }
+
+    [Fact]
     public void A_part_false_at_the_close_rejects_and_unknown_is_not_true()
     {
         var draft = BaseBreakout(Days(100, lastVolume: 1000), 100);

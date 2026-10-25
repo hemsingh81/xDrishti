@@ -31,6 +31,12 @@ internal sealed class PlanRecordConfiguration : IEntityTypeConfiguration<PlanRec
 /// <summary><c>trading.plan_items</c>: the candidates of a plan, immutable. Reserve and rejected carry reasons.</summary>
 internal sealed class PlanItemRecordConfiguration : IEntityTypeConfiguration<PlanItemRecord>
 {
+    // P7-19: all six null, or an entry reference with its session; a stop has an anchor and the right side of the entry; a target needs a stop, the right side and a reward-to-risk (and the converse).
+    internal const string LevelsCheck = "(entry_ref_price IS NULL AND levels_session IS NULL AND stop_level IS NULL AND stop_anchor IS NULL AND target_level IS NULL AND reward_risk IS NULL)"
+        + " OR (entry_ref_price IS NOT NULL AND entry_ref_price > 0 AND levels_session IS NOT NULL AND (stop_level IS NULL) = (stop_anchor IS NULL) AND (stop_anchor IS NULL OR stop_anchor IN ('level', 'close_of_d'))"
+        + " AND (stop_level IS NULL OR (stop_level > 0 AND ((side = 'BUY' AND stop_level < entry_ref_price) OR (side = 'SELL' AND stop_level > entry_ref_price))))"
+        + " AND (target_level IS NULL) = (reward_risk IS NULL) AND (target_level IS NULL OR (stop_level IS NOT NULL AND target_level > 0 AND reward_risk > 0 AND ((side = 'BUY' AND target_level > entry_ref_price) OR (side = 'SELL' AND target_level < entry_ref_price)))))";
+
     public void Configure(EntityTypeBuilder<PlanItemRecord> builder)
     {
         builder.ToTable("plan_items", Schemas.Trading, t =>
@@ -38,6 +44,7 @@ internal sealed class PlanItemRecordConfiguration : IEntityTypeConfiguration<Pla
             t.HasCheckConstraint("ck_plan_items_group", "item_group IN ('primary', 'reserve', 'rejected') AND (item_group = 'primary' OR cardinality(reasons) > 0)");
             t.HasCheckConstraint("ck_plan_items_p_win_lower", "p_win_lower IS NULL OR (p_win_lower >= 0 AND p_win_lower <= 1)");
             t.HasCheckConstraint("ck_plan_items_shape", "item_rank >= 1 AND side IN ('BUY', 'SELL') AND trades >= 0 AND (p_win IS NULL OR (p_win >= 0 AND p_win <= 1))");
+            t.HasCheckConstraint("ck_plan_items_levels", PlanItemRecordConfiguration.LevelsCheck);
         });
         builder.HasKey(x => x.Id).HasName("pk_plan_items");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
@@ -54,6 +61,11 @@ internal sealed class PlanItemRecordConfiguration : IEntityTypeConfiguration<Pla
         builder.Property(x => x.DataRange).HasMaxLength(300).IsRequired();
         builder.Property(x => x.PWinBasis).HasMaxLength(300).IsRequired();
         builder.Property(x => x.AdvisoryNote).HasMaxLength(300);
+        builder.Property(x => x.EntryRefPrice).HasPrecision(18, 4);
+        builder.Property(x => x.StopLevel).HasPrecision(18, 4);
+        builder.Property(x => x.StopAnchor).HasMaxLength(12);
+        builder.Property(x => x.TargetLevel).HasPrecision(18, 4);
+        builder.Property(x => x.RewardRisk).HasPrecision(9, 4);
         builder.HasOne<PlanRecord>().WithMany().HasForeignKey(x => x.PlanId).HasConstraintName("fk_plan_items_plans_plan_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.PlanId, x.ItemRank }).IsUnique().HasDatabaseName("uq_plan_items_plan_rank");
     }

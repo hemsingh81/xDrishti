@@ -95,4 +95,67 @@ public sealed class SelectionPlanBuilderTests
 
         Assert.True(result.IsFailure);
     }
+
+    private static TicketDraft WithLevels(double? stop, StopAnchor? anchor, double? target, string side = "BUY") =>
+        Candidate("AAA", "S1").Draft with { Side = side, StopLevel = stop, StopAnchor = anchor, TargetLevel = target, IndicativeEntry = 100, RewardRisk = target is null ? null : 2 };
+
+    [Fact]
+    public void A_numeric_stop_and_a_fixed_target_give_all_levels_and_no_reason_code()
+    {
+        var (levels, code) = SelectionPlanBuilder.LevelsOf(WithLevels(95, StopAnchor.Level, 110));
+
+        Assert.Null(code);
+        Assert.Equal(95m, levels!.Stop);
+        Assert.Equal(110m, levels.Target);
+        Assert.Equal(2m, levels.RewardRisk);
+        Assert.Equal(Session, levels.Session);
+    }
+
+    [Fact]
+    public void A_stop_without_a_number_keeps_only_the_entry_and_says_so()
+    {
+        var (levels, code) = SelectionPlanBuilder.LevelsOf(WithLevels(null, null, null));
+
+        Assert.Equal(TicketLevels.NotNumericCode, code);
+        Assert.Equal(100m, levels!.EntryRef);
+        Assert.Null(levels.Stop);
+        Assert.Null(levels.Target);
+    }
+
+    [Fact]
+    public void An_implausible_stop_distance_withholds_stop_and_target()
+    {
+        var (levels, code) = SelectionPlanBuilder.LevelsOf(WithLevels(60, StopAnchor.Level, 180));
+
+        Assert.Equal(TicketLevels.ImplausibleCode, code);
+        Assert.Null(levels!.Stop);
+        Assert.Null(levels.Target);
+    }
+
+    [Fact]
+    public void A_sell_is_mirrored()
+    {
+        var (levels, code) = SelectionPlanBuilder.LevelsOf(WithLevels(105, StopAnchor.CloseOfD, 90, "SELL"));
+
+        Assert.Null(code);
+        Assert.Equal(90m, levels!.Target);
+    }
+
+    [Fact]
+    public async Task Levels_are_stored_on_the_item_and_join_the_hash_only_when_present()
+    {
+        var withNumbers = Candidate("AAA", "S1");
+        withNumbers = withNumbers with { Draft = withNumbers.Draft with { StopAnchor = StopAnchor.Level, TargetLevel = 104 } };
+        var without = Candidate("AAA", "S1");
+        without = without with { Draft = without.Draft with { IndicativeEntry = null } };
+
+        var a = await Builder([withNumbers], Loose).BuildAsync(Request, CancellationToken.None);
+        var a2 = await Builder([withNumbers], Loose).BuildAsync(Request, CancellationToken.None);
+        var b = await Builder([without], Loose).BuildAsync(Request, CancellationToken.None);
+
+        Assert.Equal(98m, a.Value.Items[0].Levels!.Stop);
+        Assert.Equal(a.Value.InputHash, a2.Value.InputHash);
+        Assert.Null(b.Value.Items[0].Levels);
+        Assert.NotEqual(a.Value.InputHash, b.Value.InputHash);
+    }
 }

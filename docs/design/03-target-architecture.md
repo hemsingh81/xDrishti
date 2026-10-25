@@ -379,7 +379,7 @@ The labels, the banner and the readme carry the roadmap's "what a P3 number mean
 | `data` | `import_profiles`, `import_jobs`, `import_issues` |
 | `portfolio` | `transactions`, `lots`, `lot_closures`, `positions`, `buckets`, `cash_flows`, `valuations_daily`, `corporate_action_adjustments` |
 | `research` | `sim_runs`, `sim_trades` (with MAE/MFE, R, exit reason, feature snapshot), `cell_stats`, `exit_choices`, `regimes`, `training_sets`, `model_versions`, `hypotheses`, `learning_changelog`, `lessons`, `experiments`, `execution_gap` (per trade: plan vs fill), `autonomy_settings`, `smart_rules`, `meta_models`, `entry_windows`, `loss_tags`, `digests` |
-| `trading` | `accounts`, `account_roles`, `account_snapshots`, `plans`, `plan_items` (primary/reserve/rejected), `outcomes`, `journal_entries`, `fills`, (later) `orders`, `order_events` |
+| `trading` | `accounts`, `account_roles`, `account_snapshots`, `plans`, `plan_items` (primary/reserve/rejected; indicative entry, stop, stop anchor, target, reward-to-risk and session as nullable numeric columns, P7-19), `outcomes`, `journal_entries`, `fills`, (later) `orders`, `order_events` |
 | `lab` | `strategies`, `strategy_versions`, `lab_runs`, `lab_results`, `test_ledger` |
 | `config` | `config_versions` (YAML, hash, author, activated_at), `active_config` |
 | `ops` | `commands`, `service_schedules`, `service_runs`, `validation_runs`, `validation_results`, `data_quality_issues`, `audit_log`, `notifications` |

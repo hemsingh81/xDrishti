@@ -8104,6 +8104,7 @@ export interface components {
       evidence: components['schemas']['PlanEvidenceView'];
       /** @description Size per account. */
       allocations: components['schemas']['PlanAllocationView'][];
+      levels?: null | components['schemas']['TicketLevelsView'];
     };
     /** @description The journal of one plan. */
     PlanJournalView: {
@@ -10226,6 +10227,38 @@ export interface components {
       costBasis: null | string;
       /** @description Why, in words. */
       detail: null | string;
+    };
+    /** @description The indicative numbers of a ticket (spec P7-19, ADR 0108): rupees as of the close of the session, not tomorrow's price and not an order. */
+    TicketLevelsView: {
+      /**
+       * Format: double
+       * @description The close of the session.
+       */
+      entryRef: number;
+      /**
+       * Format: date
+       * @description The session D.
+       */
+      session: string;
+      /**
+       * Format: double
+       * @description The stop level, or null when the stop has no number.
+       */
+      stop: null | number;
+      /** @description "level" (a market level) or "close_of_d" (a distance from the close); null with no stop. */
+      stopAnchor: null | string;
+      /**
+       * Format: double
+       * @description The target level of a fixed reward-to-risk exit, or null.
+       */
+      target: null | number;
+      /**
+       * Format: double
+       * @description That reward-to-risk, or null.
+       */
+      rewardRisk: null | number;
+      /** @description The pinned sentence on what the numbers are. */
+      basis: string;
     };
     /** @description The aggregates of one timeframe compared with the recomputed ones: `compared` buckets (stored or recomputed), `differences` among them. */
     TimeframeCheck: {

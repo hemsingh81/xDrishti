@@ -179,7 +179,8 @@ internal sealed class SelectionPlanBuilder(
     {
         var cell = candidate.Cell;
         var stats = candidate.Stats;
-        var unavailable = notApplied.Concat(standings).Concat(caveats).Distinct(StringComparer.Ordinal).ToList();
+        var (levels, levelCode) = LevelsOf(draft);
+        var unavailable = notApplied.Concat(standings).Concat(caveats).Concat(levelCode is null ? [] : [levelCode]).Distinct(StringComparer.Ordinal).ToList();
         var evidence = new PlanEvidence(
             cell.Key,
             stats?.N ?? 0,
@@ -192,7 +193,28 @@ internal sealed class SelectionPlanBuilder(
             stats?.WinRateLower);
         return new NewPlanItem(
             rank, group, draft.Symbol, draft.Side, draft.StrategyId, draft.StrategyVersionHash,
-            Clamp(draft.TriggerText, 500), Clamp(draft.StopText, 500), Clamp(draft.TargetText, 500), Clamp(draft.ValidityText, 200), reasons, evidence, allocations);
+            Clamp(draft.TriggerText, 500), Clamp(draft.StopText, 500), Clamp(draft.TargetText, 500), Clamp(draft.ValidityText, 200), reasons, evidence, allocations, levels);
+    }
+
+    // The numbers of the draft, or the reason there are none (P7-19): never a guess, the text is unchanged either way.
+    internal static (TicketLevels? Levels, string? Code) LevelsOf(TicketDraft draft)
+    {
+        if (draft.IndicativeEntry is not { } entry)
+        {
+            return (null, null);
+        }
+
+        var entryRef = (decimal)entry;
+        if (draft.StopLevel is not { } stop || draft.StopAnchor is not { } anchor)
+        {
+            return (TicketLevels.Create(draft.Side, entryRef, draft.Session, null, null, null, null).Value, TicketLevels.NotNumericCode);
+        }
+
+        var target = draft.TargetLevel is { } t && draft.RewardRisk is not null ? (decimal?)t : null;
+        var created = TicketLevels.Create(draft.Side, entryRef, draft.Session, (decimal)stop, anchor, target, target is null ? null : (decimal?)draft.RewardRisk);
+        return created.IsSuccess
+            ? (created.Value, null)
+            : (TicketLevels.Create(draft.Side, entryRef, draft.Session, null, null, null, null).Value, created.Error.Code == TicketLevels.ImplausibleCode ? TicketLevels.ImplausibleCode : TicketLevels.NotNumericCode);
     }
 
     // The proposal sentence first, then what the numbers rest on, then the banner: the gate flag first (the engine adds it first), the rest as they come, the honest-limit notes last. Cut at the column's length, never silently longer.
@@ -218,6 +240,10 @@ internal sealed class SelectionPlanBuilder(
         foreach (var i in items)
         {
             sb.Append(CultureInfo.InvariantCulture, $"\n{i.Rank}|{i.Group}|{i.Symbol}|{i.Side}|{i.StrategyVersionHash}|{i.Trigger}|{i.Stop}|{i.Target}|{i.Evidence.CellKey}|{string.Join(',', i.Reasons)}|{string.Join(',', i.Evidence.Unavailable)}|{string.Join(',', i.Allocations.Select(a => a.AccountId.ToString("N", CultureInfo.InvariantCulture) + ":" + a.Quantity.ToString(CultureInfo.InvariantCulture)))}");
+            if (i.Levels is { } l)
+            {
+                sb.Append(CultureInfo.InvariantCulture, $"|L:{l.EntryRef}|{l.Stop}|{l.Anchor?.Code()}|{l.Target}|{l.RewardRisk}|{l.Session:yyyy-MM-dd}");
+            }
         }
 
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString())));

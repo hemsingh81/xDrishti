@@ -812,7 +812,7 @@ returns every indicator to its first state. <strong>The per-session rule (<a hre
 </tr>
 <tr>
 <td><code>trading</code></td>
-<td><code>accounts</code>, <code>account_roles</code>, <code>account_snapshots</code>, <code>plans</code>, <code>plan_items</code> (primary/reserve/rejected), <code>outcomes</code>, <code>journal_entries</code>, <code>fills</code>, (later) <code>orders</code>, <code>order_events</code></td>
+<td><code>accounts</code>, <code>account_roles</code>, <code>account_snapshots</code>, <code>plans</code>, <code>plan_items</code> (primary/reserve/rejected; indicative entry, stop, stop anchor, target, reward-to-risk and session as nullable numeric columns, P7-19), <code>outcomes</code>, <code>journal_entries</code>, <code>fills</code>, (later) <code>orders</code>, <code>order_events</code></td>
 </tr>
 <tr>
 <td><code>lab</code></td>
@@ -1022,7 +1022,7 @@ records the configuring actor for audit.</li>
     <a class="prev" href="02-requirements.html"><small>← Previous  [</small>02 · Requirements</a>
     <a class="next" href="04-accounts-access-and-operations.html"><small>Next  ] →</small>04 · Accounts, access &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-25 17:19</footer>
+  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-25 17:29</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-architecture-at-a-glance" class="d2">1. Architecture at a glance</a>
 <a href="#2-technology-decisions" class="d2">2. Technology decisions</a>

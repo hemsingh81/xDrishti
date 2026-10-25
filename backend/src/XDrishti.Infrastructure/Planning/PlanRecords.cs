@@ -74,6 +74,18 @@ internal sealed class PlanItemRecord
     public string[] Unavailable { get; set; } = [];
 
     public string? AdvisoryNote { get; set; }
+
+    public decimal? EntryRefPrice { get; set; }
+
+    public decimal? StopLevel { get; set; }
+
+    public string? StopAnchor { get; set; }
+
+    public decimal? TargetLevel { get; set; }
+
+    public decimal? RewardRisk { get; set; }
+
+    public DateOnly? LevelsSession { get; set; }
 }
 
 /// <summary>A row of <c>trading.plan_item_allocations</c>. Insert-only.</summary>

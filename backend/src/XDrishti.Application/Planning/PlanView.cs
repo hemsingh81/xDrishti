@@ -67,6 +67,7 @@ public sealed record PlanView(
 /// <param name="Validity">Validity window.</param>
 /// <param name="Reasons">Reason codes.</param>
 /// <param name="Evidence">The evidence block.</param>
+/// <param name="Levels">Indicative numbers as of the close of D (P7-19), or null for a plan stored without them or a ticket with no numeric level.</param>
 /// <param name="Allocations">Size per account.</param>
 public sealed record PlanItemView(
     long Id,
@@ -84,7 +85,8 @@ public sealed record PlanItemView(
     string Validity,
     IReadOnlyList<string> Reasons,
     PlanEvidenceView Evidence,
-    IReadOnlyList<PlanAllocationView> Allocations)
+    IReadOnlyList<PlanAllocationView> Allocations,
+    TicketLevelsView? Levels = null)
 {
     /// <summary>Builds the view from the stored row.</summary>
     public static PlanItemView Of(PlanItemRow row)
@@ -97,7 +99,8 @@ public sealed record PlanItemView(
             row.Id, i.Rank, i.Group.Code(), ticket ? row.State.Code() : null, ticket ? [.. TicketLifecycle.Next(row.State).Select(s => s.Code())] : [],
             i.Symbol, i.Side, i.StrategyId, i.StrategyVersionHash, i.Trigger, i.Stop, i.Target, i.Validity, i.Reasons,
             new PlanEvidenceView(e.CellKey, e.Trades, e.DataRange, e.PWinBasis, e.PWin, e.ConservativeExpectancyR, e.Unavailable, e.AdvisoryNote),
-            [.. i.Allocations.Select(a => new PlanAllocationView(a.AccountId, a.Mode, a.Quantity))]);
+            [.. i.Allocations.Select(a => new PlanAllocationView(a.AccountId, a.Mode, a.Quantity))],
+            i.Levels is { } l ? new TicketLevelsView(l.EntryRef, l.Session, l.Stop, l.Anchor?.Code(), l.Target, l.RewardRisk, TicketLevelsView.BasisText) : null);
     }
 }
 
@@ -128,3 +131,17 @@ public sealed record PlanAllocationView(Guid AccountId, string Mode, int Quantit
 /// <param name="ApprovalId">The approval row of an owner decision.</param>
 /// <param name="At">When.</param>
 public sealed record PlanEventView(long Id, long? ItemId, string From, string To, string Actor, string Reason, long? ApprovalId, DateTimeOffset At);
+
+/// <summary>The indicative numbers of a ticket (spec P7-19, ADR 0108): rupees as of the close of the session, not tomorrow's price and not an order.</summary>
+/// <param name="EntryRef">The close of the session.</param>
+/// <param name="Session">The session D.</param>
+/// <param name="Stop">The stop level, or null when the stop has no number.</param>
+/// <param name="StopAnchor">"level" (a market level) or "close_of_d" (a distance from the close); null with no stop.</param>
+/// <param name="Target">The target level of a fixed reward-to-risk exit, or null.</param>
+/// <param name="RewardRisk">That reward-to-risk, or null.</param>
+/// <param name="Basis">The pinned sentence on what the numbers are.</param>
+public sealed record TicketLevelsView(decimal EntryRef, DateOnly Session, decimal? Stop, string? StopAnchor, decimal? Target, decimal? RewardRisk, string Basis)
+{
+    /// <summary>The fixed basis sentence.</summary>
+    public const string BasisText = "indicative from the close of the session; not tomorrow's price";
+}
