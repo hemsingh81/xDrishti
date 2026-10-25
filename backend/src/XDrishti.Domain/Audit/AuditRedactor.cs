@@ -35,7 +35,7 @@ public static partial class AuditRedactor
         }
     }
 
-    private static Regex[] Patterns() => [Authorization(), UrlCredentials(), ConnectionString(), KeyValue(), PasswordIs(), BareSecret(), Jwt(), Bearer(), Basic(), PasswordHash(), RecoveryCode(), Hex(), LongToken(), OneTimeCode()];
+    private static Regex[] Patterns() => [Authorization(), UrlCredentials(), ConnectionString(), CookieLine(), PassphraseLine(), KeyValue(), PasswordIs(), PasswordTo(), BareSecret(), BrokerBare(), Jwt(), Bearer(), Basic(), PasswordHash(), RecoveryCode(), Hex(), LongToken(), OneTimeCode()];
 
     // "Authorization: Bearer abc" / "Authorization: Basic dXNl..." : the scheme and the credential go together (first, before the key rule would stop at the scheme).
     [GeneratedRegex(@"authorization\s*[:=]\s*(?:(?:bearer|basic|digest|token)\s+)?\S+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
@@ -51,7 +51,7 @@ public static partial class AuditRedactor
 
     // A secret-like name, with any prefix or suffix (my_token, sessionid), then ":" or "=" (quoted or JSON forms too) and the value.
     [GeneratedRegex(
-        @"(?<![A-Za-z0-9])[A-Za-z0-9_.-]*(?:password|passwd|passphrase|pwd|pw|secret|token|api[\s_-]?key|private[\s_-]?key|access[\s_-]?key|recovery[\s_-]?code|refresh|cookie|credential|session|sid|client[\s_-]?id|authorization|totp|otp|auth)[A-Za-z0-9_.-]*[""']?\s*[:=]\s*[""']?\S+",
+        @"(?<![A-Za-z0-9])[A-Za-z0-9_.-]*(?:password|passwd|passphrase|pwd|pw|secret|token|api[\s_-]?key|private[\s_-]?key|access[\s_-]?key|recovery[\s_-]?code|refresh|cookie|credential|session|sid|client[\s_-]?id|authorization|totp|otp|auth|consent)[A-Za-z0-9_.-]*[""']?\s*[:=]\s*(?:""[^""]*""|'[^']*'|\S+)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
         matchTimeoutMilliseconds: 200)]
     private static partial Regex KeyValue();
@@ -60,17 +60,44 @@ public static partial class AuditRedactor
     [GeneratedRegex(@"(?<![A-Za-z0-9])(?:password|passwd|passphrase|pwd|pin|secret|token)\s+(?:is|was)\s+\S+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
     private static partial Regex PasswordIs();
 
-    // "token abc", "secret x": the word that follows, unless it is plain prose around the word ("password for the account", "token expired").
+    private const string Prose =
+        @"(?!(?:for|of|to|in|on|at|by|and|or|the|a|an|has|had|have|was|were|are|is|will|must|should|can|not|no|too|expired|expires|changed|change|reset|updated|update|rotated|replaced|stored|set|check|checked|length|policy|rules?|refused|failed|accepted|saved|matches|mismatch|did|does|from|with|when|after|before|missing|invalid|required|empty|unchanged|ticket|code)\b)";
+
+    private const string Value = @"(?:""[^""]*""|'[^']*'|[A-Za-z0-9_\-+/=.@]+)";
+
+    // "token abc", "secret x", "user a@b.c pwd hunter2", "x-api-key abc": the word that follows, unless it is plain prose around the word ("password for the account", "token expired").
     [GeneratedRegex(
-        @"(?<![A-Za-z0-9])(?:password|passwd|passphrase|token|secret)\s+(?!(?:for|of|to|in|on|at|by|and|or|the|a|an|has|had|have|was|were|are|is|will|must|should|can|not|no|too|expired|expires|changed|change|reset|updated|update|rotated|replaced|stored|set|check|checked|length|policy|rules?|refused|failed|accepted|saved|matches|mismatch|did|does|from|with|when|after|before)\b)[A-Za-z0-9_\-+/=.]+",
+        @"(?<![A-Za-z0-9])(?:[A-Za-z0-9_.-]*api[\s_-]?key|password|passwd|passphrase|pwd|pin|token|secret)\s+" + Prose + Value,
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
         matchTimeoutMilliseconds: 200)]
     private static partial Regex BareSecret();
 
+    // The broker and consent field names as bare words (any prefix: dhanClientId, client-id, access-token, app_secret) with a space as the separator.
+    [GeneratedRegex(
+        @"(?<![A-Za-z0-9])[A-Za-z0-9_.-]*(?:client[\s_-]?id|client[\s_-]?secret|access[\s_-]?token|refresh[\s_-]?token|auth[\s_-]?token|app[\s_-]?secret|api[\s_-]?secret|consent[\s_-]?(?:app[\s_-]?)?id|consent)\s+" + Prose + Value,
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        matchTimeoutMilliseconds: 200)]
+    private static partial Regex BrokerBare();
+
+    // "password changed to hunter2", "set password to hunter2": the value after "to".
+    [GeneratedRegex(
+        @"(?<![A-Za-z0-9])(?:password|passwd|passphrase|pwd|pin|token|secret)(?:\s+(?:was|is|has|been|changed|change|reset|set|updated|rotated|replaced))*\s+to\s+" + Value,
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+        matchTimeoutMilliseconds: 200)]
+    private static partial Regex PasswordTo();
+
+    // "Cookie: a=1; b=2": a cookie header runs to the end of the line.
+    [GeneratedRegex(@"(?<![A-Za-z0-9])(?:set-)?cookie\s*[:=][^\r\n]*", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
+    private static partial Regex CookieLine();
+
+    // "new password: correct horse battery staple": a passphrase after a colon runs to the end of the line.
+    [GeneratedRegex(@"(?<![A-Za-z0-9])(?:password|passwd|passphrase|pwd|secret)\s*:[^\r\n]*", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
+    private static partial Regex PassphraseLine();
+
     [GeneratedRegex(@"\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.?[A-Za-z0-9_-]*", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
     private static partial Regex Jwt();
 
-    [GeneratedRegex(@"\bBearer\s+\S+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
+    [GeneratedRegex(@"\bBearer\s*:?\s*\S+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
     private static partial Regex Bearer();
 
     [GeneratedRegex(@"\bBasic\s+[A-Za-z0-9+/_-]{8,}={0,2}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
