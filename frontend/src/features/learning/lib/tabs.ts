@@ -32,6 +32,30 @@ const entries = [
     slice: 'P8-02',
     load: () => import('../components/SetupsTab').then((m) => ({ default: m.SetupsTab })),
   },
+  {
+    id: 'lessons',
+    label: 'Lessons',
+    slice: 'P8-03',
+    load: () => import('../components/LessonsTab').then((m) => ({ default: m.LessonsTab })),
+  },
+  {
+    id: 'experiments',
+    label: 'Experiments',
+    slice: 'P8-03',
+    load: () => import('../components/ExperimentsTab').then((m) => ({ default: m.ExperimentsTab })),
+  },
+  {
+    id: 'models',
+    label: 'Models',
+    slice: 'P8-03',
+    load: () => import('../components/ModelsTab').then((m) => ({ default: m.ModelsTab })),
+  },
+  {
+    id: 'digest',
+    label: 'Digest',
+    slice: 'P8-03',
+    load: () => import('../components/DigestTab').then((m) => ({ default: m.DigestTab })),
+  },
 ] as const satisfies readonly TabEntry[];
 
 /** The ids of the registry, checked by the compiler wherever a tab is named. */

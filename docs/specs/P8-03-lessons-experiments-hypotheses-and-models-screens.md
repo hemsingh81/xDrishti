@@ -75,3 +75,9 @@ None.
 - Prerequisite **P8-02b** (tab registry extracted from the built `LearningPage`) added to Needs; the text assumed a `tabs.ts` registry and a `readOnlyFeatures.test.ts` list that do not exist (the built page has a hard-coded `tabs` array and a feature-local `readOnly.test.ts`).
 - Fixtures: the built `learningFixtures.ts` uses `buildEntry` (not `buildChangelogEntry`); new builders are added beside it.
 - No dependency on P8-06 endpoints; no server change (verified the six record endpoints and the digest endpoints exist).
+
+## Built 2026-10-25 (branch feature/p8-03)
+- Four lazy tabs through the registry (`lessons`, `experiments`, `models`, `digest`); no server change; first-load JavaScript unchanged (196.1 KB gzip of 200). Lazy chunks (gzip): Digest 1.3 KB, Lessons 1.9 KB, Models 2.4 KB, Experiments 2.7 KB.
+- **Deviation from criterion 1 ("no other built Learning file changes"):** `components/LearningPage.tsx` also changed once: switching tab now clears the parameters a tab keeps (`cell`, `lesson`, `experiment`, `hypothesis`, `model`, `state`, `role`, `week`), so an open record or filter of one tab does not linger in the address of another. `OverviewTab.test.tsx` was updated for the six tabs. Links between records build fresh addresses for the same reason.
+- `?week=` is checked against `YYYY-Www`; anything else shows "No digest stored for this week" without a request.
+- Numbers before and after appear with the n of the linked experiment; without a readable experiment they show "Not available".

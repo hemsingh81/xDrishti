@@ -5,6 +5,17 @@ import { LoadingState, PageHeader } from '@/shared/ui';
 import { ButtonTabs, type ButtonTab } from '@/shared/ui/ButtonTabs';
 import { DEFAULT_TAB, tabs, type TabId } from '../lib/tabs';
 
+// What a tab keeps in the address (its open record and filter): leaving the tab drops it.
+const closed = {
+  cell: null,
+  lesson: null,
+  experiment: null,
+  hypothesis: null,
+  model: null,
+  state: null,
+  role: null,
+  week: null,
+};
 const ids = tabs.map((tab) => tab.id);
 const buttons: readonly ButtonTab<TabId>[] = tabs.map((tab) => ({
   value: tab.id,
@@ -24,7 +35,7 @@ export function LearningPage() {
   const tab: TabId = url.text('cell') === null ? url.choice('tab', ids, DEFAULT_TAB) : 'setups';
   const select = (next: TabId) => {
     // A cell belongs to the Setups tab; leaving it closes the cell.
-    url.update({ tab: next === DEFAULT_TAB ? null : next, cell: null });
+    url.update({ tab: next === DEFAULT_TAB ? null : next, ...closed });
   };
   const active = tabs.find((candidate) => candidate.id === tab);
   return (
