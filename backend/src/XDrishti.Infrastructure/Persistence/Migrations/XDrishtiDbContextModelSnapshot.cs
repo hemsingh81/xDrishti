@@ -4817,6 +4817,533 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     NpgsqlEntityTypeBuilderExtensions.IsUnlogged(b, true);
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperCaptureRunRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("EntriesWritten")
+                        .HasColumnType("integer")
+                        .HasColumnName("entries_written");
+
+                    b.Property<int>("ExitsWritten")
+                        .HasColumnType("integer")
+                        .HasColumnName("exits_written");
+
+                    b.Property<DateTimeOffset>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<int>("Integrity")
+                        .HasColumnType("integer")
+                        .HasColumnName("integrity");
+
+                    b.Property<bool>("Manual")
+                        .HasColumnType("boolean")
+                        .HasColumnName("manual");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("outcome");
+
+                    b.Property<int>("Pending")
+                        .HasColumnType("integer")
+                        .HasColumnName("pending");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<int>("Seen")
+                        .HasColumnType("integer")
+                        .HasColumnName("seen");
+
+                    b.Property<DateOnly>("SessionDate")
+                        .HasColumnType("date")
+                        .HasColumnName("session_date");
+
+                    b.Property<int>("SkipsWritten")
+                        .HasColumnType("integer")
+                        .HasColumnName("skips_written");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_capture_runs");
+
+                    b.HasIndex("SessionDate", "Id")
+                        .HasDatabaseName("ix_capture_runs_session_date_id");
+
+                    b.ToTable("capture_runs", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_capture_runs_shape", "outcome IN ('done', 'partial', 'failed') AND seen >= 0 AND pending >= 0 AND integrity >= 0 AND finished_at >= started_at");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperEntryRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<long>("ApprovalId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approval_id");
+
+                    b.Property<string>("ApprovalKind")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("approval_kind");
+
+                    b.Property<DateTimeOffset>("ArmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("armed_at");
+
+                    b.Property<string>("Basis")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("basis");
+
+                    b.Property<string>("CellKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("cell_key");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("EngineVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("engine_version");
+
+                    b.Property<DateTimeOffset>("EntryAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("entry_at");
+
+                    b.Property<decimal>("EntryExact")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("entry_exact");
+
+                    b.Property<decimal>("EntryPrice")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("entry_price");
+
+                    b.Property<long>("EpochId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("epoch_id");
+
+                    b.Property<string>("MeasureStatus")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("measure_status");
+
+                    b.Property<long>("PlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_id");
+
+                    b.Property<long>("PlanItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_item_id");
+
+                    b.Property<int>("Qty")
+                        .HasColumnType("integer")
+                        .HasColumnName("qty");
+
+                    b.Property<int>("QtyAllocated")
+                        .HasColumnType("integer")
+                        .HasColumnName("qty_allocated");
+
+                    b.Property<string>("RunKey")
+                        .IsRequired()
+                        .HasColumnType("char(64)")
+                        .HasColumnName("run_key");
+
+                    b.Property<string>("Side")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("side");
+
+                    b.Property<decimal>("StopPrice")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("stop_price");
+
+                    b.Property<string>("StrategyHash")
+                        .IsRequired()
+                        .HasColumnType("char(64)")
+                        .HasColumnName("strategy_hash");
+
+                    b.Property<string>("StrategyId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<bool>("Swing")
+                        .HasColumnType("boolean")
+                        .HasColumnName("swing");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("symbol");
+
+                    b.Property<decimal?>("TargetPrice")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("target_price");
+
+                    b.Property<string>("TicketGroup")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("ticket_group");
+
+                    b.Property<string>("TradeKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("trade_key");
+
+                    b.HasKey("Id")
+                        .HasName("pk_entries");
+
+                    b.HasIndex("ApprovalId")
+                        .HasDatabaseName("ix_entries_approval_id");
+
+                    b.HasIndex("EpochId")
+                        .HasDatabaseName("ix_entries_epoch_id");
+
+                    b.HasIndex("PlanId")
+                        .HasDatabaseName("ix_entries_plan_id");
+
+                    b.HasIndex("EntryAt", "Id")
+                        .HasDatabaseName("ix_entries_entry_at_id");
+
+                    b.HasIndex("Id", "EntryAt")
+                        .IsUnique()
+                        .HasDatabaseName("uq_entries_id_entry_at");
+
+                    b.HasIndex("PlanItemId", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_entries_item_account");
+
+                    b.ToTable("entries", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_entries_shape", "measure_status IN ('measured', 'straddle') AND ticket_group IN ('primary', 'reserve') AND approval_kind IN ('owner', 'auto') AND side IN ('BUY', 'SELL') AND qty > 0 AND qty <= qty_allocated AND entry_at >= armed_at AND basis = 'simulated on the official 1-minute bars; no order was placed or exists'");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperEpochAccountRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("Capital")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("capital");
+
+                    b.Property<string>("CapitalSource")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("capital_source");
+
+                    b.Property<long>("EpochId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("epoch_id");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("mode");
+
+                    b.HasKey("Id")
+                        .HasName("pk_epoch_accounts");
+
+                    b.HasIndex("AccountId")
+                        .HasDatabaseName("ix_epoch_accounts_account_id");
+
+                    b.HasIndex("EpochId", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_epoch_accounts_epoch_account");
+
+                    b.ToTable("epoch_accounts", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_epoch_accounts_shape", "mode = 'paper' AND capital > 0");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperEpochRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("FingerprintHash")
+                        .HasColumnType("char(64)")
+                        .HasColumnName("fingerprint_hash");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<long?>("PrevEpochId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("prev_epoch_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<DateOnly>("StartedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("started_on");
+
+                    b.HasKey("Id")
+                        .HasName("pk_epochs");
+
+                    b.HasIndex("Kind")
+                        .IsUnique()
+                        .HasDatabaseName("uq_epochs_first")
+                        .HasFilter("kind = 'first'");
+
+                    b.HasIndex("PrevEpochId")
+                        .HasDatabaseName("ix_epochs_prev_epoch_id");
+
+                    b.ToTable("epochs", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_epochs_shape", "kind IN ('first', 'detected_change', 'owner_restart') AND length(btrim(reason)) > 0 AND length(btrim(actor)) > 0 AND (fingerprint_hash IS NULL OR length(fingerprint_hash) = 64)");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperExitRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ChargeSheetId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("charge_sheet_id");
+
+                    b.Property<decimal?>("Charges")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("charges");
+
+                    b.Property<string>("CostBasis")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("cost_basis");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTimeOffset>("EntryAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("entry_at");
+
+                    b.Property<long>("EntryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("entry_id");
+
+                    b.Property<DateTimeOffset>("ExitAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("exit_at");
+
+                    b.Property<decimal>("ExitPrice")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("exit_price");
+
+                    b.Property<string>("ExitReason")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("exit_reason");
+
+                    b.Property<decimal>("GrossPnl")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("gross_pnl");
+
+                    b.Property<int>("HeldSessions")
+                        .HasColumnType("integer")
+                        .HasColumnName("held_sessions");
+
+                    b.Property<double>("MaeR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("mae_r");
+
+                    b.Property<double>("MfeR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("mfe_r");
+
+                    b.Property<decimal?>("NetPnl")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("net_pnl");
+
+                    b.Property<string>("RBasis")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)")
+                        .HasColumnName("r_basis");
+
+                    b.Property<double>("RExact")
+                        .HasColumnType("double precision")
+                        .HasColumnName("r_exact");
+
+                    b.Property<double>("RGross")
+                        .HasColumnType("double precision")
+                        .HasColumnName("r_gross");
+
+                    b.Property<double?>("RNet")
+                        .HasColumnType("double precision")
+                        .HasColumnName("r_net");
+
+                    b.Property<double>("RSim")
+                        .HasColumnType("double precision")
+                        .HasColumnName("r_sim");
+
+                    b.HasKey("Id")
+                        .HasName("pk_exits");
+
+                    b.HasIndex("EntryId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_exits_entry_id");
+
+                    b.ToTable("exits", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_exits_shape", "exit_at >= entry_at AND held_sessions >= 1 AND r_basis IN ('net', 'gross') AND (charges IS NULL) = (r_net IS NULL) AND (charges IS NULL) = (net_pnl IS NULL) AND (charges IS NULL) = (charge_sheet_id IS NULL) AND ((r_basis = 'net') = (r_net IS NOT NULL))");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperSkipRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("detail");
+
+                    b.Property<long>("EpochId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("epoch_id");
+
+                    b.Property<long>("PlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_id");
+
+                    b.Property<long>("PlanItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_item_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_skips");
+
+                    b.HasIndex("EpochId")
+                        .HasDatabaseName("ix_skips_epoch_id");
+
+                    b.HasIndex("PlanItemId", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_skips_item_account");
+
+                    b.ToTable("skips", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_skips_shape", "code IN ('not_triggered', 'not_gradable', 'dropped_by_sizing', 'legs_not_supported', 'entered_before_armed', 'modification_unreadable', 'approval_missing') AND length(btrim(detail)) > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Planning.ApprovalRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -7619,6 +8146,69 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_live_quotes_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperEntryRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.ApprovalRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_entries_approvals_approval_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Paper.PaperEpochRecord", null)
+                        .WithMany()
+                        .HasForeignKey("EpochId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_entries_epochs_epoch_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperEpochAccountRecord", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_epoch_accounts_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Paper.PaperEpochRecord", null)
+                        .WithMany()
+                        .HasForeignKey("EpochId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_epoch_accounts_epochs_epoch_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperEpochRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Paper.PaperEpochRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PrevEpochId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_epochs_epochs_prev_epoch_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperExitRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Paper.PaperEntryRecord", null)
+                        .WithMany()
+                        .HasForeignKey("EntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_exits_entries_entry_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperSkipRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Paper.PaperEpochRecord", null)
+                        .WithMany()
+                        .HasForeignKey("EpochId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_skips_epochs_epoch_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Planning.ApprovalRecord", b =>

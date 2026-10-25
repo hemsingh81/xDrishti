@@ -95,6 +95,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, HypothesesEndpoints>();
         services.AddSingleton<IEndpointModule, LessonsEndpoints>();
         services.AddSingleton<IEndpointModule, PlansEndpoints>();
+        services.AddSingleton<IEndpointModule, PaperEndpoints>();
         services.AddSingleton<IEndpointModule, ReportsEndpoints>();
         services.AddSingleton<IEndpointModule, AutonomyEndpoints>();
         services.AddSingleton<IEndpointModule, PlanReviewEndpoints>(); // the owner's approve / modify / reject / approve-all of a plan (P7-10); session + CSRF, manual approval, no order

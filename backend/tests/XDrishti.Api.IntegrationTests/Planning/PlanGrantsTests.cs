@@ -57,6 +57,34 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
     }
 
     [Fact]
+    public async Task On_every_paper_table_the_runtime_role_reads_and_inserts_and_can_neither_change_nor_delete()
+    {
+        await using var connection = new NpgsqlConnection(server.Owner);
+        await connection.OpenAsync(Ct);
+        await using var tables = new NpgsqlCommand("SELECT schemaname || '.' || tablename FROM pg_tables WHERE schemaname = 'paper' ORDER BY 1", connection);
+        var names = new List<string>();
+        await using (var reader = await tables.ExecuteReaderAsync(Ct))
+        {
+            while (await reader.ReadAsync(Ct))
+            {
+                names.Add(reader.GetString(0));
+            }
+        }
+
+        names.ShouldBe(["paper.capture_runs", "paper.entries", "paper.epoch_accounts", "paper.epochs", "paper.exits", "paper.skips"]);
+        foreach (var name in names)
+        {
+            foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
+            {
+                await using var check = new NpgsqlCommand("SELECT has_table_privilege('xd_app', @t, @p)", connection);
+                check.Parameters.AddWithValue("t", name);
+                check.Parameters.AddWithValue("p", privilege);
+                ((bool)(await check.ExecuteScalarAsync(Ct))!).ShouldBe(expected, $"{privilege} on {name}");
+            }
+        }
+    }
+
+    [Fact]
     public async Task As_xd_app_inserting_works_and_updating_deleting_and_truncating_fail_with_insufficient_privilege()
     {
         const string plan = "INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at, basis_flags_json) VALUES ('grants-probe', '2026-10-13', '2026-10-13 03:35:00+00', 1, repeat('a', 64), 'b', true, 'n', 'l', 'probe', now(), '{}')";
