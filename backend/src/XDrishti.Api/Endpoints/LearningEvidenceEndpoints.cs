@@ -6,7 +6,7 @@ using XDrishti.Domain.Common;
 
 namespace XDrishti.Api.Endpoints;
 
-/// <summary>Smart-rule and loss-tag evidence of spec P8-13 (ADR 0108). Read only: nothing is stored, applied or switched.</summary>
+/// <summary>Smart-rule and loss-tag evidence of spec P8-13 (ADR 0111). Read only: nothing is stored, applied or switched.</summary>
 internal sealed class LearningEvidenceEndpoints : IEndpointModule
 {
     public void Map(IEndpointRouteBuilder api)
@@ -20,7 +20,7 @@ internal sealed class LearningEvidenceEndpoints : IEndpointModule
 
         learning.MapGet("/loss-tags", LossTagsAsync)
             .WithName("GetLossTags")
-            .WithSummary("Why trades lost, on the report population: per cell the loss count, untagged count, count, share and R lost per tag, growing tags, the worst losses, the number of comparisons with the expected chance flags, and what is not built. Repeat run=KEY:STYLE:EXIT (1 to 50) to name runs; without it the default run set of the reports is used for the runs that record a style and exit. Computed on read. 422 learning.invalid or reports.too_large; 404 learning.run_not_found; 409 learning.cell_duplicate or learning.mixed_basis. Read only.")
+            .WithSummary("Why trades lost, on the report population: per cell the loss count, untagged count, count, share and R lost per tag, growing tags, the worst losses, the number of comparisons with the expected chance flags, and what is not built. Repeat run=KEY:STYLE:EXIT (1 to 50) to name runs; without it the default run set of the reports is used for the runs that record a style and exit. Computed on read from the run headers and the learning cell reader, not through the P8-06 report loader's population; at most 150,000 closed trades per request (reports.too_large). Two runs of one strategy or one cell are refused as 409 learning.cell_duplicate (not reports.run_overlap). 422 learning.invalid or reports.too_large; 404 learning.run_not_found; 409 learning.cell_duplicate or learning.mixed_basis. Read only.")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);

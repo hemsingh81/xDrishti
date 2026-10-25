@@ -41,7 +41,8 @@ function CellSection({ cell }: { cell: CellLossTags }) {
       kind: 'metric',
       id: 'lost',
       header: 'R lost',
-      metric: (r) => ({ kind: 'value', value: r.lostR }),
+      metric: (r) =>
+        r.lostR === null ? { kind: 'unavailable', reason: 'not computed' } : { kind: 'value', value: r.lostR },
       format: formatR,
     },
   ];

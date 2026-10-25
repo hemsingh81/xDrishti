@@ -81,4 +81,90 @@ public sealed class EvidenceHandlersTests
         view.NotBuilt.ShouldNotBeEmpty();
         await analyze.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
     }
+
+    private static string Key(char c) => new(c, 64);
+
+    private static XDrishti.Application.Abstractions.Reporting.ReportRunInfo Run(char key, string strategy = "ORB", string? sheet = null, string? style = "intraday", string? exit = "FIXED_RR", int closed = 10) =>
+        new(Key(key), strategy, "basket", "b", "basket:" + strategy, Day, Day, sheet, style, null, exit, null, closed, 0, At);
+
+    private static LossTagReport Report(int losses, int window = 30) =>
+        new(new LossTagOptions(GrowingWindow: window), losses, losses, [new CellLossTags("C", losses, losses, [0, 0, 0, 0, 0, 0, losses], 0, [], [0, 0, 0, 0, 0, 0, -1.0 * losses])], [], 0, []);
+
+    private static (GetLossTagsHandler Handler, IQueryHandler<AnalyzeLossTagsQuery, Result<LossTagReport>> Analyze) LossTags(IReadOnlyList<XDrishti.Application.Abstractions.Reporting.ReportRunInfo> runs, Result<LossTagReport> answer)
+    {
+        var source = Substitute.For<XDrishti.Application.Abstractions.Reporting.IReportTradeSource>();
+        source.ListRunsAsync(Ct).Returns(runs);
+        var analyze = Substitute.For<IQueryHandler<AnalyzeLossTagsQuery, Result<LossTagReport>>>();
+        analyze.HandleAsync(Arg.Any<AnalyzeLossTagsQuery>(), Ct).Returns(answer);
+        return (new GetLossTagsHandler(source, new XDrishti.Application.Reporting.ReportGate(), analyze), analyze);
+    }
+
+    [Fact]
+    public async Task Runs_above_the_loss_tag_cap_are_refused_before_anything_is_read()
+    {
+        var (handler, analyze) = LossTags([Run('a', closed: GetLossTagsHandler.MaxClosedTrades + 1)], Result.Success(Report(1)));
+
+        var result = await handler.HandleAsync(new GetLossTagsQuery([]), Ct);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("reports.too_large");
+        await analyze.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task The_default_set_uses_the_runs_that_record_style_and_exit_and_skips_the_others()
+    {
+        var (handler, analyze) = LossTags([Run('a'), Run('b', strategy: "GAP", style: null)], Result.Success(Report(3)));
+
+        var view = (await handler.HandleAsync(new GetLossTagsQuery([]), Ct)).Value;
+
+        await analyze.Received(1).HandleAsync(Arg.Is<AnalyzeLossTagsQuery>(q => q.Sources.Count == 1 && q.Sources[0].RunKey == Key('a') && q.Sources[0].Style == "intraday" && q.Sources[0].Exit == "FIXED_RR"), Ct);
+        view.Evidence.DefaultRunSet.ShouldBeTrue();
+        view.Evidence.Skipped.ShouldHaveSingleItem().ShouldContain("not recorded");
+    }
+
+    [Fact]
+    public async Task Named_runs_pass_through_with_an_exit_label_that_holds_a_colon_and_a_missing_run_is_not_found()
+    {
+        var (handler, analyze) = LossTags([Run('a')], Result.Failure<LossTagReport>(LearningErrors.RunNotFound(Key('b'))));
+
+        var result = await handler.HandleAsync(new GetLossTagsQuery([new CellSource(Key('a'), "swing", "X:Y"), new CellSource(Key('b'), "swing", "Z")]), Ct);
+
+        await analyze.Received(1).HandleAsync(Arg.Is<AnalyzeLossTagsQuery>(q => q.Sources[0].Exit == "X:Y" && q.Sources.Count == 2), Ct);
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(LearningErrors.RunNotFoundCode);
+    }
+
+    [Theory]
+    [InlineData("net", "s", "s")]
+    [InlineData("gross", null, null)]
+    [InlineData("mixed", "s", null)]
+    public async Task The_basis_is_net_gross_or_mixed_by_the_runs_used(string expected, string? first, string? second)
+    {
+        var (handler, _) = LossTags([Run('a', "ORB", first), Run('b', "GAP", second)], Result.Success(Report(3)));
+
+        var view = (await handler.HandleAsync(new GetLossTagsQuery([new CellSource(Key('a'), "intraday", "E"), new CellSource(Key('b'), "intraday", "E")]), Ct)).Value;
+
+        view.Evidence.Basis.ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData(59, "not_evaluable")]
+    [InlineData(60, "evaluated")]
+    public async Task Growing_tags_are_evaluated_only_with_two_windows_of_losses(int losses, string state)
+    {
+        var (handler, _) = LossTags([Run('a')], Result.Success(Report(losses)));
+
+        var cell = (await handler.HandleAsync(new GetLossTagsQuery([]), Ct)).Value.Cells.Single();
+
+        cell.GrowingState.ShouldBe(state);
+        (cell.GrowingReason is null).ShouldBe(state == "evaluated");
+        cell.Tags[^1].LostR.ShouldBe(-1.0 * losses);
+    }
+
+    [Fact]
+    public void The_rule_facts_have_one_entry_per_rule_of_the_counter()
+    {
+        GetSmartRulesEvidenceHandler.Rules.Keys.OrderBy(k => k, StringComparer.Ordinal).ShouldBe(SmartRulesEvidence.RuleIds.OrderBy(k => k, StringComparer.Ordinal));
+    }
 }

@@ -10,7 +10,7 @@ namespace XDrishti.Application.Learning;
 
 /// <summary>
 /// The loss tags on the report population (P8-13): resolves the runs (named, or the default set with the labels the runs record), refuses a set above the report limit, takes the place in the <see cref="ReportGate"/>, and wraps
-/// <see cref="AnalyzeLossTagsHandler"/>. Computed on read: the rules are pure and one pass (ADR 0108).
+/// <see cref="AnalyzeLossTagsHandler"/>. Computed on read: the rules are pure and one pass (ADR 0111).
 /// </summary>
 internal sealed class GetLossTagsHandler(
     IReportTradeSource source,
@@ -18,6 +18,12 @@ internal sealed class GetLossTagsHandler(
     IQueryHandler<AnalyzeLossTagsQuery, Result<LossTagReport>> analyze) : IQueryHandler<GetLossTagsQuery, Result<LossTagsView>>
 {
     private const int MaxWorst = 25;
+
+    /// <summary>
+    /// The most closed trades one loss-tag read takes (by the run headers, before reading). Lower than the report engine's cap because this read holds whole simulated trades, not report rows, and the pure pass alone takes about 0.9 s at 500,000 (ADR 0111).
+    /// Shortcut: compute on read; store as a learning_reports kind when P8-12 lands. The problem code stays reports.too_large.
+    /// </summary>
+    public const int MaxClosedTrades = 150_000;
 
     private static readonly string[] Unavailable =
     [
@@ -66,9 +72,9 @@ internal sealed class GetLossTagsHandler(
         }
 
         var closed = used.Sum(r => (long)r.ClosedTrades);
-        if (closed > ReportLoader.MaxClosedTrades)
+        if (closed > MaxClosedTrades)
         {
-            return Result.Failure<LossTagsView>(Error.Validation("reports.too_large", $"The runs hold {closed} closed trades; one request reads at most {ReportLoader.MaxClosedTrades}."));
+            return Result.Failure<LossTagsView>(Error.Validation("reports.too_large", $"The runs hold {closed} closed trades; loss tags read at most {MaxClosedTrades} in one request."));
         }
 
         if (sources.Count == 0)
@@ -107,13 +113,13 @@ internal sealed class GetLossTagsHandler(
             c.Trades,
             c.Losses,
             c.Untagged,
-            [.. kinds.Select((k, i) => new TagCountView(Snake(k), c.Counts[i], c.Losses == 0 ? null : (double)c.Counts[i] / c.Losses, c.LostR?[i] ?? 0))],
+            [.. kinds.Select((k, i) => new TagCountView(Snake(k), c.Counts[i], c.Losses == 0 ? null : (double)c.Counts[i] / c.Losses, c.LostR?[i]))],
             c.Losses >= 2 * window ? "evaluated" : "not_evaluable",
             c.Losses >= 2 * window ? null : string.Create(CultureInfo.InvariantCulture, $"needs {2 * window} losses (two windows of {window})"),
             [.. c.Growing.Select(g => new GrowingTagView(Snake(g.Kind), g.RecentCount, g.EarlierCount, g.Window))])).ToList();
         var worst = report.Worst.Select(w => new WorstLossView(w.Key, w.CellKey, w.R, [.. w.Tags.Select(t => new LossTagDetailView(Snake(t.Kind), t.Detail))])).ToList();
         var limits = new List<string>(report.Limits) { "Tags overlap: the R lost per tag adds to more than the total, and shares are of the cell's losses and do not add to 100 per cent." };
-        return new LossTagsView("ok", report.Trades, report.Losses, cells, worst, report.Comparisons, report.Comparisons * 0.05, LossTagReport.NotBuilt, new LossTagsEvidenceView(basis, report.Trades, runs, isDefault, skipped, Unavailable), limits);
+        return new LossTagsView("ok", report.Trades, report.Losses, cells, worst, report.Comparisons, report.Comparisons * LossTagAnalyzer.ChanceFlagRate, LossTagReport.NotBuilt, new LossTagsEvidenceView(basis, report.Trades, runs, isDefault, skipped, Unavailable), limits);
     }
 
     /// <summary>GapThroughStop becomes gap_through_stop.</summary>

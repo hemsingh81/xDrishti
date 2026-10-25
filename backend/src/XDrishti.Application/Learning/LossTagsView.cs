@@ -38,8 +38,8 @@ public sealed record CellLossTagsView(string CellKey, int Trades, int Losses, in
 /// <param name="Kind">The kind, snake case.</param>
 /// <param name="Count">Losses with the tag.</param>
 /// <param name="Share">Of the cell's losses; null when the cell has no loss. Tags overlap, shares do not add to 1.</param>
-/// <param name="LostR">Sum of the (negative) R of the losses carrying the tag.</param>
-public sealed record TagCountView(string Kind, int Count, double? Share, double LostR);
+/// <param name="LostR">Sum of the (negative) R of the losses carrying the tag; null when the analyzer did not compute it (never shown as 0).</param>
+public sealed record TagCountView(string Kind, int Count, double? Share, double? LostR);
 
 /// <summary>A tag whose share rose between two windows of losses.</summary>
 /// <param name="Kind">The kind.</param>

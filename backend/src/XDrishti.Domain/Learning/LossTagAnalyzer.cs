@@ -12,7 +12,7 @@ public static class LossTagAnalyzer
     public const string InvalidCode = "loss_tags.invalid";
 
     /// <summary>A rough share of comparisons that flag by chance alone (a rough planning figure, not a test); the report prints comparisons times this.</summary>
-    private const double ChanceFlagRate = 0.05;
+    public const double ChanceFlagRate = 0.05;
 
     /// <summary>Tags the losses of <paramref name="inputs"/>; fails on bad options, no trades, a repeated trade key or a non-finite R.</summary>
     public static Result<LossTagReport> Analyze(IReadOnlyList<LossTagInput> inputs, LossTagOptions options)

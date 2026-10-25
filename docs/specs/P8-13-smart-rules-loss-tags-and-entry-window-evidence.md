@@ -84,7 +84,10 @@ None. (Running `--store` on the owner's data is the owner's CLI act; default unt
 - Needs now names P8-02b; the two tabs register through it. Follow the built `readOnly.test.ts` for the no-write test.
 
 ## Build record 2026-10-25
-- Spike done and recorded in [ADR 0108](../adr/0108-smart-rule-and-loss-tag-evidence-is-read-from-what-is-stored-and-the-rest-is-a-named-non-value.md): the owner's database holds no plan, run or champion; a plan row does not prove a rule ran; the pure loss-tag pass takes about 0.9 s on 500,000 trades.
+- Spike done and recorded in [ADR 0111](../adr/0111-smart-rule-and-loss-tag-evidence-is-read-from-what-is-stored-and-the-rest-is-a-named-non-value.md): the owner's database holds no plan, run or champion; a plan row does not prove a rule ran; the pure loss-tag pass takes about 0.9 s on 500,000 trades.
 - Built: criteria 1 to 7 and 10 (smart-rules and loss-tags endpoints, `LostR`, the two tabs). Run overlap is refused by the learning cell rules (`learning.cell_duplicate`), not `reports.run_overlap`.
 - Not built (P8-12's `learning_reports` table is not on main): criteria 8 and 9 (`entry-windows`, `meta-policy`, `--store` on the two verbs); the Smart rules tab shows both rules as not evaluable with their verbs.
 - Status stays Draft until the owner's Approved.
+- Criterion 11 was answered from empty tables: S3 (champion) and S4 (`xd learn windows`) were not measured, only that the tables hold no rows; S2 was measured on synthetic trades only.
+- Criterion 3 text drift: the empty rule rows say "No plan stored yet (the nightly service is paused until the owner starts it)." in the tab and "no plan stored yet" in the API field; the tab shows no digit.
+- Loss tags have their own cap (150,000 closed trades, `reports.too_large`) and do not use the P8-06 report loader; duplicates are `learning.cell_duplicate`, not `reports.run_overlap`.

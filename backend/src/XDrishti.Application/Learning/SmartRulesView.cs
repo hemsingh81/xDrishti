@@ -15,7 +15,7 @@ public sealed record SmartRulesView(string State, int PlansRead, DateOnly? From,
 /// <param name="Id">gate, throttle, meta, windows or correlation.</param>
 /// <param name="Name">The rule's name.</param>
 /// <param name="State"><c>empty</c> (no plan), <c>observed</c> (counts from plans) or <c>not_recorded</c> (the plan rows carry no code for this rule).</param>
-/// <param name="RanOn">Plans on which the rule ran: always null, a plan row does not prove a run (ADR 0108).</param>
+/// <param name="RanOn">Plans on which the rule ran: always null, a plan row does not prove a run (ADR 0111).</param>
 /// <param name="UnavailableOn">Plans on which the rule was unavailable; null when not recorded.</param>
 /// <param name="PartialOn">Plans on which some correlation pairs were not checked; null for the other rules.</param>
 /// <param name="Moved">Candidates moved to reserve; null when not recorded.</param>

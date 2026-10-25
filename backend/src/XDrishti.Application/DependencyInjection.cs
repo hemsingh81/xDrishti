@@ -479,8 +479,8 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ProposeEntryWindowsQuery, Result<EntryWindowReport>>, ProposeEntryWindowsHandler>(); // learned entry windows, proposal only (P6-14, ADR 0069)
         services.AddScoped<IQueryHandler<ReplayDriftQuery, Result<DriftReport>>, ReplayDriftHandler>(); // drift monitors over replayed history, read-only (P6-09, ADR 0074)
         services.AddScoped<IQueryHandler<AnalyzeLossTagsQuery, Result<LossTagReport>>, AnalyzeLossTagsHandler>(); // automatic loss tags, read-only (P6-15, ADR 0071)
-        services.AddScoped<IQueryHandler<GetLossTagsQuery, Result<LossTagsView>>, GetLossTagsHandler>(); // loss tags on the report population (P8-13, ADR 0108)
-        services.AddScoped<IQueryHandler<GetSmartRulesEvidenceQuery, Result<SmartRulesView>>, GetSmartRulesEvidenceHandler>(); // smart-rule evidence from stored plan rows (P8-13, ADR 0108)
+        services.AddScoped<IQueryHandler<GetLossTagsQuery, Result<LossTagsView>>, GetLossTagsHandler>(); // loss tags on the report population (P8-13, ADR 0111)
+        services.AddScoped<IQueryHandler<GetSmartRulesEvidenceQuery, Result<SmartRulesView>>, GetSmartRulesEvidenceHandler>(); // smart-rule evidence from stored plan rows (P8-13, ADR 0111)
         services.AddScoped<IQueryHandler<ListCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListCellsHandler>();
         services.AddScoped<IQueryHandler<GetCellQuery, Result<IReadOnlyList<CellStatsView>>>, GetCellHandler>();
         services.AddScoped<IQueryHandler<EvaluateCounterfactualQuery, Result<CounterfactualReport>>, EvaluateCounterfactualHandler>(); // frozen-model counterfactual, evidence only (P6-12, ADR 0077)

@@ -2544,7 +2544,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Why trades lost, on the report population: per cell the loss count, untagged count, count, share and R lost per tag, growing tags, the worst losses, the number of comparisons with the expected chance flags, and what is not built. Repeat run=KEY:STYLE:EXIT (1 to 50) to name runs; without it the default run set of the reports is used for the runs that record a style and exit. Computed on read. 422 learning.invalid or reports.too_large; 404 learning.run_not_found; 409 learning.cell_duplicate or learning.mixed_basis. Read only. */
+    /** Why trades lost, on the report population: per cell the loss count, untagged count, count, share and R lost per tag, growing tags, the worst losses, the number of comparisons with the expected chance flags, and what is not built. Repeat run=KEY:STYLE:EXIT (1 to 50) to name runs; without it the default run set of the reports is used for the runs that record a style and exit. Computed on read from the run headers and the learning cell reader, not through the P8-06 report loader's population; at most 150,000 closed trades per request (reports.too_large). Two runs of one strategy or one cell are refused as 409 learning.cell_duplicate (not reports.run_overlap). 422 learning.invalid or reports.too_large; 404 learning.run_not_found; 409 learning.cell_duplicate or learning.mixed_basis. Read only. */
     get: operations['GetLossTags'];
     put?: never;
     post?: never;
@@ -10086,7 +10086,7 @@ export interface components {
       state: string;
       /**
        * Format: int32
-       * @description Plans on which the rule ran: always null, a plan row does not prove a run (ADR 0108).
+       * @description Plans on which the rule ran: always null, a plan row does not prove a run (ADR 0111).
        */
       ranOn: null | number;
       /**
@@ -10441,9 +10441,9 @@ export interface components {
       share: null | number;
       /**
        * Format: double
-       * @description Sum of the (negative) R of the losses carrying the tag.
+       * @description Sum of the (negative) R of the losses carrying the tag; null when the analyzer did not compute it (never shown as 0).
        */
-      lostR: number;
+      lostR: null | number;
     };
     /** @description One ticket with its grade as the API shows it. */
     TicketGradeView: {

@@ -1,4 +1,4 @@
-# 0108 — Smart-rule and loss-tag evidence is read from what is stored; the rest is a named non-value
+# 0111 — Smart-rule and loss-tag evidence is read from what is stored; the rest is a named non-value
 
 - **Status:** Proposed (spec [P8-13](../specs/P8-13-smart-rules-loss-tags-and-entry-window-evidence.md), built 2026-10-25). Becomes Accepted when the owner has read it.
 - **Date:** 2026-10-25.
@@ -6,7 +6,7 @@
 
 ## The spike (what is stored), as found on the owner's database on 2026-10-25
 - **S1 plans.** `trading.plans`, `plan_items`: 0 rows. Code reading settles the fact that matters: `SelectionPlanBuilder` writes a smart-rule code on an item only when the rule was unavailable (`gate_unavailable`, `throttle_unavailable`, `correlation_unavailable`, `correlation_partial`), flagged the plan (`rule_removed_half`, whose rule name lives only in the banner text and is not stored) or moved a candidate to reserve (reserve reasons `gate_no_trade`, `gate_reduced_cut`, `same_bet_better_ticket`, `same_bet_open_trade`). A rule that ran normally leaves nothing. So **a plan row does not prove a rule ran**: "ran on" is always null, only "unavailable on" and "moved" are counted. Meta-labelling and entry windows leave no code at all: their counts are `not_recorded`.
-- **S2 loss-tag cost.** `LossTagAnalyzer` on 500,000 synthetic trades in 20 cells (Debug build, five runs): 703 to 903 ms, p50 855 ms, p95 about 900 ms, for the pure pass alone. Reading 500,000 trades from the database comes on top, so the end-to-end read at the cap is expected above the 1 s rule. For the sizes that exist (the database holds 0 runs, 0 trades) compute-on-read is instant. Decision: compute on read, with the report engine's cap (500,000 closed trades, one report at a time through `ReportGate`). The stored variant (`loss_tags` kind) needs the `learning_reports` table of P8-12, which is not built; it is deferred with that table, not faked.
+- **S2 loss-tag cost.** `LossTagAnalyzer` on 500,000 synthetic trades in 20 cells (Debug build, five runs): 703 to 903 ms, p50 855 ms, p95 about 900 ms, for the pure pass alone. Reading 500,000 trades from the database comes on top, so the end-to-end read at the cap is expected above the 1 s rule. For the sizes that exist (the database holds 0 runs, 0 trades) compute-on-read is instant. Decision: compute on read, with its own lower cap of 150,000 closed trades (problem code `reports.too_large`), one read at a time through `ReportGate`; the report engine's 500,000 is not used because this read holds whole simulated trades. The stored variant (`loss_tags` kind) needs the `learning_reports` table of P8-12, which is not built; it is deferred with that table, not faked.
 - **S3 champion.** `research.model_versions` and `model_designations`: 0 rows. No champion, so the meta-policy view would be `not_evaluable: no champion`.
 - **S4 entry windows.** `research.sim_runs` is empty, so `xd learn windows` could not be run on real data; no cost or outcome is claimed.
 - **S5 run labels.** P8-06 gives each run an optional style (of the stored strategy) and exit (of the stored comparison), null when not recorded. Loss tags use them for the default set; a run without them is left out with the reason, and `run=KEY:STYLE:EXIT` names runs explicitly (the exit is the rest of the text after the second colon).
@@ -17,9 +17,11 @@
 3. **Every outcome is `not_evaluable` with its reason and command** (gate: market context P3-01d/e; throttle: real taken trades P10/P11; meta: champion and stored policy; windows: a stored study; correlation: the 60-day return table at plan time). No proxy is invented; a count the plan rows cannot give is null with a reason, never zero. With no plan stored the rules are `empty` and the view contains no number.
 4. **R lost per tag** is added to `CellLossTags` as a trailing optional `LostR` (parallel to `Counts`; the sum of the negative R of the losses carrying the tag). No rule changes, `RuleVersion` stays `lt-2`, existing counts and tests are unchanged. Tags overlap, so sums and shares do not add to the total; the view says so.
 5. **Growing tags** are `not_evaluable` for a cell with fewer than two windows of losses (60 by default); its tag counts still show with n.
-6. No switch to turn a rule off is built (a password-protected owner act, P8-19).
+6. **Loss tags do not use the P8-06 `ReportLoader` population.** They read run headers (`IReportTradeSource.ListRunsAsync`) for the default set and the size check, then the learning `CellSourceReader` through `AnalyzeLossTagsHandler`. So `reports.run_overlap` is replaced by `learning.cell_duplicate` (409) and `learning.mixed_basis`; the report filters (dates, symbols) do not apply.
+7. **Shortcut, plan read:** `IPlanStore` has no per-date read, so three times the sessions asked for are listed on the assumption of at most three versions per session; the view says how many sessions it returned. Shortcut, loss-tag store: compute on read, store as a `learning_reports` kind when P8-12 lands.
+8. No switch to turn a rule off is built (a password-protected owner act, P8-19).
 
 ## Consequences
 - On the owner's machine both tabs are empty today, which is the correct display; the layouts are proved by fixtures.
 - Counting codes measures what the plan recorded, not what a rule would have done. P8-14's structured flags will let "ran on" and the rule behind `rule_removed_half` be shown.
-- Loss tags over a very large run set are bounded by the report cap and may take more than a second; storing the view is the planned remedy once P8-12's table exists.
+- Loss tags over a large run set are bounded by the 150,000-trade cap and may take about a second; storing the view is the planned remedy once P8-12's table exists.

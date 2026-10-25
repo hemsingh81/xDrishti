@@ -3,7 +3,7 @@ using XDrishti.Domain.Selection.SmartRules;
 namespace XDrishti.Domain.Learning;
 
 /// <summary>
-/// Counts, from the codes stored on plan rows, how often each smart rule was unavailable and how many candidates it moved to reserve (P8-13, ADR 0108). A plan row stores no code for a rule that ran normally, so "ran on N plans" is never derived; and no outcome is computed.
+/// Counts, from the codes stored on plan rows, how often each smart rule was unavailable and how many candidates it moved to reserve (P8-13, ADR 0111). A plan row stores no code for a rule that ran normally, so "ran on N plans" is never derived; and no outcome is computed.
 /// Pure and deterministic. A plan is counted once per code however many of its items carry it (the flag codes are copied onto every item).
 /// </summary>
 public static class SmartRulesEvidence

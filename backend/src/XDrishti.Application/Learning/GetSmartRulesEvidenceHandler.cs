@@ -17,7 +17,8 @@ internal sealed class GetSmartRulesEvidenceHandler(IPlanStore plans) : IQueryHan
 
     private const string Source = "The reason and unavailable codes the plan builder stored on each plan item. Structured plan flags (P8-14) are not stored yet.";
 
-    private static readonly Dictionary<string, (string Name, string Outcome, string Command, string? NotRecorded)> Rules = new(StringComparer.Ordinal)
+    /// <summary>The display facts of each rule; the keys must equal <see cref="SmartRulesEvidence.RuleIds"/> (a test pins it).</summary>
+    internal static readonly Dictionary<string, (string Name, string Outcome, string Command, string? NotRecorded)> Rules = new(StringComparer.Ordinal)
     {
         ["gate"] = ("Market gate", "R by VIX and breadth bucket needs market context, which is not stored (P3-01d/e).", "P3-01d/e (market context)", null),
         ["throttle"] = ("Equity throttle", "Equity with and without the throttle needs real taken trades, which exist only after paper and live trading. The throttle cuts risk, so it moves no candidate.", "P10/P11 (taken trades)", null),
@@ -34,7 +35,8 @@ internal sealed class GetSmartRulesEvidenceHandler(IPlanStore plans) : IQueryHan
             return Result.Failure<SmartRulesView>(LearningErrors.Invalid([new FieldError("plans", $"Read 1 to {MaxPlans} plans.")]));
         }
 
-        // The newest version of each planned session, newest sessions first. IPlanStore has no per-date list, so more rows than asked for are listed to cover repeated versions.
+        // Shortcut: IPlanStore lists newest first with no per-date or distinct-date read, so three times the sessions asked for are listed on the assumption of at most three versions per session; with more versions fewer sessions come back.
+        // The answer says how many sessions it returned. A per-date read on the store would remove this.
         var listed = await plans.ListAsync(null, null, query.Plans * 3, cancellationToken);
         var chosen = listed.GroupBy(p => p.Plan.ForDate).Select(g => g.OrderByDescending(p => p.Plan.Version).First()).OrderByDescending(p => p.Plan.ForDate).Take(query.Plans).ToList();
         var facts = new List<PlanRuleFacts>();
@@ -51,7 +53,9 @@ internal sealed class GetSmartRulesEvidenceHandler(IPlanStore plans) : IQueryHan
             "A plan row stores a code only when a rule was unavailable, moved a candidate or flagged the plan; a rule that ran normally leaves nothing, so 'ran on' is not derived.",
             "Counting codes measures what the plan recorded, not what a rule would have done had its input existed.",
             "The flag rule_removed_half names no rule in the stored record (the rule is only in the banner text).",
-            FormattableString.Invariant($"Only the newest version of each of the newest {query.Plans} planned sessions is read."),
+            counts.PlansRead == 0
+                ? "No planned session is stored."
+                : FormattableString.Invariant($"{counts.PlansRead} planned sessions from {counts.From:yyyy-MM-dd} to {counts.To:yyyy-MM-dd} were read, of the {query.Plans} asked for; only the newest version of each session is counted."),
         };
         return Result.Success(new SmartRulesView(
             empty ? "empty" : "observed",
