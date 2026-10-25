@@ -25,8 +25,6 @@ internal sealed class JournalPlansHandler(
     private const int MaxPlans = 30;
     private const int MaxOpenEntries = 500;
 
-    private static readonly TicketState[] ApprovedFamily = [TicketState.Approved, TicketState.Armed, TicketState.Triggered, TicketState.Closed];
-
     public async ValueTask<Result<JournalOutcome>> HandleAsync(JournalPlansCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -91,9 +89,9 @@ internal sealed class JournalPlansHandler(
             .GroupBy(e => e.ItemId!.Value)
             .ToDictionary(g => g.Key, g => g.Min(e => e.At));
         var result = new List<JournalTicket>();
-        foreach (var item in items.Where(i => i.Item.Group != TicketGroup.Rejected && ApprovedFamily.Contains(i.State) && approvedAt.ContainsKey(i.Id)))
+        foreach (var item in items.Where(i => i.Item.Group != TicketGroup.Rejected && TicketLifecycle.ApprovedFamily.Contains(i.State) && approvedAt.ContainsKey(i.Id)))
         {
-            if (ParseSide(item.Item.Side) is not { } side)
+            if (TicketLifecycle.ParseSide(item.Item.Side) is not { } side)
             {
                 continue;
             }
@@ -126,7 +124,7 @@ internal sealed class JournalPlansHandler(
         foreach (var entry in open)
         {
             var item = await plans.FindItemAsync(entry.ItemId, cancellationToken);
-            if (item is null || ParseSide(item.Item.Side) is not { } side)
+            if (item is null || TicketLifecycle.ParseSide(item.Item.Side) is not { } side)
             {
                 pending++;
                 continue;
@@ -158,11 +156,4 @@ internal sealed class JournalPlansHandler(
 
     internal static JournalFill Fill(StoredFill f) =>
         new(f.TransactionId, f.AccountId, f.Symbol, f.Side == "buy" ? Side.Buy : Side.Sell, f.Date, f.Time, f.TradeQty, f.Price, f.Charges);
-
-    internal static Side? ParseSide(string side) => side switch
-    {
-        "BUY" => Side.Buy,
-        "SELL" => Side.Sell,
-        _ => null,
-    };
 }

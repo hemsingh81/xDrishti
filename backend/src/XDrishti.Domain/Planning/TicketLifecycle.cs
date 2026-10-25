@@ -1,3 +1,5 @@
+using XDrishti.Domain.Research;
+
 namespace XDrishti.Domain.Planning;
 
 /// <summary>
@@ -23,6 +25,17 @@ public static class TicketLifecycle
         (TicketState.Armed, TicketState.Expired),
         (TicketState.Triggered, TicketState.Closed),
     ];
+
+    /// <summary>The states of a ticket the owner approved and that went on from there: the only tickets a fill can be matched to (the journal, P7-14) and a prompt about fills can be about (the bell, P8-15).</summary>
+    public static IReadOnlyList<TicketState> ApprovedFamily { get; } = [TicketState.Approved, TicketState.Armed, TicketState.Triggered, TicketState.Closed];
+
+    /// <summary>The side of a ticket (<c>BUY</c> or <c>SELL</c>) as a trade side; null for any other text.</summary>
+    public static Side? ParseSide(string side) => side switch
+    {
+        "BUY" => Side.Buy,
+        "SELL" => Side.Sell,
+        _ => null,
+    };
 
     /// <summary>Every legal move.</summary>
     public static IReadOnlyList<(TicketState From, TicketState To)> Moves => Legal;

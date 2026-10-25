@@ -9312,6 +9312,27 @@
         }
       }
     },
+    "/api/plans/notices": {
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "What the owner should know about the plan for the notification bell, derived at read time from the stored plan record, runs and fills: a plan awaiting review with the minutes to its stored cutoff, the nightly run that failed closed (gate and reason), tickets that lapsed, tickets armed or invalidated at pre-open, and approved tickets whose fills are not matched yet. Each item has an in-app route and no command, carries counts and no symbol, and is gone once the stored state changes. Read only; in-app only",
+        "operationId": "GetPlanNotices",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanNotices"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/plans/{id}": {
       "get": {
         "tags": [
@@ -24287,6 +24308,65 @@
           }
         },
         "description": "The journal of one plan."
+      },
+      "PlanNotice": {
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "text",
+          "route",
+          "planId",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string"
+          },
+          "planId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "One thing about the plan the owner should know. `kind`: plan_awaiting_review · plan_nightly_failed · plan_tickets_lapsed · plan_tickets_armed · plan_tickets_invalidated · plan_fills_unmatched.\n`severity`: error · warning · info. `id` carries what changes, so a worse or bigger situation is unread again: `plan:review:{planId}:{info|warning}`, `plan:{lapsed|armed|invalidated|fills|fills-ambiguous}:{planId}:{count}`, `plan:nightly:{yyyy-MM-dd}:{attempt}`. `route` is an in-app path (`/plans?plan={id}`, or `/plans`\nfor a run that failed closed and so has no plan); there is no command: the notice only shows and opens. `at` is the moment it is about (the cutoff, the end of the failed run), or null. The text has counts, never a symbol, a size or a price."
+      },
+      "PlanNotices": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanNotice"
+            }
+          }
+        },
+        "description": "The current plan notices, worst first. An item is present while its cause stands and absent once the stored state has changed."
       },
       "PlanPhaseCheckView": {
         "required": [

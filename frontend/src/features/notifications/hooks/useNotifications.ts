@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { accountsQuery, useNow } from '@/features/accounts';
-import { dataNoticesQuery, portfolioNoticesQuery, serviceNoticesQuery } from '@/shared/api';
+import { dataNoticesQuery, planNoticesQuery, portfolioNoticesQuery, serviceNoticesQuery } from '@/shared/api';
 import { deriveDataNotifications } from '../lib/deriveDataNotifications';
+import { derivePlanNotifications } from '../lib/derivePlanNotifications';
 import { derivePortfolioNotifications } from '../lib/derivePortfolioNotifications';
 import { deriveServiceNotifications } from '../lib/deriveServiceNotifications';
 import { compareNotifications, deriveNotifications, type AppNotification } from '../lib/deriveNotifications';
@@ -19,8 +20,8 @@ export interface NotificationsState {
 }
 
 /**
- * All current notifications: the accounts' (the API-key expiry, derived here from their state), the data, service and Portfolio
- * notices (derived by the API, among them the items that need the owner), open ones first and most urgent first. The notices
+ * All current notifications: the accounts' (the API-key expiry, derived here from their state), the data, service, Portfolio
+ * and plan notices (derived by the API, among them the items that need the owner), open ones first and most urgent first. The notices
  * are polled lightly; when they cannot be read the account notifications still show.
  */
 export function useNotifications(): NotificationsState {
@@ -32,6 +33,8 @@ export function useNotifications(): NotificationsState {
   const serviceItems = serviceNotices.data?.items;
   const portfolioNotices = useQuery(portfolioNoticesQuery);
   const portfolioItems = portfolioNotices.data?.items;
+  const planNotices = useQuery(planNoticesQuery);
+  const planItems = planNotices.data?.items;
   const notifications = useMemo(
     () =>
       [
@@ -39,8 +42,9 @@ export function useNotifications(): NotificationsState {
         ...deriveDataNotifications(noticeItems ?? []),
         ...deriveServiceNotifications(serviceItems ?? []),
         ...derivePortfolioNotifications(portfolioItems ?? []),
+        ...derivePlanNotifications(planItems ?? []),
       ].sort(compareNotifications),
-    [data, now, noticeItems, serviceItems, portfolioItems],
+    [data, now, noticeItems, serviceItems, portfolioItems, planItems],
   );
   return {
     notifications,

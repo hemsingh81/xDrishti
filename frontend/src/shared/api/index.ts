@@ -3,6 +3,7 @@ export { api, ApiError, configureApiAuth, ensureOk, unwrap, type ApiAuthHooks } 
 export { parseCommand, runCommand, type Command } from './commands';
 export { dataIdlePollMs, dataJobQuery, dataOverviewQuery } from './dataJobs';
 export { dataNoticesPollMs, dataNoticesQuery } from './dataNotices';
+export { planNoticesPollMs, planNoticesQuery } from './planNotices';
 export { portfolioNoticesPollMs, portfolioNoticesQuery } from './portfolioNotices';
 export { queryRoots } from './queryRoots';
 export { serviceNoticesPollMs, serviceNoticesQuery } from './serviceNotices';

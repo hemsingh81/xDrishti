@@ -28,6 +28,7 @@ export const planKeys = {
   suggestions: (id: number) => ['plans', 'suggestions', id] as const,
   grade: (id: number) => ['plans', 'grade', id] as const,
   journal: (id: number) => ['plans', 'journal', id] as const,
+  notices: ['plans', 'notices'] as const, // read by the bell (shared/api/planNotices.ts)
   digests: ['plans', 'digests'] as const,
   autonomy: ['plans', 'autonomy'] as const,
 };

@@ -2775,6 +2775,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/plans/notices': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What the owner should know about the plan for the notification bell, derived at read time from the stored plan record, runs and fills: a plan awaiting review with the minutes to its stored cutoff, the nightly run that failed closed (gate and reason), tickets that lapsed, tickets armed or invalidated at pre-open, and approved tickets whose fills are not matched yet. Each item has an in-app route and no command, carries counts and no symbol, and is gone once the stored state changes. Read only; in-app only */
+    get: operations['GetPlanNotices'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/plans/{id}': {
     parameters: {
       query?: never;
@@ -7884,6 +7901,26 @@ export interface components {
        * @description Approved tickets that no fill was matched to.
        */
       ticketsWithoutFills: number;
+    };
+    /**
+     * @description One thing about the plan the owner should know. `kind`: plan_awaiting_review · plan_nightly_failed · plan_tickets_lapsed · plan_tickets_armed · plan_tickets_invalidated · plan_fills_unmatched.
+     *     `severity`: error · warning · info. `id` carries what changes, so a worse or bigger situation is unread again: `plan:review:{planId}:{info|warning}`, `plan:{lapsed|armed|invalidated|fills|fills-ambiguous}:{planId}:{count}`, `plan:nightly:{yyyy-MM-dd}:{attempt}`. `route` is an in-app path (`/plans?plan={id}`, or `/plans`
+     *     for a run that failed closed and so has no plan); there is no command: the notice only shows and opens. `at` is the moment it is about (the cutoff, the end of the failed run), or null. The text has counts, never a symbol, a size or a price.
+     */
+    PlanNotice: {
+      id: string;
+      kind: string;
+      severity: string;
+      text: string;
+      route: string;
+      /** Format: int64 */
+      planId: null | number;
+      /** Format: date-time */
+      at: null | string;
+    };
+    /** @description The current plan notices, worst first. An item is present while its cause stands and absent once the stored state has changed. */
+    PlanNotices: {
+      items: components['schemas']['PlanNotice'][];
     };
     /** @description The phase check as the verb prints it and the endpoint returns it. */
     PlanPhaseCheckView: {
@@ -17130,6 +17167,26 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPlanNotices: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanNotices'];
         };
       };
     };

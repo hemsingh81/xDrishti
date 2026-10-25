@@ -32,6 +32,7 @@ export function PlanDetail({ planId }: { planId: number }) {
     void queryClient.invalidateQueries({ queryKey: planKeys.one(planId) });
     void queryClient.invalidateQueries({ queryKey: planKeys.review(planId) });
     void queryClient.invalidateQueries({ queryKey: planKeys.list });
+    void queryClient.invalidateQueries({ queryKey: planKeys.notices });
   }, [queryClient, planId]);
 
   if (plan.isPending || review.isPending) return <LoadingState label="Loading plan…" />;

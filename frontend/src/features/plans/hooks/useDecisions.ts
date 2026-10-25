@@ -24,6 +24,7 @@ export function useDecisions(planId: number, report: (notice: Notice) => void) {
       queryClient.invalidateQueries({ queryKey: planKeys.one(planId) }),
       queryClient.invalidateQueries({ queryKey: planKeys.review(planId) }),
       queryClient.invalidateQueries({ queryKey: planKeys.list }),
+      queryClient.invalidateQueries({ queryKey: planKeys.notices }), // the bell's plan items leave with the decision
     ]);
   const fail = (e: unknown) => {
     report({ tone: 'error', text: decisionError(e) });
