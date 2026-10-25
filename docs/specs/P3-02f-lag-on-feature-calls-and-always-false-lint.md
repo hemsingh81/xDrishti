@@ -1,6 +1,6 @@
 # P3-02f — A lag on a feature call (`highest(20)[1]`) and a warning for comparisons that cannot be true
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it). **Decision recorded: GO**, in two parts that can be built and merged separately (D1).
+- **Status:** Built 2026-10-25 (Parts A and B; ADR 0108). Was Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it). **Decision recorded: GO**, in two parts that can be built and merged separately (D1).
 - **Phase / roadmap row:** P3 — row P3-02f (Later, optional); issue ISS-24 (traps of the rules language). Supersedes an approved restriction, so Part B needs an ADR and the owner's Approved.
 - **Design refs:** docs/design/11-strategy-lab.md §2 (*Lags*, *Lint*) · docs/design/07-strategies.md §3 · docs/design/18-roadmap.md (P3-02f row, ISS-24)
 - **Needs:** built: the parser, binder, lint and compiler (`XDrishti.Strategies`), the feature frame (`FeatureFrame.At`). ADRs 0034 (Amendment 8: a subscript only after a reference; the lint table), 0035 (per-session features keep the history of the session only), 0031/0032 (frame history). Spec P3-02, criterion 1.

@@ -316,7 +316,7 @@ internal sealed class Recovery(string source, List<Token<Tk>> tokens, List<Probl
                 SyntaxCodes.SubscriptOnNonReference,
                 previous == Tk.RightBracket
                     ? "A value can have only one subscript."
-                    : "A subscript can only follow a name, like close[1]; it cannot follow a call, a parenthesised expression or a literal.",
+                    : "A subscript can only follow a name or a feature call, like close[1] or highest(20)[1]; it cannot follow a parenthesised expression or a literal.",
                 SpanOfToken(at));
         }
 

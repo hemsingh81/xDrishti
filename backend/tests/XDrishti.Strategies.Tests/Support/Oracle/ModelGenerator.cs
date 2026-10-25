@@ -196,7 +196,7 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
             4 => new Feature("supertrend_dir(2, 1.5)", "supertrend_dir(2, 1.5)", false, new FeatureSpec("supertrend_dir", Timeframe.M1, PriceSource.Default, 2, 1.5)),
             _ => new Feature("nr(2)", "nr(2)", false, new FeatureSpec("nr", Timeframe.M1, PriceSource.Default, 2)),
         };
-        return new Leaf(feature, frame, frame != evaluation || Chance(15), feature.IsReference && Chance(30) ? _random.Next(1, 3) : 0);
+        return new Leaf(feature, frame, frame != evaluation || Chance(15), Chance(30) ? _random.Next(1, 3) : 0);
     }
 
     private Cmp Compare() => new Cmp(Pick(Comparisons), Number(2, null), Chance(25) ? Level() : Number(2, null));
@@ -393,7 +393,7 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
     private Leaf Finish(Feature feature, Timeframe frame)
     {
         var qualified = frame != evaluation || Chance(15);
-        var lag = feature.IsReference && Chance(30) ? SubscriptLag(frame) : 0;
+        var lag = Chance(30) ? SubscriptLag(frame) : 0;
         return new Leaf(feature, frame, qualified, lag);
     }
 

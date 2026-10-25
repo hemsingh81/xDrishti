@@ -15,7 +15,7 @@ public sealed class LintTableTests
     private static readonly string[] Rows =
     [
         "unknown_name", "bad_arguments", "unsupported_timeframe", "negative_or_zero_lag", "lag_too_deep", "lag_on_non_feature", "mixed_timeframes_in_lag", "time_on_daily", "bad_time_literal",
-        "type_mismatch", "constant_condition", "redundant_timeframe", "needs_context", "needs_expiry_days", "shadowed_name", "lag_across_session",
+        "type_mismatch", "constant_condition", "redundant_timeframe", "needs_context", "needs_expiry_days", "shadowed_name", "lag_across_session", "never_true",
     ];
 
     private static string Label(string code) => code + ": ";

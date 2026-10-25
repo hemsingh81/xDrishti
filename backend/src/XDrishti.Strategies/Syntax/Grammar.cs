@@ -9,7 +9,7 @@ namespace XDrishti.Strategies.Syntax;
 
 /// <summary>
 /// The grammar of the rules language over the tokens of <see cref="Lexer"/> (the grammar and its precedence are in the spec P3-02 and in docs/design/11-strategy-lab.md §2), built from Superpower parsers. The
-/// parsers hold no state, so one set serves every thread. A comparison is not chained, a subscript is accepted only right after a reference, and a <see cref="Tk.Missing"/> token stands in for whatever the recovery of
+/// parsers hold no state, so one set serves every thread. A comparison is not chained, a subscript is accepted only right after a reference or a call, and a <see cref="Tk.Missing"/> token stands in for whatever the recovery of
 /// <see cref="Recovery"/> had to supply, so one problem does not hide the next.
 /// <para>
 /// <b>Two kinds of parser.</b> The small productions that do not nest (names, literals, <c>tf("1h").</c>, a named argument, a subscript) are combinators. The <b>recursive spine</b> (an expression with its
@@ -240,7 +240,7 @@ internal static class Grammar
             var (frame, member) = tail.Value;
             if (tail.Remainder.ConsumeToken() is { HasValue: true, Value.Kind: Tk.LeftParen })
             {
-                return ParseCall(input, member, name.Span, frame, tail.Remainder);
+                return SubscriptedCall(ParseCall(input, member, name.Span, frame, tail.Remainder), input);
             }
 
             return Subscripted(new Reference(member, name.Span.To(member.Span), null, frame), input, tail.Remainder);
@@ -248,7 +248,7 @@ internal static class Grammar
 
         if (nextKind == Tk.LeftParen)
         {
-            return ParseCall(input, name, name.Span, null, afterName);
+            return SubscriptedCall(ParseCall(input, name, name.Span, null, afterName), input);
         }
 
         if (nextKind == Tk.Dot)
@@ -265,8 +265,8 @@ internal static class Grammar
         return Subscripted(new Reference(name, name.Span), input, afterName);
     }
 
-    /// <summary>A reference, followed by a subscript if there is one. A subscript is only read after a reference; after anything else the <c>[</c> is left for the caller to reject.</summary>
-    private static TokenListParserResult<Tk, Expression> Subscripted(Reference reference, TokenList<Tk> input, TokenList<Tk> rest)
+    /// <summary>A reference or a call, followed by a subscript if there is one. A subscript is only read after those; after anything else the <c>[</c> is left for the caller to reject.</summary>
+    private static TokenListParserResult<Tk, Expression> Subscripted(Expression reference, TokenList<Tk> input, TokenList<Tk> rest)
     {
         if (rest.ConsumeToken() is not { HasValue: true, Value.Kind: Tk.LeftBracket })
         {
@@ -282,6 +282,10 @@ internal static class Grammar
         var (lag, lagSpan, end) = tail.Value;
         return TokenListParserResult.Value<Tk, Expression>(new Subscript(reference, lag, lagSpan, reference.Span.To(end)), input, tail.Remainder);
     }
+
+    /// <summary>A call, followed by a subscript if there is one (<c>highest(20)[1]</c>).</summary>
+    private static TokenListParserResult<Tk, Expression> SubscriptedCall(TokenListParserResult<Tk, Expression> call, TokenList<Tk> input) =>
+        call.HasValue ? Subscripted(call.Value, input, call.Remainder) : call;
 
     /// <summary><c>(</c> arguments separated by commas <c>)</c>, where an argument is <c>name=name</c> or an expression.</summary>
     private static TokenListParserResult<Tk, Expression> ParseCall(TokenList<Tk> input, Identifier name, SourceSpan start, StringLiteral? timeframe, TokenList<Tk> atOpen)

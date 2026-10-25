@@ -214,7 +214,7 @@ internal static class LagRules
 
         /// <summary>
         /// The same crossing written out with one side lagged by hand, when one side is a plain reference on the strategy's own timeframe: <c>close &gt; tf("1D").ema(20) and close[1] &lt;= tf("1D").ema(20)</c>. Null
-        /// when no side qualifies (a call cannot be given a subscript).
+        /// when no side qualifies (only a plain reference is lagged by hand here).
         /// </summary>
         private string? ExplicitCrossing(BoundCrossing crossing)
         {

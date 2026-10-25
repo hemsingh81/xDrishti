@@ -58,6 +58,7 @@ public static class CompilerWarmup
 
         // lagged reads and the nine timeframes
         new("close[2] > open[3] and tf(\"1D\").close[1] < close"),
+        new("close > highest(20)[1] and rsi(14)[1] < 70 and crosses_above(close, lowest(5)[2]) and tf(\"1h\").ema(20)[1] > atr(14)[3]"),
         new("tf(\"1m\").close > tf(\"10m\").close and tf(\"15m\").ema(9) > tf(\"30m\").ema(21) and tf(\"1h\").rsi(14) < 60"),
         new("tf(\"1D\").sma(20) > tf(\"1W\").close and tf(\"1W\").ema(10) > tf(\"1M\").close"),
 
@@ -84,6 +85,7 @@ public static class CompilerWarmup
         new("close > open and true"),
         new("tf(\"5m\").close > 0"),
         new("rising(vwap, 75)"),
+        new("close > highest(20) and rsi(14) > 100"),
 
         // a daily strategy
         new("close > sma(200) and rsi(14) < 70", Timeframe.D1),
@@ -109,7 +111,7 @@ public static class CompilerWarmup
         new("rsi(14,)"),
         new("rsi(,14)"),
         new("a = b"),
-        new("rsi(14)[1]"),
+        new("(close)[1]"),
         new("x[a]"),
         new("tf(\"1h\")"),
 

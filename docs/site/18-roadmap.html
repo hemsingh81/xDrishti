@@ -327,12 +327,12 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td>P3-04d</td>
-<td><strong>Proposed, no spec file: the decision trace and the &quot;conditions at the decision bar&quot; section of a card</strong> (fourth part of the former row P3-04b): <code>ISimulationEngine.Explain</code>, <code>TradeExplanation</code> and the extraction of the full input reader. The replay keeps no trace today (<code>SimTrade.EntrySnapshotJson</code> is always null and <code>InstrumentReplay</code> holds only trades), so the truth and values of every condition need a replay; the chart does not. P3-04c prints one line saying so. Whether the 20-trade check needs it is the owner&#39;s choice (P3-09 has no spec yet: UNVERIFIED).</td>
+<td><strong>The decision trace and the &quot;conditions at the decision bar&quot; section of a card, built 2026-10-25</strong> (fourth part of the former row P3-04b; <a href="../specs/P3-04d-decision-trace-and-conditions-on-cards.html">spec</a>, <a href="../adr/0041-the-simulate-verb-the-export-library-and-the-pipeline-in-the-host.html">ADR 0041</a> Amendment 5): <code>ISimulationEngine.Explain</code>, <code>TradeExplanation</code>, <code>CompiledCondition.Reads</code> and <code>InstrumentInputReader</code>. The second read of the cards recomputes each chosen trade with the engine that made it, must reproduce it (<code>simulation.cards_mismatch</code> otherwise) and prints, for setup, trigger and invalidate, each condition with its truth and the value of every feature it read at its lag. Export format <code>xd-sim-export-4</code>.</td>
 <td>2 (B), after P3-04c</td>
-<td>1.3 d</td>
-<td>Proposed</td>
-<td>Spec to be drafted (the size is the one P3-04c and P3-04b2 state)</td>
-<td>Spec to be drafted</td>
+<td>2 d</td>
+<td>Built</td>
+<td><a href="../specs/P3-04d-decision-trace-and-conditions-on-cards.html">spec</a></td>
+<td>Section equals the hand values of the ORB day; the guard refuses an edited trade; one replay per instrument</td>
 </tr>
 <tr>
 <td>P3-03d</td>
@@ -1023,8 +1023,8 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Catalogue reports the stored data can serve</strong> (strategies, side, calendar and time, MAE / MFE, instruments, symbol and sector, exit-policy comparison, Monte Carlo risk).</td>
 <td>P8</td>
 <td>5 d</td>
-<td>Spec Draft (plan)</td>
-<td><a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
+<td>Part a built 2026-10-25 (<a href="../adr/0106-the-report-engine-gains-excursions-entry-hour-and-sector-additively-and-mae-mfe-is-served-as-counts-in-bins.html">ADR 0106</a>): engine fields, <code>Sector</code>/<code>Hour</code> lenses, <code>GET /api/reports/mae-mfe</code>, strategies / side / calendar / MAE-MFE / distribution / instruments / sectors screens; part b (exit comparison, Monte Carlo, pointer entries) open</td>
+<td><a href="../specs/P8-10-catalogue-reports-the-stored-data-can-serve.html">spec</a></td>
 <td>Per report with the state vocabulary</td>
 </tr>
 <tr>
@@ -1248,8 +1248,8 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>BUY to SELL mirror</strong>: rewrite a BUY side into its SELL side on the syntax tree and print it (comparison direction, <code>crosses_above/below</code>, <code>rising/falling</code>, <code>highest/lowest</code>, <code>or_high/or_low</code>, previous-day high/low, <code>rsi(n)</code> to <code>100 − n</code>, signed features) from a closed rewrite table; anything without a defined mirror (<code>day_of_week</code>, <code>regime()</code>, several context names) is an error that tells the author to write a sell block. The three built-ins carry hand-written sell blocks, so this is for user strategies (doc 11 §2).</td>
 <td>free capacity</td>
 <td>3 d</td>
-<td>Later</td>
-<td>Spec to be drafted</td>
+<td>Built 2026-10-25 (ADR 0107)</td>
+<td><a href="../specs/P3-02e-buy-to-sell-mirror.html">Spec</a></td>
 <td><code>mirror(mirror(x))</code> equals <code>x</code> on a 500-condition corpus; a metamorphic test on an inverted price series (<code>p&#39; = K − p</code>) gives the same decisions as the original for every mirrored feature; the refusal list is pinned with codes and suggestions</td>
 </tr>
 <tr>
@@ -1267,7 +1267,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td>free capacity</td>
 <td>2 d</td>
 <td>Later (optional)</td>
-<td>Spec to be drafted if wanted</td>
+<td>Built 2026-10-25 (<a href="../adr/0108-a-lag-on-a-feature-call-and-a-warning-for-comparisons-that-cannot-be-true.html">ADR 0108</a>)</td>
 <td>The pinned invalid sources <code>rsi(14)[1]</code> and <code>tf(&quot;1h&quot;).ema(20)[1]</code> become valid with hand-calculated values; the interpreter oracle, the tree audit and the compiler warm-up coverage tests include the new shape; at least 10 failing and 10 near-miss lint examples</td>
 </tr>
 </tbody></table>
@@ -1524,7 +1524,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td>ISS-24</td>
-<td><strong>Traps of the rules language.</strong> (1) A lag on a feature call is refused: <code>highest(20)[1]</code>, <code>ema(20)[1]</code>, <code>rsi(14)[1]</code> give the syntax problem <code>subscript_on_non_reference</code> (the approved restriction; spec P3-02 criterion 1, ADR 0034 Amendment 8). <code>highest(n)</code> includes the current bar, so &quot;close above the previous N-bar high&quot; has no spelling on one timeframe and <code>crosses_above(close, highest(20))</code> is never true. The spellings that exist are <code>close &gt;= highest(n, source=close)</code> (a new n-bar closing high, ties count) and <code>tf(&quot;1D&quot;).highest(n)</code> read from an intraday strategy (the last closed day, today excluded). (2) Comparisons that cannot be true by construction are not linted (<code>close &gt; highest(n)</code>, <code>crosses_above(close, highest(n))</code>, <code>low &lt; lowest(n)</code>, <code>rsi(14) &gt; 100</code>): constant detection sees literals and parameters only. (3) Smaller gaps: a condition is boolean only, so a stop, target or level cannot be written in the language (stops are typed kinds in P3-02b); <code>or_high(m)</code> needs m to be a whole number of bars of the evaluation timeframe (<code>or_high(15)</code> is <code>bad_arguments</code> on 30m); a time of day or a lag cannot be a parameter (windows live in <code>time_rules</code>); there is no average volume, turnover or event calendar, so the filters <code>min_turnover</code> and <code>not_event_day</code> cannot be evaluated and results days are not excluded; the BUY to SELL mirror is defined nowhere (P3-02e).</td>
+<td><strong>Traps of the rules language.</strong> (1) <strong>Built in P3-02f (ADR 0108): a lag on a feature call is accepted</strong> (<code>highest(20)[1]</code>); before it, it was refused: <code>highest(20)[1]</code>, <code>ema(20)[1]</code>, <code>rsi(14)[1]</code> give the syntax problem <code>subscript_on_non_reference</code> (the approved restriction; spec P3-02 criterion 1, ADR 0034 Amendment 8). <code>highest(n)</code> includes the current bar, so &quot;close above the previous N-bar high&quot; has no spelling on one timeframe and <code>crosses_above(close, highest(20))</code> is never true. The spellings that exist are <code>close &gt;= highest(n, source=close)</code> (a new n-bar closing high, ties count) and <code>tf(&quot;1D&quot;).highest(n)</code> read from an intraday strategy (the last closed day, today excluded). (2) <strong>Built in P3-02f: the warning <code>never_true</code></strong>; before it, comparisons that could not be true by construction were not linted (<code>close &gt; highest(n)</code>, <code>crosses_above(close, highest(n))</code>, <code>low &lt; lowest(n)</code>, <code>rsi(14) &gt; 100</code>): constant detection sees literals and parameters only. (3) Smaller gaps: a condition is boolean only, so a stop, target or level cannot be written in the language (stops are typed kinds in P3-02b); <code>or_high(m)</code> needs m to be a whole number of bars of the evaluation timeframe (<code>or_high(15)</code> is <code>bad_arguments</code> on 30m); a time of day or a lag cannot be a parameter (windows live in <code>time_rules</code>); there is no average volume, turnover or event calendar, so the filters <code>min_turnover</code> and <code>not_event_day</code> cannot be evaluated and results days are not excluded; the BUY to SELL mirror is defined nowhere (P3-02e).</td>
 <td>P3 re-plan (2026-10-18): the review of the plan found that <a href="11-strategy-lab.html">doc 11</a> §2 writes <code>ema(20)[1]</code> in its &quot;A lag counts bars&quot; paragraph, which the parser refuses; <code>InvalidSources.cs</code> pins <code>rsi(14)[1]</code> and <code>tf(&quot;1h&quot;).ema(20)[1]</code>.</td>
 <td>A rule that never fires gives zero trades and zero losses and looks safe; an example in the documentation that does not compile misleads the author.</td>
 <td>The example in doc 11 §2 is reworded (done in the documentation pass of 2026-10-18). The dynamic guard is built in P3-03 and P3-04: per-condition true, false, unknown and not-ready counters in every result and run record, and a rule in each spec that the strategy&#39;s fixtures show at least one true. The static lint and the grammar change are the optional slice P3-02f (an owner decision and an ADR). The P3-02b model accepts the filter names and the simulator refuses a run that uses one (<code>filter_not_available</code>); liquidity belongs to the universe layer (<a href="10-trade-selection.html">doc 10</a> §2) and events to P15.</td>
@@ -1577,7 +1577,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-25 15:40</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-25 17:34</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

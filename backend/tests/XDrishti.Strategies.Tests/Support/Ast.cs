@@ -34,8 +34,8 @@ public static class Ast
     /// <summary><c>source=high</c>.</summary>
     public static NamedArgument Named(string name, string value) => new(Id(name), Id(value), NoSpan);
 
-    /// <summary><c>close[1]</c>.</summary>
-    public static Subscript Idx(Reference target, int lag) => new(target, lag, NoSpan, NoSpan);
+    /// <summary><c>close[1]</c> or <c>highest(20)[1]</c>.</summary>
+    public static Subscript Idx(Expression target, int lag) => new(target, lag, NoSpan, NoSpan);
 
     public static Unary Not(Expression operand) => new(UnaryOperator.Not, operand, NoSpan);
 

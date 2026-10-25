@@ -69,12 +69,11 @@ public sealed class ConditionMirrorExamplesTests
     }
 
     [Fact]
-    public void The_lagged_call_row_is_inert_until_the_parser_accepts_a_subscript_over_a_call()
+    public void A_subscript_over_a_call_mirrors_the_call_and_keeps_the_lag()
     {
-        var result = Try("close > highest(20)[1]");
-
-        result.Unreadable.ShouldBeTrue();
-        result.Problem.ShouldBeNull();
+        Ok("close > highest(20)[1]").ShouldBe("close < lowest(20)[1]");
+        Ok("rsi(14)[1] > 55").ShouldBe("rsi(14)[1] < 45");
+        Ok("close > tf(\"1h\").ema(20)[1]").ShouldBe("close < tf(\"1h\").ema(20)[1]");
     }
 
     [Fact]

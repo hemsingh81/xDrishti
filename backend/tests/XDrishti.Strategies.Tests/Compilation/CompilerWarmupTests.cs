@@ -246,7 +246,7 @@ public sealed class CompilerWarmupTests
             .Select(f => (string)f.GetRawConstantValue()!)
             .ToList();
 
-        new[] { LintCodes.ConstantCondition, LintCodes.RedundantTimeframe, LintCodes.LagAcrossSession, LintCodes.NeedsContext, LintCodes.NeedsExpiryDays }.ShouldBeSubsetOf(valid, "warnings and notes of a condition that compiles");
+        new[] { LintCodes.ConstantCondition, LintCodes.NeverTrue, LintCodes.RedundantTimeframe, LintCodes.LagAcrossSession, LintCodes.NeedsContext, LintCodes.NeedsExpiryDays }.ShouldBeSubsetOf(valid, "warnings and notes of a condition that compiles");
         codes.Except(all).Except(LeftOut.Keys).ShouldBeEmpty("kinds of problem that no source of the warm-up reports");
         all.Intersect(LeftOut.Keys).ShouldBeEmpty("a kind of problem listed as left out is reported by the warm-up: take it off the list");
     }

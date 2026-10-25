@@ -39,7 +39,7 @@ public sealed class ConditionCompilerTests
     [InlineData("rsi(14) >", SyntaxCodes.UnexpectedEnd)]
     [InlineData("rsi(14", SyntaxCodes.UnclosedBracket)]
     [InlineData("a < b < c", SyntaxCodes.ChainedComparison)]
-    [InlineData("rsi(14)[1] > 0", SyntaxCodes.SubscriptOnNonReference)]
+    [InlineData("(close)[1] > 0", SyntaxCodes.SubscriptOnNonReference)]
     [InlineData("close > 1 $", SyntaxCodes.UnknownCharacter)]
     [InlineData("rsi(14 > 55 and closee > vwap", SyntaxCodes.UnclosedBracket)]
     public void A_text_that_does_not_parse_returns_the_syntax_problems_and_nothing_from_the_binder(string source, string code)

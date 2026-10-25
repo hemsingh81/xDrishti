@@ -71,6 +71,12 @@ public static class ValidSources
         ["tf(\"1h\").close[2]"] = Idx(Tf("1h", "close"), 2),
         ["prev_day.high[1]"] = Idx(R("prev_day", "high"), 1),
         ["-x[1]"] = Neg(Idx(R("x"), 1)),
+        ["highest(20)[1]"] = Idx(C("highest", N(20)), 1),
+        ["rsi(14)[1]"] = Idx(C("rsi", N(14)), 1),
+        ["tf(\"1h\").ema(20)[1]"] = Idx(TfC("1h", "ema", N(20)), 1),
+        ["highest(20)[0]"] = Idx(C("highest", N(20)), 0),
+        ["highest(20)[-1]"] = Idx(C("highest", N(20)), -1),
+        ["nr(7) [ 1 ]"] = Idx(C("nr", N(7)), 1),
 
         // precedence and associativity
         ["a or b and c"] = Or(R("a"), And(R("b"), R("c"))),

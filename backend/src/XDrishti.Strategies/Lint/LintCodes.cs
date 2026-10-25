@@ -77,6 +77,14 @@ public static class LintCodes
     /// <summary>A true/false part of the condition that reads no data and is the same on every bar (<c>1 &lt; 2</c>, <c>true</c>, <c>crosses_above(1, 2)</c>, <c>rsi_len &gt; 5</c> with a parameter). The span is the largest such part. Warning.</summary>
     public const string ConstantCondition = "strategy.lint.constant_condition";
 
+    /// <summary>
+    /// A comparison that can never be true by construction, so the rule silently never fires: a feature against a number outside the values it can take (<c>rsi(14) &gt; 100</c>, <c>volume &lt; 0</c>; a strategy
+    /// parameter counts as a number), or a raw bar field against a <c>highest</c>/<c>lowest</c> window that holds the current bar (<c>close &gt; highest(20)</c>, <c>crosses_above(close, highest(20))</c>, <c>low &lt; lowest(20)</c>).
+    /// The span is the whole comparison (the whole <c>crosses_*</c> call); the suggestion is the window read one bar back (<c>close &gt; highest(20)[1]</c>) or the same comparison at the limit (<c>rsi(14) &gt;= 100</c>); a range
+    /// violation with no reachable limit has none. Warning.
+    /// </summary>
+    public const string NeverTrue = "strategy.lint.never_true";
+
     /// <summary><c>tf("15m")</c> on a feature when the strategy already runs on 15m. The span is the whole feature; the suggestion is the feature without <c>tf(…)</c>. Warning.</summary>
     public const string RedundantTimeframe = "strategy.lint.redundant_timeframe";
 
