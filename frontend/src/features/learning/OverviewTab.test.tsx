@@ -184,6 +184,10 @@ describe('Learning overview', () => {
       'Experiments',
       'Models',
       'Digest',
+      'Plan vs actual',
+      'Decisions',
+      'Autonomy',
+      'Phase checks',
     ]);
   });
 

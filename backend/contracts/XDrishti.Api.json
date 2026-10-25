@@ -8559,6 +8559,27 @@
         }
       }
     },
+    "/api/learning/phase-check": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The P6 phase check from stored records (ADR 0080, amended by ADR 0103): each exit criterion as MET, NOT MET or NOT EVALUABLE with its numbers and caveat, and the honest limits. It re-reads the two runs of the newest experiment and judges them again, so it can take seconds (elapsedMs says how long); it takes no parameter, a client cannot supply a replay time. Read only; writes nothing.",
+        "operationId": "GetLearningPhaseCheck",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningPhaseCheckView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/learning/digest": {
       "get": {
         "tags": [
@@ -10645,6 +10666,55 @@
         }
       }
     },
+    "/api/reports/plan-vs-actual": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Where the edge goes between the plan and the fills: the plan's R, then entry slippage, charges, a remainder 'not attributed' (exit slippage and anything else) and the realised R after the charges the sync recorded, as means over the tickets graded on fills; the counts of approved lines (with fills, uncertain, without fills), triggered tickets that had no fill (outside the chain), the parts not decomposed with the reason, per strategy, and the approvals by kind (owner, auto). Each figure below the minimum number of graded tickets is insufficient with no number. Takes from and to (planned sessions, at most 366 days apart). Read only. 422 reports.invalid.",
+        "operationId": "GetPlanVsActual",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanVsActualView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/trades": {
       "get": {
         "tags": [
@@ -12476,6 +12546,25 @@
             "format": "int64"
           }
         }
+      },
+      "ApprovalCountView": {
+        "required": [
+          "kind",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "owner or auto; an automatic approval is never counted as the owner's."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Approvals.",
+            "format": "int32"
+          }
+        },
+        "description": "Approve decisions of one kind (P8-04)."
       },
       "ApproveAllOutcome": {
         "required": [
@@ -22713,6 +22802,78 @@
         },
         "description": "What the Learning screen needs first (P6-18, ADR 0080): counts and the newest verdicts of the stored learning records. Read from the stores; no statistic is computed and no model is scored."
       },
+      "LearningPhaseCheckView": {
+        "required": [
+          "criteria",
+          "limits",
+          "text",
+          "elapsedMs"
+        ],
+        "type": "object",
+        "properties": {
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningPhaseCriterionView"
+            },
+            "description": "The criteria in order."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honest limits; never empty."
+          },
+          "text": {
+            "type": "string",
+            "description": "The printable report."
+          },
+          "elapsedMs": {
+            "type": "integer",
+            "description": "Milliseconds this read took (the check re-reads two runs).",
+            "format": "int64"
+          }
+        },
+        "description": "The P6 exit criteria from stored records (P8-04)."
+      },
+      "LearningPhaseCriterionView": {
+        "required": [
+          "number",
+          "name",
+          "verdict",
+          "detail",
+          "caveat"
+        ],
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "description": "1 to 3.",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "description": "The criterion."
+          },
+          "verdict": {
+            "type": "string",
+            "description": "MET, NOT MET or NOT EVALUABLE."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The numbers and the reason."
+          },
+          "caveat": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What a MET rests on without being verified here; null when none."
+          }
+        },
+        "description": "One P6 exit criterion (P8-04)."
+      },
       "LedgerClassTotal": {
         "required": [
           "class",
@@ -25104,6 +25265,291 @@
           }
         },
         "description": "A plan as the API shows it (P7-03, ADR 0083): header, current state, the sentences it carries as data, and for one plan the tickets and the trail."
+      },
+      "PlanVsActualCounts": {
+        "required": [
+          "approvedLines",
+          "withFills",
+          "gradedOnFills",
+          "uncertain",
+          "noPlanLevels",
+          "notFinished",
+          "withoutFills"
+        ],
+        "type": "object",
+        "properties": {
+          "approvedLines": {
+            "type": "integer",
+            "description": "Approved ticket lines.",
+            "format": "int32"
+          },
+          "withFills": {
+            "type": "integer",
+            "description": "Lines with a matched fill.",
+            "format": "int32"
+          },
+          "gradedOnFills": {
+            "type": "integer",
+            "description": "Lines in the chain.",
+            "format": "int32"
+          },
+          "uncertain": {
+            "type": "integer",
+            "description": "Fills that may not be the ticket's alone: no R.",
+            "format": "int32"
+          },
+          "noPlanLevels": {
+            "type": "integer",
+            "description": "Fills without usable plan levels.",
+            "format": "int32"
+          },
+          "notFinished": {
+            "type": "integer",
+            "description": "Position still open or grade not there yet.",
+            "format": "int32"
+          },
+          "withoutFills": {
+            "type": "integer",
+            "description": "Lines with no matched fill.",
+            "format": "int32"
+          }
+        },
+        "description": "How the approved ticket lines divide (P8-04). A graded line with a zero or missing planned risk per share is counted under `NoPlanLevels`."
+      },
+      "PlanVsActualEvidenceView": {
+        "required": [
+          "basis",
+          "n",
+          "firstDate",
+          "lastDate",
+          "provisional",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "Text: realised fills beside simulated plan prices."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Tickets graded on fills.",
+            "format": "int32"
+          },
+          "firstDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Earliest planned session read.",
+            "format": "date"
+          },
+          "lastDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Latest planned session read.",
+            "format": "date"
+          },
+          "provisional": {
+            "type": "boolean",
+            "description": "A plan read is marked provisional."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The limits that always apply."
+          }
+        },
+        "description": "The evidence block of plan versus actual (P8-04)."
+      },
+      "PlanVsActualMissedView": {
+        "required": [
+          "count",
+          "totalPlanR"
+        ],
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Tickets.",
+            "format": "int32"
+          },
+          "totalPlanR": {
+            "description": "Their plan R summed.",
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "Triggered tickets without a fill (P8-04)."
+      },
+      "PlanVsActualNotDecomposed": {
+        "required": [
+          "step",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "step": {
+            "type": "string",
+            "description": "exit_slippage or overrides."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why."
+          }
+        },
+        "description": "A part of the gap that is never given a number, with the reason (P8-04)."
+      },
+      "PlanVsActualStepView": {
+        "required": [
+          "step",
+          "label",
+          "metric",
+          "n"
+        ],
+        "type": "object",
+        "properties": {
+          "step": {
+            "type": "string",
+            "description": "plan_prices, entry_slippage, charges, not_attributed or actual."
+          },
+          "label": {
+            "type": "string",
+            "description": "The step in words."
+          },
+          "metric": {
+            "description": "Mean in R.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "n": {
+            "type": "integer",
+            "description": "Tickets behind it.",
+            "format": "int32"
+          }
+        },
+        "description": "One step of the chain (P8-04)."
+      },
+      "PlanVsActualStrategyView": {
+        "required": [
+          "strategyId",
+          "n",
+          "planR",
+          "actualR",
+          "entrySlippageR"
+        ],
+        "type": "object",
+        "properties": {
+          "strategyId": {
+            "type": "string",
+            "description": "The strategy."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Graded tickets.",
+            "format": "int32"
+          },
+          "planR": {
+            "description": "Mean plan R.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "actualR": {
+            "description": "Mean realised R after charges.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "entrySlippageR": {
+            "description": "Mean entry slippage in R.",
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "Plan versus actual of one strategy (P8-04)."
+      },
+      "PlanVsActualView": {
+        "required": [
+          "from",
+          "to",
+          "plans",
+          "counts",
+          "approvals",
+          "chain",
+          "missed",
+          "notDecomposed",
+          "byStrategy",
+          "minTickets",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Requested first session, or null.",
+            "format": "date"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Requested last session, or null.",
+            "format": "date"
+          },
+          "plans": {
+            "type": "integer",
+            "description": "Plans read (the newest version of each session).",
+            "format": "int32"
+          },
+          "counts": {
+            "description": "How the approved ticket lines divide.",
+            "$ref": "#/components/schemas/PlanVsActualCounts"
+          },
+          "approvals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApprovalCountView"
+            },
+            "description": "Approve decisions by kind, from the stored approval rows."
+          },
+          "chain": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanVsActualStepView"
+            },
+            "description": "The steps from plan R to actual R; empty states carry no number."
+          },
+          "missed": {
+            "description": "Triggered tickets without a fill, outside the chain.",
+            "$ref": "#/components/schemas/PlanVsActualMissedView"
+          },
+          "notDecomposed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanVsActualNotDecomposed"
+            },
+            "description": "Parts never given a number, with the reason."
+          },
+          "byStrategy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanVsActualStrategyView"
+            },
+            "description": "Per strategy."
+          },
+          "minTickets": {
+            "type": "integer",
+            "description": "The rule applied.",
+            "format": "int32"
+          },
+          "evidence": {
+            "description": "The basis and the limits.",
+            "$ref": "#/components/schemas/PlanVsActualEvidenceView"
+          }
+        },
+        "description": "Plan versus actual on the wire (P8-04)."
       },
       "PortfolioHistory": {
         "required": [

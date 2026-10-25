@@ -127,6 +127,11 @@ internal sealed class JournalStore(NpgsqlDataSource dataSource) : IJournalStore
     public ValueTask<IReadOnlyList<StoredEntry>> OpenEntriesAsync(int limit, CancellationToken cancellationToken) =>
         ReadEntriesAsync("e.id IN (SELECT x.id FROM trading.journal_entries x WHERE NOT EXISTS (SELECT 1 FROM trading.fill_grades g WHERE g.entry_id = x.id) ORDER BY x.for_date DESC, x.id DESC LIMIT @limit)", cmd => cmd.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit), cancellationToken);
 
+    public ValueTask<IReadOnlyList<StoredEntry>> EntriesForPlansAsync(IReadOnlyList<long> planIds, CancellationToken cancellationToken) =>
+        planIds.Count == 0
+            ? ValueTask.FromResult<IReadOnlyList<StoredEntry>>([])
+            : ReadEntriesAsync("e.plan_id = ANY(@plans)", cmd => cmd.Parameters.AddWithValue("plans", NpgsqlDbType.Array | NpgsqlDbType.Bigint, planIds.ToArray()), cancellationToken);
+
     public ValueTask<IReadOnlyList<StoredEntry>> EntriesAsync(long planId, CancellationToken cancellationToken) =>
         ReadEntriesAsync("e.plan_id = @plan", cmd => cmd.Parameters.AddWithValue("plan", NpgsqlDbType.Bigint, planId), cancellationToken);
 

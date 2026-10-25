@@ -2503,6 +2503,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/learning/phase-check': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The P6 phase check from stored records (ADR 0080, amended by ADR 0103): each exit criterion as MET, NOT MET or NOT EVALUABLE with its numbers and caveat, and the honest limits. It re-reads the two runs of the newest experiment and judges them again, so it can take seconds (elapsedMs says how long); it takes no parameter, a client cannot supply a replay time. Read only; writes nothing. */
+    get: operations['GetLearningPhaseCheck'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/learning/digest': {
     parameters: {
       query?: never;
@@ -3047,6 +3064,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/reports/plan-vs-actual': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Where the edge goes between the plan and the fills: the plan's R, then entry slippage, charges, a remainder 'not attributed' (exit slippage and anything else) and the realised R after the charges the sync recorded, as means over the tickets graded on fills; the counts of approved lines (with fills, uncertain, without fills), triggered tickets that had no fill (outside the chain), the parts not decomposed with the reason, per strategy, and the approvals by kind (owner, auto). Each figure below the minimum number of graded tickets is insufficient with no number. Takes from and to (planned sessions, at most 366 days apart). Read only. 422 reports.invalid. */
+    get: operations['GetPlanVsActual'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/reports/trades': {
     parameters: {
       query?: never;
@@ -3572,6 +3606,16 @@ export interface components {
       startedAt: string;
       /** Format: int64 */
       uptimeSeconds: number;
+    };
+    /** @description Approve decisions of one kind (P8-04). */
+    ApprovalCountView: {
+      /** @description owner or auto; an automatic approval is never counted as the owner's. */
+      kind: string;
+      /**
+       * Format: int32
+       * @description Approvals.
+       */
+      count: number;
     };
     /** @description What approve-all did. */
     ApproveAllOutcome: {
@@ -7233,6 +7277,36 @@ export interface components {
       /** @description What the numbers are not. */
       limits: string[];
     };
+    /** @description The P6 exit criteria from stored records (P8-04). */
+    LearningPhaseCheckView: {
+      /** @description The criteria in order. */
+      criteria: components['schemas']['LearningPhaseCriterionView'][];
+      /** @description The honest limits; never empty. */
+      limits: string[];
+      /** @description The printable report. */
+      text: string;
+      /**
+       * Format: int64
+       * @description Milliseconds this read took (the check re-reads two runs).
+       */
+      elapsedMs: number;
+    };
+    /** @description One P6 exit criterion (P8-04). */
+    LearningPhaseCriterionView: {
+      /**
+       * Format: int32
+       * @description 1 to 3.
+       */
+      number: number;
+      /** @description The criterion. */
+      name: string;
+      /** @description MET, NOT MET or NOT EVALUABLE. */
+      verdict: string;
+      /** @description The numbers and the reason. */
+      detail: string;
+      /** @description What a MET rests on without being verified here; null when none. */
+      caveat: null | string;
+    };
     /** @description The entries of one class in the period and their signed total. */
     LedgerClassTotal: {
       class: string;
@@ -8253,6 +8327,152 @@ export interface components {
       items: components['schemas']['PlanItemView'][];
       /** @description The trail, oldest first; empty in a list. */
       history: components['schemas']['PlanEventView'][];
+    };
+    /** @description How the approved ticket lines divide (P8-04). A graded line with a zero or missing planned risk per share is counted under `NoPlanLevels`. */
+    PlanVsActualCounts: {
+      /**
+       * Format: int32
+       * @description Approved ticket lines.
+       */
+      approvedLines: number;
+      /**
+       * Format: int32
+       * @description Lines with a matched fill.
+       */
+      withFills: number;
+      /**
+       * Format: int32
+       * @description Lines in the chain.
+       */
+      gradedOnFills: number;
+      /**
+       * Format: int32
+       * @description Fills that may not be the ticket's alone: no R.
+       */
+      uncertain: number;
+      /**
+       * Format: int32
+       * @description Fills without usable plan levels.
+       */
+      noPlanLevels: number;
+      /**
+       * Format: int32
+       * @description Position still open or grade not there yet.
+       */
+      notFinished: number;
+      /**
+       * Format: int32
+       * @description Lines with no matched fill.
+       */
+      withoutFills: number;
+    };
+    /** @description The evidence block of plan versus actual (P8-04). */
+    PlanVsActualEvidenceView: {
+      /** @description Text: realised fills beside simulated plan prices. */
+      basis: string;
+      /**
+       * Format: int32
+       * @description Tickets graded on fills.
+       */
+      n: number;
+      /**
+       * Format: date
+       * @description Earliest planned session read.
+       */
+      firstDate: null | string;
+      /**
+       * Format: date
+       * @description Latest planned session read.
+       */
+      lastDate: null | string;
+      /** @description A plan read is marked provisional. */
+      provisional: boolean;
+      /** @description The limits that always apply. */
+      limits: string[];
+    };
+    /** @description Triggered tickets without a fill (P8-04). */
+    PlanVsActualMissedView: {
+      /**
+       * Format: int32
+       * @description Tickets.
+       */
+      count: number;
+      /** @description Their plan R summed. */
+      totalPlanR: components['schemas']['MetricView'];
+    };
+    /** @description A part of the gap that is never given a number, with the reason (P8-04). */
+    PlanVsActualNotDecomposed: {
+      /** @description exit_slippage or overrides. */
+      step: string;
+      /** @description Why. */
+      reason: string;
+    };
+    /** @description One step of the chain (P8-04). */
+    PlanVsActualStepView: {
+      /** @description plan_prices, entry_slippage, charges, not_attributed or actual. */
+      step: string;
+      /** @description The step in words. */
+      label: string;
+      /** @description Mean in R. */
+      metric: components['schemas']['MetricView'];
+      /**
+       * Format: int32
+       * @description Tickets behind it.
+       */
+      n: number;
+    };
+    /** @description Plan versus actual of one strategy (P8-04). */
+    PlanVsActualStrategyView: {
+      /** @description The strategy. */
+      strategyId: string;
+      /**
+       * Format: int32
+       * @description Graded tickets.
+       */
+      n: number;
+      /** @description Mean plan R. */
+      planR: components['schemas']['MetricView'];
+      /** @description Mean realised R after charges. */
+      actualR: components['schemas']['MetricView'];
+      /** @description Mean entry slippage in R. */
+      entrySlippageR: components['schemas']['MetricView'];
+    };
+    /** @description Plan versus actual on the wire (P8-04). */
+    PlanVsActualView: {
+      /**
+       * Format: date
+       * @description Requested first session, or null.
+       */
+      from: null | string;
+      /**
+       * Format: date
+       * @description Requested last session, or null.
+       */
+      to: null | string;
+      /**
+       * Format: int32
+       * @description Plans read (the newest version of each session).
+       */
+      plans: number;
+      /** @description How the approved ticket lines divide. */
+      counts: components['schemas']['PlanVsActualCounts'];
+      /** @description Approve decisions by kind, from the stored approval rows. */
+      approvals: components['schemas']['ApprovalCountView'][];
+      /** @description The steps from plan R to actual R; empty states carry no number. */
+      chain: components['schemas']['PlanVsActualStepView'][];
+      /** @description Triggered tickets without a fill, outside the chain. */
+      missed: components['schemas']['PlanVsActualMissedView'];
+      /** @description Parts never given a number, with the reason. */
+      notDecomposed: components['schemas']['PlanVsActualNotDecomposed'][];
+      /** @description Per strategy. */
+      byStrategy: components['schemas']['PlanVsActualStrategyView'][];
+      /**
+       * Format: int32
+       * @description The rule applied.
+       */
+      minTickets: number;
+      /** @description The basis and the limits. */
+      evidence: components['schemas']['PlanVsActualEvidenceView'];
     };
     /**
      * @description The value history of a scope (all accounts that count in totals, one account, one bucket). `Points` are in date order at `Resolution` (`day`, `week` or `month`: the last trading day of the period); `Value` is what the
@@ -16767,6 +16987,26 @@ export interface operations {
       };
     };
   };
+  GetLearningPhaseCheck: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LearningPhaseCheckView'];
+        };
+      };
+    };
+  };
   GetLearningDigest: {
     parameters: {
       query?: {
@@ -17957,6 +18197,38 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPlanVsActual: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanVsActualView'];
         };
       };
       /** @description Unprocessable Entity */
