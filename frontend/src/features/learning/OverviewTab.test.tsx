@@ -172,10 +172,12 @@ describe('Learning overview', () => {
     expect(screen.getByRole('tab', { name: 'Setups', selected: true })).toBeInTheDocument();
   });
 
-  it('names the planned tabs in one line from the registry and does not render them as tabs', async () => {
+  it('renders every built tab from the registry and names no planned tab (none is left)', async () => {
     mountLearning();
     renderLearning();
 
+    await screen.findByRole('tab', { name: 'Overview' });
+    expect(screen.queryByText(/Not built yet/)).not.toBeInTheDocument();
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Overview',
       'Setups',
