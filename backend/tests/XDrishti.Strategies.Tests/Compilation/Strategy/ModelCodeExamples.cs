@@ -57,7 +57,7 @@ public sealed record ModelCodeExample(
             Row("duplicate_side", "sides[1]", Basic() with { Sides = [Side.Buy, Side.Buy] }, Basic()),
             Row("side_not_declared", "sides", Basic() with { Sides = [Side.Sell] }, Basic()),
             Row("side_rules_missing", "buy", Basic() with { Buy = null }, Basic()),
-            Row("sell_block_missing", "sell", Basic() with { Sell = null }, Basic(), side: Side.Sell),
+            Row("sell_block_missing", "sell", Basic() with { Buy = null, Sell = null }, Basic(), side: Side.Sell),
             Row("swing_sell_unsupported", "sides[1]", Defs.Swing() with { Sides = [Side.Buy, Side.Sell] }, Defs.Swing(), timeframe: Timeframe.H1),
             Row("side_rules_unused", "sell", Basic() with { Sides = [Side.Buy] }, Basic(), ProblemSeverity.Warning),
 

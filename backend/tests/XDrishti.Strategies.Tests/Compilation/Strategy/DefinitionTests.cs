@@ -280,18 +280,19 @@ public sealed class DefinitionTests
     }
 
     [Fact]
-    public void The_sell_side_without_a_sell_block_gives_sell_block_missing_naming_the_mirror_and_the_buy_side_of_the_same_definition_still_compiles()
+    public void The_sell_side_without_a_sell_block_is_mirrored_from_the_buy_side_and_only_a_definition_with_no_buy_block_gives_sell_block_missing()
     {
         var doc11 = Defs.VwapRsiTrend();
 
         var sell = Located.Compile(doc11, Timeframe.M15, Side.Sell);
         var buy = Located.Compile(doc11, Timeframe.M15, Side.Buy);
+        var noBuy = Located.Compile(doc11 with { Buy = null }, Timeframe.M15, Side.Sell);
 
-        var problem = sell.ShouldHave(ModelCodes.SellBlockMissing, "sell");
-        problem.Problem.Message.ShouldContain("P3-02e");
-        problem.Problem.Message.ShouldContain("write it");
+        sell.IsSuccess.ShouldBeTrue(Located.Show(sell));
+        sell.At(ModelCodes.SellBlockMissing, "sell").ShouldBeEmpty();
         buy.IsSuccess.ShouldBeTrue(Located.Show(buy));
         buy.At(ModelCodes.SellBlockMissing, "sell").ShouldBeEmpty();
+        noBuy.ShouldHave(ModelCodes.SellBlockMissing, "sell").Problem.Message.ShouldContain("write it");
     }
 
     [Fact]

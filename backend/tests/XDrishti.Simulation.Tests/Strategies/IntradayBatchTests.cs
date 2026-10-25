@@ -50,7 +50,7 @@ public sealed class IntradayBatchTests
         return read.Definition.ShouldNotBeNull();
     }
 
-    private static Bar[] Days(string id, bool negative = false) => id switch
+    internal static Bar[] Days(string id, bool negative = false) => id switch
     {
         "PDH_PDL_BREAK" => IntradayBatchDays.PdhBreak(negative),
         "PDH_PDL_REJECT" => IntradayBatchDays.PdlReject(negative),

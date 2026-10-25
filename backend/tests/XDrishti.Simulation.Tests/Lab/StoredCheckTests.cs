@@ -93,14 +93,11 @@ public sealed class StoredCheckTests
         StoredStrategies.Check(Valid).Version.ShouldBeNull();
     }
 
-    private static readonly string SellBlock = Valid[Valid.IndexOf("  sell:", StringComparison.Ordinal)..Valid.IndexOf("  time_rules:", StringComparison.Ordinal)];
-
     public static TheoryData<string, string, string, string, string> Mutations => new()
     {
         // name, before, after, code, path
         { "misspelt word in buy.trigger[1]", "close[1] > vwap[1] and", "clse[1] > vwap[1] and", "strategy.lint.unknown_name", "buy.trigger[1]" },
         { "a fifth param", "    rr: 2\n", "    rr: 2\n    a: 1\n    b: 2\n    c: 3\n", "strategy.model.too_many_params", "params" },
-        { "BUY and SELL without a sell block", SellBlock, string.Empty, "strategy.model.sell_block_missing", "sell" },
         { "a swing SELL", "style: intraday", "style: swing", "strategy.model.swing_sell_unsupported", "sides[1]" },
         { "a filter with no data", "  time_rules:", "  filters: [no_such_filter]\n  time_rules:", "strategy.model.unknown_filter", "filters[0]" },
         { "an unknown key", "  entry:\n    type: at_close\n  stop", "  entri: 1\n  entry:\n    type: at_close\n  stop", "file.unknown_field", "entri" },

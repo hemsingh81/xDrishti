@@ -64,6 +64,15 @@ internal static class FileWriter
         return text.ToString();
     }
 
+    /// <summary>The <c>sell:</c> block as it is written inside <c>strategy:</c> (two spaces in), for the author to copy into a file.</summary>
+    public static string WriteSell(SideRules sell)
+    {
+        ArgumentNullException.ThrowIfNull(sell);
+        var text = new StringBuilder("  sell:\n");
+        Side(text, 2, sell);
+        return text.ToString();
+    }
+
     private static void Side(StringBuilder text, int level, SideRules rules)
     {
         Conditions(text, level, "setup", rules.Setup);

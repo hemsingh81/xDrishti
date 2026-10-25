@@ -30,6 +30,7 @@ public static class CanonicalStrategy
             ("params", definition.Params is { } parameters ? Arr(parameters.OrderBy(p => p.Name, StringComparer.Ordinal).Select(p => Obj(("name", Str(p.Name)), ("value", Num(p.Value))))) : null),
             ("buy", definition.Buy is { } buy ? SideJson(buy) : null),
             ("sell", definition.Sell is { } sell ? SideJson(sell) : null),
+            ("sell_mirrored", definition.SellMirroredWith is { } mirrored ? Str(mirrored) : null),
             ("time_rules", definition.TimeRules is { } rules ? Rules(rules) : null),
             ("filters", definition.Filters is { } filters ? Arr(filters.Select(Str)) : null));
     }

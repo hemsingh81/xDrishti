@@ -1,5 +1,6 @@
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
+using XDrishti.Strategies.Mirror;
 using XDrishti.Strategies.Model;
 
 namespace XDrishti.Strategies.Compilation;
@@ -39,12 +40,23 @@ public static class StrategyCompiler
         var declared = checks.CheckParams(definition);
 
         var rules = side == Side.Buy ? definition.Buy : definition.Sell;
+        if (rules is null && side == Side.Sell && StrategyMirror.Applies(definition))
+        {
+            // a definition that reaches the compiler without its SELL (the Lab expands before; a caller that does not gets the same mirror here)
+            var (expanded, mirrorProblems) = StrategyMirror.Expand(definition);
+            rules = expanded.Sell;
+            foreach (var located in mirrorProblems.Where(m => m.Problem.Severity == ProblemSeverity.Error))
+            {
+                sink.Condition(located.Path, located.Problem);
+            }
+        }
+
         SideCompiler.Parts? parts = null;
         if (rules is not null)
         {
             parts = new SideCompiler(sink, declared).Compile(rules, side, evaluationTimeframe, definition.Style, definition.TimeRules?.MaxHoldSessions);
         }
-        else if (declaredSides.Contains(side))
+        else if (declaredSides.Contains(side) && !(side == Side.Sell && StrategyMirror.Applies(definition)))
         {
             if (side == Side.Buy)
             {
@@ -52,7 +64,7 @@ public static class StrategyCompiler
             }
             else
             {
-                sink.Error("sell", ModelCodes.SellBlockMissing, "The strategy lists SELL but has no `sell` block: write it. The automatic mirror of the BUY block is P3-02e.");
+                sink.Error("sell", ModelCodes.SellBlockMissing, "The strategy lists SELL but has no `sell` block: write it. There is no BUY block to mirror.");
             }
         }
 

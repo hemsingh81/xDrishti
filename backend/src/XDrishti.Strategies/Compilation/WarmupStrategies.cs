@@ -122,6 +122,9 @@ internal static class WarmupStrategies
         new(VwapTrend(), Timeframe.M30, Side.Sell),
         new(BarStops(), Timeframe.M30, Side.Buy),
         new(BarStops(), Timeframe.M30, Side.Sell),
+
+        // the SELL side made by the mirror (spec P3-02e): no sell block, so the compiler rewrites the BUY side
+        new(Orb() with { Sell = null }, Timeframe.M15, Side.Sell),
         new(Swing(), Timeframe.H1, Side.Buy),
         new(Swing() with { Buy = Swing().Buy! with { Stop = new StopSpec(StopKind.FixedPct, Pct: Quantity.Of(2)) } }, Timeframe.D1, Side.Buy),
 
@@ -147,7 +150,7 @@ internal static class WarmupStrategies
         // the sections
         new(Orb() with { Buy = new SideRules(All(), All(), All(), null, null, [], null) }, Timeframe.M15, Side.Buy),
         new(Orb() with { Buy = null }, Timeframe.M15, Side.Buy),
-        new(Orb() with { Sell = null }, Timeframe.M15, Side.Sell),
+        new(Orb() with { Buy = null, Sell = null }, Timeframe.M15, Side.Sell),
         new(Orb() with { Buy = Orb().Sell! with { Trigger = null } }, Timeframe.M15, Side.Buy),
 
         // the exits and the overlays
