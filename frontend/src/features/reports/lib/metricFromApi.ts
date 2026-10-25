@@ -10,7 +10,7 @@ export function asNonValue(state: MetricState): Exclude<MetricState, { kind: 'va
 
 /**
  * The kit state of a server figure. `n` is the group's trades and `min` the minimum sample (`what-works.minTrades`) when one is
- * at hand; without it an `insufficient` figure prints the server's reason instead of "of at least N". A `value` without a
+ * at hand; without it an `insufficient` figure is `not_evaluable` and prints the server's reason (no digit) instead of "of at least N". A `value` without a
  * number is `unavailable`, never 0; a state this client does not know is `unavailable` too.
  */
 export function metricFromApi(view: Metric, n?: number | null, min?: number | null): MetricState {
@@ -27,7 +27,7 @@ export function metricFromApi(view: Metric, n?: number | null, min?: number | nu
     case 'insufficient':
       return typeof n === 'number' && typeof min === 'number'
         ? { kind: 'insufficient', n, min }
-        : { kind: 'unavailable', reason: `Insufficient data: ${reason ?? 'too few trades for a figure.'}` };
+        : { kind: 'not_evaluable', reason: `Insufficient data: ${reason ?? 'too few trades for a figure.'}` };
     case 'not_evaluable':
       return { kind: 'not_evaluable', reason: reason ?? 'The figure cannot be evaluated.' };
     case 'empty':

@@ -1,6 +1,5 @@
 import { Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
 import {
   EvidenceBlock,
   formatCount,
@@ -24,16 +23,13 @@ const words: Record<string, string> = {
   not_evaluable: 'not evaluable',
   empty: 'no records yet',
 };
+const noop = () => undefined;
 const textOf = (state: MetricState): string =>
   state.kind === 'value' ? formatR(state.value) : (words[state.kind] ?? state.kind);
 
 /** Expectancy by strategy (rows) and timeframe (columns). The server masks thin cells; this only draws what it sent. */
 export function StrategyTimeframePanel({ query, min }: ReportPanelProps) {
   const result = useQuery(pivotQuery(query, lenses.pivot));
-  const [selected, setSelected] = useState<string | null>(null);
-  const choose = useCallback((key: string) => {
-    setSelected(key);
-  }, []);
   return (
     <QueryPanel title="Strategy by timeframe" query={result}>
       {(pivot) => {
@@ -68,7 +64,6 @@ export function StrategyTimeframePanel({ query, min }: ReportPanelProps) {
             ),
           };
         };
-        const picked = selected ? selected.split('\u0000') : null;
         return (
           <Box sx={{ display: 'grid', gap: 1.5 }}>
             <HeatGrid
@@ -78,16 +73,11 @@ export function StrategyTimeframePanel({ query, min }: ReportPanelProps) {
               rows={rows}
               columns={columns}
               cell={cellOf}
-              selectedKey={selected}
-              onOpen={choose}
+              // The grid needs an opener; a cell's drill-down arrives with P8-11, so opening does nothing yet.
+              onOpen={noop}
               emptyText="No trades"
               legend="Expectancy in R per trade. Hatched cells have too few trades for a figure."
             />
-            <Typography variant="body2" color="text.secondary" aria-live="polite">
-              {picked
-                ? `Selected: ${picked[0] ?? ''} on ${picked[1] ?? ''}. Drill-down into its trades arrives with a later slice.`
-                : 'Pick a cell to read it.'}
-            </Typography>
             {pivot.nonAdditive && (
               <Typography variant="body2" color="text.secondary">
                 {NON_ADDITIVE_NOTE}

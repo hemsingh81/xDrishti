@@ -60,6 +60,14 @@ describe.each<ColorMode>(['light', 'dark'])('%s palette contrast', (mode) => {
     }
   });
 
+  it.each(['good', 'bad', 'accent'] as const)(
+    'the %s bar fill of a bar list or column chart (P8-08, no new colour) is at least 3:1 on the surface and its track',
+    (key) => {
+      expect(contrast(p[key], p.surface)).toBeGreaterThanOrEqual(3);
+      expect(contrast(p[key], p.surfaceAlt)).toBeGreaterThanOrEqual(3);
+    },
+  );
+
   it.each(['good', 'bad', 'warn', 'info'] as const)('%s text is at least 4.5:1 on accentSoft and surfaceAlt', (key) => {
     expect(contrast(p[key], p.accentSoft)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(p[key], p.surfaceAlt)).toBeGreaterThanOrEqual(4.5);
