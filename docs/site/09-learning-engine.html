@@ -336,6 +336,7 @@ and two actions: <strong>Revert</strong> and <strong>Re-run with a different val
 <p>Built (P8-02, P8-03): the Learning screen has the tabs Overview and Setups (P8-02) and Lessons, Experiments (with Hypotheses), Models and Digest (P8-03), all read only over the GET endpoints: no control moves a lesson, hypothesis, model or cell, and the states a record &quot;may move to&quot; are text that names the <code>xd learn</code> verb. &quot;No measurable change&quot;, &quot;Inconclusive&quot;, &quot;Not better&quot; and &quot;no model stored&quot; are ordinary neutral results; a before or after figure appears only in a lesson&#39;s drawer and only with the trade count of its experiment. Journey, Smart rules and the rest of this table are later P8 slices.</p>
 <p>The frozen-model line is what makes progress honest: improvement is measured against &quot;what would have happened
 if the system had stopped learning&quot;, on the same days and instruments.</p>
+<p>Built (P8-12, <a href="../adr/0110-the-frozen-model-counterfactual-is-stored-by-the-verb-in-a-generic-insert-only-report-table-and-the-journey-only-reads-it.html">ADR 0110</a>): the counterfactual is compared <strong>per retrain window</strong> (quarterly by default), not weekly: the evaluator retrains every <code>RetrainMonths</code> and scores whole windows, so the period (at most about a year) holds a handful of windows. <code>xd learn counterfactual --store</code> keeps the result in the insert-only <code>research.learning_reports</code>; the Journey tab reads it with the lessons and model versions of the same period and the plan-price grades by week, and its live line is <code>not_evaluable</code> until paper and live trades exist.</p>
 <h2 id="12-tweak-re-run-experiments">12. Tweak &amp; re-run (experiments)<a class="hash" href="#12-tweak-re-run-experiments" aria-label="Link to this section">#</a></h2>
 <p>You can change any learning knob and replay the last 12 months walk-forward before anything goes live.</p>
 <table>
@@ -530,7 +531,7 @@ the last 100 trades, is flagged for review instead of being trusted blindly.</p>
     <a class="prev" href="08-exits-and-risk.html"><small>← Previous  [</small>08 · Exits &amp; risk</a>
     <a class="next" href="10-trade-selection.html"><small>Next  ] →</small>10 · Trade selection</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-25 18:32</footer>
+  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-25 18:55</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-four-layers" class="d2">1. Four layers</a>
 <a href="#2-validation-purged-walk-forward" class="d2">2. Validation: purged walk-forward</a>

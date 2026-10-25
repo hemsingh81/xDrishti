@@ -1041,16 +1041,16 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Journey</strong>: the frozen-model counterfactual stored (one migration) and shown; the live line <code>not_evaluable</code>.</td>
 <td>P8</td>
 <td>4 d</td>
-<td>Spec Draft (plan)</td>
-<td><a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
+<td>Built 2026-10-25 (<a href="../adr/0110-the-frozen-model-counterfactual-is-stored-by-the-verb-in-a-generic-insert-only-report-table-and-the-journey-only-reads-it.html">ADR 0110</a>): <code>research.learning_reports</code>, <code>xd learn counterfactual --store</code>, <code>GET /api/learning/counterfactual(s)</code> and <code>/journey</code>, Journey tab</td>
+<td><a href="../specs/P8-12-journey-counterfactual-stored-and-shown.html">spec</a></td>
 <td>Empty, inconclusive, clear difference</td>
 </tr>
 <tr>
 <td>P8-13</td>
-<td><strong>Smart-rules, loss-tags and entry-window evidence</strong> (0.5 d spike first: what is stored).</td>
+<td><strong>Smart-rules, loss-tags and entry-window evidence</strong> (0.5 d spike first: what is stored). Built 2026-10-25 (<a href="../adr/0111-smart-rule-and-loss-tag-evidence-is-read-from-what-is-stored-and-the-rest-is-a-named-non-value.html">ADR 0111</a>): Smart rules and Loss tags tabs; the entry-window and meta-policy stored views wait for P8-12&#39;s table.</td>
 <td>P8</td>
 <td>3.5 d</td>
-<td>Spec Draft (plan)</td>
+<td>Built (partial)</td>
 <td><a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
 <td>Each tab; nothing stored is <code>not_evaluable</code> with its verb</td>
 </tr>
@@ -1267,7 +1267,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td>free capacity</td>
 <td>2 d</td>
 <td>Later (optional)</td>
-<td>Spec to be drafted if wanted</td>
+<td>Built 2026-10-25 (<a href="../adr/0108-a-lag-on-a-feature-call-and-a-warning-for-comparisons-that-cannot-be-true.html">ADR 0108</a>)</td>
 <td>The pinned invalid sources <code>rsi(14)[1]</code> and <code>tf(&quot;1h&quot;).ema(20)[1]</code> become valid with hand-calculated values; the interpreter oracle, the tree audit and the compiler warm-up coverage tests include the new shape; at least 10 failing and 10 near-miss lint examples</td>
 </tr>
 </tbody></table>
@@ -1524,7 +1524,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td>ISS-24</td>
-<td><strong>Traps of the rules language.</strong> (1) A lag on a feature call is refused: <code>highest(20)[1]</code>, <code>ema(20)[1]</code>, <code>rsi(14)[1]</code> give the syntax problem <code>subscript_on_non_reference</code> (the approved restriction; spec P3-02 criterion 1, ADR 0034 Amendment 8). <code>highest(n)</code> includes the current bar, so &quot;close above the previous N-bar high&quot; has no spelling on one timeframe and <code>crosses_above(close, highest(20))</code> is never true. The spellings that exist are <code>close &gt;= highest(n, source=close)</code> (a new n-bar closing high, ties count) and <code>tf(&quot;1D&quot;).highest(n)</code> read from an intraday strategy (the last closed day, today excluded). (2) Comparisons that cannot be true by construction are not linted (<code>close &gt; highest(n)</code>, <code>crosses_above(close, highest(n))</code>, <code>low &lt; lowest(n)</code>, <code>rsi(14) &gt; 100</code>): constant detection sees literals and parameters only. (3) Smaller gaps: a condition is boolean only, so a stop, target or level cannot be written in the language (stops are typed kinds in P3-02b); <code>or_high(m)</code> needs m to be a whole number of bars of the evaluation timeframe (<code>or_high(15)</code> is <code>bad_arguments</code> on 30m); a time of day or a lag cannot be a parameter (windows live in <code>time_rules</code>); there is no average volume, turnover or event calendar, so the filters <code>min_turnover</code> and <code>not_event_day</code> cannot be evaluated and results days are not excluded; the BUY to SELL mirror is defined nowhere (P3-02e).</td>
+<td><strong>Traps of the rules language.</strong> (1) <strong>Built in P3-02f (ADR 0108): a lag on a feature call is accepted</strong> (<code>highest(20)[1]</code>); before it, it was refused: <code>highest(20)[1]</code>, <code>ema(20)[1]</code>, <code>rsi(14)[1]</code> give the syntax problem <code>subscript_on_non_reference</code> (the approved restriction; spec P3-02 criterion 1, ADR 0034 Amendment 8). <code>highest(n)</code> includes the current bar, so &quot;close above the previous N-bar high&quot; has no spelling on one timeframe and <code>crosses_above(close, highest(20))</code> is never true. The spellings that exist are <code>close &gt;= highest(n, source=close)</code> (a new n-bar closing high, ties count) and <code>tf(&quot;1D&quot;).highest(n)</code> read from an intraday strategy (the last closed day, today excluded). (2) <strong>Built in P3-02f: the warning <code>never_true</code></strong>; before it, comparisons that could not be true by construction were not linted (<code>close &gt; highest(n)</code>, <code>crosses_above(close, highest(n))</code>, <code>low &lt; lowest(n)</code>, <code>rsi(14) &gt; 100</code>): constant detection sees literals and parameters only. (3) Smaller gaps: a condition is boolean only, so a stop, target or level cannot be written in the language (stops are typed kinds in P3-02b); <code>or_high(m)</code> needs m to be a whole number of bars of the evaluation timeframe (<code>or_high(15)</code> is <code>bad_arguments</code> on 30m); a time of day or a lag cannot be a parameter (windows live in <code>time_rules</code>); there is no average volume, turnover or event calendar, so the filters <code>min_turnover</code> and <code>not_event_day</code> cannot be evaluated and results days are not excluded; the BUY to SELL mirror is defined nowhere (P3-02e).</td>
 <td>P3 re-plan (2026-10-18): the review of the plan found that <a href="11-strategy-lab.html">doc 11</a> §2 writes <code>ema(20)[1]</code> in its &quot;A lag counts bars&quot; paragraph, which the parser refuses; <code>InvalidSources.cs</code> pins <code>rsi(14)[1]</code> and <code>tf(&quot;1h&quot;).ema(20)[1]</code>.</td>
 <td>A rule that never fires gives zero trades and zero losses and looks safe; an example in the documentation that does not compile misleads the author.</td>
 <td>The example in doc 11 §2 is reworded (done in the documentation pass of 2026-10-18). The dynamic guard is built in P3-03 and P3-04: per-condition true, false, unknown and not-ready counters in every result and run record, and a rule in each spec that the strategy&#39;s fixtures show at least one true. The static lint and the grammar change are the optional slice P3-02f (an owner decision and an ADR). The P3-02b model accepts the filter names and the simulator refuses a run that uses one (<code>filter_not_available</code>); liquidity belongs to the universe layer (<a href="10-trade-selection.html">doc 10</a> §2) and events to P15.</td>
@@ -1577,7 +1577,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-25 18:32</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-25 18:55</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>
