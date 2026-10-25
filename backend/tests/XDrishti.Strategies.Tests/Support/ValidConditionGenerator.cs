@@ -244,7 +244,7 @@ internal sealed class ValidConditionGenerator(int seed, Timeframe evaluationTime
         var qualified = frame != evaluationTimeframe || _random.Next(100) < 20;
         var text = qualified ? "tf(\"" + frame.ToCode() + "\")." + leaf.QualifiedText : leaf.Text;
         var lag = 0;
-        if (leaf.IsReference && _random.Next(3) == 0)
+        if (_random.Next(3) == 0)
         {
             lag = _random.Next(1, maxLag + 1);
             text += "[" + lag.ToString(CultureInfo.InvariantCulture) + "]";

@@ -160,12 +160,12 @@ internal sealed partial class Binder
     }
 
     /// <summary>
-    /// <c>close[1]</c>: the feature some closed bars of its own timeframe ago, 1 or more. The target is bound first, so that its own problems come first; a lag that is not usable is reported after them (see
+    /// <c>close[1]</c> or <c>highest(20)[1]</c>: the feature some closed bars of its own timeframe ago, 1 or more. The target is bound first, so that its own problems come first; a lag that is not usable is reported after them (see
     /// <see cref="ReportUnusableLag"/>).
     /// </summary>
     private IBoundExpression BindSubscript(Subscript subscript)
     {
-        var target = BindReference(subscript.Target);
+        var target = Bind(subscript.Target);
         if (target.Type == BoundType.Invalid)
         {
             ReportUnusableLag(subscript, false);
@@ -174,8 +174,9 @@ internal sealed partial class Binder
 
         if (target is not BoundFeature feature)
         {
-            var name = subscript.Target.Name.Text;
-            var kind = scope.Parameters.ContainsKey(name) ? "a strategy parameter" : Vocabulary.TryConstant(name, out _) ? "a constant" : "the time of day";
+            var name = subscript.Target is Reference reference ? reference.Name.Text : string.Empty;
+            var kind = subscript.Target is Call ? "a function of the language"
+                : scope.Parameters.ContainsKey(name) ? "a strategy parameter" : Vocabulary.TryConstant(name, out _) ? "a constant" : "the time of day";
             scope.Error(
                 LintCodes.LagOnNonFeature,
                 "A subscript reads a feature some closed bars ago, but " + scope.Quoted(subscript.Target.Span) + " is " + kind

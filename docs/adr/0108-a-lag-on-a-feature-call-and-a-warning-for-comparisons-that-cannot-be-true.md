@@ -1,0 +1,18 @@
+# 0108 — A lag on a feature call, and a warning for comparisons that cannot be true
+
+- **Status:** Proposed (spec [P3-02f](../specs/P3-02f-lag-on-feature-calls-and-always-false-lint.md), built 2026-10-25, owner approved the plans). Becomes Accepted when the owner has read it.
+- **Date:** 2026-10-25.
+- **Relation to other ADRs:** supersedes in part [0034](0034-the-rules-expression-language-lint-and-compiler.md) (Amendment 8: a subscript only after a reference); builds on [0035](0035-per-session-features-keep-the-history-of-the-session-only.md) (a lag over a per-session feature), [0031](0031-streaming-indicators-and-the-feature-frame.md) / 0032 (`FeatureFrame.At`) and [0107](0107-the-buy-to-sell-mirror-is-a-closed-typed-rewrite-table-expanded-at-read-time-and-recorded-in-the-definition.md) (the mirror row for a subscript over a call).
+
+## Decision
+1. **A subscript may follow a catalog call.** `highest(20)[1]`, `rsi(14)[2]`, `tf("1h").ema(20)[1]`. `Subscript.Target` is a `Reference` or a `Call`; the binder binds the call as a feature and sets the lag, then the lag rules apply unchanged (`lag_too_deep`, `mixed_timeframes_in_lag`, `lag_across_session`, the history depth is the lag plus one). Meaning: exactly `FeatureFrame.At(handle, k)`, the value k closed bars of the feature's own timeframe ago. It stays refused after a group, an arithmetic expression, a literal, a parameter or a second subscript (`subscript_on_non_reference`); `x[0]` and negative lags stay `negative_or_zero_lag` (ADR 0034 Amendment 1); a subscript after a function of the language (`abs(x)[1]`) is `lag_on_non_feature`.
+2. **A warning for comparisons that cannot be true.** `strategy.lint.never_true` (the 17th lint code, a warning, never blocks a run) on the whole comparison: a catalog feature against a number (a parameter counts) outside a closed table of value ranges (`ValueRange`, only bounds the definition of the feature guarantees; a feature without a row is never warned), and a raw bar field against a `highest`/`lowest` window on one timeframe that holds the current bar (`close > highest(20)`, `high > highest(20)`, `close > highest(n, source=close)`, `low < lowest(20)`, and `crosses_above/below` on the current bar). The suggestion is the working spelling: the window read one bar back, or the same comparison made inclusive at the limit of the range (none when the limit cannot be reached). The spec's `regime` row (1 to 9) is not in the table: a regime is compared with a name or a code that is already checked by `type_mismatch`.
+3. **Mirror.** A subscript over a call mirrors the call and keeps the lag (`close > highest(20)[1]` becomes `close < lowest(20)[1]`).
+
+## Identity and versions
+No stored text can contain the new shape (it did not parse), so no stored definition, hash or run key changes. The mirror table is unchanged (`mirror-1`: rows and refusals are the same; the rewriter now accepts the subscript over a call, which previously made the condition unreadable). `SimulationEngine.Version` is unchanged: a simulation of a condition that parsed before gives the same result. A new warning does not alter the definition hash (hash covers the canonical text, not the lint). The 15 stored strategies compile with no `never_true` (a regression test).
+
+## Consequences
+- The language can say "the close is above the previous N-bar high" on one timeframe; the strongest classic breakout is writable, and the silent never-firing spelling is now warned.
+- The interpreter oracle, the look-ahead property and the printer round trip generate lagged calls; the oracle has a mutant "a lagged call read one bar nearer" that it notices.
+- Doc 11 (grammar, *Lags*, lint table) and ISS-24 are updated.

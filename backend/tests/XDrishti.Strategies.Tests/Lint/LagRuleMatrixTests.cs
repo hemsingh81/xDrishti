@@ -55,6 +55,22 @@ public sealed class LagRuleMatrixTests
 
     [Theory]
     [MemberData(nameof(Pairs))]
+    public void A_lagged_call_inside_a_crossing_is_refused_on_two_timeframes_and_allowed_on_one(Timeframe strategy, Timeframe other)
+    {
+        var errors = Errors($"crosses_above(close, tf(\"{Code(other)}\").highest(20)[1])", strategy);
+
+        if (strategy == other)
+        {
+            errors.ShouldBeEmpty();
+        }
+        else
+        {
+            errors.ShouldHaveSingleItem().Code.ShouldBe(LintCodes.MixedTimeframesInLag);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Pairs))]
     public void Rising_and_falling_of_an_expression_are_refused_on_two_timeframes_but_two_calls_on_two_timeframes_are_fine(Timeframe strategy, Timeframe other)
     {
         var o = Code(other);

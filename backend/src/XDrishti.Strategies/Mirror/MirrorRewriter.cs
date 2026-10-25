@@ -135,8 +135,8 @@ internal sealed partial class MirrorRewriter(IReadOnlySet<string> parameters)
 
     private Typed? Lagged(Subscript subscript)
     {
-        var target = Atom(subscript.Target);
-        return target is { Tree: Reference reference } typed ? new Typed(subscript with { Target = reference }, typed.Kind) : null;
+        var target = Visit(subscript.Target);
+        return target is { Tree: Reference or Call } typed ? new Typed(subscript with { Target = typed.Tree }, typed.Kind) : null;
     }
 
     private Typed? CallOf(Call call)

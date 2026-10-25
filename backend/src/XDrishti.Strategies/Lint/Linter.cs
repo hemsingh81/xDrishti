@@ -32,6 +32,7 @@ internal static class Linter
         TimeRule.Apply(root, scope);
         var depth = LagRules.Apply(root, scope);
         ConstantRule.Apply(root, scope);
+        NeverTrueRule.Apply(root, scope);
 
         // last, because the notes are for a condition that can be used: with an error there is no plan to need anything
         var (needsContext, needsExpiryDays) = Requirements.Apply(leaves, scope);

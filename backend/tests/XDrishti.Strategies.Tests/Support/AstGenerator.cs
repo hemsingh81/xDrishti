@@ -48,7 +48,7 @@ public sealed class AstGenerator(int seed)
         3 => new StringLiteral(Pick(Texts), default),
         4 => new BoolLiteral(_random.Next(2) == 0, default),
         5 or 6 => Reference(),
-        7 => new Subscript(Reference(), _random.Next(2) == 0 ? _random.Next(0, 300) : -_random.Next(1, 5), default, default),
+        7 => new Subscript(_random.Next(3) == 0 ? Call(1) : Reference(), _random.Next(2) == 0 ? _random.Next(0, 300) : -_random.Next(1, 5), default, default),
         _ => Reference(),
     };
 

@@ -3,6 +3,14 @@ namespace XDrishti.Strategies.Tests.Lint;
 /// <summary>The exact messages of the failing examples of <see cref="LintCases"/>, in the order of their problems.</summary>
 internal static class LintMessages
 {
+    private static string Window(string comparison, string window, string suggestion) =>
+        $"`{comparison}` can never be true: the window of `{window}` includes the current bar, so it already holds the other price. To compare with the previous bars write `{suggestion}`.";
+
+    private static string Range(string comparison, string feature, string bounds, string suggestion) =>
+        $"`{comparison}` can never be true: {feature} is {bounds}, so the rule never fires. The nearest comparison that can be true is `{suggestion}`.";
+
+    private static string Context(string feature) => $"`{feature}` reads the daily market context: create the frame with a MarketContext (FrameOptions.Context).";
+
     public static readonly IReadOnlyDictionary<string, string[]> Cases = new Dictionary<string, string[]>
     {
         ["unknown_name: a typo of a feature"] =
@@ -647,6 +655,31 @@ internal static class LintMessages
         ["constant_condition: between constants"] =
         [
             "`between(5, 1, 10)` reads no data, so it is the same on every bar.",
+        ],
+        ["never_true: close above its own window"] = [Window("close > highest(20)", "highest(20)", "close > highest(20)[1]")],
+        ["never_true: high above its own window"] = [Window("high > highest(20)", "highest(20)", "high > highest(20)[1]")],
+        ["never_true: close above the highest close"] = [Window("close > highest(20, source=close)", "highest(20, source=close)", "close > highest(20, source=close)[1]")],
+        ["never_true: a crossing of the own window"] = [Window("crosses_above(close, highest(20))", "highest(20)", "crosses_above(close, highest(20)[1])")],
+        ["never_true: low below its own window"] = [Window("low < lowest(20)", "lowest(20)", "low < lowest(20)[1]")],
+        ["never_true: close below the lowest close"] = [Window("close < lowest(20, source=close)", "lowest(20, source=close)", "close < lowest(20, source=close)[1]")],
+        ["never_true: the window written first"] = [Window("highest(20) < close", "highest(20)", "highest(20)[1] < close")],
+        ["never_true: rsi above 100"] = [Range("rsi(14) > 100", "rsi", "between 0 and 100", "rsi(14) >= 100")],
+        ["never_true: rsi below 0"] = [Range("rsi(14) < 0", "rsi", "between 0 and 100", "rsi(14) <= 0")],
+        ["never_true: adx above 100"] = [Range("adx(14) > 100", "adx", "between 0 and 100", "adx(14) >= 100")],
+        ["never_true: volume below 0"] = [Range("volume < 0", "volume", "at least 0", "volume <= 0")],
+        ["never_true: regime volatility above 2"] = [Range("regime_vol > 2", "regime_vol", "between 0 and 2", "regime_vol >= 2"), Context("regime_vol")],
+        ["never_true: supertrend direction above 1"] = [Range("supertrend_dir(10, 3) > 1", "supertrend_dir", "between -1 and 1", "supertrend_dir(10, 3) >= 1")],
+        ["never_true: breadth above 100"] = [Range("breadth > 100", "breadth", "between 0 and 100", "breadth >= 100"), Context("breadth")],
+        ["never_true: day of week above 7"] = [Range("day_of_week > 7", "day_of_week", "between 1 and 7", "day_of_week >= 7")],
+        ["never_true: a crossing of a bounded oscillator has no suggestion"] =
+        [
+            "`crosses_above(rsi(14), 100)` can never be true: rsi is between 0 and 100, so the rule never fires. Remove the condition or change the number.",
+        ],
+        ["never_true: the number written first"] = [Range("0 > rsi(14)", "rsi", "between 0 and 100", "0 >= rsi(14)")],
+        ["never_true: a parameter that decides"] = [Range("rsi(14) > rsi_hi", "rsi", "between 0 and 100", "rsi(14) >= 100")],
+        ["never_true: a bound that cannot be reached has no suggestion"] =
+        [
+            "`gap_pct < -100` can never be true: gap_pct is more than -100, so the rule never fires. Remove the condition or change the number.",
         ],
         ["redundant_timeframe: the strategy's own timeframe"] =
         [

@@ -123,11 +123,13 @@ public static class InvalidSources
         ["close =="] = [P(SyntaxCodes.UnexpectedEnd, 8, 8, 1, 9)],
 
         // subscripts
-        ["rsi(14)[1]"] = [P(SyntaxCodes.SubscriptOnNonReference, 7, 8, 1, 8)],
+        ["highest(20)[1][2]"] = [P(SyntaxCodes.SubscriptOnNonReference, 14, 15, 1, 15)],
+        ["highest(20)["] = [P(SyntaxCodes.UnclosedBracket, 11, 12, 1, 12, "]")],
+        ["highest(20)[1"] = [P(SyntaxCodes.UnclosedBracket, 11, 12, 1, 12, "]")],
         ["(a)[1]"] = [P(SyntaxCodes.SubscriptOnNonReference, 3, 4, 1, 4)],
         ["x[1][2]"] = [P(SyntaxCodes.SubscriptOnNonReference, 4, 5, 1, 5)],
         ["1[2]"] = [P(SyntaxCodes.SubscriptOnNonReference, 1, 2, 1, 2)],
-        ["tf(\"1h\").ema(20)[1]"] = [P(SyntaxCodes.SubscriptOnNonReference, 16, 17, 1, 17)],
+        ["(close + open)[1]"] = [P(SyntaxCodes.SubscriptOnNonReference, 14, 15, 1, 15)],
         ["x[]"] = [P(SyntaxCodes.BadSubscript, 2, 3, 1, 3)],
         ["x[a]"] = [P(SyntaxCodes.BadSubscript, 2, 3, 1, 3)],
         ["x[1.5]"] = [P(SyntaxCodes.BadSubscript, 2, 5, 1, 3)],

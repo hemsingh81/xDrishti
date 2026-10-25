@@ -20,6 +20,8 @@ public sealed partial class InterpreterOracleTests
 {
     private const string LagOneNearer = "a feature is read one bar nearer than written";
 
+    private const string CallLagOneNearer = "a lagged call (highest(20)[1]) is read one bar nearer than written";
+
     private const string PreviousIsCurrent = "the previous value is the current value";
 
     private const string RunDropsWrittenLag = "a run forgets the lag written in its operand";
@@ -35,6 +37,7 @@ public sealed partial class InterpreterOracleTests
 
     [Theory]
     [InlineData(LagOneNearer)]
+    [InlineData(CallLagOneNearer)]
     [InlineData(PreviousIsCurrent)]
     [InlineData(RunDropsWrittenLag)]
     [InlineData(ClockOneMinuteAhead)]
@@ -109,13 +112,13 @@ public sealed partial class InterpreterOracleTests
     private static BoundCondition Changed(CompiledCondition condition, FeatureFrame frame, string mutant)
     {
         var lambda = ExpressionBuilder.Lambda(condition.Tree, condition.Features);
-        var changed = (Expression<Decision>)new Mutation(mutant).Visit(lambda);
+        var changed = (Expression<Decision>)new Mutation(mutant, condition.Features).Visit(lambda);
         int[] handles = [.. condition.Features.Select(feature => frame.HandleOf(feature))];
         return new BoundCondition(condition, changed.Compile(), handles);
     }
 
     /// <summary>Rewrites the expression tree of a condition the way a faulty compiler would have built it. Only the calls that read the frame at a lag, and the clock, are touched.</summary>
-    private sealed class Mutation(string mutant) : ExpressionVisitor
+    private sealed class Mutation(string mutant, IReadOnlyList<FeatureSpec> features) : ExpressionVisitor
     {
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
@@ -133,11 +136,17 @@ public sealed partial class InterpreterOracleTests
             return mutant switch
             {
                 LagOneNearer => Expression.Call(node.Method, frame, handle, OneNearer(lag)),
+                CallLagOneNearer when IsCall(handle) => Expression.Call(node.Method, frame, handle, OneNearer(lag)),
                 PreviousIsCurrent when lag is ConstantExpression { Value: 1 } => Expression.Call(KernelMethods.Value, frame, handle),
                 RunDropsWrittenLag when lag is BinaryExpression { NodeType: ExpressionType.Add, Left: ConstantExpression { Value: int }, Right: ParameterExpression counter } => Expression.Call(node.Method, frame, handle, counter),
                 _ => base.VisitMethodCall(node),
             };
         }
+
+        /// <summary>True when the handle is the slot of a feature written as a call (one with parameters: <c>rsi(14)</c>, <c>highest(20)</c>), not as a reference.</summary>
+        private bool IsCall(Expression handle) =>
+            handle is BinaryExpression { NodeType: ExpressionType.ArrayIndex, Right: ConstantExpression { Value: int slot } }
+            && IndicatorCatalog.TryGet(features[slot].Name, out var info) && info.Parameters.Count > 0;
 
         /// <summary>A written lag of at least 1 becomes one less, in a constant and in the constant part of a run's <c>written + counter</c>.</summary>
         private static Expression OneNearer(Expression lag) => lag switch
