@@ -10,7 +10,7 @@ import { QueryPanel } from './Panel';
 
 interface GroupBarsProps extends ReportPanelProps, Pick<MetricValueProps, 'format'> {
   title: string;
-  lens: 'month' | 'basket' | 'weekday';
+  lens: 'month' | 'basket' | 'weekday' | 'hour' | 'sector';
   figure: (group: GroupView) => GroupView['totalR'];
   diverging?: boolean;
   /** Orders the groups (the server's order when absent). */
@@ -27,7 +27,10 @@ export function GroupBars({ query, min, title, lens, figure, format, diverging, 
         const ordered = sort ? [...groups].sort(sort) : groups;
         const rows: BarRow[] = ordered.map((group) => ({
           id: group.key,
-          label: baskets.part(lens, group.parts[0]?.value ?? null),
+          label:
+            lens === 'sector'
+              ? (group.parts[0]?.value ?? 'Unclassified')
+              : baskets.part(lens, group.parts[0]?.value ?? null),
           state: metricFromApi(figure(group), group.n, min),
           n: group.n,
         }));

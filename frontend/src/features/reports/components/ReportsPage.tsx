@@ -20,6 +20,8 @@ import { FilterBar } from './FilterBar';
 import { GroupBars } from './GroupBars';
 import { InsightsList } from './InsightsList';
 import { KpiTiles } from './KpiTiles';
+import { isMoreReport } from '../lib/moreViews';
+import { MoreReport } from './MoreReport';
 import { Panel } from './Panel';
 import { PivotBuilder } from './PivotBuilder';
 import { StrategyTimeframePanel } from './StrategyTimeframePanel';
@@ -149,6 +151,8 @@ export function ReportsPage() {
             <BasketComparison {...panel} />
           ) : view === 'pivot' ? (
             <PivotBuilder {...panel} />
+          ) : isMoreReport(view) ? (
+            <MoreReport view={view} {...panel} />
           ) : (
             <>
               <WhatWorksCard

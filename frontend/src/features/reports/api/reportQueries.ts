@@ -9,6 +9,7 @@ export type GroupsView = Schemas['GroupsView'];
 export type PivotView = Schemas['PivotView'];
 export type EquityView = Schemas['EquityView'];
 export type DistributionView = Schemas['DistributionView'];
+export type MaeMfeView = Schemas['ReportMaeMfeView'];
 export type InsightsView = Schemas['InsightsView'];
 export type WhatWorksView = Schemas['WhatWorksView'];
 export type BenchmarksView = Schemas['ReportBenchmarksView'];
@@ -62,10 +63,23 @@ export const equityQuery = (query: ReportQuery, lens?: string) =>
     retry: false,
   });
 
-export const distributionQuery = (query: ReportQuery) =>
+export const distributionQuery = (query: ReportQuery, lens?: string) =>
   queryOptions({
-    queryKey: ['reports', 'distribution', queryString(query)] as const,
-    queryFn: async ({ signal }) => unwrap(await api.GET('/api/reports/distribution', { params: { query }, signal })),
+    queryKey: ['reports', 'distribution', lens ?? '', queryString(query)] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/reports/distribution', { params: { query: lens ? { ...query, lens } : query }, signal }),
+      ),
+    staleTime,
+    retry: false,
+  });
+
+/** MAE and MFE as counts in bins (P8-10); no lens is the whole population. */
+export const maeMfeQuery = (query: ReportQuery, lens?: string) =>
+  queryOptions({
+    queryKey: ['reports', 'mae-mfe', lens ?? '', queryString(query)] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/reports/mae-mfe', { params: { query: lens ? { ...query, lens } : query }, signal })),
     staleTime,
     retry: false,
   });

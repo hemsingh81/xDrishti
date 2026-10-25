@@ -1,6 +1,18 @@
 import { isRealDay } from '@/shared/lib/dates';
 
-export const views = ['overview', 'what-works', 'baskets', 'pivot'] as const;
+export const views = [
+  'overview',
+  'what-works',
+  'baskets',
+  'pivot',
+  'strategies',
+  'side',
+  'calendar',
+  'maemfe',
+  'distribution',
+  'instruments',
+  'sectors',
+] as const;
 export type ReportView = (typeof views)[number];
 
 /** The timeframe codes of the engine and the two sides: fixed lists (P8-08 decision 7). */

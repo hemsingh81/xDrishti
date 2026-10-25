@@ -14,7 +14,7 @@ internal sealed class ReportsEndpoints : IEndpointModule
 {
     private const string Common = " Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively.";
 
-    private const string Lens = " lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason).";
+    private const string Lens = " lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason).";
 
     private const string Caps = " An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn.";
 
@@ -59,6 +59,13 @@ internal sealed class ReportsEndpoints : IEndpointModule
         reports.MapGet("/distribution", DistributionAsync)
             .WithName("GetReportDistribution")
             .WithSummary("The distribution of R of each group of the lens in bins of half an R from -4 R to 6 R with an open bin at each end. A group below the minimum sample has no bins, only the reason. Read only." + Lens + Common + Caps + Errors)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        reports.MapGet("/mae-mfe", MaeMfeAsync)
+            .WithName("GetReportMaeMfe")
+            .WithSummary("The excursions of each group of the lens as counts, never one point per trade: a grid of the maximum adverse excursion (0.25 R bins to 2 R, then 2 R or more) by the result R (half an R, -5 R to +5 R with a tail at each end), a histogram of the maximum favourable excursion (half an R to 5 R, then 5 R or more), how many trades reached +1, +2 and +3 R at some point, and the 90th percentile (nearest rank) of the adverse excursion of the winners. Trades with no recorded excursion are left out and counted apart (excursionN). A group below the minimum sample has no counts, only the reason. Read only." + Lens + Common + Caps + Errors)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -139,6 +146,13 @@ internal sealed class ReportsEndpoints : IEndpointModule
         IQueryHandler<GetReportDistributionQuery, Result<DistributionView>> handler,
         CancellationToken cancellationToken) =>
         ReadAsync(input.ToInput(), http, q => handler.HandleAsync(new GetReportDistributionQuery(q), cancellationToken));
+
+    private static Task<Results<Ok<ReportMaeMfeView>, ProblemHttpResult>> MaeMfeAsync(
+        [AsParameters] ReportLensParams input,
+        HttpContext http,
+        IQueryHandler<GetReportMaeMfeQuery, Result<ReportMaeMfeView>> handler,
+        CancellationToken cancellationToken) =>
+        ReadAsync(input.ToInput(), http, q => handler.HandleAsync(new GetReportMaeMfeQuery(q), cancellationToken));
 
     private static Task<Results<Ok<InsightsView>, ProblemHttpResult>> InsightsAsync(
         [AsParameters] ReportFilterParams input,

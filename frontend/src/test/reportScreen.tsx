@@ -9,6 +9,7 @@ import {
   buildGroup,
   buildGroups,
   buildInsights,
+  buildMaeMfe,
   buildPivot,
   buildRunsView,
   buildWhatWorks,
@@ -88,6 +89,10 @@ export function reportServer(opts: ReportOptions = {}) {
     http.get('/api/reports/distribution', ({ request }) => {
       seen(request);
       return HttpResponse.json(buildDistribution());
+    }),
+    http.get('/api/reports/mae-mfe', ({ request }) => {
+      seen(request);
+      return HttpResponse.json(buildMaeMfe());
     }),
     http.get('/api/reports/insights', ({ request }) => {
       seen(request);

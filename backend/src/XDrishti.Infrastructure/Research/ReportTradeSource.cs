@@ -36,7 +36,7 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
     private const string RunIdsSql = "SELECT id, run_key FROM research.sim_runs WHERE run_key = ANY(@keys)";
 
     private const string TradesSelect = """
-        SELECT t.run_id, t.trade_key, t.strategy_id, t.trigger_timeframe, t.side, t.instrument_id, t.symbol, t.basket_ids, t.trade_date, t.exit_epoch_seconds, t.r_filled, t.r_net, t.sessions_held
+        SELECT t.run_id, t.trade_key, t.strategy_id, t.trigger_timeframe, t.side, t.instrument_id, t.symbol, t.basket_ids, t.trade_date, t.exit_epoch_seconds, t.r_filled, t.r_net, t.sessions_held, t.mae_r, t.mfe_r, t.entry_epoch_seconds, t.exit_reason
         FROM research.sim_trades t
         WHERE t.run_id = ANY(@run_ids) AND t.open_at_end = false
         """;
@@ -193,7 +193,11 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
             SessionClock.DateOf(reader.GetInt64(9)),
             reader.GetDouble(10),
             reader.IsDBNull(11) ? null : reader.GetDouble(11),
-            reader.GetInt32(12));
+            reader.GetInt32(12),
+            reader.GetDouble(13),
+            reader.GetDouble(14),
+            SessionClock.MinuteOfDay(reader.GetInt64(15)),
+            Intern(strings, reader.GetString(16)));
     }
 
     private static string Intern(Dictionary<string, string> strings, string value)

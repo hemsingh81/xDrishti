@@ -2952,7 +2952,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The report grouped by the lens, in a fixed order (a value that was not recorded last). A trade in several baskets appears under each, so basket totals are not additive (nonAdditive says so). Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** The report grouped by the lens, in a fixed order (a value that was not recorded last). A trade in several baskets appears under each, so basket totals are not additive (nonAdditive says so). Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['GetReportGroups'];
     put?: never;
     post?: never;
@@ -2969,7 +2969,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** A pivot of the two dimensions of the lens (rows first; exactly two) by one figure (metric, snake case, default expectancy_r): every cell of the grid, empty where no trade fell and masked (insufficient, with its count) below the minimum sample, never a zero. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** A pivot of the two dimensions of the lens (rows first; exactly two) by one figure (metric, snake case, default expectancy_r): every cell of the grid, empty where no trade fell and masked (insufficient, with its count) below the minimum sample, never a zero. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['GetReportPivot'];
     put?: never;
     post?: never;
@@ -2986,7 +2986,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The equity curve (running R at the end of each exit date) and the deepest drawdown of each date for each group of the lens. A group below the minimum sample has no curve, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** The equity curve (running R at the end of each exit date) and the deepest drawdown of each date for each group of the lens. A group below the minimum sample has no curve, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['GetReportEquity'];
     put?: never;
     post?: never;
@@ -3003,8 +3003,25 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The distribution of R of each group of the lens in bins of half an R from -4 R to 6 R with an open bin at each end. A group below the minimum sample has no bins, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** The distribution of R of each group of the lens in bins of half an R from -4 R to 6 R with an open bin at each end. A group below the minimum sample has no bins, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['GetReportDistribution'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/mae-mfe': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The excursions of each group of the lens as counts, never one point per trade: a grid of the maximum adverse excursion (0.25 R bins to 2 R, then 2 R or more) by the result R (half an R, -5 R to +5 R with a tail at each end), a histogram of the maximum favourable excursion (half an R to 5 R, then 5 R or more), how many trades reached +1, +2 and +3 R at some point, and the 90th percentile (nearest rank) of the adverse excursion of the winners. Trades with no recorded excursion are left out and counted apart (excursionN). A group below the minimum sample has no counts, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    get: operations['GetReportMaeMfe'];
     put?: never;
     post?: never;
     delete?: never;
@@ -3037,7 +3054,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** What works, in which basket, on which timeframe, with which exit: the cells (the dimensions of the lens, or basket, strategy, timeframe, side and exit by default) ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and the answer 'nothing has enough evidence yet' when no cell qualifies (a 200, not an error). Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** What works, in which basket, on which timeframe, with which exit: the cells (the dimensions of the lens, or basket, strategy, timeframe, side and exit by default) ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and the answer 'nothing has enough evidence yet' when no cell qualifies (a 200, not an error). Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['GetReportWhatWorks'];
     put?: never;
     post?: never;
@@ -7548,6 +7565,50 @@ export interface components {
       estimated: boolean;
       returns: components['schemas']['ReturnsView'];
     };
+    /** @description Counts by MAE (rows; the last row is the last edge and above) and result R (columns; the first is below the first edge, the last at or above the last edge). The two counts repeat the totals of the tail columns. */
+    MaeGridView: {
+      /** @description Edges of the MAE bins in R. */
+      maeEdges: number[];
+      /** @description Edges of the result bins in R. */
+      resultEdges: number[];
+      /** @description Rows by columns. */
+      counts: number[][];
+      /**
+       * Format: int32
+       * @description Trades below the first result edge.
+       */
+      belowCount: number;
+      /**
+       * Format: int32
+       * @description Trades at or above the last result edge.
+       */
+      aboveCount: number;
+    };
+    /** @description The excursions of one group. The grid, the histogram and the levels exist only for a group that is a value; otherwise `WinnersMaeP90` holds the reason. */
+    MaeMfeGroupView: {
+      /** @description The group key text. */
+      key: string;
+      /** @description The coordinates. */
+      parts: components['schemas']['GroupPartView'][];
+      /**
+       * Format: int32
+       * @description Trades in the group.
+       */
+      n: number;
+      /**
+       * Format: int32
+       * @description Trades with a recorded MAE and MFE: the n behind every count.
+       */
+      excursionN: number;
+      /** @description Nearest-rank 90th percentile of the MAE of winners, or its state. */
+      winnersMaeP90: components['schemas']['MetricView'];
+      grid: null | components['schemas']['MaeGridView'];
+      mfe: null | components['schemas']['MfeHistogramView'];
+      /** @description Trades that reached 1, 2 and 3 R at some point; empty for a non-value group. */
+      reachedMfe: components['schemas']['ReachedMfeView'][];
+      /** @description The evidence of the group. */
+      evidence: components['schemas']['GroupEvidenceView'];
+    };
     /**
      * @description A trade typed in by the owner: for a holding (`HoldingId`) or for a security of an account (`AccountId` and `Symbol` and/or `Isin`, which must be an NSE share or ETF of the master list). `Side` buy or sell, the date not in the
      *     future, `Quantity` a whole number above 0, `Price` above 0, `Charges` optional (0).
@@ -7586,6 +7647,18 @@ export interface components {
       number: null | number;
       /** @description Why the figure is not a plain value; null for a value. */
       reason: null | string;
+    };
+    /** @description Counts by MFE: one bin between each pair of edges, then the open bin at or above the last edge. */
+    MfeHistogramView: {
+      /** @description Edges in R. */
+      edges: number[];
+      /** @description Counts per bin between edges. */
+      counts: number[];
+      /**
+       * Format: int32
+       * @description Trades at or above the last edge.
+       */
+      aboveCount: number;
     };
     /** @description A missing minute: the India date and the minute (`HH:mm`). */
     MissingMinute: {
@@ -9011,6 +9084,24 @@ export interface components {
       /** @description The lower bound of expectancy is above 0: the only reading of "works" the engine allows. */
       lowerBoundPositive: boolean;
     };
+    /** @description Trades whose favourable excursion reached the level, and their share of the trades with a recorded excursion. */
+    ReachedMfeView: {
+      /**
+       * Format: double
+       * @description The level in R.
+       */
+      atR: number;
+      /**
+       * Format: int32
+       * @description Trades that reached it.
+       */
+      count: number;
+      /**
+       * Format: double
+       * @description Count over the trades with a recorded excursion.
+       */
+      share: number;
+    };
     /** @description One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving. */
     RefreshRunView: {
       /** Format: uuid */
@@ -9170,6 +9261,17 @@ export interface components {
       folds: number;
       /** Format: int32 */
       positiveFolds: number;
+    };
+    /** @description The excursions of a report for a lens, one entry per group, as counts in bins (never one point per trade), with the evidence of the report. */
+    ReportMaeMfeView: {
+      /** @description The dimensions grouped by. */
+      dimensions: string[];
+      /** @description A trade is in more than one group. */
+      nonAdditive: boolean;
+      /** @description The groups. */
+      groups: components['schemas']['MaeMfeGroupView'][];
+      /** @description The evidence of the report. */
+      evidence: components['schemas']['ReportEvidenceView'];
     };
     /** @description What was tested: the strategy version, the method, the window and the universe (spec P5-06). */
     ReportRunView: {
@@ -18017,6 +18119,66 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['DistributionView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReportMaeMfe: {
+    parameters: {
+      query?: {
+        runs?: string;
+        basis?: string;
+        lens?: string;
+        strategy?: string;
+        timeframe?: string;
+        side?: string;
+        style?: string;
+        exit?: string;
+        basket?: string;
+        symbol?: string;
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReportMaeMfeView'];
         };
       };
       /** @description Not Found */
