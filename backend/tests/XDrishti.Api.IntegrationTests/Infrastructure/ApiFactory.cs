@@ -14,6 +14,7 @@ using XDrishti.Application;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Live.Push;
@@ -127,6 +128,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddTransient<IStartupFilter, LoopbackRemoteAddressStartupFilter>();
             services.AddSingleton<ILogEventSink>(Logs);
             Brokers.Clock = Clock;
+
+            // The registered ticket-notice source stays the inner one; the switch lets a test play P7-20's items.
+            var ticketSource = services.Single(d => d.ServiceType == typeof(ITicketNoticeSource));
+            services.Remove(ticketSource);
+            services.AddSingleton<TicketNoticeSwitch>(sp => new TicketNoticeSwitch((ITicketNoticeSource)ActivatorUtilities.CreateInstance(sp, ticketSource.ImplementationType!)));
+            services.AddScoped<ITicketNoticeSource>(sp => sp.GetRequiredService<TicketNoticeSwitch>());
 
             // Only the innermost handler is replaced: the allow-list guard and the client settings stay as in production.
             services.AddHttpClient(BrokerHttpClientNames.Dhan).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);

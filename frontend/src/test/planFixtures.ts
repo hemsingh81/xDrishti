@@ -160,5 +160,6 @@ export const buildPlanNotice = (over: Partial<Schemas['PlanNotice']> = {}): Sche
   route: '/plans?plan=7',
   planId: 7,
   at: cutoffIso,
+  resolved: false,
   ...over,
 });

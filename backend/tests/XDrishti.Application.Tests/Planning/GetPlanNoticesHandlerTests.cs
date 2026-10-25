@@ -17,6 +17,7 @@ public sealed class GetPlanNoticesHandlerTests
 
     private readonly IPlanStore _plans = Substitute.For<IPlanStore>();
     private readonly IJournalStore _journal = Substitute.For<IJournalStore>();
+    private readonly ITicketNoticeSource _tickets = Substitute.For<ITicketNoticeSource>();
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -28,13 +29,14 @@ public sealed class GetPlanNoticesHandlerTests
         _journal.FillsAsync(Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Ct).Returns([]);
         _journal.EntriesAsync(Arg.Any<long>(), Ct).Returns([]);
         _plans.HistoryAsync(Arg.Any<long>(), Ct).Returns([]);
+        _tickets.ListAsync(Arg.Any<DateTimeOffset>(), Ct).Returns([]);
     }
 
     // Approved on the evening before the session, before any fill of the session day.
     private static PlanEventRow Approval(long item, DateTimeOffset? at = null) =>
         new(item, item, "proposed", "approved", "owner:me", "ok", 1, at ?? new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
 
-    private GetPlanNoticesHandler Handler() => new(_plans, _journal, _time);
+    private GetPlanNoticesHandler Handler() => new(_plans, _journal, _tickets, _time);
 
     private static PlanRow Row(long id, DateOnly? date = null, int version = 1, PlanState state = PlanState.Published) =>
         new(id, new NewPlan("k" + id, date ?? Session, Cutoff, version, Hash, "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, []), state, 1, 0, 0);
@@ -214,5 +216,31 @@ public sealed class GetPlanNoticesHandlerTests
         var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
 
         result.Items.Select(i => (i.Kind, i.Severity)).ToList().ShouldBe(kind is null ? [] : [(kind, severity!)]);
+    }
+
+    [Fact]
+    public async Task Ticket_notices_of_the_source_are_carried_as_they_are_and_sorted_with_the_plan_items()
+    {
+        Store(Row(1), Item(1, 1, TicketState.Proposed));
+        var crossed = new PlanNotice("crossing:5", "ticket_level_crossed", "warning", "crossed", "/plans?plan=1", 1, null, Cutoff, false);
+        var prompt = new PlanNotice("prompt:2", "post_trade_prompt", "info", "ambiguous", "/plans?plan=1", 1, null, Cutoff, true);
+        var clash = new PlanNotice("plan:review:1:info", "post_trade_prompt", "info", "same id", "/plans?plan=1", 1, null, null, false);
+        _tickets.ListAsync(Arg.Any<DateTimeOffset>(), Ct).Returns([prompt, clash, crossed]);
+
+        var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
+
+        result.Items.Select(i => i.Id).ShouldBe(["crossing:5", "plan:review:1:info", "prompt:2"]);
+        result.Items[0].ShouldBe(crossed);
+        result.Items[2].Resolved.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Without_ticket_notices_the_answer_is_the_plan_items_alone()
+    {
+        Store(Row(1), Item(1, 1, TicketState.Proposed));
+
+        var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
+
+        result.Items.Select(i => i.Kind).ShouldBe(["plan_awaiting_review"]);
     }
 }

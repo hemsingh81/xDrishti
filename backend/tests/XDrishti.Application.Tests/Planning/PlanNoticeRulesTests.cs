@@ -168,7 +168,7 @@ public sealed class PlanNoticeRulesTests
         items.Count.ShouldBe(6);
         items.ShouldAllBe(i => i.Route.StartsWith("/plans", StringComparison.Ordinal));
         items.ShouldAllBe(i => !i.Text.Contains("RELIANCE", StringComparison.Ordinal) && !i.Text.Contains("POST ", StringComparison.Ordinal));
-        typeof(PlanNotice).GetProperties().Select(p => p.Name).ShouldBe(["Id", "Kind", "Severity", "Text", "Route", "PlanId", "At"], ignoreOrder: true); // no action or command member
+        typeof(PlanNotice).GetProperties().Select(p => p.Name).ShouldBe(["Id", "Kind", "Severity", "Text", "Route", "PlanId", "At", "Since", "Resolved"], ignoreOrder: true); // no action or command member
     }
 
     [Fact]

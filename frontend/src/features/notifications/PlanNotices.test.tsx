@@ -72,6 +72,37 @@ describe('Notification bell: plan notices', () => {
     }
   });
 
+  it('shows carried ticket notices in the real bell: the open crossing counts, the resolved prompt does not', async () => {
+    serve([
+      buildPlanNotice({
+        id: 'crossing:41',
+        kind: 'ticket_level_crossed',
+        severity: 'warning',
+        text: '1 watched ticket crossed its indicative stop level. Alert only: no order is placed and none exists.',
+        since: '2026-10-26T02:00:00Z',
+      }),
+      buildPlanNotice({
+        id: 'prompt:9',
+        kind: 'post_trade_prompt',
+        severity: 'info',
+        text: '1 armed ticket has a trade on record.',
+        resolved: true,
+        since: '2026-10-26T02:00:00Z',
+      }),
+    ]);
+    renderBell();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Notifications' });
+
+    expect(within(drawer).getByText(/crossed its indicative stop level/)).toBeInTheDocument();
+    expect(
+      within(drawer)
+        .getAllByRole('link')
+        .every((l) => l.getAttribute('href') === '/plans?plan=7'),
+    ).toBe(true);
+  });
+
   it('opens the Plans screen on the plan from the notice', async () => {
     serve([buildPlanNotice()]);
     const { router } = renderBell();
@@ -210,6 +241,7 @@ describe('derivePlanNotifications', () => {
       at: Date.parse('2026-10-26T03:40:00Z'),
       title: null,
       actions: [],
+      since: null,
       resolved: false,
     });
   });
@@ -230,5 +262,20 @@ describe('derivePlanNotifications', () => {
 
     expect(list.map((n) => n.id)).toEqual(['plan:review:15', 'plan:armed:7']);
     expect(list.every((n) => n.at === null)).toBe(true);
+  });
+
+  it('carries the ticket crossing and post-trade prompt kinds as route-only items without actions', () => {
+    const list = derivePlanNotifications([
+      buildPlanNotice({
+        id: 'plan:crossed:7:1',
+        kind: 'ticket_level_crossed',
+        severity: 'warning',
+        route: '/plans?plan=7',
+      }),
+      buildPlanNotice({ id: 'plan:prompt:7:1', kind: 'post_trade_prompt', severity: 'info', route: '/plans?plan=7' }),
+    ]);
+
+    expect(list.map((n) => n.kind)).toEqual(['ticket_level_crossed', 'post_trade_prompt']);
+    expect(list.every((n) => n.actions.length === 0 && n.href === '/plans?plan=7')).toBe(true);
   });
 });
