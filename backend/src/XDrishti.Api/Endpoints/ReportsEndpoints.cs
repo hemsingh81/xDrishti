@@ -77,6 +77,12 @@ internal sealed class ReportsEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        reports.MapGet("/benchmarks", BenchmarksAsync)
+            .WithName("GetReportBenchmarks")
+            .WithSummary("What simply holding each basket would have done over a window (equal weight, bought at the first close and held, price return, dividends not included) beside the benchmark index in force, each with the instruments behind it and every instrument left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price). Takes basket (ids, comma separated, at most 12), from, to (default the window of the default run set; window.source says which) and membersAsOf (default the India date of the newest run of the basket, else today; members as of that date, not as of each trading day). Fewer than 3 included instruments gives no number. Baskets share instruments, so nonAdditive is true and there is no total. Read only. 422 reports.invalid; 404 reports.not_found.")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         reports.MapGet("/trades", TradesAsync)
             .WithName("ListReportTrades")
             .WithSummary("A page of the closed trades the report counts, in the order of the exits (limit 1 to 1,000, default 100; cursor from the previous page, which belongs to that report and is refused for another): the very set the figures were computed from, open-at-end trades excluded. Every page recomputes the population. There is no lens. Read only." + Common + Caps + Errors)
@@ -142,6 +148,16 @@ internal sealed class ReportsEndpoints : IEndpointModule
         IQueryHandler<GetReportWhatWorksQuery, Result<WhatWorksView>> handler,
         CancellationToken cancellationToken) =>
         ReadAsync(input.ToInput(), http, q => handler.HandleAsync(new GetReportWhatWorksQuery(q), cancellationToken));
+
+    private static async Task<Results<Ok<ReportBenchmarksView>, ProblemHttpResult>> BenchmarksAsync(
+        [AsParameters] BenchmarkParams input,
+        HttpContext http,
+        IQueryHandler<GetReportBenchmarksQuery, Result<ReportBenchmarksView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetReportBenchmarksQuery(input.Basket, input.From, input.To, input.MembersAsOf), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
 
     private static Task<Results<Ok<TradesView>, ProblemHttpResult>> TradesAsync(
         [AsParameters] ReportTradesParams input,

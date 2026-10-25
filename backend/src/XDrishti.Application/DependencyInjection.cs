@@ -421,6 +421,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetReportInsightsQuery, Result<InsightsView>>, GetReportInsightsHandler>();
         services.AddScoped<IQueryHandler<GetReportWhatWorksQuery, Result<WhatWorksView>>, GetReportWhatWorksHandler>();
         services.AddScoped<IQueryHandler<PageReportTradesQuery, Result<TradesView>>, PageReportTradesHandler>();
+        services.AddScoped<IQueryHandler<GetReportBenchmarksQuery, Result<ReportBenchmarksView>>, GetReportBenchmarksHandler>();
     }
 
     /// <summary>The Lab API (P5-01, ADR 0057): validate, store and read strategy texts.</summary>
