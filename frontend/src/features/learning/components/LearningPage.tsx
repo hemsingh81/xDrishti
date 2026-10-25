@@ -1,17 +1,17 @@
 import PsychologyIcon from '@mui/icons-material/PsychologyOutlined';
+import { Suspense } from 'react';
 import { useUrlState } from '@/shared/analytics';
-import { PageHeader } from '@/shared/ui';
+import { LoadingState, PageHeader } from '@/shared/ui';
 import { ButtonTabs, type ButtonTab } from '@/shared/ui/ButtonTabs';
-import { OverviewTab } from './OverviewTab';
-import { SetupsTab } from './SetupsTab';
+import { DEFAULT_TAB, tabs, type TabId } from '../lib/tabs';
 
-const tabValues = ['overview', 'setups'] as const;
-type Tab = (typeof tabValues)[number];
-
-const tabs: readonly ButtonTab<Tab>[] = [
-  { value: 'overview', label: 'Overview', id: 'learning-tab-overview', panelId: 'learning-panel' },
-  { value: 'setups', label: 'Setups', id: 'learning-tab-setups', panelId: 'learning-panel' },
-];
+const ids = tabs.map((tab) => tab.id);
+const buttons: readonly ButtonTab<TabId>[] = tabs.map((tab) => ({
+  value: tab.id,
+  label: tab.label,
+  id: `learning-tab-${tab.id}`,
+  panelId: 'learning-panel',
+}));
 
 /**
  * Learning (P8-02): what the learning engine holds and which setups (cells) have enough evidence. Read only: the screen has
@@ -19,12 +19,14 @@ const tabs: readonly ButtonTab<Tab>[] = [
  */
 export function LearningPage() {
   const url = useUrlState();
-  // A cell in the address belongs to Setups, so a link with `?cell=` opens that tab even without `tab=setups`.
-  const tab = url.text('cell') === null ? url.choice('tab', tabValues, 'overview') : 'setups';
-  const select = (next: Tab) => {
+  // A cell in the address belongs to the Setups tab (the registry id 'setups', checked by `TabId`), so a link with `?cell=`
+  // opens that tab even without `tab=setups`.
+  const tab: TabId = url.text('cell') === null ? url.choice('tab', ids, DEFAULT_TAB) : 'setups';
+  const select = (next: TabId) => {
     // A cell belongs to the Setups tab; leaving it closes the cell.
-    url.update({ tab: next === 'overview' ? null : next, cell: null });
+    url.update({ tab: next === DEFAULT_TAB ? null : next, cell: null });
   };
+  const active = tabs.find((candidate) => candidate.id === tab);
   return (
     <>
       <PageHeader
@@ -33,17 +35,11 @@ export function LearningPage() {
         hue="learning"
         description="What the system has learned from past data, read from stored records. About 2.1 years of replayed history: a description of the past, not a forecast."
       />
-      <ButtonTabs tabs={tabs} value={tab} onChange={select} label="Learning sections" />
+      <ButtonTabs tabs={buttons} value={tab} onChange={select} label="Learning sections" />
       <div role="tabpanel" id="learning-panel" aria-labelledby={`learning-tab-${tab}`}>
-        {tab === 'overview' ? (
-          <OverviewTab
-            onOpenSetups={() => {
-              select('setups');
-            }}
-          />
-        ) : (
-          <SetupsTab />
-        )}
+        <Suspense fallback={<LoadingState label="Loading the tab…" />}>
+          {active && <active.Component open={select} />}
+        </Suspense>
       </div>
     </>
   );

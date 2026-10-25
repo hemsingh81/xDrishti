@@ -15,6 +15,7 @@ export {
   NOT_AVAILABLE,
 } from './format';
 export { carriesNumber, metricOf, nonValueKinds, resolveMetric, type MetricKind, type MetricState } from './metric';
+export { HATCH_ALPHA, HeatGrid, type HeatGridCell, type HeatGridColumn, type HeatGridRow } from './HeatGrid';
 export { MetricCell, type MetricCellProps } from './MetricCell';
 export { MetricTile } from './MetricTile';
 export { MetricValue, type MetricValueProps } from './MetricValue';
