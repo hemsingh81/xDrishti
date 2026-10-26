@@ -1,0 +1,11 @@
+namespace XDrishti.Domain.Reporting;
+
+/// <summary>
+/// The writes the read-only rule of P8 allows (P8-00 criterion 5): <c>METHOD pattern</c> strings, compile-time. Empty in P8-17; P8-18, P8-19 and P8-20 each extend it by commit with their POSTs, the owner's answer recorded. A route under a
+/// guarded prefix that is not GET and not on this list makes the phase check say NOT MET.
+/// </summary>
+public static class ApprovedReportWrites
+{
+    /// <summary>The approved writes.</summary>
+    public static IReadOnlyList<string> All { get; } = [];
+}

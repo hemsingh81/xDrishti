@@ -26,7 +26,8 @@ npm run check
 say "Frontend: build"
 npm run build >/dev/null
 say "Frontend: bundle guard (first-load JavaScript <= 200 KB gzip)"
-npm run size --silent
+# The measurement is recorded for the P8 phase check (scripts/p8-phase-check.sh); data/ is git-ignored.
+XD_EVIDENCE_DIR="$ROOT/data/p8-evidence" npm run size --silent
 
 # Record this green run so the Stop hook knows the current changes were verified.
 "$ROOT/scripts/_fingerprint.sh" >"$(git -C "$ROOT" rev-parse --absolute-git-dir)/xd-check-pass"
