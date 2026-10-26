@@ -13,7 +13,7 @@ import {
   rankedWhatWorks,
   value,
 } from '@/test/reportFixtures';
-import { renderReports, reportServer } from '@/test/reportScreen';
+import { renderReports, reportServer, scrollOverviewToEnd } from '@/test/reportScreen';
 import { server } from '@/test/server';
 
 pinClock('2026-10-25T10:00:00Z');
@@ -50,6 +50,7 @@ describe('every state through the heat grid and the ranked table', () => {
       ),
     );
     renderReports();
+    await scrollOverviewToEnd();
     const grid = await screen.findByRole('grid', { name: 'Expectancy by strategy and timeframe' });
     const named = (word: RegExp) => within(grid).getByRole('button', { name: word });
     expect(named(/orb, v: \+0\.30 R/)).toHaveTextContent('+0.30 R');
@@ -141,6 +142,7 @@ describe('free text from the server is text', () => {
       ),
     );
     const { container } = renderReports();
+    await scrollOverviewToEnd();
     const list = await screen.findByRole('list', { name: 'Insights' });
     expect(within(list).getAllByText(new RegExp('onerror=alert\\(1\\)')).length).toBe(8);
     const basket = await screen.findByRole('region', { name: 'Expectancy by basket' });

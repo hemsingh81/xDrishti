@@ -1,3 +1,5 @@
+import { screen } from '@testing-library/react';
+import { scrollToEnd } from './intersection';
 import { http, HttpResponse } from 'msw';
 import { Link } from 'react-router';
 import type { Schemas } from '@/shared/api';
@@ -126,4 +128,10 @@ export function renderReportsFromStart() {
     ],
     { initialPath: '/' },
   );
+}
+
+/** The owner scrolls down the Overview: the panels below the first view mount (P8-17f). Call after `renderReports()`. */
+export async function scrollOverviewToEnd() {
+  await screen.findByRole('region', { name: 'Equity and drawdown' });
+  scrollToEnd();
 }

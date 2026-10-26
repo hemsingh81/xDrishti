@@ -4,16 +4,19 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { countingUser } from '@/test/interactions';
 import { pinClock } from '@/test/pinClock';
 import { buildWhatWorks, rankedWhatWorks } from '@/test/reportFixtures';
+import { scrollToEnd } from '@/test/intersection';
 import { renderReportsFromStart, reportServer } from '@/test/reportScreen';
 
 pinClock('2026-10-25T10:00:00Z');
 
 // P8-17 criteria 1 and 2: the exit question is answered within 4 interactions, and the requests made are the ones the manifest names.
 const MAX_INTERACTIONS = 4;
-// Spec P8-17 criterion 2 says at most 12 requests. The built page (P8-08) makes 21 from the cold start to the picked basket (ten panels, then the same ten
-// again with the basket filter). The test ratchets that measured count exactly; the roadmap row 'P8-08 follow-up: Reports page fan-out 21 -> 12 requests'
-// brings it to the spec's 12, and lowering this number is part of that follow-up.
-const MEASURED_REQUESTS = 21;
+// Spec P8-17 criterion 2: at most 12 requests. The built page (P8-08) made 21 from the cold start to the picked basket: ten panels, then the
+// same ten with the basket filter. P8-17f mounts the panels below the first view only when they come near the viewport (the walk does not
+// scroll), so the path makes the first-view requests twice and nothing else. The test ratchets that measured count exactly.
+const MAX_REQUESTS = 12;
+const MEASURED_REQUESTS = 11;
+const withinRequests = (count: number) => count <= MAX_REQUESTS;
 const basketId = '00000000-0000-4000-8000-000000000401';
 
 interface Manifest {
@@ -84,6 +87,7 @@ describe('the What works path (P8-17)', () => {
     expect(interactions).toBe(4);
     expect(requests.some((u) => u.pathname === route('ListReportRuns').path)).toBe(true);
     expect(requests.length).toBe(MEASURED_REQUESTS);
+    expect(withinRequests(requests.length)).toBe(true);
     const seen = new Map<string, number>();
     for (const u of requests) seen.set(u.pathname + u.search, (seen.get(u.pathname + u.search) ?? 0) + 1);
     for (const n of seen.values()) expect(n).toBeLessThanOrEqual(2);
@@ -94,6 +98,28 @@ describe('the What works path (P8-17)', () => {
     const interactions = await walk();
     expect((await screen.findAllByText(/Nothing has enough evidence yet/)).length).toBeGreaterThan(0);
     expect(withinBudget(interactions)).toBe(true);
+  });
+
+  it('keeps the panels below the first view out of the path, and draws them with the basket once they are near', async () => {
+    const requests = reportServer({ whatWorks: rankedWhatWorks() });
+    await walk();
+    await screen.findByRole('region', { name: 'Equity and drawdown' });
+    expect(screen.queryByRole('region', { name: 'Monthly total R' })).not.toBeInTheDocument();
+    scrollToEnd();
+    expect(await screen.findByRole('region', { name: 'Monthly total R' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        requests.some((u) => u.pathname === '/api/reports/groups' && u.searchParams.get('basket') === basketId),
+      ).toBe(true);
+    });
+    expect(
+      requests.filter((u) => u.searchParams.get('lens') === 'month' && !u.searchParams.has('basket')),
+    ).toHaveLength(0);
+  });
+
+  it('counts a thirteenth request and the budget fails it (positive control)', () => {
+    expect(withinRequests(12)).toBe(true);
+    expect(withinRequests(13)).toBe(false);
   });
 
   it('counts a fifth interaction and the budget fails it (positive control)', async () => {
