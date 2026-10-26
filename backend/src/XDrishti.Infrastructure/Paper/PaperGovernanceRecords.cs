@@ -59,3 +59,21 @@ internal sealed class EpochNoteRecord
 
     public DateTimeOffset CreatedAt { get; set; }
 }
+
+/// <summary>A row of <c>paper.weekly_reviews</c> (spec P10-03, ADR 0121): the weekly paper review, one per ISO week and epoch. Insert-only.</summary>
+internal sealed class PaperReviewRecord
+{
+    public long Id { get; set; }
+
+    public string IsoWeek { get; set; } = string.Empty;
+
+    public long EpochId { get; set; }
+
+    public DateTimeOffset BuiltAt { get; set; }
+
+    public string BuiltBy { get; set; } = string.Empty;
+
+    public string Text { get; set; } = string.Empty;
+
+    public string Sections { get; set; } = "[]";
+}

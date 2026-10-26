@@ -5466,6 +5466,59 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperReviewRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("BuiltAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("built_at");
+
+                    b.Property<string>("BuiltBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("built_by");
+
+                    b.Property<long>("EpochId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("epoch_id");
+
+                    b.Property<string>("IsoWeek")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("iso_week");
+
+                    b.Property<string>("Sections")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("sections");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id")
+                        .HasName("pk_weekly_reviews");
+
+                    b.HasIndex("EpochId")
+                        .HasDatabaseName("ix_weekly_reviews_epoch_id");
+
+                    b.HasIndex("IsoWeek", "EpochId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_weekly_reviews_week_epoch");
+
+                    b.ToTable("weekly_reviews", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_weekly_reviews_shape", "iso_week ~ '^[0-9]{4}-W[0-9]{2}$' AND text LIKE 'Paper only: no order was placed and none exists.%' AND length(btrim(built_by)) > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperSkipRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -8604,6 +8657,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_exits_entries_entry_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperReviewRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Paper.PaperEpochRecord", null)
+                        .WithMany()
+                        .HasForeignKey("EpochId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_weekly_reviews_epochs_epoch_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperSkipRecord", b =>

@@ -54,3 +54,20 @@ internal sealed class EpochNoteRecordConfiguration : IEntityTypeConfiguration<Ep
         builder.HasOne<ConfigChangeRecord>().WithMany().HasForeignKey(x => x.ChangeId).HasConstraintName("fk_epoch_notes_config_changes_change_id").OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+/// <summary><c>paper.weekly_reviews</c> (spec P10-03, ADR 0121): the weekly paper review, one row per ISO week and epoch, insert-only for the runtime role. The database refuses a text that does not open with the pinned line.</summary>
+internal sealed class PaperReviewRecordConfiguration : IEntityTypeConfiguration<PaperReviewRecord>
+{
+    public void Configure(EntityTypeBuilder<PaperReviewRecord> builder)
+    {
+        builder.ToTable("weekly_reviews", Schemas.Paper, t => t.HasCheckConstraint("ck_weekly_reviews_shape", "iso_week ~ '^[0-9]{4}-W[0-9]{2}$' AND text LIKE 'Paper only: no order was placed and none exists.%' AND length(btrim(built_by)) > 0"));
+        builder.HasKey(x => x.Id).HasName("pk_weekly_reviews");
+        builder.Property(x => x.Id).UseIdentityAlwaysColumn();
+        builder.Property(x => x.IsoWeek).HasColumnType("text").IsRequired();
+        builder.Property(x => x.BuiltBy).HasColumnType("text").IsRequired();
+        builder.Property(x => x.Text).HasColumnType("text").IsRequired();
+        builder.Property(x => x.Sections).HasColumnType("jsonb").IsRequired();
+        builder.HasIndex(x => new { x.IsoWeek, x.EpochId }).IsUnique().HasDatabaseName("uq_weekly_reviews_week_epoch"); // one review per week and epoch; the second insert is skipped
+        builder.HasOne<PaperEpochRecord>().WithMany().HasForeignKey(x => x.EpochId).HasConstraintName("fk_weekly_reviews_epochs_epoch_id").OnDelete(DeleteBehavior.Restrict);
+    }
+}

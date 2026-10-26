@@ -219,6 +219,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM paper.entries;
                 DELETE FROM paper.skips;
                 DELETE FROM paper.capture_runs;
+                DELETE FROM paper.weekly_reviews;
                 DELETE FROM paper.epoch_notes;
                 DELETE FROM paper.config_changes;
                 DELETE FROM paper.config_snapshots;
@@ -367,6 +368,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM paper.entries;
                 DELETE FROM paper.skips;
                 DELETE FROM paper.capture_runs;
+                DELETE FROM paper.weekly_reviews;
                 DELETE FROM paper.epoch_notes;
                 DELETE FROM paper.config_changes;
                 DELETE FROM paper.config_snapshots;

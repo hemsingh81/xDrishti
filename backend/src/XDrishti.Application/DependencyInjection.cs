@@ -154,6 +154,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, PlanExpiryService>(); // expires the day's armed tickets after the close (P7-11); starts paused
         services.AddSingleton<IScheduledService, PaperCaptureService>(); // paper fills of armed tickets after the end-of-day run (P10-01); starts paused, no order
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
+        services.AddSingleton<IScheduledService, PaperReviewService>(); // the weekly paper review (P10-03); starts paused, builds and stores one text per week and epoch, applies nothing
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
@@ -619,6 +620,13 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetPaperPositionsQuery, Result<PaperPositionList>>, GetPaperPositionsHandler>();
         services.AddScoped<IQueryHandler<GetPaperEquityQuery, Result<PaperEquityView>>, GetPaperEquityHandler>();
         services.AddScoped<IQueryHandler<ReconcilePaperQuery, Result<PaperReconcileView>>, ReconcilePaperHandler>();
+        services.AddScoped<IPaperReviewSource, PaperReviewSource>(); // the read-only door of the weekly paper review (P10-03, ADR 0121)
+        services.AddScoped<IReviewComparisonLine, ComparisonLineNotBuilt>(); // replaced by P10-04
+        services.AddScoped<PaperReviewGatherer>();
+        services.AddScoped<ICommandHandler<BuildPaperReviewCommand, PaperReviewView>, BuildPaperReviewHandler>();
+        services.AddScoped<IQueryHandler<GetPaperReviewQuery, Result<PaperReviewView>>, GetPaperReviewHandler>();
+        services.AddScoped<IQueryHandler<ListPaperReviewsQuery, Result<PaperReviewList>>, ListPaperReviewsHandler>();
+        services.AddScoped<IQueryHandler<GetDisciplineQuery, Result<DisciplineView>>, GetDisciplineHandler>();
         services.AddScoped<ICommandHandler<JournalPlansCommand, JournalOutcome>, JournalPlansHandler>(); // auto-journal (P7-14, ADR 0093): reads stored fills, insert-only links, no order
         services.AddScoped<IQueryHandler<GetPlanJournalQuery, Result<PlanJournalView>>, GetPlanJournalHandler>();
     }

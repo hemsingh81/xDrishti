@@ -152,6 +152,8 @@ public static class DependencyInjection
         services.AddScoped<IGradeStore, GradeStore>(); // insert-only grades of tickets (P7-13, ADR 0090)
         services.AddScoped<IPaperLedgerData, PaperLedgerData>(); // read-only paper ledger reads (P10-02, ADR 0118)
         services.AddScoped<IGovernanceStore, GovernanceStore>(); // insert-only configuration record (P10-05, ADR 0119)
+        services.AddScoped<IPaperReviewData, PaperReviewData>(); // read-only reads of the weekly paper review (P10-03, ADR 0121)
+        services.AddScoped<IPaperReviewStore, PaperReviewStore>(); // insert-only weekly paper reviews (P10-03, ADR 0121)
         services.AddSingleton<IPlanningSettingsReader, PlanningSettingsReader>();
         services.AddScoped<IPaperStore, PaperStore>(); // insert-only paper record (P10-01, ADR 0116)
         services.AddOptions<TicketAlertOptions>().Bind(configuration.GetSection(TicketAlertOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // price-crossing alerts and post-trade prompts, default OFF (P7-20, ADR 0115)

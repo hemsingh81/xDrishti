@@ -283,6 +283,8 @@ What the app can mend by itself it mends quietly ([doc 12](12-portfolio-monitori
 | R34 | Loss tags | Why trades lose | Tag counts and R lost by tag, linked lessons |
 | R35 | Smart-rule evidence | Is each rule still earning its place | Throttle: equity with/without; meta: R taken vs skipped; gate: R by VIX/breadth bucket; windows: R by hour; correlation matrix |
 
+**As built (P10-03, ADR 0121):** R19 for the paper phase is the seven-category discipline report with the skipped (plan-price grade), resized and added lines and no composite score; R32 for paper has the rows plan, modelled slippage, charges and net, with missed triggers and real slippage `not_evaluable` until P11. Both are in the weekly paper review (`/paper` Review tab, `xd paper review`).
+
 **Standard KPIs:** trades · win rate · avg win/loss R · expectancy · profit factor · total R · net ₹ after
 costs · max drawdown (R, %) · Sharpe/Sortino · avg holding · exposure · longest loss streak.
 
