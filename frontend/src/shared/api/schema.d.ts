@@ -3710,6 +3710,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/reports/phase-check': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The P8 exit judged from what can be read: criteria 1 to 10 of P8-00, each MET, NOT MET or NOT EVALUABLE with its detail (a caveat beside a MET that rests on a convention); the answer the What-works view gives on the default set (a ranked cell with its n and lower bound, or the nothing-has-enough-evidence sentence with the counts); the cold and warm time of each report read; the honest limits. A criterion that could not be read is never MET. The interaction test, the owner's stopwatch note, the bundle size and the browser pass are files on the owner's machine and are read by scripts/p8-phase-check.sh, not here. Takes no parameter. Read only; the check runs the reports once more than a screen would and is not a polling target. */
+    get: operations['GetReportsPhaseCheck'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/autonomy/settings': {
     parameters: {
       query?: never;
@@ -12233,6 +12250,82 @@ export interface components {
     ReportWarningView: {
       code: string;
       text: string;
+    };
+    /** @description The What-works answer on the default set (spec P8-17). */
+    ReportsPhaseAnswerView: {
+      /** @description ranked, nothing_qualifies or no_runs. */
+      kind: string;
+      /** @description The answer in one sentence. */
+      sentence: string;
+      /**
+       * Format: int32
+       * @description Cells looked at.
+       */
+      cellsLooked: number;
+      /**
+       * Format: int32
+       * @description The most trades in any cell.
+       */
+      largestN: number;
+      /**
+       * Format: int32
+       * @description The sample a cell needs.
+       */
+      requiredN: number;
+    };
+    /** @description The P8 phase check as a read (spec P8-17). */
+    ReportsPhaseCheckView: {
+      /** @description The criteria, the answer, the timings and the limits. */
+      report: components['schemas']['ReportsPhaseReportView'];
+      /** @description The printable report. */
+      text: string;
+    };
+    /** @description The body of the P8 phase check (spec P8-17). */
+    ReportsPhaseReportView: {
+      /** @description The headline; MET only on real evidence for every counted criterion. */
+      headline: string;
+      /** @description Criteria 1 to 10 of P8-00, numbered as there. */
+      criteria: components['schemas']['LearningPhaseCriterionView'][];
+      /** @description What the What-works view answers on the default set. */
+      answer: components['schemas']['ReportsPhaseAnswerView'];
+      /** @description The timed reads, cold and warm. */
+      timings: components['schemas']['ReportsPhaseTimingView'][];
+      /**
+       * Format: int32
+       * @description Stored runs.
+       */
+      runs: number;
+      /**
+       * Format: int32
+       * @description Trades in the default set.
+       */
+      trades: number;
+      /**
+       * Format: int32
+       * @description Baskets with trades in the default set.
+       */
+      basketsWithTrades: number;
+      /** @description The reports the check called. */
+      builtReports: string[];
+      /** @description The honest limits; always printed. */
+      limits: string[];
+    };
+    /** @description One timed read of the phase check (spec P8-17). */
+    ReportsPhaseTimingView: {
+      /** @description The operation id of the endpoint. */
+      operation: string;
+      /** @description On the answer path of the exit question. */
+      answerPath: boolean;
+      /**
+       * Format: int64
+       * @description The first call; null when the read was refused.
+       */
+      coldMs: null | number;
+      /**
+       * Format: int64
+       * @description The second call; null when the read was refused.
+       */
+      warmMs: null | number;
     };
     /** @description Pasted tickers, canonical symbols (`NSE:RELIANCE`) or ISINs, up to 5,000 entries. */
     ResolveInput: {
@@ -22875,6 +22968,35 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReportsPhaseCheck: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReportsPhaseCheckView'];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
         headers: {
           [name: string]: unknown;
         };

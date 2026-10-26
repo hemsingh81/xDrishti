@@ -12686,6 +12686,37 @@
         }
       }
     },
+    "/api/reports/phase-check": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "The P8 exit judged from what can be read: criteria 1 to 10 of P8-00, each MET, NOT MET or NOT EVALUABLE with its detail (a caveat beside a MET that rests on a convention); the answer the What-works view gives on the default set (a ranked cell with its n and lower bound, or the nothing-has-enough-evidence sentence with the counts); the cold and warm time of each report read; the honest limits. A criterion that could not be read is never MET. The interaction test, the owner's stopwatch note, the bundle size and the browser pass are files on the owner's machine and are read by scripts/p8-phase-check.sh, not here. Takes no parameter. Read only; the check runs the reports once more than a screen would and is not a polling target.",
+        "operationId": "GetReportsPhaseCheck",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportsPhaseCheckView"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/autonomy/settings": {
       "get": {
         "tags": [
@@ -34843,6 +34874,164 @@
           }
         },
         "description": "A caution derived from the report's own numbers. It never changes the outcome."
+      },
+      "ReportsPhaseAnswerView": {
+        "required": [
+          "kind",
+          "sentence",
+          "cellsLooked",
+          "largestN",
+          "requiredN"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "ranked, nothing_qualifies or no_runs."
+          },
+          "sentence": {
+            "type": "string",
+            "description": "The answer in one sentence."
+          },
+          "cellsLooked": {
+            "type": "integer",
+            "description": "Cells looked at.",
+            "format": "int32"
+          },
+          "largestN": {
+            "type": "integer",
+            "description": "The most trades in any cell.",
+            "format": "int32"
+          },
+          "requiredN": {
+            "type": "integer",
+            "description": "The sample a cell needs.",
+            "format": "int32"
+          }
+        },
+        "description": "The What-works answer on the default set (spec P8-17)."
+      },
+      "ReportsPhaseCheckView": {
+        "required": [
+          "report",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "report": {
+            "description": "The criteria, the answer, the timings and the limits.",
+            "$ref": "#/components/schemas/ReportsPhaseReportView"
+          },
+          "text": {
+            "type": "string",
+            "description": "The printable report."
+          }
+        },
+        "description": "The P8 phase check as a read (spec P8-17)."
+      },
+      "ReportsPhaseReportView": {
+        "required": [
+          "headline",
+          "criteria",
+          "answer",
+          "timings",
+          "runs",
+          "trades",
+          "basketsWithTrades",
+          "builtReports",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "headline": {
+            "type": "string",
+            "description": "The headline; MET only on real evidence for every counted criterion."
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningPhaseCriterionView"
+            },
+            "description": "Criteria 1 to 10 of P8-00, numbered as there."
+          },
+          "answer": {
+            "description": "What the What-works view answers on the default set.",
+            "$ref": "#/components/schemas/ReportsPhaseAnswerView"
+          },
+          "timings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportsPhaseTimingView"
+            },
+            "description": "The timed reads, cold and warm."
+          },
+          "runs": {
+            "type": "integer",
+            "description": "Stored runs.",
+            "format": "int32"
+          },
+          "trades": {
+            "type": "integer",
+            "description": "Trades in the default set.",
+            "format": "int32"
+          },
+          "basketsWithTrades": {
+            "type": "integer",
+            "description": "Baskets with trades in the default set.",
+            "format": "int32"
+          },
+          "builtReports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The reports the check called."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honest limits; always printed."
+          }
+        },
+        "description": "The body of the P8 phase check (spec P8-17)."
+      },
+      "ReportsPhaseTimingView": {
+        "required": [
+          "operation",
+          "answerPath",
+          "coldMs",
+          "warmMs"
+        ],
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "description": "The operation id of the endpoint."
+          },
+          "answerPath": {
+            "type": "boolean",
+            "description": "On the answer path of the exit question."
+          },
+          "coldMs": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The first call; null when the read was refused.",
+            "format": "int64"
+          },
+          "warmMs": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The second call; null when the read was refused.",
+            "format": "int64"
+          }
+        },
+        "description": "One timed read of the phase check (spec P8-17)."
       },
       "ResolveInput": {
         "required": [

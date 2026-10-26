@@ -3,7 +3,8 @@
 // It also prints the "always needed at first paint" total (app shell, landing route, CSS; fonts raw), which is not held
 // to the limit, and a WARNING (exit 0) when less than 3 KB of headroom is left.
 // `node scripts/size.mjs <dist dir>` measures another build (the guard is exercised on a planted import that way).
-import { readdirSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -49,6 +50,21 @@ const lazy = readdirSync(join(dist, 'assets'))
   .slice(0, 5);
 console.log('Largest lazy chunks (not counted):');
 for (const c of lazy) console.log(`  ${kb(c.gzip).padStart(9)}  /assets/${c.name}`);
+
+// P8-17: with XD_EVIDENCE_DIR set (scripts/check.sh does), the measurement is recorded for the phase check, with the commit it was taken at.
+if (process.env.XD_EVIDENCE_DIR) {
+  const commit = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+  mkdirSync(process.env.XD_EVIDENCE_DIR, { recursive: true });
+  const record = {
+    commit,
+    date: new Date().toISOString().slice(0, 10),
+    total: result.total,
+    budget: result.budget,
+    withinBudget: result.withinBudget,
+    chunks: result.chunks,
+  };
+  writeFileSync(join(process.env.XD_EVIDENCE_DIR, 'bundle.json'), `${JSON.stringify(record, null, 2)}\n`);
+}
 
 if (!result.withinBudget) {
   console.error('Bundle guard FAILED: the first load is over budget.');
