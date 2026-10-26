@@ -227,6 +227,36 @@ public sealed class ConfigGovernanceTests
     }
 
     [Fact]
+    public void The_removed_old_cell_carries_the_explanation_of_the_matched_addition()
+    {
+        var added = new ConfigChange("cells.eligible/" + Cell25, ConfigClass.Frozen, null, "h3");
+        var removed = new ConfigChange("cells.eligible/" + Cell20, ConfigClass.RiskDown, "h1", null);
+        var h7 = new AcceptedHypothesis(7, Cell20, "Exit", "exit", Cell25.Split('|')[4], Prev);
+
+        var result = Explain([added, removed], [h7]);
+
+        result[removed.Key].ShouldBe("hypothesis:7");
+    }
+
+    [Theory]
+    [InlineData("planning.ticketalerts:enabled")]
+    [InlineData("planning.ticketalerts:prompttradingdays")]
+    [InlineData("planning.ticketalerts:watchedcacheseconds")]
+    public void Notification_settings_are_free_never_frozen(string key)
+    {
+        PaperConfigKeys.Classify(key, "1", "2").ShouldBe(ConfigClass.Free);
+        PaperConfigKeys.Classify("planning.grading:capital", "1", "2").ShouldBe(ConfigClass.Frozen);
+    }
+
+    [Fact]
+    public void An_account_that_leaves_the_paper_list_is_risk_down_and_a_new_account_is_frozen()
+    {
+        PaperConfigKeys.Classify("accounts.paper/a/enabled", "true", null).ShouldBe(ConfigClass.RiskDown);
+        PaperConfigKeys.Classify("accounts.paper/a/mode", "Paper", null).ShouldBe(ConfigClass.RiskDown);
+        PaperConfigKeys.Classify("accounts.paper/a/enabled", null, "true").ShouldBe(ConfigClass.Frozen);
+    }
+
+    [Fact]
     public void Settings_accounts_and_autonomy_are_never_explained_by_a_hypothesis()
     {
         var change = new ConfigChange("autonomy.auto_approve_tickets", ConfigClass.Frozen, "false", "true");

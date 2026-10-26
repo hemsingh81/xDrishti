@@ -16874,7 +16874,8 @@
       "ConfigChangeList": {
         "required": [
           "basis",
-          "items"
+          "items",
+          "truncated"
         ],
         "type": "object",
         "properties": {
@@ -16888,6 +16889,10 @@
               "$ref": "#/components/schemas/ConfigChangeView"
             },
             "description": "The differences, newest first."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the list was cut at the limit."
           }
         },
         "description": "The recorded differences."
@@ -21380,7 +21385,8 @@
           "basis",
           "epoch",
           "changes",
-          "notes"
+          "notes",
+          "truncated"
         ],
         "type": "object",
         "properties": {
@@ -21405,6 +21411,10 @@
               "$ref": "#/components/schemas/EpochNoteView"
             },
             "description": "The owner's notes."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the changes or notes were cut at the read limit of 200."
           }
         },
         "description": "One epoch with its changes and notes."
@@ -31789,7 +31799,8 @@
       "QueueView": {
         "required": [
           "note",
-          "items"
+          "items",
+          "truncated"
         ],
         "type": "object",
         "properties": {
@@ -31803,6 +31814,10 @@
               "$ref": "#/components/schemas/QueueItem"
             },
             "description": "The hypotheses, oldest first."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the 200 newest accepted hypotheses were read and there may be more."
           }
         },
         "description": "The queue of accepted hypotheses that no change names."

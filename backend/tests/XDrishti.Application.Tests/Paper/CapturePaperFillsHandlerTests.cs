@@ -103,6 +103,28 @@ public sealed class CapturePaperFillsHandlerTests
     private static string ModificationText(int qty) => TicketModification.Serialize([new QuantityChange(Account, qty)]);
 
     [Fact]
+    public async Task A_session_of_an_earlier_epoch_that_still_has_work_is_revisited_and_written_under_its_own_epoch()
+    {
+        var first = new EpochRow(1, new DateOnly(2026, 11, 2), DateTimeOffset.UnixEpoch, "first", "default", "system");
+        var second = new EpochRow(2, new DateOnly(2026, 11, 4), DateTimeOffset.UnixEpoch, "detected_change", "changed", "system");
+        _gate.ResolveAsync(Arg.Any<IReadOnlyList<DateOnly>>(), Ct).Returns(call => new EpochResolution(second, call.Arg<IReadOnlyList<DateOnly>>().Distinct().ToDictionary(s => s, _ => "measured"), [second, first]));
+        _paper.CoverageAsync(Ct).Returns(new SessionCoverage(new HashSet<DateOnly> { F }, new HashSet<DateOnly> { F }));
+        _plans.ItemsAsync(1, Ct).Returns([Item(11)]);
+        Replay([PaperFixture.Trade(Instrument)]);
+        var writes = new List<SessionWrite>();
+        _paper.WriteSessionAsync(Arg.Any<SessionWrite>(), Ct).Returns(call =>
+        {
+            writes.Add(call.Arg<SessionWrite>());
+            return new SessionWritten(0, 0, 0);
+        });
+
+        await Handler().HandleAsync(new CapturePaperFillsCommand(null, false), Ct);
+
+        writes.Single(w => w.Run.SessionDate == F).EpochId.ShouldBe(1);
+        writes.Where(w => w.Run.SessionDate != F).ShouldAllBe(w => w.EpochId == 2);
+    }
+
+    [Fact]
     public async Task An_armed_ticket_becomes_one_entry_and_exit_at_the_owners_size_with_the_hand_worked_numbers()
     {
         _plans.ItemsAsync(1, Ct).Returns([Item(11)]);

@@ -37,7 +37,7 @@ internal sealed class FingerprintEpochGate(
         var epoch = await paper.CurrentEpochAsync(cancellationToken);
         if (epoch is not null && distinct.Count == 0)
         {
-            return new EpochResolution(epoch, new Dictionary<DateOnly, string>());
+            return new EpochResolution(epoch, new Dictionary<DateOnly, string>(), await HistoryAsync(cancellationToken));
         }
 
         var now = time.GetUtcNow();
@@ -48,6 +48,8 @@ internal sealed class FingerprintEpochGate(
         var created = epoch is null;
         epoch ??= await store.CreateFirstEpochAsync(IndiaTime.Today(now), now, partial ? null : fingerprint.Hash, cancellationToken);
         var newest = distinct.Count == 0 ? calendar.LastClosedSession(now) : distinct[^1];
+
+        // shortcut: a snapshot is taken only on a run that has sessions to capture (a run with none reads nothing), so a change that is made and reversed between two such runs is invisible. Upgrade: a daily snapshot job independent of the capture.
         var snapshot = new NewSnapshot(now, newest, fingerprint.Hash, fingerprint.CanonicalJson, partial, Process);
         if (partial)
         {
@@ -84,8 +86,10 @@ internal sealed class FingerprintEpochGate(
             GovernanceLog.EpochStarted(logger, "detected_change", started.StartedOn, fingerprint.Hash[..12]);
         }
 
-        return new EpochResolution(epoch, decision.MeasureStatus);
+        return new EpochResolution(epoch, decision.MeasureStatus, await HistoryAsync(cancellationToken));
     }
+
+    private async Task<IReadOnlyList<EpochRow>> HistoryAsync(CancellationToken cancellationToken) => [.. (await store.ListEpochsAsync(cancellationToken)).Select(e => e.Epoch)];
 
     /// <summary>The key without the part that can name an account or a cell.</summary>
     internal static string Group(string key)
@@ -121,7 +125,7 @@ internal sealed class FingerprintEpochGate(
     }
 }
 
-/// <summary>The stored parameters of a strategy version, read from its canonical JSON. The shape is unverified: the first <c>params</c> object, its scalar members as text. Anything else gives null.</summary>
+/// <summary>The stored parameters of a strategy version, read from its canonical JSON. UNVERIFIED shape (kept as a marker until it is checked against real stored versions): the first <c>params</c> object, its scalar members as text. Anything else gives null.</summary>
 internal static class VersionParameters
 {
     public static IReadOnlyDictionary<string, string>? Read(string? canonicalJson)

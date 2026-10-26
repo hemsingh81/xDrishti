@@ -42,6 +42,7 @@ function mount(
         options.queue ?? {
           note: 'accepted means judged better offline; nothing was applied; applying it starts a new epoch',
           items: [],
+          truncated: false,
         },
       ),
     ),
@@ -108,6 +109,7 @@ describe('the Governance tab', () => {
             experimentId: 4,
           },
         ],
+        truncated: false,
       },
     });
 

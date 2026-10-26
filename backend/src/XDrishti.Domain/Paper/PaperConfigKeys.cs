@@ -40,6 +40,11 @@ public static class PaperConfigKeys
     /// <summary>Prefix of every <c>Planning:*</c> setting (flattened, lower-cased section path).</summary>
     public const string PlanningPrefix = "planning.";
 
+    /// <summary>
+    /// Sections of <c>Planning:*</c> that are notification choices (the price-crossing alerts and post-trade prompts): irrelevant to the numbers, so they are not read into the fingerprint and, if one ever appears, they are <c>free</c> (spec P10-05 criterion 3).
+    /// </summary>
+    public static IReadOnlyList<string> NotificationPlanningSections { get; } = ["ticketalerts"];
+
     /// <summary>Prefix of the autonomy settings.</summary>
     public const string AutonomyPrefix = "autonomy.";
 
@@ -172,6 +177,11 @@ public static class PaperConfigKeys
             return ConfigClass.Free;
         }
 
+        if (key.StartsWith(PlanningPrefix, StringComparison.Ordinal) && NotificationPlanningSections.Any(n => key.StartsWith(PlanningPrefix + n + ":", StringComparison.Ordinal)))
+        {
+            return ConfigClass.Free;
+        }
+
         if (key.StartsWith(CellsEligible, StringComparison.Ordinal))
         {
             return after is null ? ConfigClass.RiskDown : ConfigClass.Frozen;
@@ -191,7 +201,19 @@ public static class PaperConfigKeys
         {
             var field = key[(key.LastIndexOf('/') + 1)..];
             var table = TradingFields.Concat(RiskLimitFields).FirstOrDefault(p => Snake(p.Key) == field);
-            return table.Key is null || before is null || after is null ? ConfigClass.Frozen : Direct(table.Value, before, after);
+            if (before is not null && after is null)
+            {
+                // An account that leaves the paper list (disabled, retired or moved out of paper mode) drops all its keys: a pause is a safety action, so a removal is risk_down.
+                // Moving an account to a mode that can trade for real is outside P10 (P12) and would need its own rule there.
+                return ConfigClass.RiskDown;
+            }
+
+            if (table.Key is null || before is null || after is null)
+            {
+                return ConfigClass.Frozen;
+            }
+
+            return Direct(table.Value, before, after);
         }
 
         return ConfigClass.Frozen;

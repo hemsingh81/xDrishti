@@ -5207,6 +5207,8 @@ export interface components {
       basis: string;
       /** @description The differences, newest first. */
       items: components['schemas']['ConfigChangeView'][];
+      /** @description True when the list was cut at the limit. */
+      truncated: boolean;
     };
     /** @description One stored difference of the configuration. */
     ConfigChangeView: {
@@ -6852,6 +6854,8 @@ export interface components {
       changes: components['schemas']['ConfigChangeView'][];
       /** @description The owner's notes. */
       notes: components['schemas']['EpochNoteView'][];
+      /** @description True when the changes or notes were cut at the read limit of 200. */
+      truncated: boolean;
     };
     /** @description The epochs, newest first. */
     EpochList: {
@@ -10934,6 +10938,8 @@ export interface components {
       note: string;
       /** @description The hypotheses, oldest first. */
       items: components['schemas']['QueueItem'][];
+      /** @description True when the 200 newest accepted hypotheses were read and there may be more. */
+      truncated: boolean;
     };
     /** @description A cell with enough sample in its place in the ranking by the credible lower bound of expectancy. */
     RankedCellView: {

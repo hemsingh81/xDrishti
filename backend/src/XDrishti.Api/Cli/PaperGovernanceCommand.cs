@@ -58,8 +58,19 @@ internal static class PaperGovernanceCommand
                 case "restart" when options.Keys.All(k => k == "reason") && options.ContainsKey("reason"):
                     return await RestartAsync(p, options["reason"], console, cancellationToken);
                 case "explain" when options.Keys.All(k => k is "change" or "hypothesis" or "reason") && options.ContainsKey("change") && options.ContainsKey("reason"):
-                    return long.TryParse(options["change"], NumberStyles.None, CultureInfo.InvariantCulture, out var change) && (!options.TryGetValue("hypothesis", out var h) || long.TryParse(h, NumberStyles.None, CultureInfo.InvariantCulture, out _))
-                        ? await ExplainAsync(p, change, options.TryGetValue("hypothesis", out var hid) ? long.Parse(hid, CultureInfo.InvariantCulture) : null, options["reason"], console, cancellationToken)
+                    long? hypothesis = null;
+                    if (options.TryGetValue("hypothesis", out var h))
+                    {
+                        if (!long.TryParse(h, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed))
+                        {
+                            return await UsageAsync(console);
+                        }
+
+                        hypothesis = parsed;
+                    }
+
+                    return long.TryParse(options["change"], NumberStyles.None, CultureInfo.InvariantCulture, out var change)
+                        ? await ExplainAsync(p, change, hypothesis, options["reason"], console, cancellationToken)
                         : await UsageAsync(console);
                 case "config" when options.Count == 0:
                     return await ConfigAsync(p, console, cancellationToken);

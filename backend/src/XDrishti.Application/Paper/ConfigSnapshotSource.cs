@@ -23,6 +23,7 @@ namespace XDrishti.Application.Paper;
 /// Reads the configuration the paper count is measured against through the existing ports (spec P10-05, ADR 0119): about ten reads, once per capture run, no replay. It writes nothing. A group whose port fails is reported as unreadable (the snapshot is then
 /// partial), never guessed. Only the engine and schema versions are in the fingerprint, not the code revision (Decision 4).
 /// </summary>
+// shortcut: UNVERIFIED shapes are read leniently (the smart-rule home above; a strategy version's parameters are read by FingerprintEpochGate's VersionParameters).
 internal sealed class ConfigSnapshotSource(
     IPlanningSettingsReader planning,
     IAutonomySettingsStore autonomy,
@@ -131,9 +132,14 @@ internal sealed class ConfigSnapshotSource(
         var rows = await changelog.ListAsync("cell", null, DigestBuilder.ReadLimit, cancellationToken);
         var result = new List<ConfigComponent>();
         var hashes = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var subject in rows.Select(r => r.Entry.Subject).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))
+
+
+        // One read when the list is complete (fewer rows than the read limit): the histories are grouped from it. Only a list that may be cut at the limit falls back to one history read per cell.
+        var complete = rows.Count < DigestBuilder.ReadLimit;
+        var grouped = rows.GroupBy(r => r.Entry.Subject, StringComparer.Ordinal).ToDictionary(g => g.Key, g => (IReadOnlyList<ChangelogEntry>)[.. g.OrderBy(r => r.Id)], StringComparer.Ordinal);
+        foreach (var subject in grouped.Keys.Order(StringComparer.Ordinal))
         {
-            var replay = CellHistory.Replay(await changelog.HistoryAsync(subject, cancellationToken));
+            var replay = CellHistory.Replay(complete ? grouped[subject] : await changelog.HistoryAsync(subject, cancellationToken));
             if (!Eligible.Contains(replay.State) || replay.State < minimum || CellId.TryParse(subject) is not { } cell)
             {
                 continue;
@@ -178,6 +184,7 @@ internal sealed class ConfigSnapshotSource(
         ];
     }
 
+    // shortcut: the smart-rule and selection options have no settings home yet (the engine builds them with `new`), so their code defaults are read; a change arrives with a deploy and is seen then. Upgrade when they become stored settings (read the stored values here).
     private static IEnumerable<ConfigComponent> SmartRules(SmartRulesOptions options) =>
         Properties(options).Select(p => new ConfigComponent(PaperConfigKeys.SmartRulesPrefix + PaperConfigKeys.Snake(p.Name), Text(p.GetValue(options))));
 

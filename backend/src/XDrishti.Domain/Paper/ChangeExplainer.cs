@@ -46,6 +46,7 @@ public static class ChangeExplainer
         ArgumentNullException.ThrowIfNull(parameters);
         var taken = new HashSet<long>(used);
         var result = new Dictionary<string, string?>(StringComparer.Ordinal);
+        var matched = new List<AcceptedHypothesis>();
         foreach (var change in changes.OrderBy(c => c.Key, StringComparer.Ordinal))
         {
             string? explained = null;
@@ -56,6 +57,7 @@ public static class ChangeExplainer
                 if (match is not null)
                 {
                     taken.Add(match.Id);
+                    matched.Add(match);
                     explained = "hypothesis:" + match.Id.ToString(CultureInfo.InvariantCulture);
                 }
                 else if (changelog.Where(c => c.Subject == cell && c.At > previousAt && c.At <= detectedAt).OrderBy(c => c.Id).FirstOrDefault() is { } row)
@@ -65,6 +67,15 @@ public static class ChangeExplainer
             }
 
             result[change.Key] = explained;
+        }
+
+        // The old cell the matched hypothesis was about leaves the eligible set when its replacement arrives: the removal is the same act and carries the same explanation.
+        foreach (var removed in changes.Where(c => c.After is null && c.Key.StartsWith(PaperConfigKeys.CellsEligible, StringComparison.Ordinal)))
+        {
+            if (matched.FirstOrDefault(h => h.CellKey == removed.Key[PaperConfigKeys.CellsEligible.Length..]) is { } owner)
+            {
+                result[removed.Key] = "hypothesis:" + owner.Id.ToString(CultureInfo.InvariantCulture);
+            }
         }
 
         return result;

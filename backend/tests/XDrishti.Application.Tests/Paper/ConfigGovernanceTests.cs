@@ -123,6 +123,47 @@ public sealed class ConfigGovernanceTests
     }
 
     [Fact]
+    public async Task A_catch_up_of_several_sessions_with_no_configuration_difference_measures_them_all()
+    {
+        await RunAsync(D(11, 2));
+
+        var r = await RunAsync(D(11, 3), D(11, 4), D(11, 5));
+
+        r.MeasureStatus.Values.ShouldAllBe(v => v == "measured");
+        _store.Epochs.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void What_does_not_reset_is_structurally_outside_the_fingerprint_tickets_approvals_services_and_code_deploys()
+    {
+        // Criterion 7: approving, modifying, rejecting or lapsing a ticket, pausing or resuming a service, and a deploy that leaves the engine and schema versions unchanged are not read by the snapshot source,
+        // so none can change the hash. The source depends on settings, accounts, autonomy, learning stores and the engine facts only.
+        var dependencies = typeof(ConfigSnapshotSource).GetConstructors()[0].GetParameters().Select(p => p.ParameterType.Name).ToList();
+
+        dependencies.ShouldNotContain("IPlanStore");
+        dependencies.ShouldNotContain("IServiceScheduleReader");
+        dependencies.ShouldNotContain("IServiceScheduleStore");
+        dependencies.ShouldNotContain("IAutoApprovalStore");
+        dependencies.ShouldAllBe(d => d != "IGradeStore" && d != "IPaperStore");
+        ConfigFingerprint.Create([new("engine.version", "sim-6"), new("engine.trade_schema", "5")]).Hash
+            .ShouldBe(ConfigFingerprint.Create([new("engine.trade_schema", "5"), new("engine.version", "sim-6")]).Hash);
+    }
+
+    [Fact]
+    public async Task A_notification_choice_is_not_a_configuration_change_and_an_account_leaving_the_paper_list_is_risk_down()
+    {
+        await RunAsync(D(11, 2));
+        _components = [.. _components.Where(c => !c.Key.StartsWith("accounts.paper/", StringComparison.Ordinal)), new("planning.ticketalerts:enabled", "true")];
+
+        var r = await RunAsync(D(11, 3));
+
+        r.MeasureStatus[D(11, 3)].ShouldBe("measured");
+        _store.Epochs.Count.ShouldBe(1);
+        _store.Changes.Select(c => (c.Key, c.Class)).ShouldContain(("accounts.paper/a/risk_per_trade_pct", "risk_down"));
+        _store.Changes.Single(c => c.Key.StartsWith("planning.ticketalerts", StringComparison.Ordinal)).Class.ShouldBe("free");
+    }
+
+    [Fact]
     public async Task An_unreadable_group_claims_no_change_and_counts_only_near_the_last_full_snapshot()
     {
         await RunAsync(D(11, 2));
@@ -212,11 +253,13 @@ public sealed class ConfigGovernanceTests
         await RunAsync(D(11, 3));
         var changeId = _store.StoredChanges.Single().Id;
         var handler = new ExplainChangeHandler(_store, _hypotheses, _time, NullLogger<ExplainChangeHandler>.Instance);
-        _hypotheses.FindAsync(9, Ct).Returns(new HypothesisRow(9, null!));
-        _hypotheses.FindAsync(10, Ct).Returns((HypothesisRow?)null);
 
+        _hypotheses.HistoryAsync(9, Ct).Returns([new HypothesisRow(9, new NewHypothesisRow(null, "accepted", "judged", "owner", Cell20, "exit", "Exit", "a", "b", "w", "b", "c", 3, "ok", "owner", DateTimeOffset.UnixEpoch))]);
+        _hypotheses.HistoryAsync(8, Ct).Returns([new HypothesisRow(8, new NewHypothesisRow(null, "rejected", "judged", "owner", Cell20, "exit", "Exit", "a", "b", "w", "b", "c", 3, "ok", "owner", DateTimeOffset.UnixEpoch))]);
+        _hypotheses.HistoryAsync(10, Ct).Returns([]);
         var ok = await handler.HandleAsync(new ExplainChangeCommand(changeId, 9, "I changed the builder on purpose", "cli:xd"), Ct);
         var noChange = await handler.HandleAsync(new ExplainChangeCommand(999, null, "I changed the builder on purpose", "cli:xd"), Ct);
+        var notAccepted = await handler.HandleAsync(new ExplainChangeCommand(changeId, 8, "I changed the builder on purpose", "cli:xd"), Ct);
         var noHypothesis = await handler.HandleAsync(new ExplainChangeCommand(changeId, 10, "I changed the builder on purpose", "cli:xd"), Ct);
         var shortReason = await handler.HandleAsync(new ExplainChangeCommand(changeId, null, "no", "cli:xd"), Ct);
 
@@ -224,6 +267,7 @@ public sealed class ConfigGovernanceTests
         _store.Notes.Single().HypothesisId.ShouldBe(9);
         noChange.Error.Code.ShouldBe(PaperErrors.NotFoundCode);
         noHypothesis.Error.Code.ShouldBe(PaperErrors.NotFoundCode);
+        notAccepted.Error.Code.ShouldBe(PaperErrors.InvalidCode);
         shortReason.Error.Code.ShouldBe(PaperErrors.InvalidCode);
     }
 

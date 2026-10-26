@@ -47,12 +47,14 @@ public sealed record EpochList(string Basis, IReadOnlyList<EpochView> Items);
 /// <param name="Epoch">The epoch.</param>
 /// <param name="Changes">The differences recorded under it.</param>
 /// <param name="Notes">The owner's notes.</param>
-public sealed record EpochDetail(string Basis, EpochView Epoch, IReadOnlyList<ConfigChangeView> Changes, IReadOnlyList<EpochNoteView> Notes);
+/// <param name="Truncated">True when the changes or notes were cut at the read limit of 200.</param>
+public sealed record EpochDetail(string Basis, EpochView Epoch, IReadOnlyList<ConfigChangeView> Changes, IReadOnlyList<EpochNoteView> Notes, bool Truncated);
 
 /// <summary>The recorded differences.</summary>
 /// <param name="Basis">The label.</param>
 /// <param name="Items">The differences, newest first.</param>
-public sealed record ConfigChangeList(string Basis, IReadOnlyList<ConfigChangeView> Items);
+/// <param name="Truncated">True when the list was cut at the limit.</param>
+public sealed record ConfigChangeList(string Basis, IReadOnlyList<ConfigChangeView> Items, bool Truncated);
 
 /// <summary>One component of the configuration with the rule that classes a change of it.</summary>
 /// <param name="Key">The key.</param>
@@ -102,7 +104,8 @@ public sealed record QueueItem(long HypothesisId, int AgeDays, string? CellKey, 
 /// <summary>The queue of accepted hypotheses that no change names.</summary>
 /// <param name="Note">Accepted means judged better offline; nothing was applied; applying it starts a new epoch.</param>
 /// <param name="Items">The hypotheses, oldest first.</param>
-public sealed record QueueView(string Note, IReadOnlyList<QueueItem> Items);
+/// <param name="Truncated">True when the 200 newest accepted hypotheses were read and there may be more.</param>
+public sealed record QueueView(string Note, IReadOnlyList<QueueItem> Items, bool Truncated);
 
 /// <summary>What the explain verb stored.</summary>
 /// <param name="ChangeId">The change.</param>

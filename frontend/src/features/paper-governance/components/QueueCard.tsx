@@ -51,7 +51,7 @@ export function QueueCard() {
           </Table>
         )}
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          {q.data.note}.
+          {q.data.note}.{q.data.truncated && ' Only the 200 newest accepted hypotheses are read; there may be more.'}
         </Typography>
       </CardContent>
     </Card>

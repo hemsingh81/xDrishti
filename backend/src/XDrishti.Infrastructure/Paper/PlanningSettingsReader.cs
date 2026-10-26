@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using XDrishti.Application.Abstractions.Paper;
+using XDrishti.Domain.Paper;
 
 namespace XDrishti.Infrastructure.Paper;
 
@@ -9,5 +10,6 @@ internal sealed class PlanningSettingsReader(IConfiguration configuration) : IPl
     public IReadOnlyDictionary<string, string> Read() =>
         configuration.GetSection("Planning").AsEnumerable()
             .Where(p => p.Key.StartsWith("Planning:", StringComparison.OrdinalIgnoreCase) && p.Value is not null)
+            .Where(p => !PaperConfigKeys.NotificationPlanningSections.Any(n => p.Key.StartsWith("Planning:" + n + ":", StringComparison.OrdinalIgnoreCase))) // notification choices are not part of the measured configuration
             .ToDictionary(p => p.Key["Planning:".Length..].ToLowerInvariant(), p => p.Value!, StringComparer.Ordinal);
 }

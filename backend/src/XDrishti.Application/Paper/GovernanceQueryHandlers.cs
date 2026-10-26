@@ -42,7 +42,7 @@ internal sealed class GetEpochHandler(IGovernanceStore store) : IQueryHandler<Ge
 
         var notes = await store.ListNotesAsync(query.Id, cancellationToken);
         var changes = await store.ListChangesAsync(query.Id, 200, cancellationToken);
-        return Result.Success(new EpochDetail(GovernanceWording.Basis, epoch, ChangeViews.Of(changes, notes), [.. notes.Select(n => new EpochNoteView(n.Id, n.ChangeId, n.HypothesisId, n.Text, n.Actor, n.CreatedAt))]));
+        return Result.Success(new EpochDetail(GovernanceWording.Basis, epoch, ChangeViews.Of(changes, notes), [.. notes.Select(n => new EpochNoteView(n.Id, n.ChangeId, n.HypothesisId, n.Text, n.Actor, n.CreatedAt))], changes.Count >= 200 || notes.Count >= 200));
     }
 }
 
@@ -65,7 +65,7 @@ internal sealed class GetConfigChangesHandler(IGovernanceStore store) : IQueryHa
         }
 
         var changes = await store.ListChangesAsync(query.EpochId, query.Limit, cancellationToken);
-        return Result.Success(new ConfigChangeList(GovernanceWording.Basis, ChangeViews.Of(changes, await store.ListNotesAsync(query.EpochId, cancellationToken))));
+        return Result.Success(new ConfigChangeList(GovernanceWording.Basis, ChangeViews.Of(changes, await store.ListNotesAsync(query.EpochId, cancellationToken)), changes.Count >= query.Limit));
     }
 }
 
@@ -108,11 +108,12 @@ internal sealed class GetQueueHandler(IHypothesisLog hypotheses, IGovernanceStor
     {
         var used = await store.UsedHypothesisIdsAsync(cancellationToken);
         var now = time.GetUtcNow();
-        var items = (await hypotheses.ListAsync("accepted", 200, cancellationToken))
+        var accepted = await hypotheses.ListAsync("accepted", 200, cancellationToken);
+        var items = accepted
             .Where(h => !used.Contains(h.HypothesisId))
             .OrderBy(h => h.HypothesisId)
             .Select(h => new QueueItem(h.HypothesisId, Math.Max(0, (int)(now - h.Row.CreatedAt).TotalDays), h.Row.CellKey, h.Row.KnobName, h.Row.BaselineValue, h.Row.CandidateValue, h.Row.ExperimentId))
             .ToList();
-        return Result.Success(new QueueView(GovernanceWording.QueueNote, items));
+        return Result.Success(new QueueView(GovernanceWording.QueueNote, items, accepted.Count >= 200));
     }
 }

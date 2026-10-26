@@ -74,9 +74,18 @@ internal sealed class ExplainChangeHandler(IGovernanceStore store, IHypothesisLo
             return Result.Failure<ExplainOutcome>(Error.NotFound(PaperErrors.NotFoundCode, "No recorded change " + command.ChangeId + "."));
         }
 
-        if (command.HypothesisId is { } id && await hypotheses.FindAsync(id, cancellationToken) is null)
+        if (command.HypothesisId is { } id)
         {
-            return Result.Failure<ExplainOutcome>(Error.NotFound(PaperErrors.NotFoundCode, "No hypothesis " + id + "."));
+            var history = await hypotheses.HistoryAsync(id, cancellationToken);
+            if (history.Count == 0)
+            {
+                return Result.Failure<ExplainOutcome>(Error.NotFound(PaperErrors.NotFoundCode, "No hypothesis " + id + "."));
+            }
+
+            if (history[^1].Row.State != "accepted")
+            {
+                return Result.Failure<ExplainOutcome>(PaperErrors.Invalid("hypothesis", "Only an accepted hypothesis can be attached; hypothesis " + id + " is " + history[^1].Row.State + "."));
+            }
         }
 
         await store.AddNoteAsync(change.EpochId, change.Id, command.HypothesisId, reason, command.Actor, time.GetUtcNow(), cancellationToken);
