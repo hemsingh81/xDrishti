@@ -3370,6 +3370,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/paper/backtest-vs-paper': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The counted paper trades of an epoch against a composition-matched bootstrap of the backtest trades known before the epoch started: the paper mean with its own 90% interval against the 5th to 95th percentile band (below, within or above), the paper's largest fall against the 90th percentile of the same number of backtest trades, the two exit statistics as verdicts (met, not_met, not_evaluable: they need 60 counted trades and costs the owner confirmed), an early warning, the fan of cumulative R, the cells and the plan-price sensitivity beside. Every figure is a state and a number only for a value or provisional figure. Optional epoch (default the newest) and draws 1000 to 100000 (default 10000). Deterministic, read only; simulated, no order exists. 404 paper.not_found, 422 paper.invalid */
+    get: operations['GetBacktestVsPaper'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/plans/{id}/alerts': {
     parameters: {
       query?: never;
@@ -4384,6 +4401,45 @@ export interface components {
       /** @description The changes, newest first (the latest 50). */
       history: components['schemas']['AutonomyChangeView'][];
     };
+    /** @description The backtest-versus-paper report (spec P10-04, R14). Every figure is a state and a number only for a value or provisional figure. */
+    BacktestVsPaperView: {
+      /**
+       * Format: int64
+       * @description The epoch, or null before the first capture.
+       */
+      epochId: null | number;
+      /**
+       * Format: int32
+       * @description Counted paper trades.
+       */
+      n: number;
+      /** @description What counts and what is set apart. */
+      counts: components['schemas']['CompareCountsView'];
+      /** @description net, gross, mixed or none. */
+      basis: string;
+      /** @description The sheet(s) and the confirmation. */
+      chargeSheet: components['schemas']['CompareChargeSheetView'];
+      /** @description The paper side. */
+      paper: components['schemas']['ComparePaperView'];
+      /** @description The band. */
+      band: components['schemas']['CompareBandView'];
+      /** @description The drawdown reference. */
+      drawdown: components['schemas']['CompareDrawdownView'];
+      /** @description The verdicts. */
+      criteria: components['schemas']['CompareCriteriaView'];
+      /** @description The warning sentence, or null. */
+      earlyWarning: null | string;
+      /** @description The cells. */
+      cells: components['schemas']['CompareCellView'][];
+      /** @description The fan; empty unless the band is a figure. */
+      fan: components['schemas']['CompareFanPointView'][];
+      /** @description The plan-price sensitivity. */
+      sensitivityAllProposals: components['schemas']['CompareSensitivityView'];
+      /** @description What it rests on. */
+      evidence: components['schemas']['CompareEvidenceView'];
+      /** @description The honest limits. */
+      limits: string[];
+    };
     /** @description A bar that broke a row rule: its start and what is wrong with it. */
     BadBar: {
       /** Format: date-time */
@@ -5288,6 +5344,197 @@ export interface components {
       sourceId: string;
       /** Format: int32 */
       sourceVersion: number;
+    };
+    /** @description The backtest band of the mean. */
+    CompareBandView: {
+      /** @description 5th percentile. */
+      p05: components['schemas']['MetricView'];
+      /** @description Median. */
+      p50: components['schemas']['MetricView'];
+      /** @description 95th percentile. */
+      p95: components['schemas']['MetricView'];
+      /** @description Percentile rank of the paper mean. */
+      rank: components['schemas']['MetricView'];
+      /** @description below, within or above; null when the band is not a figure. */
+      position: null | string;
+      /**
+       * Format: int32
+       * @description Resamples.
+       */
+      draws: number;
+      /** @description The seed as text (64 bits). */
+      seed: null | string;
+    };
+    /** @description One cell of the counted set against its reference. */
+    CompareCellView: {
+      /** @description The cell. */
+      cellKey: string;
+      /**
+       * Format: int32
+       * @description Counted paper trades of the cell.
+       */
+      paperN: number;
+      /** @description Their mean R. */
+      paperMean: components['schemas']['MetricView'];
+      /**
+       * Format: int32
+       * @description Backtest trades before the epoch.
+       */
+      referenceN: number;
+      /** @description Their mean R. */
+      referenceMean: components['schemas']['MetricView'];
+      /** @description ok, no_reference, thin_reference or basis_differs. */
+      state: string;
+      /** @description Why, when not ok. */
+      reason: null | string;
+    };
+    /** @description The charge sheet(s) of the counted trades and the owner's confirmation. */
+    CompareChargeSheetView: {
+      /** @description The sheet id(s), or null when no counted trade was charged. */
+      id: null | string;
+      /**
+       * Format: date
+       * @description The day the owner confirmed them; null when not confirmed.
+       */
+      confirmedOn: null | string;
+    };
+    /** @description The counts of the epoch's tickets: what counts and what is set apart. */
+    CompareCountsView: {
+      /**
+       * Format: int32
+       * @description Tickets that count.
+       */
+      counted: number;
+      /**
+       * Format: int32
+       * @description Reserve tickets.
+       */
+      reserve: number;
+      /**
+       * Format: int32
+       * @description Tickets that straddle a change.
+       */
+      straddle: number;
+      /**
+       * Format: int32
+       * @description Open tickets.
+       */
+      open: number;
+      /**
+       * Format: int32
+       * @description Entries of other epochs.
+       */
+      otherEpochs: number;
+    };
+    /** @description The two exit statistics. */
+    CompareCriteriaView: {
+      /** @description E3. */
+      expectancy: components['schemas']['CompareVerdictView'];
+      /** @description E4. */
+      drawdown: components['schemas']['CompareVerdictView'];
+    };
+    /** @description The backtest reference of the largest fall at the paper's trade count. */
+    CompareDrawdownView: {
+      /** @description Median. */
+      p50: components['schemas']['MetricView'];
+      /** @description 90th percentile. */
+      p90: components['schemas']['MetricView'];
+      /** @description 95th percentile. */
+      p95: components['schemas']['MetricView'];
+      /** @description within or above; null when the reference is not a figure. */
+      position: null | string;
+    };
+    /** @description What the report rests on. */
+    CompareEvidenceView: {
+      /**
+       * Format: date
+       * @description The first session of the epoch.
+       */
+      epochStart: null | string;
+      /**
+       * Format: date
+       * @description First counted exit day.
+       */
+      firstExit: null | string;
+      /**
+       * Format: date
+       * @description Last counted exit day.
+       */
+      lastExit: null | string;
+      /** @description The cell snapshot in force at the start. */
+      snapshotKey: null | string;
+      /**
+       * Format: date
+       * @description Its as-of date.
+       */
+      referenceAsOf: null | string;
+      /** @description The runs the reference was read from. */
+      runKeys: string[];
+      /** @description The basis sentence. */
+      statement: string;
+    };
+    /** @description One point of the fan. */
+    CompareFanPointView: {
+      /**
+       * Format: int32
+       * @description Trades so far.
+       */
+      index: number;
+      /**
+       * Format: double
+       * @description 5th percentile of the draws' cumulative R.
+       */
+      p05: number;
+      /**
+       * Format: double
+       * @description Median.
+       */
+      p50: number;
+      /**
+       * Format: double
+       * @description 95th percentile.
+       */
+      p95: number;
+      /**
+       * Format: double
+       * @description The paper cumulative R.
+       */
+      paper: number;
+    };
+    /** @description A 90% interval; each end is a figure. */
+    CompareIntervalView: {
+      /** @description Lower end. */
+      lo: components['schemas']['MetricView'];
+      /** @description Upper end. */
+      hi: components['schemas']['MetricView'];
+    };
+    /** @description The paper side. */
+    ComparePaperView: {
+      /** @description The mean R. */
+      mean: components['schemas']['MetricView'];
+      /** @description The mean's own 90% bootstrap interval. */
+      ci90: components['schemas']['CompareIntervalView'];
+      /** @description The largest fall of cumulative R in exit order. */
+      maxDrawdownR: components['schemas']['MetricView'];
+    };
+    /** @description The plan-price grades of all primary tickets of the epoch, beside the comparison and never used by it. */
+    CompareSensitivityView: {
+      /** @description What it is. */
+      label: string;
+      /**
+       * Format: int32
+       * @description Graded tickets.
+       */
+      n: number;
+      /** @description Their mean R. */
+      mean: components['schemas']['MetricView'];
+    };
+    /** @description One verdict. */
+    CompareVerdictView: {
+      /** @description met, not_met or not_evaluable. */
+      verdict: string;
+      /** @description The fact in words. */
+      label: string;
     };
     /** @description One member of a comparison. */
     ComparisonMemberView: {
@@ -21474,6 +21721,47 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['DisciplineView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetBacktestVsPaper: {
+    parameters: {
+      query?: {
+        epoch?: number;
+        draws?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BacktestVsPaperView'];
         };
       };
       /** @description Not Found */
