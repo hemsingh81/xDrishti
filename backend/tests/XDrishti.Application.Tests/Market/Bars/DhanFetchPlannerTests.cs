@@ -161,4 +161,33 @@ public sealed class DhanFetchPlannerTests
         DhanFetchPlanner.StartOf(null, Now, 30).ShouldBe(Now.AddDays(-30));
         DhanFetchPlanner.StartOf(Now.AddDays(3), Now, 30).ShouldBe(Now.AddDays(-2));
     }
+
+    [Fact]
+    public void An_index_without_bars_goes_the_index_depth_back_and_a_share_the_ordinary_depth()
+    {
+        var targets = new[]
+        {
+            new FetchTarget(Guid.NewGuid(), "NSE:NIFTY", "index", "13", "IDX_I", null),
+            new FetchTarget(Guid.NewGuid(), "NSE:ABB", "share", "1", "NSE_EQ", null),
+        };
+
+        var plan = DhanFetchPlanner.Plan(targets, Now, 365, null, 1825);
+
+        plan.Targets[0].Windows[0].From.ShouldBe(Now.AddDays(-1825));
+        plan.Targets[0].Windows.Count.ShouldBe(21);
+        plan.Targets[1].Windows[0].From.ShouldBe(Now.AddDays(-365));
+    }
+
+    [Fact]
+    public void Without_an_index_depth_an_index_is_planned_like_everything_else_and_an_index_with_bars_keeps_its_overlap()
+    {
+        var withBars = new FetchTarget(Guid.NewGuid(), "NSE:NIFTY", "index", "13", "IDX_I", Now.AddDays(-3));
+        var without = new FetchTarget(Guid.NewGuid(), "NSE:INDIAVIX", "index", "21", "IDX_I", null);
+
+        var plan = DhanFetchPlanner.Plan([withBars, without], Now, 365);
+        var indexed = DhanFetchPlanner.Plan([withBars], Now, 365, null, 1825);
+
+        plan.Targets[1].Windows[0].From.ShouldBe(Now.AddDays(-365));
+        indexed.Targets[0].Windows.ShouldBe([new FetchWindow(Now.AddDays(-5), Now)]);
+    }
 }

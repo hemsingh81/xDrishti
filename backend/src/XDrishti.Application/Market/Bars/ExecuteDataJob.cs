@@ -3,6 +3,7 @@ using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Bars.Pipeline;
 using XDrishti.Application.Market.Calendar;
+using XDrishti.Application.Market.Context;
 using XDrishti.Application.Market.Quality;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Bars;
@@ -20,6 +21,7 @@ internal sealed class ExecuteDataJobHandler(
     AggregatePhaseRunner aggregate,
     QualityPhaseRunner quality,
     ICalendarUpkeep calendar,
+    IContextUpkeep context,
     TimeProvider clock,
     ILogger<ExecuteDataJobHandler> logger) : ICommandHandler<ExecuteDataJobCommand>
 {
@@ -105,6 +107,17 @@ internal sealed class ExecuteDataJobHandler(
         if (job.InstrumentId is null && job.Steps.Any(step => step != DataSteps.Quality))
         {
             await calendar.RunAsync(reporter, cancellationToken);
+            if (reporter.Ended)
+            {
+                DataLog.JobEndedElsewhere(logger, job.Id);
+                return;
+            }
+        }
+
+        // The days that became final are written to the market context (P3-01d); only ever warnings.
+        if (job.InstrumentId is null && job.Steps.Contains(DataSteps.Aggregate))
+        {
+            await context.RunAsync(reporter, cancellationToken);
             if (reporter.Ended)
             {
                 DataLog.JobEndedElsewhere(logger, job.Id);

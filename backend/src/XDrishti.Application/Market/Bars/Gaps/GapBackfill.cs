@@ -35,7 +35,7 @@ internal sealed class GapBackfill(IBarDayCounts dayCounts, IBarGaps gaps, IDataS
         }
 
         var counts = await dayCounts.CountAsync(target.InstrumentId, dates[0], dates[^1], cancellationToken);
-        var ordinaryFrom = IndiaTime.Today(DhanFetchPlanner.StartOf(target.LastBar, now, settings.DhanInitialDays));
+        var ordinaryFrom = IndiaTime.Today(DhanFetchPlanner.StartOf(target.LastBar, now, DhanFetchPlanner.InitialDaysOf(target.Type, settings.DhanInitialDays, settings.DhanInitialDaysIndex)));
         var recent = sessions.ToHashSet();
         var items = new List<GapItem>();
         var deferred = new List<DeferredDay>();

@@ -1,5 +1,6 @@
 using XDrishti.Api.Auth;
 using XDrishti.Api.Cli;
+using XDrishti.Api.Context;
 using XDrishti.Api.CostSheets;
 using XDrishti.Api.Infrastructure;
 using XDrishti.Api.Simulate;
@@ -19,6 +20,12 @@ if (verb == Verb.Simulate)
 if (verb == Verb.CostSheet)
 {
     return await CostSheetProgram.RunProcessAsync(args[1..]);
+}
+
+// The context verb (P3-01d) is chosen the same way: `context refresh` never selects another step.
+if (verb == Verb.Context)
+{
+    return await ContextProgram.RunProcessAsync(args[1..]);
 }
 
 // The verify-pack verb (spec P3-09) is chosen the same way, by the first argument alone.

@@ -12,6 +12,7 @@ using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.Tests.Market.Actions;
 using XDrishti.Application.Tests.Market.Calendar;
+using XDrishti.Application.Tests.Market.Context;
 using XDrishti.Application.Tests.Market.Quality;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Quality;
@@ -39,6 +40,7 @@ public sealed class DataJobHandlersTests
     private readonly FakeAggregates _aggregates = new();
     private readonly FakeDataSettings _settings = new();
     private readonly FakeCalendarUpkeep _calendar = new();
+    private readonly FakeContextUpkeep _context = new();
     private readonly FakeQualityData _qualityData = new();
     private readonly FakeQualityRuns _qualityRuns = new();
 
@@ -56,6 +58,7 @@ public sealed class DataJobHandlersTests
         new AggregatePhaseRunner(_aggregates, new FixedCalendar(), _settings, new CorporateActionDetection(new FakeDailySeries(), new InMemoryActionData(), new InMemoryActionData(), _clock), _clock, NullLogger<AggregatePhaseRunner>.Instance),
         new QualityPhaseRunner(_qualityData, _qualityRuns, _bars, new FakeBarGaps(), new FixedCalendar(), _settings, _clock, NullLogger<QualityPhaseRunner>.Instance),
         _calendar,
+        _context,
         _clock,
         NullLogger<ExecuteDataJobHandler>.Instance);
 
@@ -213,6 +216,43 @@ public sealed class DataJobHandlersTests
 
         _calendar.Runs.ShouldBe(1);
         _jobs.Jobs[view.Id].Status.ShouldBe(DataJobStatus.Failed);
+    }
+
+    [Fact]
+    public async Task The_context_upkeep_runs_after_the_calendar_upkeep_of_a_job_that_aggregated()
+    {
+        var view = await StartedAsync("aggregate");
+        _calendar.Action = _ =>
+        {
+            _context.Runs.ShouldBe(0, "the calendar comes first: it may show a new holiday");
+            return ValueTask.CompletedTask;
+        };
+
+        await Execute.HandleAsync(new ExecuteDataJobCommand(view.Id), Ct);
+
+        _context.Runs.ShouldBe(1);
+        _jobs.Jobs[view.Id].Status.ShouldBe(DataJobStatus.Succeeded);
+    }
+
+    [Fact]
+    public async Task The_context_upkeep_does_not_run_after_a_job_without_the_aggregate_step()
+    {
+        var view = await StartedAsync("dhan");
+
+        await Execute.HandleAsync(new ExecuteDataJobCommand(view.Id), Ct);
+
+        _context.Runs.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_job_ended_elsewhere_gets_no_context_upkeep()
+    {
+        var view = await StartedAsync("aggregate");
+        _jobs.EndedElsewhere.Add(view.Id);
+
+        await Execute.HandleAsync(new ExecuteDataJobCommand(view.Id), Ct);
+
+        _context.Runs.ShouldBe(0);
     }
 
     [Fact]

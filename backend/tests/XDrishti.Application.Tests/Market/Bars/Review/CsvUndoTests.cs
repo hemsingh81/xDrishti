@@ -12,6 +12,7 @@ using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.Tests.Market.Actions;
 using XDrishti.Application.Tests.Market.Calendar;
+using XDrishti.Application.Tests.Market.Context;
 using XDrishti.Application.Tests.Market.Quality;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Market.Bars;
@@ -55,6 +56,7 @@ public sealed class CsvUndoTests
         new AggregatePhaseRunner(_aggregates, new FixedCalendar(), _settings, new CorporateActionDetection(new FakeDailySeries(), new InMemoryActionData(), new InMemoryActionData(), _clock), _clock, NullLogger<AggregatePhaseRunner>.Instance),
         new QualityPhaseRunner(new FakeQualityData(), new FakeQualityRuns(), _bars, new FakeBarGaps(), new FixedCalendar(), _settings, _clock, NullLogger<QualityPhaseRunner>.Instance),
         new FakeCalendarUpkeep(),
+        new FakeContextUpkeep(),
         _clock,
         NullLogger<ExecuteDataJobHandler>.Instance);
 

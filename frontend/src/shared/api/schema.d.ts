@@ -1059,8 +1059,25 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** What the owner should know about the data for the notification bell: sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending). A failed scheduled run is no longer here: it is the service_failed notice of GET /api/services/notices */
+    /** What the owner should know about the data for the notification bell: sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending), a market context more than one session behind (data_context_stale) or with sessions missing inside it (data_context_gap). A failed scheduled run is no longer here: it is the service_failed notice of GET /api/services/notices */
     get: operations['GetDataNotices'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/data/context': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The coverage of the market context (P3-01d): days stored, first and last date, the first readable date of index_trend, regime and vix_pct, the VIX days and the calendar span of their window, the first date the regime has both parts, how many sessions the newest day is behind (stale when more than one), the skipped days with reasons (first 50 and the total), and the missing prerequisite (index_not_tracked, vix_not_tracked, disabled) with its fix. Read only; derived from 1-minute bars */
+    get: operations['GetDataContext'];
     put?: never;
     post?: never;
     delete?: never;
@@ -6176,6 +6193,55 @@ export interface components {
       /** Format: date-time */
       lastConnectedAt: null | string;
       lastError: null | string;
+    };
+    /**
+     * @description What the stored market context makes readable (`GET /api/data/context`, criterion 7). `Missing` names an unmet prerequisite (`index_not_tracked`, `vix_not_tracked`, `disabled`) with its `Fix`. `AgeSessions` is the number of
+     *     trading sessions the newest day is behind the last closed one; `Stale` is more than one.
+     */
+    ContextCoverageView: {
+      enabled: boolean;
+      missing: null | string;
+      fix: null | string;
+      indexSymbol: null | string;
+      vixSymbol: null | string;
+      /** Format: int32 */
+      days: number;
+      /** Format: date */
+      firstDate: null | string;
+      /** Format: date */
+      lastDate: null | string;
+      /** Format: int32 */
+      ageSessions: null | number;
+      stale: boolean;
+      /** Format: date */
+      indexTrendReadableFrom: null | string;
+      /** Format: date */
+      regimeReadableFrom: null | string;
+      /** Format: date */
+      vixPctReadableFrom: null | string;
+      /** Format: date */
+      regimeWithVixReadableFrom: null | string;
+      /** Format: int32 */
+      vixDays: number;
+      /** Format: int32 */
+      vixMissingDays: number;
+      /** Format: int32 */
+      vixWindowSpanDays: null | number;
+      vixWindowTooWide: boolean;
+      /** Format: int32 */
+      gapSessions: number;
+      /** Format: int32 */
+      skippedTotal: number;
+      skipped: components['schemas']['ContextSkippedView'][];
+      source: string;
+    };
+    /** @description One day (or VIX leg) the derivation did not use, with the reason code and the bars it had. */
+    ContextSkippedView: {
+      /** Format: date */
+      date: string;
+      reason: string;
+      /** Format: int32 */
+      bars: number;
     };
     /** @description A page of corporate actions, newest ex-date first. `pending` is the number of suggestions waiting for a decision over all instruments, whatever the filter. */
     CorporateActionPage: {
@@ -17942,6 +18008,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['DataNotices'];
+        };
+      };
+    };
+  };
+  GetDataContext: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ContextCoverageView'];
         };
       };
     };

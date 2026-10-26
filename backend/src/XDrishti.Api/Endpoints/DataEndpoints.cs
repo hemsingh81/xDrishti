@@ -6,6 +6,7 @@ using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Bars.Eod;
 using XDrishti.Application.Market.Bars.Gaps;
 using XDrishti.Application.Market.Calendar;
+using XDrishti.Application.Market.Context;
 using XDrishti.Domain.Common;
 
 namespace XDrishti.Api.Endpoints;
@@ -54,7 +55,11 @@ internal sealed class DataEndpoints : IEndpointModule
 
         group.MapGet("/notices", GetNoticesAsync)
             .WithName("GetDataNotices")
-            .WithSummary("What the owner should know about the data for the notification bell: sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending). A failed scheduled run is no longer here: it is the service_failed notice of GET /api/services/notices");
+            .WithSummary("What the owner should know about the data for the notification bell: sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending), a market context more than one session behind (data_context_stale) or with sessions missing inside it (data_context_gap). A failed scheduled run is no longer here: it is the service_failed notice of GET /api/services/notices");
+
+        group.MapGet("/context", GetContextAsync)
+            .WithName("GetDataContext")
+            .WithSummary("The coverage of the market context (P3-01d): days stored, first and last date, the first readable date of index_trend, regime and vix_pct, the VIX days and the calendar span of their window, the first date the regime has both parts, how many sessions the newest day is behind (stale when more than one), the skipped days with reasons (first 50 and the total), and the missing prerequisite (index_not_tracked, vix_not_tracked, disabled) with its fix. Read only; derived from 1-minute bars");
 
         group.MapGet("/calendar", GetCalendarAsync)
             .WithName("GetTradingCalendar")
@@ -120,6 +125,11 @@ internal sealed class DataEndpoints : IEndpointModule
         var result = await handler.HandleAsync(new ListBarGapsQuery(new GapRequest(status, instrumentId, page, pageSize)), cancellationToken);
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
+
+    private static async Task<Ok<ContextCoverageView>> GetContextAsync(
+        IQueryHandler<GetContextCoverageQuery, ContextCoverageView> handler,
+        CancellationToken cancellationToken) =>
+        TypedResults.Ok(await handler.HandleAsync(new GetContextCoverageQuery(), cancellationToken));
 
     private static async Task<Ok<DataNotices>> GetNoticesAsync(
         IQueryHandler<GetDataNoticesQuery, DataNotices> handler,

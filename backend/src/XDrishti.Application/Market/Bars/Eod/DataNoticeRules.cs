@@ -2,6 +2,7 @@ using System.Globalization;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Market.Quality;
+using XDrishti.Domain.Market.Context;
 
 namespace XDrishti.Application.Market.Bars.Eod;
 
@@ -18,13 +19,18 @@ public static class DataNoticeRules
 
     public const string CorporateActionsPending = "data_corporate_actions_pending";
 
+    public const string ContextStale = "data_context_stale";
+
+    public const string ContextGap = "data_context_gap";
+
     private const int MaxReasonLength = 160;
 
     /// <param name="gaps">The gap counts.</param>
     /// <param name="lastQualityRun">The latest quality run over every instrument; without one nothing is said about quality.</param>
     /// <param name="gate">The quality gate now (<see cref="QualityGateRules"/>).</param>
     /// <param name="pendingActions">The corporate action suggestions waiting for a decision.</param>
-    public static IReadOnlyList<DataNotice> Build(GapSummary gaps, QualityRunView? lastQualityRun = null, QualityGateView? gate = null, PendingActions? pendingActions = null)
+    /// <param name="context">How current the stored market context is (P3-01d); null when none is stored, which says nothing.</param>
+    public static IReadOnlyList<DataNotice> Build(GapSummary gaps, QualityRunView? lastQualityRun = null, QualityGateView? gate = null, PendingActions? pendingActions = null, ContextHealth? context = null)
     {
         ArgumentNullException.ThrowIfNull(gaps);
         var notices = new List<DataNotice>();
@@ -52,6 +58,22 @@ public static class DataNoticeRules
             var text = pending.Count == 1 ? "1 suggested corporate action (split or bonus) to review" : $"{pending.Count} suggested corporate actions (splits or bonus issues) to review";
             var stamp = pending.LatestAt is { } found ? found.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) : "0";
             notices.Add(new DataNotice($"data:corporate_actions_pending:{stamp}:{pending.Count}", CorporateActionsPending, "warn", text, pending.LatestAt));
+        }
+
+        if (context is { Stale: true })
+        {
+            notices.Add(new DataNotice(
+                $"data:context_stale:{context.Last:yyyy-MM-dd}:{context.AgeSessions}",
+                ContextStale,
+                "warn",
+                $"The market context is {context.AgeSessions} sessions behind (last day {context.Last:yyyy-MM-dd}); regime and VIX figures are unavailable until it catches up",
+                null));
+        }
+
+        if (context is { GapSessions: > 0 })
+        {
+            var text = context.GapSessions == 1 ? "1 session of the market context has no record" : $"{context.GapSessions} sessions of the market context have no record";
+            notices.Add(new DataNotice($"data:context_gap:{context.Last:yyyy-MM-dd}:{context.GapSessions}", ContextGap, "warn", text, null));
         }
 
         return notices;

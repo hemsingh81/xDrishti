@@ -52,7 +52,7 @@ public sealed class MarketContextTests
     {
         var friday = new DateOnly(2026, 3, 6);
         var monday = friday.AddDays(3);
-        var thursdayBeforeHoliday = new DateOnly(2026, 3, 19);
+        var thursdayBeforeHoliday = new DateOnly(2026, 3, 16);
         var context = MarketContext.Create([Day(friday, 100), Day(monday, 101), Day(thursdayBeforeHoliday, 102), Day(thursdayBeforeHoliday.AddDays(4), 103)]).Value;
 
         foreach (var (asked, expected) in new[]
@@ -66,12 +66,52 @@ public sealed class MarketContextTests
             (thursdayBeforeHoliday.AddDays(3), thursdayBeforeHoliday),
             (thursdayBeforeHoliday.AddDays(4), thursdayBeforeHoliday),
             (thursdayBeforeHoliday.AddDays(5), thursdayBeforeHoliday.AddDays(4)),
-            (DateOnly.MaxValue, thursdayBeforeHoliday.AddDays(4)),
+            (thursdayBeforeHoliday.AddDays(11), thursdayBeforeHoliday.AddDays(4)),
         })
         {
             context.TryAsOf(asked, out var values).ShouldBeTrue($"{asked}");
             values.Date.ShouldBe(expected, $"{asked}");
         }
+    }
+
+    [Fact]
+    public void A_date_more_than_MaxAgeDays_after_the_last_record_is_not_ready_and_exactly_MaxAgeDays_is()
+    {
+        var last = new DateOnly(2026, 3, 2);
+        var context = MarketContext.Create([Day(last, 100)]).Value;
+
+        context.TryAsOf(last.AddDays(7), out var atBound).ShouldBeTrue();
+        context.TryAsOf(last.AddDays(8), out _).ShouldBeFalse();
+        context.TryAsOf(DateOnly.MaxValue, out _).ShouldBeFalse();
+        var cursor = 0;
+        context.TryAsOf(last.AddDays(7), ref cursor, out _).ShouldBeTrue();
+        context.TryAsOf(last.AddDays(8), ref cursor, out _).ShouldBeFalse();
+        atBound.Date.ShouldBe(last);
+    }
+
+    [Fact]
+    public void A_gap_inside_the_history_longer_than_the_bound_reads_not_ready_and_recovers_on_the_next_record()
+    {
+        var first = new DateOnly(2026, 3, 2);
+        var second = first.AddDays(20);
+        var context = MarketContext.Create([Day(first, 100), Day(second, 101)]).Value;
+
+        context.TryAsOf(first.AddDays(7), out _).ShouldBeTrue();
+        context.TryAsOf(first.AddDays(8), out _).ShouldBeFalse();
+        context.TryAsOf(second, out _).ShouldBeFalse();
+        context.TryAsOf(second.AddDays(1), out var recovered).ShouldBeTrue();
+        recovered.Date.ShouldBe(second);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3651)]
+    public void MaxAgeDays_outside_one_to_3650_is_refused(int maxAge)
+    {
+        var result = MarketContext.Create([], new ContextOptions(MaxAgeDays: maxAge));
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(MarketContext.InvalidOptionsCode);
     }
 
     [Theory]

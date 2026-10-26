@@ -8,6 +8,7 @@ using XDrishti.Application.Market.Bars.Pipeline;
 using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Tests.Market.Bars;
 using XDrishti.Application.Tests.Market.Calendar;
+using XDrishti.Application.Tests.Market.Context;
 using XDrishti.Application.Tests.Market.Quality;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
@@ -109,7 +110,7 @@ public sealed class CorporateActionHooksTests
     {
         _data.Actions.Add(CorporateAction.Suggest(Guid.NewGuid(), new DateOnly(2026, 9, 1), CorporateActionKind.Split, 1, 5, null, Now));
 
-        var notices = await new GetDataNoticesHandler(new FakeBarGaps(), new StubQualityQueries(), new FixedCalendar(), new FakeDataSettings(), _data, _clock).HandleAsync(new GetDataNoticesQuery(), Ct);
+        var notices = await new GetDataNoticesHandler(new FakeBarGaps(), new StubQualityQueries(), new FixedCalendar(), new FakeDataSettings(), _data, new FakeContextDayStore(), _clock).HandleAsync(new GetDataNoticesQuery(), Ct);
 
         notices.Items.ShouldHaveSingleItem().Kind.ShouldBe("data_corporate_actions_pending");
     }

@@ -483,18 +483,26 @@ public sealed class FrameContextSemanticsTests
     }
 
     [Fact]
-    public void A_frame_that_runs_past_the_end_of_the_context_keeps_the_values_of_its_last_day()
+    public void A_frame_that_runs_past_the_end_of_the_context_keeps_the_values_of_its_last_day_for_MaxAgeDays_and_then_has_none()
     {
         var days = FrameContextFixtures.Consecutive(11, 60, Monday);
         var context = FrameContextFixtures.Build(days, FrameContextFixtures.Small);
         var own = ContextRead.Days(context, days);
         var frame = FrameContextFixtures.Frame(MarketNames, context);
+        var last = days[^1].Date;
 
-        foreach (var date in FrameContextFixtures.Dates(days[^1].Date.AddDays(1), days[^1].Date.AddDays(400)))
+        foreach (var date in FrameContextFixtures.Dates(last.AddDays(1), last.AddDays(400)))
         {
             frame.Step(Minutes.Close(date, Minutes.Open, 100));
 
-            ContextRead.Fields(own[^1]).Zip(Enumerable.Range(0, frame.Count).Select(h => frame[h])).ShouldAllBe(p => Tolerance.Identical(p.First, p.Second));
+            if (date.DayNumber - last.DayNumber <= FrameContextFixtures.Small.MaxAgeDays)
+            {
+                ContextRead.Fields(own[^1]).Zip(Enumerable.Range(0, frame.Count).Select(h => frame[h])).ShouldAllBe(p => Tolerance.Identical(p.First, p.Second));
+            }
+            else
+            {
+                Enumerable.Range(0, frame.Count).Select(h => frame[h]).ShouldAllBe(v => double.IsNaN(v));
+            }
         }
     }
 

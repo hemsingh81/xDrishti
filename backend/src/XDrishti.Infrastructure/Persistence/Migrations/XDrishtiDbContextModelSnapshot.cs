@@ -4819,6 +4819,63 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.Context.ContextDailyRecord", b =>
+                {
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<short>("IndexBars")
+                        .HasColumnType("smallint")
+                        .HasColumnName("index_bars");
+
+                    b.Property<double>("IndexClose")
+                        .HasColumnType("double precision")
+                        .HasColumnName("index_close");
+
+                    b.Property<double>("IndexHigh")
+                        .HasColumnType("double precision")
+                        .HasColumnName("index_high");
+
+                    b.Property<Guid>("IndexInstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("index_instrument_id");
+
+                    b.Property<double>("IndexLow")
+                        .HasColumnType("double precision")
+                        .HasColumnName("index_low");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
+
+                    b.Property<short?>("VixBars")
+                        .HasColumnType("smallint")
+                        .HasColumnName("vix_bars");
+
+                    b.Property<double?>("VixClose")
+                        .HasColumnType("double precision")
+                        .HasColumnName("vix_close");
+
+                    b.Property<DateTimeOffset>("WrittenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("written_at");
+
+                    b.HasKey("Date")
+                        .HasName("pk_context_daily");
+
+                    b.ToTable("context_daily", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_context_daily_bars", "index_bars > 0 AND (vix_bars IS NULL OR vix_bars > 0)");
+
+                            t.HasCheckConstraint("ck_context_daily_index", "index_low > 0 AND index_high >= index_low AND index_close >= index_low AND index_close <= index_high");
+
+                            t.HasCheckConstraint("ck_context_daily_vix", "vix_close IS NULL OR vix_close > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Market.InstrumentBrokerIdRecord", b =>
                 {
                     b.Property<Guid>("InstrumentId")

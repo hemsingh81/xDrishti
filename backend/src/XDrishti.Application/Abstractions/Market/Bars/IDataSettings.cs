@@ -9,6 +9,9 @@ public interface IDataSettings
     /// <summary>How many days of 1-minute bars are fetched from Dhan for an instrument that has none (<c>Data:Dhan:InitialDays</c>, default 365).</summary>
     int DhanInitialDays { get; }
 
+    /// <summary>How many days of 1-minute bars are fetched from Dhan for an instrument of type index that has none (<c>Data:Dhan:InitialDaysIndex</c>, default 1825: the index history behind the market context, P3-01d).</summary>
+    int DhanInitialDaysIndex { get; }
+
     /// <summary>The most Dhan Data API requests per second (<c>Data:Dhan:RequestsPerSecond</c>, default 4).</summary>
     int DhanRequestsPerSecond { get; }
 

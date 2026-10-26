@@ -3910,7 +3910,7 @@
         "tags": [
           "Data"
         ],
-        "summary": "What the owner should know about the data for the notification bell: sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending). A failed scheduled run is no longer here: it is the service_failed notice of GET /api/services/notices",
+        "summary": "What the owner should know about the data for the notification bell: sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending), a market context more than one session behind (data_context_stale) or with sessions missing inside it (data_context_gap). A failed scheduled run is no longer here: it is the service_failed notice of GET /api/services/notices",
         "operationId": "GetDataNotices",
         "responses": {
           "200": {
@@ -3919,6 +3919,27 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DataNotices"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/context": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The coverage of the market context (P3-01d): days stored, first and last date, the first readable date of index_trend, regime and vix_pct, the VIX days and the calendar span of their window, the first date the regime has both parts, how many sessions the newest day is behind (stale when more than one), the skipped days with reasons (first 50 and the total), and the missing prerequisite (index_not_tracked, vix_not_tracked, disabled) with its fix. Read only; derived from 1-minute bars",
+        "operationId": "GetDataContext",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextCoverageView"
                 }
               }
             }
@@ -19927,6 +19948,176 @@
           }
         },
         "description": "The account's connection to Dhan. Status is \"not_connected\", \"connected\", \"expired\" (the expiry has passed — derived when read,\nno broker call needed). ExpiresAt is when the token stops working (as Dhan states, otherwise 24 hours after sign-in).\nBrokerUserName and BrokerUserId (masked like the client id) are what Dhan reported for the token. LastError is a short safe text (at most\nDhan's error code). The token itself is never returned."
+      },
+      "ContextCoverageView": {
+        "required": [
+          "enabled",
+          "missing",
+          "fix",
+          "indexSymbol",
+          "vixSymbol",
+          "days",
+          "firstDate",
+          "lastDate",
+          "ageSessions",
+          "stale",
+          "indexTrendReadableFrom",
+          "regimeReadableFrom",
+          "vixPctReadableFrom",
+          "regimeWithVixReadableFrom",
+          "vixDays",
+          "vixMissingDays",
+          "vixWindowSpanDays",
+          "vixWindowTooWide",
+          "gapSessions",
+          "skippedTotal",
+          "skipped",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "missing": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "indexSymbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "vixSymbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "lastDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "ageSessions": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "indexTrendReadableFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "regimeReadableFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "vixPctReadableFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "regimeWithVixReadableFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "vixDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "vixMissingDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "vixWindowSpanDays": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "vixWindowTooWide": {
+            "type": "boolean"
+          },
+          "gapSessions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skippedTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContextSkippedView"
+            }
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "description": "What the stored market context makes readable (`GET /api/data/context`, criterion 7). `Missing` names an unmet prerequisite (`index_not_tracked`, `vix_not_tracked`, `disabled`) with its `Fix`. `AgeSessions` is the number of\ntrading sessions the newest day is behind the last closed one; `Stale` is more than one."
+      },
+      "ContextSkippedView": {
+        "required": [
+          "date",
+          "reason",
+          "bars"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "bars": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One day (or VIX leg) the derivation did not use, with the reason code and the bars it had."
       },
       "CorporateActionPage": {
         "required": [

@@ -280,6 +280,8 @@ internal sealed class FakeDataSettings : IDataSettings
 
     public int DhanInitialDays { get; set; } = 365;
 
+    public int DhanInitialDaysIndex { get; set; } = 1825;
+
     public int DhanRequestsPerSecond { get; set; } = 4;
 
     public int CsvMaxRowsPerFile { get; set; } = 5_000_000;

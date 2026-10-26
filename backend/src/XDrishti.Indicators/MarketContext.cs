@@ -160,7 +160,7 @@ public sealed class MarketContext
         var days = Days(out var count);
         var datesRead = 0;
         var index = LastBefore(days, 0, count, date, ref datesRead);
-        if (index < 0)
+        if (index < 0 || TooOld(days[index].Date, date))
         {
             values = default;
             return false;
@@ -169,6 +169,9 @@ public sealed class MarketContext
         values = days[index];
         return true;
     }
+
+    /// <summary>The age bound of ADR 0033 amendment 14 (P3-01d D6): a day more than <see cref="ContextOptions.MaxAgeDays"/> calendar days before the date asked for is not read, so a stale context is not ready rather than silently current.</summary>
+    private bool TooOld(DateOnly day, DateOnly date) => (long)date.DayNumber - day.DayNumber > Options.MaxAgeDays;
 
     /// <summary>
     /// The same read for a caller that walks forward through dates (a frame, once per India date): <paramref name="cursorHint"/> is the caller's own position — the index of its previous answer — so a date that
@@ -185,7 +188,7 @@ public sealed class MarketContext
     {
         var days = Days(out var count);
         var index = Locate(days, count, date, cursorHint, out datesRead);
-        if (index < 0)
+        if (index < 0 || TooOld(days[index].Date, date))
         {
             values = default;
             return false;

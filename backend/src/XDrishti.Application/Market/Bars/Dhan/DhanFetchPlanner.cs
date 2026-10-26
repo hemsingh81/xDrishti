@@ -6,7 +6,7 @@ namespace XDrishti.Application.Market.Bars.Dhan;
 
 /// <summary>
 /// Decides what the Dhan phase asks for (ADR 0016 §2): from two days before the instrument's last stored bar (the overlap reconciles Dhan's bars with the
-/// stored ones), or <c>Data:Dhan:InitialDays</c> back when it has none, up to now, in windows of at most 90 days (Dhan's limit per request); plus, for the gap
+/// stored ones), or <c>Data:Dhan:InitialDays</c> back (<c>InitialDaysIndex</c> for an index) when it has none, up to now, in windows of at most 90 days (Dhan's limit per request); plus, for the gap
 /// backfill (ADR 0017 §3), windows for the older sessions with missing bars. Independent of HTTP, so every <see cref="IIntradayBarSource"/> asks for the same things.
 /// </summary>
 public static class DhanFetchPlanner
@@ -74,10 +74,14 @@ public static class DhanFetchPlanner
         return windows;
     }
 
-    public static IntradayFetchPlan Plan(IReadOnlyList<FetchTarget> targets, DateTimeOffset now, int initialDays, IReadOnlyDictionary<Guid, IReadOnlyList<FetchWindow>>? gapWindows = null)
+    /// <summary>The initial depth of a target: <paramref name="initialDaysIndex"/> for an instrument of type index when given (P3-01d: the market context needs years of index history), else <paramref name="initialDays"/>.</summary>
+    public static int InitialDaysOf(string type, int initialDays, int? initialDaysIndex) =>
+        initialDaysIndex is { } index && type == InstrumentTypeCodes.Index ? index : initialDays;
+
+    public static IntradayFetchPlan Plan(IReadOnlyList<FetchTarget> targets, DateTimeOffset now, int initialDays, IReadOnlyDictionary<Guid, IReadOnlyList<FetchWindow>>? gapWindows = null, int? initialDaysIndex = null)
     {
         ArgumentNullException.ThrowIfNull(targets);
-        return new IntradayFetchPlan([.. targets.Select(t => new IntradayTarget(t.InstrumentId, t.Symbol, t.Type, t.SecurityId, t.Segment, WindowsOf(t, now, initialDays, gapWindows)))]);
+        return new IntradayFetchPlan([.. targets.Select(t => new IntradayTarget(t.InstrumentId, t.Symbol, t.Type, t.SecurityId, t.Segment, WindowsOf(t, now, InitialDaysOf(t.Type, initialDays, initialDaysIndex), gapWindows)))]);
     }
 
     private static IReadOnlyList<FetchWindow> WindowsOf(FetchTarget target, DateTimeOffset now, int initialDays, IReadOnlyDictionary<Guid, IReadOnlyList<FetchWindow>>? gapWindows)

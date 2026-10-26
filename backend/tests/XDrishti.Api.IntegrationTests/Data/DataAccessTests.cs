@@ -32,6 +32,7 @@ public sealed class DataAccessTests(ApiFactory factory)
         { "DELETE", "/api/data/calendar/2026-10-02" },
         { "GET", "/api/data/gaps" },
         { "GET", "/api/data/notices" },
+        { "GET", "/api/data/context" },
         { "GET", "/api/data/quality/overview" },
         { "GET", "/api/data/quality/instruments" },
         { "GET", "/api/data/quality/instruments?status=fail&q=abb&sort=-score&page=2&pageSize=10" },
@@ -188,6 +189,7 @@ public sealed class DataAccessTests(ApiFactory factory)
     [InlineData("/api/data/calendar")]
     [InlineData("/api/data/gaps")]
     [InlineData("/api/data/notices")]
+    [InlineData("/api/data/context")]
     [InlineData("/api/data/quality/overview")]
     [InlineData("/api/data/quality/instruments")]
     [InlineData("/api/data/quality/runs")]

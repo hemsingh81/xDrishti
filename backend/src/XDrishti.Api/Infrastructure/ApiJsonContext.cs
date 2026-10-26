@@ -27,6 +27,7 @@ using XDrishti.Application.Market.Bars.Gaps;
 using XDrishti.Application.Market.Bars.Review;
 using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Market.Calendar;
+using XDrishti.Application.Market.Context;
 using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
@@ -248,6 +249,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(DataInstrumentPage))]
 [JsonSerializable(typeof(GapPage))]
 [JsonSerializable(typeof(DataNotices))]
+[JsonSerializable(typeof(ContextCoverageView))]
 [JsonSerializable(typeof(InstrumentBars))]
 [JsonSerializable(typeof(StartQualityRunRequest))]
 [JsonSerializable(typeof(QualityOverview))]

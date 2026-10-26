@@ -10,6 +10,8 @@ internal sealed class DataSettings(IOptions<DataOptions> options) : IDataSetting
 
     public int DhanInitialDays => options.Value.Dhan.InitialDays;
 
+    public int DhanInitialDaysIndex => options.Value.Dhan.InitialDaysIndex;
+
     public int DhanRequestsPerSecond => options.Value.Dhan.RequestsPerSecond;
 
     public int CsvMaxRowsPerFile => options.Value.Csv.MaxRowsPerFile;

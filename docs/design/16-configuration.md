@@ -214,7 +214,7 @@ learning:
   recency_half_life_days: 180
   bayes_prior: { type: beta, shrink_to_parent: true, strength: 20 }
   regime: { trend: { sma_days: 50, slope_days: 5, adx_period: 14, adx_min: 20 },       # built in P3-01c (ADR 0033): the numbers of ContextOptions
-            volatility: { atr_period: 14, percentile_window: 252, low_below: 33.333333333333336, high_from: 66.66666666666667 } }  # exactly one third and two thirds (100/3, 200/3: the doubles of ContextOptions, never 33.33 / 66.67) of the mean of the VIX and index-ATR% percentiles; below low_below is LOW, from high_from is HIGH; pending owner confirmation, ADR 0033 Amendments 1, 2 and 13 (the owner's wording was 33.3 and 66.7)
+            volatility: { atr_period: 14, percentile_window: 252, low_below: 33.333333333333336, high_from: 66.66666666666667 } }  # exactly one third and two thirds (100/3, 200/3: the doubles of ContextOptions, never 33.33 / 66.67) of the mean of the VIX and index-ATR% percentiles; below low_below is LOW, from high_from is HIGH; confirmed 2026-10-27, ADR 0033 Amendments 1, 2 and 13 (the owner's wording was 33.3 and 66.7); max_age_days: 7 (ADR 0033 Amendment 14) is the bound on the age of a context read
   meta_model: { enabled: true, trainer: lightgbm, fallback_trainer: fasttree, split_by: [style, side],
                 calibration: pav, must_beat_baseline: true }
   qualification_gates: { min_oos_trades: 30, min_expectancy_R: 0.15, min_profit_factor: 1.2,

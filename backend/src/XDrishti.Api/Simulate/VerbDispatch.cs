@@ -10,6 +10,8 @@ internal static class VerbDispatch
 
     public const string CostSheetName = "cost-sheet";
 
+    public const string ContextName = "context";
+
     public const string VerifyPackName = "verify-pack";
 
     public const string XdName = "xd";
@@ -26,6 +28,11 @@ internal static class VerbDispatch
         if (args.Count > 0 && string.Equals(args[0], CostSheetName, StringComparison.Ordinal))
         {
             return Verb.CostSheet;
+        }
+
+        if (args.Count > 0 && string.Equals(args[0], ContextName, StringComparison.Ordinal))
+        {
+            return Verb.Context;
         }
 
         if (args.Count > 0 && string.Equals(args[0], VerifyPackName, StringComparison.Ordinal))

@@ -18,6 +18,7 @@ using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
+using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Market.Quality;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
@@ -39,6 +40,7 @@ using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Actions;
 using XDrishti.Infrastructure.Market.Bars;
 using XDrishti.Infrastructure.Market.Calendar;
+using XDrishti.Infrastructure.Market.Context;
 using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Market.Quality;
 using XDrishti.Infrastructure.Paper;
@@ -360,6 +362,13 @@ public static class DependencyInjection
             .Validate(DataOptions.IsValid, DataOptions.InvalidMessage)
             .ValidateOnStart();
         services.AddSingleton<IDataSettings, DataSettings>();
+
+        // The market context (P3-01d): its settings, the daily rows of the two indices, the insert-only store and the reader that builds the library's context.
+        services.AddSingleton<IContextSettings, ContextSettings>();
+        services.AddSingleton<ContextFiguresAdapter.Cache>();
+        services.AddScoped<IContextBarSource, ContextBarSource>();
+        services.AddScoped<IContextDayStore, ContextDayStore>();
+        services.AddScoped<IContextFigures, ContextFiguresAdapter>();
         services.AddSingleton<ICsvFolder, CsvFolder>();
         services.AddSingleton<IDataJobChannel, DataJobChannel>();
         services.AddScoped<IDataJobStore, DataJobStore>();

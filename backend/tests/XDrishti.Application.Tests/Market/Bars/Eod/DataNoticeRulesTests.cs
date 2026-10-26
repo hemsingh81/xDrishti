@@ -4,9 +4,11 @@ using XDrishti.Application.Market.Bars.Eod;
 using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Tests.Market.Actions;
 using XDrishti.Application.Tests.Market.Calendar;
+using XDrishti.Application.Tests.Market.Context;
 using XDrishti.Application.Tests.Market.Quality;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
+using XDrishti.Domain.Market.Context;
 
 namespace XDrishti.Application.Tests.Market.Bars.Eod;
 
@@ -59,7 +61,7 @@ public sealed class DataNoticeRulesTests
         var gaps = new FakeBarGaps();
         gaps.Rows[(Guid.NewGuid(), new DateOnly(2026, 10, 9))] = BarGap.Detect(Guid.NewGuid(), new DateOnly(2026, 10, 9), 375, 10, Start);
 
-        var notices = await new GetDataNoticesHandler(gaps, new StubQualityQueries(), new FixedCalendar(), new FakeDataSettings(), new InMemoryActionData(), new FakeTimeProvider(Start)).HandleAsync(new GetDataNoticesQuery(), TestContext.Current.CancellationToken);
+        var notices = await new GetDataNoticesHandler(gaps, new StubQualityQueries(), new FixedCalendar(), new FakeDataSettings(), new InMemoryActionData(), new FakeContextDayStore(), new FakeTimeProvider(Start)).HandleAsync(new GetDataNoticesQuery(), TestContext.Current.CancellationToken);
 
         notices.Items.Select(n => n.Kind).ShouldBe(["data_gaps_open"]);
     }
@@ -135,8 +137,50 @@ public sealed class DataNoticeRulesTests
     {
         var queries = new StubQualityQueries { LastFullRun = QualityRun(), Counts = new QualityCounts(100, 100, 90, 0, 10, 0, 90) };
 
-        var notices = await new GetDataNoticesHandler(new FakeBarGaps(), queries, new FixedCalendar(), new FakeDataSettings(), new InMemoryActionData(), new FakeTimeProvider(Start)).HandleAsync(new GetDataNoticesQuery(), TestContext.Current.CancellationToken);
+        var notices = await new GetDataNoticesHandler(new FakeBarGaps(), queries, new FixedCalendar(), new FakeDataSettings(), new InMemoryActionData(), new FakeContextDayStore(), new FakeTimeProvider(Start)).HandleAsync(new GetDataNoticesQuery(), TestContext.Current.CancellationToken);
 
         notices.Items.ShouldHaveSingleItem().Kind.ShouldBe("data_quality_failed");
+    }
+
+    [Fact]
+    public void A_context_more_than_one_session_behind_raises_a_stale_warning_with_the_days_behind()
+    {
+        var health = new ContextHealth(new DateOnly(2026, 1, 1), new DateOnly(2026, 10, 6), 4, 0);
+
+        var notice = DataNoticeRules.Build(NoGaps, context: health).ShouldHaveSingleItem();
+
+        (notice.Kind, notice.Severity).ShouldBe(("data_context_stale", "warn"));
+        notice.Text.ShouldContain("4 sessions behind");
+        notice.Id.ShouldBe("data:context_stale:2026-10-06:4");
+    }
+
+    [Fact]
+    public void A_current_context_and_a_missing_one_raise_nothing()
+    {
+        DataNoticeRules.Build(NoGaps, context: new ContextHealth(new DateOnly(2026, 1, 1), new DateOnly(2026, 10, 9), 1, 0)).ShouldBeEmpty();
+        DataNoticeRules.Build(NoGaps, context: null).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Sessions_missing_inside_the_context_raise_a_gap_warning_whose_id_changes_with_the_count()
+    {
+        var one = DataNoticeRules.Build(NoGaps, context: new ContextHealth(new DateOnly(2026, 1, 1), new DateOnly(2026, 10, 9), 0, 1)).ShouldHaveSingleItem();
+        var two = DataNoticeRules.Build(NoGaps, context: new ContextHealth(new DateOnly(2026, 1, 1), new DateOnly(2026, 10, 9), 0, 2)).ShouldHaveSingleItem();
+
+        one.Kind.ShouldBe("data_context_gap");
+        one.Text.ShouldBe("1 session of the market context has no record");
+        two.Text.ShouldBe("2 sessions of the market context have no record");
+        two.Id.ShouldNotBe(one.Id);
+    }
+
+    [Fact]
+    public async Task The_handler_reads_the_stored_context_against_the_calendar()
+    {
+        var store = new FakeContextDayStore();
+        store.Rows.AddRange([new ContextDayRecord(new DateOnly(2026, 10, 1), 105, 95, 100, 15, 375, 375), new ContextDayRecord(new DateOnly(2026, 10, 5), 105, 95, 100, 15, 375, 375)]);
+
+        var notices = await new GetDataNoticesHandler(new FakeBarGaps(), new StubQualityQueries(), new FixedCalendar(), new FakeDataSettings(), new InMemoryActionData(), store, new FakeTimeProvider(Start)).HandleAsync(new GetDataNoticesQuery(), TestContext.Current.CancellationToken);
+
+        notices.Items.Select(n => n.Kind).ShouldBe(["data_context_stale", "data_context_gap"]);
     }
 }

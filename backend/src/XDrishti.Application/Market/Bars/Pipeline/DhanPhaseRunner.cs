@@ -59,7 +59,7 @@ internal sealed class DhanPhaseRunner(
 
         var calendar = await tradingCalendar.GetAsync(cancellationToken);
         var gapPlans = await PlanGapsAsync(calendar, list, reporter, cancellationToken);
-        var plan = DhanFetchPlanner.Plan(list, clock.GetUtcNow(), settings.DhanInitialDays, gapPlans.ToDictionary(p => p.Key, p => p.Value.Windows));
+        var plan = DhanFetchPlanner.Plan(list, clock.GetUtcNow(), settings.DhanInitialDays, gapPlans.ToDictionary(p => p.Key, p => p.Value.Windows), settings.DhanInitialDaysIndex);
         phase = phase with { Total = list.Count, AccountName = state.Name };
         await reporter.ReportAsync(phase, cancellationToken, publishNow: true);
 

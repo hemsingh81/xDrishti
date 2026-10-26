@@ -120,6 +120,7 @@ services:
       # back, at most this many requests per second.
       Data__CsvFolder: /data/csv
       Data__Dhan__InitialDays: ${XD_DATA_DHAN_INITIAL_DAYS:-365}
+      Data__Dhan__InitialDaysIndex: ${XD_DATA_DHAN_INITIAL_DAYS_INDEX:-1825}
       Data__Dhan__RequestsPerSecond: ${XD_DATA_DHAN_REQUESTS_PER_SECOND:-4}
     # The 1-minute CSV files (ADR 0016): read-only, the API never writes there. deploy/xd-up.sh creates the folder when it is missing.
     volumes:

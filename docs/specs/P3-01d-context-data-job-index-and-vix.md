@@ -1,6 +1,6 @@
 # P3-01d — Context data job: NIFTY 50 and INDIA VIX into `market.context_daily`, the reader, and the six ADR 0033 deviations settled
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner approved all plans, 2026-10-27). **Built 2026-10-27 except the live probe (acceptance 1)**, which needs the owner's connected Dhan account: [the note](../research/p3-01d-context-probe.md) holds the exact steps and the outcome is pending.
 - **Phase / roadmap row:** P3 — row P3-01d (Later, "before P5"); the data behind `by_regime` (P5-05, P6-02) and the VIX figure of the market gate (P7-06). Breadth is [P3-01e](P3-01e-breadth-point-in-time.md).
 - **Design refs:** docs/design/05-data-and-brokers.md §4, §6, §9 (`market.context_daily`) · docs/design/07-strategies.md §6 (regime) · docs/design/11-strategy-lab.md §2 (market context) · docs/design/17-deployment-and-operations.md §3 (the allow-list table) · docs/design/18-roadmap.md (P3-01d row, *Open owner decisions* items 1 and 3 Q7, ISS-19)
 - **Needs:** P3-01c (built: `MarketContext`, `ContextDay`), P1-17a (built: Dhan phase, `bars_agg`), ADR 0033 (its six ⚠ amendments are settled here), ADR 0039 (Application names no engine type), ADR 0016 §7 (the chart endpoint). Needs from the owner, as acts: Dhan connected, and NIFTY 50 and INDIA VIX tracked on the Instruments screen.
@@ -81,3 +81,11 @@ None that block the build. Owner acts (defaults until then): connect Dhan and tr
 - The `NSE:INDIA_VIX` symbol is cited to doc 06 (symbol rules), not ADR 0010.
 - Criterion 3 now says: no table-level UPDATE/DELETE; column grants only by P3-01e.
 - The '+100 M rows' figure (P14-00) is the 5-year total; about 59 M are added to today's 40.9 M. This spec carries no such figure.
+
+## Build notes 2026-10-27 (deviations from the sketch)
+- `ContextSkipReason` has `index_missing`, `index_thin`, `index_invalid` (a leg the table would refuse is skipped, not written), `not_a_session` and `vix_thin` (evidence of a thin VIX leg; the day then waits or goes without). A day that waits for its VIX is listed in `Pending`, not as a skip, so `vix_pending` is not a reason code.
+- `IContextDayStore` also has `StampAsync` (count and newest date: the cache key of the adapter) and `InsertAsync` takes the index instrument id (the table keeps which index a day came from). `IContextSettings` is its own port (the settings are `Data:Context:*`).
+- `data_context_gap` is raised when sessions between the first and the last stored day have no record; `data_context_stale` when the newest day is more than one session behind the last closed one. Neither is raised while nothing is stored (a fresh install says nothing; `GET /api/data/context` names the missing prerequisite).
+- A missing prerequisite (an index that is not tracked, or has no daily row) is logged and shown by the coverage, not added as a job warning on every update.
+- `GET /api/data/context` also carries `gapSessions`, `enabled`, `indexSymbol`, `vixSymbol` and the source sentence; the verb is `context refresh|coverage` (`scripts/context.sh`).
+- The probe-dependent tests are not run: nothing here depends on its outcome, and the owner's numbers go into the note.

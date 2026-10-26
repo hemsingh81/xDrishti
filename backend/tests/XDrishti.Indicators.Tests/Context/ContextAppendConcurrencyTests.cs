@@ -49,8 +49,9 @@ public sealed class ContextAppendConcurrencyTests
             while (Volatile.Read(ref writing))
             {
                 var days = context.Count;
-                Check(context.TryAsOf(DateOnly.MaxValue, out var latest), latest, days, "binary search");
-                Check(context.TryAsOf(DateOnly.MaxValue, ref cursor, out var walked), walked, days, "cursor");
+                var asked = Start.AddDays(days + 1);
+                Check(context.TryAsOf(asked, out var latest), latest, days, "binary search");
+                Check(context.TryAsOf(asked, ref cursor, out var walked), walked, days, "cursor");
                 if (days > 0)
                 {
                     counted++;
@@ -100,7 +101,7 @@ public sealed class ContextAppendConcurrencyTests
         failures.ShouldBeEmpty();
         context.Count.ShouldBe(Days);
         Volatile.Read(ref readsOfDays).ShouldBeGreaterThanOrEqualTo(Days / Burst, "reads that saw at least one day while the writer was appending");
-        context.TryAsOf(DateOnly.MaxValue, out var last).ShouldBeTrue();
+        context.TryAsOf(Start.AddDays(Days), out var last).ShouldBeTrue();
         last.Date.ShouldBe(Start.AddDays(Days - 1));
     }
 }

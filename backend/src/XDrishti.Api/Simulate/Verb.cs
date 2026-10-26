@@ -12,6 +12,9 @@ internal enum Verb
     /// <summary>The <c>cost-sheet</c> verb (spec P3-03f): first argument <c>cost-sheet</c>, nothing else selects it.</summary>
     CostSheet,
 
+    /// <summary>The <c>context</c> verb (P3-01d): first argument <c>context</c>, nothing else selects it.</summary>
+    Context,
+
     /// <summary>The <c>verify-pack</c> verb (spec P3-09): first argument <c>verify-pack</c>, nothing else selects it.</summary>
     VerifyPack,
 

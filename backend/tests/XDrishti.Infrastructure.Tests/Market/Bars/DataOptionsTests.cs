@@ -160,4 +160,40 @@ public sealed class DataOptionsTests
     {
         DataOptions.InvalidMessage.ShouldContain("Data:Quality:Sessions");
     }
+
+    [Fact]
+    public void The_index_depth_defaults_to_five_years_and_the_context_job_is_on_with_its_documented_numbers()
+    {
+        var options = new DataOptions();
+
+        options.Dhan.InitialDaysIndex.ShouldBe(1825);
+        (options.Context.Enabled, options.Context.VixGraceSessions, options.Context.MinDayFraction).ShouldBe((true, 5, 0.96));
+        DataOptions.IsValid(options).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(364)]
+    [InlineData(1826)]
+    public void An_index_depth_outside_one_to_five_years_is_refused(int days)
+    {
+        DataOptions.IsValid(new DataOptions { Dhan = new DhanDataOptions { InitialDaysIndex = days } }).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(365)]
+    [InlineData(1825)]
+    public void The_index_depth_limits_themselves_are_fine(int days)
+    {
+        DataOptions.IsValid(new DataOptions { Dhan = new DhanDataOptions { InitialDaysIndex = days } }).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(0, 0.96)]
+    [InlineData(31, 0.96)]
+    [InlineData(5, 0.49)]
+    [InlineData(5, 1.01)]
+    public void Context_settings_outside_their_range_are_refused(int grace, double fraction)
+    {
+        DataOptions.IsValid(new DataOptions { Context = new ContextDataOptions { VixGraceSessions = grace, MinDayFraction = fraction } }).ShouldBeFalse();
+    }
 }

@@ -33,6 +33,7 @@ using XDrishti.Application.Market.Bars.Pipeline;
 using XDrishti.Application.Market.Bars.Review;
 using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Market.Calendar;
+using XDrishti.Application.Market.Context;
 using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
@@ -299,6 +300,11 @@ public static class DependencyInjection
         services.AddScoped<NseCalendarRefresher>();
         services.AddScoped<ObservedCalendarRunner>();
         services.AddScoped<ICalendarUpkeep, CalendarUpkeep>();
+
+        // The market context (P3-01d, ADR 0033): written by the data job after the aggregates, read through IContextFigures, coverage at /api/data/context.
+        services.AddScoped<ICommandHandler<RefreshContextCommand, ContextRefreshed>, RefreshContextHandler>();
+        services.AddScoped<IContextUpkeep, ContextUpkeep>();
+        services.AddScoped<IQueryHandler<GetContextCoverageQuery, ContextCoverageView>, GetContextCoverageHandler>();
         services.AddScoped<IQueryHandler<GetCalendarQuery, Result<CalendarView>>, GetCalendarHandler>();
         services.AddScoped<ICommandHandler<AddCalendarDayCommand, AddedCalendarDay>, AddCalendarDayHandler>();
         services.AddScoped<ICommandHandler<ConfirmCalendarDayCommand, CalendarDayView>, ConfirmCalendarDayHandler>();
