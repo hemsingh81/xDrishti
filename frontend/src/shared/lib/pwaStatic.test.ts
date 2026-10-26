@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { stampSw, swFiles } from '../../../scripts/stampSw.mjs';
 
 const pub = (path: string) => `public/${path}`;
 const manifest = JSON.parse(readFileSync(pub('manifest.webmanifest'), 'utf8')) as Record<string, unknown> & {
@@ -48,6 +49,13 @@ describe('web app manifest', () => {
     expect(readFileSync(pub('sw.js'), 'utf8').match(/'__XD_BUILD__'/g)).toHaveLength(1);
   });
 
+  it('the build stamp list and the worker allow-list are the same files, in the same order', () => {
+    const sw = readFileSync(pub('sw.js'), 'utf8');
+    const listed = [...(/XD_PRECACHE = \[([^\]]*)\]/.exec(sw)?.[1] ?? '').matchAll(/'(\/[^']+)'/g)].map((m) => m[1]);
+    // the first entry of XD_PRECACHE is the constant XD_OFFLINE, not a quoted path
+    expect(swFiles.map((file) => `/${file}`)).toEqual(['/offline.html', ...listed]);
+  });
+
   it('every file the worker caches exists, and the offline page has no script and no external resource', () => {
     const sw = readFileSync(pub('sw.js'), 'utf8');
     const listed = [...(/XD_PRECACHE = \[([^\]]*)\]/.exec(sw)?.[1] ?? '').matchAll(/'(\/[^']+)'/g)].map(
@@ -60,5 +68,22 @@ describe('web app manifest', () => {
       'You are offline. xDrishti shows no data without a connection and keeps none on this device.',
     );
     expect(page).not.toMatch(/<script|src=|https?:\/\//);
+  });
+});
+
+describe('build stamp', () => {
+  const source = readFileSync(pub('sw.js'), 'utf8');
+
+  it('replaces the placeholder with a hash of the cached files and changes it when a file changes', () => {
+    const one = stampSw(source, ['a', 'b']);
+    expect(one).not.toContain('__XD_BUILD__');
+    expect(one).toMatch(/const XD_BUILD = '[0-9a-f]{10}';/);
+    expect(stampSw(source, ['a', 'b'])).toBe(one);
+    expect(stampSw(source, ['a', 'c'])).not.toBe(one);
+  });
+
+  it('fails the build when the placeholder is missing or appears twice', () => {
+    expect(() => stampSw("const XD_BUILD = 'x';", [])).toThrow('exactly one');
+    expect(() => stampSw("'__XD_BUILD__' '__XD_BUILD__'", [])).toThrow('exactly one');
   });
 });

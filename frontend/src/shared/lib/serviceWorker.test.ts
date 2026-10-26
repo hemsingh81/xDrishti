@@ -108,6 +108,13 @@ describe('service worker request rules', () => {
     '/assets/index-abc.js',
     '/assets',
     '/%zz',
+    '/\\api/x',
+    '/\\\\api',
+    '/%2fapi',
+    '/api%2fx',
+    '/api?x=1',
+    '/%2e%2e/api/x',
+    '/ok/../api/x',
   ])('never answers the network-only path %s', (path) => {
     expect(answers(path)).toBe(false);
   });
@@ -124,7 +131,61 @@ describe('service worker request rules', () => {
   });
 });
 
+describe('service worker request rules: pinned edge spellings', () => {
+  const answers = (path: string) => {
+    const r = request(path);
+    return load().ctx.xdShouldAnswer?.(origin, r.url, r.method, r.mode, null);
+  };
+
+  it('a path that merely starts with the same letters, or is decoded only once, is a page', () => {
+    expect(answers('/apiary')).toBe(true);
+    expect(answers('/%2561pi')).toBe(true); // decoded once, as the server does: the literal path "/%61pi", not /api
+  });
+
+  it('a double-slash path on this origin is a same-origin page; a protocol-relative string is not a URL at all', () => {
+    expect(answers('//evil.test/x')).toBe(true); // origin + path: still this origin
+    expect(load().ctx.xdShouldAnswer?.(origin, '//evil.test/x', 'GET', 'navigate', null)).toBe(false);
+  });
+});
+
+describe('xdStorable', () => {
+  const response = (init: { status?: number; type?: string; redirected?: boolean; contentType?: string }) => ({
+    status: init.status ?? 200,
+    type: init.type ?? 'basic',
+    redirected: init.redirected ?? false,
+    headers: { get: () => init.contentType ?? 'image/png' },
+  });
+  const storable = (path: string, r: ReturnType<typeof response>) => load().ctx.xdStorable?.(path, r);
+
+  it('accepts only the real static file', () => {
+    expect(storable('/icons/icon-192.png', response({}))).toBe(true);
+    expect(storable('/offline.html', response({ contentType: 'text/html; charset=utf-8' }))).toBe(true);
+  });
+
+  it.each([
+    ['404', { status: 404 }],
+    ['206 partial', { status: 206 }],
+    ['redirected', { redirected: true }],
+    ['opaque', { type: 'opaque', status: 0 }],
+    ['cors', { type: 'cors' }],
+    ['an icon that is HTML (the SPA fallback)', { contentType: 'text/html' }],
+  ])('refuses %s', (_name, init) => {
+    expect(storable('/icons/icon-192.png', response(init))).toBe(false);
+  });
+
+  it('refuses the offline page when it is not HTML', () => {
+    expect(storable('/offline.html', response({ contentType: 'image/png' }))).toBe(false);
+  });
+});
+
 describe('service worker events', () => {
+  it('does not answer a plain page navigation to /api/x either (mode navigate)', async () => {
+    const f = load();
+    await fire(f, 'fetch', { request: request('/api/x', { mode: 'navigate' }) });
+    expect(f.responded).toHaveLength(0);
+    expect(f.fetched).toHaveLength(0);
+  });
+
   it('does not call respondWith for data requests and never touches the network or cache for them', async () => {
     const f = load();
     for (const path of ['/api/accounts', '/hubs/events', '/assets/a.js']) {
