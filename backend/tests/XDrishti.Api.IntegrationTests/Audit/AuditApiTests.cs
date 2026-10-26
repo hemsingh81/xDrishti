@@ -12,7 +12,7 @@ using XDrishti.Domain.Planning;
 
 namespace XDrishti.Api.IntegrationTests.Audit;
 
-/// <summary>Spec P8-22 (ADR 0117) on a real database with all six stores filled, some by the real writers: the merged read, paging, redaction, the field policy, the refusals and that a read writes nothing.</summary>
+/// <summary>Spec P8-22 (ADR 0117) on a real database with all seven stores filled, some by the real writers: the merged read, paging, redaction, the field policy, the refusals and that a read writes nothing.</summary>
 [Collection(ApiTestSuite.Name)]
 public sealed class AuditApiTests(ApiFactory factory) : DataTestBase(factory)
 {
@@ -20,7 +20,7 @@ public sealed class AuditApiTests(ApiFactory factory) : DataTestBase(factory)
 
     private static readonly Guid AccountId = Guid.Parse("0b6f2a9e-7a52-4d7e-9c3a-5d0a7e0b7a40");
 
-    private static readonly string[] SourceCodes = ["auth", "account", "approval", "plan", "autonomy", "learning"];
+    private static readonly string[] SourceCodes = ["auth", "account", "approval", "plan", "autonomy", "learning", "chargesheet"];
 
     private static readonly string[] ForbiddenNames = ["ip", "userAgent", "confirmReason", "modifications", "settingsHash", "snapshotHash", "password", "passwordHash", "token", "sessionId", "csrfToken", "clientId", "cutoff", "policyVersion"];
 
@@ -30,6 +30,8 @@ public sealed class AuditApiTests(ApiFactory factory) : DataTestBase(factory)
         await using var connection = await OpenAsync();
         await ExecuteAsync(connection, "DELETE FROM research.learning_changelog");
         await ExecuteAsync(connection, "DELETE FROM auth.audit_events");
+        await ExecuteAsync(connection, "DELETE FROM workflow.charge_sheet_events");
+        await ExecuteAsync(connection, "INSERT INTO workflow.charge_sheet_events (kind, actor, reason) VALUES ('gate_on', @actor, 'confirming allowed')", ("actor", "owner:" + ApiFactory.OwnerEmail));
         await ExecuteAsync(
             connection,
             """
@@ -107,7 +109,7 @@ public sealed class AuditApiTests(ApiFactory factory) : DataTestBase(factory)
     }
 
     [Fact]
-    public async Task All_six_stores_are_merged_newest_first_and_the_list_follows_the_field_policy()
+    public async Task All_seven_stores_are_merged_newest_first_and_the_list_follows_the_field_policy()
     {
         var (body, json) = await GetAsync($"/api/audit/entries?{Wide}&limit=200");
 

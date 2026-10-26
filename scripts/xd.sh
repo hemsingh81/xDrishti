@@ -12,6 +12,7 @@
 #   scripts/xd.sh plan run [--date YYYY-MM-DD] [--dry-run]   (P7-08, ADR 0086: the fail-closed nightly pipeline now; a failing gate publishes nothing and exits 1; --dry-run writes nothing)
 #   scripts/xd.sh plan phase-check [--through YYYY-MM-DD]   (P7-18, ADR 0097: the P7 exit criteria from stored plan runs, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
 #   scripts/xd.sh reports phase-check   (P8-17, ADR 0126: the P8 exit criteria from stored runs, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
+#   scripts/xd.sh charge-sheet show [--sheet ID]   (P8-23, ADR 0127: whether the owner's charge-sheet confirmation stands; read only; confirm and revoke are the owner's act with a fresh password on the Settings screen, the verb refuses them)
 #   scripts/xd.sh lab runs [--strategy ID] [--state succeeded] [--limit 20]
 # Exit codes: 0 done (a full test: PASS), 1 refused (located problems on stderr), 2 wrong command line or configuration, 3 failure or timeout,
 # 4 a full test with verdict MARGINAL or FAIL, 130 cancelled. A test needs the stack running (deploy/xd-up.sh): xd-api carries the run out; this command stores

@@ -43,7 +43,7 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             }
         }
 
-        names.ShouldBe(["trading.fill_grades", "trading.grades", "trading.journal_entries", "trading.journal_fills", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "trading.ticket_alerts", "trading.ticket_notice_acks", "trading.ticket_prompts", "workflow.approvals", "workflow.autonomy_settings", "workflow.suggestion_seen", "workflow.suggestions"]);
+        names.ShouldBe(["trading.fill_grades", "trading.grades", "trading.journal_entries", "trading.journal_fills", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "trading.ticket_alerts", "trading.ticket_notice_acks", "trading.ticket_prompts", "workflow.approvals", "workflow.autonomy_settings", "workflow.charge_sheet_events", "workflow.suggestion_seen", "workflow.suggestions"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -139,6 +139,9 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             "UPDATE workflow.suggestion_seen SET actor = 'owner:x' WHERE false",
             "DELETE FROM workflow.suggestion_seen WHERE false",
             "TRUNCATE workflow.suggestion_seen",
+            "UPDATE workflow.charge_sheet_events SET kind = 'revoke' WHERE false",
+            "DELETE FROM workflow.charge_sheet_events WHERE false",
+            "TRUNCATE workflow.charge_sheet_events",
         })
         {
             (await SqlStateAsync(server.App, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
@@ -151,6 +154,32 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
         (await StoreKit.CountAsync(server.App, "SELECT count(*) FROM workflow.suggestions", Ct)).ShouldBe(1);
 
         (await StoreKit.CountAsync(server.App, "SELECT count(*) FROM trading.plans WHERE plan_key = 'grants-probe'", Ct)).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task As_xd_app_the_charge_sheet_log_takes_owner_acts_only_and_confirms_only_while_the_capability_is_on()
+    {
+        var rates = new string('a', 64);
+        string Confirm(string actor = "owner:probe@example.test") => $"INSERT INTO workflow.charge_sheet_events (kind, sheet_id, rates_sha256, actor, reason) VALUES ('confirm', 'grants-sheet', '{rates}', '{actor}', 'probe')";
+        const string On = "INSERT INTO workflow.charge_sheet_events (kind, actor, reason) VALUES ('gate_on', 'owner:probe@example.test', 'probe')";
+        const string Off = "INSERT INTO workflow.charge_sheet_events (kind, actor, reason) VALUES ('gate_off', 'owner:probe@example.test', 'probe')";
+
+        (await SqlStateAsync(server.App, Confirm())).ShouldBe(PostgresErrorCodes.CheckViolation); // no capability row: off
+        (await SqlStateAsync(server.App, On)).ShouldBeNull();
+        (await SqlStateAsync(server.App, Confirm("cli:xd"))).ShouldBe(PostgresErrorCodes.CheckViolation); // only an owner
+        (await SqlStateAsync(server.App, Confirm("rule:autonomy"))).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await SqlStateAsync(server.App, Confirm())).ShouldBeNull();
+        (await SqlStateAsync(server.App, "INSERT INTO workflow.charge_sheet_events (kind, sheet_id, rates_sha256, actor, reason) VALUES ('confirm', 'test-sheet', '" + rates + "', 'owner:probe@example.test', 'probe')")).ShouldBe(PostgresErrorCodes.CheckViolation); // a test sheet
+        (await SqlStateAsync(server.App, "INSERT INTO workflow.charge_sheet_events (kind, sheet_id, rates_sha256, actor, reason) VALUES ('confirm', 'grants-sheet', 'not-a-hash', 'owner:probe@example.test', 'probe')")).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await SqlStateAsync(server.App, Off)).ShouldBeNull();
+        (await SqlStateAsync(server.App, Confirm())).ShouldBe(PostgresErrorCodes.CheckViolation); // switched off again
+        (await SqlStateAsync(server.App, $"INSERT INTO workflow.charge_sheet_events (kind, sheet_id, rates_sha256, actor, reason) VALUES ('revoke', 'grants-sheet', '{rates}', 'owner:probe@example.test', 'probe')")).ShouldBeNull(); // a revoke needs no capability
+
+        // The database draws the id, the time and the India date of a confirmation: a chosen value is overwritten.
+        (await SqlStateAsync(server.App, On)).ShouldBeNull();
+        (await SqlStateAsync(server.App, $"INSERT INTO workflow.charge_sheet_events (id, kind, sheet_id, rates_sha256, confirmed_on, actor, reason, created_at) OVERRIDING SYSTEM VALUE VALUES (1, 'confirm', 'grants-sheet', '{rates}', '2000-01-01', 'owner:probe@example.test', 'probe', '2000-01-01')")).ShouldBeNull();
+        (await StoreKit.CountAsync(server.App, "SELECT count(*) FROM workflow.charge_sheet_events WHERE created_at < '2020-01-01' OR confirmed_on < '2020-01-01' OR id = 1", Ct)).ShouldBe(0);
+        (await StoreKit.CountAsync(server.App, "SELECT count(*) FROM workflow.charge_sheet_events", Ct)).ShouldBe(6);
     }
 
     [Fact]

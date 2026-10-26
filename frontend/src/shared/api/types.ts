@@ -220,6 +220,7 @@ export type LongTermLot = Schemas['LongTermLot'];
 export type ActionThresholds = Schemas['ActionThresholds'];
 export type ActionThresholdsInput = Schemas['ActionThresholdsInput'];
 export type ActionThresholdsView = Schemas['ActionThresholdsView'];
+export type ChargeSheetStatusView = Schemas['ChargeSheetStatusView'];
 /** One-shot price alerts, checked on every quotes tick. */
 export type PriceAlert = Schemas['PriceAlertView'];
 export type PriceAlertPage = Schemas['PriceAlertPage'];

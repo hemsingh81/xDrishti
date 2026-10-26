@@ -9,7 +9,6 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Research;
-using XDrishti.Domain.Platform;
 using XDrishti.Tests.Shared;
 
 namespace XDrishti.Api.IntegrationTests.Research;
@@ -36,9 +35,15 @@ public sealed class ReportsApiTests(ApiFactory factory) : DataTestBase(factory)
         await ExecuteAsync(connection, sql);
     }
 
-    /// <summary>Stores the owner's confirmation of a sheet as the owner's act would: the sheet id, the hash of its rates and the date.</summary>
-    private Task ConfirmAsync(string sheetId, string? rates = null) =>
-        ExecuteSqlAsync($"INSERT INTO platform.app_settings (key, value, updated_by, updated_at) VALUES ('{AppSettingKeys.ReportsChargeSheetConfirmation}', '{{\"sheet_id\":\"{sheetId}\",\"rates_sha256\":\"{rates ?? FixtureSheet.Sheet.RatesSha256}\",\"confirmed_on\":\"2026-10-01\"}}', 'test', now())");
+    /// <summary>
+    /// Stores the owner's confirmation of a sheet as the owner's act would (P8-23): the capability row, then the confirmation row (the database stamps the date); the endpoint is covered by <c>ChargeSheetApiTests</c>.
+    /// Returns the date the database stamped, as the reports print it.
+    /// </summary>
+    private async Task<string> ConfirmAsync(string sheetId, string? rates = null)
+    {
+        await ExecuteSqlAsync($"INSERT INTO workflow.charge_sheet_events (kind, actor, reason) VALUES ('gate_on', 'owner:test@example.com', 'test'); INSERT INTO workflow.charge_sheet_events (kind, sheet_id, rates_sha256, actor, reason) VALUES ('confirm', '{sheetId}', '{rates ?? FixtureSheet.Sheet.RatesSha256}', 'owner:test@example.com', 'test')");
+        return await ScalarAsync<string>("SELECT to_char(confirmed_on, 'YYYY-MM-DD') FROM workflow.charge_sheet_events WHERE kind = 'confirm' ORDER BY id DESC LIMIT 1");
+    }
 
     private async Task<JsonElement> GetOkAsync(string path)
     {
@@ -308,14 +313,14 @@ public sealed class ReportsApiTests(ApiFactory factory) : DataTestBase(factory)
         }
 
         var before = await GetProblemAsync($"/api/reports/summary?runs={run.RunKey}&basis=net");
-        await ConfirmAsync("fixture-a");
+        var on = await ConfirmAsync("fixture-a");
         var net = await GetOkAsync($"/api/reports/summary?runs={run.RunKey}&basis=net");
         var gross = await GetOkAsync($"/api/reports/summary?runs={run.RunKey}");
         var runs = await GetOkAsync("/api/reports/runs");
 
         before.ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"));
         net.GetProperty("evidence").GetProperty("basis").GetString().ShouldBe("net");
-        net.GetProperty("evidence").GetProperty("netBasisConfirmation").GetString().ShouldBe($"charge sheet 'fixture-a' with rates {FixtureSheet.Sheet.RatesSha256[..12]} confirmed by the owner on 2026-10-01");
+        net.GetProperty("evidence").GetProperty("netBasisConfirmation").GetString().ShouldBe($"charge sheet 'fixture-a' with rates {FixtureSheet.Sheet.RatesSha256[..12]} confirmed by the owner on {on}");
         Number(net.GetProperty("all").GetProperty("totalR")).ShouldBe(run.Trades.Sum(t => t.Trade.Costing!.RNet), 1e-9);
         Number(gross.GetProperty("all").GetProperty("totalR")).ShouldBe(run.Trades.Sum(t => t.Trade.RFilled), 1e-9);
         net.GetProperty("all").GetProperty("n").GetInt32().ShouldBe(run.Trades.Count);
@@ -336,18 +341,10 @@ public sealed class ReportsApiTests(ApiFactory factory) : DataTestBase(factory)
         problem.Code.ShouldBe("reports.net_unavailable");
     }
 
-    [Theory]
-    [InlineData("not json")]
-    [InlineData("{\"sheet_id\":\"no-such-sheet\",\"rates_sha256\":\"RATES\",\"confirmed_on\":\"2026-10-01\"}")]
-    [InlineData("{\"sheet_id\":\"fixture-a\",\"rates_sha256\":\"RATES\",\"confirmed_on\":\"01/10/2026\"}")]
-    [InlineData("{\"sheet_id\":\"\",\"rates_sha256\":\"RATES\",\"confirmed_on\":\"2026-10-01\"}")]
-    [InlineData("{\"sheet_id\":\"fixture-a\",\"confirmed_on\":\"2026-10-01\"}")]
-    [InlineData("{\"sheet_id\":\"fixture-a\",\"rates_sha256\":\"not-a-hash\",\"confirmed_on\":\"2026-10-01\"}")]
-    [InlineData("{\"sheet_id\":\"fixture-a\",\"rates_sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"confirmed_on\":\"2026-10-01\"}")]
-    [InlineData("[1,2]")]
-    public async Task A_stored_confirmation_that_is_malformed_or_names_no_stored_sheet_counts_as_not_confirmed(string stored)
+    [Fact]
+    public async Task A_confirmation_that_names_no_stored_sheet_counts_as_not_confirmed()
     {
-        await ExecuteSqlAsync($"INSERT INTO platform.app_settings (key, value, updated_by, updated_at) VALUES ('{AppSettingKeys.ReportsChargeSheetConfirmation}', '{stored.Replace("RATES", FixtureSheet.Sheet.RatesSha256, StringComparison.Ordinal).Replace("'", "''", StringComparison.Ordinal)}', 'test', now())");
+        await ConfirmAsync("no-such-sheet");
 
         var runs = await GetOkAsync("/api/reports/runs");
         var problem = await GetProblemAsync($"/api/reports/summary?runs={Both}&basis=net");
@@ -357,14 +354,58 @@ public sealed class ReportsApiTests(ApiFactory factory) : DataTestBase(factory)
     }
 
     [Fact]
+    public async Task A_hand_written_settings_row_is_not_a_confirmation_only_the_owners_log_is_read()
+    {
+        await StoreCostedRunAsync("RPTNETH");
+        await ExecuteSqlAsync($"INSERT INTO platform.app_settings (key, value, updated_by, updated_at) VALUES ('reports.charge_sheet_confirmation', '{{\"sheet_id\":\"fixture-a\",\"rates_sha256\":\"{FixtureSheet.Sheet.RatesSha256}\",\"confirmed_on\":\"2026-10-01\"}}', 'test', now())");
+
+        var problem = await GetProblemAsync($"/api/reports/summary?runs={Both}&basis=net");
+        var runs = await GetOkAsync("/api/reports/runs");
+
+        problem.ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"));
+        runs.GetProperty("net").GetProperty("state").GetString().ShouldBe("unavailable");
+    }
+
+    [Fact]
+    public async Task A_confirmation_made_through_the_owners_endpoint_is_what_makes_a_report_net_and_a_revoke_makes_it_gross_again()
+    {
+        var run = await StoreCostedRunAsync("RPTNETE");
+        var net = $"/api/reports/summary?runs={run.RunKey}&basis=net";
+        (await GetProblemAsync(net)).ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"));
+
+        using var on = await Client.PutAsJsonAsync(new Uri("/api/charge-sheet/capability", UriKind.Relative), new { on = true, reason = "I will confirm my sheet", password = Factory.OwnerPassword }, Ct);
+        using var confirm = await Client.PostAsJsonAsync(new Uri("/api/charge-sheet/confirmation", UriKind.Relative), new { sheetId = "fixture-a", ratesSha256 = FixtureSheet.Sheet.RatesSha256, reason = "checked against my contract notes", password = Factory.OwnerPassword }, Ct);
+        on.StatusCode.ShouldBe(HttpStatusCode.OK);
+        confirm.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        (await GetOkAsync(net)).GetProperty("evidence").GetProperty("basis").GetString().ShouldBe("net");
+        using var revoke = await Client.PostAsJsonAsync(new Uri("/api/charge-sheet/confirmation/revoke", UriKind.Relative), new { reason = "changed my mind", password = Factory.OwnerPassword }, Ct);
+        revoke.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await GetProblemAsync(net)).ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"));
+    }
+
+    [Fact]
+    public async Task A_revoked_confirmation_makes_every_report_gross_again()
+    {
+        var run = await StoreCostedRunAsync("RPTNETR");
+        await ConfirmAsync("fixture-a");
+        (await GetOkAsync($"/api/reports/summary?runs={run.RunKey}&basis=net")).GetProperty("evidence").GetProperty("basis").GetString().ShouldBe("net");
+
+        await ExecuteSqlAsync($"INSERT INTO workflow.charge_sheet_events (kind, sheet_id, rates_sha256, actor, reason) VALUES ('revoke', 'fixture-a', '{FixtureSheet.Sheet.RatesSha256}', 'owner:test@example.com', 'test')");
+        var problem = await GetProblemAsync($"/api/reports/summary?runs={run.RunKey}&basis=net");
+
+        problem.ShouldBe((HttpStatusCode.UnprocessableEntity, "reports.net_not_confirmed"));
+    }
+
+    [Fact]
     public async Task A_stored_confirmation_stays_what_it_is_whatever_sheet_the_request_names()
     {
         var run = await StoreCostedRunAsync("RPTNET2");
-        await ConfirmAsync("fixture-a");
+        var on = await ConfirmAsync("fixture-a");
 
         var net = await GetOkAsync($"/api/reports/summary?runs={run.RunKey}&basis=net&sheet_id=other-sheet&sheet=other&rates_sha256={new string('0', 64)}&confirmed_on=2020-01-01");
 
-        net.GetProperty("evidence").GetProperty("netBasisConfirmation").GetString().ShouldBe($"charge sheet 'fixture-a' with rates {FixtureSheet.Sheet.RatesSha256[..12]} confirmed by the owner on 2026-10-01");
+        net.GetProperty("evidence").GetProperty("netBasisConfirmation").GetString().ShouldBe($"charge sheet 'fixture-a' with rates {FixtureSheet.Sheet.RatesSha256[..12]} confirmed by the owner on {on}");
     }
 
     [Fact]

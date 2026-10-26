@@ -16,6 +16,7 @@ using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
+using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Live;
@@ -631,7 +632,10 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListPaperReviewsQuery, Result<PaperReviewList>>, ListPaperReviewsHandler>();
         services.AddScoped<IQueryHandler<GetDisciplineQuery, Result<DisciplineView>>, GetDisciplineHandler>();
         services.AddScoped<BacktestReferenceReader>(); // the point-in-time backtest reference of the paper comparison (P10-04)
-        services.AddSingleton<ICostConfirmationFact, NotConfirmed>(); // no sheet is confirmed until the slice that writes the confirmation exists (P10-04, criterion 7)
+        services.TryAddSingleton<ICostConfirmationFact, NotConfirmed>(); // the default and the test default: no sheet is confirmed. The Infrastructure registration replaces it with the stored owner confirmation (P8-23, ADR 0127)
+        services.AddScoped<ChargeSheetStatusBuilder>(); // the charge-sheet confirmation: status, and the owner's one writer (P8-23, ADR 0127)
+        services.AddScoped<IQueryHandler<GetChargeSheetStatusQuery, Result<ChargeSheetStatusView>>, GetChargeSheetStatusHandler>();
+        services.AddScoped<ICommandHandler<RecordChargeSheetActCommand, ChargeSheetActOutcome>, RecordChargeSheetActHandler>();
         services.AddScoped<IQueryHandler<EvaluatePaperPhaseCheckQuery, Result<PaperPhaseCheckView>>, EvaluatePaperPhaseCheckHandler>(); // the paper phase check: reads only, judges nothing it cannot read (P10-06, ADR 0123)
         services.AddScoped<IQueryHandler<GetBacktestVsPaperQuery, Result<BacktestVsPaperView>>, GetBacktestVsPaperHandler>(); // backtest vs paper, computed on read (P10-04, ADR 0122)
         services.AddScoped<ICommandHandler<JournalPlansCommand, JournalOutcome>, JournalPlansHandler>(); // auto-journal (P7-14, ADR 0093): reads stored fills, insert-only links, no order

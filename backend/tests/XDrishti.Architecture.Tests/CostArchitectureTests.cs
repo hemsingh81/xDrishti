@@ -158,7 +158,7 @@ public sealed partial class CostArchitectureTests
         [
             "XDrishti.Api", "XDrishti.Application", "XDrishti.Domain", "XDrishti.Feed", "XDrishti.Hosting", "XDrishti.Indicators", "XDrishti.Infrastructure", "XDrishti.Learning.MlNet", "XDrishti.SimExport", "XDrishti.SimReader", "XDrishti.Simulation", "XDrishti.Strategies", "XDrishti.Strategies.File", "XDrishti.Worker",
         ]);
-        migrations.ShouldNotContain(m => m!.Contains("Cost", StringComparison.OrdinalIgnoreCase) || m.Contains("Charge", StringComparison.OrdinalIgnoreCase), "the store of the sheet and its migration are P3-03f");
+        migrations.ShouldNotContain(m => !m!.Contains("AddChargeSheetEvents", StringComparison.Ordinal) && (m.Contains("Cost", StringComparison.OrdinalIgnoreCase) || m.Contains("Charge", StringComparison.OrdinalIgnoreCase)), "the store of the sheet and its migration are P3-03f; the one exception is the owner's confirmation log of P8-23 (AddChargeSheetEvents), which does not touch the sheet");
     }
 }
 

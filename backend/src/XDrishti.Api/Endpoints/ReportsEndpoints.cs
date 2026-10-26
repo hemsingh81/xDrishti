@@ -26,7 +26,7 @@ internal sealed class ReportsEndpoints : IEndpointModule
 
         reports.MapGet("/runs", RunsAsync)
             .WithName("ListReportRuns")
-            .WithSummary("The stored simulation runs a report may use, newest first: strategy, universe, window, costed or gross, the style and exit labels and where they come from, closed and open-at-end trades, whether the default run set takes the run (and why not), and whether net figures are possible at all (unavailable with the reason until the owner has confirmed the stored charge sheet). Takes no parameter. Read only.");
+            .WithSummary("The stored simulation runs a report may use, newest first: strategy, universe, window, costed or gross, the style and exit labels and where they come from, closed and open-at-end trades, whether the default run set takes the run (and why not), and whether net figures are possible at all (unavailable with the reason until the owner has confirmed the stored charge sheet, on the Settings screen, tab Charge sheet). Takes no parameter. Read only.");
 
         reports.MapGet("/summary", SummaryAsync)
             .WithName("GetReportSummary")

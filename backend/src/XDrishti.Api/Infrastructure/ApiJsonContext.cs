@@ -13,6 +13,7 @@ using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
+using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Live.Push;
@@ -88,6 +89,11 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(IReadOnlyList<LessonView>))]
 [JsonSerializable(typeof(AutonomySettingsView))]
 [JsonSerializable(typeof(ChangeAutonomyRequest))]
+[JsonSerializable(typeof(ChargeSheetStatusView))]
+[JsonSerializable(typeof(ChargeSheetActOutcome))]
+[JsonSerializable(typeof(ConfirmChargeSheetRequest))]
+[JsonSerializable(typeof(RevokeChargeSheetRequest))]
+[JsonSerializable(typeof(ChangeChargeSheetCapabilityRequest))]
 [JsonSerializable(typeof(PlanReviewView))]
 [JsonSerializable(typeof(ReviewDecisionOutcome))]
 [JsonSerializable(typeof(ApproveAllOutcome))]

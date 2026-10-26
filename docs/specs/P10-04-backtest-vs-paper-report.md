@@ -73,3 +73,4 @@ None. (The charge-sheet confirmation is the owner's act, tracked in P10-00; unti
 - AC7: production default `NotConfirmed` makes E3/E4 `not_evaluable`, so tests inject a stub `ICostConfirmationFact`; the follow-up label 'P10-07' replaced by 'the unwritten slice that writes the charge-sheet confirmation'.
 - Decision 1: percentiles are nearest-rank, as `MonteCarlo`.
 - Size 2.5 -> 4 agent-days (P10-00 table to match).
+- Update 2026-10-26 ([P8-23](P8-23-charge-sheet-confirmation-writer.md), ADR 0127): the confirmation writer exists. The production `ICostConfirmationFact` is now `StoredCostConfirmation` (Infrastructure, over the owner's stored confirmation: the confirmed day for the confirmed sheet only); `NotConfirmed` stays the Application and test default. With no confirmation E3 and E4 still read `not_evaluable: costs not confirmed`; every test that expects `met` or `not_met` still injects a stub.

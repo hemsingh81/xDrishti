@@ -18,6 +18,10 @@ export const queryRoots = {
   accounts: ['accounts'] as const,
   /** The Action center's lists (the Settings thresholds card reloads them: a threshold changes the next read). */
   portfolioActions: ['portfolio', 'actions'] as const,
+  /** Everything the Reports screens read (a charge-sheet confirmation changes whether net figures are possible). */
+  reports: ['reports'] as const,
+  /** Everything the Paper screens read (a charge-sheet confirmation changes the cost-dependent criteria). */
+  paper: ['paper'] as const,
   /** Every members list (current and as-of) of every basket. */
   basketMembers: ['baskets', 'members'] as const,
 };

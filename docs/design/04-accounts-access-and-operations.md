@@ -242,7 +242,7 @@ of the next three runs while editing.
 |----------|----------|----------|
 | **Automatic** (no approval) | Data fetch, aggregation, quality checks, grading, cell statistics, portfolio sync, valuations | Services |
 | **Proposed → you confirm** | Next-day trade tickets · AI instrument suggestions (track, add to / remove from basket) · hypothesis promotions · cell promotions to Active · config change proposals · (later) semi-auto orders | You |
-| **Only you** | Accounts & roles, credentials, baskets you create, risk limits, enabling execution | You |
+| **Only you** | Accounts & roles, credentials, baskets you create, risk limits, enabling execution, **confirming your charge sheet as your own** (the password is typed again for that act; switched off until you switch it on; [ADR 0127](../adr/0127-the-owners-confirmation-of-the-charge-sheet-is-an-insert-only-log-written-only-by-the-owners-endpoint-after-a-fresh-password-bound-to-the-rates-hash-and-off-by-default.md)) | You |
 
 ### 4.2 Next-day plan approval
 

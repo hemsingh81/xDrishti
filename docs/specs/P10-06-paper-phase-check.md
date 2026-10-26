@@ -76,3 +76,4 @@ None for the build. For the owner (wall-clock): complete the pre-flight of P10-0
 
 ## Built 2026-10-26 (ADR 0123)
 - Built with the decisions above; the pending-pair part of I reads the stored capture row (it cannot tell missing bars from a late replay); the review's backtest line (P10-03 port) now reads P10-04.
+- Update 2026-10-26 ([P8-23](P8-23-charge-sheet-confirmation-writer.md), ADR 0127): the confirmation-writer slice is built. A real MET is reachable only after the owner's own act (switch confirming on, confirm the stored sheet at its rates) and only while that confirmation stands; a revoke or a change of the sheet's rates makes C3 and C4 `NOT EVALUABLE: costs not confirmed` again. The blocker line now names the owner's act (Settings, tab Charge sheet).

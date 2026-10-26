@@ -34,7 +34,14 @@ export function configureApiAuth(hooks: ApiAuthHooks | undefined): void {
 const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
 const anonymousPaths = new Set<string>(['/api/auth/login', '/api/auth/session']);
 // Calls that ask for the password again: a wrong one is an answer to the user, not an ended session.
-const passwordCheckPaths = new Set<string>(['/api/auth/step-up', '/api/auth/change-password']);
+const passwordCheckPaths = new Set<string>([
+  '/api/auth/step-up',
+  '/api/auth/change-password',
+  '/api/autonomy/settings',
+  '/api/charge-sheet/confirmation',
+  '/api/charge-sheet/confirmation/revoke',
+  '/api/charge-sheet/capability',
+]);
 
 api.use({
   onRequest({ request, schemaPath }) {
