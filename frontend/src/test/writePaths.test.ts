@@ -8,6 +8,7 @@ const WRITER_FEATURES = new Set([
   'auth',
   'baskets',
   'data',
+  'exports',
   'instruments',
   'lab',
   'owner-acts',
@@ -74,6 +75,16 @@ const moveRoutes = [
   '/api/changelog/{id}/revert',
   '/api/autonomy/settings',
 ];
+
+describe('the export route is written from exports only', () => {
+  it('names the route in no other feature', () => {
+    const holders = [...byFeature.entries()]
+      .filter(([, files]) => files.some(([, text]) => /\.POST\(\s*'\/api\/exports\/\{kind\}'/.test(text)))
+      .map(([feature]) => feature)
+      .sort();
+    expect(holders).toEqual(['exports']);
+  });
+});
 
 describe('the learning move routes are written from owner-acts only', () => {
   const writes = (route: string, text: string) =>

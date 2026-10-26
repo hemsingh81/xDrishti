@@ -1,5 +1,6 @@
 import { Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { ExportMenu } from '@/features/exports';
 import { carriesNumber, EvidenceBlock, formatR, NonValue } from '@/shared/analytics';
 import { TimeSeriesChart, type ChartColor, type ChartDash, type ChartSeries } from '@/shared/ui/chart';
 import { equityQuery } from '../api/reportQueries';
@@ -36,6 +37,7 @@ export function EquityByGroup({ query, min, title, lens }: EquityByGroupProps) {
         }));
         return (
           <Box sx={{ display: 'grid', gap: 1 }}>
+            <ExportMenu kind="report-equity" query={{ ...query, lens }} />
             {chart.length === 0 ? (
               <NonValue state={{ kind: 'empty', reason: 'No group has enough trades for a curve.' }} />
             ) : (

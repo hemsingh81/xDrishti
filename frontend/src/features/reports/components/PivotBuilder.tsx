@@ -1,5 +1,6 @@
 import { Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { ExportMenu } from '@/features/exports';
 import { useState } from 'react';
 import { useUrlState } from '@/shared/analytics';
 import { pivotQuery } from '../api/reportQueries';
@@ -35,6 +36,10 @@ export function PivotBuilder({ query, min }: ReportPanelProps) {
             <PivotError error={result.error} set={url.update} />
           ) : (
             <>
+              <ExportMenu
+                kind="report-pivot"
+                query={{ ...query, lens: `${axes.rows},${axes.columns}`, metric: axes.metric }}
+              />
               <PivotGrid
                 pivot={result.data}
                 min={min}

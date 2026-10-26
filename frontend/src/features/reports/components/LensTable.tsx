@@ -1,5 +1,6 @@
 import { Alert, Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { ExportMenu } from '@/features/exports';
 import { DataTable, formatCount, formatR, formatRate } from '@/shared/analytics';
 import {
   dimensionReasonQuery,
@@ -127,15 +128,18 @@ function ByDimension({ query, min, onOpen, by }: Omit<LensTableProps, 'lens'> & 
   return (
     <QueryPanel title="Groups by lens" query={result}>
       {(g) => (
-        <GroupTable
-          title={`Groups by ${by}`}
-          groups={g.groups}
-          evidence={g.evidence}
-          min={min}
-          dimension={by}
-          nonAdditive={g.nonAdditive}
-          onOpen={onOpen}
-        />
+        <>
+          <ExportMenu kind="report-groups" query={{ ...query, lens: by }} />
+          <GroupTable
+            title={`Groups by ${by}`}
+            groups={g.groups}
+            evidence={g.evidence}
+            min={min}
+            dimension={by}
+            nonAdditive={g.nonAdditive}
+            onOpen={onOpen}
+          />
+        </>
       )}
     </QueryPanel>
   );

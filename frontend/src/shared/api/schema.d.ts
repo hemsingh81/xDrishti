@@ -2929,6 +2929,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/exports/{kind}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Save one research table the Reports screens show (report-groups, report-pivot, report-what-works, report-equity, report-trades) as a CSV file: the same numbers as the GET of the same query, with the evidence block (basis with the charge-sheet confirmation if net, population rule, as-of, runs, unavailable inputs, limits, row count and hash) as # comment lines before the table and a closing line after it. A figure is three columns (number, state, reason); a non-value has no number. The file is never cut: a table over 100,000 rows or 25 MB is refused (413 exports.too_large) with the sentence to narrow the filters. Needs a session, the CSRF token and the capability exports (OFF by default; switching it ON asks the password), at most 6 a minute and one at a time. Body {format:'csv', query:{...the ReportQueryInput fields of the screen}}. The name of the file is made by the server (xd-<kind>-<yyyyMMdd>-<8 hex of the table hash>.csv). One audit row (ReportExported: kind, format, rows, bytes, how many filters) and no content in any log. 403 capabilities.off, 422 exports.kind_unknown, exports.format_unknown, reports.invalid and the other report refusals of the same query, 409 reports.run_overlap or reports.mixed_basis, 404 reports.not_found, 413 exports.too_large, 429 auth.rate_limited, 500 exports.audit_failed. */
+    post: operations['ExportTable'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/changelog': {
     parameters: {
       query?: never;
@@ -8276,6 +8293,12 @@ export interface components {
       /** @description Who recorded it. */
       createdBy: string;
     };
+    /** @description The body of an export (spec P8-20). There is no password, no actor and no file name in it: the actor is the session, the name is made by the server. */
+    ExportRequest: {
+      /** @description csv (the default and the only format). */
+      format: null | string;
+      query: null | components['schemas']['ReportQueryInput'];
+    };
     /** @description A filter value and how many active instruments have it. */
     FacetCount: {
       value: string;
@@ -13008,6 +13031,42 @@ export interface components {
       groups: components['schemas']['MaeMfeGroupView'][];
       /** @description The evidence of the report. */
       evidence: components['schemas']['ReportEvidenceView'];
+    };
+    /**
+     * @description The raw text of the one query model of the report endpoints (P8-00 D4): what the query string carries, before the whitelist. Lists are comma separated. There is deliberately no field for the basis confirmation: whether a report may be net is decided from the
+     *     owner's stored confirmation only, never from what a caller says.
+     */
+    ReportQueryInput: {
+      /** @description Run keys (64 lower-case hex each); empty means the default set: the newest run of each strategy and universe. */
+      runs?: null | string;
+      /** @description `gross` (default) or `net`. */
+      basis?: null | string;
+      /** @description Dimensions to group by, in order: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are named and refused with the reason). */
+      lens?: null | string;
+      /** @description Strategy ids to keep. */
+      strategy?: null | string;
+      /** @description Timeframe codes to keep (`15m`). */
+      timeframe?: null | string;
+      /** @description BUY or SELL. */
+      side?: null | string;
+      /** @description Run style labels to keep (`intraday`, `swing`). */
+      style?: null | string;
+      /** @description Run exit labels to keep, separated by semicolons (a label such as `FIXED_RR{rr=2,x=3}` may hold a comma). */
+      exit?: null | string;
+      /** @description Basket ids to keep. */
+      basket?: null | string;
+      /** @description Symbols to keep. */
+      symbol?: null | string;
+      /** @description First entry date to keep, `yyyy-MM-dd`. */
+      from?: null | string;
+      /** @description Last entry date to keep, `yyyy-MM-dd`. */
+      to?: null | string;
+      /** @description The figure of a pivot (snake case, `expectancy_r` by default). */
+      metric?: null | string;
+      /** @description Page size of the trade list, 1 to 1,000 (100 by default). */
+      limit?: null | string;
+      /** @description The cursor the previous page of the trade list returned. */
+      cursor?: null | string;
     };
     /** @description What was tested: the strategy version, the method, the window and the universe (spec P5-06). */
     ReportRunView: {
@@ -22282,6 +22341,93 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ExportTable: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kind: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['ExportRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Payload Too Large */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Too Many Requests */
+      429: {
         headers: {
           [name: string]: unknown;
         };

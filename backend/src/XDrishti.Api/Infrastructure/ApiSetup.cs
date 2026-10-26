@@ -19,6 +19,7 @@ using XDrishti.Application;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
+using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Learning.Jobs;
 using XDrishti.Application.Live.Push;
@@ -97,6 +98,9 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, ExperimentsEndpoints>();
         services.AddSingleton<IEndpointModule, ExperimentJobsEndpoints>(); // the replay job started from the Learning area (P8-18 Part B, ADR 0129): capability off by default, fresh password, never applies
         services.AddSingleton<IEndpointModule, OwnerMovesEndpoints>(); // the lesson, hypothesis and revert moves of the owner-acts forms (P8-19, ADR 0130): capability off by default, fresh password, writes one row
+        services.AddSingleton<IEndpointModule, ExportsEndpoints>(); // saving a research table as a file (P8-20, ADR 0131): capability off by default, audited before the file is given, nothing kept
+        services.AddSingleton<Exports.ExportSlot>();
+        services.AddScoped<ICommandHandler<Exports.ExportCommand, Exports.ExportFile>, Exports.ExportHandler>();
         services.AddSingleton<IEndpointModule, ChangelogEndpoints>();
         services.AddSingleton<IEndpointModule, AuditEndpoints>();
         services.AddSingleton<IEndpointModule, HypothesesEndpoints>();

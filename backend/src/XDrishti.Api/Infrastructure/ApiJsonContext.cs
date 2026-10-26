@@ -104,6 +104,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ExperimentJobView))]
 [JsonSerializable(typeof(ExperimentJobList))]
 [JsonSerializable(typeof(StartExperimentRequest))]
+[JsonSerializable(typeof(ExportRequest))]
 [JsonSerializable(typeof(OwnerMoveRequest))]
 [JsonSerializable(typeof(LinkLessonRequest))]
 [JsonSerializable(typeof(MoveHypothesisRequest))]

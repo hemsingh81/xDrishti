@@ -33,7 +33,7 @@ public static class Capabilities
         new(ExperimentsUi, "Start a replay from the Learning area", "Allows you to start one replay job that judges a changed exit or a dearer slippage against a stored run. Every start asks for your password. The result is a proposal: nothing is applied to a strategy or setting."),
         new(LearningMovesUi, "Move lessons and hypotheses, revert a change", "Allows you to link, close or dismiss a lesson, move a hypothesis and revert a learning change from the screens. Every move asks for your password."),
         new(AutonomyForm, "Change the autonomy switches in the app", "Allows you to change the autonomy settings from the screen. Every change asks for your password. No setting places an order."),
-        new(Exports, "Export a table as a file", "Allows you to save a research table as a file on this device, outside the app's protection."),
+        new(Exports, "Export a table as a file", "Allows you to save a research table of the Reports screens as a CSV file on this device, outside the app's protection. The file holds research tables only, with their evidence, and nothing about accounts. Each export is recorded; it asks no password."),
         new(Pwa, "Installable shell with an offline cache", "Allows the app to register a service worker and keep a cache of its own pages on this device."),
     ];
 

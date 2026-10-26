@@ -67,16 +67,16 @@ internal sealed class CsvRow
     public void Empty() => Separate();
 
     /// <summary>
-    /// A text cell, in this order: every character of the Unicode category Control (a NUL, tab, CR or LF inside a cell) or Format (the bidi controls, zero-width characters) is dropped; then, when the first character of the original text or
-    /// of the stripped text is <c>=</c>, <c>+</c>, <c>-</c>, <c>@</c>, TAB, CR or LF, the cell gains a leading apostrophe (the two tests together close the bypasses a single test leaves); a cell with a comma or a quote is quoted and its
-    /// quotes doubled.
+    /// A text cell, in this order: every character of the Unicode category Control (a NUL, tab, CR or LF inside a cell) or Format (the bidi controls, zero-width characters) is dropped; then, when the first character of the original text, or the first
+    /// kept character that is not white space (a leading space does not hide a trigger), is <c>=</c>, <c>+</c>, <c>-</c>, <c>@</c>, their full-width forms, or the original begins with TAB, CR or LF, the cell gains a leading apostrophe (P8-20); a cell with a comma
+    /// or a quote is quoted and its quotes doubled.
     /// </summary>
     public void Text(ReadOnlySpan<char> text)
     {
         Separate();
         var prefix = !text.IsEmpty && IsFormulaStart(text[0]);
         var quote = false;
-        var firstKept = true;
+        var significant = false;
         foreach (var rune in text.EnumerateRunes())
         {
             if (IsDropped(rune))
@@ -84,10 +84,10 @@ internal sealed class CsvRow
                 continue;
             }
 
-            if (firstKept)
+            if (!significant && !Rune.IsWhiteSpace(rune))
             {
-                firstKept = false;
-                prefix |= rune.IsAscii && IsFormulaStart((char)rune.Value);
+                significant = true;
+                prefix |= IsTrigger(rune);
             }
 
             quote |= rune.Value is ',' or '"';
@@ -134,6 +134,9 @@ internal sealed class CsvRow
     }
 
     private static bool IsFormulaStart(char c) => c is '=' or '+' or '-' or '@' or '\t' or '\r' or '\n';
+
+    /// <summary>The characters a spreadsheet may read as the start of a formula: the ASCII four and their full-width forms (OWASP, CSV injection).</summary>
+    private static bool IsTrigger(Rune rune) => rune.Value is '=' or '+' or '-' or '@' or '\uFF1D' or '\uFF0B' or '\uFF0D' or '\uFF20';
 
     private static bool IsDropped(Rune rune)
     {

@@ -9913,6 +9913,116 @@
         }
       }
     },
+    "/api/exports/{kind}": {
+      "post": {
+        "tags": [
+          "Exports"
+        ],
+        "summary": "Save one research table the Reports screens show (report-groups, report-pivot, report-what-works, report-equity, report-trades) as a CSV file: the same numbers as the GET of the same query, with the evidence block (basis with the charge-sheet confirmation if net, population rule, as-of, runs, unavailable inputs, limits, row count and hash) as # comment lines before the table and a closing line after it. A figure is three columns (number, state, reason); a non-value has no number. The file is never cut: a table over 100,000 rows or 25 MB is refused (413 exports.too_large) with the sentence to narrow the filters. Needs a session, the CSRF token and the capability exports (OFF by default; switching it ON asks the password), at most 6 a minute and one at a time. Body {format:'csv', query:{...the ReportQueryInput fields of the screen}}. The name of the file is made by the server (xd-<kind>-<yyyyMMdd>-<8 hex of the table hash>.csv). One audit row (ReportExported: kind, format, rows, bytes, how many filters) and no content in any log. 403 capabilities.off, 422 exports.kind_unknown, exports.format_unknown, reports.invalid and the other report refusals of the same query, 409 reports.run_overlap or reports.mixed_basis, 404 reports.not_found, 413 exports.too_large, 429 auth.rate_limited, 500 exports.audit_failed.",
+        "operationId": "ExportTable",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExportRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/changelog": {
       "get": {
         "tags": [
@@ -25301,6 +25411,34 @@
         },
         "description": "An experiment as the API shows it (P6-11, ADR 0072). The report text and the parameters are empty in a list and filled for one experiment."
       },
+      "ExportRequest": {
+        "required": [
+          "format",
+          "query"
+        ],
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "csv (the default and the only format)."
+          },
+          "query": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The query of the screen the table is on, with the same field names as the GET of that screen; the page fields (limit, cursor) are ignored. There is deliberately no field for the charge-sheet confirmation.",
+                "$ref": "#/components/schemas/ReportQueryInput"
+              }
+            ]
+          }
+        },
+        "description": "The body of an export (spec P8-20). There is no password, no actor and no file name in it: the actor is the session, the name is made by the server."
+      },
       "FacetCount": {
         "required": [
           "value",
@@ -37327,6 +37465,117 @@
         },
         "description": "The excursions of a report for a lens, one entry per group, as counts in bins (never one point per trade), with the evidence of the report."
       },
+      "ReportQueryInput": {
+        "type": "object",
+        "properties": {
+          "runs": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Run keys (64 lower-case hex each); empty means the default set: the newest run of each strategy and universe."
+          },
+          "basis": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`gross` (default) or `net`."
+          },
+          "lens": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Dimensions to group by, in order: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are named and refused with the reason)."
+          },
+          "strategy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Strategy ids to keep."
+          },
+          "timeframe": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Timeframe codes to keep (`15m`)."
+          },
+          "side": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "BUY or SELL."
+          },
+          "style": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Run style labels to keep (`intraday`, `swing`)."
+          },
+          "exit": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Run exit labels to keep, separated by semicolons (a label such as `FIXED_RR{rr=2,x=3}` may hold a comma)."
+          },
+          "basket": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Basket ids to keep."
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Symbols to keep."
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "First entry date to keep, `yyyy-MM-dd`."
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Last entry date to keep, `yyyy-MM-dd`."
+          },
+          "metric": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The figure of a pivot (snake case, `expectancy_r` by default)."
+          },
+          "limit": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Page size of the trade list, 1 to 1,000 (100 by default)."
+          },
+          "cursor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The cursor the previous page of the trade list returned."
+          }
+        },
+        "description": "The raw text of the one query model of the report endpoints (P8-00 D4): what the query string carries, before the whitelist. Lists are comma separated. There is deliberately no field for the basis confirmation: whether a report may be net is decided from the\nowner's stored confirmation only, never from what a caller says."
+      },
       "ReportRunView": {
         "required": [
           "key",
@@ -42925,6 +43174,9 @@
     },
     {
       "name": "Learning"
+    },
+    {
+      "name": "Exports"
     },
     {
       "name": "Audit"

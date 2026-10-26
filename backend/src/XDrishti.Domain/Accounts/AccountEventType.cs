@@ -83,4 +83,5 @@ public enum AccountEventType
     HypothesisMoved,
     ChangelogReverted,
     AutonomySettingsChanged,
+    ReportExported,
 }

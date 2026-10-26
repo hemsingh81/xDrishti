@@ -1,5 +1,6 @@
 import { Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { ExportMenu } from '@/features/exports';
 import { DataTable, EvidenceBlock, formatCount, formatR, formatRate, NonValue } from '@/shared/analytics';
 import { whatWorksQuery, type GroupView } from '../api/reportQueries';
 import { useBasketNames } from '../hooks/useBasketNames';
@@ -23,6 +24,7 @@ export function WhatWorksView({ query }: { query: ReportQuery }) {
             <Typography variant="body1" sx={{ fontWeight: 600 }}>
               {w.headline}
             </Typography>
+            <ExportMenu kind="report-what-works" query={query} />
             <Typography variant="body2">
               {`Looked at ${formatCount(w.cellsLookedAt)} cells, compared ${formatCount(w.cellsComparable)}. ${w.selectionNote} About ${w.expectedChancePositives.toFixed(1)} positive lower bounds are expected by chance; ${formatCount(w.positiveLowerBound)} found.`}
             </Typography>

@@ -1,5 +1,6 @@
 import { Box, Typography } from '@mui/material';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { ExportMenu } from '@/features/exports';
 import { useNavigate } from 'react-router';
 import { formatR } from '@/shared/analytics';
 import { ApiError } from '@/shared/api';
@@ -45,6 +46,7 @@ export function TradeList({ query }: { query: ReportQuery }) {
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Open a trade to see it on its own bars. Simulated trades on replayed history.
       </Typography>
+      <ExportMenu kind="report-trades" query={query} />
       <Box sx={{ height: 420 }}>
         <Grid
           label="Trades of this cell"
