@@ -34,7 +34,7 @@ for (const screen of screens) {
         await installApi(page, 'full', mount);
         await throttle(page);
         await page.goto(screen.route);
-        const result = await c14Performance(page);
+        const result = await c14Performance(page, screen.scrollToEnd);
         record(ctx, [result]);
       });
     }

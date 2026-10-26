@@ -15,6 +15,7 @@ import {
 import { fail, na, pass, type Ctx, type Result } from './checks/types';
 import type { Screen } from './matrix';
 import { record, shotsDir } from './record';
+import { scrollThrough } from './scroll';
 
 export interface Opened {
   log: ApiLog;
@@ -35,6 +36,7 @@ export async function open(page: Page, screen: Screen, ctx: Ctx, mount: () => vo
   // Fonts loaded and the network quiet: the layout the checks measure is the settled one.
   await page.evaluate(() => document.fonts.ready);
   if (ctx.state !== 'loading') await page.waitForLoadState('networkidle');
+  if (ctx.state !== 'loading' && screen.scrollToEnd) await scrollThrough(page);
   return api;
 }
 

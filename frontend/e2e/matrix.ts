@@ -38,6 +38,8 @@ export interface Screen {
   route: string;
   /** Review-type screens have their answer checked above the fold at 360 x 800 (C2). */
   review?: boolean;
+  /** Panels below the first view mount when near the viewport (DeferUntilNear): the runner scrolls to the end and back. */
+  scrollToEnd?: boolean;
   /** Mounts the fixtures of a state; a state not listed has no fixture and is recorded `na`. */
   mounts: Partial<Record<State, () => void>>;
 }
@@ -101,10 +103,11 @@ const reportEmpty = () => {
     http.get('/api/reports/benchmarks', () => problemResponse({ title: 'Not found', code: 'reports.not_found' }, 404)),
   );
 };
-const reports = (id: string, view: string, review = false): Screen => ({
+const reports = (id: string, view: string, review = false, scrollToEnd = false): Screen => ({
   id: `P8-${id}`,
   route: view ? `/reports?view=${view}` : '/reports',
   review,
+  scrollToEnd,
   mounts: { full: reportBase, empty: reportEmpty },
 });
 
@@ -160,7 +163,7 @@ export const screens: Screen[] = [
       mountJourney(buildJourney());
     },
   }),
-  reports('08-overview', '', false),
+  reports('08-overview', '', false, true),
   reports('08-what-works', 'what-works', true),
   reports('09-baskets', 'baskets'),
   reports('09-pivot', 'pivot'),

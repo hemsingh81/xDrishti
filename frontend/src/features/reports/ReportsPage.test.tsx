@@ -16,7 +16,13 @@ import {
   runKeyA,
   runKeyB,
 } from '@/test/reportFixtures';
-import { dimensionReasons, renderReports, renderReportsFromStart, reportServer } from '@/test/reportScreen';
+import {
+  dimensionReasons,
+  renderReports,
+  renderReportsFromStart,
+  reportServer,
+  scrollOverviewToEnd,
+} from '@/test/reportScreen';
 import { problemResponse, server } from '@/test/server';
 
 pinClock('2026-10-25T10:00:00Z');
@@ -60,6 +66,7 @@ describe('Reports screen', () => {
   it('draws the Overview panels with their evidence', async () => {
     reportServer();
     renderReports();
+    await scrollOverviewToEnd();
     for (const name of [
       'Key figures',
       'Auto-insights',

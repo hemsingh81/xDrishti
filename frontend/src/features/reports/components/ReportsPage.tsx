@@ -12,6 +12,7 @@ import { useReportFilter } from '../hooks/useReportFilter';
 import { moreViews, queryString, toQuery, type MoreView, type ReportView } from '../lib/reportFilter';
 import { BasketComparison } from './BasketComparison';
 import { Catalogue } from './Catalogue';
+import { DeferUntilNear } from './DeferUntilNear';
 import { DataUsedPanel } from './DataUsedPanel';
 import { DistributionPanel } from './DistributionPanel';
 import { EquityPanel } from './EquityPanel';
@@ -164,33 +165,41 @@ export function ReportsPage() {
               <KpiTiles {...panel} />
               <InsightsList {...panel} />
               <EquityPanel {...panel} />
-              <Box
-                sx={{
-                  display: 'grid',
-                  gap: 2,
-                  gridTemplateColumns: { xs: 'minmax(0, 1fr)', xl: 'repeat(2, minmax(0, 1fr))' },
-                }}
-              >
-                <GroupBars {...panel} title="Monthly total R" lens="month" figure={(g) => g.totalR} format={formatR} />
-                <StrategyTimeframePanel {...panel} />
-                <GroupBars
-                  {...panel}
-                  title="Expectancy by basket"
-                  lens="basket"
-                  figure={(g) => g.expectancyR}
-                  format={formatR}
-                />
-                <DistributionPanel {...panel} />
-                <GroupBars
-                  {...panel}
-                  title="Win rate by weekday"
-                  lens="weekday"
-                  figure={(g) => g.winRate}
-                  format={formatRate}
-                  diverging={false}
-                  sort={(a, b) => dayIndex(a.parts[0]?.value ?? undefined) - dayIndex(b.parts[0]?.value ?? undefined)}
-                />
-              </Box>
+              <DeferUntilNear>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gap: 2,
+                    gridTemplateColumns: { xs: 'minmax(0, 1fr)', xl: 'repeat(2, minmax(0, 1fr))' },
+                  }}
+                >
+                  <GroupBars
+                    {...panel}
+                    title="Monthly total R"
+                    lens="month"
+                    figure={(g) => g.totalR}
+                    format={formatR}
+                  />
+                  <StrategyTimeframePanel {...panel} />
+                  <GroupBars
+                    {...panel}
+                    title="Expectancy by basket"
+                    lens="basket"
+                    figure={(g) => g.expectancyR}
+                    format={formatR}
+                  />
+                  <DistributionPanel {...panel} />
+                  <GroupBars
+                    {...panel}
+                    title="Win rate by weekday"
+                    lens="weekday"
+                    figure={(g) => g.winRate}
+                    format={formatRate}
+                    diverging={false}
+                    sort={(a, b) => dayIndex(a.parts[0]?.value ?? undefined) - dayIndex(b.parts[0]?.value ?? undefined)}
+                  />
+                </Box>
+              </DeferUntilNear>
             </>
           )}
           <DataUsedPanel runs={runs.data} query={query} filter={filter} set={set} />
