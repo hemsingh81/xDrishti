@@ -283,6 +283,8 @@ What the app can mend by itself it mends quietly ([doc 12](12-portfolio-monitori
 | R34 | Loss tags | Why trades lose | Tag counts and R lost by tag, linked lessons |
 | R35 | Smart-rule evidence | Is each rule still earning its place | Throttle: equity with/without; meta: R taken vs skipped; gate: R by VIX/breadth bucket; windows: R by hour; correlation matrix |
 
+**R14 as built for paper (P10-04, [ADR 0122](../adr/0122-backtest-versus-paper-is-a-composition-matched-bootstrap-of-the-pre-epoch-backtest-trades-computed-on-read.md)):** the `/paper` tab Backtest vs paper draws the paper's cumulative R over the 5th, 50th and 95th percentile fan of a composition-matched bootstrap of the pre-epoch backtest trades, with the mean's band, the largest fall against the 90th percentile at the paper's n and the two exit statistics (met, not met, not evaluable). The live line and the slippage distribution wait for P11. R15 for the paper count is drawn at the paper's n, not the Lab's.
+
 **Standard KPIs:** trades · win rate · avg win/loss R · expectancy · profit factor · total R · net ₹ after
 costs · max drawdown (R, %) · Sharpe/Sortino · avg holding · exposure · longest loss streak.
 

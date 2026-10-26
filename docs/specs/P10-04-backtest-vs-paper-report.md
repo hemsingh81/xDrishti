@@ -60,7 +60,7 @@ Unit: `BacktestBand` fixtures below; slot-order and permutation properties; seed
 None. (The charge-sheet confirmation is the owner's act, tracked in P10-00; until it exists E3 and E4 read `not_evaluable: costs not confirmed`.)
 
 ## Done when
-- [ ] All acceptance criteria have evidence
+- [x] All acceptance criteria have evidence (built 2026-10-26, ADR 0122)
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`); no migration
 - [ ] ADR written; doc 13 R14/R15 "as built" note and roadmap row updated; `scripts/build-docs.sh`

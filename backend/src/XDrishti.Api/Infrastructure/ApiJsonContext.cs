@@ -123,6 +123,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(PaperPositionList))]
 [JsonSerializable(typeof(PaperEquityView))]
 [JsonSerializable(typeof(PaperReconcileView))]
+[JsonSerializable(typeof(BacktestVsPaperView))]
 [JsonSerializable(typeof(CaptureRunList))]
 [JsonSerializable(typeof(EpochList))]
 [JsonSerializable(typeof(EpochDetail))]

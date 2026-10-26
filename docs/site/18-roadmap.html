@@ -153,7 +153,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td><strong>P10 Paper trading</strong> (≥ 12w, from P7)</td>
-<td>Follow plans on paper/minimal size; weekly review; config changes only via hypothesis loop. <em>P10-01 paper fill capture built 2026-10-26 (service <code>paper-capture</code>, paused until the owner switches it on; ADR 0116). P10-02 paper ledger and <code>/paper</code> Ledger tab built 2026-10-26 (derived equity, open risk and marks; <code>Planning:OpenBook:UsePaperLedger</code>, default off; ADR 0118). P10-05 configuration governance built 2026-10-26: it freezes the measured configuration and any frozen change starts a new epoch; the system detects and labels, never applies or blocks (ADR 0119).</em></td>
+<td>Follow plans on paper/minimal size; weekly review; config changes only via hypothesis loop. <em>P10-01 paper fill capture built 2026-10-26 (service <code>paper-capture</code>, paused until the owner switches it on; ADR 0116). P10-02 paper ledger and <code>/paper</code> Ledger tab built 2026-10-26 (derived equity, open risk and marks; <code>Planning:OpenBook:UsePaperLedger</code>, default off; ADR 0118). P10-05 configuration governance built 2026-10-26: it freezes the measured configuration and any frozen change starts a new epoch; the system detects and labels, never applies or blocks (ADR 0119). P10-04 backtest versus paper built 2026-10-26: a composition-matched bootstrap band for the paper mean and the largest fall at the paper&#39;s n, with the two exit statistics as verdicts that read <code>not_evaluable: costs not confirmed</code> until the owner&#39;s sheet confirmation exists (ADR 0122).</em></td>
 <td>≥ 60 graded trades; positive expectancy after costs within backtest band; drawdown within Monte Carlo 90th pct</td>
 </tr>
 <tr>
@@ -1577,7 +1577,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-26 00:08</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-26 00:38</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

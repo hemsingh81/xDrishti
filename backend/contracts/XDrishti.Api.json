@@ -10688,6 +10688,65 @@
         }
       }
     },
+    "/api/paper/backtest-vs-paper": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The counted paper trades of an epoch against a composition-matched bootstrap of the backtest trades known before the epoch started: the paper mean with its own 90% interval against the 5th to 95th percentile band (below, within or above), the paper's largest fall against the 90th percentile of the same number of backtest trades, the two exit statistics as verdicts (met, not_met, not_evaluable: they need 60 counted trades and costs the owner confirmed), an early warning, the fan of cumulative R, the cells and the plan-price sensitivity beside. Every figure is a state and a number only for a value or provisional figure. Optional epoch (default the newest) and draws 1000 to 100000 (default 10000). Deterministic, read only; simulated, no order exists. 404 paper.not_found, 422 paper.invalid",
+        "operationId": "GetBacktestVsPaper",
+        "parameters": [
+          {
+            "name": "epoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "draws",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestVsPaperView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/plans/{id}/alerts": {
       "get": {
         "tags": [
@@ -14628,6 +14687,106 @@
         },
         "description": "The settings in force, with the history newest first."
       },
+      "BacktestVsPaperView": {
+        "required": [
+          "epochId",
+          "n",
+          "counts",
+          "basis",
+          "chargeSheet",
+          "paper",
+          "band",
+          "drawdown",
+          "criteria",
+          "earlyWarning",
+          "cells",
+          "fan",
+          "sensitivityAllProposals",
+          "evidence",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "epochId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The epoch, or null before the first capture.",
+            "format": "int64"
+          },
+          "n": {
+            "type": "integer",
+            "description": "Counted paper trades.",
+            "format": "int32"
+          },
+          "counts": {
+            "description": "What counts and what is set apart.",
+            "$ref": "#/components/schemas/CompareCountsView"
+          },
+          "basis": {
+            "type": "string",
+            "description": "net, gross, mixed or none."
+          },
+          "chargeSheet": {
+            "description": "The sheet(s) and the confirmation.",
+            "$ref": "#/components/schemas/CompareChargeSheetView"
+          },
+          "paper": {
+            "description": "The paper side.",
+            "$ref": "#/components/schemas/ComparePaperView"
+          },
+          "band": {
+            "description": "The band.",
+            "$ref": "#/components/schemas/CompareBandView"
+          },
+          "drawdown": {
+            "description": "The drawdown reference.",
+            "$ref": "#/components/schemas/CompareDrawdownView"
+          },
+          "criteria": {
+            "description": "The verdicts.",
+            "$ref": "#/components/schemas/CompareCriteriaView"
+          },
+          "earlyWarning": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The warning sentence, or null."
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompareCellView"
+            },
+            "description": "The cells."
+          },
+          "fan": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompareFanPointView"
+            },
+            "description": "The fan; empty unless the band is a figure."
+          },
+          "sensitivityAllProposals": {
+            "description": "The plan-price sensitivity.",
+            "$ref": "#/components/schemas/CompareSensitivityView"
+          },
+          "evidence": {
+            "description": "What it rests on.",
+            "$ref": "#/components/schemas/CompareEvidenceView"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honest limits."
+          }
+        },
+        "description": "The backtest-versus-paper report (spec P10-04, R14). Every figure is a state and a number only for a value or provisional figure."
+      },
       "BadBar": {
         "required": [
           "ts",
@@ -16977,6 +17136,402 @@
           }
         },
         "description": "A clone (spec P5-01): the text with the new id, the hash of the version it came from (post it as `parentHash` to record the lineage) and the source."
+      },
+      "CompareBandView": {
+        "required": [
+          "p05",
+          "p50",
+          "p95",
+          "rank",
+          "position",
+          "draws",
+          "seed"
+        ],
+        "type": "object",
+        "properties": {
+          "p05": {
+            "description": "5th percentile.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "p50": {
+            "description": "Median.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "p95": {
+            "description": "95th percentile.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "rank": {
+            "description": "Percentile rank of the paper mean.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "position": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "below, within or above; null when the band is not a figure."
+          },
+          "draws": {
+            "type": "integer",
+            "description": "Resamples.",
+            "format": "int32"
+          },
+          "seed": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The seed as text (64 bits)."
+          }
+        },
+        "description": "The backtest band of the mean."
+      },
+      "CompareCellView": {
+        "required": [
+          "cellKey",
+          "paperN",
+          "paperMean",
+          "referenceN",
+          "referenceMean",
+          "state",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "cellKey": {
+            "type": "string",
+            "description": "The cell."
+          },
+          "paperN": {
+            "type": "integer",
+            "description": "Counted paper trades of the cell.",
+            "format": "int32"
+          },
+          "paperMean": {
+            "description": "Their mean R.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "referenceN": {
+            "type": "integer",
+            "description": "Backtest trades before the epoch.",
+            "format": "int32"
+          },
+          "referenceMean": {
+            "description": "Their mean R.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "state": {
+            "type": "string",
+            "description": "ok, no_reference, thin_reference or basis_differs."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, when not ok."
+          }
+        },
+        "description": "One cell of the counted set against its reference."
+      },
+      "CompareChargeSheetView": {
+        "required": [
+          "id",
+          "confirmedOn"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The sheet id(s), or null when no counted trade was charged."
+          },
+          "confirmedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The day the owner confirmed them; null when not confirmed.",
+            "format": "date"
+          }
+        },
+        "description": "The charge sheet(s) of the counted trades and the owner's confirmation."
+      },
+      "CompareCountsView": {
+        "required": [
+          "counted",
+          "reserve",
+          "straddle",
+          "open",
+          "otherEpochs"
+        ],
+        "type": "object",
+        "properties": {
+          "counted": {
+            "type": "integer",
+            "description": "Tickets that count.",
+            "format": "int32"
+          },
+          "reserve": {
+            "type": "integer",
+            "description": "Reserve tickets.",
+            "format": "int32"
+          },
+          "straddle": {
+            "type": "integer",
+            "description": "Tickets that straddle a change.",
+            "format": "int32"
+          },
+          "open": {
+            "type": "integer",
+            "description": "Open tickets.",
+            "format": "int32"
+          },
+          "otherEpochs": {
+            "type": "integer",
+            "description": "Entries of other epochs.",
+            "format": "int32"
+          }
+        },
+        "description": "The counts of the epoch's tickets: what counts and what is set apart."
+      },
+      "CompareCriteriaView": {
+        "required": [
+          "expectancy",
+          "drawdown"
+        ],
+        "type": "object",
+        "properties": {
+          "expectancy": {
+            "description": "E3.",
+            "$ref": "#/components/schemas/CompareVerdictView"
+          },
+          "drawdown": {
+            "description": "E4.",
+            "$ref": "#/components/schemas/CompareVerdictView"
+          }
+        },
+        "description": "The two exit statistics."
+      },
+      "CompareDrawdownView": {
+        "required": [
+          "p50",
+          "p90",
+          "p95",
+          "position"
+        ],
+        "type": "object",
+        "properties": {
+          "p50": {
+            "description": "Median.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "p90": {
+            "description": "90th percentile.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "p95": {
+            "description": "95th percentile.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "position": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "within or above; null when the reference is not a figure."
+          }
+        },
+        "description": "The backtest reference of the largest fall at the paper's trade count."
+      },
+      "CompareEvidenceView": {
+        "required": [
+          "epochStart",
+          "firstExit",
+          "lastExit",
+          "snapshotKey",
+          "referenceAsOf",
+          "runKeys",
+          "statement"
+        ],
+        "type": "object",
+        "properties": {
+          "epochStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The first session of the epoch.",
+            "format": "date"
+          },
+          "firstExit": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "First counted exit day.",
+            "format": "date"
+          },
+          "lastExit": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Last counted exit day.",
+            "format": "date"
+          },
+          "snapshotKey": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The cell snapshot in force at the start."
+          },
+          "referenceAsOf": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Its as-of date.",
+            "format": "date"
+          },
+          "runKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The runs the reference was read from."
+          },
+          "statement": {
+            "type": "string",
+            "description": "The basis sentence."
+          }
+        },
+        "description": "What the report rests on."
+      },
+      "CompareFanPointView": {
+        "required": [
+          "index",
+          "p05",
+          "p50",
+          "p95",
+          "paper"
+        ],
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "description": "Trades so far.",
+            "format": "int32"
+          },
+          "p05": {
+            "type": "number",
+            "description": "5th percentile of the draws' cumulative R.",
+            "format": "double"
+          },
+          "p50": {
+            "type": "number",
+            "description": "Median.",
+            "format": "double"
+          },
+          "p95": {
+            "type": "number",
+            "description": "95th percentile.",
+            "format": "double"
+          },
+          "paper": {
+            "type": "number",
+            "description": "The paper cumulative R.",
+            "format": "double"
+          }
+        },
+        "description": "One point of the fan."
+      },
+      "CompareIntervalView": {
+        "required": [
+          "lo",
+          "hi"
+        ],
+        "type": "object",
+        "properties": {
+          "lo": {
+            "description": "Lower end.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "hi": {
+            "description": "Upper end.",
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "A 90% interval; each end is a figure."
+      },
+      "ComparePaperView": {
+        "required": [
+          "mean",
+          "ci90",
+          "maxDrawdownR"
+        ],
+        "type": "object",
+        "properties": {
+          "mean": {
+            "description": "The mean R.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "ci90": {
+            "description": "The mean's own 90% bootstrap interval.",
+            "$ref": "#/components/schemas/CompareIntervalView"
+          },
+          "maxDrawdownR": {
+            "description": "The largest fall of cumulative R in exit order.",
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "The paper side."
+      },
+      "CompareSensitivityView": {
+        "required": [
+          "label",
+          "n",
+          "mean"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "What it is."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Graded tickets.",
+            "format": "int32"
+          },
+          "mean": {
+            "description": "Their mean R.",
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "The plan-price grades of all primary tickets of the epoch, beside the comparison and never used by it."
+      },
+      "CompareVerdictView": {
+        "required": [
+          "verdict",
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "description": "met, not_met or not_evaluable."
+          },
+          "label": {
+            "type": "string",
+            "description": "The fact in words."
+          }
+        },
+        "description": "One verdict."
       },
       "ComparisonMemberView": {
         "required": [
