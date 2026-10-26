@@ -20,9 +20,9 @@ const sharedIsLeaf = {
   message: 'shared/ and theme/ must not depend on features or app.',
 };
 const chartLibrary = {
-  group: ['echarts', 'echarts/*', 'zrender', 'zrender/*'],
+  group: ['echarts', 'echarts/*', 'zrender', 'zrender/*', 'lightweight-charts', 'lightweight-charts/*'],
   message:
-    'Use <TimeSeriesChart> or <CategoryChart> from @/shared/ui/chart; only shared/ui/chart/EChartsCanvas.tsx and CategoryChartCanvas.tsx import the chart library.',
+    'Use <TimeSeriesChart>, <CategoryChart> or <PriceChart> from @/shared/ui/chart; only shared/ui/chart/EChartsCanvas.tsx, CategoryChartCanvas.tsx and PriceChartCanvas.tsx import a chart library.',
 };
 
 export default defineConfig([
@@ -71,8 +71,12 @@ export default defineConfig([
     },
   },
   {
-    // The two modules allowed to import the chart library.
-    files: ['src/shared/ui/chart/EChartsCanvas.tsx', 'src/shared/ui/chart/CategoryChartCanvas.tsx'],
+    // The three modules allowed to import a chart library.
+    files: [
+      'src/shared/ui/chart/EChartsCanvas.tsx',
+      'src/shared/ui/chart/CategoryChartCanvas.tsx',
+      'src/shared/ui/chart/PriceChartCanvas.tsx',
+    ],
     rules: {
       'no-restricted-imports': ['error', { patterns: [featureIndexOnly, sharedIsLeaf] }],
     },

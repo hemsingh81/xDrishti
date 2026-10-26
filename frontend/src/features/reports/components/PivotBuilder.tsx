@@ -54,6 +54,7 @@ export function PivotBuilder({ query, min }: ReportPanelProps) {
       </Panel>
       <LensTable lens={lens} query={query} min={min} onOpen={setOpen} />
       <CellPanel
+        query={query}
         info={open}
         onClose={() => {
           setOpen(null);

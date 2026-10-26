@@ -422,12 +422,55 @@ public sealed class ReportsApiTests(ApiFactory factory) : DataTestBase(factory)
     }
 
     [Fact]
+    public async Task A_stored_trade_replays_with_its_facts_and_says_no_bars_when_the_instrument_has_none()
+    {
+        var replay = await GetOkAsync($"/api/reports/trades/{ReportFixture.RunA.RunKey}/0?timeframe=15m");
+
+        replay.GetProperty("ordinal").GetInt32().ShouldBe(0);
+        replay.GetProperty("basis").GetString().ShouldBe("gross");
+        replay.GetProperty("trade").GetProperty("symbol").GetString().ShouldBe("NSE:RPT1");
+        replay.GetProperty("trade").GetProperty("stopPrice").GetDouble().ShouldBe(98);
+        replay.GetProperty("legs").GetArrayLength().ShouldBe(0);
+        replay.GetProperty("chart").GetProperty("timeframe").GetString().ShouldBe("15m");
+        replay.GetProperty("chart").GetProperty("coherence").GetProperty("state").GetString().ShouldBe("no_bars");
+        replay.GetProperty("features").GetProperty("state").GetString().ShouldBe("unavailable");
+        replay.GetProperty("evidence").GetProperty("n").GetInt32().ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_trade_list_carries_the_ordinal_that_addresses_the_replay()
+    {
+        var page = await GetOkAsync($"/api/reports/trades?runs={ReportFixture.RunB.RunKey}&limit=1");
+
+        var ordinal = page.GetProperty("items")[0].GetProperty("ordinal").GetInt32();
+        var replay = await GetOkAsync($"/api/reports/trades/{ReportFixture.RunB.RunKey}/{ordinal}");
+
+        replay.GetProperty("tradeKey").GetString().ShouldBe(page.GetProperty("items")[0].GetProperty("tradeKey").GetString());
+    }
+
+    [Theory]
+    [InlineData("0?timeframe=10m", HttpStatusCode.UnprocessableEntity, "reports.invalid")]
+    [InlineData("0?before=9", HttpStatusCode.UnprocessableEntity, "reports.invalid")]
+    [InlineData("9999", HttpStatusCode.NotFound, "reports.not_found")]
+    [InlineData("0?openAtEnd=true", HttpStatusCode.NotFound, "reports.not_found")]
+    public async Task A_replay_that_cannot_be_made_is_refused_with_its_status_and_code(string tail, HttpStatusCode status, string code) =>
+        (await GetProblemAsync($"/api/reports/trades/{ReportFixture.RunA.RunKey}/{tail}")).ShouldBe((status, code));
+
+    [Fact]
+    public async Task An_unknown_run_replay_is_404()
+    {
+        var problem = await GetProblemAsync($"/api/reports/trades/{new string('b', 64)}/0");
+
+        problem.ShouldBe((HttpStatusCode.NotFound, "reports.not_found"));
+    }
+
+    [Fact]
     public async Task The_endpoints_are_read_only_and_need_a_signed_in_owner()
     {
         using var anonymous = Factory.CreateClient();
         using var post = await Client.PostAsync(new Uri("/api/reports/summary", UriKind.Relative), null, Ct);
 
-        foreach (var path in new[] { "runs", "summary", "groups", "pivot", "equity", "distribution", "insights", "what-works", "trades" })
+        foreach (var path in new[] { "runs", "summary", "groups", "pivot", "equity", "distribution", "insights", "what-works", "trades", "trades/" + ReportFixture.RunA.RunKey + "/0" })
         {
             using var response = await anonymous.GetAsync(new Uri("/api/reports/" + path, UriKind.Relative), Ct);
             response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized, path);

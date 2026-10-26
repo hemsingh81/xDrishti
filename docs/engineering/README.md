@@ -85,3 +85,6 @@ Rules for working with agents:
   better, to an analyzer/architecture test — instead of repeating the correction.
 - **Product agents (P9 assistant, Hermes) are separate** from this workflow; see `docs/design/14-ai-assistant.md`.
 
+
+## Third-party notices
+- **TradingView Lightweight Charts** (`lightweight-charts@5.2.1`, Apache-2.0), used for price charts (ADR 0125). The licence asks for the attribution notice of its NOTICE file and a link to https://www.tradingview.com/ on a page that shows the chart: the replay page footer carries the notice and the link, and the chart's own attribution logo is on. Notice (the letter in "(с)" is the Cyrillic с, U+0441, as the file has it): TradingView Lightweight Charts™ Copyright (с) 2025 TradingView, Inc. https://www.tradingview.com/

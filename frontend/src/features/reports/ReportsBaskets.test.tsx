@@ -245,14 +245,16 @@ describe('Basket comparison', () => {
     expect(screen.getByRole('grid', { name: 'Expectancy by basket and style' })).toBeInTheDocument();
   });
 
-  it('opens a side panel for a cell with the P8-11 line', async () => {
+  it('opens a side panel for a cell with the link to its detail and trades (P8-11)', async () => {
     setup();
     const user = userEvent.setup();
     renderReports(cmp);
     const grid = await screen.findByRole('grid', { name: 'Expectancy by basket and side' });
     await user.click(within(grid).getByRole('button', { name: 'MyChoice, BUY: +0.40 R, n 60' }));
     const dialog = await screen.findByRole('dialog', { name: 'Cell MyChoice, BUY' });
-    expect(dialog).toHaveTextContent('Trades of this cell: drill-down arrives with P8-11');
+    const link = within(dialog).getByRole('link', { name: 'Open the cell and its trades' });
+    expect(link).toHaveAttribute('href', expect.stringContaining('/reports/cell?'));
+    expect(link).toHaveAttribute('href', expect.stringContaining('side=BUY'));
   });
 
   it('refuses a seventh basket', async () => {

@@ -1,5 +1,6 @@
 import { Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router';
 import {
   EvidenceBlock,
   formatCount,
@@ -12,6 +13,7 @@ import {
 import { pivotQuery, lenses } from '../api/reportQueries';
 import { NOT_RECORDED } from '../hooks/useBasketNames';
 import { evidenceOf, NON_ADDITIVE_NOTE } from '../lib/evidence';
+import { cellHref } from '../lib/cellLink';
 import { metricFromApi } from '../lib/metricFromApi';
 import type { ReportPanelProps } from '../lib/reportFilter';
 import { QueryPanel } from './Panel';
@@ -23,13 +25,13 @@ const words: Record<string, string> = {
   not_evaluable: 'not evaluable',
   empty: 'no records yet',
 };
-const noop = () => undefined;
 const textOf = (state: MetricState): string =>
   state.kind === 'value' ? formatR(state.value) : (words[state.kind] ?? state.kind);
 
 /** Expectancy by strategy (rows) and timeframe (columns). The server masks thin cells; this only draws what it sent. */
 export function StrategyTimeframePanel({ query, min }: ReportPanelProps) {
   const result = useQuery(pivotQuery(query, lenses.pivot));
+  const navigate = useNavigate();
   return (
     <QueryPanel title="Strategy by timeframe" query={result}>
       {(pivot) => {
@@ -73,8 +75,21 @@ export function StrategyTimeframePanel({ query, min }: ReportPanelProps) {
               rows={rows}
               columns={columns}
               cell={cellOf}
-              // The grid needs an opener; a cell's drill-down arrives with P8-11, so opening does nothing yet.
-              onOpen={noop}
+              // A cell is a strategy and a timeframe: its detail page takes those as filters (P8-11).
+              onOpen={(key) => {
+                const cell = cells.get(key);
+                const href = cell
+                  ? cellHref(
+                      query,
+                      [
+                        { dimension: 'strategy', value: cell.row },
+                        { dimension: 'timeframe', value: cell.column },
+                      ],
+                      `${cell.row ?? ''}, ${cell.column ?? ''}`,
+                    )
+                  : null;
+                if (href) void navigate(href);
+              }}
               emptyText="No trades"
               legend="Expectancy in R per trade. Hatched cells have too few trades for a figure."
             />

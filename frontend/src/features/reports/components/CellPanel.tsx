@@ -1,4 +1,5 @@
-import { Box, Drawer, IconButton, Typography } from '@mui/material';
+import { Box, Drawer, IconButton, Link as MuiLink, Typography } from '@mui/material';
+import { Link } from 'react-router';
 import CloseIcon from '@mui/icons-material/Close';
 import {
   EvidenceBlock,
@@ -11,7 +12,9 @@ import {
 } from '@/shared/analytics';
 import type { EvidenceView, GroupView } from '../api/reportQueries';
 import { evidenceOf } from '../lib/evidence';
+import { cellHref, type CellPart } from '../lib/cellLink';
 import { metricFromApi } from '../lib/metricFromApi';
+import type { ReportQuery } from '../lib/reportFilter';
 
 /** What a heat cell or table row opens: its figure, n, and (for a group) all its KPIs. */
 export interface CellInfo {
@@ -23,13 +26,24 @@ export interface CellInfo {
   evidence: EvidenceView;
   group?: GroupView;
   min?: number | null;
+  /** What the cell is made of; without it (or with a part that is not a filter) the cell has no trade list. */
+  parts?: readonly CellPart[];
 }
 
 /**
- * The side panel of a cell: its KPIs and the runs behind it. The trades of the cell arrive with P8-11 (this line says so).
+ * The side panel of a cell: its KPIs, the runs behind it and, where the cell is a set of filters, the link to its detail and trades (P8-11).
  * Every figure goes through the kit, so a non-value prints its word.
  */
-export function CellPanel({ info, onClose }: { info: CellInfo | null; onClose: () => void }) {
+export function CellPanel({
+  info,
+  onClose,
+  query = {},
+}: {
+  info: CellInfo | null;
+  onClose: () => void;
+  query?: ReportQuery;
+}) {
+  const href = info?.parts ? cellHref(query, info.parts, info.title) : null;
   const group = info?.group;
   const kpis = group
     ? ([
@@ -83,9 +97,15 @@ export function CellPanel({ info, onClose }: { info: CellInfo | null; onClose: (
             </Typography>
           )}
           <EvidenceBlock {...evidenceOf(info.evidence, { n: info.n })} />
-          <Typography variant="body2" color="text.secondary">
-            Trades of this cell: drill-down arrives with P8-11.
-          </Typography>
+          {href ? (
+            <MuiLink component={Link} to={href} variant="body2">
+              Open the cell and its trades
+            </MuiLink>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              This cell cannot be said as filters of a report, so its trades are not listed here.
+            </Typography>
+          )}
         </Box>
       )}
     </Drawer>

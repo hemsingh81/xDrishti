@@ -4,3 +4,6 @@ export { TimeSeriesChart, type TimeSeriesChartProps } from './TimeSeriesChart';
 export type { ChartColor, ChartDash, ChartPoint, ChartSeries } from './types';
 export { CategoryChart, type CategoryChartProps } from './CategoryChart';
 export type { CategoryData, CategorySlice, StackCategory, StackSeries } from './categoryTypes';
+export { PriceChart, type PriceChartProps } from './PriceChart';
+export { lightweightChartsNotice } from './attribution';
+export type { PriceBar, PriceEvent, PriceEventKind, PriceLine, PriceLineKind } from './priceChartTypes';
