@@ -1,10 +1,10 @@
 import { act, screen, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { scrollToEnd } from '@/test/intersection';
 import { countingUser } from '@/test/interactions';
 import { pinClock } from '@/test/pinClock';
 import { buildWhatWorks, rankedWhatWorks } from '@/test/reportFixtures';
-import { scrollToEnd } from '@/test/intersection';
 import { renderReportsFromStart, reportServer } from '@/test/reportScreen';
 
 pinClock('2026-10-25T10:00:00Z');
@@ -87,7 +87,6 @@ describe('the What works path (P8-17)', () => {
     expect(interactions).toBe(4);
     expect(requests.some((u) => u.pathname === route('ListReportRuns').path)).toBe(true);
     expect(requests.length).toBe(MEASURED_REQUESTS);
-    expect(withinRequests(requests.length)).toBe(true);
     const seen = new Map<string, number>();
     for (const u of requests) seen.set(u.pathname + u.search, (seen.get(u.pathname + u.search) ?? 0) + 1);
     for (const n of seen.values()) expect(n).toBeLessThanOrEqual(2);

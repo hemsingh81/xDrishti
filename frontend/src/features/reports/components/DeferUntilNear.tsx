@@ -1,6 +1,10 @@
 import { Box } from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
 import { useRef, type ReactNode } from 'react';
 import { useInView } from '@/shared/lib/useInView';
+
+/** The height of the five panels below the first view (measured on the fixture): one column below xl, rows of two from xl. */
+const placeholderHeight = { xs: 1260, sm: 1050, xl: 760 };
 
 /**
  * Mounts its children, and so their requests, when the place comes near the viewport (P8-17f). The panels below the first
@@ -11,8 +15,8 @@ export function DeferUntilNear({ children }: { children: ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
   const near = useInView(root);
   return (
-    <Box ref={root} sx={near ? undefined : { minHeight: 480 }}>
-      {near && children}
+    <Box ref={root} aria-busy={!near} sx={near ? undefined : { minHeight: placeholderHeight }}>
+      {near ? children : <Box sx={visuallyHidden}>More panels load as you scroll.</Box>}
     </Box>
   );
 }
