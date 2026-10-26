@@ -3217,6 +3217,91 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/paper/epochs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The measurement epochs, newest first: kind, first session, end (the next epoch's start), configuration fingerprint (short), counted and straddle entries, risk-down changes and unexplained changes. Epochs are never pooled. Read only. */
+    get: operations['ListPaperEpochs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/paper/epochs/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One epoch with the configuration changes recorded under it and the owner's notes. Read only. 404 paper.not_found */
+    get: operations['GetPaperEpoch'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/paper/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The configuration now with the class rule of every component, the last snapshot's hash, the differences not yet captured (each marked would restart the count or noted only) and the learning services enabled during an epoch (blockers). A preview: nothing is stored. Read only. */
+    get: operations['GetPaperConfig'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/paper/config/changes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The recorded configuration changes, newest first, with class, before, after, effect and explanation (hypothesis:id, changelog:id or unexplained). Optional epoch, limit 1 to 200 (default 50). Read only. 422 paper.invalid */
+    get: operations['ListPaperConfigChanges'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/paper/queue': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Accepted hypotheses that no change names: age, cell, knob, from, to and experiment. Accepted means judged better offline; nothing was applied; applying it starts a new epoch. The system never applies or reorders it. Read only. */
+    get: operations['GetPaperQueue'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/plans/{id}/alerts': {
     parameters: {
       query?: never;
@@ -4523,6 +4608,13 @@ export interface components {
       trades: number;
       candidates: components['schemas']['BillCandidate'][];
     };
+    /** @description A service that would restart the count when it runs. */
+    BlockerView: {
+      /** @description The service id. */
+      serviceId: string;
+      /** @description The warning. */
+      text: string;
+    };
     /**
      * @description Where one dropped row of a broker read lies, and why it was dropped: the dates of the request that returned it (DateOnly BrokerDroppedRow.WindowFrom, DateOnly BrokerDroppedRow.WindowTo; after a split, the half that was asked), the int BrokerDroppedRow.Page of the answer (0 for the
      *     ledger, which has one) and the zero-based int BrokerDroppedRow.RowIndex of the row in that answer, so the owner can look the row up in Dhan's own statement. <b>Location and reason code only</b>: never a name, symbol, amount, id or narration of the row (roadmap ISS-03).
@@ -5176,6 +5268,67 @@ export interface components {
       /** Format: int32 */
       unfillableMinutes: number;
       sessions: components['schemas']['SessionCompleteness'][];
+    };
+    /** @description The recorded differences. */
+    ConfigChangeList: {
+      /** @description The label. */
+      basis: string;
+      /** @description The differences, newest first. */
+      items: components['schemas']['ConfigChangeView'][];
+      /** @description True when the list was cut at the limit. */
+      truncated: boolean;
+    };
+    /** @description One stored difference of the configuration. */
+    ConfigChangeView: {
+      /**
+       * Format: int64
+       * @description The id.
+       */
+      id: number;
+      /**
+       * Format: int64
+       * @description The epoch it led to or belongs to.
+       */
+      epochId: number;
+      /** @description The key. */
+      key: string;
+      /** @description frozen, risk_down or free. */
+      class: string;
+      /** @description Earlier value; null when added. */
+      before: null | string;
+      /** @description Later value; null when removed. */
+      after: null | string;
+      /** @description new_epoch or noted. */
+      effect: string;
+      /** @description hypothesis:id, changelog:id or null. */
+      explainedBy: null | string;
+      /** @description True when there is no explanation and no owner note. */
+      unexplained: boolean;
+    };
+    /** @description One component of the configuration with the rule that classes a change of it. */
+    ConfigComponentView: {
+      /** @description The key. */
+      key: string;
+      /** @description What a change of it does to the count. */
+      rule: string;
+      /** @description The value in force now. */
+      value: string;
+    };
+    /** @description The configuration now, its class rules, the last snapshot and the differences not yet captured (spec P10-05 criteria 10 and 11a). A preview: nothing is stored. */
+    ConfigView: {
+      /** @description The label. */
+      basis: string;
+      /** @description The first 12 characters of the hash of the configuration now. */
+      currentHash: string;
+      last: null | components['schemas']['LastSnapshotView'];
+      /** @description Every component. */
+      components: components['schemas']['ConfigComponentView'][];
+      /** @description Differences from the last snapshot. */
+      pending: components['schemas']['PendingChangeView'][];
+      /** @description Enabled services that restart the count. */
+      blockers: components['schemas']['BlockerView'][];
+      /** @description Groups that could not be read. */
+      unreadable: string[];
     };
     /** @description Where to send the owner's browser to sign in at Dhan (same tab): Dhan's consent login page. The sign-in must come back before ExpiresAt. */
     ConnectStartView: {
@@ -6758,6 +6911,97 @@ export interface components {
       status: string;
       trigger: string;
       message: null | string;
+    };
+    /** @description One epoch with its changes and notes. */
+    EpochDetail: {
+      /** @description The label. */
+      basis: string;
+      /** @description The epoch. */
+      epoch: components['schemas']['EpochView'];
+      /** @description The differences recorded under it. */
+      changes: components['schemas']['ConfigChangeView'][];
+      /** @description The owner's notes. */
+      notes: components['schemas']['EpochNoteView'][];
+      /** @description True when the changes or notes were cut at the read limit of 200. */
+      truncated: boolean;
+    };
+    /** @description The epochs, newest first. */
+    EpochList: {
+      /** @description The label. */
+      basis: string;
+      /** @description The epochs. */
+      items: components['schemas']['EpochView'][];
+    };
+    /** @description An owner's note on an epoch. */
+    EpochNoteView: {
+      /**
+       * Format: int64
+       * @description The id.
+       */
+      id: number;
+      /**
+       * Format: int64
+       * @description The change it explains, or null.
+       */
+      changeId: null | number;
+      /**
+       * Format: int64
+       * @description The hypothesis it names, or null.
+       */
+      hypothesisId: null | number;
+      /** @description The words. */
+      text: string;
+      /** @description Who. */
+      actor: string;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      createdAt: string;
+    };
+    /** @description One epoch as the API shows it (spec P10-05). Epochs are never pooled: each carries its own count. */
+    EpochView: {
+      /**
+       * Format: int64
+       * @description The id.
+       */
+      id: number;
+      /** @description first, detected_change or owner_restart. */
+      kind: string;
+      /**
+       * Format: date
+       * @description The first session of the epoch.
+       */
+      startedOn: string;
+      /**
+       * Format: date
+       * @description The next epoch's start, or null for the epoch in force.
+       */
+      endedOn: null | string;
+      /** @description The first 12 characters of the configuration hash, or null. */
+      fingerprint: null | string;
+      /**
+       * Format: int32
+       * @description Entries that count.
+       */
+      counted: number;
+      /**
+       * Format: int32
+       * @description Entries set aside around a change (stored, shown, never counted).
+       */
+      straddle: number;
+      /**
+       * Format: int32
+       * @description Risk-down changes noted in the epoch.
+       */
+      riskDownChanges: number;
+      /**
+       * Format: int32
+       * @description Changes with neither an explanation nor a note.
+       */
+      unexplainedChanges: number;
+      /** @description Why the epoch started. */
+      reason: string;
     };
     /** @description One point of an equity curve: the running R after the exits of a date and its fall from the running peak. */
     EquityPointView: {
@@ -8488,6 +8732,21 @@ export interface components {
       dhan: null | components['schemas']['DataJobView'];
       aggregate: null | components['schemas']['DataJobView'];
     };
+    /** @description The last snapshot taken. */
+    LastSnapshotView: {
+      /** @description The first 12 characters of its hash. */
+      hash: string;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      takenAt: string;
+      /**
+       * Format: date
+       * @description The newest session of the run.
+       */
+      sessionDate: string;
+    };
     /** @description What the Learning screen needs first (P6-18, ADR 0080): counts and the newest verdicts of the stored learning records. Read from the stores; no statistic is computed and no model is scored. */
     LearningOverviewView: {
       /**
@@ -9746,6 +10005,19 @@ export interface components {
       description: null | string;
       unit: null | string;
     };
+    /** @description A difference the next capture would see. */
+    PendingChangeView: {
+      /** @description The key. */
+      key: string;
+      /** @description frozen, risk_down or free. */
+      class: string;
+      /** @description The value in the last snapshot. */
+      before: null | string;
+      /** @description The value now. */
+      after: null | string;
+      /** @description would restart the count, or noted only. */
+      meaning: string;
+    };
     /** @description A labelled count. */
     PhaseCount: {
       /** @description What is counted. */
@@ -10999,6 +11271,41 @@ export interface components {
        * @description The new quantity (at least 1, below the allocated one).
        */
       quantity: number;
+    };
+    /** @description An accepted hypothesis waiting; nothing was applied. */
+    QueueItem: {
+      /**
+       * Format: int64
+       * @description The id.
+       */
+      hypothesisId: number;
+      /**
+       * Format: int32
+       * @description Days since it was accepted.
+       */
+      ageDays: number;
+      /** @description The cell, or null. */
+      cellKey: null | string;
+      /** @description The knob. */
+      knob: string;
+      /** @description The baseline value. */
+      from: string;
+      /** @description The candidate value. */
+      to: string;
+      /**
+       * Format: int64
+       * @description The stored experiment, or null.
+       */
+      experimentId: null | number;
+    };
+    /** @description The queue of accepted hypotheses that no change names. */
+    QueueView: {
+      /** @description Accepted means judged better offline; nothing was applied; applying it starts a new epoch. */
+      note: string;
+      /** @description The hypotheses, oldest first. */
+      items: components['schemas']['QueueItem'][];
+      /** @description True when the 200 newest accepted hypotheses were read and there may be more. */
+      truncated: boolean;
     };
     /** @description A cell with enough sample in its place in the ranking by the credible lower bound of expectancy. */
     RankedCellView: {
@@ -20643,6 +20950,129 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListPaperEpochs: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EpochList'];
+        };
+      };
+    };
+  };
+  GetPaperEpoch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EpochDetail'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPaperConfig: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfigView'];
+        };
+      };
+    };
+  };
+  ListPaperConfigChanges: {
+    parameters: {
+      query?: {
+        epoch?: number;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfigChangeList'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPaperQueue: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['QueueView'];
         };
       };
     };

@@ -228,6 +228,7 @@ Allocation goes only to accounts with the <strong>Trading</strong> role.</p>
 <p>Daily loss limit ⇒ cancel remaining tickets; the <strong>market gate</strong> (learned from VIX, breadth and the event
 calendar) reduces or cancels the whole plan; the <strong>equity-curve throttle</strong> halves risk while the system is cold. Optional <strong>pre-open check</strong> (default 09:10, after the review cutoff and NSE pre-open price discovery): gap beyond
 trigger or &gt; <code>gap_invalidate_atr</code> ⇒ invalidate and promote from reserve.</p>
+<p><em>Built in P10-02 (ADR 0118):</em> at night the daily loss input is the last closed session&#39;s realised paper loss as a percent of equity (a proxy; 0 when not a loss), and the equity throttle reads the counted paper trades, both only when <code>Planning:OpenBook:UsePaperLedger</code> is on.</p>
 <h2 id="8-proving-the-selector-and-your-overrides">8. Proving the selector (and your overrides)<a class="hash" href="#8-proving-the-selector-and-your-overrides" aria-label="Link to this section">#</a></h2>
 <p>Rejected candidates are graded nightly. Reports compare primary vs reserve vs rejected and &quot;top-1/3/5/all&quot;
 curves — showing whether ranking adds value and what <code>max_new_entries_per_day</code> should be.
@@ -252,7 +253,7 @@ system proposed.</p>
     <a class="prev" href="09-learning-engine.html"><small>← Previous  [</small>09 · Learning engine</a>
     <a class="next" href="11-strategy-lab.html"><small>Next  ] →</small>11 · Strategy Lab</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/10-trade-selection.md</code> · 2026-10-25 23:55</footer>
+  <footer class="foot">Generated from <code>docs/10-trade-selection.md</code> · 2026-10-26 00:08</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-pipeline" class="d2">1. Pipeline</a>
 <a href="#smart-rules-learned-doc-09-14" class="d3">Smart rules (learned, doc 09 §14)</a>

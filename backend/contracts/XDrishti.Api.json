@@ -10534,6 +10534,160 @@
         }
       }
     },
+    "/api/paper/epochs": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The measurement epochs, newest first: kind, first session, end (the next epoch's start), configuration fingerprint (short), counted and straddle entries, risk-down changes and unexplained changes. Epochs are never pooled. Read only.",
+        "operationId": "ListPaperEpochs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpochList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/epochs/{id}": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "One epoch with the configuration changes recorded under it and the owner's notes. Read only. 404 paper.not_found",
+        "operationId": "GetPaperEpoch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpochDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/config": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The configuration now with the class rule of every component, the last snapshot's hash, the differences not yet captured (each marked would restart the count or noted only) and the learning services enabled during an epoch (blockers). A preview: nothing is stored. Read only.",
+        "operationId": "GetPaperConfig",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/config/changes": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The recorded configuration changes, newest first, with class, before, after, effect and explanation (hypothesis:id, changelog:id or unexplained). Optional epoch, limit 1 to 200 (default 50). Read only. 422 paper.invalid",
+        "operationId": "ListPaperConfigChanges",
+        "parameters": [
+          {
+            "name": "epoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigChangeList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/queue": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "Accepted hypotheses that no change names: age, cell, knob, from, to and experiment. Accepted means judged better offline; nothing was applied; applying it starts a new epoch. The system never applies or reorders it. Read only.",
+        "operationId": "GetPaperQueue",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/plans/{id}/alerts": {
       "get": {
         "tags": [
@@ -15368,6 +15522,24 @@
         },
         "description": "A scrip name of a global transaction report. `Name` is the name as written (plain text, untrusted), `NameKey` the name reduced to what the server compares names by (key the choices by it), `SymbolHint` the ticker in brackets. `Status`: `resolved`,\n`ambiguous` (more than one security fits: `Candidates`) or `needs_match` (none: its trades are kept without an ISIN). `Kind` is the rule that decided: `choice`, `alias`, `symbol`, `holding`, `master`, `learned` (a demat or depository file taught\nit), `partial` (a spelling that differs by a word's ending: check it), `none`."
       },
+      "BlockerView": {
+        "required": [
+          "serviceId",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "description": "The service id."
+          },
+          "text": {
+            "type": "string",
+            "description": "The warning."
+          }
+        },
+        "description": "A service that would restart the count when it runs."
+      },
       "BrokerDroppedRow": {
         "required": [
           "windowFrom",
@@ -16915,6 +17087,181 @@
           }
         },
         "description": "Completeness: the 1-minute bars the trading calendar expects in the window against the ones stored. `missingPercent` is of the expected minutes; `unfillableMinutes` are missing\nminutes of sessions a refetch could not fill (a halt, a circuit-locked day): they are a warning, never a failure."
+      },
+      "ConfigChangeList": {
+        "required": [
+          "basis",
+          "items",
+          "truncated"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "The label."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigChangeView"
+            },
+            "description": "The differences, newest first."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the list was cut at the limit."
+          }
+        },
+        "description": "The recorded differences."
+      },
+      "ConfigChangeView": {
+        "required": [
+          "id",
+          "epochId",
+          "key",
+          "class",
+          "before",
+          "after",
+          "effect",
+          "explainedBy",
+          "unexplained"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The id.",
+            "format": "int64"
+          },
+          "epochId": {
+            "type": "integer",
+            "description": "The epoch it led to or belongs to.",
+            "format": "int64"
+          },
+          "key": {
+            "type": "string",
+            "description": "The key."
+          },
+          "class": {
+            "type": "string",
+            "description": "frozen, risk_down or free."
+          },
+          "before": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Earlier value; null when added."
+          },
+          "after": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Later value; null when removed."
+          },
+          "effect": {
+            "type": "string",
+            "description": "new_epoch or noted."
+          },
+          "explainedBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "hypothesis:id, changelog:id or null."
+          },
+          "unexplained": {
+            "type": "boolean",
+            "description": "True when there is no explanation and no owner note."
+          }
+        },
+        "description": "One stored difference of the configuration."
+      },
+      "ConfigComponentView": {
+        "required": [
+          "key",
+          "rule",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The key."
+          },
+          "rule": {
+            "type": "string",
+            "description": "What a change of it does to the count."
+          },
+          "value": {
+            "type": "string",
+            "description": "The value in force now."
+          }
+        },
+        "description": "One component of the configuration with the rule that classes a change of it."
+      },
+      "ConfigView": {
+        "required": [
+          "basis",
+          "currentHash",
+          "last",
+          "components",
+          "pending",
+          "blockers",
+          "unreadable"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "The label."
+          },
+          "currentHash": {
+            "type": "string",
+            "description": "The first 12 characters of the hash of the configuration now."
+          },
+          "last": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The last full snapshot, or null.",
+                "$ref": "#/components/schemas/LastSnapshotView"
+              }
+            ]
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigComponentView"
+            },
+            "description": "Every component."
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingChangeView"
+            },
+            "description": "Differences from the last snapshot."
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockerView"
+            },
+            "description": "Enabled services that restart the count."
+          },
+          "unreadable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Groups that could not be read."
+          }
+        },
+        "description": "The configuration now, its class rules, the last snapshot and the differences not yet captured (spec P10-05 criteria 10 and 11a). A preview: nothing is stored."
       },
       "ConnectStartView": {
         "required": [
@@ -21249,6 +21596,185 @@
           }
         },
         "description": "An automatic (scheduled) run as the Data screen shows it. `status`: running · succeeded · failed · skipped; `message` is the reason a run failed or was skipped\n(for example the Data account was not connected). `trigger` is always `daily` here."
+      },
+      "EpochDetail": {
+        "required": [
+          "basis",
+          "epoch",
+          "changes",
+          "notes",
+          "truncated"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "The label."
+          },
+          "epoch": {
+            "description": "The epoch.",
+            "$ref": "#/components/schemas/EpochView"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigChangeView"
+            },
+            "description": "The differences recorded under it."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EpochNoteView"
+            },
+            "description": "The owner's notes."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the changes or notes were cut at the read limit of 200."
+          }
+        },
+        "description": "One epoch with its changes and notes."
+      },
+      "EpochList": {
+        "required": [
+          "basis",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "The label."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EpochView"
+            },
+            "description": "The epochs."
+          }
+        },
+        "description": "The epochs, newest first."
+      },
+      "EpochNoteView": {
+        "required": [
+          "id",
+          "changeId",
+          "hypothesisId",
+          "text",
+          "actor",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The id.",
+            "format": "int64"
+          },
+          "changeId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The change it explains, or null.",
+            "format": "int64"
+          },
+          "hypothesisId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The hypothesis it names, or null.",
+            "format": "int64"
+          },
+          "text": {
+            "type": "string",
+            "description": "The words."
+          },
+          "actor": {
+            "type": "string",
+            "description": "Who."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          }
+        },
+        "description": "An owner's note on an epoch."
+      },
+      "EpochView": {
+        "required": [
+          "id",
+          "kind",
+          "startedOn",
+          "endedOn",
+          "fingerprint",
+          "counted",
+          "straddle",
+          "riskDownChanges",
+          "unexplainedChanges",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The id.",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "description": "first, detected_change or owner_restart."
+          },
+          "startedOn": {
+            "type": "string",
+            "description": "The first session of the epoch.",
+            "format": "date"
+          },
+          "endedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The next epoch's start, or null for the epoch in force.",
+            "format": "date"
+          },
+          "fingerprint": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The first 12 characters of the configuration hash, or null."
+          },
+          "counted": {
+            "type": "integer",
+            "description": "Entries that count.",
+            "format": "int32"
+          },
+          "straddle": {
+            "type": "integer",
+            "description": "Entries set aside around a change (stored, shown, never counted).",
+            "format": "int32"
+          },
+          "riskDownChanges": {
+            "type": "integer",
+            "description": "Risk-down changes noted in the epoch.",
+            "format": "int32"
+          },
+          "unexplainedChanges": {
+            "type": "integer",
+            "description": "Changes with neither an explanation nor a note.",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the epoch started."
+          }
+        },
+        "description": "One epoch as the API shows it (spec P10-05). Epochs are never pooled: each carries its own count."
       },
       "EquityPointView": {
         "required": [
@@ -25920,6 +26446,31 @@
         },
         "description": "The latest job in which each phase ran to an end (null when none did yet)."
       },
+      "LastSnapshotView": {
+        "required": [
+          "hash",
+          "takenAt",
+          "sessionDate"
+        ],
+        "type": "object",
+        "properties": {
+          "hash": {
+            "type": "string",
+            "description": "The first 12 characters of its hash."
+          },
+          "takenAt": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          },
+          "sessionDate": {
+            "type": "string",
+            "description": "The newest session of the run.",
+            "format": "date"
+          }
+        },
+        "description": "The last snapshot taken."
+      },
       "LearningOverviewView": {
         "required": [
           "cellRows",
@@ -28801,6 +29352,45 @@
           }
         },
         "description": "A parameter of a service with its schema: `kind` integer · number · boolean, the bounds of a number, the current value and the default."
+      },
+      "PendingChangeView": {
+        "required": [
+          "key",
+          "class",
+          "before",
+          "after",
+          "meaning"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The key."
+          },
+          "class": {
+            "type": "string",
+            "description": "frozen, risk_down or free."
+          },
+          "before": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The value in the last snapshot."
+          },
+          "after": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The value now."
+          },
+          "meaning": {
+            "type": "string",
+            "description": "would restart the count, or noted only."
+          }
+        },
+        "description": "A difference the next capture would see."
       },
       "PhaseCount": {
         "required": [
@@ -31941,6 +32531,84 @@
           }
         },
         "description": "A lower size for one account of the ticket."
+      },
+      "QueueItem": {
+        "required": [
+          "hypothesisId",
+          "ageDays",
+          "cellKey",
+          "knob",
+          "from",
+          "to",
+          "experimentId"
+        ],
+        "type": "object",
+        "properties": {
+          "hypothesisId": {
+            "type": "integer",
+            "description": "The id.",
+            "format": "int64"
+          },
+          "ageDays": {
+            "type": "integer",
+            "description": "Days since it was accepted.",
+            "format": "int32"
+          },
+          "cellKey": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The cell, or null."
+          },
+          "knob": {
+            "type": "string",
+            "description": "The knob."
+          },
+          "from": {
+            "type": "string",
+            "description": "The baseline value."
+          },
+          "to": {
+            "type": "string",
+            "description": "The candidate value."
+          },
+          "experimentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The stored experiment, or null.",
+            "format": "int64"
+          }
+        },
+        "description": "An accepted hypothesis waiting; nothing was applied."
+      },
+      "QueueView": {
+        "required": [
+          "note",
+          "items",
+          "truncated"
+        ],
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "Accepted means judged better offline; nothing was applied; applying it starts a new epoch."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueueItem"
+            },
+            "description": "The hypotheses, oldest first."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the 200 newest accepted hypotheses were read and there may be more."
+          }
+        },
+        "description": "The queue of accepted hypotheses that no change names."
       },
       "RankedCellView": {
         "required": [
