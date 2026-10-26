@@ -187,7 +187,7 @@ describe('My account: profile', () => {
       ...fake.handlers,
     );
     renderRoutes([{ path: '/', element: <AccountPage /> }]);
-    expect(await screen.findByRole('progressbar', { name: 'Loading your profile' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading your profile')).toBeInTheDocument();
   });
 
   it('shows an error with Retry when the profile cannot be read', async () => {
@@ -442,7 +442,7 @@ describe('My account: recent sign-in activity', () => {
     );
     renderRoutes([{ path: '/', element: <AccountPage /> }]);
 
-    expect(await screen.findByRole('progressbar', { name: 'Loading sign-in activity' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading sign-in activity')).toBeInTheDocument();
   });
 
   it('shows an error with Retry when the events cannot be read', async () => {

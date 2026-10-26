@@ -85,7 +85,11 @@ function DisabledDimension({ label, dimension }: { label: string; dimension: 're
       label={label}
       value=""
       helperText={reason.data ?? (reason.isError ? 'Not available.' : 'Reading the reason…')}
-      slotProps={{ inputLabel: { shrink: true } }}
+      slotProps={{
+        inputLabel: { shrink: true },
+        // The reason is information, not a disabled control: it keeps the readable secondary text colour.
+        formHelperText: { sx: { '&.Mui-disabled': { color: 'text.secondary' } } },
+      }}
     />
   );
 }

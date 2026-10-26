@@ -95,6 +95,7 @@ export function createControlComponents(theme: Theme, mode: ColorMode): Componen
           };
           const tone = tones[ownerState.color ?? 'default'] ?? { bg: p.surfaceStrong, fg: p.textSecondary };
           return {
+            maxWidth: '100%',
             fontWeight: 600,
             fontSize: rem(11.5),
             borderRadius: shape.radiusPill,
@@ -109,9 +110,13 @@ export function createControlComponents(theme: Theme, mode: ColorMode): Componen
             },
           };
         },
-        sizeSmall: { height: 22 },
-        sizeMedium: { height: 26 },
+        // A long label wraps (a chip never wider than its row); the height is a minimum.
+        sizeSmall: { height: 'auto', minHeight: 22 },
+        sizeMedium: { height: 'auto', minHeight: 26 },
         label: ({ ownerState }) => ({
+          whiteSpace: 'normal',
+          overflowWrap: 'anywhere',
+          paddingBlock: 2,
           paddingLeft: ownerState.size === 'small' ? 9 : 11,
           paddingRight: ownerState.size === 'small' ? 9 : 11,
         }),

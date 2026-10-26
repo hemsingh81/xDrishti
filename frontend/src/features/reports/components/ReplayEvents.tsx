@@ -7,7 +7,12 @@ import type { ReplayEvent } from '../lib/replayModel';
 export function ReplayEvents({ events }: { events: readonly ReplayEvent[] }) {
   return (
     <>
-      <TableContainer sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
+      <TableContainer
+        tabIndex={0}
+        role="region"
+        aria-label="Events of the trade, scrolls sideways"
+        sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
+      >
         <Table size="small" aria-label="Events of the trade">
           <TableHead>
             <TableRow>

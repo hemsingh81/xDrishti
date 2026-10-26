@@ -255,6 +255,7 @@ describe.each(['light', 'dark'] as const)('%s theme', (mode) => {
       <>
         <button className="MuiButton-root" data-testid="plain" />
         <button className="MuiButton-root MuiButton-sizeSmall" data-testid="small" />
+        <button className="MuiToggleButton-root" data-testid="toggle" />
         <button className="MuiIconButton-root" data-testid="icon" />
         <button className="MuiTab-root" data-testid="tab" />
         <div className="MuiChip-root MuiChip-clickable" data-testid="chip" />
@@ -278,7 +279,22 @@ describe.each(['light', 'dark'] as const)('%s theme', (mode) => {
     expect(rule).not.toBeNull();
     const selector = (rule?.[1] ?? '').replace(/\.Mui(\w+)-root\*/g, '.Mui$1-root *');
     const hit = (id: string) => screen.getByTestId(id).matches(selector);
-    for (const id of ['plain', 'icon', 'tab', 'chip']) expect(hit(id)).toBe(true);
-    for (const id of ['small', 'small-chip', 'in-cell', 'in-autocomplete', 'dense']) expect(hit(id)).toBe(false);
+    // Small buttons are phone targets too (chart table toggles, legends); only chips, icon buttons and fields stay dense.
+    for (const id of ['plain', 'small', 'icon', 'tab', 'chip', 'toggle']) expect(hit(id)).toBe(true);
+    for (const id of ['small-chip', 'in-cell', 'in-autocomplete', 'dense']) expect(hit(id)).toBe(false);
+  });
+
+  it('keeps the small buttons of the top bar (search, accounts) at 44 px on phones', () => {
+    renderThemed(
+      mode,
+      <header className="MuiAppBar-root">
+        <button className="MuiButton-root MuiButton-sizeSmall" data-testid="in-bar" />
+      </header>,
+    );
+    // Whitespace is stripped from the injected CSS, so the descendant selector reads `.MuiAppBar-root.MuiButton-root`.
+    expect(injectedCss()).toMatch(
+      /@media\(max-width:479\.95px\)\{[^]*?\.MuiAppBar-root\.MuiButton-root,\.MuiAlert-action\.MuiButton-root\{min-height:44px;min-width:44px/,
+    );
+    expect(screen.getByTestId('in-bar').matches('.MuiAppBar-root .MuiButton-root')).toBe(true);
   });
 });

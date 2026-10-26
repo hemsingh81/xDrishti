@@ -114,3 +114,10 @@ scroll moving only the strip; the tab focus ring is inset so the strip does not 
 clipping behave in Chrome is unverified. Criterion 14: `npm run size` 196.5 KB of 200 KB (3.5 KB spare). Not built: the
 Playwright and axe runner (owner decision on dev dependencies; criteria 1, 2, 5, 8 to 13, 15), `data-ready` markers, evidence
 files, owner sheet. No ADR needed.
+
+## Build note 2026-10-26 (runner built and run, ADR 0124)
+Runner built: `playwright.config.ts`, `e2e/` (matrix, api, run, checks, self-test), `tsconfig.e2e.json`, `scripts/p8Checklist.mjs`, `data-ready` on
+`main`, `LoadingState` text in its live region; `npm run test:browser`, `test:browser:perf`. Playwright 1.63 drives the installed Chrome.
+First full run over 22 screen rows: see the ADR for counts and the unfixed findings. Criteria 1, 2, 5, 8 to 13 have evidence for the
+fixtures run; criterion 6 (Escape closes and returns focus) and the drill-down, bell, Smart rules and Loss tags rows are not in the matrix;
+criterion 15's owner walkthrough is still to do. Results file name is `browser.jsonl` (field `result`), not the name written above.

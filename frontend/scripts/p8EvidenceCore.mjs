@@ -77,7 +77,7 @@ export function judgeBundle(record, head, codeChanged, dirty = false) {
 }
 
 /**
- * Criterion 8: the lines of browser-checklist.jsonl (the P8-16 format: screen, width, scheme, state, check, result pass|fail|na, note, commit, date).
+ * Criterion 8: the lines of browser.jsonl (the P8-16 format: screen, width, scheme, state, check, result pass|fail|na, note, commit, date).
  * `builtScreens` is the committed list of screens that are built (frontend/scripts/p8-built-screens.json): every one must have at least one line,
  * so a screen the runner skipped is NOT EVALUABLE, never silently absent. Lines of screens not on the list are ignored.
  */
@@ -85,20 +85,19 @@ export function judgeChecklist(lines, head, codeChanged, builtScreens, dirty = f
   if (!Array.isArray(builtScreens) || builtScreens.length === 0)
     return result(NOT_EVALUABLE, 'no list of built screens (frontend/scripts/p8-built-screens.json)');
   if (!lines || lines.length === 0)
-    return result(
-      NOT_EVALUABLE,
-      'data/p8-evidence/browser-checklist.jsonl is absent or empty: run npm run test:browser (P8-16)',
-    );
+    return result(NOT_EVALUABLE, 'data/p8-evidence/browser.jsonl is absent or empty: run npm run test:browser (P8-16)');
   const parsed = [];
   for (const [i, line] of lines.entries()) {
     try {
       parsed.push(JSON.parse(line));
     } catch {
-      return result(NOT_EVALUABLE, `browser-checklist.jsonl line ${i + 1} is not JSON`);
+      return result(NOT_EVALUABLE, `browser.jsonl line ${i + 1} is not JSON`);
     }
   }
-  const rows = parsed.filter((r) => builtScreens.includes(r.screen));
-  const missing = builtScreens.filter((s) => !rows.some((r) => r.screen === s));
+  // The runner names a screen row `P8-02-overview` (slice id plus tab or view): a line counts for its slice id.
+  const sliceOf = (s) => (builtScreens.includes(s) ? s : builtScreens.find((b) => String(s).startsWith(`${b}-`)));
+  const rows = parsed.filter((r) => sliceOf(r.screen) !== undefined);
+  const missing = builtScreens.filter((s) => !rows.some((r) => sliceOf(r.screen) === s));
   if (missing.length > 0)
     return result(
       NOT_EVALUABLE,

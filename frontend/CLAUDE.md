@@ -49,5 +49,12 @@ src/
   for the default instants) and not part of `npm run check`. Fixtures must not expire: the API key of the account fixtures
   runs until 31 Dec 2099; a test that needs an expiring key builds the date from its pinned instant.
 
+- **Browser runner (manual, P8-16, ADR 0124):** `npm run test:browser` drives the installed Chrome (Playwright, axe) over
+  `vite preview` of the production build on 127.0.0.1:4173, answers the API from the MSW handlers (`e2e/api.ts`), runs the
+  checklist C0 to C16 per screen, width, scheme and state, and writes `data/p8-evidence/browser.jsonl` plus
+  `browser-checklist-summary.md`. `npm run test:browser -- --grep P8-08` runs one screen; `npm run test:browser:perf` the
+  throttled timing. It is not part of `scripts/check.sh`; `e2e/` is type-checked and linted by `npm run check`. A new
+  screen adds its row to `e2e/matrix.ts` (route and fixtures).
+
 ## Commands
 `npm run dev` (proxies /api to the stack on :8080) · `npm run check` (typecheck, lint, format, tests) · `npm run build`

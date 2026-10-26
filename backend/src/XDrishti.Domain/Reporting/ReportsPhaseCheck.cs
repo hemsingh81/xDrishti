@@ -55,7 +55,7 @@ public static class ReportsPhaseCheck
             ReadOnly(facts),
             new(6, "Layers and contract", PhaseVerdict.NotEvaluable, "proved by XDrishti.Architecture.Tests and scripts/gen-api.sh, not by this check"),
             new(7, "Bundle", PhaseVerdict.NotEvaluable, $"read from data/p8-evidence/bundle.json by {Spec}; the server cannot see the frontend build"),
-            new(8, "Responsive and accessible", PhaseVerdict.NotEvaluable, $"read from data/p8-evidence/browser-checklist.jsonl by {Spec}; the server cannot see the browser pass"),
+            new(8, "Responsive and accessible", PhaseVerdict.NotEvaluable, $"read from data/p8-evidence/browser.jsonl by {Spec}; the server cannot see the browser pass"),
             DeterminismAndSecurity(facts),
             new(10, "Gates", PhaseVerdict.NotEvaluable, "scripts/check.sh and the reviewer pass are run by the builder, not by this check"),
         ];

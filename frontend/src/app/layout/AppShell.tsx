@@ -1,4 +1,5 @@
 import { Box, Drawer, Link } from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
 import { Suspense, useState } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { AttentionPopups } from '@/features/notifications';
@@ -6,6 +7,7 @@ import { LoadingState } from '@/shared/ui';
 import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { layout, pagePadding } from '@/theme';
 import { allNavItems, routeTitles } from '../navigation';
+import { ReadyMarker } from './ReadyMarker';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
@@ -17,7 +19,7 @@ const mainId = 'main-content';
  */
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const title = allNavItems.find((i) => i.path === pathname)?.label ?? routeTitles[pathname] ?? 'xDrishti';
   const paper = { width: layout.sidebarWidth, boxSizing: 'border-box' as const };
 
@@ -35,7 +37,7 @@ export function AppShell() {
           left: theme.spacing(1),
           top: theme.spacing(1),
           // Hidden (still focusable) until it has focus.
-          '&:not(:focus)': { clipPath: 'inset(50%)', width: 1, height: 1, overflow: 'hidden', whiteSpace: 'nowrap' },
+          '&:not(:focus)': visuallyHidden,
           zIndex: theme.zIndex.tooltip,
           padding: theme.spacing(1, 2),
           borderRadius: 1,
@@ -77,7 +79,8 @@ export function AppShell() {
           <Box
             component="main"
             id={mainId}
-            tabIndex={-1}
+            // A scroll container the keyboard can reach (arrow keys scroll it) and the skip link can focus.
+            tabIndex={0}
             sx={(theme) => ({
               // The prototype's `.page` padding: 14 px on phones, 24 from the sidebar breakpoint, more room on wide monitors.
               padding: `${pagePadding.compact}px`,
@@ -98,6 +101,7 @@ export function AppShell() {
             <Suspense fallback={<LoadingState />}>
               <Outlet />
             </Suspense>
+            <ReadyMarker key={pathname + search} />
           </Box>
         </Box>
       </Box>

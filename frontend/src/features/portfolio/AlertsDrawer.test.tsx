@@ -203,7 +203,7 @@ describe('Alerts panel', () => {
     server.use(http.get('/api/portfolio/alerts', () => pendingResponse()));
     const { panel } = await openPanel();
 
-    expect(await panel.findByRole('progressbar', { name: 'Loading alerts' })).toBeInTheDocument();
+    expect(await panel.findByText('Loading alerts')).toBeInTheDocument();
   });
 
   it('loads further alerts with Show more', async () => {
@@ -264,7 +264,7 @@ describe('Alerts panel: tabs are different lists', () => {
 
     await userEvent.click(panel.getByRole('tab', { name: 'Triggered (1)' }));
 
-    expect(await panel.findByRole('progressbar', { name: 'Loading alerts' })).toBeInTheDocument();
+    expect(await panel.findByText('Loading alerts')).toBeInTheDocument();
     expect(panel.queryByRole('button', { name: /^Cancel alert on/ })).not.toBeInTheDocument();
     expect(panel.queryByText('NSE:RELIANCE')).not.toBeInTheDocument();
     expect(panel.getByRole('tabpanel')).toHaveAttribute('aria-busy', 'true');

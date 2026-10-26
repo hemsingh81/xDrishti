@@ -2,7 +2,7 @@
 # The P8 phase check, local summary (spec P8-17, ADR 0126). Read only: it writes nothing but the interaction result under data/p8-evidence/.
 #   1. the server check (xd reports phase-check) on the stored runs
 #   2. the interaction-budget test (vitest, src/features/reports/phase) recorded for this commit
-#   3. the summary: server criteria + bundle.json + browser-checklist.jsonl + interaction.json + stopwatch.json + the OpenAPI contract
+#   3. the summary: server criteria + bundle.json + browser.jsonl + interaction.json + stopwatch.json + the OpenAPI contract
 # The owner's stopwatch is the owner's act: node frontend/scripts/p8-evidence.mjs stopwatch --seconds .. --interactions .. (see the ADR). Never invented here.
 set -euo pipefail
 source "$(dirname "$0")/_env.sh"

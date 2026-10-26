@@ -3,6 +3,7 @@
 //   stopwatch --seconds 84,97,71 --interactions 3,3,3 --basket NAME --answer RANKED|NOTHING --date YYYY-MM-DD [--note ".."]
 //                                          record the OWNER's stopwatch trials for this commit; nothing is invented or sent anywhere
 //   interaction --from vitest.json         record the result of the interaction-budget test (vitest --reporter=json) for this commit
+//   checklist [FILE]                       fold the browser runner's lines (browser.jsonl) and write browser-checklist-summary.md (scripts/p8Checklist.mjs, P8-16)
 //   summary --server-text FILE             merge the verb's text (xd reports phase-check) with the local evidence, print the ten criteria
 // Evidence lives in $XD_EVIDENCE_DIR (default <repo>/data/p8-evidence, git-ignored). Files are recorded, never verified.
 import { spawnSync } from 'node:child_process';
@@ -67,7 +68,13 @@ const write = (name, value) => {
 const [command, ...rest] = process.argv.slice(2);
 const args = flags(rest);
 
-if (command === 'bundle') {
+if (command === 'checklist') {
+  const run = spawnSync(process.execPath, [fileURLToPath(new URL('./p8Checklist.mjs', import.meta.url)), ...rest], {
+    stdio: 'inherit',
+    env: { ...process.env, XD_EVIDENCE_DIR: dir },
+  });
+  process.exit(run.status ?? 1);
+} else if (command === 'bundle') {
   const r = judgeBundle(readJson('bundle.json'), head(), codeChanged, dirty());
   console.log(`${r.verdict}  ${r.detail}`);
 } else if (command === 'stopwatch') {
@@ -117,7 +124,7 @@ if (command === 'bundle') {
   local[7] = judgeBundle(readJson('bundle.json'), h, codeChanged, isDirty);
   const builtPath = join(root, 'frontend', 'scripts', 'p8-built-screens.json');
   const built = existsSync(builtPath) ? JSON.parse(readFileSync(builtPath, 'utf8')) : null;
-  local[8] = judgeChecklist(readLines('browser-checklist.jsonl'), h, codeChanged, built?.built ?? null, isDirty);
+  local[8] = judgeChecklist(readLines('browser.jsonl'), h, codeChanged, built?.built ?? null, isDirty);
   const serverFive = server.criteria.find((c) => c.number === 5);
   if (serverFive?.verdict === NOT_EVALUABLE) {
     const contract = JSON.parse(readFileSync(join(root, 'backend', 'contracts', 'XDrishti.Api.json'), 'utf8'));
@@ -136,7 +143,7 @@ if (command === 'bundle') {
   process.stdout.write(render(merged, headline(merged)));
 } else {
   console.error(
-    'usage: p8-evidence.mjs bundle | stopwatch --seconds .. --interactions .. --basket .. --answer .. --date .. | interaction --from FILE | summary --server-text FILE',
+    'usage: p8-evidence.mjs bundle | stopwatch --seconds .. --interactions .. --basket .. --answer .. --date .. | interaction --from FILE | checklist [FILE] | summary --server-text FILE',
   );
   process.exit(2);
 }

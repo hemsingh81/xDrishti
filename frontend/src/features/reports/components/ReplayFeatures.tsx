@@ -21,7 +21,12 @@ export function ReplayFeatures({ features }: { features: TradeReplay['features']
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             {`${String(features.items.length)} values stored at the decision (catalogue ${features.version}).`}
           </Typography>
-          <TableContainer sx={{ border: 1, borderColor: 'divider', borderRadius: 1, maxHeight: 420 }}>
+          <TableContainer
+            tabIndex={0}
+            role="region"
+            aria-label="Decision-time features, scrolls"
+            sx={{ border: 1, borderColor: 'divider', borderRadius: 1, maxHeight: 420 }}
+          >
             <Table size="small" stickyHeader aria-label="Decision-time features">
               <TableHead>
                 <TableRow>

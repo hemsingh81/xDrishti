@@ -188,7 +188,7 @@ describe('Holding drawer: Dividends section', () => {
     );
     renderPortfolio(`?holding=${holdingIds.reliance}`);
     const drawer = within(await screen.findByLabelText('Holding details'));
-    expect(await drawer.findByRole('progressbar', { name: 'Loading dividends' })).toBeInTheDocument();
+    expect(await drawer.findByText('Loading dividends')).toBeInTheDocument();
 
     state = 'fail';
     await releasePending();

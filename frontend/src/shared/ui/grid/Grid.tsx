@@ -127,6 +127,8 @@ export function Grid<Row>({
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, minWidth: 0 }}>
       <Box
         ref={scroller}
+        role="region"
+        aria-label={`${label}, scrolls sideways`}
         sx={{
           flex: '1 1 auto',
           minHeight: 0,

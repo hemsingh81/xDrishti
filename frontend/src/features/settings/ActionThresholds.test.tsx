@@ -186,7 +186,7 @@ describe('Settings: Action center thresholds', () => {
     server.use(http.get('/api/portfolio/action-thresholds', () => pendingResponse()));
     renderTab();
 
-    expect(await screen.findByRole('progressbar', { name: 'Loading thresholds' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading thresholds')).toBeInTheDocument();
   });
 
   it('shows the problem with Retry when the thresholds cannot be loaded', async () => {

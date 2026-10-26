@@ -23,7 +23,8 @@ export function TopBar({ title, onMenu }: { title: string; onMenu: () => void })
           gap: '10px',
           paddingInline: '24px',
           [theme.breakpoints.down('md')]: { paddingInline: '12px', gap: '8px' },
-          [theme.breakpoints.down('sm')]: { gap: 0.5 },
+          // On a phone the bar wraps to a second row when the text is enlarged, so nothing is pushed off the screen (WCAG 1.4.10).
+          [theme.breakpoints.down('sm')]: { gap: 0.5, flexWrap: 'wrap', '&.MuiToolbar-root': { height: 'auto' } },
           // The narrowest phones (320 px): tighter padding and gaps, so the avatar is not squeezed out of the bar.
           [theme.breakpoints.down(360)]: { px: 1, gap: 0.25 },
         })}

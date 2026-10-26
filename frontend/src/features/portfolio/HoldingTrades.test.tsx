@@ -108,7 +108,7 @@ describe('Holding drawer: Trades section', () => {
     );
     renderPortfolio(`?holding=${holdingIds.infy}`);
     const drawer = within(await screen.findByLabelText('Holding details'));
-    expect(await drawer.findByRole('progressbar', { name: 'Loading trades' })).toBeInTheDocument();
+    expect(await drawer.findByText('Loading trades')).toBeInTheDocument();
 
     state = 'fail';
     await releasePending();

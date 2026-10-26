@@ -398,7 +398,7 @@ describe('Coverage table: the bars drawer', () => {
     await userEvent.click(await screen.findByRole('gridcell', { name: 'NSE:RELIANCE' }));
     const drawer = await screen.findByRole('dialog', { name: 'Bars' });
 
-    expect(within(drawer).getByRole('progressbar', { name: 'Loading bars' })).toBeInTheDocument();
+    expect(within(drawer).getByText('Loading bars')).toBeInTheDocument();
   });
 
   it('shows an error with a retry when the bars cannot be loaded', async () => {

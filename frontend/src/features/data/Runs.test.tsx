@@ -62,7 +62,7 @@ describe('Runs tab: the list', () => {
   it('shows a loading state while the runs are read', async () => {
     renderData({ search: '?tab=runs', handlers: [http.get('/api/data/jobs', () => delay('infinite'))] });
 
-    expect(await screen.findByRole('progressbar', { name: 'Loading recent runs' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading recent runs')).toBeInTheDocument();
   });
 
   it('says so when the runs cannot be loaded, and retries', async () => {

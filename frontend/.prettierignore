@@ -5,3 +5,5 @@ package-lock.json
 *.md
 .vitest
 src/test/fixtures/liveGolden.json
+test-results
+playwright-report

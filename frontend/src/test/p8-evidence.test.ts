@@ -98,6 +98,11 @@ describe('browser checklist (criterion 8)', () => {
     expect(judge(both, false, null).verdict).toBe('NOT EVALUABLE');
     expect(judge(both, false, []).verdict).toBe('NOT EVALUABLE');
   });
+  it('counts a runner row named with its slice id plus the tab (P8-02-overview) for the slice P8-02', () => {
+    const rows = [line({ screen: 'reports-overview' }), line({ screen: 'learning-setups' })];
+    expect(judge(rows).verdict).toBe('MET');
+    expect(judge([line({ screen: 'reportsx' }), line({ screen: 'learning' })]).verdict).toBe('NOT EVALUABLE');
+  });
   it('ignores the lines of a screen that is not built, even a failed one', () => {
     expect(judge([...both, line({ screen: 'drilldown', result: 'fail' })]).verdict).toBe('MET');
   });

@@ -46,7 +46,7 @@ export function PivotAxes({ rows, columns, metric, set }: PivotAxesProps) {
     </TextField>
   );
   return (
-    <Box sx={{ display: 'grid', gap: 1.5 }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 1.5 }}>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
         {axis('rows', 'Rows', rows, columns)}
         {axis('columns', 'Columns', columns, rows)}

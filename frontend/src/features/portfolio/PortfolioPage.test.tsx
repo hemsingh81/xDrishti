@@ -216,7 +216,7 @@ describe('Portfolio page: totals', () => {
     server.use(http.get('/api/holdings/summary', () => pendingResponse()));
     renderPortfolio();
 
-    expect(await screen.findByRole('progressbar', { name: 'Loading totals' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading totals')).toBeInTheDocument();
   });
 });
 

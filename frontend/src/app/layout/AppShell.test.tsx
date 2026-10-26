@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { appliedCss } from '@/test/css';
 import { renderRoutes } from '@/test/render';
@@ -97,5 +97,23 @@ describe('Instruments layout', () => {
     expect(skip).toHaveFocus();
     await userEvent.keyboard('{Enter}');
     expect(screen.getByRole('main')).toHaveFocus();
+  });
+
+  it('marks the page with data-ready once the route has loaded, and starts over on navigation', async () => {
+    renderRoutes(routes, { initialPath: '/system' });
+    await screen.findByRole('heading', { level: 1, name: 'System status' });
+    const main = screen.getByRole('main');
+    await waitFor(() => {
+      expect(main.querySelector('[data-ready]')).not.toBeNull();
+    });
+    const settledBefore = main.querySelector('[data-ready]');
+    await userEvent.click(screen.getAllByRole('link', { name: 'Audit log' })[0]!);
+    await screen.findByRole('heading', { level: 1, name: 'Audit log' });
+    // A new marker: the one of the old route was thrown away with it, and the new route settled on its own.
+    await waitFor(() => {
+      const marker = main.querySelector('[data-ready]');
+      expect(marker).not.toBeNull();
+      expect(marker).not.toBe(settledBefore);
+    });
   });
 });
