@@ -73,7 +73,8 @@ public sealed partial class CapabilityArchitectureTests
         Regex.Count(text, @"\.MapGet\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(1);
         Regex.Count(text, @"\.MapPut\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(1);
         Regex.Count(text, @"\.MapPost\(|\.MapDelete\(|\.MapPatch\(|\.MapMethods\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(0);
-        Regex.Count(text, @"RequireRateLimiting\(SessionAuthentication\.LoginRateLimitPolicy\)", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(1);
+        Regex.Count(text, @"RequireRateLimiting\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(0, "the kill switch never answers 429: only the ON direction is limited, in the handler");
+        text.ShouldContain("request.Enabled && !limiter.TryAcquire(");
         text.ShouldContain("request.Enabled\n            ? await OwnerAct.AuthorizeAsync(");
         text.ShouldContain(": OwnerAct.SessionOwner(http)");
         text.ShouldNotContain("Elevate");
@@ -82,6 +83,26 @@ public sealed partial class CapabilityArchitectureTests
 
         var dir = Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Endpoints", "CapabilitiesEndpoints.cs"))!;
         Directory.GetFiles(dir, "*.cs").Where(f => !f.EndsWith("CapabilitiesEndpoints.cs", StringComparison.Ordinal) && File.ReadAllText(f).Contains("\"/capabilities", StringComparison.Ordinal)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void No_entity_framework_path_writes_the_capability_log_only_the_raw_store_does()
+    {
+        foreach (var file in Directory.GetFiles(Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "DependencyInjection.cs"))!, "*.cs", SearchOption.AllDirectories).Where(f => !f.Contains("/obj/", StringComparison.Ordinal) && !f.Contains("/bin/", StringComparison.Ordinal) && !f.Contains("/Migrations/", StringComparison.Ordinal)))
+        {
+            var text = File.ReadAllText(file);
+            var name = Path.GetFileName(file);
+            if (name is "CapabilityChangeRecord.cs" or "CapabilityChangeConfiguration.cs" or "XDrishtiDbContext.cs")
+            {
+                continue;
+            }
+
+            text.ShouldNotContain("CapabilityChangeRecord", Case.Sensitive, name);
+            text.ShouldNotContain(".CapabilityChanges", Case.Sensitive, name);
+        }
+
+        File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Capabilities", "CapabilityLogStore.cs")).ShouldNotContain("SaveChanges");
+        Directory.GetFiles(Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Application", "DependencyInjection.cs"))!, "*.cs", SearchOption.AllDirectories).Where(f => File.ReadAllText(f).Contains("CapabilityChangeRecord", StringComparison.Ordinal)).ShouldBeEmpty();
     }
 
     [Fact]

@@ -6,6 +6,7 @@ using Npgsql;
 using XDrishti.Api.IntegrationTests.Data;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
@@ -47,6 +48,10 @@ public sealed class ExperimentJobApiTests(ApiFactory factory) : DataTestBase(fac
         "UPDATE research.experiment_jobs SET created_by = 'owner:other@y.z'",
         "UPDATE research.experiment_jobs SET baseline_run_key = repeat('b', 64)",
     ];
+
+    private static readonly string[] AllowedColumns = ["state = 'running'", "stage = 'x'", "progress_done = 1", "progress_total = 1", "cancel_requested = true", "candidate_run_key = repeat('c', 64)", "experiment_id = 1", "error_code = 'x'", "error_text = 'x'", "replay_ms = 1", "compare_ms = 1", "other_heavy_jobs_seen = true", "started_at = now()", "finished_at = now()", "host = 'x'", "updated_at = now()"];
+
+    private static readonly string[] RefusedColumns = ["reason = 'x'", "created_by = 'owner:z@y.z'", "candidate_value = '9'", "baseline_run_key = repeat('b', 64)", "knob_name = 'x'", "knob_kind = 'exit'", "baseline_value = '9'", "hold_out_months = 1", "instruments = 9", "job_key = repeat('3', 64)", "created_at = now()", "id = gen_random_uuid()"];
 
     private static readonly double[] TwoValues = [3.0, 4.0];
 
@@ -181,6 +186,20 @@ public sealed class ExperimentJobApiTests(ApiFactory factory) : DataTestBase(fac
         {
             await Factory.RestoreOwnerAsync();
         }
+    }
+
+    [Fact]
+    public async Task A_capability_switched_off_between_the_handlers_check_and_the_insert_is_refused_by_the_trigger_and_the_store_answers_off()
+    {
+        var ids = await SeedAsync();
+        var baseline = await StoreBaselineAsync(ids);
+        using var scope = Factory.Services.CreateScope();
+
+        var inserted = await scope.ServiceProvider.GetRequiredService<IExperimentJobStore>().InsertAsync(
+            new NewExperimentJob(Guid.NewGuid(), new string('1', 64), baseline.RunKey, "exit", "FIXED_RR.rr", "2", "3", 0, "x", OwnerActor, 2, Now), 3, TimeSpan.FromHours(24), Ct);
+
+        inserted.Status.ShouldBe(ExperimentJobInsertStatus.CapabilityOff);
+        (await CountAsync("research.experiment_jobs")).ShouldBe(0);
     }
 
     [Fact]
@@ -444,7 +463,16 @@ public sealed class ExperimentJobApiTests(ApiFactory factory) : DataTestBase(fac
                     (await Should.ThrowAsync<PostgresException>(() => AppRoleProbe.ExecuteAsync(connection, statement, Ct))).SqlState.ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
                 }
 
-                await AppRoleProbe.ExecuteAsync(connection, "UPDATE research.experiment_jobs SET state = 'running', stage = 'prepare' WHERE false", Ct);
+                // the allowed columns work (a statement over no row proves the privilege) and every other column is refused at the column level
+                foreach (var column in AllowedColumns)
+                {
+                    await AppRoleProbe.ExecuteAsync(connection, $"UPDATE research.experiment_jobs SET {column} WHERE false", Ct);
+                }
+
+                foreach (var column in RefusedColumns)
+                {
+                    (await Should.ThrowAsync<PostgresException>(() => AppRoleProbe.ExecuteAsync(connection, $"UPDATE research.experiment_jobs SET {column} WHERE false", Ct))).SqlState.ShouldBe(PostgresErrorCodes.InsufficientPrivilege, column);
+                }
             },
             Ct);
     }

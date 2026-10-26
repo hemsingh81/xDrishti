@@ -264,32 +264,103 @@ public sealed class ExperimentJobRunnerTests
     }
 
     [Fact]
-    public async Task Progress_events_are_at_most_four_a_second_and_other_heavy_jobs_are_noted_on_the_job()
+    public async Task Other_heavy_jobs_seen_while_the_replay_runs_are_noted_on_the_job_and_the_progress_events_carry_the_job()
     {
-        _heavy.AnyOtherRunningAsync(Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(true));
+        var seen = new TaskCompletionSource();
+        _heavy.AnyOtherRunningAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            seen.TrySetResult();
+            return ValueTask.FromResult(true);
+        });
         _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>()).Returns(Async(async call =>
         {
-            var progress = (IProgress<int>)call.Arg<RunSimulationQuery>().Progress!;
-            for (var i = 1; i <= 120; i++)
-            {
-                progress.Report(i);
-                await Task.Delay(10, Ct);
-            }
-
+            ((IProgress<int>)call.Arg<RunSimulationQuery>().Progress!).Report(1);
+            await _jobs.HeavyMarked.Task; // the replay lasts until the watcher has noted it: no wall-clock assertion
             return Result.Success(_run);
         }));
         var job = await QueuedAsync();
 
-        var clock = System.Diagnostics.Stopwatch.StartNew();
         await Runner(TimeProvider.System).ExecuteAsync(job, Ct);
-        clock.Stop();
 
-        // The rate is judged against the measured replay time, not a fixed 1.2 s: a busy machine stretches the replay and must not fail the limit.
-        var count = _progress.Progress.Count;
-        count.ShouldBeGreaterThan(0);
-        count.ShouldBeLessThanOrEqualTo((int)Math.Ceiling(clock.Elapsed.TotalSeconds * 4) + 2, "at most four a second, plus the edges");
         Row(job.Id).OtherHeavyJobsSeen.ShouldBeTrue();
+        Row(job.Id).State.ShouldBe(ExperimentJobState.Succeeded);
         _progress.Progress.ShouldAllBe(p => p.JobId == job.Id && p.State == "running");
+    }
+
+    [Fact]
+    public void The_progress_throttle_passes_at_most_four_events_a_second_on_a_fake_clock()
+    {
+        var clock = new FakeTimeProvider(Start);
+        var throttle = new XDrishti.Application.Lab.ProgressThrottle(clock, XDrishti.Application.Lab.ProgressThrottle.QuarterSecond);
+        var passed = 0;
+        for (var i = 0; i < 100; i++)
+        {
+            if (throttle.TryPass())
+            {
+                passed++;
+            }
+
+            clock.Advance(TimeSpan.FromMilliseconds(10)); // 100 attempts over exactly one second
+        }
+
+        passed.ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task A_failing_progress_report_or_cancel_read_never_stops_the_job_from_ending_in_a_final_state_and_a_new_job_can_start()
+    {
+        _jobs.FailReport = true;
+        _jobs.FailIsCancel = true;
+        var seen = new TaskCompletionSource();
+        _heavy.AnyOtherRunningAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            seen.TrySetResult();
+            return ValueTask.FromResult(false);
+        });
+        _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>()).Returns(Async(async _ =>
+        {
+            await Task.Delay(1500, Ct); // long enough for the watcher to fail on its reports and its cancel reads
+            return Result.Success(_run);
+        }));
+        var job = await QueuedAsync();
+
+        await Runner(TimeProvider.System).ExecuteAsync(job, Ct);
+
+        ExperimentJobStates.IsFinal(Row(job.Id).State).ShouldBeTrue("the watcher's failures never strand the job in running");
+        _jobs.FailReport = false;
+        _jobs.FailIsCancel = false;
+        var next = new NewExperimentJob(Guid.NewGuid(), new string('2', 64), JobFixtures.BaselineKey, "exit", "FIXED_RR.rr", "2", "4", 6, "again", JobFixtures.Owner, 2, Start);
+        (await _jobs.InsertAsync(next, 10, TimeSpan.FromHours(24), Ct)).Status.ShouldBe(ExperimentJobInsertStatus.Created, "nothing is stranded in running");
+    }
+
+    [Fact]
+    public async Task A_finish_that_fails_twice_is_tried_again_and_the_job_ends()
+    {
+        _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(_run));
+        var job = await QueuedAsync();
+        _jobs.FinishFailures = 2;
+
+        await Runner(TimeProvider.System).ExecuteAsync(job, Ct);
+
+        Row(job.Id).State.ShouldBe(ExperimentJobState.Succeeded);
+        _progress.Finished.ShouldBe([new ExperimentJobFinished(job.Id, "succeeded")]);
+    }
+
+    [Fact]
+    public async Task A_finish_that_keeps_failing_throws_to_the_dispatcher_which_marks_the_job_interrupted_so_a_new_job_can_start()
+    {
+        _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(_run));
+        var job = await QueuedAsync();
+        _jobs.FinishFailures = 99;
+
+        await Should.ThrowAsync<InvalidOperationException>(() => Runner(TimeProvider.System).ExecuteAsync(job, Ct));
+
+        Row(job.Id).State.ShouldBe(ExperimentJobState.Running, "the runner could not end it");
+        _jobs.FinishFailures = 0;
+        (await _jobs.InterruptAsync(job.Id, Start, Ct)).ShouldBeTrue(); // what the dispatcher does when the runner throws
+        Row(job.Id).State.ShouldBe(ExperimentJobState.Interrupted);
+        var next = new NewExperimentJob(Guid.NewGuid(), new string('2', 64), JobFixtures.BaselineKey, "exit", "FIXED_RR.rr", "2", "4", 6, "again", JobFixtures.Owner, 2, Start);
+        (await _jobs.InsertAsync(next, 10, TimeSpan.FromHours(24), Ct)).Status.ShouldBe(ExperimentJobInsertStatus.Created);
     }
 
     [Theory]

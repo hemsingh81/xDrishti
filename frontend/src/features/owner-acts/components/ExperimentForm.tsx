@@ -19,6 +19,7 @@ export function ExperimentForm({ runKey, onStarted }: { runKey: string; onStarte
   const [reason, setReason] = useState('');
   const [password, setPassword] = useState('');
   const [understood, setUnderstood] = useState(false);
+  const [problem, setProblem] = useState<ReturnType<typeof startProblem> | null>(null);
 
   if (!hex64.test(runKey))
     return <Typography color="text.secondary">Pick a stored run, or paste its 64-character key.</Typography>;
@@ -45,10 +46,10 @@ export function ExperimentForm({ runKey, onStarted }: { runKey: string; onStarte
     password.length > 0 &&
     (!needsBox || understood) &&
     !start.isPending;
-  const problem = start.isError ? startProblem(start.error, preview.activeJobId) : null;
 
   const submit = () => {
     if (!knob) return;
+    setProblem(null);
     start.mutate(
       {
         baselineRunKey: runKey,
@@ -59,10 +60,17 @@ export function ExperimentForm({ runKey, onStarted }: { runKey: string; onStarte
         password,
       },
       {
+        onError: (error) => {
+          setProblem(startProblem(error, preview.activeJobId));
+        },
         onSettled: () => {
           setPassword('');
+          start.reset(); // the password sits in the variables of the mutation: it is dropped as soon as the call ends
         },
-        onSuccess: onStarted,
+        onSuccess: (job) => {
+          setUnderstood(false);
+          onStarted(job);
+        },
       },
     );
   };

@@ -150,6 +150,38 @@ public sealed class CapabilityApiTests(ApiFactory factory) : DataTestBase(factor
     }
 
     [Fact]
+    public async Task The_kill_switch_never_answers_429_while_switching_on_is_limited_per_minute()
+    {
+        await ReadAsync(await SwitchAsync("pwa", true, Factory.OwnerPassword));
+        try
+        {
+            for (var i = 0; i < 25; i++)
+            {
+                using var off = await SwitchAsync("pwa", false, null, "kill switch " + i);
+                off.StatusCode.ShouldBe(HttpStatusCode.OK, "switch " + i);
+            }
+
+            var limited = 0;
+            for (var i = 0; i < 14; i++)
+            {
+                using var on = await SwitchAsync("pwa", true, "not-the-password");
+                if (on.StatusCode == HttpStatusCode.TooManyRequests)
+                {
+                    limited++;
+                    (await on.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("code").GetString().ShouldBe("auth.rate_limited");
+                    on.Headers.RetryAfter.ShouldNotBeNull();
+                }
+            }
+
+            limited.ShouldBeGreaterThan(0, "attempts to switch ON beyond the sign-in limit are refused");
+        }
+        finally
+        {
+            await Factory.RestoreOwnerAsync();
+        }
+    }
+
+    [Fact]
     public async Task An_open_step_up_window_does_not_stand_in_for_the_password_and_is_not_used_up_by_the_switch()
     {
         var elevated = await Factory.SignInElevatedAsync(Ct);

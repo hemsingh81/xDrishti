@@ -11,7 +11,6 @@ const WRITER_FEATURES = new Set([
   'instruments',
   'lab',
   'owner-acts',
-  'exports', // P8-20: allowed ahead of the feature so it needs no change here
   'plans',
   'portfolio',
   'quality',
@@ -61,7 +60,7 @@ describe('write paths are only in the features that may write', () => {
   );
 
   it('lists only features that exist or are planned', () => {
-    const unknown = [...WRITER_FEATURES].filter((name) => !byFeature.has(name) && name !== 'exports');
+    const unknown = [...WRITER_FEATURES].filter((name) => !byFeature.has(name));
     expect(unknown).toEqual([]);
   });
 });

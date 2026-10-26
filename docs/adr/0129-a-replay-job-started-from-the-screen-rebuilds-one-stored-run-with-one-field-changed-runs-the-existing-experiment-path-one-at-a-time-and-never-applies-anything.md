@@ -19,6 +19,9 @@
 9. **Candidate runs are marked.** The default report set (`RunSelection`) leaves out runs whose `created_by` starts with `experiment:` (note "experiment candidate"); they stay selectable by name.
 10. **Audit and surface.** `AccountEventType.ExperimentJobStarted` and `ExperimentJobCancelled` (kind and instrument count, never a value). `ApprovedReportWrites` lists exactly `POST /api/experiments/` and its cancel, so the P8 read-only check names them. Hub events `experimentProgress` (at most 4 a second) and `experimentFinished`. Log ids 4905 to 4914. The UI is one lazy panel of the owner-acts feature.
 
+11. **A job is never stranded.** The watcher (progress, stop flag, heavy-job probe) logs a failed look and looks again; the runner always reaches `FinishAsync` (three tries) and, if the store still fails, the dispatcher marks the job `interrupted` (as a restart would) so the one-active index never blocks a new start. An interrupted job's card says a candidate run may be stored and an experiment may be on the ledger.
+12. **A capability switched off between the handler's check and the insert** is refused by the database trigger (23514) and answered as 403 `capabilities.off`, not as a failure.
+
 ## Consequences
 - With the capability off (the default after deploy) nothing can start; the preview is read only and works regardless.
 - On today's data every result is at best Inconclusive; the screen says it before the start.

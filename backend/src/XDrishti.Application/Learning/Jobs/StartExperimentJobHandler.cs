@@ -76,6 +76,8 @@ internal sealed class StartExperimentJobHandler(
             case ExperimentJobInsertStatus.DailyLimit:
                 var leaves = inserted.OldestLeavesAt ?? now;
                 return Refuse(ExperimentJobErrors.DailyLimit(settings.MaxJobsPerDay, leaves, (int)Math.Max(1, Math.Ceiling((leaves - now).TotalSeconds))));
+            case ExperimentJobInsertStatus.CapabilityOff:
+                return Refuse(XDrishti.Domain.Capabilities.CapabilityErrors.Off(XDrishti.Domain.Capabilities.Capabilities.ExperimentsUi));
             case ExperimentJobInsertStatus.Existing:
                 return Result.Success(new StartedExperimentJob(false, ExperimentJobViews.Of(inserted.Job!, header)));
             default:

@@ -68,6 +68,12 @@ internal sealed class ExperimentJobStore(NpgsqlDataSource dataSource) : IExperim
             await reader.ReadAsync(cancellationToken);
             created = Read(reader);
         }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.CheckViolation)
+        {
+            // the capability trigger: the owner switched it off between the handler's check and this insert
+            await transaction.RollbackAsync(CancellationToken.None);
+            return new ExperimentJobInsert(ExperimentJobInsertStatus.CapabilityOff, null, null);
+        }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
         {
             await transaction.RollbackAsync(CancellationToken.None);
@@ -204,6 +210,14 @@ internal sealed class ExperimentJobStore(NpgsqlDataSource dataSource) : IExperim
         await using var command = dataSource.CreateCommand("SELECT cancel_requested FROM research.experiment_jobs WHERE id = @id");
         command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id);
         return await command.ExecuteScalarAsync(cancellationToken) is true;
+    }
+
+    public async ValueTask<bool> InterruptAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("UPDATE research.experiment_jobs SET state = 'interrupted', finished_at = @now, updated_at = @now WHERE id = @id AND state = 'running'");
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id);
+        command.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
     public async ValueTask<IReadOnlyList<Guid>> InterruptRunningAsync(string host, DateTimeOffset now, CancellationToken cancellationToken)

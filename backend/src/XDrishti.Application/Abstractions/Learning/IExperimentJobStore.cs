@@ -50,6 +50,9 @@ public enum ExperimentJobInsertStatus
 
     /// <summary>The jobs of the last 24 hours are at the daily limit.</summary>
     DailyLimit,
+
+    /// <summary>The database refused the insert because the capability was switched off after the handler asked (the trigger, the last layer of the gate).</summary>
+    CapabilityOff,
 }
 
 /// <summary>The outcome of inserting a job.</summary>
@@ -120,6 +123,9 @@ public interface IExperimentJobStore
 
     /// <summary>True when a stop was asked for this job.</summary>
     ValueTask<bool> IsCancelRequestedAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Makes this job <c>interrupted</c> if it is still running (the runner crashed and could not end it); false when it was not running.</summary>
+    ValueTask<bool> InterruptAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken);
 
     /// <summary>Makes every job that <paramref name="host"/> had running <c>interrupted</c>; returns their ids.</summary>
     ValueTask<IReadOnlyList<Guid>> InterruptRunningAsync(string host, DateTimeOffset now, CancellationToken cancellationToken);

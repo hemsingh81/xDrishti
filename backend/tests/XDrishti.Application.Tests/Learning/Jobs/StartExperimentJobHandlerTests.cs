@@ -59,6 +59,18 @@ public sealed class StartExperimentJobHandlerTests
     }
 
     [Fact]
+    public async Task A_capability_switched_off_between_the_check_and_the_insert_is_refused_by_the_database_and_answered_as_off_not_as_a_failure()
+    {
+        _jobs.RefuseAsOff = true;
+
+        var result = await Start();
+
+        result.Error.Code.ShouldBe("capabilities.off");
+        result.Error.Kind.ShouldBe(ErrorKind.Forbidden);
+        _events.DidNotReceiveWithAnyArgs().Record(default!);
+    }
+
+    [Fact]
     public async Task A_valid_start_queues_one_job_with_the_owner_the_knob_and_the_instrument_count_and_audits_it_once_without_the_value()
     {
         var result = await Start();

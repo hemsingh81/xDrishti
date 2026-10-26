@@ -59,9 +59,14 @@ internal static class ExperimentJobViews
     {
         ArgumentNullException.ThrowIfNull(job);
         var limits = new List<string> { Nothing };
-        if (job.State is ExperimentJobState.Failed or ExperimentJobState.Cancelled or ExperimentJobState.Interrupted)
+        if (job.State is ExperimentJobState.Failed or ExperimentJobState.Cancelled)
         {
             limits.Add("Judged nothing; not counted as a trial.");
+        }
+        else if (job.State == ExperimentJobState.Interrupted)
+        {
+            // the host stopped at an unknown point: the candidate run may be stored and the judgement may already be on the ledger
+            limits.Add("The job was interrupted at an unknown point and is never resumed. A candidate run may have been stored and an experiment may be on the ledger: check the Experiments list; an experiment there counts as a trial.");
         }
 
         return new ExperimentJobView(

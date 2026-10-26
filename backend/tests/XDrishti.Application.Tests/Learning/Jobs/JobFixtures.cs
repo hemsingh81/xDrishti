@@ -87,8 +87,26 @@ internal static class JobFixtures
     {
         public List<ExperimentJob> Rows { get; } = [];
 
+        /// <summary>Failures to raise, to prove that a hiccup of the store never strands a job.</summary>
+        public bool FailReport { get; set; }
+
+        public bool FailIsCancel { get; set; }
+
+        public int FinishFailures { get; set; }
+
+        /// <summary>The database trigger refuses the insert (the capability was switched off after the handler asked).</summary>
+        public bool RefuseAsOff { get; set; }
+
+        /// <summary>Completed when the runner noted that another heavy job ran.</summary>
+        public TaskCompletionSource HeavyMarked { get; } = new();
+
         public ValueTask<ExperimentJobInsert> InsertAsync(NewExperimentJob job, int maxPerDay, TimeSpan window, CancellationToken cancellationToken)
         {
+            if (RefuseAsOff)
+            {
+                return ValueTask.FromResult(new ExperimentJobInsert(ExperimentJobInsertStatus.CapabilityOff, null, null));
+            }
+
             if (Rows.LastOrDefault(r => r.JobKey == job.JobKey && r.State is ExperimentJobState.Queued or ExperimentJobState.Running or ExperimentJobState.Succeeded) is { } same)
             {
                 return ValueTask.FromResult(new ExperimentJobInsert(ExperimentJobInsertStatus.Existing, same, null));
@@ -134,6 +152,11 @@ internal static class JobFixtures
 
         public ValueTask<bool> ReportAsync(Guid id, string stage, int done, int total, DateTimeOffset now, CancellationToken cancellationToken)
         {
+            if (FailReport)
+            {
+                throw new InvalidOperationException("report failed");
+            }
+
             var i = Rows.FindIndex(r => r.Id == id && r.State == ExperimentJobState.Running);
             if (i < 0)
             {
@@ -148,11 +171,18 @@ internal static class JobFixtures
         {
             var i = Rows.FindIndex(r => r.Id == id);
             Rows[i] = Rows[i] with { OtherHeavyJobsSeen = true };
+            HeavyMarked.TrySetResult();
             return ValueTask.CompletedTask;
         }
 
         public ValueTask<bool> FinishAsync(ExperimentJobFinish finish, CancellationToken cancellationToken)
         {
+            if (FinishFailures > 0)
+            {
+                FinishFailures--;
+                throw new InvalidOperationException("finish failed");
+            }
+
             var i = Rows.FindIndex(r => r.Id == finish.Id && r.State == ExperimentJobState.Running);
             if (i < 0)
             {
@@ -184,7 +214,19 @@ internal static class JobFixtures
             }
         }
 
-        public ValueTask<bool> IsCancelRequestedAsync(Guid id, CancellationToken cancellationToken) => ValueTask.FromResult(Rows.Any(r => r.Id == id && r.CancelRequested));
+        public ValueTask<bool> IsCancelRequestedAsync(Guid id, CancellationToken cancellationToken) => FailIsCancel ? throw new InvalidOperationException("cancel read failed") : ValueTask.FromResult(Rows.Any(r => r.Id == id && r.CancelRequested));
+
+        public ValueTask<bool> InterruptAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            var i = Rows.FindIndex(r => r.Id == id && r.State == ExperimentJobState.Running);
+            if (i < 0)
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            Rows[i] = Rows[i] with { State = ExperimentJobState.Interrupted, FinishedAt = now };
+            return ValueTask.FromResult(true);
+        }
 
         public ValueTask<IReadOnlyList<Guid>> InterruptRunningAsync(string host, DateTimeOffset now, CancellationToken cancellationToken)
         {

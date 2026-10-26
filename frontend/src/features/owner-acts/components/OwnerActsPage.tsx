@@ -1,7 +1,7 @@
 import { Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
-import { capabilitiesQuery } from '../api/capabilitiesApi';
+import { capabilitiesQuery } from '../api/capabilitiesRead';
 import { CapabilityCard } from './CapabilityCard';
 import { CapabilityHistory } from './CapabilityHistory';
 

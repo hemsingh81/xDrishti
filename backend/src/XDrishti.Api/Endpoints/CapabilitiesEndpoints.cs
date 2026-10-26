@@ -24,9 +24,8 @@ internal sealed class CapabilitiesEndpoints : IEndpointModule
             .ProducesRejections(conflict: false, notFound: false);
 
         group.MapPut("/{name}", ChangeAsync)
-            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy) // a password is checked here, so the sign-in limit applies
-            .WithName("ChangeCapability")
-            .WithSummary("Switch one capability ON or OFF as the owner; appends an audited row (the same state again writes nothing and answers changed=false). Switching ON needs a session, the CSRF token and the password in the body, checked on EVERY request; switching OFF needs no password. 401 auth.invalid_credentials, 423 auth.locked, 404 capabilities.not_found, 422 capabilities.invalid, 429 auth.rate_limited")
+            .WithName("ChangeCapability") // no route limiter: the OFF direction (the kill switch) must never answer 429; the ON direction is limited in the handler below
+            .WithSummary("Switch one capability ON or OFF as the owner; appends an audited row (the same state again writes nothing and answers changed=false). Switching ON needs a session, the CSRF token and the password in the body, checked on EVERY request; switching OFF needs no password. 401 auth.invalid_credentials, 423 auth.locked, 404 capabilities.not_found, 422 capabilities.invalid, 429 auth.rate_limited (switching ON only)")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesRejections(conflict: false);
     }
@@ -44,12 +43,20 @@ internal sealed class CapabilitiesEndpoints : IEndpointModule
         HttpContext http,
         ICommandHandler<StepUpCommand, StepUpResult> passwordCheck,
         ICommandHandler<ChangeCapabilityCommand, CapabilityChangeOutcome> handler,
+        SwitchOnLimiter limiter,
         CancellationToken cancellationToken)
     {
         // A name outside the whitelist is answered before any password is checked: it says nothing about the password.
         if (!Domain.Capabilities.Capabilities.IsKnown(name))
         {
             return ProblemResults.From(Domain.Capabilities.CapabilityErrors.NotFound(name), http);
+        }
+
+        // A password is checked only to switch ON, so only that direction shares the attempt limit of the sign-in; the kill switch is never slower than the switch.
+        if (request.Enabled && !limiter.TryAcquire(http, out var retryAfter))
+        {
+            http.Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return TypedResults.Problem(ProblemResults.Create(StatusCodes.Status429TooManyRequests, "Too many attempts. Try again later.", SessionAuthentication.RateLimitedCode, retryAfter));
         }
 
         // ON: a fresh password for this act. OFF: the signed-in owner is enough (the kill switch is never slower than the switch).

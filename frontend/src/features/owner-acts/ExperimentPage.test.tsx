@@ -126,6 +126,47 @@ describe('Replay one change, starting', () => {
     expect(screen.getByLabelText(/^Your password/)).toHaveValue('');
   });
 
+  it('leaves no password in the mutation cache after a start, a wrong password or a refusal, and unticks the box after a start', async () => {
+    const { client, router } = renderPage();
+    await fillForm();
+    await userEvent.click(start());
+    await waitFor(() => {
+      expect(router.state.location.search).toBe(`?job=${jobId}`);
+    });
+
+    const cached = () =>
+      JSON.stringify(
+        client
+          .getMutationCache()
+          .getAll()
+          .map((m) => m.state.variables ?? null),
+      );
+    expect(cached()).not.toContain('correct-horse');
+    expect(
+      client
+        .getMutationCache()
+        .getAll()
+        .filter((m) => m.options.mutationKey === undefined && m.state.status === 'pending'),
+    ).toEqual([]);
+    expect(screen.queryByRole('checkbox', { name: /counts as a look/ })?.hasAttribute('checked') ?? false).toBe(false);
+  });
+
+  it('a wrong password leaves nothing of it in the mutation cache and the problem stays on screen', async () => {
+    const { client } = renderPage();
+    await fillForm({ password: 'wrong' });
+    await userEvent.click(start());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The password was not accepted.');
+    expect(
+      JSON.stringify(
+        client
+          .getMutationCache()
+          .getAll()
+          .map((m) => m.state.variables ?? null),
+      ),
+    ).not.toContain('wrong');
+  });
+
   it('a wrong password is said in words, clears the field and does not sign out', async () => {
     const { router } = renderPage();
     await fillForm({ password: 'wrong' });

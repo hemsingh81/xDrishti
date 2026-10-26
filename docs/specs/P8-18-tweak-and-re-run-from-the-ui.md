@@ -120,3 +120,11 @@ None blocking. Owner acts after the build: switching `experiments_ui` ON in `/ow
 - **B8 Database layers.** Insert trigger (capability on, state queued), update trigger (a final state is final, running never back to queued), partial unique index (one active), column-level UPDATE grant, no DELETE.
 - **B9 Report set.** `RunSelection` leaves out `created_by LIKE 'experiment:%'` runs with the note "experiment candidate" (decided in the spec's review fixes, not an owner question).
 - **B10 Approved writes.** `ApprovedReportWrites` names exactly the start and the cancel, so the P8 phase check keeps judging every other write under the guarded prefixes.
+
+## Review fixes 2026-10-26 (decisions)
+- **R1 Never stranded.** Watcher failures are logged and the next tick looks again; the runner always tries to finish (three tries); a runner that still fails leaves the job to the dispatcher, which marks it `interrupted`. Tests: failing report, failing stop read, throwing finish.
+- **R2 Off between check and insert.** The trigger's 23514 is answered as 403 `capabilities.off` (the safer reading: nothing was written).
+- **R3 Kill switch.** `PUT /api/capabilities/{name}` has no route limiter; only the ON direction takes the attempt limit (decision: the kill switch never answers 429).
+- **R4 Password in the cache.** The start mutation has `gcTime: 0` and is reset when the call settles; the box is unticked after a start.
+- **R5 Interrupted card** says a candidate may be stored and an experiment may be on the ledger.
+- **R6** The write-path guard no longer lists `exports` ahead of its slice. The switch mutation lives in the lazy page; the Learning link reads capabilities through a read-only module.

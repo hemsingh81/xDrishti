@@ -34,4 +34,7 @@ internal static partial class ExperimentJobLogEvents
 
     [LoggerMessage(EventId = 4914, Level = LogLevel.Information, Message = "experiment.job.cancel_asked {JobId}: {Outcome}")]
     public static partial void CancelAsked(ILogger logger, Guid jobId, string outcome);
+
+    [LoggerMessage(EventId = 4915, Level = LogLevel.Warning, Message = "experiment.job.watch_failed {JobId}")]
+    public static partial void WatcherFailed(ILogger logger, Guid jobId, Exception exception);
 }

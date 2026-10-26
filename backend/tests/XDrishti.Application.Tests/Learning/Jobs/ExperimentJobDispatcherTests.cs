@@ -91,6 +91,21 @@ public sealed class ExperimentJobDispatcherTests
         _ran.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task When_the_runner_crashes_the_dispatcher_marks_the_job_interrupted_with_a_final_event_so_the_next_job_can_start()
+    {
+        Queue(1);
+        var crashing = Substitute.For<IExperimentJobExecutor>();
+        crashing.ExecuteAsync(Arg.Any<ExperimentJob>(), Arg.Any<CancellationToken>()).Returns<Task>(_ => throw new InvalidOperationException("could not finish"));
+        var scopes = new Scopes(new Dictionary<Type, object> { [typeof(IExperimentJobStore)] = _jobs, [typeof(IExperimentJobProgress)] = _progress, [typeof(IExperimentJobExecutor)] = crashing });
+        var dispatcher = new ExperimentJobDispatcher(scopes, new ExperimentJobSettings(), TimeProvider.System, NullLogger<ExperimentJobDispatcher>.Instance);
+
+        await dispatcher.DrainAsync(Ct);
+
+        _jobs.Rows.Single().State.ShouldBe(ExperimentJobState.Interrupted);
+        _progress.Finished.ShouldBe([new ExperimentJobFinished(_jobs.Rows.Single().Id, "interrupted")]);
+    }
+
     private sealed class Scopes(Dictionary<Type, object> services) : IServiceScopeFactory
     {
         public IServiceScope CreateScope() => new Scope(services);

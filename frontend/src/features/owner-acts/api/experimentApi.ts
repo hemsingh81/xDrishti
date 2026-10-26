@@ -59,6 +59,7 @@ export interface StartInput {
 export function useStartExperiment() {
   const queryClient = useQueryClient();
   return useMutation({
+    gcTime: 0, // the password is in the variables of this mutation: it is not kept after the call
     mutationFn: async ({ baselineRunKey, kind, name, candidateValue, reason, password }: StartInput) =>
       unwrap(
         await api.POST('/api/experiments', {

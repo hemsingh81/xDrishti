@@ -124,6 +124,27 @@ public sealed class ExperimentJobDispatcher(IServiceScopeFactory scopes, Experim
 #pragma warning restore CA1031
         {
             ExperimentJobLogEvents.Crashed(logger, job.Id, job.Stage ?? "claimed", ex);
+            await InterruptAsync(job);
+        }
+    }
+
+    // The runner could not end the job: it must not stay running (that blocks every new start), so it is marked interrupted, as a restart would.
+    private async Task InterruptAsync(ExperimentJob job)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            if (await scope.ServiceProvider.GetRequiredService<IExperimentJobStore>().InterruptAsync(job.Id, time.GetUtcNow(), CancellationToken.None))
+            {
+                ExperimentJobLogEvents.Interrupted(logger, job.Id);
+                await scope.ServiceProvider.GetRequiredService<IExperimentJobProgress>().FinishedAsync(new ExperimentJobFinished(job.Id, ExperimentJobStates.Code(ExperimentJobState.Interrupted)), CancellationToken.None);
+            }
+        }
+#pragma warning disable CA1031 // the next start of the host marks it interrupted if even this fails
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            ExperimentJobLogEvents.DispatcherFailed(logger, ex);
         }
     }
 }

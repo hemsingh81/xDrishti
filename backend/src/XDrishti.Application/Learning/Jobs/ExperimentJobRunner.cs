@@ -71,7 +71,7 @@ internal sealed class ExperimentJobRunner(
         }
         catch (OperationCanceledException) when (hostStop.IsCancellationRequested)
         {
-            await StopAsync(watcherStop, watcher);
+            await StopQuietlyAsync(watcherStop, watcher, job.Id);
             return; // the host is stopping: the job stays running and the next start marks it interrupted
         }
         catch (OperationCanceledException)
@@ -90,11 +90,42 @@ internal sealed class ExperimentJobRunner(
             finish = Failed(job, watch, ExperimentJobErrors.CrashedCode, "The job stopped on an unexpected error; see the log. Nothing was judged; not counted as a trial.");
         }
 
-        await StopAsync(watcherStop, watcher);
-        await jobs.FinishAsync(finish, CancellationToken.None);
+        // The job ALWAYS reaches a final state: a watcher that failed does not stop the finish, and the finish is tried again (a job left running would block every new start until a restart).
+        await StopQuietlyAsync(watcherStop, watcher, job.Id);
+        await FinishAsync(finish);
         var stateCode = ExperimentJobStates.Code(finish.State);
         ExperimentJobLogEvents.Finished(logger, job.Id, stateCode, finish.ReplayMs ?? 0, finish.CompareMs ?? 0);
-        await progress.FinishedAsync(new ExperimentJobFinished(job.Id, ExperimentJobStates.Code(finish.State)), CancellationToken.None);
+        try
+        {
+            await progress.FinishedAsync(new ExperimentJobFinished(job.Id, stateCode), CancellationToken.None);
+        }
+#pragma warning disable CA1031 // a missed event costs nothing: the job is served by the API as well
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            ExperimentJobLogEvents.WatcherFailed(logger, job.Id, ex);
+        }
+    }
+
+    private const int FinishAttempts = 3;
+
+    private async Task FinishAsync(ExperimentJobFinish finish)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await jobs.FinishAsync(finish, CancellationToken.None);
+                return;
+            }
+#pragma warning disable CA1031 // retried; the last failure goes to the dispatcher, which marks the job interrupted
+            catch (Exception ex) when (attempt < FinishAttempts)
+#pragma warning restore CA1031
+            {
+                ExperimentJobLogEvents.WatcherFailed(logger, finish.Id, ex);
+                await Task.Delay(TimeSpan.FromMilliseconds(200), time, CancellationToken.None);
+            }
+        }
     }
 
     private async Task<ExperimentJobFinish> StagesAsync(ExperimentJob job, Watch watch, CancellationToken token, CancellationToken hostStop)
@@ -174,9 +205,9 @@ internal sealed class ExperimentJobRunner(
     {
         var throttle = new ProgressThrottle(time, ProgressThrottle.QuarterSecond);
         var ticks = 0;
-        try
+        while (!stop.IsCancellationRequested)
         {
-            while (!stop.IsCancellationRequested)
+            try
             {
                 await Task.Delay(WatchTick, time, stop);
                 ticks++;
@@ -202,16 +233,31 @@ internal sealed class ExperimentJobRunner(
                     }
                 }
             }
-        }
-        catch (OperationCanceledException)
-        {
-            // stopped by the runner
+            catch (OperationCanceledException)
+            {
+                return; // stopped by the runner
+            }
+#pragma warning disable CA1031 // a failed look (a database hiccup, a hub that is down) must never end the job: it is logged and the next tick looks again
+            catch (Exception ex)
+#pragma warning restore CA1031
+            {
+                ExperimentJobLogEvents.WatcherFailed(logger, job.Id, ex);
+            }
         }
     }
 
-    private static async Task StopAsync(CancellationTokenSource stop, Task watcher)
+    private async Task StopQuietlyAsync(CancellationTokenSource stop, Task watcher, Guid jobId)
     {
-        await stop.CancelAsync();
-        await watcher;
+        try
+        {
+            await stop.CancelAsync();
+            await watcher;
+        }
+#pragma warning disable CA1031 // the watcher is a convenience: its failure never stops the job from ending
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            ExperimentJobLogEvents.WatcherFailed(logger, jobId, ex);
+        }
     }
 }

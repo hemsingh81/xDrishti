@@ -246,7 +246,7 @@ public static class ReportsPhaseCheck
         var writes = scanned.Where(r => r.Method != "GET" && !ApprovedReportWrites.All.Contains($"{r.Method} {r.Pattern}", StringComparer.OrdinalIgnoreCase)).Select(r => $"{r.Method} {r.Pattern}").ToList();
         return writes.Count > 0
             ? new(5, name, PhaseVerdict.NotMet, "not read-only: " + string.Join(", ", writes))
-            : new(5, name, PhaseVerdict.Met, string.Create(CultureInfo.InvariantCulture, $"{scanned.Count} routes under the guarded prefixes, GET only ({ApprovedReportWrites.All.Count} approved writes)"), "frontend folders are checked by the no-write test, not here");
+            : new(5, name, PhaseVerdict.Met, string.Create(CultureInfo.InvariantCulture, $"{scanned.Count} routes under the guarded prefixes, GET only, plus the {ApprovedReportWrites.All.Count} approved owner-act writes"), "frontend folders are checked by the no-write test, not here");
     }
 
     private static PhaseCriterion DeterminismAndSecurity(ReportsPhaseFacts f)

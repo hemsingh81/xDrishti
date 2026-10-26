@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link as RouterLink, useSearchParams } from 'react-router';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
-import { capabilitiesQuery } from '../api/capabilitiesApi';
+import { capabilitiesQuery } from '../api/capabilitiesRead';
 import { ExperimentForm } from './ExperimentForm';
 import { JobPanel } from './JobPanel';
 import { RunPicker } from './RunPicker';
