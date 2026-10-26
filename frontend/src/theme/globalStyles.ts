@@ -26,9 +26,9 @@ const interactive = [
 const packed = '[role="menuitem"], [role="option"], [role="tab"], .MuiListItemButton-root, .MuiMenuItem-root';
 
 /** The controls that reach 44 px on phones, and those left at their dense size. */
-export const touchControls = '.MuiButton-root, .MuiIconButton-root, .MuiTab-root, .MuiChip-clickable, [role="button"]';
+export const touchControls =
+  '.MuiButton-root, .MuiIconButton-root, .MuiTab-root, .MuiChip-clickable, .MuiToggleButton-root, [role="button"]';
 export const touchExempt = [
-  '.MuiButton-sizeSmall',
   '.MuiIconButton-sizeSmall',
   '.MuiChip-sizeSmall',
   '[data-dense]',
@@ -60,7 +60,12 @@ export function createGlobalStyles(theme: Theme) {
     [`@media (max-width:${touchTarget.phoneMaxWidth}px)`]: {
       [`:is(${touchControls}):not(${touchExempt})`]: { minHeight: touchTarget.phone, minWidth: touchTarget.phone },
       // The top bar's search and accounts buttons are small buttons, but on a phone they are the bar's targets too.
-      '.MuiAppBar-root .MuiButton-root': { minHeight: touchTarget.phone, minWidth: touchTarget.phone },
+      '.MuiAppBar-root .MuiButton-root, .MuiAlert-action .MuiButton-root': {
+        minHeight: touchTarget.phone,
+        minWidth: touchTarget.phone,
+      },
+      // Single-line fields: the typed text area is 44 px high (padding, not a fixed height, so the text stays centred).
+      '.MuiOutlinedInput-root .MuiInputBase-input:not(textarea)': { paddingTop: '12px', paddingBottom: '12px' },
     },
     body: {
       WebkitFontSmoothing: 'antialiased',

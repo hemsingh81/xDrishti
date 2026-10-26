@@ -142,7 +142,7 @@ internal static class ReportViews
         answer.NonAdditive,
         Evidence(answer.Evidence, report));
 
-    public static TradeLineView TradeLine(ReportTradeLine t) => new(t.RunKey, t.TradeKey, t.Strategy, t.Timeframe, t.Side, t.Symbol, [.. t.BasketIds], t.EntryDate, t.ExitDate, t.R, t.SessionsHeld, t.Style, t.Exit, t.Provisional);
+    public static TradeLineView TradeLine(ReportTradeLine t) => new(t.RunKey, t.TradeKey, t.Strategy, t.Timeframe, t.Side, t.Symbol, [.. t.BasketIds], t.EntryDate, t.ExitDate, t.R, t.SessionsHeld, t.Style, t.Exit, t.Provisional, t.Ordinal);
 
     private static string KindName(InsightKind kind) => kind switch
     {

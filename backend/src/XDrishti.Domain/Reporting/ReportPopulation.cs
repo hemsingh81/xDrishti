@@ -448,7 +448,7 @@ public sealed class ReportPopulation
         {
             var row = _rows[i];
             var t = row.Trade;
-            lines.Add(new ReportTradeLine(t.RunKey, t.TradeKey, t.Strategy, t.Timeframe, t.Side, t.Symbol, t.BasketIds, t.EntryDate, t.ExitDate, row.R, t.SessionsHeld, row.Style, row.Exit, row.Provisional));
+            lines.Add(new ReportTradeLine(t.RunKey, t.TradeKey, t.Strategy, t.Timeframe, t.Side, t.Symbol, t.BasketIds, t.EntryDate, t.ExitDate, row.R, t.SessionsHeld, row.Style, row.Exit, row.Provisional, t.Ordinal));
         }
 
         return lines.AsReadOnly();

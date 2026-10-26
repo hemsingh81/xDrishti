@@ -84,7 +84,7 @@ describe('Data quality: header and last run', () => {
   it('shows a loading indicator while the overview loads', () => {
     renderQuality();
 
-    expect(screen.getByRole('progressbar', { name: 'Loading data quality' })).toBeInTheDocument();
+    expect(screen.getByText('Loading data quality')).toBeInTheDocument();
   });
 
   it('leaves the slot for the corporate actions alert empty until that feature exists', async () => {
@@ -377,7 +377,7 @@ describe('Data quality: run history', () => {
 
     const drawer = await openHistory();
 
-    expect(within(drawer).getByRole('progressbar', { name: 'Loading recent runs' })).toBeInTheDocument();
+    expect(within(drawer).getByText('Loading recent runs')).toBeInTheDocument();
   });
 
   it('says when nothing has run, and when the runs cannot be loaded (Retry loads them)', async () => {

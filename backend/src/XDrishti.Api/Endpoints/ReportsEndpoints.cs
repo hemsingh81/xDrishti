@@ -109,6 +109,12 @@ internal sealed class ReportsEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        reports.MapGet("/trades/{runKey}/{ordinal:int}", TradeReplayAsync)
+            .WithName("GetTradeReplay")
+            .WithSummary("One stored simulated trade on its own bars (the replay of the drill-down): the trade facts in adjusted prices, its legs, the costing (figures only for a charge sheet the owner confirmed), the bars of its window at the chosen timeframe built on the server from the 1-minute bars and adjusted for the corporate actions applied now, a check that the stored entry still fits the bars (ok, entry_mismatch, no_bars), the decision-time features stored for the trade (a number only where one is stored) and the evidence block. Takes openAtEnd (default false), timeframe (1m, 5m, 15m, 1h, 1D; default 5m), before and after (sessions around the trade: 0 to 3, or 0 to 60 for 1D). A window above 5,000 bars is refused, never thinned. Read only. 422 reports.invalid or reports.window_too_large; 404 reports.not_found.")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status404NotFound);
     }
 
     private static async Task<Results<Ok<RunsView>, ProblemHttpResult>> RunsAsync(
@@ -221,6 +227,21 @@ internal sealed class ReportsEndpoints : IEndpointModule
         IQueryHandler<PageReportTradesQuery, Result<TradesView>> handler,
         CancellationToken cancellationToken) =>
         ReadAsync(input.ToInput(), http, q => handler.HandleAsync(new PageReportTradesQuery(q), cancellationToken));
+
+    private static async Task<Results<Ok<TradeReplayView>, ProblemHttpResult>> TradeReplayAsync(
+        string runKey,
+        int ordinal,
+        bool? openAtEnd,
+        string? timeframe,
+        int? before,
+        int? after,
+        HttpContext http,
+        IQueryHandler<GetTradeReplayQuery, Result<TradeReplayView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetTradeReplayQuery(runKey, ordinal, openAtEnd ?? false, timeframe, before, after), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
 
     /// <summary>Checks the query against its whitelist, then runs the use case; every refusal of the engine passes through with its code.</summary>
     private static async Task<Results<Ok<T>, ProblemHttpResult>> ReadAsync<T>(ReportQueryInput input, HttpContext http, Func<ReportQuery, ValueTask<Result<T>>> run)

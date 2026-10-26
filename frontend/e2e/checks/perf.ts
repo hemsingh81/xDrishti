@@ -18,8 +18,8 @@ export async function throttle(page: Page): Promise<void> {
 
 /** C14: time from navigation to the `data-ready` marker and the layout shift; fails only above twice the budget. */
 export async function c14Performance(page: Page): Promise<Result> {
-  await page.waitForSelector('main[data-ready]', { timeout: 60_000 });
-  await page.waitForTimeout(500);
+  await page.waitForSelector('main [data-ready]', { state: 'attached', timeout: 60_000 });
+  await page.waitForLoadState('networkidle');
   const ready = await page.evaluate(() => {
     const entry = performance.getEntriesByType('mark').find((m) => m.name === 'xd-ready');
     return entry?.startTime ?? performance.now();

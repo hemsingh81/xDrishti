@@ -22,9 +22,11 @@ import { mountPaper } from '../src/test/paperFixtures';
 import { buildDiscipline, buildReview, mountReview } from '../src/test/paperReviewFixtures';
 import { buildPhase, mountPhase } from '../src/test/phaseFixtures';
 import { mount as mountPlans } from '../src/test/planScreen';
-import { rankedWhatWorks, buildRunsView } from '../src/test/reportFixtures';
+import { replayServer } from '../src/test/replayFixtures';
+import { buildEvidence, buildRunsView, rankedWhatWorks, runKeyA } from '../src/test/reportFixtures';
 import { reportServer } from '../src/test/reportScreen';
 import { problemResponse, server } from '../src/test/server';
+import { auditEntry, mountAudit } from './auditFixtures';
 import type { State } from './checks/types';
 
 export const widths = [360, 768, 1440, 2560] as const;
@@ -106,54 +108,34 @@ const reports = (id: string, view: string, review = false): Screen => ({
   mounts: { full: reportBase, empty: reportEmpty },
 });
 
-type AuditPage = Schemas['AuditPageView'];
-const auditPage = (items: AuditPage['items']): AuditPage => ({
-  window: { from: '2026-09-13', to: '2026-10-12' },
-  items,
-  nextCursor: null,
-  sources: ['auth', 'account', 'approval', 'plan', 'autonomy', 'learning'].map((source) => ({
-    source,
-    state: 'value',
-    reason: null,
-  })),
-  limits: ['Only what is recorded is shown.'],
+const tradeLine = (ordinal: number): Schemas['TradeLineView'] => ({
+  runKey: runKeyA,
+  tradeKey: `ORB|NSE:S${String(ordinal)}|BUY|2026-03-02`,
+  strategy: 'ORB',
+  timeframe: '15m',
+  side: 'BUY',
+  symbol: `S${String(ordinal)}`,
+  basketIds: [],
+  entryDate: '2026-03-02',
+  exitDate: '2026-03-03',
+  r: ordinal % 2 === 0 ? 1.5 : -1,
+  sessionsHeld: 1,
+  style: 'intraday',
+  exit: 'fixed_r',
+  provisional: false,
+  ordinal,
 });
-const auditEntry = (n: number): AuditPage['items'][number] => ({
-  id: `account:00000000-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`,
-  at: '2026-10-12T05:00:00Z',
-  source: 'account',
-  category: 'portfolio_data',
-  kind: 'HoldingsImported',
-  outcome: 'ok',
-  actorKind: 'owner',
-  actor: 'owner@example.com',
-  accountId: null,
-  accountName: null,
-  summary: `Holdings imported: ${n} holdings imported`,
-  redacted: false,
-  planId: null,
-  itemId: null,
-});
-const mountAudit = (items: AuditPage['items']) => () => {
+const mountTrades = (count: number) => () => {
+  reportBase();
+  const items = Array.from({ length: count }, (_, i) => tradeLine(i + 1));
   server.use(
-    http.get('/api/audit/entries', () => HttpResponse.json(auditPage(items))),
-    http.get('/api/audit/summary', () =>
+    http.get('/api/reports/trades', () =>
       HttpResponse.json({
-        window: { from: '2026-09-13', to: '2026-10-12' },
-        total: items.length,
-        bySource: [],
-        byCategory: [],
-        byOutcome: [],
-        sources: [],
-      }),
-    ),
-    http.get('/api/audit/kinds', () =>
-      HttpResponse.json({
-        kinds: [{ source: 'auth', kind: 'LoginFailed', label: 'Login failed', category: 'sign_in', outcome: 'failed' }],
-        categories: ['sign_in', 'security'],
-        outcomes: ['ok', 'failed', 'refused'],
-        actors: ['owner', 'system', 'rule', 'cli', 'other'],
-      }),
+        items,
+        total: count,
+        nextCursor: null,
+        evidence: buildEvidence({ n: count }),
+      } satisfies Schemas['TradesView']),
     ),
   );
 };
@@ -184,6 +166,20 @@ export const screens: Screen[] = [
   reports('09-pivot', 'pivot'),
   reports('10-strategies', 'strategies'),
   reports('10-distribution', 'distribution'),
+  {
+    id: 'P8-11-cell',
+    route: '/reports/cell?strategy=ORB&timeframe=15m&cell=ORB%20%C2%B7%2015m',
+    mounts: { full: mountTrades(12), empty: mountTrades(0) },
+  },
+  {
+    id: 'P8-11-replay',
+    route: `/reports/trades/${runKeyA}/4`,
+    mounts: {
+      full: () => {
+        replayServer();
+      },
+    },
+  },
   {
     id: 'P8-14-plans',
     route: '/plans',

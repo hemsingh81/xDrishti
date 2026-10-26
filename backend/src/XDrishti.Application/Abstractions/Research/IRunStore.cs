@@ -35,4 +35,7 @@ public interface IRunStore
 
     /// <summary>A page of a run's trades in the record's order by keyset on <c>(open_at_end, ordinal)</c>, with the closed filter.</summary>
     ValueTask<Result<Page<RunTrade>>> PageTradesAsync(string runKey, TradePageFilter filter, PageRequest page, CancellationToken cancellationToken);
+
+    /// <summary>One stored trade by its place in the run (legs and costing as <see cref="PageTradesAsync"/> reads them), or null when the run or the trade is not stored (P8-11).</summary>
+    ValueTask<RunTrade?> ReadTradeAsync(string runKey, bool openAtEnd, int ordinal, CancellationToken cancellationToken);
 }

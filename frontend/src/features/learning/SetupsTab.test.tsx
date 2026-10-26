@@ -180,7 +180,7 @@ describe('Learning, Setups tab', () => {
     server.use(http.get('/api/cells', () => new Promise<never>(() => undefined)));
     renderLearning('?tab=setups');
 
-    expect(await screen.findByLabelText('Loading the cells…')).toBeInTheDocument();
+    expect(await screen.findByText('Loading the cells…')).toBeInTheDocument();
     expect(screen.queryByRole('grid', { name: 'Setups by strategy and timeframe' })).not.toBeInTheDocument();
   });
 

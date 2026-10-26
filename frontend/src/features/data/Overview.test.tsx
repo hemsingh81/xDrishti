@@ -19,7 +19,7 @@ describe('Data & import: the page', () => {
   it('shows a loading state, then the page', async () => {
     renderData();
 
-    expect(screen.getByRole('progressbar', { name: 'Loading data overview' })).toBeInTheDocument();
+    expect(screen.getByText('Loading data overview')).toBeInTheDocument();
     expect(await ready()).toBeInTheDocument();
   });
 

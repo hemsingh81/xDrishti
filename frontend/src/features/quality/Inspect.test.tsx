@@ -211,7 +211,7 @@ describe('Inspect drawer: header and checks', () => {
     });
 
     const drawer = await screen.findByRole('dialog', { name: 'Inspect' });
-    expect(within(drawer).getByRole('progressbar', { name: 'Loading the checks' })).toBeInTheDocument();
+    expect(within(drawer).getByText('Loading the checks')).toBeInTheDocument();
   });
 
   it('says an instrument that is gone is gone', async () => {

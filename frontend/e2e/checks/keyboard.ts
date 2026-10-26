@@ -21,6 +21,17 @@ export async function keyboardChecks(page: Page): Promise<Result[]> {
   let trapped = '';
   for (let i = 0; i < maxStops; i += 1) {
     await page.keyboard.press('Tab');
+    // The ring and the field border are drawn a frame after focus moves (even with the transitions at 0.01 ms): read after it.
+    await page.evaluate(
+      () =>
+        new Promise<void>((done) => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              done();
+            });
+          });
+        }),
+    );
     const stop = await page.evaluate(() => {
       const el = document.activeElement;
       if (!el || el === document.body) return null;

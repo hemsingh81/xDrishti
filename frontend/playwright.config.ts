@@ -6,6 +6,7 @@ const port = 4173;
 
 export default defineConfig({
   testDir: './e2e',
+  globalSetup: './e2e/globalSetup.ts',
   testMatch: '**/*.spec.ts',
   tsconfig: './tsconfig.e2e.json',
   timeout: 90_000,

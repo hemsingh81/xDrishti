@@ -172,7 +172,7 @@ describe('Services: the trading-day timeline', () => {
   it('shows a loading indicator while the timeline is read', async () => {
     renderServices({ handlers: [http.get('/api/services/timeline', () => pendingResponse())] });
 
-    expect(await within(await card()).findByRole('progressbar', { name: 'Loading the timeline' })).toBeInTheDocument();
+    expect(await within(await card()).findByText('Loading the timeline')).toBeInTheDocument();
     expect(await screen.findByRole('list', { name: 'Services' })).toBeInTheDocument();
   });
 

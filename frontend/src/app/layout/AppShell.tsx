@@ -1,42 +1,17 @@
 import { Box, Drawer, Link } from '@mui/material';
-import { useIsFetching } from '@tanstack/react-query';
-import { Suspense, useEffect, useState } from 'react';
+import { visuallyHidden } from '@mui/utils';
+import { Suspense, useState } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { AttentionPopups } from '@/features/notifications';
 import { LoadingState } from '@/shared/ui';
 import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { layout, pagePadding } from '@/theme';
 import { allNavItems, routeTitles } from '../navigation';
+import { ReadyMarker } from './ReadyMarker';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
 const mainId = 'main-content';
-
-/**
- * True once the route's queries have been settled for a moment (the `data-ready` marker of `main`): the browser runner and
- * the performance figures wait for it instead of guessing from timers. It resets on every navigation.
- */
-function useSettled(routeKey: string): boolean {
-  const fetching = useIsFetching();
-  const [settled, setSettled] = useState<string | null>(null);
-  useEffect(() => {
-    if (fetching > 0) return;
-    let timer = 0;
-    const settle = () => {
-      // A route's own loading state (the spinner of LoadingState, a status region) means its chunk or data is still coming.
-      if (document.querySelector(`#${mainId} [role="status"] > [role="progressbar"]`)) {
-        timer = window.setTimeout(settle, 150);
-      } else {
-        setSettled(routeKey);
-      }
-    };
-    timer = window.setTimeout(settle, 150);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [fetching, routeKey]);
-  return settled === routeKey && fetching === 0;
-}
 
 /**
  * Persistent layout: sidebar (permanent on desktop, drawer on mobile), top bar and the routed page (full width). It owns the
@@ -45,7 +20,6 @@ function useSettled(routeKey: string): boolean {
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { pathname, search } = useLocation();
-  const ready = useSettled(pathname + search);
   const title = allNavItems.find((i) => i.path === pathname)?.label ?? routeTitles[pathname] ?? 'xDrishti';
   const paper = { width: layout.sidebarWidth, boxSizing: 'border-box' as const };
 
@@ -63,14 +37,7 @@ export function AppShell() {
           left: theme.spacing(1),
           top: theme.spacing(1),
           // Hidden (still focusable) until it has focus.
-          '&:not(:focus)': {
-            clipPath: 'inset(50%)',
-            width: '1px',
-            height: '1px',
-            p: 0,
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-          },
+          '&:not(:focus)': visuallyHidden,
           zIndex: theme.zIndex.tooltip,
           padding: theme.spacing(1, 2),
           borderRadius: 1,
@@ -112,8 +79,8 @@ export function AppShell() {
           <Box
             component="main"
             id={mainId}
-            data-ready={ready ? '' : undefined}
-            tabIndex={-1}
+            // A scroll container the keyboard can reach (arrow keys scroll it) and the skip link can focus.
+            tabIndex={0}
             sx={(theme) => ({
               // The prototype's `.page` padding: 14 px on phones, 24 from the sidebar breakpoint, more room on wide monitors.
               padding: `${pagePadding.compact}px`,
@@ -134,6 +101,7 @@ export function AppShell() {
             <Suspense fallback={<LoadingState />}>
               <Outlet />
             </Suspense>
+            <ReadyMarker key={pathname + search} />
           </Box>
         </Box>
       </Box>

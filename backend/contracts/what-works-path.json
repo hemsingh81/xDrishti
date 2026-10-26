@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "answerPath": [
+    { "operation": "ListReportRuns" },
+    { "operation": "GetReportWhatWorks", "query": { "basket": "{basket}" } }
+  ],
+  "landing": [
+    { "operation": "GetReportSummary" },
+    { "operation": "GetReportInsights" }
+  ]
+}

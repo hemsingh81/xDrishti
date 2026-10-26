@@ -15,6 +15,7 @@ namespace XDrishti.Application.Reporting;
 /// <param name="Style">The run's style label; null when not recorded.</param>
 /// <param name="Exit">The run's exit label; null when not recorded.</param>
 /// <param name="Provisional">The run is marked provisional.</param>
+/// <param name="Ordinal">The trade's position in its run: with the run key, the address of its replay (a closed trade, so open-at-end is false).</param>
 public sealed record TradeLineView(
     string RunKey,
     string TradeKey,
@@ -29,4 +30,5 @@ public sealed record TradeLineView(
     int SessionsHeld,
     string? Style,
     string? Exit,
-    bool Provisional);
+    bool Provisional,
+    int Ordinal = 0);

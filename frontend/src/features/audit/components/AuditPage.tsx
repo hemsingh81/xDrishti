@@ -1,5 +1,6 @@
 import HistoryIcon from '@mui/icons-material/History';
 import TuneIcon from '@mui/icons-material/Tune';
+import { visuallyHidden } from '@mui/utils';
 import { Alert, Box, Button, Drawer, Stack, Typography, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -140,6 +141,11 @@ export function AuditPage() {
         </Alert>
       )}
 
+      {status?.kind === 'loading' && (
+        <Box role="status" sx={visuallyHidden}>
+          Loading the audit entries…
+        </Box>
+      )}
       {status?.kind === 'empty' && (
         <Typography sx={{ py: 3 }} color="text.secondary">
           No entries in this range{hasFilters(filter) ? ' with these filters' : ''}.

@@ -629,7 +629,7 @@ describe('Group by: loading, errors and empty views', () => {
     const gate = holdGroups();
     renderPortfolio('?groupBy=sector');
 
-    expect(await screen.findByRole('progressbar', { name: 'Loading groups' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading groups')).toBeInTheDocument();
 
     gate.release();
     expect(await groupsTable()).toBeInTheDocument();

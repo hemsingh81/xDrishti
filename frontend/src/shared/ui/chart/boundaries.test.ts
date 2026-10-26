@@ -46,3 +46,22 @@ describe('chart library boundary', () => {
     expect(referrers(categoryCanvas)).toEqual([['/src/shared/ui/chart/CategoryChart.tsx', false]]);
   });
 });
+
+describe('price chart library boundary', () => {
+  const priceCanvas = '/src/shared/ui/chart/PriceChartCanvas.tsx';
+  const importsPriceLibrary = /(?:from|import\()\s*['"]lightweight-charts(?:\/[^'"]*)?['"]/;
+
+  it('is imported by PriceChartCanvas and by nothing else', () => {
+    expect(production.filter(([, text]) => importsPriceLibrary.test(text)).map(([path]) => path)).toEqual([
+      priceCanvas,
+    ]);
+  });
+
+  it('reaches the canvas only through a dynamic import in PriceChart', () => {
+    const name = 'PriceChartCanvas';
+    const found = production
+      .filter(([path, text]) => path !== priceCanvas && text.includes(name))
+      .map(([path, text]) => [path, new RegExp(`from\\s+['"][^'"]*${name}['"]`).test(text)] as const);
+    expect(found).toEqual([['/src/shared/ui/chart/PriceChart.tsx', false]]);
+  });
+});

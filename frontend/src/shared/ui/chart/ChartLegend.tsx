@@ -1,4 +1,5 @@
 import { Box, Button, Stack } from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
 import { useId } from 'react';
 import { touchTarget } from '@/theme/tokens';
 import type { ChartTokens } from './chartTheme';
@@ -73,18 +74,7 @@ export function ChartLegend({ series, hidden, colors, onToggle }: ChartLegendPro
         );
       })}
       {visibleCount === 1 && (
-        <Box
-          component="span"
-          id={reasonId}
-          sx={{
-            position: 'absolute',
-            width: '1px',
-            height: '1px',
-            overflow: 'hidden',
-            clip: 'rect(0 0 0 0)',
-            whiteSpace: 'nowrap',
-          }}
-        >
+        <Box component="span" id={reasonId} sx={visuallyHidden}>
           {lastLineReason}
         </Box>
       )}

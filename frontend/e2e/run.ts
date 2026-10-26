@@ -31,8 +31,10 @@ export async function open(page: Page, screen: Screen, ctx: Ctx, mount: () => vo
   // A screen with its own loading look and no status region is a finding (C11), not a runner failure.
   if (ctx.state === 'loading')
     await page.waitForSelector('main [role=status]', { timeout: 4_000 }).catch(() => undefined);
-  else await page.waitForSelector('main[data-ready]', { timeout: 30_000 });
-  await page.waitForTimeout(300);
+  else await page.waitForSelector('main [data-ready]', { state: 'attached', timeout: 30_000 });
+  // Fonts loaded and the network quiet: the layout the checks measure is the settled one.
+  await page.evaluate(() => document.fonts.ready);
+  if (ctx.state !== 'loading') await page.waitForLoadState('networkidle');
   return api;
 }
 

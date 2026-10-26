@@ -39,7 +39,7 @@ public sealed partial class ReportEndpointsArchitectureTests
         var code = Code(EndpointsSource);
 
         WritingRoute().IsMatch(code).ShouldBeFalse();
-        ReadingRoute().Count(code).ShouldBe(14); // P8-04 added plan-vs-actual (GET); P8-10 added mae-mfe (GET); P8-10b added comparisons and exit-selections (GET)
+        ReadingRoute().Count(code).ShouldBe(15); // P8-11 added the trade replay (GET); P8-04 added plan-vs-actual (GET); P8-10 added mae-mfe (GET); P8-10b added comparisons and exit-selections (GET)
         code.ShouldNotContain("ICommandHandler");
         WritingRoute().IsMatch("reports.MapPost(\"/x\", Handler)").ShouldBeTrue("the scan does see a write route");
         WritingRoute().IsMatch("reports.MapDelete(\"/x\", Handler)").ShouldBeTrue();
@@ -62,7 +62,7 @@ public sealed partial class ReportEndpointsArchitectureTests
     {
         var readers = Types.InAssembly(Application).That().HaveDependencyOn(ConfirmationSource).GetTypes().Select(t => t.Name).Where(n => !n.StartsWith('<')).Distinct().Order(StringComparer.Ordinal).ToList();
 
-        readers.ShouldBe(["ListReportRunsHandler", "ReportLoader", "RunCostBasis", "StoreCounterfactualHandler", "StoreEntryWindowsHandler", "StoreMetaPolicyHandler"]); // the store handlers state the basis of a stored study through RunCostBasis (P8-12, P8-13b); none writes a confirmation
+        readers.ShouldBe(["GetTradeReplayHandler", "ListReportRunsHandler", "ReportLoader", "RunCostBasis", "StoreCounterfactualHandler", "StoreEntryWindowsHandler", "StoreMetaPolicyHandler"]); // the store handlers state the basis of a stored study through RunCostBasis (P8-12, P8-13b); none writes a confirmation; P8-11: the trade replay reads it to show net figures only for a confirmed sheet
         Types.InAssembly(Api).That().HaveDependencyOn(ConfirmationSource).GetTypes().ShouldBeEmpty();
         Types.InAssembly(Api).That().HaveDependencyOn(typeof(XDrishti.Domain.Reporting.ChargeSheetConfirmation).FullName!).GetTypes().ShouldBeEmpty();
         Types.InAssembly(typeof(ConfirmationReaderSentinel).Assembly).That().HaveDependencyOn(ConfirmationSource).GetTypes().Select(t => t.Name).ShouldContain(nameof(ConfirmationReaderSentinel));

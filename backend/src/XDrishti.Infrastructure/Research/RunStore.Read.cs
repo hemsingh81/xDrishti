@@ -213,6 +213,37 @@ internal sealed partial class RunStore
         return Result.Success(new Page<RunTrade>(items, more ? PageCursor.ForTrade(last.OpenAtEnd, last.Ordinal) : null));
     }
 
+    public async ValueTask<RunTrade?> ReadTradeAsync(string runKey, bool openAtEnd, int ordinal, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(runKey);
+        if (await FindRunAsync(runKey, cancellationToken) is not { } run)
+        {
+            return null;
+        }
+
+        var chunk = new List<(bool OpenAtEnd, int Ordinal, RunTrade Trade)>(1);
+        await using (var connection = await dataSource.OpenConnectionAsync(cancellationToken))
+        await using (var command = new NpgsqlCommand(TradeSelect + " WHERE run_id = @run_id AND open_at_end = @open_at_end AND ordinal = @ordinal", connection))
+        {
+            command.Parameters.AddWithValue("run_id", NpgsqlDbType.Bigint, run.Id);
+            command.Parameters.AddWithValue("open_at_end", NpgsqlDbType.Boolean, openAtEnd);
+            command.Parameters.AddWithValue("ordinal", NpgsqlDbType.Integer, ordinal);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                chunk.Add((reader.GetBoolean(0), reader.GetInt32(1), ReadTrade(reader, run)));
+            }
+        }
+
+        if (chunk.Count == 0)
+        {
+            return null;
+        }
+
+        var items = await HasLegsAsync(run.Id, cancellationToken) ? await WithLegsAsync(run.Id, chunk, cancellationToken) : [chunk[0].Trade];
+        return items[0];
+    }
+
     private static void Equal(StringBuilder sql, NpgsqlCommand command, string column, string? value)
     {
         if (value is null)

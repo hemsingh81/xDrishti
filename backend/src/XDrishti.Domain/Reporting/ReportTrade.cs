@@ -23,6 +23,7 @@ namespace XDrishti.Domain.Reporting;
 /// <param name="MfeR">Maximum favourable excursion in R; null when not recorded.</param>
 /// <param name="EntryMinuteIst">Minutes after midnight, India time, of the entry fill; null when not recorded.</param>
 /// <param name="ExitReason">Why the trade closed (the stored reason); null when not recorded.</param>
+/// <param name="Ordinal">The trade's position in its run (the key, with the run key, of the replay); 0 when not read.</param>
 /// <param name="Sector">The sector of the instrument as of the read (not as of the trade); null when the master has none.</param>
 public sealed record ReportTrade(
     string RunKey,
@@ -42,4 +43,5 @@ public sealed record ReportTrade(
     double? MfeR = null,
     int? EntryMinuteIst = null,
     string? ExitReason = null,
-    string? Sector = null);
+    string? Sector = null,
+    int Ordinal = 0);

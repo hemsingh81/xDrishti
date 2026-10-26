@@ -66,7 +66,7 @@ describe('Import history', () => {
     fake.config.holdBatches = true;
     const { panel } = await openHistory();
 
-    expect(await panel.findByRole('progressbar', { name: 'Loading the imports' })).toBeInTheDocument();
+    expect(await panel.findByText('Loading the imports')).toBeInTheDocument();
   });
 
   it('shows an error with Retry', async () => {

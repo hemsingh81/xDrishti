@@ -136,7 +136,16 @@ export async function c10WideTables(page: Page): Promise<Result> {
 /** C12: reflow at 360 with 200 % text: nothing cut off (text clipped by overflow) and no page scroll. Overlap is not measured. */
 export async function c12Reflow(page: Page): Promise<Result> {
   await page.addStyleTag({ content: 'html{font-size:200% !important}' });
-  await page.waitForTimeout(250);
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            done();
+          });
+        });
+      }),
+  );
   const scroll = await c1NoPageScroll(page);
   const clipped = await page.evaluate(() => {
     const sel = (window as unknown as XdWindow).__sel;

@@ -3710,6 +3710,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/reports/trades/{runKey}/{ordinal}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One stored simulated trade on its own bars (the replay of the drill-down): the trade facts in adjusted prices, its legs, the costing (figures only for a charge sheet the owner confirmed), the bars of its window at the chosen timeframe built on the server from the 1-minute bars and adjusted for the corporate actions applied now, a check that the stored entry still fits the bars (ok, entry_mismatch, no_bars), the decision-time features stored for the trade (a number only where one is stored) and the evidence block. Takes openAtEnd (default false), timeframe (1m, 5m, 15m, 1h, 1D; default 5m), before and after (sessions around the trade: 0 to 3, or 0 to 60 for 1D). A window above 5,000 bars is refused, never thinned. Read only. 422 reports.invalid or reports.window_too_large; 404 reports.not_found. */
+    get: operations['GetTradeReplay'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/phase-check': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The P8 exit judged from what can be read: criteria 1 to 10 of P8-00, each MET, NOT MET or NOT EVALUABLE with its detail (a caveat beside a MET that rests on a convention); the answer the What-works view gives on the default set (a ranked cell with its n and lower bound, or the nothing-has-enough-evidence sentence with the counts); the cold and warm time of each report read; the honest limits. A criterion that could not be read is never MET. The interaction test, the owner's stopwatch note, the bundle size and the browser pass are files on the owner's machine and are read by scripts/p8-phase-check.sh, not here. Takes no parameter. Read only; the check runs the reports once more than a screen would and is not a polling target. */
+    get: operations['GetReportsPhaseCheck'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/autonomy/settings': {
     parameters: {
       query?: never;
@@ -12088,6 +12122,151 @@ export interface components {
       /** Format: int32 */
       memberCount: number;
     };
+    /** @description One bar: `t` is the epoch seconds of its start. */
+    ReplayBarView: {
+      /** Format: int64 */
+      t: number;
+      /** Format: double */
+      o: number;
+      /** Format: double */
+      h: number;
+      /** Format: double */
+      l: number;
+      /** Format: double */
+      c: number;
+      /** Format: int64 */
+      v: number;
+    };
+    /** @description The bars of the replay window at one timeframe, adjusted for the corporate actions applied now, with the coherence of the stored entry against them. */
+    ReplayChartView: {
+      /** @description 1m, 5m, 15m, 1h or 1D. */
+      timeframe: string;
+      /** @description Always true: the bars are adjusted like the stored trade. */
+      adjusted: boolean;
+      /**
+       * Format: date
+       * @description The ex-date of the last corporate action applied to the bars; null when none is.
+       */
+      adjustedThrough: null | string;
+      /**
+       * Format: date-time
+       * @description First instant of the window.
+       */
+      from: string;
+      /**
+       * Format: date-time
+       * @description Last instant of the window.
+       */
+      to: string;
+      /**
+       * Format: int32
+       * @description Bars returned (never above 5,000).
+       */
+      barCount: number;
+      /** @description The bars, oldest first. */
+      bars: components['schemas']['ReplayBarView'][];
+      /** @description Whether the bars agree with the stored entry. */
+      coherence: components['schemas']['ReplayCoherenceView'];
+    };
+    /** @description `state` is ok, entry_mismatch or no_bars; `entryOnBars` is null with no bar. */
+    ReplayCoherenceView: {
+      state: string;
+      /** Format: double */
+      entryStored: number;
+      /** Format: double */
+      entryOnBars: null | number;
+      detail: string;
+    };
+    /** @description What the run charged the trade. The figures are present only when the owner confirmed this very charge sheet (`confirmed`); otherwise only the sheet id is, and the screen says "costed on sheet X, not confirmed as yours" beside the gross figures. */
+    ReplayCostingView: {
+      sheetId: string;
+      confirmed: boolean;
+      /** Format: int64 */
+      quantity: null | number;
+      /** Format: double */
+      totalCharges: null | number;
+      /** Format: double */
+      costR: null | number;
+      /** Format: double */
+      rNet: null | number;
+    };
+    /** @description One stored feature: its group (`bars`, `context`, `plan`), and a number only when `state` is value. */
+    ReplayFeatureItemView: {
+      name: string;
+      source: string;
+      state: string;
+      /** Format: double */
+      value: null | number;
+      reason: null | string;
+    };
+    /** @description The decision-time features stored for the trade (catalog `version`): `state` is value, or unavailable with the `reason` (no row stored, or a row of another decision). Never a zero for an unknown. */
+    ReplayFeaturesView: {
+      state: string;
+      version: string;
+      reason: null | string;
+      items: components['schemas']['ReplayFeatureItemView'][];
+    };
+    /** @description One fill of a trade with legs: `kind` is entry, add or exit; `share` the fraction of the maximum quantity; `reason` empty for an entry or an add. */
+    ReplayLegView: {
+      /** Format: date-time */
+      at: string;
+      kind: string;
+      /** Format: double */
+      price: number;
+      /** Format: double */
+      filledPrice: number;
+      /** Format: double */
+      share: number;
+      reason: string;
+    };
+    /** @description The stored facts of a replayed trade, in adjusted prices. Times are instants (the screen shows India time); a target is null without a fixed reward-to-risk, never zero. */
+    ReplayTradeView: {
+      strategyId: string;
+      /** Format: uuid */
+      instrumentId: string;
+      symbol: string;
+      side: string;
+      /** Format: date */
+      tradeDate: string;
+      triggerTimeframe: string;
+      /** Format: date-time */
+      decisionAt: string;
+      /** Format: date-time */
+      entryAt: string;
+      /** Format: double */
+      entryPrice: number;
+      /** Format: double */
+      entryFilledPrice: number;
+      /** Format: double */
+      stopPrice: number;
+      /** Format: double */
+      targetPrice: null | number;
+      /** Format: date-time */
+      exitAt: string;
+      /** Format: double */
+      exitPrice: number;
+      /** Format: double */
+      exitFilledPrice: number;
+      exitReason: string;
+      /** Format: double */
+      rExact: number;
+      /** Format: double */
+      rFilled: number;
+      /** Format: double */
+      slippageR: number;
+      /** Format: double */
+      maeR: number;
+      /** Format: double */
+      mfeR: number;
+      /** Format: int32 */
+      sessionsHeld: number;
+      /** Format: int32 */
+      sessionsUnseen: number;
+      fills: string;
+      entryFill: string;
+      tickFallback: boolean;
+      basketIds: string[];
+    };
     /** @description What holding each basket, and the benchmark index, would have done over one window (P8-07). */
     ReportBenchmarksView: {
       /** @description The window and where it came from. */
@@ -12233,6 +12412,82 @@ export interface components {
     ReportWarningView: {
       code: string;
       text: string;
+    };
+    /** @description The What-works answer on the default set (spec P8-17). */
+    ReportsPhaseAnswerView: {
+      /** @description ranked, nothing_qualifies or no_runs. */
+      kind: string;
+      /** @description The answer in one sentence. */
+      sentence: string;
+      /**
+       * Format: int32
+       * @description Cells looked at.
+       */
+      cellsLooked: number;
+      /**
+       * Format: int32
+       * @description The most trades in any cell.
+       */
+      largestN: number;
+      /**
+       * Format: int32
+       * @description The sample a cell needs.
+       */
+      requiredN: number;
+    };
+    /** @description The P8 phase check as a read (spec P8-17). */
+    ReportsPhaseCheckView: {
+      /** @description The criteria, the answer, the timings and the limits. */
+      report: components['schemas']['ReportsPhaseReportView'];
+      /** @description The printable report. */
+      text: string;
+    };
+    /** @description The body of the P8 phase check (spec P8-17). */
+    ReportsPhaseReportView: {
+      /** @description The headline; MET only on real evidence for every counted criterion. */
+      headline: string;
+      /** @description Criteria 1 to 10 of P8-00, numbered as there. */
+      criteria: components['schemas']['LearningPhaseCriterionView'][];
+      /** @description What the What-works view answers on the default set. */
+      answer: components['schemas']['ReportsPhaseAnswerView'];
+      /** @description The timed reads, cold and warm. */
+      timings: components['schemas']['ReportsPhaseTimingView'][];
+      /**
+       * Format: int32
+       * @description Stored runs.
+       */
+      runs: number;
+      /**
+       * Format: int32
+       * @description Trades in the default set.
+       */
+      trades: number;
+      /**
+       * Format: int32
+       * @description Baskets with trades in the default set.
+       */
+      basketsWithTrades: number;
+      /** @description The reports the check called. */
+      builtReports: string[];
+      /** @description The honest limits; always printed. */
+      limits: string[];
+    };
+    /** @description One timed read of the phase check (spec P8-17). */
+    ReportsPhaseTimingView: {
+      /** @description The operation id of the endpoint. */
+      operation: string;
+      /** @description On the answer path of the exit question. */
+      answerPath: boolean;
+      /**
+       * Format: int64
+       * @description The first call; null when the read was refused.
+       */
+      coldMs: null | number;
+      /**
+       * Format: int64
+       * @description The second call; null when the read was refused.
+       */
+      warmMs: null | number;
     };
     /** @description Pasted tickers, canonical symbols (`NSE:RELIANCE`) or ISINs, up to 5,000 entries. */
     ResolveInput: {
@@ -13663,6 +13918,12 @@ export interface components {
       exit: null | string;
       /** @description The run is marked provisional. */
       provisional: boolean;
+      /**
+       * Format: int32
+       * @description The trade's position in its run: with the run key, the address of its replay (a closed trade, so open-at-end is false).
+       * @default 0
+       */
+      ordinal: number;
     };
     /** @description A holding (or security) that an undo could not rebuild: its `Symbol`, the `HoldingId` when it is a single holding, and the `Reason` — `ambiguous` or the mismatch (`negative_opening`, `sell_exceeds_open`, `fractional_after_adjustment`). */
     TradeNotRebuilt: {
@@ -13741,6 +14002,35 @@ export interface components {
       /** Format: double */
       costDelta?: null | number;
       costNote?: null | string;
+    };
+    /** @description One stored simulated trade drawn on its own bars (P8-11): the trade, its legs and costing, the bars of its window at one timeframe with the coherence check, the decision-time features it has, and the evidence block (n = 1). Read only. */
+    TradeReplayView: {
+      /** @description The run. */
+      runKey: string;
+      /**
+       * Format: int32
+       * @description The trade's place in the run.
+       */
+      ordinal: number;
+      /** @description The trade was still open at the end of the data. */
+      openAtEnd: boolean;
+      /** @description The stored signal key. */
+      tradeKey: string;
+      /** @description gross, or net only when the owner confirmed the charge sheet the run was costed with. */
+      basis: string;
+      /** @description The stored facts. */
+      trade: components['schemas']['ReplayTradeView'];
+      /** @description The fills, in the record's order; empty for a trade that entered and left in one fill each. */
+      legs: components['schemas']['ReplayLegView'][];
+      costing: null | components['schemas']['ReplayCostingView'];
+      /** @description The bars and the coherence. */
+      chart: components['schemas']['ReplayChartView'];
+      /** @description The stored decision-time features. */
+      features: components['schemas']['ReplayFeaturesView'];
+      /** @description The evidence block. */
+      evidence: components['schemas']['ReportEvidenceView'];
+      /** @description What this picture does not show. */
+      limits: string[];
     };
     /** @description A security of the file: its trades in the file and, when the account holds it, what the rebuild would do. `Matched` is true when it is a holding of the account or an NSE share or ETF of the master list. */
     TradeSecurityView: {
@@ -22875,6 +23165,81 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetTradeReplay: {
+    parameters: {
+      query?: {
+        openAtEnd?: boolean;
+        timeframe?: string;
+        before?: number;
+        after?: number;
+      };
+      header?: never;
+      path: {
+        runKey: string;
+        ordinal: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TradeReplayView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReportsPhaseCheck: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReportsPhaseCheckView'];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
         headers: {
           [name: string]: unknown;
         };

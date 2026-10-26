@@ -51,7 +51,7 @@ src/
 
 - **Browser runner (manual, P8-16, ADR 0124):** `npm run test:browser` drives the installed Chrome (Playwright, axe) over
   `vite preview` of the production build on 127.0.0.1:4173, answers the API from the MSW handlers (`e2e/api.ts`), runs the
-  checklist C0 to C16 per screen, width, scheme and state, and writes `data/p8-evidence/browser-checklist.jsonl` plus
+  checklist C0 to C16 per screen, width, scheme and state, and writes `data/p8-evidence/browser.jsonl` plus
   `browser-checklist-summary.md`. `npm run test:browser -- --grep P8-08` runs one screen; `npm run test:browser:perf` the
   throttled timing. It is not part of `scripts/check.sh`; `e2e/` is type-checked and linted by `npm run check`. A new
   screen adds its row to `e2e/matrix.ts` (route and fixtures).

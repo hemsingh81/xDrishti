@@ -281,7 +281,7 @@ describe('Account sync settings', () => {
     );
     renderDialog();
 
-    expect(await screen.findByRole('progressbar', { name: 'Loading accounts' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading accounts')).toBeInTheDocument();
     expect(await screen.findByText('The accounts could not be loaded.')).toBeInTheDocument();
     fail = false;
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));

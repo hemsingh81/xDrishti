@@ -58,6 +58,7 @@ function GroupTable({ title, groups, evidence, min, dimension, nonAdditive, onOp
                     evidence,
                     group: g,
                     min,
+                    parts: g.parts,
                   });
                 }}
               >

@@ -261,7 +261,7 @@ describe('Services: loading, errors and nothing to show', () => {
   it('shows a loading state until the list arrives', async () => {
     renderServices({ handlers: [http.get('/api/services', () => pendingResponse())] });
 
-    expect(await screen.findByRole('progressbar', { name: 'Loading services' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading services')).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Services' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Services summary' })).not.toBeInTheDocument();
   });

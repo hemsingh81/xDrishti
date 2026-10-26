@@ -6,7 +6,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../data/p8-evidence');
+const root = process.env.XD_EVIDENCE_DIR
+  ? resolve(process.env.XD_EVIDENCE_DIR)
+  : resolve(dirname(fileURLToPath(import.meta.url)), '../../data/p8-evidence');
 const file = process.argv[2] ? resolve(process.argv[2]) : join(root, 'browser.jsonl');
 if (!existsSync(file)) {
   console.error(`No results at ${file}: run \`npm run test:browser\` first.`);
@@ -37,12 +39,19 @@ for (const r of failed) {
   const key = `${r.screen} @ ${r.width} ${r.scheme}`;
   perScreen.set(key, [...(perScreen.get(key) ?? []), r]);
 }
-const commit = rows[0]?.commit ?? 'unknown';
+const commits = [...new Set(rows.map((r) => r.commit))];
+const commit = commits.join(', ') || 'unknown';
 const out = [
   '# Browser checklist summary (P8-16)',
   '',
   `${rows.length} check results (commit ${commit}): ${count('pass')} pass, ${count('fail')} fail, ${count('na')} na.`,
   '',
+  ...(commits.length > 1
+    ? [
+        `WARNING: ${commits.length} commits are present in the rows; a full \`npm run test:browser\` run starts a fresh file.`,
+        '',
+      ]
+    : []),
   '## Failures by check',
   '',
   ...[...byCheck].sort((a, b) => b[1] - a[1]).map(([check, n]) => `- ${check}: ${n}`),
@@ -60,5 +69,7 @@ const out = [
   '',
 ];
 writeFileSync(join(root, 'browser-checklist-summary.md'), out.join('\n'));
-console.log(`p8-evidence: ${rows.length} results, ${count('pass')} pass, ${count('fail')} fail, ${count('na')} na`);
+if (commits.length > 1)
+  console.warn(`p8Checklist: rows from ${commits.length} commits (${commit}); rerun the full matrix`);
+console.log(`p8Checklist: ${rows.length} results, ${count('pass')} pass, ${count('fail')} fail, ${count('na')} na`);
 process.exit(rows.some((r) => r.check === 'C14' && r.result === 'fail') ? 1 : 0);

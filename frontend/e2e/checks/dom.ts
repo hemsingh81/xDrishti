@@ -43,12 +43,6 @@ export function installProbes(): void {
   };
   new MutationObserver((mutations) => {
     for (const mutation of mutations) {
-      if (mutation.type === 'attributes') {
-        if (mutation.attributeName === 'data-ready' && (mutation.target as Element).hasAttribute('data-ready')) {
-          if (performance.getEntriesByName('xd-ready').length === 0) performance.mark('xd-ready');
-        }
-        continue;
-      }
       const target = mutation.target instanceof Element ? mutation.target : mutation.target.parentElement;
       const region = target?.closest(liveSelector);
       if (region) {
@@ -57,6 +51,8 @@ export function installProbes(): void {
       }
       for (const added of mutation.addedNodes) {
         if (!(added instanceof Element)) continue;
+        if (added.hasAttribute('data-ready') && performance.getEntriesByName('xd-ready').length === 0)
+          performance.mark('xd-ready');
         if (added.matches(liveSelector)) note(added);
         else added.querySelectorAll(liveSelector).forEach(note);
       }
@@ -65,7 +61,5 @@ export function installProbes(): void {
     subtree: true,
     childList: true,
     characterData: true,
-    attributes: true,
-    attributeFilter: ['data-ready'],
   });
 }

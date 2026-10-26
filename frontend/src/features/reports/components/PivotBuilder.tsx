@@ -25,9 +25,9 @@ export function PivotBuilder({ query, min }: ReportPanelProps) {
   const names = useBasketNames();
   const result = useQuery(pivotQuery(query, `${axes.rows},${axes.columns}`, axes.metric));
   return (
-    <Box sx={{ display: 'grid', gap: 2 }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 2 }}>
       <Panel title="Pivot builder">
-        <Box sx={{ display: 'grid', gap: 1.5 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 1.5 }}>
           <PivotAxes {...axes} set={url.update} />
           {result.isPending ? (
             <LoadingState label="Loading the pivot…" />
@@ -54,6 +54,7 @@ export function PivotBuilder({ query, min }: ReportPanelProps) {
       </Panel>
       <LensTable lens={lens} query={query} min={min} onOpen={setOpen} />
       <CellPanel
+        query={query}
         info={open}
         onClose={() => {
           setOpen(null);

@@ -27,8 +27,8 @@ describe('Trading calendar: the card', () => {
   it('shows a loading state, then the upcoming holidays and special sessions', async () => {
     renderData();
 
-    expect(screen.getByRole('progressbar', { name: 'Loading data overview' })).toBeInTheDocument();
-    expect(await screen.findByRole('progressbar', { name: 'Loading the trading calendar' })).toBeInTheDocument();
+    expect(screen.getByText('Loading data overview')).toBeInTheDocument();
+    expect(await screen.findByText('Loading the trading calendar')).toBeInTheDocument();
     const grid = await upcoming();
     expect(within(grid).getAllByRole('row')).toHaveLength(1 + 3);
   });

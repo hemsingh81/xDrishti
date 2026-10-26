@@ -98,6 +98,7 @@ export function ComparisonTable({ query, onOpen }: ComparisonTableProps) {
             evidence,
             group: g,
             min,
+            parts: g.parts,
           });
         };
         return (

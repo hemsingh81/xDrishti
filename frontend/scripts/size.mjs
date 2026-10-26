@@ -3,7 +3,8 @@
 // It also prints the "always needed at first paint" total (app shell, landing route, CSS; fonts raw), which is not held
 // to the limit, and a WARNING (exit 0) when less than 3 KB of headroom is left.
 // `node scripts/size.mjs <dist dir>` measures another build (the guard is exercised on a planted import that way).
-import { readdirSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -49,6 +50,49 @@ const lazy = readdirSync(join(dist, 'assets'))
   .slice(0, 5);
 console.log('Largest lazy chunks (not counted):');
 for (const c of lazy) console.log(`  ${kb(c.gzip).padStart(9)}  /assets/${c.name}`);
+
+// P8-17: with XD_EVIDENCE_DIR set (scripts/check.sh does), the measurement is recorded for the phase check, with the commit it was taken at.
+if (process.env.XD_EVIDENCE_DIR) {
+  const commit = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+  mkdirSync(process.env.XD_EVIDENCE_DIR, { recursive: true });
+  const record = {
+    commit,
+    date: new Date().toISOString().slice(0, 10),
+    total: result.total,
+    budget: result.budget,
+    withinBudget: result.withinBudget,
+    chunks: result.chunks,
+  };
+  writeFileSync(join(process.env.XD_EVIDENCE_DIR, 'bundle.json'), `${JSON.stringify(record, null, 2)}\n`);
+}
+
+// P8-11: the first per-chunk budgets. A lazy chunk whose file name starts with the prefix may not exceed its bytes (gzip, 1 KB = 1000
+// bytes); a missing chunk is a failure too (a renamed chunk would otherwise slip out of its budget unnoticed).
+const lazyBudgets = [
+  { prefix: 'PriceChartCanvas-', bytes: 65_000 },
+  { prefix: 'TradeReplayPage-', bytes: 15_000 },
+  { prefix: 'CellDetailPage-', bytes: 20_000 },
+];
+let lazyFailed = false;
+const allJs = readdirSync(join(dist, 'assets')).filter((name) => name.endsWith('.js'));
+console.log('Lazy chunk budgets:');
+for (const { prefix, bytes } of lazyBudgets) {
+  const name = allJs.find((n) => n.startsWith(prefix));
+  if (!name) {
+    console.error(`  MISSING  ${prefix}* (no chunk with this name; update lazyBudgets)`);
+    lazyFailed = true;
+    continue;
+  }
+  const size = gzipBytes(readFileSync(join(dist, 'assets', name)));
+  const over = size > bytes;
+  lazyFailed ||= over;
+  console.log(`  ${kb(size).padStart(9)} of ${kb(bytes)}  /assets/${name}${over ? '  OVER BUDGET' : ''}`);
+}
+
+if (lazyFailed) {
+  console.error('Bundle guard FAILED: a lazy chunk is over its budget.');
+  process.exit(1);
+}
 
 if (!result.withinBudget) {
   console.error('Bundle guard FAILED: the first load is over budget.');

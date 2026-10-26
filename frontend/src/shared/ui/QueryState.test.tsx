@@ -7,7 +7,9 @@ describe('QueryState live regions', () => {
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('Loading the stored runs…');
     expect(status).toHaveAttribute('aria-live', 'polite');
-    expect(screen.getByRole('progressbar', { name: 'Loading the stored runs…' })).toBeInTheDocument();
+    // The label is announced once: the spinner is hidden from assistive technology and carries no name of its own.
+    expect(screen.getAllByText('Loading the stored runs…')).toHaveLength(1);
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
   it('announces a failed request through an alert', () => {

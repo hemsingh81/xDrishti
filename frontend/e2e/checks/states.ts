@@ -3,7 +3,7 @@ import { fail, na, pass, type Result, type State, type XdWindow } from './types'
 
 // The words the kit prints for a state; the runner looks for one of them (never for colour).
 const stateWords: Record<Exclude<State, 'full'>, RegExp> = {
-  loading: /loading/i,
+  loading: /\S+/,
   error: /\S+/,
   empty: /no [a-z ]+ (yet|stored|recorded|found|to show)|nothing|empty|not stored|no snapshot|none/i,
   thin: /not enough|too few|thin|insufficient|fewer than/i,
@@ -16,11 +16,11 @@ export async function c6WithoutColour(page: Page, state: State): Promise<Result>
   await page.addStyleTag({ content: 'html{filter:grayscale(1) !important}' });
   const word = stateWords[state];
   const out = await page.evaluate(
-    ({ source, asAlert }) => {
+    ({ source, region }) => {
       const re = new RegExp(source, 'i');
       const main = document.querySelector('main');
       // An error is told by its alert (the kit's role=alert region): its text is the word.
-      const text = asAlert ? (main?.querySelector('[role=alert]')?.textContent ?? '') : (main?.innerText ?? '');
+      const text = region ? (main?.querySelector(region)?.textContent ?? '') : (main?.innerText ?? '');
       const hit = text.match(re)?.[0] ?? '';
       const holder = hit
         ? [...(main?.querySelectorAll('*') ?? [])]
@@ -32,7 +32,7 @@ export async function c6WithoutColour(page: Page, state: State): Promise<Result>
         ?.querySelector('svg, [role=img], .MuiCircularProgress-root');
       return { hit, icon };
     },
-    { source: word.source, asAlert: state === 'error' },
+    { source: word.source, region: state === 'error' ? '[role=alert]' : state === 'loading' ? '[role=status]' : '' },
   );
   if (!out.hit) return fail('C6', `no ${state} word found in the main region`);
   return pass('C6', `word "${out.hit}"${out.icon ? ' with an icon' : ' (no icon found next to it)'}`);
@@ -65,7 +65,10 @@ export async function c7ChartHasTable(page: Page): Promise<Result> {
 /** C9: with reduced motion nothing animates after load (a spinner in the loading state is the state itself). */
 export async function c9ReducedMotion(page: Page, state: State): Promise<Result> {
   if (state === 'loading') return na('C9', 'loading state shows a progress indicator by design');
-  await page.waitForTimeout(1200);
+  // Let entry transitions end; an animation still running after that is the finding.
+  await page
+    .waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'), null, { timeout: 1500 })
+    .catch(() => undefined);
   const running = await page.evaluate(() => {
     const sel = (window as unknown as XdWindow).__sel;
     return document
@@ -130,7 +133,7 @@ export async function c16UrlState(page: Page, route: string): Promise<Result> {
     );
   const before = { url: page.url(), tab: await selected() };
   await page.reload();
-  await page.waitForSelector('main[data-ready]', { timeout: 20_000 });
+  await page.waitForSelector('main [data-ready]', { state: 'attached', timeout: 20_000 });
   const after = { url: page.url(), tab: await selected() };
   if (after.url !== before.url || after.tab !== before.tab)
     return fail('C16', `reload changed ${before.url} [${before.tab}] to ${after.url} [${after.tab}]`);
@@ -140,7 +143,7 @@ export async function c16UrlState(page: Page, route: string): Promise<Result> {
   await link.click();
   await page.waitForURL((u) => u.pathname === '/');
   await page.goBack();
-  await page.waitForSelector('main[data-ready]', { timeout: 20_000 });
+  await page.waitForSelector('main [data-ready]', { state: 'attached', timeout: 20_000 });
   const back = new URL(page.url());
   return `${back.pathname}${back.search}` === route
     ? pass('C16', 'reload and Back return to the same URL and tab')

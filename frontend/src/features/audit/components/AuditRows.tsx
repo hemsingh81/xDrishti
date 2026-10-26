@@ -1,6 +1,7 @@
 import { Box, Link, Paper, Stack, Typography } from '@mui/material';
 import { DataTable, type Column, type TableStatus } from '@/shared/analytics';
 import { formatIstDateTime } from '@/shared/lib/format';
+import { touchTarget } from '@/theme/tokens';
 import type { AuditEntry } from '../api/auditQueries';
 import { actorText } from '../lib/auditParams';
 import { OutcomeChip, SourceChip } from './AuditChips';
@@ -19,7 +20,13 @@ function Open({ row, onOpen }: { row: AuditEntry; onOpen: (id: string) => void }
       component="button"
       type="button"
       underline="hover"
-      sx={{ textAlign: 'left' }}
+      sx={{
+        textAlign: 'left',
+        display: 'inline-flex',
+        alignItems: 'center',
+        minHeight: 24,
+        [`@media (max-width:${touchTarget.phoneMaxWidth}px)`]: { minHeight: touchTarget.phone },
+      }}
       aria-label={`Details of ${row.id}`}
       onClick={() => {
         onOpen(row.id);

@@ -75,6 +75,13 @@ describe('Grid: rendering', () => {
     expect(grid()).toHaveAttribute('aria-busy', 'false');
   });
 
+  it('scrolls inside a labelled region, so a wide grid never widens the page', () => {
+    render(view());
+
+    const region = screen.getByRole('region', { name: /scrolls sideways$/ });
+    expect(region).toContainElement(grid());
+  });
+
   it('right-aligns numeric columns', () => {
     render(view());
 

@@ -158,7 +158,7 @@ describe('Learning overview', () => {
     server.use(http.get('/api/learning/overview', () => new Promise<never>(() => undefined)));
     renderLearning();
 
-    expect(await screen.findByLabelText('Loading the overview…')).toBeInTheDocument();
+    expect(await screen.findByText('Loading the overview…')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 

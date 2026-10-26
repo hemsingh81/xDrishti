@@ -11,6 +11,13 @@ public static class ReportErrors
     /// <summary>A trade names a run that is not in the set.</summary>
     public static Error UnknownRun(string runKey) => Error.NotFound("reports.not_found", $"Run '{runKey}' is not in the set of runs.");
 
+    /// <summary>The run or the trade of a replay is not stored.</summary>
+    public static Error TradeNotFound() => Error.NotFound("reports.not_found", "No stored trade has this run key and ordinal.");
+
+    /// <summary>A replay window holds more bars than one answer may carry (P8-11, D5): refused, never thinned.</summary>
+    public static Error WindowTooLarge(int bars, int ceiling) =>
+        Error.Validation("reports.window_too_large", string.Create(System.Globalization.CultureInfo.InvariantCulture, $"The window holds {bars} bars; at most {ceiling} are returned. Choose a larger timeframe or fewer sessions."));
+
     /// <summary>Two runs of one strategy, universe, overlapping window and the same labels: the same population twice.</summary>
     public static Error RunOverlap(string first, string second, string strategy) =>
         Error.Conflict("reports.run_overlap", $"Runs '{first}' and '{second}' both hold strategy '{strategy}' for the same universe, an overlapping window and the same style and exit; they would count the same trades twice. Keep one.");
