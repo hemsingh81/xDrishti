@@ -605,6 +605,13 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListPaperEntriesQuery, Result<PaperEntryList>>, ListPaperEntriesHandler>();
         services.AddScoped<IQueryHandler<ListCaptureRunsQuery, Result<CaptureRunList>>, ListCaptureRunsHandler>();
         services.AddScoped<IQueryHandler<GetPaperEpochQuery, Result<PaperEpochView>>, GetPaperEpochHandler>();
+        services.AddScoped<PaperLedgerService>(); // the derived paper ledger of each paper account, from the stored trades only (P10-02, ADR 0118)
+        services.AddScoped<PaperLedgerContext>();
+        services.AddScoped<IPaperBookReader, PaperBookReader>(); // the paper book the plan reads when the owner turns UsePaperLedger on; read only
+        services.AddScoped<IQueryHandler<GetPaperAccountsQuery, Result<PaperAccountList>>, GetPaperAccountsHandler>();
+        services.AddScoped<IQueryHandler<GetPaperPositionsQuery, Result<PaperPositionList>>, GetPaperPositionsHandler>();
+        services.AddScoped<IQueryHandler<GetPaperEquityQuery, Result<PaperEquityView>>, GetPaperEquityHandler>();
+        services.AddScoped<IQueryHandler<ReconcilePaperQuery, Result<PaperReconcileView>>, ReconcilePaperHandler>();
         services.AddScoped<ICommandHandler<JournalPlansCommand, JournalOutcome>, JournalPlansHandler>(); // auto-journal (P7-14, ADR 0093): reads stored fills, insert-only links, no order
         services.AddScoped<IQueryHandler<GetPlanJournalQuery, Result<PlanJournalView>>, GetPlanJournalHandler>();
     }

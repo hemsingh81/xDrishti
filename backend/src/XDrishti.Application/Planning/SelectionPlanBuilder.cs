@@ -96,7 +96,7 @@ internal sealed class SelectionPlanBuilder(
         for (var i = 0; i < fill.Primary.Count; i++)
         {
             var winner = fill.Primary[i].Candidate.Ranked.Merged.Winner;
-            items.Add(Item(items.Count + 1, TicketGroup.Primary, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, fill.Primary[i].Candidate.Ranked.Caveats, [], fill.Primary[i].Candidate.Ranked.AdvisoryPWin, Applied(flagCodes, filled: true, sized: true), [.. wired[i].Standings, PlanWiring.IndicativeEntry, .. (ctx.Book is { Count: 0 } ? [PlanWording.OpenBookAssumedEmpty] : (string[])[])], wired[i].Allocations));
+            items.Add(Item(items.Count + 1, TicketGroup.Primary, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, fill.Primary[i].Candidate.Ranked.Caveats, [], fill.Primary[i].Candidate.Ranked.AdvisoryPWin, Applied(flagCodes, filled: true, sized: true), [.. wired[i].Standings, PlanWiring.IndicativeEntry, .. (ctx.Book is { Count: 0 } && !ctx.BookFromLedger ? [PlanWording.OpenBookAssumedEmpty] : (string[])[])], wired[i].Allocations));
         }
 
         var reserve = smart.Reserve.Select(r => new ReserveEntry(r.Ranked, [r.Code], false))
@@ -134,7 +134,7 @@ internal sealed class SelectionPlanBuilder(
         var basis = BasisText(smart, ctx);
         var plan = new NewPlan(NightlyRules.PlanKey(request.ForDate, BuilderId), request.ForDate, request.ReviewCutoff, 1, Hash(request, basis, items), basis, true, CreatedBy, request.Now, items)
         {
-            BasisFlags = PlanBasisFlags.From(smart, ctx.Book is null ? PlanBasisFlags.OpenBookUnavailable : ctx.Book.Count == 0 ? PlanBasisFlags.OpenBookAssumedEmpty : PlanBasisFlags.OpenBookKnown, [.. fill.Primary.Select(d => d.Candidate.Ranked)]),
+            BasisFlags = PlanBasisFlags.From(smart, ctx.Book is null ? PlanBasisFlags.OpenBookUnavailable : ctx.Book.Count == 0 && !ctx.BookFromLedger ? PlanBasisFlags.OpenBookAssumedEmpty : PlanBasisFlags.OpenBookKnown, [.. fill.Primary.Select(d => d.Candidate.Ranked)]),
         };
         return Result.Success(plan);
     }

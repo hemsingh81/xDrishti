@@ -106,6 +106,8 @@ Daily loss limit ⇒ cancel remaining tickets; the **market gate** (learned from
 calendar) reduces or cancels the whole plan; the **equity-curve throttle** halves risk while the system is cold. Optional **pre-open check** (default 09:10, after the review cutoff and NSE pre-open price discovery): gap beyond
 trigger or > `gap_invalidate_atr` ⇒ invalidate and promote from reserve.
 
+*Built in P10-02 (ADR 0118):* at night the daily loss input is the last closed session's realised paper loss as a percent of equity (a proxy; 0 when not a loss), and the equity throttle reads the counted paper trades, both only when `Planning:OpenBook:UsePaperLedger` is on.
+
 ## 8. Proving the selector (and your overrides)
 
 Rejected candidates are graded nightly. Reports compare primary vs reserve vs rejected and "top-1/3/5/all"

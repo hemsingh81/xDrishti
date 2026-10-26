@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 
 namespace XDrishti.Application.Paper;
 
-/// <summary>Structured log events of the paper capture (P10-01; ids 5200 to 5209). Counts, ids and codes only: no price, no symbol, no account.</summary>
+/// <summary>Structured log events of the paper capture (P10-01; ids 5200 to 5209; P10-02 uses 5210 to 5219). Counts, ids and codes only: no price, no symbol, no account.</summary>
 internal static partial class PaperLog
 {
     [LoggerMessage(EventId = 5200, Level = LogLevel.Information, Message = "paper.session {Session}: {Seen} seen, {Entries} entries, {Exits} exits, {Skips} skips, {Pending} pending, {Integrity} integrity")]
@@ -22,4 +22,16 @@ internal static partial class PaperLog
 
     [LoggerMessage(EventId = 5205, Level = LogLevel.Error, Message = "paper.session_failed {Session}: {Reason}")]
     public static partial void SessionFailed(ILogger logger, DateOnly session, string reason);
+
+    [LoggerMessage(EventId = 5210, Level = LogLevel.Information, Message = "paper.ledger read: {Accounts} account(s), {Open} open, {Closed} closed")]
+    public static partial void LedgerRead(ILogger logger, int accounts, int open, int closed);
+
+    [LoggerMessage(EventId = 5211, Level = LogLevel.Warning, Message = "paper.book unavailable for the plan: {Code}")]
+    public static partial void BookUnavailable(ILogger logger, string code);
+
+    [LoggerMessage(EventId = 5212, Level = LogLevel.Information, Message = "paper.book read for the plan: {Accounts} account(s), {Positions} position(s), {Taken} taken trade(s)")]
+    public static partial void BookRead(ILogger logger, int accounts, int positions, int taken);
+
+    [LoggerMessage(EventId = 5213, Level = LogLevel.Warning, Message = "paper.reconcile found {Differences} difference(s)")]
+    public static partial void ReconcileDifferences(ILogger logger, int differences);
 }

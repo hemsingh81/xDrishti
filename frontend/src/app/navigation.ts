@@ -1,3 +1,4 @@
+import AccountBalanceIcon from '@mui/icons-material/AccountBalanceOutlined';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import BarChartIcon from '@mui/icons-material/BarChartOutlined';
 import ChecklistIcon from '@mui/icons-material/ChecklistOutlined';
@@ -44,7 +45,13 @@ export const navigation: NavSection[] = [
       { path: '/suggestions', label: 'Suggestions', icon: AutoAwesomeIcon, phase: 'P9' },
     ],
   },
-  { title: 'Portfolio', items: [{ path: '/portfolio', label: 'Portfolio', icon: PieChartIcon }] },
+  {
+    title: 'Portfolio',
+    items: [
+      { path: '/portfolio', label: 'Portfolio', icon: PieChartIcon },
+      { path: '/paper', label: 'Paper trading', icon: AccountBalanceIcon },
+    ],
+  },
   {
     title: 'Market',
     items: [

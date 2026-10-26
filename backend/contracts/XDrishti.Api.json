@@ -10317,6 +10317,223 @@
         }
       }
     },
+    "/api/paper/accounts": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The paper accounts (Trading role, mode paper) with their ledger derived from the stored paper trades: realised gross, charges and result (labelled gross, or after the stored sheet and not confirmed, never net as a result of record), equity = capital + realised result, funds (no leverage), open risk percent, unrealised (unavailable, never 0, when a mark is), last-session result and closed-trade drawdown. Optional epoch (default the newest). Read only; simulated, no order exists. 404 paper.not_found, 422 paper.invalid",
+        "operationId": "ListPaperAccounts",
+        "parameters": [
+          {
+            "name": "epoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperAccountList"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/accounts/{id}/positions": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The open paper positions of one account with their marks (the close of the last closed session, or unavailable with the reason and no unrealised figure) and its closed trades, newest exit first. Read only. 404 paper.not_found",
+        "operationId": "ListPaperPositions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "epoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperPositionList"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/accounts/{id}/equity": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The realised-equity line of one paper account: one point per trading session from the epoch's start (capital plus the realised result of the exits up to that session). Optional from and to (sessions), at most 400 sessions. Read only. 404 paper.not_found, 422 paper.invalid",
+        "operationId": "GetPaperEquity",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "epoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperEquityView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/accounts/{id}/reconcile": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "Compares the derived ledger of one paper account with sums read straight from the stored rows (exits sum, entries without exit, exit before entry, entries of an account that is not paper now): status ok or each difference. Read only. 404 paper.not_found",
+        "operationId": "ReconcilePaperAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "epoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperReconcileView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/plans/{id}/alerts": {
       "get": {
         "tags": [
@@ -27687,6 +27904,241 @@
         },
         "description": "One kind of learning record in the overview (P6-18): how many were counted, the split by role, outcome or state, and the newest record."
       },
+      "PaperAccountList": {
+        "required": [
+          "basis",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "The label."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaperAccountView"
+            },
+            "description": "The accounts."
+          }
+        },
+        "description": "The paper accounts with the label every paper response carries."
+      },
+      "PaperAccountView": {
+        "required": [
+          "accountId",
+          "name",
+          "epochId",
+          "capital",
+          "capitalSource",
+          "realised",
+          "equity",
+          "fundsAvailable",
+          "openRiskPct",
+          "openCount",
+          "unrealised",
+          "lastSessionResult",
+          "lastSessionPct",
+          "maxDrawdownClosed",
+          "chargeSheet",
+          "evidence",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "The account.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "epochId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The epoch; null before the first capture.",
+            "format": "int64"
+          },
+          "capital": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The capital; null when the account has none (BrokerFunds).",
+            "format": "double"
+          },
+          "capitalSource": {
+            "type": "string",
+            "description": "Where it comes from."
+          },
+          "realised": {
+            "description": "The realised result.",
+            "$ref": "#/components/schemas/PaperRealisedView"
+          },
+          "equity": {
+            "description": "Capital plus the realised result.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "fundsAvailable": {
+            "description": "Equity less the open notional, at least 0.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "openRiskPct": {
+            "description": "Open risk, percent of equity.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "openCount": {
+            "type": "integer",
+            "description": "Open positions.",
+            "format": "int32"
+          },
+          "unrealised": {
+            "description": "Rupees at the marks; unavailable when any mark is, empty without a position.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "lastSessionResult": {
+            "type": "number",
+            "description": "Realised rupees of the last closed session (0 when no trade closed).",
+            "format": "double"
+          },
+          "lastSessionPct": {
+            "description": "That result, signed percent of the equity at the start of the session.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "maxDrawdownClosed": {
+            "description": "Closed-trade drawdown of the realised result.",
+            "$ref": "#/components/schemas/PaperDrawdownView"
+          },
+          "chargeSheet": {
+            "description": "The sheet used.",
+            "$ref": "#/components/schemas/PaperChargeSheetView"
+          },
+          "evidence": {
+            "description": "What it rests on.",
+            "$ref": "#/components/schemas/PaperEvidenceView"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honest limits."
+          }
+        },
+        "description": "One paper account's ledger, every figure derived from its stored trades and labelled as paper (spec P10-02)."
+      },
+      "PaperChargeSheetView": {
+        "required": [
+          "id",
+          "confirmedOn"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The sheet id; null when no closed trade was charged."
+          },
+          "confirmedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Always null in this view (spec P10-02, criterion 5).",
+            "format": "date"
+          }
+        },
+        "description": "The sheet that charged the account's closed trades. The confirmation is unreadable here, so DateOnly? PaperChargeSheetView.ConfirmedOn is always null."
+      },
+      "PaperClosedTradeView": {
+        "required": [
+          "symbol",
+          "side",
+          "qty",
+          "entryAt",
+          "exitAt",
+          "gross",
+          "charges",
+          "result",
+          "r"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "The symbol."
+          },
+          "side": {
+            "type": "string",
+            "description": "BUY or SELL."
+          },
+          "qty": {
+            "type": "integer",
+            "description": "Quantity.",
+            "format": "int32"
+          },
+          "entryAt": {
+            "type": "string",
+            "description": "The fill minute.",
+            "format": "date-time"
+          },
+          "exitAt": {
+            "type": "string",
+            "description": "The exit minute.",
+            "format": "date-time"
+          },
+          "gross": {
+            "type": "number",
+            "description": "Rupees before charges.",
+            "format": "double"
+          },
+          "charges": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Rupees of charges; null when none.",
+            "format": "double"
+          },
+          "result": {
+            "type": "number",
+            "description": "Rupees after the stored charges (gross where none).",
+            "format": "double"
+          },
+          "r": {
+            "type": "number",
+            "description": "The trade's R.",
+            "format": "double"
+          }
+        },
+        "description": "One closed paper trade in the ledger."
+      },
+      "PaperDrawdownView": {
+        "required": [
+          "amount",
+          "pct"
+        ],
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "Rupees.",
+            "format": "double"
+          },
+          "pct": {
+            "description": "Percent of the capital plus the peak.",
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "The largest fall of the running realised result from its peak."
+      },
       "PaperEntryList": {
         "required": [
           "basis",
@@ -27851,6 +28303,110 @@
         },
         "description": "One paper trade of one account. It is a replay: no order was placed or exists (string PaperEntryView.Basis)."
       },
+      "PaperEquityPoint": {
+        "required": [
+          "date",
+          "realised",
+          "equity"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "The session.",
+            "format": "date"
+          },
+          "realised": {
+            "type": "number",
+            "description": "The realised result up to and including the session.",
+            "format": "double"
+          },
+          "equity": {
+            "description": "Capital plus that result.",
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "One point of the realised-equity line."
+      },
+      "PaperEquityView": {
+        "required": [
+          "basis",
+          "limits",
+          "accountId",
+          "epochId",
+          "points"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "The label."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honest limits."
+          },
+          "accountId": {
+            "type": "string",
+            "description": "The account.",
+            "format": "uuid"
+          },
+          "epochId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The epoch; null before the first capture.",
+            "format": "int64"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaperEquityPoint"
+            },
+            "description": "The points, oldest first."
+          }
+        },
+        "description": "The realised-equity line of a paper account, one point per trading session from the epoch's start."
+      },
+      "PaperEvidenceView": {
+        "required": [
+          "closedTrades",
+          "openTrades",
+          "epochStartedOn",
+          "lastClosedSession"
+        ],
+        "type": "object",
+        "properties": {
+          "closedTrades": {
+            "type": "integer",
+            "description": "Closed trades.",
+            "format": "int32"
+          },
+          "openTrades": {
+            "type": "integer",
+            "description": "Open positions.",
+            "format": "int32"
+          },
+          "epochStartedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The epoch's first session; null before the first capture.",
+            "format": "date"
+          },
+          "lastClosedSession": {
+            "type": "string",
+            "description": "The session the marks and the last-session result are as of.",
+            "format": "date"
+          }
+        },
+        "description": "What the figures rest on."
+      },
       "PaperExitView": {
         "required": [
           "exitAt",
@@ -27934,6 +28490,238 @@
           }
         },
         "description": "The exit of a paper trade as the API shows it (spec P10-01)."
+      },
+      "PaperMarkView": {
+        "required": [
+          "state",
+          "price",
+          "asOf",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "value or unavailable."
+          },
+          "price": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The close; null unless value.",
+            "format": "double"
+          },
+          "asOf": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The date of the bar read; null when none.",
+            "format": "date"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why unavailable; null for a value."
+          }
+        },
+        "description": "The mark of an open position: a value with its close and date, or unavailable with the reason and no price."
+      },
+      "PaperPositionList": {
+        "required": [
+          "basis",
+          "limits",
+          "accountId",
+          "asOfSession",
+          "open",
+          "closed"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "The label."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honest limits."
+          },
+          "accountId": {
+            "type": "string",
+            "description": "The account.",
+            "format": "uuid"
+          },
+          "asOfSession": {
+            "type": "string",
+            "description": "The session the marks are as of.",
+            "format": "date"
+          },
+          "open": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaperPositionView"
+            },
+            "description": "Open positions."
+          },
+          "closed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaperClosedTradeView"
+            },
+            "description": "Closed trades, newest exit first."
+          }
+        },
+        "description": "The open positions and the closed trades of a paper account."
+      },
+      "PaperPositionView": {
+        "required": [
+          "symbol",
+          "side",
+          "qty",
+          "entryAt",
+          "entryPrice",
+          "stopPrice",
+          "mark",
+          "unrealised",
+          "riskAmount",
+          "riskPctOfEquity",
+          "heldSessions"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "The symbol."
+          },
+          "side": {
+            "type": "string",
+            "description": "BUY or SELL."
+          },
+          "qty": {
+            "type": "integer",
+            "description": "Quantity.",
+            "format": "int32"
+          },
+          "entryAt": {
+            "type": "string",
+            "description": "The fill minute.",
+            "format": "date-time"
+          },
+          "entryPrice": {
+            "type": "number",
+            "description": "The filled entry.",
+            "format": "double"
+          },
+          "stopPrice": {
+            "type": "number",
+            "description": "The initial stop.",
+            "format": "double"
+          },
+          "mark": {
+            "description": "The mark.",
+            "$ref": "#/components/schemas/PaperMarkView"
+          },
+          "unrealised": {
+            "description": "Rupees at the mark; unavailable with the mark.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "riskAmount": {
+            "type": "number",
+            "description": "Rupees at risk to the initial stop.",
+            "format": "double"
+          },
+          "riskPctOfEquity": {
+            "description": "Risk as a percent of equity.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "heldSessions": {
+            "type": "integer",
+            "description": "Sessions held, entry and last closed session included.",
+            "format": "int32"
+          }
+        },
+        "description": "An open paper position."
+      },
+      "PaperRealisedView": {
+        "required": [
+          "gross",
+          "charges",
+          "net",
+          "basis"
+        ],
+        "type": "object",
+        "properties": {
+          "gross": {
+            "type": "number",
+            "description": "Rupees before charges.",
+            "format": "double"
+          },
+          "charges": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Rupees of charges; null when no closed trade was charged.",
+            "format": "double"
+          },
+          "net": {
+            "type": "number",
+            "description": "The result after the stored charges (gross where no sheet charged).",
+            "format": "double"
+          },
+          "basis": {
+            "type": "string",
+            "description": "gross, no charges / after the stored sheet / mixed, in words."
+          }
+        },
+        "description": "The realised result of a paper account. decimal PaperRealisedView.Net is gross less the stored sheet's charges where a closed trade was charged; string PaperRealisedView.Basis says what it is after and that the sheet is not confirmed here (ISS-25)."
+      },
+      "PaperReconcileView": {
+        "required": [
+          "basis",
+          "accountId",
+          "epochId",
+          "status",
+          "differences"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "The label."
+          },
+          "accountId": {
+            "type": "string",
+            "description": "The account.",
+            "format": "uuid"
+          },
+          "epochId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The epoch; null before the first capture.",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "description": "ok, or differences."
+          },
+          "differences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Each difference, in words (empty when ok)."
+          }
+        },
+        "description": "Whether the derived ledger agrees with the stored rows."
       },
       "ParameterSensitivityView": {
         "required": [
