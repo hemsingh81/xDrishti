@@ -156,6 +156,17 @@ public sealed class EvaluatePaperPhaseCheckHandlerTests
     }
 
     [Fact]
+    public async Task Trades_after_the_end_date_are_not_counted_and_the_comparison_is_withheld_for_an_early_end_date()
+    {
+        var report = await RunAsync(new DateOnly(2026, 12, 1));
+
+        report.Criteria.Single(c => c.Id == "C2").Label.ShouldBe("NOT EVALUABLE: 28 of 60");
+        report.Criteria.Single(c => c.Id == "C3").Label.ShouldContain("through is before the last closed session");
+        report.Criteria.Single(c => c.Id == "C4").Verdict.ShouldBe("NOT EVALUABLE");
+        report.ExitVerdict.ShouldBe("NOT EVALUABLE");
+    }
+
+    [Fact]
     public async Task Low_coverage_is_not_met_with_the_missing_sessions_listed()
     {
         Seed(61, 40);

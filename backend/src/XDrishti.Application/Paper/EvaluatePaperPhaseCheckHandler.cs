@@ -11,6 +11,7 @@ using XDrishti.Application.Planning;
 using XDrishti.Application.Reporting;
 using XDrishti.Domain.Autonomy;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Paper;
 using XDrishti.Domain.Planning;
@@ -89,9 +90,11 @@ internal sealed class EvaluatePaperPhaseCheckHandler(
         }
 
         var data = await paperData.ReadAsync(epoch.Id, cancellationToken);
+        var lastDay = lastClosed;
         if (data.NextEpochStart is { } next)
         {
             var end = OnOrBefore(calendar, next.AddDays(-1)) ?? epoch.StartedOn;
+            lastDay = end < lastClosed ? end : lastClosed;
             if (query.Through is not null && through > end)
             {
                 return Refuse(PaperErrors.Invalid("through", string.Create(CultureInfo.InvariantCulture, $"This epoch ended before {next:yyyy-MM-dd}; the last session it can count is {end:yyyy-MM-dd}.")));
@@ -100,9 +103,9 @@ internal sealed class EvaluatePaperPhaseCheckHandler(
             through = through > end ? end : through;
         }
 
-        var counted = CountedSet.Select(data.Rows, data.OtherEpochs).Trades;
+        var counted = CountedSet.Select(CutAt(data.Rows, through), data.OtherEpochs).Trades;
         var sessions = await SessionsAsync(calendar, epoch.StartedOn, through, cancellationToken);
-        var exit = await ExitAsync(epoch.Id, cancellationToken);
+        var exit = await ExitAsync(epoch.Id, through < lastDay, cancellationToken);
         var changes = await ChangesAsync(epoch.Id, cancellationToken);
         var lines = await DisciplineAsync(epoch, through, cancellationToken);
         var facts = new PaperPhaseFacts(
@@ -179,7 +182,14 @@ internal sealed class EvaluatePaperPhaseCheckHandler(
         return result;
     }
 
-    private async ValueTask<PhaseExitFacts?> ExitAsync(long epochId, CancellationToken cancellationToken)
+    /// <summary>
+    /// The rows as they stood at the end of <paramref name="through"/>: an entry after it is dropped, and a trade whose exit comes after it was still open then. The comparison (P10-04) takes no end date, so it is not cut:
+    /// <see cref="ExitAsync"/> withholds E3 and E4 whenever <c>through</c> is before the last day the comparison covers.
+    /// </summary>
+    private static List<PaperCompareRow> CutAt(IReadOnlyList<PaperCompareRow> rows, DateOnly through) =>
+        [.. rows.Where(r => IndiaTime.Today(r.EntryAt) <= through).Select(r => r.ExitAt is { } exitAt && IndiaTime.Today(exitAt) > through ? r with { ExitAt = null, RSim = null, RBasis = null, ChargeSheetId = null } : r)];
+
+    private async ValueTask<PhaseExitFacts?> ExitAsync(long epochId, bool throughIsEarly, CancellationToken cancellationToken)
     {
         var result = await comparison.HandleAsync(new GetBacktestVsPaperQuery(epochId, null), cancellationToken);
         if (result.IsFailure)
@@ -190,10 +200,11 @@ internal sealed class EvaluatePaperPhaseCheckHandler(
 
         var v = result.Value;
         var s = v.SensitivityAllProposals;
+        var early = new CriterionResult(CriterionResult.NotEvaluable, "not evaluable: through is before the last closed session, and the comparison reads every trade of the epoch");
         return new PhaseExitFacts(
             v.EpochId,
-            new CriterionResult(v.Criteria.Expectancy.Verdict, v.Criteria.Expectancy.Label),
-            new CriterionResult(v.Criteria.Drawdown.Verdict, v.Criteria.Drawdown.Label),
+            throughIsEarly ? early : new CriterionResult(v.Criteria.Expectancy.Verdict, v.Criteria.Expectancy.Label),
+            throughIsEarly ? early : new CriterionResult(v.Criteria.Drawdown.Verdict, v.Criteria.Drawdown.Label),
             v.Paper.Ci90.Lo.Number,
             v.Paper.Ci90.Hi.Number,
             v.EarlyWarning,

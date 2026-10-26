@@ -6,6 +6,7 @@ using XDrishti.Application.Paper;
 namespace XDrishti.Infrastructure.Paper;
 
 /// <summary>The raw read behind the paper phase check (spec P10-06, ADR 0123): one select over the capture rows. The class inserts nothing.</summary>
+/// <remarks><c>paper.capture_runs</c> has no epoch column, so the window (the epoch's sessions) is the only filter: a row written for a session that two epochs share counts in both.</remarks>
 internal sealed class PaperPhaseData(NpgsqlDataSource dataSource) : IPaperPhaseData
 {
     public async ValueTask<IReadOnlyList<CaptureRunView>> CaptureRunsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)

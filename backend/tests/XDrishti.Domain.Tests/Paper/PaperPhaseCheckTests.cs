@@ -146,6 +146,27 @@ public sealed class PaperPhaseCheckTests
     }
 
     [Fact]
+    public void A_comparison_that_says_met_without_a_confirmed_sheet_is_never_met()
+    {
+        var report = PaperPhaseCheck.Evaluate(Facts(confirmed: false));
+
+        Verdict(report, "C3").ShouldBe("NOT EVALUABLE");
+        Verdict(report, "C4").ShouldBe("NOT EVALUABLE");
+        report.ExitVerdict.ShouldBe("NOT EVALUABLE");
+        report.Criteria.Single(c => c.Id == "C3").Label.ShouldContain("costs not confirmed");
+    }
+
+    [Fact]
+    public void A_met_with_a_missing_interval_end_is_labelled_and_never_bare()
+    {
+        var facts = Facts(risk: 0);
+
+        var report = PaperPhaseCheck.Evaluate(facts with { Exit = facts.Exit! with { IntervalLow = null } });
+
+        report.ExitCriterion.ShouldBe("MET (interval unavailable)");
+    }
+
+    [Fact]
     public void One_integrity_mismatch_is_not_met()
     {
         var report = PaperPhaseCheck.Evaluate(Facts(integrity: 1));

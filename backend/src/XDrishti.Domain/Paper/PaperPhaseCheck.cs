@@ -167,12 +167,19 @@ public static class PaperPhaseCheck
 
         var verdict = result.Verdict switch
         {
+            // A met statistic is only taken at its word when the owner's confirmation of the costs is a fact.
+            CriterionResult.Met when !facts.Exit.ChargeSheetConfirmed => No,
             CriterionResult.Met => Met,
             CriterionResult.NotMet => NotMet,
             _ => No,
         };
         const string prefix = "not evaluable: ";
         var reason = result.Label.StartsWith(prefix, StringComparison.Ordinal) ? result.Label[prefix.Length..] : result.Label;
+        if (result.Verdict == CriterionResult.Met && verdict == No)
+        {
+            reason = "costs not confirmed (the comparison's met is not taken at its word)";
+        }
+
         var blockers = new List<string>();
         if (!facts.Exit.ChargeSheetConfirmed)
         {
@@ -199,6 +206,7 @@ public static class PaperPhaseCheck
         }
 
         var facing = new List<string> { string.Create(c, $"{runs} capture rows read") };
+        // A mismatch row keeps this NOT MET for the whole epoch even after the pair is resolved: capture rows are insert-only and a later run does not retract one, so only a new epoch clears it (deliberately conservative).
         var mismatched = facts.Sessions.Where(s => s.CaptureIntegrity > 0).ToList();
         var stuck = new List<PhaseSessionFact>();
         for (var i = 0; i < facts.Sessions.Count; i++)
@@ -246,6 +254,13 @@ public static class PaperPhaseCheck
         }
 
         var c = CultureInfo.InvariantCulture;
+
+        // These re-checks read facts the criteria above took from other places. Most are unreachable while those criteria hold, but a MET must never depend on them agreeing by luck.
+        if (facts.Exit?.ChargeSheetConfirmed != true)
+        {
+            malformed.Add("the charge sheet is not confirmed by the owner");
+        }
+
         if (facts.Counted.Select(t => t.TicketId).Distinct().Count() != facts.Counted.Count)
         {
             malformed.Add("a ticket is counted twice");
@@ -277,6 +292,11 @@ public static class PaperPhaseCheck
         }
 
         var caveats = new List<string>();
+        if (facts.Exit is not { IntervalLow: not null, IntervalHigh: not null })
+        {
+            caveats.Add("interval unavailable");
+        }
+
         if (facts.Exit is { IntervalLow: { } lo, IntervalHigh: { } hi } && lo <= 0)
         {
             caveats.Add($"point estimate; 90% interval [{Signed(lo)}, {Signed(hi)}] includes 0");
