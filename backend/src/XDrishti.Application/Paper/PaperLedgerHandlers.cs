@@ -172,7 +172,7 @@ internal sealed class ReconcilePaperHandler(PaperLedgerContext context, IPaperLe
         var known = r.Accounts.Select(a => a.AccountId).ToHashSet();
         foreach (var id in (await data.EntryAccountsAsync(r.Epoch.Id, cancellationToken)).Where(id => !known.Contains(id)))
         {
-            differences.Add($"entries exist for account {id}, which is not a paper account now");
+            differences.Add($"entries exist in this epoch for account {id}, which is not a paper account now");
         }
 
         if (differences.Count > 0)

@@ -2,7 +2,6 @@ import { Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { paperPositionsQuery } from '../api/paperQueries';
-import { BasisNote } from './BasisNote';
 import { ClosedTable } from './ClosedTable';
 import { EquityLine } from './EquityLine';
 import { PositionsTable } from './PositionsTable';
@@ -19,7 +18,6 @@ export function LedgerBody({ accountId }: { accountId: string }) {
   const none = open.length === 0 && closed.length === 0;
   return (
     <Stack spacing={3}>
-      <BasisNote basis={positions.data.basis} limits={positions.data.limits} />
       {none ? (
         <Typography>{EMPTY_TEXT}</Typography>
       ) : (

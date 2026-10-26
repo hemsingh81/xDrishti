@@ -31,12 +31,24 @@ describe('Paper ledger tab', () => {
     expect(screen.getByText(/after the stored sheet; the sheet is not confirmed/)).toBeInTheDocument();
     expect(screen.getAllByText(/no order was placed or exists/).length).toBeGreaterThan(0);
     expect(await screen.findByText('limit: no leverage is modelled')).toBeInTheDocument();
-    expect(await screen.findByText('limit: marks are daily closes')).toBeInTheDocument();
     const table = await screen.findByRole('table', { name: 'Open paper positions' });
     expect(within(table).getByText('RELIANCE')).toBeInTheDocument();
     expect(await screen.findByRole('table', { name: 'Closed paper trades' })).toBeInTheDocument();
     expect(await screen.findByRole('img', { name: /Realised equity from .* to .*3 sessions/ })).toBeInTheDocument();
     expect(await screen.findByText(/Reconciliation: ok/)).toBeInTheDocument();
+  });
+
+  it('labels the result gross when no stored sheet charged anything', async () => {
+    mountPaper({
+      accounts: [
+        buildPaperAccount({ realised: { gross: 1500, charges: null, net: 1500, basis: 'gross, no charges' } }),
+      ],
+    });
+    open();
+
+    expect(await screen.findByText('Result (gross)')).toBeInTheDocument();
+    expect(screen.queryByText('Result after stored charges')).not.toBeInTheDocument();
+    expect(screen.getAllByText('gross, no charges').length).toBeGreaterThan(0);
   });
 
   it('says a stale mark is unavailable, with the reason, and no number', async () => {

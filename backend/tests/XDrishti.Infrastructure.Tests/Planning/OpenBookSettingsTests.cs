@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Infrastructure.Planning;
 
 namespace XDrishti.Infrastructure.Tests.Planning;
@@ -60,16 +59,31 @@ public sealed class OpenBookSettingsTests
     public void The_two_switches_are_exclusive_at_host_start(bool assumedEmpty, bool usePaper, bool valid) =>
         OpenBookCheck.IsValid(new OpenBookCheck { AssumedEmpty = assumedEmpty, UsePaperLedger = usePaper }).ShouldBe(valid);
 
-    [Fact]
-    public void Both_on_fails_validation_when_the_options_are_resolved()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Planning:OpenBook:AssumedEmpty"] = "true", ["Planning:OpenBook:UsePaperLedger"] = "true" }).Build());
-        services.AddSingleton<IOpenBookSettings, OpenBookSettings>();
-        services.AddOptions<OpenBookCheck>().Configure<IOpenBookSettings>((o, s) => (o.AssumedEmpty, o.UsePaperLedger) = (s.AssumedEmpty, s.UsePaperLedger)).Validate(OpenBookCheck.IsValid, OpenBookCheck.Message);
+    private static IHost HostWith(params (string Key, string Value)[] pairs) =>
+        Host.CreateDefaultBuilder()
+            .ConfigureAppConfiguration(c => c.AddInMemoryCollection(pairs.ToDictionary(p => p.Key, p => (string?)p.Value)))
+            .ConfigureServices(services => OpenBookCheck.AddOpenBook(services))
+            .Build();
 
-        var failure = Should.Throw<OptionsValidationException>(() => services.BuildServiceProvider().GetRequiredService<IOptions<OpenBookCheck>>().Value);
+    [Fact]
+    public async Task A_host_with_both_switches_on_does_not_start()
+    {
+        using var host = HostWith(("Planning:OpenBook:AssumedEmpty", "true"), ("Planning:OpenBook:UsePaperLedger", "true"));
+
+        var failure = await Should.ThrowAsync<OptionsValidationException>(() => host.StartAsync(TestContext.Current.CancellationToken));
 
         failure.Message.ShouldContain("exclusive");
+    }
+
+    [Theory]
+    [InlineData("true", "false")]
+    [InlineData("false", "true")]
+    [InlineData("false", "false")]
+    public async Task A_host_with_at_most_one_switch_on_starts(string assumedEmpty, string usePaper)
+    {
+        using var host = HostWith(("Planning:OpenBook:AssumedEmpty", assumedEmpty), ("Planning:OpenBook:UsePaperLedger", usePaper));
+
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        await host.StopAsync(TestContext.Current.CancellationToken);
     }
 }

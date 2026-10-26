@@ -20,7 +20,7 @@ export function AccountTiles({ account }: { account: PaperAccount }) {
     >
       <MetricTile label="Equity" state={toMetric(account.equity)} format={formatInr} />
       <MetricTile
-        label="Result after stored charges"
+        label={realised.charges === null ? 'Result (gross)' : 'Result after stored charges'}
         state={metricOf(realised.net)}
         format={signedInr}
         tone="gain-loss"

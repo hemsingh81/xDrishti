@@ -43,7 +43,7 @@ internal sealed class StoredPlanContextSource(
 
         // Only when the owner turned UsePaperLedger on (default off: nothing below runs and the context is byte-identical to P7-09). The book is the paper ledger, or unavailable when capture is behind.
         var paper = openBook.UsePaperLedger
-            ? await paperBook.ReadAsync(request.Session, [.. trading.Where(a => a.Trading.Mode == TradingMode.Paper).Select(PaperInput)], cancellationToken)
+            ? await paperBook.ReadAsync(request.Session, [.. trading.Where(a => a.Trading.Mode == TradingMode.Paper).Select(PaperAccountInput.From)], cancellationToken)
             : null;
         if (paper is PaperBook ledger)
         {
@@ -77,9 +77,6 @@ internal sealed class StoredPlanContextSource(
             ? Result.Success(new PlanContext(book.Positions, facts, contextAccounts, correlations, null, book.Taken, notes, BookFromLedger: true))
             : Result.Success(new PlanContext(openBook.AssumedEmpty ? [] : null, facts, contextAccounts, correlations, null, null, notes));
     }
-
-    private static PaperAccountInput PaperInput(BrokerAccount a) =>
-        new(a.Id, a.Name, a.Trading.CapitalSource == CapitalSource.Fixed ? a.Trading.CapitalAmount : null, string.Empty);
 
     /// <summary>A paper account with the ledger's equity, open risk, funds, held symbols and loss carried; an account the ledger has no capital for keeps null numbers (the plan treats its limits as unknown).</summary>
     private static ContextAccount WithLedger(ContextAccount account, PaperBook book) =>

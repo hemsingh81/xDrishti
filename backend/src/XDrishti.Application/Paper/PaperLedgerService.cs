@@ -19,9 +19,7 @@ internal sealed class PaperLedgerService(IPaperLedgerData data, IAccountStore ac
         return [.. active
             .Where(a => a.Trading.Enabled && a.Trading.Mode == TradingMode.Paper)
             .OrderBy(a => a.Id)
-            .Select(a => a.Trading.CapitalSource == CapitalSource.Fixed && a.Trading.CapitalAmount is { } amount
-                ? new PaperAccountInput(a.Id, a.Name, amount, "the account's fixed capital (the amount the plan sizes on)")
-                : new PaperAccountInput(a.Id, a.Name, null, "no capital figure: the account takes its funds from the broker, which a paper account cannot read"))];
+            .Select(PaperAccountInput.From)];
     }
 
     /// <summary>The ledgers of <paramref name="inputs"/> in <paramref name="epoch"/> (null: no capture yet, so no trade) as of the last closed session.</summary>

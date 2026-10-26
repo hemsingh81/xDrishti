@@ -1,3 +1,4 @@
+using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Paper;
 
 namespace XDrishti.Application.Abstractions.Paper;
@@ -7,7 +8,17 @@ namespace XDrishti.Application.Abstractions.Paper;
 /// <param name="Name">Its name.</param>
 /// <param name="Capital">The fixed capital; null for a BrokerFunds account (no capital figure: equity and every percentage are unavailable).</param>
 /// <param name="CapitalSource">Where the capital comes from, in words.</param>
-public sealed record PaperAccountInput(Guid AccountId, string Name, decimal? Capital, string CapitalSource);
+public sealed record PaperAccountInput(Guid AccountId, string Name, decimal? Capital, string CapitalSource)
+{
+    /// <summary>The one mapping from a Trading-role account: Fixed capital is the amount the plan sizes on; BrokerFunds has no capital figure.</summary>
+    public static PaperAccountInput From(BrokerAccount account)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        return account.Trading.CapitalSource == Domain.Accounts.CapitalSource.Fixed && account.Trading.CapitalAmount is { } amount
+            ? new PaperAccountInput(account.Id, account.Name, amount, "the account's fixed capital (the amount the plan sizes on)")
+            : new PaperAccountInput(account.Id, account.Name, null, "no capital figure: the account takes its funds from the broker, which a paper account cannot read");
+    }
+}
 
 /// <summary>A newest stored daily bar of an instrument and the instrument's id (for its sector and baskets).</summary>
 /// <param name="InstrumentId">The instrument master id.</param>

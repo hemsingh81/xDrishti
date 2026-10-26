@@ -53,13 +53,13 @@ public sealed class PaperLedgerDatabaseTests(ApiFactory factory) : DataTestBase(
     }
 
     /// <summary>One approved ticket gives the approval row and the arming instant that every seeded entry rests on.</summary>
-    private async Task<(long Plan, long[] Items, long Approval, DateTimeOffset Armed)> ApprovedArmedTicketAsync(string key)
+    private async Task<(long Plan, long[] Items, long Approval, DateTimeOffset Armed)> ApprovedArmedTicketAsync(string key, int count = 3)
     {
         Factory.Clock.Pin(BeforeCutoff);
         NewPlanItem Item(int rank, string symbol) => new(
             rank, TicketGroup.Primary, symbol, "BUY", "ORB", new string('a', 64), "close above 15m high", "0.8 ATR below entry", "2R", "09:30-11:30", [],
             new PlanEvidence("ORB|15m|BUY|intraday|FIXED_RR{rr=2}|*", 41, "replayed history", "cell statistics only", 0.72, 0.12, [], null, 0.7), [new NewAllocation(AccountId, "paper", 100)]);
-        var plan = new NewPlan(key, Session, Cutoff, 1, new string('c', 64), "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, [Item(1, "NSE:LEDA"), Item(2, "NSE:LEDB"), Item(3, "NSE:LEDC")]);
+        var plan = new NewPlan(key, Session, Cutoff, 1, new string('c', 64), "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, [.. Enumerable.Range(1, count).Select(i => Item(i, "NSE:LED" + i))]);
         var published = await WithAsync(p => p.GetRequiredService<IPlanStore>().PublishAsync(plan, Ct).AsTask());
         var ids = (await WithAsync(p => p.GetRequiredService<IPlanStore>().ItemsAsync(published.Id, Ct).AsTask())).OrderBy(i => i.Item.Rank).Select(i => i.Id).ToArray();
         var id = ids[0];
@@ -124,6 +124,34 @@ public sealed class PaperLedgerDatabaseTests(ApiFactory factory) : DataTestBase(
         reconcile.GetProperty("status").GetString().ShouldBe("ok");
         var equity = await Client.GetFromJsonAsync<JsonElement>(new Uri($"/api/paper/accounts/{AccountId}/equity", UriKind.Relative), Ct);
         equity.GetProperty("accountId").GetGuid().ShouldBe(AccountId);
+    }
+
+    [Fact]
+    public async Task The_sql_totals_equal_the_pure_ledger_over_random_seeded_trade_sets()
+    {
+        var (plan, items, approval, armed) = await ApprovedArmedTicketAsync("paper-ledger-2", 12);
+        var epoch = await WithAsync(p => p.GetRequiredService<IPaperStore>().EnsureFirstEpochAsync(Session, AfterClose, Ct).AsTask());
+        var random = new Random(20261026);
+        var entries = items.Select((item, i) =>
+        {
+            var price = 50m + random.Next(0, 150);
+            var gross = random.Next(-900, 1500) + (random.Next(0, 100) / 100m);
+            var charged = random.Next(0, 3) > 0;
+            var exit = random.Next(0, 4) == 0 ? null : Exit(armed.AddMinutes(20 + random.Next(0, 300)), price + 1, gross, charged ? 17.35m : null, charged ? gross - 17.35m : null, random.NextDouble());
+            return new NewPaperEntry(Entry(plan, item, approval, armed, "LED" + (i + 1), random.Next(0, 2) == 0 ? "BUY" : "SELL", random.Next(1, 100), price, price - 2, "ORB|LED" + (i + 1) + "|BUY|2099-03-01"), "measured", exit);
+        }).ToArray();
+        await WriteAsync(epoch.Id, new DateOnly(2099, 6, 1), "done", 0, entries);
+
+        var data = Factory.Services.CreateScope().ServiceProvider.GetRequiredService<IPaperLedgerData>();
+        var ledger = PaperLedger.Compute(100_000m, await data.TradesAsync(epoch.Id, AccountId, Ct), new DateOnly(2099, 3, 2));
+        var totals = await data.TotalsAsync(epoch.Id, AccountId, Ct);
+
+        totals.ExitResult.ShouldBe(ledger.Result);
+        totals.EntriesWithoutExit.ShouldBe(ledger.OpenCount);
+        totals.ExitBeforeEntry.ShouldBe(0);
+        (ledger.ClosedCount + ledger.OpenCount).ShouldBe(12);
+        ledger.ClosedCount.ShouldBeGreaterThan(0);
+        ledger.OpenCount.ShouldBeGreaterThan(0);
     }
 
     [Fact]
