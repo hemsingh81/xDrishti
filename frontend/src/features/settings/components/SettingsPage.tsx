@@ -21,7 +21,7 @@ type SettingsTab = (typeof settingsTabs)[number]['key'];
 const parseTab = (value: string | null): SettingsTab =>
   settingsTabs.find((tab) => tab.key === value)?.key ?? 'profiles';
 
-/** Settings shared across accounts: risk profiles, which account has which role and the Action center thresholds. in the URL. */
+/** Settings shared across accounts: risk profiles, which account has which role and the Action center thresholds, and the charge sheet's confirmation. The open tab lives in the URL. */
 export function SettingsPage() {
   const [params, setParams] = useSearchParams();
   const tab = parseTab(params.get('tab'));

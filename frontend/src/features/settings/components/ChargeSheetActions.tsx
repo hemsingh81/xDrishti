@@ -22,6 +22,7 @@ export function ChargeSheetActions({ status, shown }: { status: ChargeSheetStatu
   const run = (next: ChargeSheetAct) => {
     act.mutate(next, {
       onSettled: () => {
+        // The field is cleared at once; the mutation state keeps the last variables in memory only until the next act (never persisted or logged).
         setPassword('');
       },
       onSuccess: () => {
