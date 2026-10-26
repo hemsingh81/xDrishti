@@ -241,4 +241,44 @@ describe.each(['light', 'dark'] as const)('%s theme', (mode) => {
     renderThemed(mode, <span>x</span>);
     expect(injectedCss()).toMatch(/prefers-reduced-motion:reduce\)\{[^}]*\{[^}]*transition-duration:0\.01ms!important/);
   });
+
+  it('grows the root font on large monitors (15 px from 1680, 16 px from 2560)', () => {
+    renderThemed(mode, <span>x</span>);
+    const css = injectedCss();
+    expect(css).toMatch(/@media\(min-width:1680px\)\{html\{font-size:93\.75%/);
+    expect(css).toMatch(/@media\(min-width:2560px\)\{html\{font-size:100%/);
+  });
+
+  it('makes buttons, icon buttons, tabs and clickable chips 44 px on phones, except dense ones', () => {
+    renderThemed(
+      mode,
+      <>
+        <button className="MuiButton-root" data-testid="plain" />
+        <button className="MuiButton-root MuiButton-sizeSmall" data-testid="small" />
+        <button className="MuiIconButton-root" data-testid="icon" />
+        <button className="MuiTab-root" data-testid="tab" />
+        <div className="MuiChip-root MuiChip-clickable" data-testid="chip" />
+        <div className="MuiChip-root MuiChip-clickable MuiChip-sizeSmall" data-testid="small-chip" />
+        <table>
+          <tbody>
+            <tr>
+              <td className="MuiTableCell-root">
+                <button className="MuiIconButton-root" data-testid="in-cell" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div className="MuiAutocomplete-root">
+          <button className="MuiIconButton-root" data-testid="in-autocomplete" />
+        </div>
+        <button className="MuiIconButton-root" data-dense data-testid="dense" />
+      </>,
+    );
+    const rule = /@media\(max-width:479\.95px\)\{([^{]+)\{min-height:44px;min-width:44px/.exec(injectedCss());
+    expect(rule).not.toBeNull();
+    const selector = (rule?.[1] ?? '').replace(/\.Mui(\w+)-root\*/g, '.Mui$1-root *');
+    const hit = (id: string) => screen.getByTestId(id).matches(selector);
+    for (const id of ['plain', 'icon', 'tab', 'chip']) expect(hit(id)).toBe(true);
+    for (const id of ['small', 'small-chip', 'in-cell', 'in-autocomplete', 'dense']) expect(hit(id)).toBe(false);
+  });
 });

@@ -72,4 +72,17 @@ describe('ButtonTabs', () => {
 
     expect(seen).toEqual([]);
   });
+
+  it('scrolls sideways inside its own strip and moves only the strip to keep the selected tab in view', async () => {
+    render(<Harness />);
+    const strip = screen.getByRole('tablist', { name: 'Letters' });
+    expect(strip).toHaveStyle({ overflowX: 'auto' });
+    // jsdom has no layout: give the strip 100 px of room and tab C a place beyond it.
+    Object.defineProperty(strip, 'clientWidth', { value: 100 });
+    const tabC = screen.getByRole('tab', { name: 'Tab C' });
+    Object.defineProperty(tabC, 'offsetLeft', { value: 150 });
+    Object.defineProperty(tabC, 'offsetWidth', { value: 60 });
+    await userEvent.click(tabC);
+    expect(strip.scrollLeft).toBe(110);
+  });
 });

@@ -95,6 +95,13 @@ title shows the current screen.
 Rules: no horizontal page scroll at any width (wide tables scroll inside their card), fluid grids
 (`auto-fit`/`minmax`), charts resize with their containers, sidebar state remembered per device.
 
+As built (P8-16, global rules in place, pinned by CSS-text/jsdom tests, NOT verified in a browser): the root font is 14 px,
+15 px from 1680 px and 16 px from 2560 px (`rootFontSizeLarge`); below 480 px buttons, icon buttons, tabs, clickable chips and
+`[role=button]` get a 44 px minimum (`touchTarget`) with doubled specificity; exempt (dense) are small buttons, icon buttons and
+chips, anything inside a table cell, text field or autocomplete, and `data-dense`; the shell has a "Skip to content" link as the
+first tab stop and a focusable `main`; `scroll-padding-top` on `html` clears the sticky top bar below `md`; `ButtonTabs` scroll
+sideways inside their strip. The Playwright and axe runner is not built.
+
 ## 1e. Visual system (P1-19)
 
 Calm, data-first, trustworthy: cool-neutral base, one deliberate accent. Tokens live in `frontend/src/theme/tokens.ts`
