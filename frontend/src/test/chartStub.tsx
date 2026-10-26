@@ -1,5 +1,6 @@
 import type { CategoryChartCanvasProps } from '@/shared/ui/chart/CategoryChartCanvas';
 import type { EChartsCanvasProps } from '@/shared/ui/chart/EChartsCanvas';
+import type { PriceChartCanvasProps } from '@/shared/ui/chart/PriceChartCanvas';
 
 /**
  * Stand-in for the lazy ECharts module (`shared/ui/chart/EChartsCanvas`, replaced for every test in setup.ts): jsdom has
@@ -66,4 +67,23 @@ export function CategoryChartCanvasStub(props: CategoryChartCanvasProps) {
   if (categoryStub.fail) throw new Error('The chart library could not be loaded.');
   categoryStub.calls.push(props);
   return <div data-testid="category-canvas" />;
+}
+
+/** The same for the candlestick canvas (`shared/ui/chart/PriceChartCanvas`): what each render was asked to draw (bars, levels, markers, crosshair). */
+export const priceStub = {
+  calls: [] as PriceChartCanvasProps[],
+  fail: false,
+  reset() {
+    priceStub.calls = [];
+    priceStub.fail = false;
+  },
+  get last(): PriceChartCanvasProps | undefined {
+    return priceStub.calls[priceStub.calls.length - 1];
+  },
+};
+
+export function PriceChartCanvasStub(props: PriceChartCanvasProps) {
+  if (priceStub.fail) throw new Error('The chart library could not be loaded.');
+  priceStub.calls.push(props);
+  return <div data-testid="price-canvas" />;
 }

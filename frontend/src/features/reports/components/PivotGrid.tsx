@@ -70,6 +70,10 @@ export function PivotGrid({ pivot, min, names, label, onOpen, selectedKey }: Piv
             state: metricFromApi(cell.value, cell.n, min),
             format,
             evidence: pivot.evidence,
+            parts: [
+              { dimension: pivot.rowDimension, value: cell.row },
+              { dimension: pivot.columnDimension, value: cell.column },
+            ],
           });
         }}
         emptyText="No trades"

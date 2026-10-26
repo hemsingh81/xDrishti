@@ -64,4 +64,21 @@ internal sealed class TradeFeatureStore(NpgsqlDataSource dataSource) : ITradeFea
 
         return list;
     }
+
+    public async ValueTask<TradeFeatureRow?> ReadOneAsync(string runKey, string tradeKey, string featureVersion, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(runKey);
+        ArgumentNullException.ThrowIfNull(tradeKey);
+        await using var command = dataSource.CreateCommand("""
+            SELECT run_key, trade_key, strategy, timeframe, side, trade_date, decision_epoch_seconds, feature_values FROM research.trade_features
+            WHERE feature_version = @version AND run_key = @run_key AND trade_key = @trade_key
+            """);
+        command.Parameters.AddWithValue("version", NpgsqlDbType.Varchar, featureVersion);
+        command.Parameters.AddWithValue("run_key", NpgsqlDbType.Char, runKey);
+        command.Parameters.AddWithValue("trade_key", NpgsqlDbType.Text, tradeKey);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? new TradeFeatureRow(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetFieldValue<DateOnly>(5), reader.GetInt64(6), reader.GetFieldValue<double[]>(7))
+            : null;
+    }
 }

@@ -16,4 +16,7 @@ internal static partial class ReportLog
 
     [LoggerMessage(EventId = 4803, Level = LogLevel.Information, Message = "report.read kind {Kind}: {Plans} plans, {Lines} lines, {Milliseconds} ms")]
     public static partial void Read(ILogger logger, string kind, int plans, int lines, long milliseconds);
+
+    [LoggerMessage(EventId = 4897, Level = LogLevel.Information, Message = "report.replay run {RunPrefix} ordinal {Ordinal} timeframe {Timeframe}: {Bars} bars, {Milliseconds} ms")]
+    public static partial void Replay(ILogger logger, string runPrefix, int ordinal, string timeframe, int bars, long milliseconds);
 }

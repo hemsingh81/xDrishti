@@ -10,4 +10,7 @@ public interface ITradeFeatureStore
 
     /// <summary>The rows of the runs for the catalog version, ordered by run key then trade key.</summary>
     ValueTask<IReadOnlyList<TradeFeatureRow>> ReadAsync(IReadOnlyList<string> runKeys, string featureVersion, CancellationToken cancellationToken);
+
+    /// <summary>The stored row of one trade for the catalog version, or null when none is stored (P8-11).</summary>
+    ValueTask<TradeFeatureRow?> ReadOneAsync(string runKey, string tradeKey, string featureVersion, CancellationToken cancellationToken);
 }

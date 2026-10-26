@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { setHubTransport } from '@/shared/realtime';
 import { installFakeIntersectionObserver } from './intersection';
-import { categoryStub, chartStub } from './chartStub';
+import { categoryStub, chartStub, priceStub } from './chartStub';
 import { releasePending } from './gate';
 import { server } from './server';
 import { pinNow, unpinClock } from './pinClock';
@@ -17,6 +17,10 @@ installFakeIntersectionObserver();
 vi.mock('@/shared/ui/chart/EChartsCanvas', async () => ({ default: (await import('./chartStub')).default }));
 vi.mock('@/shared/ui/chart/CategoryChartCanvas', async () => ({
   default: (await import('./chartStub')).CategoryChartCanvasStub,
+}));
+
+vi.mock('@/shared/ui/chart/PriceChartCanvas', async () => ({
+  default: (await import('./chartStub')).PriceChartCanvasStub,
 }));
 
 // jsdom cannot run Monaco: the Lab editor is a labelled textarea in tests.
@@ -89,6 +93,7 @@ afterEach(async () => {
   }
   chartStub.reset();
   categoryStub.reset();
+  priceStub.reset();
   server.resetHandlers();
 });
 afterAll(() => {

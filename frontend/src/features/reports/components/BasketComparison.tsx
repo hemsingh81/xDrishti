@@ -38,6 +38,7 @@ export function BasketComparison({ query, min }: ReportPanelProps) {
         </>
       )}
       <CellPanel
+        query={cmpQuery}
         info={open}
         onClose={() => {
           setOpen(null);

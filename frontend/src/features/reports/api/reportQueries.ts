@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query';
+import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { api, unwrap, type Schemas } from '@/shared/api';
 import { queryString, type ReportQuery } from '../lib/reportFilter';
 
@@ -19,6 +19,9 @@ export type ComparisonItem = Schemas['ComparisonView'];
 export type ExitSelectionsView = Schemas['ReportExitSelectionsView'];
 export type ExitSelectionItem = Schemas['ExitSelectionView'];
 export type MonteCarlo = Schemas['MonteCarloView'];
+export type TradeReplay = Schemas['TradeReplayView'];
+export type TradeLine = Schemas['TradeLineView'];
+export type TradesView = Schemas['TradesView'];
 
 /** Stored runs are insert-only, so a report stays valid for minutes (P8-08). */
 const staleTime = 5 * 60_000;
@@ -170,6 +173,58 @@ export const labReportQuery = (id: string) =>
     queryKey: ['reports', 'lab-report', id] as const,
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/lab/runs/{id}/report', { params: { path: { id } }, signal })),
+    staleTime,
+    retry: false,
+  });
+
+/** The options of a replay: all optional, the server has the defaults (5m; one session before, none after; the day timeframe 20 and 20). */
+export interface ReplayOptions {
+  timeframe?: string;
+  before?: number;
+  after?: number;
+  openAtEnd?: boolean;
+}
+
+/** One stored trade on its bars (P8-11). A GET: nothing is written, nothing is kept offline. */
+export const tradeReplayQuery = (runKey: string, ordinal: number, options: ReplayOptions = {}) =>
+  queryOptions({
+    queryKey: [
+      'reports',
+      'replay',
+      runKey,
+      ordinal,
+      options.timeframe ?? '',
+      options.before ?? '',
+      options.after ?? '',
+      options.openAtEnd ?? false,
+    ] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/reports/trades/{runKey}/{ordinal}', {
+          params: { path: { runKey, ordinal }, query: options },
+          signal,
+        }),
+      ),
+    staleTime,
+    retry: false,
+  });
+
+/** Trades per page of the trade list. */
+export const tradesPageSize = 50;
+
+/** The closed trades of a report, 50 per page by the cursor of the previous page (the cursor belongs to that report). */
+export const tradesInfiniteQuery = (query: ReportQuery) =>
+  infiniteQueryOptions({
+    queryKey: ['reports', 'trades', queryString(query)] as const,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ signal, pageParam }) =>
+      unwrap(
+        await api.GET('/api/reports/trades', {
+          params: { query: { ...query, limit: String(tradesPageSize), cursor: pageParam } },
+          signal,
+        }),
+      ),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
     staleTime,
     retry: false,
   });

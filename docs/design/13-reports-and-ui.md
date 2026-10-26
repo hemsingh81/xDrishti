@@ -305,5 +305,5 @@ summary. Notifications appear in-app (SignalR); optional external channel only i
 
 - Report queries live in the .NET Reporting module; heavy aggregates via SQL materialised views refreshed
   nightly; responses are chart-ready series.
-- Lightweight Charts for anything price-based; ECharts for analytics.
+- Lightweight Charts (TradingView, Apache-2.0, pinned `5.2.1`) for anything price-based, behind the one lazy wrapper `shared/ui/chart/PriceChart` (the trade replay, later the ticket charts); ECharts for analytics. Bars are built, adjusted and aggregated on the server; the page carries the library's attribution notice ([ADR 0125](../adr/0125-the-trade-replay-reads-one-stored-trade-on-server-built-adjusted-bars-with-an-entry-check-and-draws-it-with-lightweight-charts-behind-one-wrapper.md)).
 - The SPA is a PWA so it can be "installed" on your phone (LAN access).

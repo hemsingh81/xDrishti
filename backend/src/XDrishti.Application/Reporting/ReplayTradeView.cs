@@ -1,0 +1,31 @@
+namespace XDrishti.Application.Reporting;
+
+/// <summary>The stored facts of a replayed trade, in adjusted prices. Times are instants (the screen shows India time); a target is null without a fixed reward-to-risk, never zero.</summary>
+public sealed record ReplayTradeView(
+    string StrategyId,
+    Guid InstrumentId,
+    string Symbol,
+    string Side,
+    DateOnly TradeDate,
+    string TriggerTimeframe,
+    DateTimeOffset DecisionAt,
+    DateTimeOffset EntryAt,
+    double EntryPrice,
+    double EntryFilledPrice,
+    double StopPrice,
+    double? TargetPrice,
+    DateTimeOffset ExitAt,
+    double ExitPrice,
+    double ExitFilledPrice,
+    string ExitReason,
+    double RExact,
+    double RFilled,
+    double SlippageR,
+    double MaeR,
+    double MfeR,
+    int SessionsHeld,
+    int SessionsUnseen,
+    string Fills,
+    string EntryFill,
+    bool TickFallback,
+    IReadOnlyList<string> BasketIds);
