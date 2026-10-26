@@ -17,6 +17,8 @@ fi
 
 cd "$ROOT/frontend"
 vitest_json="$XD_EVIDENCE_DIR/vitest-phase.json"
+# A stale passing file must never be stamped current: delete it first, and the recorder refuses a run of fewer than 3 tests.
+rm -f "$vitest_json" "$XD_EVIDENCE_DIR/interaction.json"
 npx vitest run src/features/reports/phase --reporter=json --outputFile="$vitest_json" >/dev/null 2>&1 || true
 if [ -s "$vitest_json" ]; then node scripts/p8-evidence.mjs interaction --from "$vitest_json"; fi
 

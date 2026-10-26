@@ -23,15 +23,19 @@ public sealed class EvaluateReportsPhaseCheckHandlerTests
         return handler;
     }
 
-    private static EvaluateReportsPhaseCheckHandler Handler(string code, IEndpointCatalogue? catalogue = null) => new(
-        Refusing<ListReportRunsQuery, RunsView>(code),
+    private static EvaluateReportsPhaseCheckHandler Handler(
+        string code,
+        IEndpointCatalogue? catalogue = null,
+        IQueryHandler<ListReportRunsQuery, Result<RunsView>>? runs = null,
+        IQueryHandler<GetReportInsightsQuery, Result<InsightsView>>? insights = null) => new(
+        runs ?? Refusing<ListReportRunsQuery, RunsView>(code),
         Refusing<GetReportSummaryQuery, SummaryView>(code),
         Refusing<GetReportGroupsQuery, GroupsView>(code),
         Refusing<GetReportPivotQuery, PivotView>(code),
         Refusing<GetReportEquityQuery, EquityView>(code),
         Refusing<GetReportDistributionQuery, DistributionView>(code),
         Refusing<GetReportMaeMfeQuery, ReportMaeMfeView>(code),
-        Refusing<GetReportInsightsQuery, InsightsView>(code),
+        insights ?? Refusing<GetReportInsightsQuery, InsightsView>(code),
         Refusing<GetReportWhatWorksQuery, WhatWorksView>(code),
         Refusing<PageReportTradesQuery, TradesView>(code),
         catalogue ?? Substitute.For<IEndpointCatalogue>(),
@@ -62,7 +66,10 @@ public sealed class EvaluateReportsPhaseCheckHandlerTests
         var catalogue = Substitute.For<IEndpointCatalogue>();
         catalogue.Routes().Returns([new ReportsPhaseRoute("GET", "/api/reports/runs")]);
 
-        var result = await Handler("reports.too_large", catalogue).HandleAsync(new EvaluateReportsPhaseCheckQuery(), CancellationToken.None);
+        var runs = Substitute.For<IQueryHandler<ListReportRunsQuery, Result<RunsView>>>();
+        runs.HandleAsync(Arg.Any<ListReportRunsQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(new RunsView([], new NetBasisView("unavailable", "x", null), "rule"))));
+
+        var result = await Handler("reports.too_large", catalogue, runs).HandleAsync(new EvaluateReportsPhaseCheckQuery(), CancellationToken.None);
 
         var criteria = result.Value.Report.Criteria;
         criteria.Single(c => c.Number == 4).Verdict.ShouldBe("MET");
@@ -77,6 +84,36 @@ public sealed class EvaluateReportsPhaseCheckHandlerTests
 
         result.Value.Report.Criteria.Single(c => c.Number == 4).Verdict.ShouldBe("NOT MET");
         result.Value.Report.Headline.ShouldBe("P8 exit: NOT MET");
+    }
+
+    [Fact]
+    public async Task Runs_that_could_not_be_read_are_not_the_same_as_no_stored_run()
+    {
+        var result = await Handler("reports.too_large").HandleAsync(new EvaluateReportsPhaseCheckQuery(), CancellationToken.None);
+
+        var criteria = result.Value.Report.Criteria;
+        criteria.Single(c => c.Number == 1).Detail.ShouldContain("could not be read");
+        criteria.Single(c => c.Number == 1).Detail.ShouldNotContain("no stored run");
+        criteria.Single(c => c.Number == 4).Verdict.ShouldBe("NOT EVALUABLE");
+    }
+
+    [Fact]
+    public async Task Determinism_is_not_evaluable_when_a_repeat_read_fails_and_names_the_report()
+    {
+        var runs = Substitute.For<IQueryHandler<ListReportRunsQuery, Result<RunsView>>>();
+        var item = new RunListItemView("k", "ORB", "basket", "b", new DateOnly(2025, 1, 1), new DateOnly(2025, 2, 1), false, null, null, null, null, null, 10, 0, false, true, null, DateTimeOffset.UnixEpoch);
+        runs.HandleAsync(Arg.Any<ListReportRunsQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(new RunsView([item], new NetBasisView("unavailable", "x", null), "rule"))));
+        var evidence = new ReportEvidenceView("gross", 0, null, null, false, ["k"], [], true, ["limit"], [], 0, 0, null);
+        var insights = Substitute.For<IQueryHandler<GetReportInsightsQuery, Result<InsightsView>>>();
+        insights.HandleAsync(Arg.Any<GetReportInsightsQuery>(), Arg.Any<CancellationToken>()).Returns(
+            ValueTask.FromResult(Result.Success(new InsightsView([], evidence))),
+            ValueTask.FromResult(Result.Failure<InsightsView>(Error.Validation("reports.too_large", "refused"))));
+
+        var result = await Handler("reports.too_large", runs: runs, insights: insights).HandleAsync(new EvaluateReportsPhaseCheckQuery(), CancellationToken.None);
+
+        var nine = result.Value.Report.Criteria.Single(c => c.Number == 9);
+        nine.Verdict.ShouldBe("NOT EVALUABLE");
+        nine.Detail.ShouldContain("insights");
     }
 
     [Fact]

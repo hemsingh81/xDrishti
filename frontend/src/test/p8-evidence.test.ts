@@ -41,6 +41,8 @@ describe('freshness', () => {
     });
     expect(freshness(OLD, HEAD, unknown).state).toBe('stale');
     expect(freshness(undefined, HEAD, same).state).toBe('stale');
+    expect(freshness('--output=x', HEAD, same).state).toBe('stale');
+    expect(freshness(HEAD, HEAD, same, true).state).toBe('stale');
   });
 });
 
@@ -56,10 +58,14 @@ describe('bundle (criterion 7)', () => {
     expect(judgeBundle({ ...record, commit: OLD }, HEAD, changed).verdict).toBe('NOT EVALUABLE');
     expect(judgeBundle({ ...record, commit: OLD }, HEAD, same).verdict).toBe('MET');
     expect(judgeBundle({ commit: HEAD }, HEAD, changed).verdict).toBe('NOT EVALUABLE');
+    expect(judgeBundle({ ...record, total: 0 }, HEAD, changed).verdict).toBe('NOT EVALUABLE');
+    expect(judgeBundle(record, HEAD, changed, true).verdict).toBe('NOT EVALUABLE');
   });
 });
 
 describe('browser checklist (criterion 8)', () => {
+  const built = ['reports', 'learning'];
+  // The P8-16 line format: screen, width, scheme, state, check, result pass|fail|na, note, commit, date.
   const line = (over: object = {}) =>
     JSON.stringify({
       screen: 'reports',
@@ -73,23 +79,44 @@ describe('browser checklist (criterion 8)', () => {
       date: '2026-10-30',
       ...over,
     });
-  it('is MET with passes and explained na, NOT MET with a fail or an unexplained na', () => {
-    expect(judgeChecklist([line(), line({ result: 'na', note: 'no chart here' })], HEAD, changed).verdict).toBe('MET');
-    expect(judgeChecklist([line(), line({ result: 'fail' })], HEAD, changed).verdict).toBe('NOT MET');
-    expect(judgeChecklist([line({ result: 'na', note: ' ' })], HEAD, changed).verdict).toBe('NOT MET');
+  const both = [line(), line({ screen: 'learning' })];
+  const judge = (lines: string[], dirty = false, screens: string[] | null = built) =>
+    judgeChecklist(lines, HEAD, changed, screens, dirty);
+  it('is MET with passes and explained na over every built screen, and says how many', () => {
+    const met = judge([...both, line({ result: 'na', note: 'no chart here' })]);
+    expect(met.verdict).toBe('MET');
+    expect(met.detail).toContain('2 built screens');
   });
-  it('is NOT EVALUABLE when absent, stale, malformed or without a built screen', () => {
-    expect(judgeChecklist([], HEAD, changed).verdict).toBe('NOT EVALUABLE');
-    expect(judgeChecklist([line({ commit: OLD })], HEAD, changed).verdict).toBe('NOT EVALUABLE');
-    expect(judgeChecklist([line({ commit: OLD })], HEAD, same).verdict).toBe('MET');
-    expect(judgeChecklist(['{nope'], HEAD, changed).verdict).toBe('NOT EVALUABLE');
-    expect(judgeChecklist([line({ result: 'maybe' })], HEAD, changed).verdict).toBe('NOT EVALUABLE');
-    expect(judgeChecklist([line({ result: 'fail', screen: 'drilldown' })], HEAD, changed, ['reports']).verdict).toBe(
-      'NOT EVALUABLE',
-    );
-    expect(
-      judgeChecklist([line(), line({ result: 'fail', screen: 'drilldown' })], HEAD, changed, ['reports']).verdict,
-    ).toBe('MET');
+  it('is NOT MET with a fail or an unexplained na', () => {
+    expect(judge([...both, line({ result: 'fail' })]).verdict).toBe('NOT MET');
+    expect(judge([...both, line({ result: 'na', note: ' ' })]).verdict).toBe('NOT MET');
+  });
+  it('is NOT EVALUABLE when a built screen has no line, whatever the other lines say', () => {
+    const missing = judge([line(), line({ screen: 'other', result: 'pass' })]);
+    expect(missing.verdict).toBe('NOT EVALUABLE');
+    expect(missing.detail).toContain('1 of 2 built screens: learning');
+    expect(judge(both, false, null).verdict).toBe('NOT EVALUABLE');
+    expect(judge(both, false, []).verdict).toBe('NOT EVALUABLE');
+  });
+  it('ignores the lines of a screen that is not built, even a failed one', () => {
+    expect(judge([...both, line({ screen: 'drilldown', result: 'fail' })]).verdict).toBe('MET');
+  });
+  it('is NOT EVALUABLE when absent, stale, dirty, malformed or with a bad result', () => {
+    expect(judge([]).verdict).toBe('NOT EVALUABLE');
+    expect(judge([line({ commit: OLD }), line({ screen: 'learning', commit: OLD })]).verdict).toBe('NOT EVALUABLE');
+    expect(judge(both, true).verdict).toBe('NOT EVALUABLE');
+    expect(judge(['{nope']).verdict).toBe('NOT EVALUABLE');
+    expect(judge([...both, line({ result: 'maybe' })]).verdict).toBe('NOT EVALUABLE');
+    expect(judge([line({ commit: '--output=x' }), line({ screen: 'learning' })]).verdict).toBe('NOT EVALUABLE');
+  });
+  it('accepts an earlier commit when the code did not change', () => {
+    const old = [line({ commit: OLD }), line({ screen: 'learning', commit: OLD })];
+    expect(judgeChecklist(old, HEAD, same, built).verdict).toBe('MET');
+  });
+  it('reads a sample line as the P8-16 runner writes it', () => {
+    const sample =
+      '{"screen":"reports","width":1440,"scheme":"dark","state":"thin","check":"C7-contrast","result":"na","note":"no text on this state","commit":"bbbbbbbb11111111","date":"2026-10-30"}';
+    expect(judgeChecklist([sample], HEAD, changed, ['reports']).verdict).toBe('MET');
   });
 });
 

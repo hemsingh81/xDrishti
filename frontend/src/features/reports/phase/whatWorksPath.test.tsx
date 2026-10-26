@@ -11,9 +11,9 @@ pinClock('2026-10-25T10:00:00Z');
 // P8-17 criteria 1 and 2: the exit question is answered within 4 interactions, and the requests made are the ones the manifest names.
 const MAX_INTERACTIONS = 4;
 // Spec P8-17 criterion 2 says at most 12 requests. The built page (P8-08) makes 21 from the cold start to the picked basket (ten panels, then the same ten
-// again with the basket filter), so the spec's number is held by the expected-failure test below and this guard keeps the measured count from growing.
-const SPEC_MAX_REQUESTS = 12;
-const MEASURED_MAX_REQUESTS = 21;
+// again with the basket filter). The test ratchets that measured count exactly; the roadmap row 'P8-08 follow-up: Reports page fan-out 21 -> 12 requests'
+// brings it to the spec's 12, and lowering this number is part of that follow-up.
+const MEASURED_REQUESTS = 21;
 const basketId = '00000000-0000-4000-8000-000000000401';
 
 interface Manifest {
@@ -83,7 +83,7 @@ describe('the What works path (P8-17)', () => {
     expect(withinBudget(interactions)).toBe(true);
     expect(interactions).toBe(4);
     expect(requests.some((u) => u.pathname === route('ListReportRuns').path)).toBe(true);
-    expect(requests.length).toBeLessThanOrEqual(MEASURED_MAX_REQUESTS);
+    expect(requests.length).toBe(MEASURED_REQUESTS);
     const seen = new Map<string, number>();
     for (const u of requests) seen.set(u.pathname + u.search, (seen.get(u.pathname + u.search) ?? 0) + 1);
     for (const n of seen.values()) expect(n).toBeLessThanOrEqual(2);
@@ -101,12 +101,5 @@ describe('the What works path (P8-17)', () => {
     const interactions = await walk(1);
     expect(interactions).toBe(5);
     expect(withinBudget(interactions)).toBe(false);
-  });
-
-  // Flips to a failure (and so to a prompt to raise the bar) when the page's fan-out is brought within the spec's 12.
-  it.fails('makes at most 12 requests in all (spec P8-17 criterion 2; the built page makes 21)', async () => {
-    const requests = reportServer({ whatWorks: buildWhatWorks() });
-    await walk();
-    expect(requests.length).toBeLessThanOrEqual(SPEC_MAX_REQUESTS);
   });
 });

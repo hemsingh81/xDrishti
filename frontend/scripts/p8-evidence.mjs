@@ -21,6 +21,7 @@ import {
   parseStopwatch,
   render,
   NOT_EVALUABLE,
+  COMMIT_PATTERN,
 } from './p8EvidenceCore.mjs';
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -29,10 +30,13 @@ const dir = process.env.XD_EVIDENCE_DIR ? resolve(process.env.XD_EVIDENCE_DIR) :
 const git = (...args) => spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
 const head = () => git('rev-parse', 'HEAD').stdout.trim();
 const codeChanged = (recorded) => {
+  if (!COMMIT_PATTERN.test(recorded)) return null;
   const known = git('cat-file', '-e', `${recorded}^{commit}`);
   if (known.status !== 0) return null;
   return git('diff', '--quiet', recorded, 'HEAD', '--', 'backend', 'frontend').status !== 0;
 };
+// Uncommitted changes in backend/ or frontend/ make every record stale: the record was taken on code that is not what HEAD holds.
+const dirty = () => git('status', '--porcelain', '--', 'backend', 'frontend').stdout.trim() !== '';
 const readJson = (name) => {
   const path = join(dir, name);
   if (!existsSync(path)) return null;
@@ -64,7 +68,7 @@ const [command, ...rest] = process.argv.slice(2);
 const args = flags(rest);
 
 if (command === 'bundle') {
-  const r = judgeBundle(readJson('bundle.json'), head(), codeChanged);
+  const r = judgeBundle(readJson('bundle.json'), head(), codeChanged, dirty());
   console.log(`${r.verdict}  ${r.detail}`);
 } else if (command === 'stopwatch') {
   const parsed = parseStopwatch(args);
@@ -86,7 +90,8 @@ if (command === 'bundle') {
   const record = {
     commit: head(),
     date: new Date().toISOString().slice(0, 10),
-    passed: report.numFailedTests === 0 && report.numPassedTests > 0,
+    // a run that executed fewer than 3 tests is not the interaction-budget run (that file has 5), so it can never stamp a pass
+    passed: report.numFailedTests === 0 && report.numPassedTests >= 3 && report.numTotalTests >= 3,
     tests: report.numPassedTests,
     failed: report.numFailedTests,
   };
@@ -96,6 +101,7 @@ if (command === 'bundle') {
   const text = args['server-text'] && existsSync(args['server-text']) ? readFileSync(args['server-text'], 'utf8') : '';
   const server = parseServerText(text);
   const h = head();
+  const isDirty = dirty();
   const local = {};
   local[1] = judgeExitQuestion(
     {
@@ -106,14 +112,12 @@ if (command === 'bundle') {
     },
     h,
     codeChanged,
+    isDirty,
   );
-  local[7] = judgeBundle(readJson('bundle.json'), h, codeChanged);
-  local[8] = judgeChecklist(
-    readLines('browser-checklist.jsonl'),
-    h,
-    codeChanged,
-    process.env.XD_BUILT_SCREENS ? process.env.XD_BUILT_SCREENS.split(',') : null,
-  );
+  local[7] = judgeBundle(readJson('bundle.json'), h, codeChanged, isDirty);
+  const builtPath = join(root, 'frontend', 'scripts', 'p8-built-screens.json');
+  const built = existsSync(builtPath) ? JSON.parse(readFileSync(builtPath, 'utf8')) : null;
+  local[8] = judgeChecklist(readLines('browser-checklist.jsonl'), h, codeChanged, built?.built ?? null, isDirty);
   const serverFive = server.criteria.find((c) => c.number === 5);
   if (serverFive?.verdict === NOT_EVALUABLE) {
     const contract = JSON.parse(readFileSync(join(root, 'backend', 'contracts', 'XDrishti.Api.json'), 'utf8'));

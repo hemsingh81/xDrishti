@@ -288,6 +288,8 @@ What the app can mend by itself it mends quietly ([doc 12](12-portfolio-monitori
 
 **Paper phase check (P10-06, [ADR 0123]../adr/0123-the-paper-phase-check-judges-the-p10-exit-from-stored-records-with-its-caveats-in-the-label-and-reads-only.md):** the `/paper` tab Phase check lists the four exit criteria and capture integrity as MET, NOT MET or NOT EVALUABLE with their facts and blockers, the caveats of a MET inside the headline label, the week lines and every epoch (only the current one is judged); it has no write control.
 
+**P8 phase check (P8-17, [ADR 0126](../adr/0126-the-p8-phase-check-reads-three-witnesses-and-is-never-met-on-what-it-could-not-read.md)):** not a screen. `GET /api/reports/phase-check` and `xd reports phase-check` judge criteria 1 to 10 of P8-00 from the stored runs (MET, NOT MET or NOT EVALUABLE; never MET on what could not be read, no composite score); `scripts/p8-phase-check.sh` adds the interaction test, the bundle size, the browser checklist and the owner's recorded stopwatch from `data/p8-evidence/`. The panel pattern of P8-04 may show the server report later.
+
 **Standard KPIs:** trades · win rate · avg win/loss R · expectancy · profit factor · total R · net ₹ after
 costs · max drawdown (R, %) · Sharpe/Sortino · avg holding · exposure · longest loss streak.
 

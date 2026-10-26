@@ -83,7 +83,7 @@ public static class ReportsPhaseCheck
         var c = CultureInfo.InvariantCulture;
         if (f.Runs == 0)
         {
-            return new(1, name, PhaseVerdict.NotEvaluable, "no stored run: the answer path has nothing to time");
+            return new(1, name, PhaseVerdict.NotEvaluable, NoRun(f, "the answer path has nothing to time"));
         }
 
         var server = ServerTiming(f.Timings);
@@ -150,7 +150,7 @@ public static class ReportsPhaseCheck
         const string name = "No number without its evidence";
         if (f.Runs == 0)
         {
-            return new(2, name, PhaseVerdict.NotEvaluable, "no stored run: nothing to read");
+            return new(2, name, PhaseVerdict.NotEvaluable, NoRun(f, "nothing to read"));
         }
 
         var lacking = f.Reports.Where(r => r.Readable && !r.EvidenceComplete).Select(r => r.Name).ToList();
@@ -173,7 +173,7 @@ public static class ReportsPhaseCheck
         const string name = "No green-washing";
         if (f.Runs == 0)
         {
-            return new(3, name, PhaseVerdict.NotEvaluable, "no stored run: nothing to read");
+            return new(3, name, PhaseVerdict.NotEvaluable, NoRun(f, "nothing to read"));
         }
 
         if (f.MetricBreaks.Count > 0)
@@ -214,6 +214,11 @@ public static class ReportsPhaseCheck
             return new(4, name, PhaseVerdict.NotMet, string.Join("; ", failed));
         }
 
+        if (!f.RunsRead)
+        {
+            return new(4, name, PhaseVerdict.NotEvaluable, "the probes passed but the list of runs could not be read");
+        }
+
         if (f.Runs > 0 && f.DefaultSetValid is null)
         {
             return new(4, name, PhaseVerdict.NotEvaluable, "the probes passed but the default set could not be read");
@@ -249,7 +254,7 @@ public static class ReportsPhaseCheck
         const string name = "Determinism and security";
         if (f.Runs == 0 || f.Deterministic is null)
         {
-            return new(9, name, PhaseVerdict.NotEvaluable, f.Runs == 0 ? "no stored run: identical empty bodies prove nothing" : "the repeat read was not made");
+            return new(9, name, PhaseVerdict.NotEvaluable, f.Runs == 0 ? NoRun(f, "identical empty bodies prove nothing") : "the repeat read was not made for every built report: " + f.DeterminismNote);
         }
 
         var failed = new List<string>();
@@ -267,6 +272,9 @@ public static class ReportsPhaseCheck
             ? new(9, name, PhaseVerdict.NotMet, string.Join("; ", failed))
             : new(9, name, PhaseVerdict.Met, "the same request twice gave identical bodies for every built report", "names of fields, not content, were scanned for account, client, token and password words");
     }
+
+    private static string NoRun(ReportsPhaseFacts f, string consequence) =>
+        f.RunsRead ? "no stored run: " + consequence : "the list of runs could not be read: " + consequence;
 
     private static bool Under(string pattern, string prefix) =>
         pattern.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && (pattern.Length == prefix.Length || pattern[prefix.Length] is '/' or '{');

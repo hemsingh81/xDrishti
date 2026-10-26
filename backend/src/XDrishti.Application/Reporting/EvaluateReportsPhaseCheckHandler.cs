@@ -138,12 +138,14 @@ internal sealed class EvaluateReportsPhaseCheckHandler(
         var metrics = 0;
         var differs = new List<string>();
         var compared = 0;
+        var notCompared = new List<string>();
         foreach (var reading in readings)
         {
             if (reading.First is null)
             {
                 ReportsPhaseLog.Unreadable(logger, reading.Report, reading.Code ?? "unknown");
                 facts.Add(new ReportsPhaseReportFact(reading.Report, false, false, reading.Code));
+                notCompared.Add(reading.Report);
                 continue;
             }
 
@@ -153,10 +155,14 @@ internal sealed class EvaluateReportsPhaseCheckHandler(
             metrics += scan.Metrics;
             breaks.AddRange(scan.Breaks);
             sensitive.UnionWith(scan.SensitiveNames);
-            if (reading.Second is not null)
+            if (reading.Second is null || scan.Truncated)
+            {
+                notCompared.Add(reading.Report);
+            }
+            else
             {
                 compared++;
-                if (scan.Truncated || ReportViewScan.Of(reading.Second, reading.Report).Hash != scan.Hash)
+                if (ReportViewScan.Of(reading.Second, reading.Report).Hash != scan.Hash)
                 {
                     differs.Add(reading.Report);
                 }
@@ -165,6 +171,7 @@ internal sealed class EvaluateReportsPhaseCheckHandler(
 
         var timings = readings.Append(runList).Select(r => new ReportsPhaseTiming(r.Operation, r.AnswerPath, r.ColdMs, r.WarmMs)).ToList();
         var defaultSet = DefaultSetValid(readings);
+        var complete = notCompared.Count == 0;
         var baskets = groupsView?.Groups.Count(g => g.N > 0 && g.Parts.Any(p => p.Dimension == "basket" && p.Value is not null)) ?? 0;
         return new ReportsPhaseFacts(
             runCount,
@@ -179,11 +186,12 @@ internal sealed class EvaluateReportsPhaseCheckHandler(
             ReportsPhaseProbes.MixedBasisRefused(),
             defaultSet,
             catalogue.Routes(),
-            compared == 0 ? null : differs.Count == 0,
-            compared == 0 ? "no repeat read was made" : differs.Count == 0 ? $"{compared} reports compared" : string.Join(", ", differs),
+            complete ? differs.Count == 0 : differs.Count > 0 ? false : null,
+            complete ? (differs.Count == 0 ? $"{compared} reports compared" : "differs: " + string.Join(", ", differs)) : "not compared: " + string.Join(", ", notCompared),
             [.. sensitive],
             null,
-            null);
+            null,
+            runList.First is not null);
     }
 
     /// <summary>The default set is valid when its loads were not refused for an overlap or a mixed basis; a refusal for another reason (too large) leaves it unread.</summary>

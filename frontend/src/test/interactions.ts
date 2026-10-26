@@ -35,6 +35,10 @@ export function countingUser(): CountingUser {
     selectOptions: counted(user.selectOptions.bind(user), () => 1),
     type: counted(user.type.bind(user), () => 1),
     upload: counted(user.upload.bind(user), () => 1),
+    tripleClick: counted(user.tripleClick.bind(user), () => 1),
+    pointer: counted(user.pointer.bind(user), () => 1),
+    paste: counted(user.paste.bind(user), () => 1),
+    clear: counted(user.clear.bind(user), () => 1),
     keyboard: counted(user.keyboard.bind(user), (keys: string) => keyTokens(keys)),
     tab: counted(user.tab.bind(user), () => 1),
   };

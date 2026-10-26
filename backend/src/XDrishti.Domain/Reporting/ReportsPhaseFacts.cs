@@ -21,6 +21,7 @@ namespace XDrishti.Domain.Reporting;
 /// <param name="SensitiveFieldNames">Field names that hold an account, client, token or password word.</param>
 /// <param name="InteractionTestPassed">The interaction test passed at the commit under test; null when no current record exists.</param>
 /// <param name="Stopwatch">The owner's stopwatch note for the commit under test; null when none exists.</param>
+/// <param name="RunsRead">The list of stored runs could be read; false is not the same as no stored run.</param>
 public sealed record ReportsPhaseFacts(
     int Runs,
     int Trades,
@@ -38,4 +39,5 @@ public sealed record ReportsPhaseFacts(
     string? DeterminismNote,
     IReadOnlyList<string> SensitiveFieldNames,
     bool? InteractionTestPassed,
-    ReportsPhaseStopwatch? Stopwatch);
+    ReportsPhaseStopwatch? Stopwatch,
+    bool RunsRead = true);

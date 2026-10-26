@@ -1091,6 +1091,15 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td>&quot;What works, in which basket, on which TF, with which exit&quot; in &lt; 2 min, including the honest answer &quot;nothing has enough evidence&quot;</td>
 </tr>
 <tr>
+<td>P8-17f</td>
+<td><strong>P8-08 follow-up: Reports page fan-out 21 -&gt; 12 requests</strong> (ten panels load twice, unfiltered then with the basket; spec P8-17 acceptance 2 asks for at most 12; <code>whatWorksPath.test.tsx</code> ratchets the measured 21).</td>
+<td>P8</td>
+<td>1 d</td>
+<td>Open</td>
+<td><a href="../adr/0126-the-p8-phase-check-reads-three-witnesses-and-is-never-met-on-what-it-could-not-read.html">ADR 0126</a></td>
+<td>the page makes at most 12 requests from the cold start to the answer</td>
+</tr>
+<tr>
 <td>P8-18</td>
 <td><strong>Tweak and re-run from the UI</strong> (starts a replay job). <strong>SAFETY (job start, writes): stops for the owner (Q3); never an apply button.</strong></td>
 <td>P8</td>
@@ -1577,7 +1586,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-26 04:38</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-26 05:06</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

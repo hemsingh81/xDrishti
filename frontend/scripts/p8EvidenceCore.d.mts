@@ -12,23 +12,27 @@ export interface Criterion extends Judgement {
 }
 export type CodeChanged = (recorded: string) => boolean | null;
 type Timing = { answerPath: boolean; coldMs: number | null; warmMs: number | null };
+export const COMMIT_PATTERN: RegExp;
 export function freshness(
   recorded: unknown,
   head: string,
   codeChanged: CodeChanged,
+  dirty?: boolean,
 ): { state: 'current' | 'accepted' | 'stale'; note: string };
-export function judgeBundle(record: unknown, head: string, codeChanged: CodeChanged): Judgement;
+export function judgeBundle(record: unknown, head: string, codeChanged: CodeChanged, dirty?: boolean): Judgement;
 export function judgeChecklist(
   lines: string[] | null,
   head: string,
   codeChanged: CodeChanged,
-  builtScreens?: string[] | null,
+  builtScreens: string[] | null,
+  dirty?: boolean,
 ): Judgement;
 export function serverTiming(timings: Timing[]): string | null;
 export function judgeExitQuestion(
   input: { runs: number; timings: Timing[]; interaction: unknown; stopwatch: unknown },
   head: string,
   codeChanged: CodeChanged,
+  dirty?: boolean,
 ): Judgement;
 export function judgeReadOnlyContract(contract: unknown, approved: string[]): Judgement;
 export function approvedWrites(source: string): string[];

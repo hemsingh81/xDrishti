@@ -28,10 +28,19 @@ const result = (verdict, detail, caveat = null) => ({ verdict, detail, caveat })
 
 /**
  * Whether evidence recorded at `recorded` counts for `head`. `codeChanged(recorded)` says whether backend/ or frontend/ differ
- * between the two (git diff --quiet <recorded> HEAD -- backend frontend). Unknown commits are stale.
+ * between the two (git diff --quiet <recorded> HEAD -- backend frontend). Unknown or malformed commits are stale, and so is any record while backend/ or
+ * frontend/ has uncommitted changes (`dirty`, from git status --porcelain).
  */
-export function freshness(recorded, head, codeChanged) {
-  if (typeof recorded !== 'string' || recorded === '') return { state: 'stale', note: 'no commit recorded' };
+export const COMMIT_PATTERN = /^[0-9a-f]{7,40}$/;
+
+export function freshness(recorded, head, codeChanged, dirty = false) {
+  if (typeof recorded !== 'string' || !COMMIT_PATTERN.test(recorded))
+    return { state: 'stale', note: 'no valid commit recorded' };
+  if (dirty)
+    return {
+      state: 'stale',
+      note: `recorded at ${short(recorded)}, but backend or frontend has uncommitted changes: commit, then run again`,
+    };
   if (recorded === head) return { state: 'current', note: 'recorded at HEAD' };
   const changed = codeChanged(recorded);
   if (changed === null)
@@ -44,15 +53,15 @@ export function freshness(recorded, head, codeChanged) {
 const short = (commit) => String(commit).slice(0, 8);
 
 /** Criterion 7: the bundle record written by `npm run size` (XD_EVIDENCE_DIR set). */
-export function judgeBundle(record, head, codeChanged) {
+export function judgeBundle(record, head, codeChanged, dirty = false) {
   if (record == null)
     return result(
       NOT_EVALUABLE,
       'data/p8-evidence/bundle.json is absent: run scripts/check.sh (it records the size) or XD_EVIDENCE_DIR=data/p8-evidence npm run size',
     );
-  const fresh = freshness(record.commit, head, codeChanged);
+  const fresh = freshness(record.commit, head, codeChanged, dirty);
   if (fresh.state === 'stale') return result(NOT_EVALUABLE, `bundle record ${fresh.note}`);
-  if (!Number.isFinite(record.total) || !Number.isFinite(record.budget))
+  if (!Number.isFinite(record.total) || record.total <= 0 || !Number.isFinite(record.budget))
     return result(NOT_EVALUABLE, 'bundle record has no readable size');
   const kb = (record.total / 1000).toFixed(1);
   if (record.total > BUDGET_BYTES)
@@ -67,8 +76,14 @@ export function judgeBundle(record, head, codeChanged) {
   );
 }
 
-/** Criterion 8: the lines of browser-checklist.jsonl (P8-16 format: screen, width, scheme, state, check, result pass|fail|na, note, commit, date). */
-export function judgeChecklist(lines, head, codeChanged, builtScreens = null) {
+/**
+ * Criterion 8: the lines of browser-checklist.jsonl (the P8-16 format: screen, width, scheme, state, check, result pass|fail|na, note, commit, date).
+ * `builtScreens` is the committed list of screens that are built (frontend/scripts/p8-built-screens.json): every one must have at least one line,
+ * so a screen the runner skipped is NOT EVALUABLE, never silently absent. Lines of screens not on the list are ignored.
+ */
+export function judgeChecklist(lines, head, codeChanged, builtScreens, dirty = false) {
+  if (!Array.isArray(builtScreens) || builtScreens.length === 0)
+    return result(NOT_EVALUABLE, 'no list of built screens (frontend/scripts/p8-built-screens.json)');
   if (!lines || lines.length === 0)
     return result(
       NOT_EVALUABLE,
@@ -82,11 +97,16 @@ export function judgeChecklist(lines, head, codeChanged, builtScreens = null) {
       return result(NOT_EVALUABLE, `browser-checklist.jsonl line ${i + 1} is not JSON`);
     }
   }
-  const rows = builtScreens ? parsed.filter((r) => builtScreens.includes(r.screen)) : parsed;
-  if (rows.length === 0) return result(NOT_EVALUABLE, 'no checklist line for a built screen');
+  const rows = parsed.filter((r) => builtScreens.includes(r.screen));
+  const missing = builtScreens.filter((s) => !rows.some((r) => r.screen === s));
+  if (missing.length > 0)
+    return result(
+      NOT_EVALUABLE,
+      `no checklist line for ${missing.length} of ${builtScreens.length} built screens: ${missing.join(', ')}`,
+    );
   const stale = new Map();
   for (const commit of new Set(rows.map((r) => r.commit))) {
-    const fresh = freshness(commit, head, codeChanged);
+    const fresh = freshness(commit, head, codeChanged, dirty);
     if (fresh.state === 'stale') stale.set(commit, fresh.note);
   }
   if (stale.size > 0) return result(NOT_EVALUABLE, `checklist ${[...stale.values()][0]}`);
@@ -101,7 +121,7 @@ export function judgeChecklist(lines, head, codeChanged, builtScreens = null) {
   if (failed.length > 0)
     return result(
       NOT_MET,
-      `${failed.length} failed checks, first: ${String(failed[0].screen)} ${String(failed[0].width)} ${String(failed[0].check)}`,
+      `${failed.length} failed checks over ${builtScreens.length} built screens, first: ${String(failed[0].screen)} ${String(failed[0].width)} ${String(failed[0].check)}`,
     );
   const unexplained = rows.filter((r) => r.result === 'na' && !(typeof r.note === 'string' && r.note.trim() !== ''));
   if (unexplained.length > 0)
@@ -112,7 +132,7 @@ export function judgeChecklist(lines, head, codeChanged, builtScreens = null) {
   const pass = rows.filter((r) => r.result === 'pass').length;
   return result(
     MET,
-    `${pass} checks passed, ${rows.length - pass} na with a reason, none failed`,
+    `${builtScreens.length} built screens, ${pass} checks passed, ${rows.length - pass} na with a reason, none failed`,
     'recorded by the runner, not verified here; the owner walkthrough sheet is in the ADR',
   );
 }
@@ -127,9 +147,8 @@ export function serverTiming(timings) {
 }
 
 /** Criterion 1 across the three witnesses: the server timing, the interaction test and the owner's stopwatch note (all for this commit). */
-export function judgeExitQuestion({ runs, timings, interaction, stopwatch }, head, codeChanged) {
-  const name = (s) => s;
-  if (!runs) return result(NOT_EVALUABLE, name('no stored run: the answer path has nothing to time'));
+export function judgeExitQuestion({ runs, timings, interaction, stopwatch }, head, codeChanged, dirty = false) {
+  if (!runs) return result(NOT_EVALUABLE, 'no stored run: the answer path has nothing to time');
   const fails = [];
   const missing = [];
   const server = serverTiming(timings);
@@ -139,7 +158,7 @@ export function judgeExitQuestion({ runs, timings, interaction, stopwatch }, hea
   let interactionOk = null;
   if (interaction == null) missing.push('the interaction test result (data/p8-evidence/interaction.json)');
   else {
-    const fresh = freshness(interaction.commit, head, codeChanged);
+    const fresh = freshness(interaction.commit, head, codeChanged, dirty);
     if (fresh.state === 'stale') missing.push(`a current interaction test result (${fresh.note})`);
     else if (interaction.passed === true) interactionOk = true;
     else {
@@ -153,7 +172,7 @@ export function judgeExitQuestion({ runs, timings, interaction, stopwatch }, hea
   if (stopwatch == null)
     missing.push("the owner's stopwatch note (node frontend/scripts/p8-evidence.mjs stopwatch ...)");
   else {
-    const fresh = freshness(stopwatch.commit, head, codeChanged);
+    const fresh = freshness(stopwatch.commit, head, codeChanged, dirty);
     if (fresh.state === 'stale') missing.push(`a current stopwatch note (${fresh.note})`);
     else {
       trials = Array.isArray(stopwatch.trials) ? stopwatch.trials : [];
