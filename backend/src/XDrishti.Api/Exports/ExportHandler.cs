@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Globalization;
 using System.Security.Cryptography;
+using Microsoft.Extensions.Options;
 using XDrishti.Application.Abstractions.Capabilities;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
@@ -23,14 +24,8 @@ internal sealed class ExportHandler(
     IQueryHandler<GetReportEquityQuery, Result<EquityView>> equity,
     IQueryHandler<PageReportTradesQuery, Result<TradesView>> trades,
     TimeProvider clock,
-    IConfiguration configuration) : ICommandHandler<ExportCommand, ExportFile>
+    IOptions<ExportOptions> options) : ICommandHandler<ExportCommand, ExportFile>
 {
-    /// <summary>The most rows of a file; the configuration may lower it, never raise it.</summary>
-    public const int MaxCsvRows = 100_000;
-
-    /// <summary>The most bytes of a file; the configuration may lower it, never raise it.</summary>
-    public const int MaxCsvBytes = 26_214_400;
-
     private static readonly TimeSpan India = TimeSpan.FromMinutes(330);
 
     public async ValueTask<Result<ExportFile>> HandleAsync(ExportCommand command, CancellationToken cancellationToken)
@@ -59,7 +54,7 @@ internal sealed class ExportHandler(
             return Result.Failure<ExportFile>(parsed.Error);
         }
 
-        var limits = new Limits(Cap("Exports:MaxCsvRows", MaxCsvRows), Cap("Exports:MaxCsvBytes", MaxCsvBytes));
+        var limits = new Limits(options.Value.MaxCsvRows, options.Value.MaxCsvBytes);
         var body = new ArrayBufferWriter<byte>();
         var built = command.Kind switch
         {
@@ -79,8 +74,6 @@ internal sealed class ExportHandler(
 
     private static int FilterCount(ReportQueryInput i) =>
         new[] { i.Runs, i.Basis, i.Lens, i.Strategy, i.Timeframe, i.Side, i.Style, i.Exit, i.Basket, i.Symbol, i.From, i.To, i.Metric }.Count(v => !string.IsNullOrWhiteSpace(v));
-
-    private int Cap(string key, int ceiling) => configuration.GetValue<int?>(key) is { } v ? Math.Clamp(v, 1, ceiling) : ceiling;
 
     private ExportFile Finish(string kind, List<string> evidence, int rows, ArrayBufferWriter<byte> body, int filters)
     {

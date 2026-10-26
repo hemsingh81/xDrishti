@@ -4,6 +4,7 @@ import {
   Alert,
   Box,
   Button,
+  Link,
   List,
   ListItem,
   Stack,
@@ -15,6 +16,8 @@ import {
   Typography,
 } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { Link as RouterLink } from 'react-router';
+import { useCapability } from '@/features/owner-acts';
 import { formatNumber } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { reportHtmlHref, reportQuery, reportZipHref } from '../api/runQueries';
@@ -42,6 +45,7 @@ function Bullets({ label, items }: { label: string; items: string[] }) {
 /** The report of a finished full or robust test, from the stored result, with the page and the folder to keep. */
 export function ReportPanel({ runId }: { runId: string }) {
   const { data: r, error, isPending } = useQuery(reportQuery(runId));
+  const downloads = useCapability('exports');
   if (isPending) return <LoadingState label="Loading the report" />;
   if (error) return <ErrorState error={error} />;
   return (
@@ -50,12 +54,24 @@ export function ReportPanel({ runId }: { runId: string }) {
         <Typography variant="h3" component="h3" sx={{ flexGrow: 1 }}>
           Report
         </Typography>
-        <Button component="a" href={reportHtmlHref(runId)} target="_blank" rel="noopener" startIcon={<OpenIcon />}>
-          Open report page
-        </Button>
-        <Button component="a" href={reportZipHref(runId)} download startIcon={<DownloadIcon />}>
-          Download folder (zip)
-        </Button>
+        {downloads.enabled ? (
+          <>
+            <Button component="a" href={reportHtmlHref(runId)} target="_blank" rel="noopener" startIcon={<OpenIcon />}>
+              Open report page
+            </Button>
+            <Button component="a" href={reportZipHref(runId)} download startIcon={<DownloadIcon />}>
+              Download folder (zip)
+            </Button>
+          </>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            {'Report downloads are switched off: '}
+            <Link component={RouterLink} to="/owner-acts">
+              owner-act switches
+            </Link>
+            .
+          </Typography>
+        )}
       </Stack>
       <Typography>{r.summary}</Typography>
       <Typography color="text.secondary">

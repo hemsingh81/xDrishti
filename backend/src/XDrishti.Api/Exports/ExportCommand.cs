@@ -15,7 +15,10 @@ internal sealed record ExportCommand(string Kind, string? Format, ReportQueryInp
 /// <param name="Kind">The kind.</param>
 /// <param name="Rows">The data rows.</param>
 /// <param name="Filters">How many filter fields the query set (a count, never a value).</param>
-internal sealed record ExportFile(byte[] Content, string FileName, string Kind, int Rows, int Filters);
+/// <param name="ContentType">The media type (csv by default).</param>
+/// <param name="Format">The format word of the audit row (csv, html, zip).</param>
+/// <param name="Inline">True for a page shown in the browser (no attachment name).</param>
+internal sealed record ExportFile(byte[] Content, string FileName, string Kind, int Rows, int Filters, string ContentType = "text/csv; charset=utf-8", string Format = "csv", bool Inline = false);
 
 /// <summary>The tables that may be exported: research tables the Reports screens show from stored simulations, nothing about accounts (spec P8-20 assumption 1).</summary>
 internal static class ExportKinds
@@ -25,6 +28,10 @@ internal static class ExportKinds
     public const string WhatWorks = "report-what-works";
     public const string Equity = "report-equity";
     public const string Trades = "report-trades";
+
+    /// <summary>The Lab's report downloads, brought under the same switch and audit (ADR 0131, decision 7 changed); not kinds of the POST.</summary>
+    public const string LabReportHtml = "lab-report-html";
+    public const string LabReportFolder = "lab-report-folder";
 
     /// <summary>The kinds built. <c>cells</c> and <c>experiments</c> of the spec are not: their views carry no evidence block, and a table without its evidence is never exported.</summary>
     public static IReadOnlyList<string> All { get; } = [Groups, Pivot, WhatWorks, Equity, Trades];

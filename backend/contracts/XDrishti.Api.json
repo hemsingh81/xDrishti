@@ -8345,7 +8345,7 @@
         "tags": [
           "Lab"
         ],
-        "summary": "The report as one static, inert HTML page",
+        "summary": "The report as one static, inert HTML page. Data leaves the app here, so it is under the capability exports (OFF by default: 403 capabilities.off), at most 6 a minute and one at a time (429 auth.rate_limited), and one audit row (ReportExported, kind lab-report-html, bytes) is written before the page is given (500 exports.audit_failed).",
         "operationId": "GetLabReportHtml",
         "parameters": [
           {
@@ -8365,6 +8365,26 @@
               "text/html": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -8397,7 +8417,7 @@
         "tags": [
           "Lab"
         ],
-        "summary": "The report as a zip folder (report.json, report.html, summary.txt, README.txt, manifest.json), identical bytes for the same report",
+        "summary": "The report as a zip folder (report.json, report.html, summary.txt, README.txt, manifest.json), identical bytes for the same report. Under the capability exports (OFF by default: 403 capabilities.off), the same rate rule and one audit row (kind lab-report-folder) before the file is given.",
         "operationId": "DownloadLabReportFolder",
         "parameters": [
           {
@@ -8418,6 +8438,26 @@
                 "schema": {
                   "type": "string",
                   "format": "byte"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }

@@ -25,7 +25,7 @@ public sealed class ExportsArchitectureTests
 
     private static readonly Regex AccountColumn = new(@"account|client|token|email|balance|holding|quantity_held|password|secret", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
-    private static readonly string[] RouteOrder = ["RefusedWhileOffAsync(", "SessionOwner(", "slot.TryEnter()", "handler.HandleAsync(", "RecordAsync(", "TypedResults.File("];
+    private static readonly string[] RouteOrder = ["RefusedWhileOffAsync(", "SessionOwner(", "slot.TryEnter()", "gate.RequireAsync(", "await make()", "RecordAsync(", "TypedResults.File("];
 
     private static string Source(params string[] parts) => File.ReadAllText(RepositoryFiles.RepositoryFile(["backend", "src", "XDrishti.Api", .. parts]));
 
@@ -76,11 +76,23 @@ public sealed class ExportsArchitectureTests
         FilesNaming("Endpoints", @"\bExportCommand\b").ShouldBe(["ExportsEndpoints.cs"]);
         FilesNaming("Exports", @"\bExportHandler\b").ShouldBe(["ExportHandler.cs"]);
 
-        var order = RouteOrder.Select(t => endpoint.IndexOf(t, StringComparison.Ordinal)).ToList();
+        var delivery = Source("Endpoints", "ExportDelivery.cs");
+        var order = RouteOrder.Select(t => delivery.IndexOf(t, StringComparison.Ordinal)).ToList();
         order.ShouldAllBe(i => i > 0);
         order.ShouldBe([.. order.Order()], "capability, owner, rate rule, the file, the audit row, then the bytes");
-        endpoint.ShouldNotContain("AuthorizeAsync(", Case.Sensitive, "an export asks for no password: the decision of the spec (D5) is that the protection is the switch, the audit and the cap");
+        endpoint.ShouldContain("ExportDelivery.DeliverAsync(");
+        delivery.ShouldNotContain("AuthorizeAsync(", Case.Sensitive, "an export asks for no password: the decision of the spec (D5) is that the protection is the switch, the audit and the cap");
         Source("Exports", "ExportHandler.cs").ShouldContain("gate.RequireAsync(");
+    }
+
+    [Fact]
+    public void Both_downloads_of_the_lab_go_through_the_same_delivery_and_nothing_else_in_the_endpoints_gives_a_file()
+    {
+        var lab = Source("Endpoints", "LabRunsEndpoints.cs");
+
+        Regex.Count(lab, @"ExportDelivery\.DeliverAsync\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBe(2);
+        lab.ShouldNotContain("TypedResults.File(");
+        lab.ShouldNotContain("TypedResults.Text(");
     }
 
     [Fact]

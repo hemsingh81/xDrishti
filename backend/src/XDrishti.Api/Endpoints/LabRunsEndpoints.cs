@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using XDrishti.Api.Auth;
+using XDrishti.Api.Exports;
 using XDrishti.Api.Lab;
+using XDrishti.Application.Abstractions.Accounts;
+using XDrishti.Application.Abstractions.Capabilities;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Lab;
 using XDrishti.Domain.Common;
@@ -39,15 +42,19 @@ internal sealed class LabRunsEndpoints : IEndpointModule
 
         runs.MapGet("/{id:guid}/report/html", GetReportHtmlAsync)
             .WithName("GetLabReportHtml")
-            .WithSummary("The report as one static, inert HTML page")
+            .WithSummary("The report as one static, inert HTML page. Data leaves the app here, so it is under the capability exports (OFF by default: 403 capabilities.off), at most 6 a minute and one at a time (429 auth.rate_limited), and one audit row (ReportExported, kind lab-report-html, bytes) is written before the page is given (500 exports.audit_failed).")
             .Produces<string>(StatusCodes.Status200OK, "text/html")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         runs.MapGet("/{id:guid}/report/folder", GetReportFolderAsync)
             .WithName("DownloadLabReportFolder")
-            .WithSummary("The report as a zip folder (report.json, report.html, summary.txt, README.txt, manifest.json), identical bytes for the same report")
+            .WithSummary("The report as a zip folder (report.json, report.html, summary.txt, README.txt, manifest.json), identical bytes for the same report. Under the capability exports (OFF by default: 403 capabilities.off), the same rate rule and one audit row (kind lab-report-folder) before the file is given.")
             .Produces<byte[]>(StatusCodes.Status200OK, "application/zip")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
@@ -115,34 +122,47 @@ internal sealed class LabRunsEndpoints : IEndpointModule
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<ContentHttpResult, ProblemHttpResult>> GetReportHtmlAsync(
+    private static Task<Results<FileContentHttpResult, ProblemHttpResult>> GetReportHtmlAsync(
         Guid id,
         HttpContext http,
+        ICapabilityGate gate,
+        ExportSlot slot,
+        IAccountEventLog events,
+        IAccountUnitOfWork unitOfWork,
+        TimeProvider clock,
+        ILogger<LabRunsEndpoints> logger,
         IQueryHandler<GetLabReportQuery, Result<LabReportView>> handler,
-        CancellationToken cancellationToken)
-    {
-        var result = await handler.HandleAsync(new GetLabReportQuery(id), cancellationToken);
-        if (result.IsFailure)
+        CancellationToken cancellationToken) =>
+        ExportDelivery.DeliverAsync(http, gate, slot, events, unitOfWork, clock, logger, async () =>
         {
-            return ProblemResults.From(result.Error, http);
-        }
+            var result = await handler.HandleAsync(new GetLabReportQuery(id), cancellationToken);
+            if (result.IsFailure)
+            {
+                return Result.Failure<ExportFile>(result.Error);
+            }
 
-        http.Response.Headers.ContentSecurityPolicy = ReportHtml.Policy + "; sandbox; frame-ancestors 'none'";
-        http.Response.Headers.XContentTypeOptions = "nosniff";
-        return TypedResults.Text(ReportHtml.Render(result.Value), "text/html", System.Text.Encoding.UTF8);
-    }
+            http.Response.Headers.ContentSecurityPolicy = ReportHtml.Policy + "; sandbox; frame-ancestors 'none'";
+            return Result.Success(new ExportFile(System.Text.Encoding.UTF8.GetBytes(ReportHtml.Render(result.Value)), string.Empty, ExportKinds.LabReportHtml, 0, 0, "text/html; charset=utf-8", "html", Inline: true));
+        }, cancellationToken);
 
-    private static async Task<Results<FileContentHttpResult, ProblemHttpResult>> GetReportFolderAsync(
+    private static Task<Results<FileContentHttpResult, ProblemHttpResult>> GetReportFolderAsync(
         Guid id,
         HttpContext http,
+        ICapabilityGate gate,
+        ExportSlot slot,
+        IAccountEventLog events,
+        IAccountUnitOfWork unitOfWork,
+        TimeProvider clock,
+        ILogger<LabRunsEndpoints> logger,
         IQueryHandler<GetLabReportQuery, Result<LabReportView>> handler,
-        CancellationToken cancellationToken)
-    {
-        var result = await handler.HandleAsync(new GetLabReportQuery(id), cancellationToken);
-        return result.IsFailure
-            ? ProblemResults.From(result.Error, http)
-            : TypedResults.File(ReportFolder.Build(result.Value), "application/zip", $"lab-report-{id:D}.zip");
-    }
+        CancellationToken cancellationToken) =>
+        ExportDelivery.DeliverAsync(http, gate, slot, events, unitOfWork, clock, logger, async () =>
+        {
+            var result = await handler.HandleAsync(new GetLabReportQuery(id), cancellationToken);
+            return result.IsFailure
+                ? Result.Failure<ExportFile>(result.Error)
+                : Result.Success(new ExportFile(ReportFolder.Build(result.Value), $"lab-report-{id:D}.zip", ExportKinds.LabReportFolder, 0, 0, "application/zip", "zip"));
+        }, cancellationToken);
 
     private static async Task<Results<Ok<LedgerView>, ProblemHttpResult>> GetLedgerAsync(
         string id,

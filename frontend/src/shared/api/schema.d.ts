@@ -2425,7 +2425,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The report as one static, inert HTML page */
+    /** The report as one static, inert HTML page. Data leaves the app here, so it is under the capability exports (OFF by default: 403 capabilities.off), at most 6 a minute and one at a time (429 auth.rate_limited), and one audit row (ReportExported, kind lab-report-html, bytes) is written before the page is given (500 exports.audit_failed). */
     get: operations['GetLabReportHtml'];
     put?: never;
     post?: never;
@@ -2442,7 +2442,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The report as a zip folder (report.json, report.html, summary.txt, README.txt, manifest.json), identical bytes for the same report */
+    /** The report as a zip folder (report.json, report.html, summary.txt, README.txt, manifest.json), identical bytes for the same report. Under the capability exports (OFF by default: 403 capabilities.off), the same rate rule and one audit row (kind lab-report-folder) before the file is given. */
     get: operations['DownloadLabReportFolder'];
     put?: never;
     post?: never;
@@ -21175,6 +21175,15 @@ export interface operations {
           'text/html': string;
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
       /** @description Not Found */
       404: {
         headers: {
@@ -21186,6 +21195,15 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Too Many Requests */
+      429: {
         headers: {
           [name: string]: unknown;
         };
@@ -21215,6 +21233,15 @@ export interface operations {
           'application/zip': string;
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
       /** @description Not Found */
       404: {
         headers: {
@@ -21226,6 +21253,15 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Too Many Requests */
+      429: {
         headers: {
           [name: string]: unknown;
         };

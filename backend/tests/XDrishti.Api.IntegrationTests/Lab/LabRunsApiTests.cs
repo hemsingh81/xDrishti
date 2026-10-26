@@ -241,6 +241,21 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         var quick = await PostAndDrainAsync(BySymbols("ORB", symbols, 1));
         var id = robust.GetProperty("id").GetGuid();
 
+        // data leaves the app here, so the downloads are under the switch `exports` (ADR 0131): off by default, nothing is made, nothing is recorded
+        foreach (var path in new[] { "report/html", "report/folder" })
+        {
+            using var off = await Client.GetAsync(new Uri($"/api/lab/runs/{id}/{path}", UriKind.Relative), Ct);
+            off.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+            (await JsonOf(off)).GetProperty("code").GetString().ShouldBe("capabilities.off");
+        }
+
+        (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'ReportExported'")).ShouldBe(0);
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(connection, "INSERT INTO platform.capability_changes (capability, enabled, reason, actor) VALUES ('exports', true, 'test', 'owner:test@example.test')");
+        }
+
+        Factory.Services.GetRequiredService<XDrishti.Api.Exports.ExportSlot>().Reset();
         using var json = await Client.GetAsync(new Uri($"/api/lab/runs/{id}/report", UriKind.Relative), Ct);
         using var html = await Client.GetAsync(new Uri($"/api/lab/runs/{id}/report/html", UriKind.Relative), Ct);
         var zip1 = await Client.GetByteArrayAsync(new Uri($"/api/lab/runs/{id}/report/folder", UriKind.Relative), Ct);
@@ -259,6 +274,8 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         html.Headers.GetValues("Content-Security-Policy").Single().ShouldContain("default-src 'none'");
         (await html.Content.ReadAsStringAsync(Ct)).ShouldNotContain("<script");
         zip2.ShouldBe(zip1);
+        (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'ReportExported' AND detail LIKE 'kind=lab-report-html format=html rows=0 bytes=%'")).ShouldBe(1);
+        (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'ReportExported' AND detail LIKE 'kind=lab-report-folder format=zip rows=0 bytes=%'")).ShouldBe(2);
         noReport.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         missing.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }

@@ -304,7 +304,7 @@ trade replay (entry, stop, target, trail path, exit reason, feature snapshot).
 Plan: page + PDF/HTML. Portfolio: CSV/Excel of positions, transactions and realised P&L. Any report: CSV/Excel. Weekly review pack (PDF): R3, R4, R5, R12, R13, R16 + assistant
 summary. Notifications appear in-app (SignalR); optional external channel only if you enable one.
 
-*As built (P8-20, [ADR 0131](../adr/0131-an-export-is-one-audited-post-behind-a-capability-that-returns-a-research-table-as-a-csv-with-its-evidence-and-keeps-nothing.md)):* only the **research tables of the Reports screens** can be saved, as **CSV** with the evidence block inside the file (five tables: groups, pivot, what works, equity, trades), behind the switch `exports` (OFF until you switch it on at /owner-acts). Portfolio, plan, journal, audit and the weekly pack are not exported (a later decision of yours; default never). Excel, PDF and the static HTML are not built.
+*As built (P8-20, [ADR 0131](../adr/0131-an-export-is-one-audited-post-behind-a-capability-that-returns-a-research-table-as-a-csv-with-its-evidence-and-keeps-nothing.md)):* only the **research tables of the Reports screens** can be saved, as **CSV** with the evidence block inside the file (five tables: groups, pivot, what works, equity, trades), behind the switch `exports` (OFF until you switch it on at /owner-acts). Portfolio, plan, journal, audit and the weekly pack are not exported (a later decision of yours; default never). Excel, PDF and the static HTML are not built. The Lab's report page and zip are under the same switch.
 
 ## 4. Implementation notes
 

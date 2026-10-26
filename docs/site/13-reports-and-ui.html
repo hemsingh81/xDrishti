@@ -888,7 +888,7 @@ trade replay (entry, stop, target, trail path, exit reason, feature snapshot).</
 <h2 id="3-exports-delivery">3. Exports &amp; delivery<a class="hash" href="#3-exports-delivery" aria-label="Link to this section">#</a></h2>
 <p>Plan: page + PDF/HTML. Portfolio: CSV/Excel of positions, transactions and realised P&amp;L. Any report: CSV/Excel. Weekly review pack (PDF): R3, R4, R5, R12, R13, R16 + assistant
 summary. Notifications appear in-app (SignalR); optional external channel only if you enable one.</p>
-<p><em>As built (P8-20, <a href="../adr/0131-an-export-is-one-audited-post-behind-a-capability-that-returns-a-research-table-as-a-csv-with-its-evidence-and-keeps-nothing.html">ADR 0131</a>):</em> only the <strong>research tables of the Reports screens</strong> can be saved, as <strong>CSV</strong> with the evidence block inside the file (five tables: groups, pivot, what works, equity, trades), behind the switch <code>exports</code> (OFF until you switch it on at /owner-acts). Portfolio, plan, journal, audit and the weekly pack are not exported (a later decision of yours; default never). Excel, PDF and the static HTML are not built.</p>
+<p><em>As built (P8-20, <a href="../adr/0131-an-export-is-one-audited-post-behind-a-capability-that-returns-a-research-table-as-a-csv-with-its-evidence-and-keeps-nothing.html">ADR 0131</a>):</em> only the <strong>research tables of the Reports screens</strong> can be saved, as <strong>CSV</strong> with the evidence block inside the file (five tables: groups, pivot, what works, equity, trades), behind the switch <code>exports</code> (OFF until you switch it on at /owner-acts). Portfolio, plan, journal, audit and the weekly pack are not exported (a later decision of yours; default never). Excel, PDF and the static HTML are not built. The Lab&#39;s report page and zip are under the same switch.</p>
 <h2 id="4-implementation-notes">4. Implementation notes<a class="hash" href="#4-implementation-notes" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>Report queries live in the .NET Reporting module; heavy aggregates via SQL materialised views refreshed
@@ -902,7 +902,7 @@ nightly; responses are chart-ready series.</li>
     <a class="prev" href="12-portfolio-monitoring.html"><small>← Previous  [</small>12 · Portfolio monitoring</a>
     <a class="next" href="14-ai-assistant.html"><small>Next  ] →</small>14 · AI assistant</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-26 18:54</footer>
+  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-26 19:23</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-screens" class="d2">1. Screens</a>
 <a href="#1b-clickable-prototype" class="d2">1b. Clickable prototype</a>

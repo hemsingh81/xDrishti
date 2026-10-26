@@ -388,6 +388,12 @@ describe('Lab runs', () => {
       [
         http.get('/api/lab/runs/:id', () => HttpResponse.json(done)),
         http.get('/api/lab/runs/:id/report', () => HttpResponse.json(report)),
+        http.get('/api/capabilities', () =>
+          HttpResponse.json({
+            items: [{ name: 'exports', label: 'Exports', meaning: 'm', enabled: true, changedAt: null, reason: null }],
+            history: [],
+          }),
+        ),
       ],
     );
     const user = userEvent.setup();
@@ -404,7 +410,7 @@ describe('Lab runs', () => {
     expect(await screen.findByText('Marginal: expectancy is below the adjusted gate.')).toBeInTheDocument();
     expect(screen.getByText('A small rise in costs erases the edge.')).toBeInTheDocument();
     expect(screen.getByText('Full-period figures are in-sample exploration.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open report page' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Open report page' })).toHaveAttribute(
       'href',
       `/api/lab/runs/${runId}/report/html`,
     );
@@ -412,6 +418,25 @@ describe('Lab runs', () => {
       'href',
       `/api/lab/runs/${runId}/report/folder`,
     );
+  });
+
+  it('draws no download link while the exports switch is off, only the words and a link to the switches (ADR 0131)', async () => {
+    const done = buildRun({ state: 'succeeded', stage: null, method: 'full', verdict });
+    setup(
+      [done],
+      [
+        http.get('/api/lab/runs/:id', () => HttpResponse.json(done)),
+        http.get('/api/lab/runs/:id/report', () => HttpResponse.json(report)),
+      ],
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<LabPage />);
+    await openRun(user, /MY_ORB v2 · full/);
+
+    expect(await screen.findByText(/Report downloads are switched off/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'owner-act switches' })).toHaveAttribute('href', '/owner-acts');
+    expect(screen.queryByRole('link', { name: 'Open report page' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Download folder (zip)' })).toBeNull();
   });
 
   it('shows an error when the report cannot be read', async () => {

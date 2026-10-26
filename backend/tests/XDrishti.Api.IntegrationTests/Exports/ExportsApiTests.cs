@@ -4,8 +4,8 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using XDrishti.Api.Exports;
 using XDrishti.Api.IntegrationTests.Data;
 using XDrishti.Api.IntegrationTests.Infrastructure;
@@ -319,13 +319,13 @@ public sealed class ExportsApiTests(ApiFactory factory) : DataTestBase(factory)
     }
 
     [Fact]
-    public async Task A_table_over_the_row_cap_is_413_with_the_sentence_and_no_file_and_no_audit_row_and_a_lowered_cap_is_honoured_never_raised()
+    public async Task A_table_over_the_row_cap_is_413_with_the_sentence_and_no_file_and_no_audit_row_and_the_byte_cap_refuses_as_well()
     {
         await OnAsync();
-        var configuration = Factory.Services.GetRequiredService<IConfiguration>();
+        var options = Factory.Services.GetRequiredService<IOptions<ExportOptions>>().Value;
         try
         {
-            configuration["Exports:MaxCsvRows"] = "10";
+            options.MaxCsvRows = 10;
             using var refused = await PostAsync("report-trades");
             var body = await refused.Content.ReadFromJsonAsync<JsonElement>(Ct);
 
@@ -335,20 +335,82 @@ public sealed class ExportsApiTests(ApiFactory factory) : DataTestBase(factory)
             refused.Content.Headers.ContentDisposition.ShouldBeNull();
             (await EventsAsync()).ShouldBe(0);
 
-            configuration["Exports:MaxCsvRows"] = "100";
+            options.MaxCsvRows = 100;
             (await PostAsync("report-trades")).StatusCode.ShouldBe(HttpStatusCode.OK);
-            configuration["Exports:MaxCsvRows"] = "999999999";
-            (await PostAsync("report-groups")).StatusCode.ShouldBe(HttpStatusCode.OK);
 
-            configuration["Exports:MaxCsvRows"] = null;
-            configuration["Exports:MaxCsvBytes"] = "500";
+            options.MaxCsvRows = ExportOptions.RowsCeiling;
+            options.MaxCsvBytes = 500;
             (await ProblemAsync("report-trades")).ShouldBe((HttpStatusCode.RequestEntityTooLarge, "exports.too_large"));
         }
         finally
         {
-            configuration["Exports:MaxCsvRows"] = null;
-            configuration["Exports:MaxCsvBytes"] = null;
+            options.MaxCsvRows = ExportOptions.RowsCeiling;
+            options.MaxCsvBytes = ExportOptions.BytesCeiling;
         }
+    }
+
+    [Fact]
+    public void The_configuration_may_lower_the_caps_and_never_raise_them()
+    {
+        ExportOptions.IsValid(new ExportOptions()).ShouldBeTrue();
+        ExportOptions.IsValid(new ExportOptions { MaxCsvRows = 1, MaxCsvBytes = 1 }).ShouldBeTrue();
+        ExportOptions.IsValid(new ExportOptions { MaxCsvRows = ExportOptions.RowsCeiling + 1 }).ShouldBeFalse();
+        ExportOptions.IsValid(new ExportOptions { MaxCsvBytes = ExportOptions.BytesCeiling + 1 }).ShouldBeFalse();
+        ExportOptions.IsValid(new ExportOptions { MaxCsvRows = 0 }).ShouldBeFalse();
+        Factory.Services.GetRequiredService<IOptions<ExportOptions>>().Value.MaxCsvRows.ShouldBe(ExportOptions.RowsCeiling);
+    }
+
+    [Fact]
+    public async Task When_the_audit_row_cannot_be_written_the_answer_is_500_exports_audit_failed_and_there_is_no_file()
+    {
+        await OnAsync();
+        await ExecuteSqlAsync("CREATE OR REPLACE FUNCTION public.test_refuse_export_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'audit refused by the test'; END $$");
+        await ExecuteSqlAsync("CREATE TRIGGER test_refuse_export_audit BEFORE INSERT ON accounts.account_events FOR EACH ROW WHEN (NEW.event = 'ReportExported') EXECUTE FUNCTION public.test_refuse_export_audit()");
+        try
+        {
+            foreach (var (kind, query) in Kinds)
+            {
+                Factory.Services.GetRequiredService<ExportSlot>().Reset();
+                using var response = await PostAsync(kind, query);
+                var text = await response.Content.ReadAsStringAsync(Ct);
+
+                response.StatusCode.ShouldBe(HttpStatusCode.InternalServerError, kind);
+                JsonDocument.Parse(text).RootElement.GetProperty("code").GetString().ShouldBe("exports.audit_failed");
+                response.Content.Headers.ContentDisposition.ShouldBeNull();
+                text.ShouldNotContain("xDrishti research export");
+            }
+        }
+        finally
+        {
+            await ExecuteSqlAsync("DROP TRIGGER test_refuse_export_audit ON accounts.account_events");
+            await ExecuteSqlAsync("DROP FUNCTION public.test_refuse_export_audit()");
+        }
+
+        (await EventsAsync()).ShouldBe(0);
+        Factory.Services.GetRequiredService<ExportSlot>().Reset();
+        (await PostAsync("report-groups")).StatusCode.ShouldBe(HttpStatusCode.OK, "the slot was given back and the next export works");
+    }
+
+    [Fact]
+    public async Task While_another_export_runs_a_second_gets_429_and_is_served_when_the_first_is_done_and_off_stays_403_under_rate_pressure()
+    {
+        await OnAsync();
+        var slot = Factory.Services.GetRequiredService<ExportSlot>();
+
+        slot.TryEnter().ShouldBeTrue("another export is running");
+        (await ProblemAsync("report-groups")).ShouldBe((HttpStatusCode.TooManyRequests, "auth.rate_limited"));
+        slot.Leave();
+        (await PostAsync("report-groups")).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        for (var i = 0; i < ExportSlot.PerMinute; i++)
+        {
+            await PostAsync("report-groups");
+        }
+
+        (await ProblemAsync("report-groups")).Status.ShouldBe(HttpStatusCode.TooManyRequests);
+        await ExecuteSqlAsync("INSERT INTO platform.capability_changes (capability, enabled, reason, actor) VALUES ('exports', false, 'test', 'owner:test@example.test')");
+        slot.TryEnter().ShouldBeFalse("the minute is used up");
+        (await ProblemAsync("report-groups")).ShouldBe((HttpStatusCode.Forbidden, "capabilities.off"), "off is answered before any rate rule");
     }
 
     [Fact]
