@@ -54,13 +54,16 @@ internal sealed class CapturePaperFillsHandler(
             return Result.Failure<PaperCaptureOutcome>(PaperErrors.SheetMissing(settings.CostSheetId ?? string.Empty));
         }
 
-        var epoch = (await gate.ResolveAsync([], cancellationToken)).Epoch;
+        var current = await gate.ResolveAsync([], cancellationToken);
+        var epoch = current.Epoch;
+        var history = current.History is { Count: > 0 } known ? known : [epoch];
+        long EpochOf(DateOnly day) => history.Where(e => e.StartedOn <= day).OrderByDescending(e => e.StartedOn).FirstOrDefault()?.Id ?? epoch.Id;
         if (command.Date is { } asked && asked < epoch.StartedOn)
         {
             return Result.Failure<PaperCaptureOutcome>(PaperErrors.Invalid("date", "The session is before the start of the epoch; nothing is back-filled."));
         }
 
-        var sessions = await SessionsAsync(command.Date, epoch.StartedOn, lastClosed, calendar, cancellationToken);
+        var sessions = await SessionsAsync(command.Date, epoch.StartedOn, history.Min(e => e.StartedOn), lastClosed, calendar, cancellationToken);
         var statuses = (await gate.ResolveAsync(sessions, cancellationToken)).MeasureStatus;
         var total = new Totals();
         var withWork = 0;
@@ -71,7 +74,7 @@ internal sealed class CapturePaperFillsHandler(
             Totals one;
             try
             {
-                one = await CaptureSessionAsync(session, epoch.Id, statuses.GetValueOrDefault(session, "measured"), lastClosed, calendar, costs.Value, command.Manual, began, cancellationToken);
+                one = await CaptureSessionAsync(session, EpochOf(session), statuses.GetValueOrDefault(session, "measured"), lastClosed, calendar, costs.Value, command.Manual, began, cancellationToken);
             }
 #pragma warning disable CA1031 // One bad session is recorded as failed and the others still run; cancellation is rethrown by the filter.
             catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
@@ -81,7 +84,7 @@ internal sealed class CapturePaperFillsHandler(
                 var reason = failure.GetType().Name + ": the session failed; the capture will try it again";
                 PaperLog.SessionFailed(logger, session, reason);
                 one = new Totals { Failed = 1 };
-                await TryRecordFailureAsync(epoch.Id, session, began, command.Manual, reason, cancellationToken);
+                await TryRecordFailureAsync(EpochOf(session), session, began, command.Manual, reason, cancellationToken);
             }
 
             total.Add(one);
@@ -95,7 +98,7 @@ internal sealed class CapturePaperFillsHandler(
         return Result.Success(new PaperCaptureOutcome(total.Sessions, total.Seen, total.Entries, total.Exits, total.Skips, total.Pending, total.Integrity, total.Failed));
     }
 
-    private async Task<List<DateOnly>> SessionsAsync(DateOnly? date, DateOnly start, DateOnly lastClosed, TradingCalendar calendar, CancellationToken cancellationToken)
+    private async Task<List<DateOnly>> SessionsAsync(DateOnly? date, DateOnly start, DateOnly earliest, DateOnly lastClosed, TradingCalendar calendar, CancellationToken cancellationToken)
     {
         if (date is { } one)
         {
@@ -104,6 +107,9 @@ internal sealed class CapturePaperFillsHandler(
 
         var coverage = await paper.CoverageAsync(cancellationToken);
         var result = new List<DateOnly>();
+
+        // Sessions of earlier epochs that still have work (a swing exit pending when a detected change started a new epoch) are looked at again and written under their own epoch.
+        result.AddRange(coverage.Revisit.Where(d => d >= earliest && d < start && calendar.IsTradingDay(d) && d <= lastClosed).Order());
         for (var day = start; day <= lastClosed; day = day.AddDays(1))
         {
             if (calendar.IsTradingDay(day) && (!coverage.Covered.Contains(day) || coverage.Revisit.Contains(day)))

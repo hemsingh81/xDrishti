@@ -40,16 +40,3 @@ internal sealed class ListCaptureRunsHandler(IPaperStore store) : IQueryHandler<
         return Result.Success(new CaptureRunList(PaperWording.Basis, PaperWording.Limits, await store.ListRunsAsync(query.Limit, cancellationToken)));
     }
 }
-
-/// <summary>The epoch in force; reads only, so asking never starts one (spec P10-01).</summary>
-internal sealed class GetPaperEpochHandler(IPaperStore store) : IQueryHandler<GetPaperEpochQuery, Result<PaperEpochView>>
-{
-    public async ValueTask<Result<PaperEpochView>> HandleAsync(GetPaperEpochQuery query, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(query);
-        var epoch = await store.CurrentEpochAsync(cancellationToken);
-        return Result.Success(epoch is null
-            ? new PaperEpochView(null, null, null, "No capture has run yet; the first epoch starts with the first capture.", PaperWording.Basis)
-            : new PaperEpochView(epoch.Id, epoch.StartedOn, epoch.Kind, epoch.Reason, PaperWording.Basis));
-    }
-}

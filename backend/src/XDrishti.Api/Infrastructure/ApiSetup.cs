@@ -97,6 +97,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, LessonsEndpoints>();
         services.AddSingleton<IEndpointModule, PlansEndpoints>();
         services.AddSingleton<IEndpointModule, PaperEndpoints>();
+        services.AddSingleton<IEndpointModule, PaperGovernanceEndpoints>();
         services.AddSingleton<IEndpointModule, TicketAlertsEndpoints>(); // price-crossing alerts and prompts on the plan screen (P7-20); preferences only, no order
         services.AddSingleton<IEndpointModule, ReportsEndpoints>();
         services.AddSingleton<IEndpointModule, AutonomyEndpoints>();
