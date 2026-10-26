@@ -126,6 +126,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(PaperReviewView))]
 [JsonSerializable(typeof(PaperReviewList))]
 [JsonSerializable(typeof(DisciplineView))]
+[JsonSerializable(typeof(BacktestVsPaperView))]
 [JsonSerializable(typeof(CaptureRunList))]
 [JsonSerializable(typeof(EpochList))]
 [JsonSerializable(typeof(EpochDetail))]

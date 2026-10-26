@@ -147,6 +147,9 @@ internal static class XdCommand
         if (args.Count >= 2 && args[0] == "paper" && PaperReviewCommand.Handles([.. args.Skip(1)]))
         {
             return await PaperReviewCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
+        if (args.Count >= 2 && args[0] == "paper" && PaperCompareCommand.Handles([.. args.Skip(1)]))
+        {
+            return await PaperCompareCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
         }
 
         if (args.Count >= 2 && args[0] == "paper" && PaperGovernanceCommand.Handles([.. args.Skip(1)]))
