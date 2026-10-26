@@ -38,7 +38,7 @@ public sealed record CountedSet(IReadOnlyList<CountedTrade> Trades, CompareCount
 
         var trades = counted
             .OrderBy(c => c.Row.ExitAt).ThenBy(c => c.Row.EntryAt).ThenBy(c => c.Ticket).ThenBy(c => c.Row.EntryId)
-            .Select(c => new CountedTrade(c.Row.CellKey, c.Row.RSim!.Value, c.Row.RBasis!, c.Row.ChargeSheetId, c.Row.EntryAt, c.Row.ExitAt!.Value))
+            .Select(c => new CountedTrade(c.Row.CellKey, c.Row.RSim!.Value, c.Row.RBasis!, c.Row.ChargeSheetId, c.Row.EntryAt, c.Row.ExitAt!.Value, c.Ticket, c.Row.ApprovalKind))
             .ToList();
         return new CountedSet(trades, new CompareCounts(trades.Count, reserve, straddle, open, otherEpochs));
     }

@@ -219,7 +219,7 @@ internal sealed class GovernanceStore(NpgsqlDataSource dataSource) : IGovernance
         return result;
     }
 
-    private const string ChangeSelect = "SELECT id, from_snapshot_id, to_snapshot_id, \"key\", \"class\", \"before\", \"after\", effect, epoch_id, explained_by FROM paper.config_changes";
+    private const string ChangeSelect = "SELECT id, from_snapshot_id, to_snapshot_id, \"key\", \"class\", \"before\", \"after\", effect, epoch_id, explained_by, (SELECT s.session_date FROM paper.config_snapshots s WHERE s.id = to_snapshot_id) FROM paper.config_changes";
 
     private static async Task<List<StoredChange>> ReadChangesAsync(NpgsqlCommand command, CancellationToken cancellationToken)
     {
@@ -229,7 +229,7 @@ internal sealed class GovernanceStore(NpgsqlDataSource dataSource) : IGovernance
         {
             result.Add(new StoredChange(
                 reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetString(3), reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetString(6),
-                reader.GetString(7), reader.GetInt64(8), reader.IsDBNull(9) ? null : reader.GetString(9)));
+                reader.GetString(7), reader.GetInt64(8), reader.IsDBNull(9) ? null : reader.GetString(9), reader.IsDBNull(10) ? null : reader.GetFieldValue<DateOnly>(10)));
         }
 
         return result;

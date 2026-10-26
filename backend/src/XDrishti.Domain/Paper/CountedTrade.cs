@@ -7,4 +7,6 @@ namespace XDrishti.Domain.Paper;
 /// <param name="ChargeSheetId">The sheet that charged it, or null.</param>
 /// <param name="EntryAt">The entry instant.</param>
 /// <param name="ExitAt">The exit instant.</param>
-public sealed record CountedTrade(string CellKey, double R, string RBasis, string? ChargeSheetId, DateTimeOffset EntryAt, DateTimeOffset ExitAt);
+/// <param name="TicketId">The ticket (plan item); the phase check proves one ticket counts once (spec P10-06).</param>
+/// <param name="ApprovalKind">owner or auto (spec P10-06 prints the auto split).</param>
+public sealed record CountedTrade(string CellKey, double R, string RBasis, string? ChargeSheetId, DateTimeOffset EntryAt, DateTimeOffset ExitAt, long TicketId = 0, string ApprovalKind = "owner");

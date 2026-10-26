@@ -17,6 +17,11 @@ const entries: readonly { id: string; label: string; Component: ComponentType }[
     label: 'Backtest vs paper',
     Component: lazy(() => import('../components/CompareTab').then((m) => ({ default: m.CompareTab }))),
   },
+  {
+    id: 'phase',
+    label: 'Phase check',
+    Component: lazy(() => import('../components/PhaseTab').then((m) => ({ default: m.PhaseTab }))),
+  },
 ];
 
 export type TabId = string;

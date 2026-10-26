@@ -12,7 +12,7 @@ internal sealed class BacktestPaperData(NpgsqlDataSource dataSource) : IBacktest
     {
         var rows = new List<PaperCompareRow>();
         await using (var select = dataSource.CreateCommand("""
-            SELECT e.id, e.plan_item_id, e.ticket_group, e.measure_status, e.cell_key, e.trade_key, e.entry_at, x.exit_at, x.r_sim, x.r_basis, x.charge_sheet_id
+            SELECT e.id, e.plan_item_id, e.ticket_group, e.measure_status, e.cell_key, e.trade_key, e.entry_at, x.exit_at, x.r_sim, x.r_basis, x.charge_sheet_id, e.approval_kind
             FROM paper.entries e LEFT JOIN paper.exits x ON x.entry_id = e.id
             WHERE e.epoch_id = @epoch
             ORDER BY e.entry_at, e.id
@@ -28,7 +28,8 @@ internal sealed class BacktestPaperData(NpgsqlDataSource dataSource) : IBacktest
                     reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7),
                     reader.IsDBNull(8) ? null : reader.GetDouble(8),
                     reader.IsDBNull(9) ? null : reader.GetString(9),
-                    reader.IsDBNull(10) ? null : reader.GetString(10)));
+                    reader.IsDBNull(10) ? null : reader.GetString(10),
+                    reader.GetString(11)));
             }
         }
 

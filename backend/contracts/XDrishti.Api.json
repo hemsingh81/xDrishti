@@ -10980,6 +10980,65 @@
         }
       }
     },
+    "/api/paper/phase-check": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The P10 exit judged from stored records for one epoch (default the newest): duration and coverage, counted trades, expectancy within the backtest band after costs, drawdown within the 90th percentile and capture integrity, each MET, NOT MET or NOT EVALUABLE with its facts and blockers; the caveats sit in the label of a MET (exitCriterion); the week lines, every epoch (only the current one is judged), the discipline lines, the P7 phase check, the services and settings, what is never judged here and the honest limits. The report and the printable text. Optional through (rounded down to a trading session; default the last closed session) and epoch. Read only; simulated, no order exists. 404 paper.not_found, 422 paper.invalid",
+        "operationId": "GetPaperPhaseCheck",
+        "parameters": [
+          {
+            "name": "through",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "epoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperPhaseCheckView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/plans/{id}/alerts": {
       "get": {
         "tags": [
@@ -30067,6 +30126,103 @@
         },
         "description": "The mark of an open position: a value with its close and date, or unavailable with the reason and no price."
       },
+      "PaperPhaseCheckView": {
+        "required": [
+          "report",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "report": {
+            "description": "The criteria, the weeks, the epochs, what is printed and the limits.",
+            "$ref": "#/components/schemas/PaperPhaseReport"
+          },
+          "text": {
+            "type": "string",
+            "description": "The printable report, limits included."
+          }
+        },
+        "description": "The paper phase check as the verb prints it and the endpoint returns it."
+      },
+      "PaperPhaseReport": {
+        "required": [
+          "epoch",
+          "through",
+          "elapsedDays",
+          "criteria",
+          "exitVerdict",
+          "exitCriterion",
+          "weeks",
+          "epochs",
+          "printed",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "epoch": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The epoch judged; null before the first capture.",
+                "$ref": "#/components/schemas/PhaseEpochLine"
+              }
+            ]
+          },
+          "through": {
+            "type": "string",
+            "description": "The last closed session counted.",
+            "format": "date"
+          },
+          "elapsedDays": {
+            "type": "integer",
+            "description": "Days from the epoch start to Through, both included.",
+            "format": "int32"
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhaseCriterion"
+            },
+            "description": "C1 to C4 and I."
+          },
+          "exitVerdict": {
+            "type": "string",
+            "description": "The bare word: MET, NOT MET or NOT EVALUABLE."
+          },
+          "exitCriterion": {
+            "type": "string",
+            "description": "The same call with its caveats, e.g. MET (point estimate; ...)."
+          },
+          "weeks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhaseWeekLine"
+            },
+            "description": "One line per ISO week."
+          },
+          "epochs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhaseEpochLine"
+            },
+            "description": "Every epoch of the history."
+          },
+          "printed": {
+            "description": "What is printed and not judged.",
+            "$ref": "#/components/schemas/PhasePrinted"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honest limits; never empty."
+          }
+        },
+        "description": "The paper phase check (spec P10-06, ADR 0123): the P10 exit judged from stored records, with its caveats in the label."
+      },
       "PaperPositionList": {
         "required": [
           "basis",
@@ -30512,6 +30668,207 @@
         },
         "description": "A labelled count."
       },
+      "PhaseCriterion": {
+        "required": [
+          "id",
+          "title",
+          "verdict",
+          "label",
+          "facts",
+          "blockers"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "C1 to C4 and I."
+          },
+          "title": {
+            "type": "string",
+            "description": "The criterion."
+          },
+          "verdict": {
+            "type": "string",
+            "description": "MET, NOT MET or NOT EVALUABLE."
+          },
+          "label": {
+            "type": "string",
+            "description": "The call and its reason in one line."
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The facts behind it."
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What stops it and whose act it is; empty when nothing does."
+          }
+        },
+        "description": "One criterion of the paper phase check (spec P10-06): a verdict, the fact in words, the facts behind it and what stops it."
+      },
+      "PhaseEpochLine": {
+        "required": [
+          "id",
+          "startedOn",
+          "kind",
+          "reason",
+          "counted",
+          "unexplainedChanges",
+          "current"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The id.",
+            "format": "int64"
+          },
+          "startedOn": {
+            "type": "string",
+            "description": "The first session.",
+            "format": "date"
+          },
+          "kind": {
+            "type": "string",
+            "description": "first, detected_change or owner_restart."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why."
+          },
+          "counted": {
+            "type": "integer",
+            "description": "Entries that count, as stored.",
+            "format": "int32"
+          },
+          "unexplainedChanges": {
+            "type": "integer",
+            "description": "Changes with no explanation.",
+            "format": "int32"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "True for the epoch judged; earlier epochs are never pooled into it."
+          }
+        },
+        "description": "An epoch of the history, with whether it is the one judged."
+      },
+      "PhaseNotJudged": {
+        "required": [
+          "name",
+          "verdict",
+          "proof"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The property."
+          },
+          "verdict": {
+            "type": "string",
+            "description": "Always NOT EVALUABLE here."
+          },
+          "proof": {
+            "type": "string",
+            "description": "The test names (or where it is settled)."
+          }
+        },
+        "description": "A thing the check never judges, and the tests that prove it."
+      },
+      "PhasePrinted": {
+        "required": [
+          "disciplineLines",
+          "sensitivityMean",
+          "autoApproved",
+          "ownerApproved",
+          "plansWithoutPrimary",
+          "manualRuns",
+          "p7",
+          "chargeSheetConfirmed",
+          "services",
+          "switches",
+          "blockers",
+          "notJudged"
+        ],
+        "type": "object",
+        "properties": {
+          "disciplineLines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The discipline lines of P10-03, one each."
+          },
+          "sensitivityMean": {
+            "type": "string",
+            "description": "The plan-price mean over all primary proposals (P10-04), in words."
+          },
+          "autoApproved": {
+            "type": "integer",
+            "description": "Counted trades auto-approved.",
+            "format": "int32"
+          },
+          "ownerApproved": {
+            "type": "integer",
+            "description": "Counted trades the owner approved.",
+            "format": "int32"
+          },
+          "plansWithoutPrimary": {
+            "type": "integer",
+            "description": "Sessions whose plan had no primary ticket.",
+            "format": "int32"
+          },
+          "manualRuns": {
+            "type": "integer",
+            "description": "Manual nightly attempts in the window.",
+            "format": "int32"
+          },
+          "p7": {
+            "type": "string",
+            "description": "The P7 phase check's label, or why it is unavailable."
+          },
+          "chargeSheetConfirmed": {
+            "type": "boolean",
+            "description": "Whether the owner confirmed the charge sheet(s) of the counted trades."
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhaseService"
+            },
+            "description": "The pipeline's services."
+          },
+          "switches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhaseSwitch"
+            },
+            "description": "The settings."
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every blocker, with whose act it is."
+          },
+          "notJudged": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhaseNotJudged"
+            },
+            "description": "What the check does not judge."
+          }
+        },
+        "description": "What is printed beside the criteria and never judged by them."
+      },
       "PhaseService": {
         "required": [
           "id",
@@ -30567,6 +30924,79 @@
           }
         },
         "description": "One of the owner's switches."
+      },
+      "PhaseWeekLine": {
+        "required": [
+          "week",
+          "sessions",
+          "plansPublished",
+          "failedClosed",
+          "manualRuns",
+          "captureFinished",
+          "tradesCounted",
+          "cumulativeCounted",
+          "cumulativeR",
+          "frozenChanges",
+          "riskDownChanges"
+        ],
+        "type": "object",
+        "properties": {
+          "week": {
+            "type": "string",
+            "description": "The ISO week, e.g. 2026-W45."
+          },
+          "sessions": {
+            "type": "integer",
+            "description": "Trading sessions of the week inside the window.",
+            "format": "int32"
+          },
+          "plansPublished": {
+            "type": "integer",
+            "description": "Sessions with a published plan.",
+            "format": "int32"
+          },
+          "failedClosed": {
+            "type": "integer",
+            "description": "Failed-closed nightly attempts.",
+            "format": "int32"
+          },
+          "manualRuns": {
+            "type": "integer",
+            "description": "Nightly attempts a person started.",
+            "format": "int32"
+          },
+          "captureFinished": {
+            "type": "integer",
+            "description": "Sessions whose capture finished with nothing pending.",
+            "format": "int32"
+          },
+          "tradesCounted": {
+            "type": "integer",
+            "description": "Trades counted that week (by exit day).",
+            "format": "int32"
+          },
+          "cumulativeCounted": {
+            "type": "integer",
+            "description": "Counted trades up to the end of the week.",
+            "format": "int32"
+          },
+          "cumulativeR": {
+            "type": "number",
+            "description": "Their summed R.",
+            "format": "double"
+          },
+          "frozenChanges": {
+            "type": "integer",
+            "description": "Frozen changes found that week.",
+            "format": "int32"
+          },
+          "riskDownChanges": {
+            "type": "integer",
+            "description": "Risk-down changes found that week.",
+            "format": "int32"
+          }
+        },
+        "description": "One ISO week of the epoch."
       },
       "PivotCellView": {
         "required": [
