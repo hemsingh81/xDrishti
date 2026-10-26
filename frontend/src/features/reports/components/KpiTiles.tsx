@@ -39,7 +39,8 @@ export function KpiTiles({ query, min }: ReportPanelProps) {
               display: 'grid',
               gap: 1.5,
               gridTemplateColumns: {
-                xs: 'repeat(2, minmax(0, 1fr))',
+                // Two columns on a phone, one when enlarged text would make a tile narrower than 9rem (the figures stay whole at 200%).
+                xs: 'repeat(auto-fit, minmax(min(100%, max(9rem, 45%)), 1fr))',
                 md: 'repeat(4, minmax(0, 1fr))',
                 xl: 'repeat(7, minmax(0, 1fr))',
               },

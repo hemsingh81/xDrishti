@@ -2,6 +2,7 @@ import { alpha } from '@mui/material/styles';
 import { Checkbox, TableCell, TableRow } from '@mui/material';
 import { memo } from 'react';
 import { focusRing, table } from '@/theme';
+import { touchTarget } from '@/theme/tokens';
 import { cellSx, selectionCellSx } from './cellStyle';
 import { rowAttribute, selectAttribute } from './useRowNavigation';
 import type { GridColumn, GridDensity, GridRowExtras } from './types';
@@ -89,6 +90,10 @@ function GridRowView<Row>({
             outlineOffset: -focusRing.width,
           },
           '& > td': { height },
+          // A row that opens something is a touch target: 44 px on a phone (rows that do nothing stay dense).
+          ...(clickable
+            ? { [`@media (max-width:${touchTarget.phoneMaxWidth}px)`]: { '& > td': { height: touchTarget.phone } } }
+            : {}),
         }),
         extras?.sx ?? false,
       ]}

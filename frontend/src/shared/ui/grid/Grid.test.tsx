@@ -472,6 +472,14 @@ describe('Grid: loading, empty and error', () => {
     expect(screen.getByText('Nothing here')).toBeInTheDocument();
   });
 
+  it('lets the keyboard reach the scrolling region only when no row can take focus', () => {
+    const { unmount } = render(view({ rows: [], emptyState: <p>Nothing here</p> }));
+    expect(screen.getByRole('region', { name: 'Things, scrolls sideways' })).toHaveAttribute('tabindex', '0');
+    unmount();
+    render(view());
+    expect(screen.getByRole('region', { name: 'Things, scrolls sideways' })).not.toHaveAttribute('tabindex');
+  });
+
   it('shows the error with a retry instead of the rows', async () => {
     const onRetry = vi.fn();
     render(view({ error: 'The list could not be loaded.', onRetry }));

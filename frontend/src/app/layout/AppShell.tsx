@@ -7,6 +7,7 @@ import { LoadingState } from '@/shared/ui';
 import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { layout, pagePadding } from '@/theme';
 import { allNavItems, routeTitles } from '../navigation';
+import { LoadingAnnouncer } from './LoadingAnnouncer';
 import { ReadyMarker } from './ReadyMarker';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
@@ -105,6 +106,7 @@ export function AppShell() {
           </Box>
         </Box>
       </Box>
+      <LoadingAnnouncer />
       {/* The items that need the owner pop up once each; loaded after the first paint, renders nothing. */}
       <Suspense fallback={null}>
         <AttentionPopups />

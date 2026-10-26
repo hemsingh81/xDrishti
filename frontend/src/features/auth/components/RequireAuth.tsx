@@ -14,7 +14,7 @@ export function RequireAuth() {
   const location = useLocation();
 
   if (isPending) {
-    return <LoadingState label="Checking your session…" />;
+    return <LoadingState label="Checking your session…" announce />;
   }
   if (!data) {
     return (

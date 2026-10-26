@@ -13,7 +13,7 @@ export const routes: RouteObject[] = [
     // Public: the only screen reachable without a session.
     path: '/login',
     element: (
-      <Suspense fallback={<LoadingState />}>
+      <Suspense fallback={<LoadingState announce />}>
         <LoginPage />
       </Suspense>
     ),

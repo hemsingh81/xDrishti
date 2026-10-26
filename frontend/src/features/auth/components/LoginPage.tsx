@@ -17,7 +17,7 @@ function StaticRedirect({ to }: { to: string }) {
   useEffect(() => {
     window.location.assign(to);
   }, [to]);
-  return <LoadingState label="Redirecting…" />;
+  return <LoadingState label="Redirecting…" announce />;
 }
 
 /**
@@ -35,7 +35,7 @@ export function LoginPage() {
   }
 
   if (isPending) {
-    return <LoadingState label="Checking your session…" />;
+    return <LoadingState label="Checking your session…" announce />;
   }
   if (data?.status === 'authenticated') {
     const target = resolveNext(params.get('next'));

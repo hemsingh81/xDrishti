@@ -29,7 +29,7 @@ export function ColumnBars({ label, bins, binHeader = 'Bin', countHeader = 'Trad
   const tableId = useId();
   const peak = Math.max(1, ...bins.map((bin) => bin.count));
   return (
-    <Box>
+    <Box sx={{ minWidth: 0 }}>
       <Box
         role="group"
         aria-label={label}
