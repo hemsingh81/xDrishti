@@ -11,7 +11,11 @@ export const capabilitiesQuery = () =>
   });
 
 /** Other features ask this before they draw a write control; unknown or not yet loaded means off. */
-export function useCapability(name: string): { enabled: boolean; loaded: boolean } {
-  const { data } = useQuery(capabilitiesQuery());
-  return { enabled: data?.items.find((item) => item.name === name)?.enabled ?? false, loaded: data !== undefined };
+export function useCapability(name: string): { enabled: boolean; loaded: boolean; failed: boolean } {
+  const { data, isError } = useQuery(capabilitiesQuery());
+  return {
+    enabled: data?.items.find((item) => item.name === name)?.enabled ?? false,
+    loaded: data !== undefined,
+    failed: isError && data === undefined,
+  };
 }

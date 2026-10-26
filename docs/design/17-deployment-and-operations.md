@@ -22,7 +22,7 @@ broker/exchange APIs.
 
 | Container | Image basis | Profile | Notes |
 |-----------|-------------|---------|-------|
-| `xd-proxy` | Caddy (+ React build) | core | Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes `/api`, `/health`, `/hubs` (the SignalR hub, WebSocket upgrade; later `/hangfire`); serves the docs read-only at `/prototype/` (clickable prototype, delivery plan at `/prototype/delivery/`) and `/docs/` (design-docs site) — both only for a signed-in owner (`forward_auth` to `/api/auth/verify`, otherwise redirect to `/login`); compression, security headers |
+| `xd-proxy` | Caddy (+ React build) | core | Only published HTTP port (127.0.0.1:8080, never a LAN bind; a phone reaches it only through a private tunnel the owner sets up (see "Phone access" below)); routes `/api`, `/health`, `/hubs` (the SignalR hub, WebSocket upgrade; later `/hangfire`); serves the docs read-only at `/prototype/` (clickable prototype, delivery plan at `/prototype/delivery/`) and `/docs/` (design-docs site) — both only for a signed-in owner (`forward_auth` to `/api/auth/verify`, otherwise redirect to `/login`); compression, security headers |
 | `xd-migrate` | API image, `migrate` | core | One-shot: applies migrations, provisions the owner account when none exists, then exits |
 | `xd-owner-reset` | API image, `owner-reset` | tools | On-demand one-shot (`xd-up.sh --owner-reset`): replaces the owner's password from the secrets, revokes all sessions |
 | `xd-api` | .NET 10 ASP.NET Core | core | REST, SignalR, auth, assistant endpoint; the only holder of the broker vault key (`BrokerVault__Key`, refuses to start without it); `Brokers__PublicBaseUrl` = `http://localhost:${XD_HTTP_PORT}` (broker redirect URLs); background workers for the instrument master (manual and daily refresh, `Instruments__AutoRefresh__*`, [doc 06](06-instruments-and-baskets.md) §2.2); networks `back` + `egress` (broker sign-in, master files) |
@@ -39,6 +39,17 @@ broker/exchange APIs.
 
 Defined in `deploy/compose.yaml` with profiles `core`, `ops`, `ai`, `live`
 (`podman compose --profile core --profile ops up -d`). Podman Desktop shows them as one application.
+
+## Phone access (owner security act; nothing here is done by an agent or by the repo)
+
+The stack never listens on the LAN: every published port stays on `127.0.0.1`. The installable app (P8-21, [ADR 0132](../adr/0132-the-pwa-is-an-installable-shell-and-an-offline-page-behind-a-capability-its-worker-caches-six-static-files-and-answers-only-failed-page-loads.md)) works on this Mac at `http://localhost:8080` once you switch `pwa` on at /owner-acts (a browser treats `localhost` as a secure context). A phone needs HTTPS, which does not exist yet. If you want it, the researched path (spec P8-21 D1) is a private tailnet in front of the loopback proxy:
+
+1. Decide it is worth it: a third-party coordination service and an account (the traffic is end-to-end encrypted between your devices; the service sees metadata). Pricing and terms were not checked.
+2. Install the VPN client on the Mac and the phone, sign in, enable its name service and HTTPS certificates. Certificate names go into a public ledger: rename the Mac to a neutral name first. Keep public "funnel" sharing off and device sharing off; keep key expiry on.
+3. A second HTTPS-facing entry for the proxy (one shared Caddy snippet, `X-Forwarded-Proto https`, HSTS, still bound to `127.0.0.1`) is not built yet; it needs its own slice and your approval. Until then do not publish port 8080 through the tunnel.
+4. Risks: a lost unlocked phone with an open session shows plans (idle timeout, lockout and sign-out clearing exist; your phone lock is the real control); the login page is reachable by anything in your tailnet.
+
+If you do not do this, nothing is lost: "no phone access" is a valid state.
 
 ## 3. Networks
 

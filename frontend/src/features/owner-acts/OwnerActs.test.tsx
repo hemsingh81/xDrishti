@@ -144,7 +144,7 @@ describe('useCapability', () => {
     server.use(...createCapabilitiesFake().handlers);
     const known = renderHook(() => useCapability('exports'), { wrapper });
     const unknown = renderHook(() => useCapability('nope'), { wrapper });
-    expect(known.result.current).toEqual({ enabled: false, loaded: false });
+    expect(known.result.current).toEqual({ enabled: false, loaded: false, failed: false });
 
     await waitFor(() => {
       expect(known.result.current.loaded).toBe(true);
@@ -163,7 +163,7 @@ describe('useCapability', () => {
     const { result } = renderHook(() => useCapability('pwa'), { wrapper });
 
     await waitFor(() => {
-      expect(result.current).toEqual({ enabled: true, loaded: true });
+      expect(result.current).toEqual({ enabled: true, loaded: true, failed: false });
     });
   });
 });

@@ -264,7 +264,7 @@ stateDiagram-v2
 ```
 
 - The nightly pipeline produces a **proposed plan** (primary tickets + reserve list) with reasons, P(win),
-  expected R and the AI briefing. You review it in the evening or morning (phone works via the PWA).
+  expected R and the AI briefing. You review it in the evening or morning (the phone works only if you set up the private tunnel of doc 17 "Phone access" and install the app).
 - Actions per ticket: **Approve**, **Modify** (reduce size, tighten stop, change account, choose reserve instead),
   **Reject**. Bulk "approve all within limits" is available. Every modification is re-validated against risk limits.
 - **Review cutoff** (default 09:05): unreviewed tickets **lapse** (safe default — `unreviewed_policy: lapse`).

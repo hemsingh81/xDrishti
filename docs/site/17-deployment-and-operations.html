@@ -96,7 +96,7 @@ power, wired network, small UPS recommended.</li>
 <td><code>xd-proxy</code></td>
 <td>Caddy (+ React build)</td>
 <td>core</td>
-<td>Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes <code>/api</code>, <code>/health</code>, <code>/hubs</code> (the SignalR hub, WebSocket upgrade; later <code>/hangfire</code>); serves the docs read-only at <code>/prototype/</code> (clickable prototype, delivery plan at <code>/prototype/delivery/</code>) and <code>/docs/</code> (design-docs site) — both only for a signed-in owner (<code>forward_auth</code> to <code>/api/auth/verify</code>, otherwise redirect to <code>/login</code>); compression, security headers</td>
+<td>Only published HTTP port (127.0.0.1:8080, never a LAN bind; a phone reaches it only through a private tunnel the owner sets up (see &quot;Phone access&quot; below)); routes <code>/api</code>, <code>/health</code>, <code>/hubs</code> (the SignalR hub, WebSocket upgrade; later <code>/hangfire</code>); serves the docs read-only at <code>/prototype/</code> (clickable prototype, delivery plan at <code>/prototype/delivery/</code>) and <code>/docs/</code> (design-docs site) — both only for a signed-in owner (<code>forward_auth</code> to <code>/api/auth/verify</code>, otherwise redirect to <code>/login</code>); compression, security headers</td>
 </tr>
 <tr>
 <td><code>xd-migrate</code></td>
@@ -179,6 +179,15 @@ power, wired network, small UPS recommended.</li>
 </tbody></table>
 <p>Defined in <code>deploy/compose.yaml</code> with profiles <code>core</code>, <code>ops</code>, <code>ai</code>, <code>live</code>
 (<code>podman compose --profile core --profile ops up -d</code>). Podman Desktop shows them as one application.</p>
+<h2 id="phone-access-owner-security-act-nothing-here-is-done-by-an-agent-or-by-the-repo">Phone access (owner security act; nothing here is done by an agent or by the repo)<a class="hash" href="#phone-access-owner-security-act-nothing-here-is-done-by-an-agent-or-by-the-repo" aria-label="Link to this section">#</a></h2>
+<p>The stack never listens on the LAN: every published port stays on <code>127.0.0.1</code>. The installable app (P8-21, <a href="../adr/0132-the-pwa-is-an-installable-shell-and-an-offline-page-behind-a-capability-its-worker-caches-six-static-files-and-answers-only-failed-page-loads.html">ADR 0132</a>) works on this Mac at <code>http://localhost:8080</code> once you switch <code>pwa</code> on at /owner-acts (a browser treats <code>localhost</code> as a secure context). A phone needs HTTPS, which does not exist yet. If you want it, the researched path (spec P8-21 D1) is a private tailnet in front of the loopback proxy:</p>
+<ol>
+<li>Decide it is worth it: a third-party coordination service and an account (the traffic is end-to-end encrypted between your devices; the service sees metadata). Pricing and terms were not checked.</li>
+<li>Install the VPN client on the Mac and the phone, sign in, enable its name service and HTTPS certificates. Certificate names go into a public ledger: rename the Mac to a neutral name first. Keep public &quot;funnel&quot; sharing off and device sharing off; keep key expiry on.</li>
+<li>A second HTTPS-facing entry for the proxy (one shared Caddy snippet, <code>X-Forwarded-Proto https</code>, HSTS, still bound to <code>127.0.0.1</code>) is not built yet; it needs its own slice and your approval. Until then do not publish port 8080 through the tunnel.</li>
+<li>Risks: a lost unlocked phone with an open session shows plans (idle timeout, lockout and sign-out clearing exist; your phone lock is the real control); the login page is reachable by anything in your tailnet.</li>
+</ol>
+<p>If you do not do this, nothing is lost: &quot;no phone access&quot; is a valid state.</p>
 <h2 id="3-networks">3. Networks<a class="hash" href="#3-networks" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -420,10 +429,11 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-26 19:23</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-26 20:03</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>
+<a href="#phone-access-owner-security-act-nothing-here-is-done-by-an-agent-or-by-the-repo" class="d2">Phone access (owner security act; nothing here is done by an agent or by the repo)</a>
 <a href="#3-networks" class="d2">3. Networks</a>
 <a href="#4-secrets" class="d2">4. Secrets</a>
 <a href="#5-operations" class="d2">5. Operations</a>

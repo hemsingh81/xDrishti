@@ -23,6 +23,8 @@
 	# API, OpenAPI docs and health → xd-api.
 	@api path /api/* /health/*
 	handle @api {
+		# Never cacheable by the browser or a service worker (P8-21); a response that sets its own value keeps it.
+		header ?Cache-Control "no-store"
 		reverse_proxy xd-api:8080 {
 			health_uri /health/live
 			health_interval 15s
@@ -97,6 +99,10 @@
 	handle /assets/* {
 		file_server
 	}
+
+	# The web app manifest: Caddy has no built-in type for .webmanifest. The worker (/sw.js) and /offline.html fall under the
+	# fallback below (never cached by the proxy's headers; scope / and the CSP's script-src 'self' already cover the worker).
+	header /manifest.webmanifest Content-Type "application/manifest+json"
 
 	# Everything else is the single-page app: index.html for client-side routes, never cached.
 	handle {

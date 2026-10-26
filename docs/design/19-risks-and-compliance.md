@@ -47,9 +47,9 @@
 | Smart rules filtering too much (e.g. too many no-trade days) or learned on noise | Evidence shown per rule; review flag when a rule removes > 50% of trades or its skipped trades are not worse than taken ones; rules learned from walk-forward data, not only live trades |
 | Learning from plan prices that cannot be achieved | Grade on actual fills; slippage model per liquidity bucket; capacity score |
 | Alert fatigue (too many action items) | Smarter thresholds (relative to account size), severity filter, snooze/done, per-account focus |
-| Plan not reviewed in time | Unreviewed tickets lapse (safe default); reminders before cutoff; phone review via PWA |
+| Plan not reviewed in time | Unreviewed tickets lapse (safe default); reminders before cutoff; phone review via the installable app, only if the owner sets up a private tunnel ([ADR 0132](../adr/0132-the-pwa-is-an-installable-shell-and-an-offline-page-behind-a-capability-its-worker-caches-six-static-files-and-answers-only-failed-page-loads.md)) |
 | Account role misconfiguration (no data account, wrong trading account) | Validation rules (exactly one primary Data account), password re-entry, audit, Services screen warnings |
-| Unauthorised access | Login (strong password), lockout, idle timeout, LAN-only, audit of logins |
+| Unauthorised access | Login (strong password), lockout, idle timeout, loopback-only ports (no LAN bind), audit of logins |
 | CSV import errors (wrong timezone, bar-end labels, adjusted vs raw prices, duplicates) | Import profiles, preview before commit, session-boundary checks, conflict log, undo per import job |
 | Live-feed overload or disconnects | Live data only for the active set (cap `max_ws_instruments`); auto-reconnect; EOD official data replaces live bars |
 | Incomplete portfolio history (API history window, other brokers) | CSV/manual transaction import; reconciliation of computed vs broker holdings each night |

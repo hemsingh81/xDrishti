@@ -1,4 +1,5 @@
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query';
+import { clearOfflineCaches } from '@/shared/lib/offlineCaches';
 import { api, ApiError, type Problem, type SessionInfo } from '@/shared/api';
 
 /** Why there is no session: never signed in, ended by a timeout, or signed out on purpose. */
@@ -43,6 +44,7 @@ export function useSession() {
 export function endSession(queryClient: QueryClient, reason: AnonymousReason): void {
   queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth' });
   queryClient.setQueryData(sessionQueryKey, anonymous(reason));
+  void clearOfflineCaches(); // P8-21: no worker or cache outlives the session
 }
 
 /** The CSRF token of the current session, read from the cache (never persisted anywhere). */

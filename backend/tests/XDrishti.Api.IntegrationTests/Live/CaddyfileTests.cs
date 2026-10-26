@@ -82,6 +82,18 @@ public sealed partial class CaddyfileTests
         Caddyfile.ShouldContain("(prototype|docs)");
     }
 
+    [Fact]
+    public void The_api_is_no_store_the_manifest_has_its_type_and_there_is_still_one_listener()
+    {
+        // P8-21 (ADR 0132): no-store on the API unless the response says otherwise; the manifest has its type; one listener only.
+        Block("handle @api").ShouldContain("header ?Cache-Control \"no-store\"");
+        Caddyfile.ShouldContain("header /manifest.webmanifest Content-Type \"application/manifest+json\"");
+        Regex.Count(Caddyfile, @"^:\d+ \{", RegexOptions.Multiline).ShouldBe(1);
+        Caddyfile.ShouldContain(":8080 {");
+        Caddyfile.ShouldNotContain("worker-src"); // the CSP's script-src 'self' already covers /sw.js
+        Caddyfile.ShouldNotContain("0.0.0.0");
+    }
+
     [GeneratedRegex(@"^\s*@hubs\s+path\s+/hubs/\*\s*$", RegexOptions.Multiline)]
     private static partial Regex HubsMatcher();
 }

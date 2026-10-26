@@ -63,6 +63,13 @@ export function CapabilityCard({ item }: { item: Item }) {
           </Typography>
         </Stack>
         <Typography>{item.meaning}</Typography>
+        {item.name === 'pwa' && (
+          <Typography color="text.secondary">
+            Installing needs a secure address: this Mac (localhost) qualifies; a phone needs a private HTTPS path that
+            you set up yourself (see the phone-access runbook). Nothing is made reachable from here, and no data is kept
+            offline.
+          </Typography>
+        )}
         <Typography color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>
           {item.changedAt
             ? `Last switched ${formatIstDateTime(item.changedAt)}: ${item.reason ?? ''}`

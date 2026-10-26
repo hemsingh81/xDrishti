@@ -1,4 +1,6 @@
 /// <reference types="vitest/config" />
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
@@ -7,8 +9,30 @@ import { defineConfig } from 'vite';
 // so the browser always talks to one origin — same as production.
 const apiTarget = process.env.XD_API_URL ?? 'http://localhost:8080';
 
+const swFiles = [
+  'offline.html',
+  'manifest.webmanifest',
+  'icons/icon-192.png',
+  'icons/icon-512.png',
+  'icons/maskable-512.png',
+  'icons/apple-touch-icon.png',
+];
+
+// P8-21: stamps public/sw.js (copied unhashed to dist/) with a hash of the files it caches, so a changed file means a new cache name.
+const stampServiceWorker = {
+  name: 'xd-stamp-sw',
+  apply: 'build' as const,
+  closeBundle() {
+    const dist = fileURLToPath(new URL('./dist/', import.meta.url));
+    const hash = createHash('sha256');
+    swFiles.forEach((file) => hash.update(readFileSync(dist + file)));
+    const source = readFileSync(`${dist}sw.js`, 'utf8');
+    writeFileSync(`${dist}sw.js`, source.replace("'__XD_BUILD__'", `'${hash.digest('hex').slice(0, 10)}'`));
+  },
+};
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), stampServiceWorker],
   resolve: {
     alias: [
       { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },

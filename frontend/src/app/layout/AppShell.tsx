@@ -8,6 +8,7 @@ import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { layout, pagePadding } from '@/theme';
 import { allNavItems, routeTitles } from '../navigation';
 import { LoadingAnnouncer } from './LoadingAnnouncer';
+import { PwaGate } from './PwaGate';
 import { ReadyMarker } from './ReadyMarker';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
@@ -103,6 +104,7 @@ export function AppShell() {
               <Outlet />
             </Suspense>
             <ReadyMarker key={pathname + search} />
+            <PwaGate />
           </Box>
         </Box>
       </Box>
