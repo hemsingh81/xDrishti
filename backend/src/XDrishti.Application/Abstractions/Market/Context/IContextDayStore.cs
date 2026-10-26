@@ -8,6 +8,9 @@ public interface IContextDayStore
     /// <summary>How many days are stored and the newest date: a cheap key for a cache of what was built from them.</summary>
     ValueTask<ContextStamp> StampAsync(CancellationToken cancellationToken);
 
+    /// <summary>The dates of the stored days, oldest first (the notices need no prices).</summary>
+    ValueTask<IReadOnlyList<DateOnly>> ListDatesAsync(CancellationToken cancellationToken);
+
     /// <summary>Every stored day, oldest first.</summary>
     ValueTask<IReadOnlyList<ContextDayRecord>> ListAsync(CancellationToken cancellationToken);
 

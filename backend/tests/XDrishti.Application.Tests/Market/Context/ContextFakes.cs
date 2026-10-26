@@ -41,6 +41,9 @@ internal sealed class FakeContextDayStore : IContextDayStore
     public ValueTask<ContextStamp> StampAsync(CancellationToken cancellationToken) =>
         ValueTask.FromResult(new ContextStamp(Rows.Count, Rows.Count == 0 ? null : Rows.Max(r => r.Date)));
 
+    public ValueTask<IReadOnlyList<DateOnly>> ListDatesAsync(CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<DateOnly>>([.. Rows.Select(r => r.Date).Order()]);
+
     public ValueTask<IReadOnlyList<ContextDayRecord>> ListAsync(CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<ContextDayRecord>>([.. Rows.OrderBy(r => r.Date)]);
 

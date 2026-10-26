@@ -63,8 +63,14 @@ public static class ContextDerivation
                 continue;
             }
 
-            if (!IsFull(indexLeg, expected, options))
+            if (!IsFinal(indexLeg, date, expected, lastClosedSession, options))
             {
+                if (date >= lastClosedSession)
+                {
+                    pending.Add(date); // the day can still gain bars: it is written once the aggregate holds every minute, or once it is older
+                    continue;
+                }
+
                 skipped.Add(new SkippedContextDay(date, ContextSkipReason.IndexThin, indexLeg.Bars));
                 continue;
             }
@@ -78,13 +84,20 @@ public static class ContextDerivation
             DailyLeg? accepted = null;
             if (vix.TryGetValue(date, out var vixLeg))
             {
-                if (!IsFull(vixLeg, expected, options))
+                if (!IsFinal(vixLeg, date, expected, lastClosedSession, options))
                 {
-                    skipped.Add(new SkippedContextDay(date, ContextSkipReason.VixThin, vixLeg.Bars));
+                    if (date < lastClosedSession)
+                    {
+                        skipped.Add(new SkippedContextDay(date, ContextSkipReason.VixThin, vixLeg.Bars));
+                    }
                 }
                 else if (double.IsFinite(vixLeg.Close) && vixLeg.Close > 0)
                 {
                     accepted = vixLeg;
+                }
+                else
+                {
+                    skipped.Add(new SkippedContextDay(date, ContextSkipReason.VixInvalid, vixLeg.Bars));
                 }
             }
 
@@ -110,6 +123,13 @@ public static class ContextDerivation
 
         return map;
     }
+
+    /// <summary>
+    /// A leg is final when the aggregate holds every minute of the session, or when the session is older than the last closed one and the leg has at least the configured share of the expected minutes: the last closed session can still gain bars
+    /// (the Dhan phase and the gap backfill refetch it), and a day that is written is never restated.
+    /// </summary>
+    private static bool IsFinal(DailyLeg leg, DateOnly date, int expectedMinutes, DateOnly lastClosedSession, ContextDerivationOptions options) =>
+        leg.Complete || (date < lastClosedSession && IsFull(leg, expectedMinutes, options));
 
     private static bool IsFull(DailyLeg leg, int expectedMinutes, ContextDerivationOptions options) =>
         expectedMinutes > 0 && (double)leg.Bars / expectedMinutes >= options.MinDayFraction;

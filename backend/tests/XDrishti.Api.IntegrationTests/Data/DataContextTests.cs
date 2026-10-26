@@ -118,7 +118,7 @@ public sealed class DataContextTests(ApiFactory factory) : DataTestBase(factory)
         job.Status.ShouldBe("succeeded");
         var coverage = await CoverageAsync();
         coverage.Days.ShouldBe(0);
-        coverage.SkippedTotal.ShouldBe(3);
+        coverage.SkippedTotal.ShouldBe(2, "the last closed session can still gain bars: it is pending, not skipped");
         coverage.Skipped.ShouldAllBe(s => s.Reason == "index_thin" && s.Bars == 300);
     }
 

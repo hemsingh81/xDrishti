@@ -58,7 +58,7 @@ public sealed class ContextDerivationTests
     [Fact]
     public void A_day_with_a_thin_index_leg_is_skipped_with_its_bars_and_a_missing_one_is_skipped_as_missing()
     {
-        var index = Index(Sessions).Where(l => l.Date != Sessions[1]).Select(l => l.Date == Sessions[2] ? l with { Bars = 300 } : l);
+        var index = Index(Sessions).Where(l => l.Date != Sessions[1]).Select(l => l.Date == Sessions[2] ? l with { Bars = 300, Complete = false } : l);
 
         var result = Derive(index, Sessions.Select(d => Leg(d, 15)));
 
@@ -69,10 +69,11 @@ public sealed class ContextDerivationTests
     [Fact]
     public void The_threshold_is_the_share_of_the_expected_minutes_and_exactly_96_percent_counts()
     {
-        var result = Derive([Leg(S1, 22_000, 360), Leg(S1.AddDays(1), 22_000, 359)], [], lastClosed: S1.AddDays(1), options: new ContextDerivationOptions(1, 0.96));
+        var result = Derive([Leg(S1, 22_000, 360), Leg(S1.AddDays(1), 22_000, 359), Leg(S1.AddDays(2), 22_000)], [], lastClosed: S1.AddDays(2), options: new ContextDerivationOptions(1, 0.96));
 
         result.Records.Select(r => r.Date).ShouldBe([S1]);
         result.Skipped.ShouldBe([new SkippedContextDay(S1.AddDays(1), ContextSkipReason.IndexThin, 359)]);
+        result.Pending.ShouldBe([S1.AddDays(2)]);
     }
 
     [Fact]
@@ -146,5 +147,36 @@ public sealed class ContextDerivationTests
         result.Records.ShouldBeEmpty();
         result.Pending.ShouldBeEmpty();
         result.Skipped.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void The_last_closed_session_with_372_of_375_bars_is_pending_but_the_same_day_once_older_is_written()
+    {
+        var partial = Leg(S1, 22_000, 372);
+        var vix = Leg(S1, 15, 372);
+
+        var onTheLastClosed = Derive([partial], [vix], lastClosed: S1, options: new ContextDerivationOptions(1, 0.96));
+        var older = Derive([partial], [vix], lastClosed: S1.AddDays(1), options: new ContextDerivationOptions(1, 0.96));
+        var complete = Derive([partial with { Bars = 375, Complete = true }], [vix with { Bars = 375, Complete = true }], lastClosed: S1, options: new ContextDerivationOptions(1, 0.96));
+
+        onTheLastClosed.Records.ShouldBeEmpty();
+        onTheLastClosed.Pending.ShouldBe([S1]);
+        onTheLastClosed.Skipped.ShouldBeEmpty();
+        older.Records.ShouldHaveSingleItem().VixClose.ShouldBe(15);
+        complete.Records.ShouldHaveSingleItem();
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(-3.0)]
+    [InlineData(double.NaN)]
+    public void A_full_vix_leg_with_a_close_that_is_not_possible_is_listed_as_invalid_and_the_day_goes_without_it(double close)
+    {
+        var vix = new[] { Leg(Sessions[0], 15) with { Close = close } };
+
+        var result = Derive(Index(Sessions[..1]), vix);
+
+        result.Skipped.ShouldContain(new SkippedContextDay(Sessions[0], ContextSkipReason.VixInvalid, 375));
+        result.Records.ShouldHaveSingleItem().VixClose.ShouldBeNull();
     }
 }

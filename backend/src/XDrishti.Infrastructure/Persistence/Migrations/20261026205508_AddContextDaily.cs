@@ -35,6 +35,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     table.CheckConstraint("ck_context_daily_vix", "vix_close IS NULL OR vix_close > 0");
                 });
 
+            // Known limit (D10): the table is insert-only, so a day written without its VIX after an outage longer than VixGraceSessions stays VIX-less even if the VIX arrives later.
             // Insert-only for the runtime role, granted on this table alone (a schema-wide grant would give back UPDATE and DELETE). P3-01e adds breadth columns and a column-level UPDATE grant, never a table-level one.
             migrationBuilder.GrantTableToAppRole(Schemas.Market, "context_daily");
             migrationBuilder.MakeAppendOnlyForAppRole(Schemas.Market, "context_daily");

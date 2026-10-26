@@ -18,6 +18,19 @@ internal sealed class ContextDayStore(NpgsqlDataSource dataSource, TimeProvider 
         return new ContextStamp(reader.GetInt32(0), reader.IsDBNull(1) ? null : reader.GetFieldValue<DateOnly>(1));
     }
 
+    public async ValueTask<IReadOnlyList<DateOnly>> ListDatesAsync(CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT date FROM market.context_daily ORDER BY date");
+        var dates = new List<DateOnly>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            dates.Add(reader.GetFieldValue<DateOnly>(0));
+        }
+
+        return dates;
+    }
+
     public async ValueTask<IReadOnlyList<ContextDayRecord>> ListAsync(CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(

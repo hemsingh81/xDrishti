@@ -8,6 +8,7 @@ public enum ContextSkipReason
     IndexInvalid = 2,
     NotASession = 3,
     VixThin = 4,
+    VixInvalid = 5,
 }
 
 /// <summary>The wire spelling of <see cref="ContextSkipReason"/>.</summary>
@@ -20,6 +21,7 @@ public static class ContextSkipReasonCodes
         ContextSkipReason.IndexInvalid => "index_invalid",
         ContextSkipReason.NotASession => "not_a_session",
         ContextSkipReason.VixThin => "vix_thin",
+        ContextSkipReason.VixInvalid => "vix_invalid",
         _ => throw new ArgumentOutOfRangeException(nameof(reason)),
     };
 }

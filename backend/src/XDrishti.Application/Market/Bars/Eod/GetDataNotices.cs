@@ -19,7 +19,7 @@ internal sealed class GetDataNoticesHandler(IBarGaps gaps, IQualityQueries quali
         var lastQuality = await quality.GetLastRunAsync(true, cancellationToken);
         var gate = await QualityGateReader.ReadAsync(quality, tradingCalendar, settings, clock, await quality.GetCountsAsync(cancellationToken), cancellationToken);
         var calendar = await tradingCalendar.GetAsync(cancellationToken);
-        var context = ContextHealth.Of((await contextDays.ListAsync(cancellationToken)).Select(r => r.Date).ToHashSet(), calendar, calendar.LastClosedSession(clock.GetUtcNow()));
+        var context = ContextHealth.Of((await contextDays.ListDatesAsync(cancellationToken)).ToHashSet(), calendar, calendar.LastClosedSession(clock.GetUtcNow()));
         return new(DataNoticeRules.Build(await gaps.GetSummaryAsync(cancellationToken), lastQuality, gate, await corporateActions.GetPendingAsync(cancellationToken), context));
     }
 }
