@@ -39,7 +39,7 @@ public static class AuditKinds
         (Configuration,
         [
             AccountEventType.AccountCreated, AccountEventType.AccountArchived, AccountEventType.TradingUpdated, AccountEventType.PortfolioUpdated, AccountEventType.DataUpdated, AccountEventType.RiskProfileCreated, AccountEventType.RiskProfileUpdated, AccountEventType.RiskProfileDeleted,
-            AccountEventType.BucketAdded, AccountEventType.BucketCreated, AccountEventType.BucketRenamed, AccountEventType.PortfolioRefreshSettingsChanged, AccountEventType.PortfolioBenchmarkChanged, AccountEventType.FirstImportDateChanged,
+            AccountEventType.CapabilityChanged, AccountEventType.BucketAdded, AccountEventType.BucketCreated, AccountEventType.BucketRenamed, AccountEventType.PortfolioRefreshSettingsChanged, AccountEventType.PortfolioBenchmarkChanged, AccountEventType.FirstImportDateChanged,
         ]),
         (MarketData,
         [

@@ -1,6 +1,6 @@
 # P8-18 — Tweak and re-run from the UI (start one replay job, judge it, never apply it)
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (by the owner on 2026-10-26). Part A (the capability gate) built 2026-10-26; Part B (the job) is built in the second commit.
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-18 of [P8-00](P8-00-reports-and-ui-plan.md) (Q3, Q1, Q2)
 - **Design refs:** docs/design/09-learning-engine.md §12 (tweak & re-run, five honesty rules) · 04 §3-§4 (control plane vs services, human in the loop) · 13 §1c · 17 §2 (`xd-api` hosts the background services) · 19 §4 (automation over-reach, overfitting through repeated experiments) · ADR 0072 (experiments), ADR 0058 (Lab runs: queue table, dispatcher, hub), ADR 0083/0091 (owner-only acts, fresh password, auto never the owner)
 - **Needs:** P6-11 (built: `RunExperimentHandler`, `research.experiments`), P5-02 (built: the queue/dispatcher/hub pattern), P3-10 (built: `IRunStore`), P8-03 (the Experiments tab that shows the result), P8-06 (the stored-run list for the baseline picker; until then a run key typed or pasted). An ADR at build time (next free ADR number at build time).
@@ -101,3 +101,10 @@ None blocking. Owner acts after the build: switching `experiments_ui` ON in `/ow
 - Next ADR: next free number at build time (0102 when last read).
 - Table name fixed: `research.learning_changelog` (the real table; read in `LearningChangelogSql.cs`). Part A (capability gate, `FreshPasswordCheck`, criteria 15 and 16) is the only part P8-19, P8-20 and P8-21 depend on; Part B (the job) can be built after them.
 - P8-06 is built (ADR 0100) and its default run set (`RunSelection`) has no rule for `created_by = experiment:<jobId>` (searched, none found). Part B therefore amends `RunSelection` to leave such runs out of the default set (they stay selectable and labelled "experiment candidate"), with a test in the Reporting tests; this replaces the "requirement on P8-06" wording in D5.
+
+## Decisions at build (2026-10-26, Part A)
+- **A1 Fresh-password helper.** `FreshPasswordCheck` already exists as `OwnerAct.AuthorizeAsync` (P8-23); it is reused unchanged, plus `OwnerAct.SessionOwner` (session owner without a password, for the safe direction: switch OFF, cancel) and `OwnerAct.RefusedWhileOffAsync` (the generic gate for an endpoint, asked BEFORE the password so an OFF act neither counts toward the lockout nor says anything about the password).
+- **A2 Generic gate.** `ICapabilityGate.RequireAsync(name)` reads `platform.capability_changes`; the write port `ICapabilityLogWriter` has one user (`ChangeCapabilityHandler`) and that handler one caller (`CapabilitiesEndpoints`), pinned by `CapabilityArchitectureTests`. P8-19/20/21 name their capability and call the gate; they cannot switch it.
+- **A3 Audit.** One `AccountEventType.CapabilityChanged` row per real change (detail `name=<capability> on|off`, no reason, no password) beside the log row; a repeat writes neither. The two writes are two transactions (the log is the record; the event is the audit view): a failed event save leaves the log row, which the capability history shows.
+- **A4 Validation code.** `capabilities.invalid` is answered 422 and an unknown name 404 before any password check (safer: no password oracle).
+- **A5 Write-path guard.** `frontend/src/test/writePaths.test.ts` classifies every feature folder: the listed writers may write, every other folder (including a new one) may not.

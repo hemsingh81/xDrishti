@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using XDrishti.Application.Abstractions.Autonomy;
+using XDrishti.Application.Abstractions.Capabilities;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market.Calendar;
@@ -16,6 +17,7 @@ using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
+using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
@@ -636,6 +638,10 @@ public static class DependencyInjection
         services.AddScoped<ChargeSheetStatusBuilder>(); // the charge-sheet confirmation: status, and the owner's one writer (P8-23, ADR 0127)
         services.AddScoped<IQueryHandler<GetChargeSheetStatusQuery, Result<ChargeSheetStatusView>>, GetChargeSheetStatusHandler>();
         services.AddScoped<ICommandHandler<RecordChargeSheetActCommand, ChargeSheetActOutcome>, RecordChargeSheetActHandler>();
+        services.AddScoped<ICapabilityGate, CapabilityGate>(); // the generic owner-act capability gate: reads the log, switches nothing (P8-18 Part A, ADR 0128)
+        services.AddScoped<CapabilityViews>();
+        services.AddScoped<IQueryHandler<GetCapabilitiesQuery, CapabilitiesView>, GetCapabilitiesHandler>();
+        services.AddScoped<ICommandHandler<ChangeCapabilityCommand, CapabilityChangeOutcome>, ChangeCapabilityHandler>(); // the one writer of the capability log; only the owner's endpoint calls it
         services.AddScoped<IQueryHandler<EvaluatePaperPhaseCheckQuery, Result<PaperPhaseCheckView>>, EvaluatePaperPhaseCheckHandler>(); // the paper phase check: reads only, judges nothing it cannot read (P10-06, ADR 0123)
         services.AddScoped<IQueryHandler<GetBacktestVsPaperQuery, Result<BacktestVsPaperView>>, GetBacktestVsPaperHandler>(); // backtest vs paper, computed on read (P10-04, ADR 0122)
         services.AddScoped<ICommandHandler<JournalPlansCommand, JournalOutcome>, JournalPlansHandler>(); // auto-journal (P7-14, ADR 0093): reads stored fills, insert-only links, no order

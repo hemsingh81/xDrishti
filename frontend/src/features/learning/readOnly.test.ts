@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { findWrites } from '@/test/writeScan';
 
 // P8-00 D6: a read-only screen has no way to write. The feature's own sources (not its tests) must contain no mutation, no
 // call that is not a GET, and no import of another feature.
@@ -17,8 +18,7 @@ describe('the Learning feature is read only', () => {
   });
 
   it.each(files)('%s has no write call and no mutation', (_name, text) => {
-    expect(text).not.toMatch(/api\.(POST|PUT|PATCH|DELETE)\b/);
-    expect(text).not.toMatch(/\buseMutation\b|\bensureOk\b|\bmethod:\s*['"](POST|PUT|PATCH|DELETE)/);
+    expect(findWrites(text)).toEqual([]);
     expect(text).not.toMatch(/@\/features\//);
   });
 });

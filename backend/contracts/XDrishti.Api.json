@@ -13058,6 +13058,108 @@
         }
       }
     },
+    "/api/capabilities": {
+      "get": {
+        "tags": [
+          "Capabilities"
+        ],
+        "summary": "The owner-act capabilities (experiments_ui, learning_moves_ui, autonomy_form, exports, pwa), each OFF until the owner switches it on, with what it allows, when it was last switched and the latest switches. Read only",
+        "operationId": "GetCapabilities",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilitiesView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/capabilities/{name}": {
+      "put": {
+        "tags": [
+          "Capabilities"
+        ],
+        "summary": "Switch one capability ON or OFF as the owner; appends an audited row (the same state again writes nothing and answers changed=false). Switching ON needs a session, the CSRF token and the password in the body, checked on EVERY request; switching OFF needs no password. 401 auth.invalid_credentials, 423 auth.locked, 404 capabilities.not_found, 422 capabilities.invalid, 429 auth.rate_limited",
+        "operationId": "ChangeCapability",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeCapabilityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityChangeOutcome"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/plans/{id}/review": {
       "get": {
         "tags": [
@@ -16976,6 +17078,133 @@
         },
         "description": "One point of the calibration table of a model: a raw score and the probability it maps to."
       },
+      "CapabilitiesView": {
+        "required": [
+          "items",
+          "history"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityView"
+            },
+            "description": "The whitelist in screen order, each with its state (OFF when it has no row)."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityHistoryView"
+            },
+            "description": "The latest switches of all capabilities, newest first (at most 20)."
+          }
+        },
+        "description": "Every capability and the latest switches."
+      },
+      "CapabilityChangeOutcome": {
+        "required": [
+          "changed",
+          "capabilities"
+        ],
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "boolean",
+            "description": "True when a row was written; false when the log already said the same."
+          },
+          "capabilities": {
+            "description": "Every capability after the switch.",
+            "$ref": "#/components/schemas/CapabilitiesView"
+          }
+        },
+        "description": "What the switch did and what stands afterwards."
+      },
+      "CapabilityHistoryView": {
+        "required": [
+          "id",
+          "name",
+          "enabled",
+          "actor",
+          "reason",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row.",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "description": "The capability."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "The state it set."
+          },
+          "actor": {
+            "type": "string",
+            "description": "Who."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why."
+          },
+          "at": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          }
+        },
+        "description": "One switch in the history."
+      },
+      "CapabilityView": {
+        "required": [
+          "name",
+          "label",
+          "meaning",
+          "enabled",
+          "changedAt",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The stored name."
+          },
+          "label": {
+            "type": "string",
+            "description": "A few words."
+          },
+          "meaning": {
+            "type": "string",
+            "description": "What ON allows."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "The newest row says on. False when there is no row."
+          },
+          "changedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the newest row was written; null when there is none.",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The reason of the newest row; null when there is none."
+          }
+        },
+        "description": "One capability."
+      },
       "CaptureRunList": {
         "required": [
           "basis",
@@ -17543,6 +17772,35 @@
           }
         },
         "description": "The body of the autonomy change. The owner is never part of it: the actor comes from the signed-in session."
+      },
+      "ChangeCapabilityRequest": {
+        "required": [
+          "enabled",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "True to switch the capability ON (it is off by default), false to switch it OFF."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS switch. Needed to switch ON and checked on every request (an earlier step-up window does not count and is not used up); not needed to switch OFF."
+          }
+        },
+        "description": "The body of a capability switch. The owner is never part of it: the actor comes from the signed-in session."
       },
       "ChangeChargeSheetCapabilityRequest": {
         "required": [
@@ -41305,6 +41563,9 @@
     },
     {
       "name": "ChargeSheet"
+    },
+    {
+      "name": "Capabilities"
     },
     {
       "name": "Plan review"

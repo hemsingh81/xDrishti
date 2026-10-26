@@ -3814,6 +3814,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/capabilities': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The owner-act capabilities (experiments_ui, learning_moves_ui, autonomy_form, exports, pwa), each OFF until the owner switches it on, with what it allows, when it was last switched and the latest switches. Read only */
+    get: operations['GetCapabilities'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/capabilities/{name}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Switch one capability ON or OFF as the owner; appends an audited row (the same state again writes nothing and answers changed=false). Switching ON needs a session, the CSRF token and the password in the body, checked on EVERY request; switching OFF needs no password. 401 auth.invalid_credentials, 423 auth.locked, 404 capabilities.not_found, 422 capabilities.invalid, 429 auth.rate_limited */
+    put: operations['ChangeCapability'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/plans/{id}/review': {
     parameters: {
       query?: never;
@@ -5143,6 +5177,59 @@ export interface components {
        */
       probability: number;
     };
+    /** @description Every capability and the latest switches. */
+    CapabilitiesView: {
+      /** @description The whitelist in screen order, each with its state (OFF when it has no row). */
+      items: components['schemas']['CapabilityView'][];
+      /** @description The latest switches of all capabilities, newest first (at most 20). */
+      history: components['schemas']['CapabilityHistoryView'][];
+    };
+    /** @description What the switch did and what stands afterwards. */
+    CapabilityChangeOutcome: {
+      /** @description True when a row was written; false when the log already said the same. */
+      changed: boolean;
+      /** @description Every capability after the switch. */
+      capabilities: components['schemas']['CapabilitiesView'];
+    };
+    /** @description One switch in the history. */
+    CapabilityHistoryView: {
+      /**
+       * Format: int64
+       * @description The row.
+       */
+      id: number;
+      /** @description The capability. */
+      name: string;
+      /** @description The state it set. */
+      enabled: boolean;
+      /** @description Who. */
+      actor: string;
+      /** @description Why. */
+      reason: string;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      at: string;
+    };
+    /** @description One capability. */
+    CapabilityView: {
+      /** @description The stored name. */
+      name: string;
+      /** @description A few words. */
+      label: string;
+      /** @description What ON allows. */
+      meaning: string;
+      /** @description The newest row says on. False when there is no row. */
+      enabled: boolean;
+      /**
+       * Format: date-time
+       * @description When the newest row was written; null when there is none.
+       */
+      changedAt: null | string;
+      /** @description The reason of the newest row; null when there is none. */
+      reason: null | string;
+    };
     /** @description The capture runs with the label and the limits. */
     CaptureRunList: {
       /** @description The label. */
@@ -5373,6 +5460,15 @@ export interface components {
       /** @description Why, 1 to 500 characters. */
       reason: string;
       /** @description The owner's password, re-entered for THIS change. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
+      password: null | string;
+    };
+    /** @description The body of a capability switch. The owner is never part of it: the actor comes from the signed-in session. */
+    ChangeCapabilityRequest: {
+      /** @description True to switch the capability ON (it is off by default), false to switch it OFF. */
+      enabled: boolean;
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS switch. Needed to switch ON and checked on every request (an earlier step-up window does not count and is not used up); not needed to switch OFF. */
       password: null | string;
     };
     /** @description The body of the switch that allows confirming (off until the owner switches it on). */
@@ -23628,6 +23724,88 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetCapabilities: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CapabilitiesView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  ChangeCapability: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangeCapabilityRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CapabilityChangeOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

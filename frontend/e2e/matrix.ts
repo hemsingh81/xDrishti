@@ -2,6 +2,7 @@ import './shim';
 import { http, HttpResponse } from 'msw';
 import { buildCompare, buildThinCompare, mountCompare } from '../src/test/compareFixtures';
 import { buildCounterfactual, buildJourney, journeyOf, mountJourney } from '../src/test/journeyFixtures';
+import { createCapabilitiesFake } from '../src/test/capabilitiesFake';
 import { createChargeSheetFake } from '../src/test/chargeSheetFake';
 import { lossTags, rule, smart } from '../src/test/evidenceFixtures';
 import { mountPaper } from '../src/test/paperFixtures';
@@ -138,6 +139,15 @@ export const screens: Screen[] = [
     full: lossTagsMount({}),
     empty: lossTagsMount({ state: 'empty', tradesRead: 0, losses: 0, cells: [], worst: [] }),
   }),
+  {
+    id: 'P8-18-owner-acts',
+    route: '/owner-acts',
+    mounts: {
+      full: () => {
+        server.use(...createCapabilitiesFake().handlers);
+      },
+    },
+  },
   {
     id: 'settings-charge-sheet',
     route: '/settings?tab=charge-sheet',

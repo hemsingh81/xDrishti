@@ -3107,6 +3107,63 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("broker_secrets", "accounts");
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Capabilities.CapabilityChangeRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("Capability")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("capability");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<long?>("PreviousId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("previous_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("SnapshotHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("snapshot_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_capability_changes");
+
+                    b.HasIndex("Capability", "Id")
+                        .HasDatabaseName("ix_capability_changes_capability_id");
+
+                    b.ToTable("capability_changes", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_capability_changes_shape", "capability ~ '^[a-z][a-z0-9_]{0,39}$' AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND length(btrim(reason)) > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.CellStatsRecord", b =>
                 {
                     b.Property<long>("Id")

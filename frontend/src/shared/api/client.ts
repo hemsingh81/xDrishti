@@ -63,7 +63,10 @@ api.use({
       .json()
       .catch(() => undefined)) as Problem | undefined;
     // A wrong password in the step-up dialog or the change-password form: show it, do not sign the owner out.
-    if (passwordCheckPaths.has(schemaPath) && problem?.code === 'auth.invalid_credentials') {
+    if (
+      (passwordCheckPaths.has(schemaPath) || schemaPath.startsWith('/api/capabilities/')) &&
+      problem?.code === 'auth.invalid_credentials'
+    ) {
       return undefined;
     }
     authHooks.onUnauthorized(problem);

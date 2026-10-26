@@ -104,6 +104,11 @@ export const routes: RouteObject[] = [
             lazy: async () => ({ Component: (await import('@/features/system-status')).SystemStatusPage }),
           },
           ...plannedNavItems.map((item) => ({ path: item.path.slice(1), element: <ComingSoonPage /> })),
+          {
+            // Not in the sidebar: reached by the links of the screens whose write control a switch holds back.
+            path: 'owner-acts',
+            lazy: async () => ({ Component: (await import('@/features/owner-acts')).OwnerActsPage }),
+          },
           { path: '*', element: <NotFoundPage /> },
         ],
       },

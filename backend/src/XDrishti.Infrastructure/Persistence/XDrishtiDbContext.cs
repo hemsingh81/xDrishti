@@ -11,6 +11,7 @@ using XDrishti.Domain.Platform;
 using XDrishti.Domain.Platform.Services;
 using XDrishti.Domain.Portfolio;
 using XDrishti.Infrastructure.Accounts;
+using XDrishti.Infrastructure.Capabilities;
 using XDrishti.Infrastructure.Learning;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Bars;
@@ -204,6 +205,7 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<AutonomySettingRecord> AutonomySettings => Set<AutonomySettingRecord>();
 
     internal DbSet<ChargeSheetEventRecord> ChargeSheetEvents => Set<ChargeSheetEventRecord>();
+    internal DbSet<CapabilityChangeRecord> CapabilityChanges => Set<CapabilityChangeRecord>();
     internal DbSet<TicketAlertRecord> TicketAlerts => Set<TicketAlertRecord>();
     internal DbSet<TicketPromptRecord> TicketPrompts => Set<TicketPromptRecord>();
     internal DbSet<TicketNoticeAckRecord> TicketNoticeAcks => Set<TicketNoticeAckRecord>();

@@ -9,6 +9,7 @@ using XDrishti.Application;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Auth;
 using XDrishti.Application.Abstractions.Autonomy;
+using XDrishti.Application.Abstractions.Capabilities;
 using XDrishti.Application.Abstractions.ChargeSheet;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
@@ -31,6 +32,7 @@ using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Audit;
 using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
+using XDrishti.Infrastructure.Capabilities;
 using XDrishti.Infrastructure.Lab;
 using XDrishti.Infrastructure.Learning;
 using XDrishti.Infrastructure.Market;
@@ -134,6 +136,9 @@ public static class DependencyInjection
         services.AddScoped<ChargeSheetEventStore>(); // the owner's acts on the confirmation, insert-only (P8-23, ADR 0127)
         services.AddScoped<IChargeSheetLog>(sp => sp.GetRequiredService<ChargeSheetEventStore>());
         services.AddScoped<IChargeSheetLogWriter>(sp => sp.GetRequiredService<ChargeSheetEventStore>());
+        services.AddScoped<CapabilityLogStore>(); // the owner's switches of the capabilities, insert-only (P8-18 Part A, ADR 0128)
+        services.AddScoped<ICapabilityLog>(sp => sp.GetRequiredService<CapabilityLogStore>());
+        services.AddScoped<ICapabilityLogWriter>(sp => sp.GetRequiredService<CapabilityLogStore>());
         services.Replace(ServiceDescriptor.Scoped<ICostConfirmationFact, StoredCostConfirmation>()); // the paper statistics read the same stored confirmation; the Application default (NotConfirmed) stays the test default (P8-23)
         services.AddScoped<IExitSelectionStore, ExitSelectionStore>(); // the exit choices (spec P4-06)
         services.AddScoped<IStrategyStore, StrategyStore>(); // the stored strategies of the lab schema (spec P3-02d)

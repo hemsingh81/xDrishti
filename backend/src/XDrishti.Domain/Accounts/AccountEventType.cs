@@ -76,4 +76,5 @@ public enum AccountEventType
     CostsUndone,
     SecurityNamesLearned,
     TradesSuperseded,
+    CapabilityChanged,
 }
