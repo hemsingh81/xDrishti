@@ -6,6 +6,7 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Learning;
 using XDrishti.Application.Paper;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Paper;
@@ -308,6 +309,104 @@ public sealed class GetBacktestVsPaperHandlerTests
         view.N.ShouldBe(0);
         view.Paper.Mean.Number.ShouldBeNull();
         view.Criteria.Expectancy.Verdict.ShouldBe("not_evaluable");
+    }
+
+    [Theory]
+    [InlineData(30, "provisional", "not_evaluable")]
+    [InlineData(59, "provisional", "not_evaluable")]
+    [InlineData(60, "value", "met")]
+    public async Task The_states_and_verdicts_change_exactly_at_thirty_and_sixty_trades(int n, string state, string verdict)
+    {
+        Reference(30, 0.5);
+        Paper(n, 0.5);
+
+        var view = await View();
+
+        view.Paper.Mean.State.ShouldBe(state);
+        view.Band.P05.State.ShouldBe(state);
+        view.Criteria.Expectancy.Verdict.ShouldBe(verdict);
+    }
+
+    [Fact]
+    public async Task A_basis_mismatch_together_with_a_thin_cell_reports_the_mismatch_and_lists_both_cells()
+    {
+        Reference(30, 0.5);
+        const string Thin = "ORB|15m|SELL|intraday|FIXED_RR|*";
+        _data.ReadAsync(1, Ct).Returns(ValueTask.FromResult(new PaperCompareData([.. Rows(40, 0.5, basis: "gross", sheet: null), .. Rows(20, 0.5, cell: Thin, firstId: 100)], 0, null)));
+
+        var view = await View();
+
+        view.Band.P05.State.ShouldBe("not_evaluable");
+        view.Band.P05.Reason!.ShouldContain(Cell);
+        view.Cells.Select(c => c.State).Order().ShouldBe(["basis_differs", "no_reference"]);
+    }
+
+    [Fact]
+    public async Task Cells_say_not_read_when_the_reference_was_left_unread_and_unavailable_when_it_is_missing()
+    {
+        Paper(10, 0.5);
+        var few = await View();
+        few.Cells.Single().State.ShouldBe("not_read");
+        few.Cells.Single().ReferenceN.ShouldBe(0);
+
+        _stats.ListLatestBeforeAsync(Start, null, null, Ct).Returns(ValueTask.FromResult<IReadOnlyList<StoredCellStats>>([]));
+        Paper(60, 0.5);
+        var missing = await View();
+        missing.Cells.Single().State.ShouldBe("unavailable");
+        missing.Cells.Single().Reason!.ShouldContain("no cell statistics snapshot");
+    }
+
+    [Fact]
+    public async Task A_truncated_grade_page_makes_the_sensitivity_provisional_and_says_how_many()
+    {
+        Reference(30, 0.5);
+        Paper(60, 0.5);
+        GradedItem Item(double r) => new(1, Start, 1, TicketGroup.Primary, TicketState.Proposed, new TicketGrade(GradeStatus.Graded, r, 0, 0, "stop", 1, 1, "gross, no charges", "x"));
+        _grades.ReportItemsAsync(Start, null, Arg.Any<int>(), Ct).Returns(ValueTask.FromResult(new GradedPage([.. Enumerable.Range(0, 40).Select(_ => Item(0.5))], true)));
+
+        var view = await View();
+
+        view.SensitivityAllProposals.Mean.State.ShouldBe("provisional");
+        view.SensitivityAllProposals.Mean.Reason!.ShouldContain("first 5000 tickets");
+    }
+
+    [Fact]
+    public async Task A_cancelled_read_stops_the_draw()
+    {
+        Reference(30, 0.5);
+        Paper(60, 0.5);
+        var rows = Rows(60, 0.5);
+        var snapshot = await _stats.ListLatestBeforeAsync(Start, null, null, Ct);
+        var header = await _runs.FindAsync(Run, Ct);
+        var trades = new List<SimTrade>();
+        await foreach (var t in _runs.StreamTradesAsync(Run, false, Ct))
+        {
+            trades.Add(t.Trade);
+        }
+
+        _ledger.EpochAsync(Arg.Any<long?>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<EpochRow?>(Epoch));
+        _data.ReadAsync(1, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(new PaperCompareData(rows, 0, null)));
+        _stats.ListLatestBeforeAsync(Start, null, null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(snapshot));
+        _runs.FindAsync(Run, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(header));
+        _runs.StreamTradesAsync(Run, false, Arg.Any<CancellationToken>()).Returns(_ => Stream([.. trades]));
+        _costs.ConfirmedOnAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<DateOnly?>(new DateOnly(2026, 10, 30)));
+        _grades.ReportItemsAsync(Arg.Any<DateOnly?>(), Arg.Any<DateOnly?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(new GradedPage([], false)));
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(async () => await Handler().HandleAsync(new GetBacktestVsPaperQuery(null, 2_000), cts.Token));
+    }
+
+    [Fact]
+    public void An_exit_label_with_a_comma_or_colon_survives_the_stored_sources_text()
+    {
+        var parsed = CellSource.TryParseList("aaa:intraday:ATR{a,b},bbb:swing:X:Y,ccc:intraday:FIXED_RR");
+
+        parsed.ShouldNotBeNull();
+        parsed.Select(s => (s.RunKey, s.Style, s.Exit)).ShouldBe([("aaa", "intraday", "ATR{a,b}"), ("bbb", "swing", "X:Y"), ("ccc", "intraday", "FIXED_RR")]);
+        CellSource.TryParseList("").ShouldBeNull();
+        CellSource.TryParseList("nonsense").ShouldBeNull();
+        CellSource.TryParse("k:swing:E,1:2")!.Exit.ShouldBe("E,1:2");
     }
 
     [Fact]

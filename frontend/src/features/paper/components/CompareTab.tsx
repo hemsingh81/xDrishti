@@ -34,7 +34,9 @@ function Body({ view }: { view: BacktestVsPaper }) {
   return (
     <Stack spacing={3}>
       <BasisNote basis={view.evidence.statement} limits={view.limits} />
-      {view.earlyWarning && <Alert severity="warning">{view.earlyWarning}</Alert>}
+      {view.earlyWarning && (
+        <Alert severity="warning">{view.earlyWarning}. Simulated; not an instruction to trade.</Alert>
+      )}
       <Typography>
         {formatCount(view.n)} counted trades (R basis: {view.basis}). Set apart: {formatCount(counts.reserve)} reserve,{' '}
         {formatCount(counts.straddle)} straddle, {formatCount(counts.open)} open, {formatCount(counts.otherEpochs)} in
@@ -46,7 +48,11 @@ function Body({ view }: { view: BacktestVsPaper }) {
         sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' } }}
       >
         <MetricTile
-          label="Paper mean R"
+          label={
+            view.chargeSheet.confirmedOn === null
+              ? `Paper mean R (basis ${view.basis}, costs not confirmed by the owner)`
+              : 'Paper mean R'
+          }
           state={toMetric(view.paper.mean)}
           format={formatSigned}
           hint={<Interval view={view} />}

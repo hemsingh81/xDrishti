@@ -27,12 +27,12 @@ Answer, with its n and its honest state, two questions about the counted paper t
 10. **Fan.** The view returns, per trade index 1..n, the 5th, 50th, 95th percentile of cumulative R of the draws and the paper cumulative R, with the table form of the same numbers.
 11. **Sensitivity beside.** The plan-price grades of **all** primary tickets of the epoch (approved or not, P7-13) give a second mean R with its n, labelled `simulated on plan prices, all proposals`; it is shown beside, never used for E3/E4.
 12. Hand fixtures hold exactly (degenerate) and within the stated tolerance (random); a property: a permutation of the paper trades leaves the band unchanged and changes only the paper drawdown; adding a cell reference with identical trades does not change the band.
-13. Read only: no write port is reachable from the handler; 422 `paper.invalid` for an unknown epoch or a draw count out of range; 404 `paper.not_found`.
+13. Read only: no write port is reachable from the handler; 422 `paper.invalid` for a non-positive epoch id or a draw count out of range; 404 `paper.not_found` for an epoch id that is not recorded.
 
 ## Contract
 - **API:** `GET /api/paper/backtest-vs-paper?epoch=&draws=` -> `BacktestVsPaperView` { `epochId`, `n`, `counts` { `counted`, `reserve`, `straddle`, `open`, `otherEpochs` }, `basis`, `chargeSheet` { `id`, `confirmedOn` }, `paper` { `mean` (metric), `ci90` { `lo`, `hi` } , `maxDrawdownR` (metric) }, `band` { `p05`, `p50`, `p95`, `rank`, `position`, `draws`, `seed` }, `drawdown` { `p50`, `p90`, `p95`, `position` }, `criteria` { `expectancy` { `verdict`, `label` }, `drawdown` { `verdict`, `label` } }, `earlyWarning`, `cells[]` { `cellKey`, `paperN`, `paperMean` (metric), `referenceN`, `referenceMean` (metric), `state`, `reason` }, `fan[]`, `sensitivityAllProposals`, `evidence`, `limits` }. Numbers are `Metric` (a non-value has no number field).
 - **CLI:** `xd paper compare [--epoch ID] [--draws N]` prints the same as text; exit 0 whatever the verdicts say.
-- **Data:** none, no migration. Log ids 5230 to 5239.
+- **Data:** none, no migration. Log ids 5246 to 5254.
 
 ## Non-functional
 10,000 draws x 60 slots = 600,000 picks plus 60 x 10,000 sort cells: under 200 ms; reading the reference runs streams the cells' trades once (as `xd learn cells` does): budget 3 s on the owner's data (UNVERIFIED: run sizes not measured). Memory for the fan: 10,000 x 60 doubles (4.8 MB) released after the quantiles.

@@ -18,6 +18,11 @@ internal sealed record ReferenceCell(bool Costed, string? SheetId, IReadOnlyList
 /// <param name="Cells">The cells by key.</param>
 internal sealed record ReferenceRead(string? Problem, string? SnapshotKey, DateOnly? AsOf, IReadOnlyList<string> RunKeys, IReadOnlyDictionary<string, ReferenceCell> Cells)
 {
+    /// <summary>Whether the reference was left unread on purpose (too few counted trades), not because it is missing.</summary>
+    public bool NotRead { get; init; }
+
+    public static ReferenceRead NotReadYet(string why) => Unavailable(why) with { NotRead = true };
+
     public static ReferenceRead Unavailable(string problem, string? snapshot = null, DateOnly? asOf = null) =>
         new(problem, snapshot, asOf, [], new Dictionary<string, ReferenceCell>(StringComparer.Ordinal));
 }
@@ -37,7 +42,7 @@ internal sealed class BacktestReferenceReader(ICellStatsStore stats, IRunStore r
         }
 
         var first = rows[0];
-        var sources = ParseSources(first.Sources);
+        var sources = CellSource.TryParseList(first.Sources);
         if (sources is null)
         {
             return ReferenceRead.Unavailable("the snapshot's sources cannot be read", first.SnapshotKey, first.Row.AsOf);
@@ -66,22 +71,5 @@ internal sealed class BacktestReferenceReader(ICellStatsStore stats, IRunStore r
         }
 
         return new ReferenceRead(null, first.SnapshotKey, first.Row.AsOf, [.. sources.Select(s => s.RunKey).Order(StringComparer.Ordinal)], cells);
-    }
-
-    private static List<CellSource>? ParseSources(string text)
-    {
-        var result = new List<CellSource>();
-        foreach (var part in text.Split(',', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var pieces = part.Split(':', 3);
-            if (pieces.Length != 3)
-            {
-                return null;
-            }
-
-            result.Add(new CellSource(pieces[0], pieces[1], pieces[2]));
-        }
-
-        return result.Count == 0 ? null : result;
     }
 }

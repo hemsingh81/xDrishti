@@ -76,13 +76,12 @@ internal sealed class LearningEvidenceEndpoints : IEndpointModule
         foreach (var text in run ?? [])
         {
             // KEY:STYLE:EXIT, the exit label being the rest (a label may hold ':' or ',').
-            var parts = text.Split(':', 3);
-            if (parts.Length != 3)
+            if (CellSource.TryParse(text) is not { } source)
             {
                 return Problem(LearningErrors.Invalid([new FieldError("run", "Write a run as KEY:STYLE:EXIT.")]), http);
             }
 
-            sources.Add(new CellSource(parts[0], parts[1], parts[2]));
+            sources.Add(source);
         }
 
         var result = await handler.HandleAsync(new GetLossTagsQuery(sources), cancellationToken);

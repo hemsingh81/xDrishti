@@ -19,7 +19,7 @@ public sealed class BacktestBandTests
         [.. parts.SelectMany(p => Enumerable.Repeat(new PaperSlot(cell, p.R), p.Count))];
 
     private static BandResult Run(List<PaperSlot> paper, params CellReference[] references) =>
-        BacktestBand.Compute(paper, references, Draws, BacktestBand.SeedOf(1, "snap", paper.Count), BacktestBand.IntervalSeedOf(1, "snap", paper.Count))!;
+        BacktestBand.Compute(paper, references, Draws, BacktestBand.SeedOf(1, "snap", paper.Count), BacktestBand.IntervalSeedOf(1, "snap", paper.Count), TestContext.Current.CancellationToken)!;
 
     [Fact]
     public void Fixture_a_all_plus_half_against_all_plus_half_is_exactly_degenerate_and_both_statistics_are_met()
@@ -155,10 +155,19 @@ public sealed class BacktestBandTests
     {
         var reference = Reference(Cell, (30, 0.5));
 
-        BacktestBand.Compute([], [reference], Draws, 1, 2).ShouldBeNull();
-        BacktestBand.Compute(Paper("other|cell", (5, 1.0)), [reference], Draws, 1, 2).ShouldBeNull();
-        BacktestBand.Compute(Paper(Cell, (5, 1.0)), [reference], new BandOptions(999), 1, 2).ShouldBeNull();
-        BacktestBand.Compute(Paper(Cell, (5, 1.0)), [reference], new BandOptions(100_001), 1, 2).ShouldBeNull();
-        BacktestBand.Compute(Paper(Cell, (5, 1.0)), [reference], new BandOptions(1_000), 1, 2).ShouldNotBeNull();
+        BacktestBand.Compute([], [reference], Draws, 1, 2, TestContext.Current.CancellationToken).ShouldBeNull();
+        BacktestBand.Compute(Paper("other|cell", (5, 1.0)), [reference], Draws, 1, 2, TestContext.Current.CancellationToken).ShouldBeNull();
+        BacktestBand.Compute(Paper(Cell, (5, 1.0)), [reference], new BandOptions(999), 1, 2, TestContext.Current.CancellationToken).ShouldBeNull();
+        BacktestBand.Compute(Paper(Cell, (5, 1.0)), [reference], new BandOptions(100_001), 1, 2, TestContext.Current.CancellationToken).ShouldBeNull();
+        BacktestBand.Compute(Paper(Cell, (5, 1.0)), [reference], new BandOptions(1_000), 1, 2, TestContext.Current.CancellationToken).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void A_cancelled_token_stops_the_draw()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Should.Throw<OperationCanceledException>(() => BacktestBand.Compute(Paper(Cell, (5, 1.0)), [Reference(Cell, (30, 0.5))], Draws, 1, 2, cts.Token));
     }
 }

@@ -33,7 +33,7 @@ public static class BacktestBand
     /// <summary>
     /// The band, or null when it cannot be drawn: no paper trade, an invalid draw count or a paper cell without a backtest trade. The caller states why before it gets here.
     /// </summary>
-    public static BandResult? Compute(IReadOnlyList<PaperSlot> paper, IReadOnlyList<CellReference> references, BandOptions options, ulong seed, ulong intervalSeed)
+    public static BandResult? Compute(IReadOnlyList<PaperSlot> paper, IReadOnlyList<CellReference> references, BandOptions options, ulong seed, ulong intervalSeed, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(paper);
         ArgumentNullException.ThrowIfNull(references);
@@ -66,11 +66,17 @@ public static class BacktestBand
         var draws = options.Draws;
         var means = new double[draws];
         var falls = new double[draws];
+        // Memory: one column of draws per fan point, at most 120 x 100,000 doubles (about 96 MB) at the extremes and 4.8 MB at the default 10,000 x 60; released after the quantiles. A chunked quantile would cut it; not needed at this scale.
         var columns = fanAt.Select(_ => new double[draws]).ToArray();
         var picks = new double[n];
         var rng = new SeededRandom(seed);
         for (var d = 0; d < draws; d++)
         {
+            if ((d & 2047) == 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             double sum = 0;
             foreach (var slot in order)
             {

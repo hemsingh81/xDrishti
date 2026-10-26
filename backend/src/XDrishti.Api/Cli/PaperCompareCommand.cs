@@ -63,14 +63,14 @@ internal static class PaperCompareCommand
     {
         var c = v.Counts;
         yield return string.Create(CultureInfo.InvariantCulture, $"epoch {(v.EpochId?.ToString(CultureInfo.InvariantCulture) ?? "-")}: {v.N} counted trades ({c.Reserve} reserve, {c.Straddle} straddle, {c.Open} open, {c.OtherEpochs} in other epochs), basis {v.Basis}");
-        yield return "paper mean R: " + Show(v.Paper.Mean) + "; 90% interval " + Show(v.Paper.Ci90.Lo) + " to " + Show(v.Paper.Ci90.Hi);
+        yield return "paper mean " + (v.ChargeSheet.ConfirmedOn is null ? $"R (basis {v.Basis}, costs not confirmed by the owner)" : "R") + ": " + Show(v.Paper.Mean) + "; 90% interval " + Show(v.Paper.Ci90.Lo) + " to " + Show(v.Paper.Ci90.Hi);
         yield return "backtest band (5th to 95th percentile): " + Show(v.Band.P05) + " to " + Show(v.Band.P95) + "; paper is " + (v.Band.Position ?? "not placed") + "; rank " + Show(v.Band.Rank);
         yield return "largest fall (paper): " + Show(v.Paper.MaxDrawdownR) + "; backtest 90th percentile at the same n: " + Show(v.Drawdown.P90) + "; " + (v.Drawdown.Position ?? "not placed");
         yield return "E3 expectancy: " + v.Criteria.Expectancy.Verdict + " - " + v.Criteria.Expectancy.Label;
         yield return "E4 drawdown: " + v.Criteria.Drawdown.Verdict + " - " + v.Criteria.Drawdown.Label;
         if (v.EarlyWarning is not null)
         {
-            yield return "EARLY WARNING: " + v.EarlyWarning;
+            yield return "EARLY WARNING: " + v.EarlyWarning + ". Simulated; not an instruction to trade.";
         }
 
         foreach (var cell in v.Cells)

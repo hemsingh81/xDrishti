@@ -20,10 +20,21 @@ internal sealed record CellAnalysis(IReadOnlyList<CompareCellView> Views, IReadO
 internal static class CompareCells
 {
     /// <summary>The fewest trades a cell reference (and a cell's own paper mean) needs.</summary>
-    public const int MinCellTrades = 30;
+    public const int MinCellTrades = PaperExitStatistics.ProvisionalFrom;
 
     public static CellAnalysis Analyze(IReadOnlyList<CountedTrade> trades, ReferenceRead reference)
     {
+        if (reference.Problem is not null)
+        {
+            // The reference was not read or is missing: say so on every cell, never "no reference" for a cell nobody looked up.
+            var state = reference.NotRead ? "not_read" : "unavailable";
+            var views0 = trades.GroupBy(t => t.CellKey, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal).Select(g => new CompareCellView(
+                g.Key, g.Count(),
+                g.Count() >= MinCellTrades ? ReportViews.Metric(Metric.Of(g.Average(t => t.R))) : ReportViews.Metric(Metric.Insufficient(string.Create(CultureInfo.InvariantCulture, $"{g.Count()} paper trades, {MinCellTrades} are needed"))),
+                0, ReportViews.Metric(Metric.Unavailable(reference.Problem)), state, reference.Problem)).ToList();
+            return new CellAnalysis(views0, [], null);
+        }
+
         var views = new List<CompareCellView>();
         var references = new List<CellReference>();
         var differs = new List<string>();

@@ -74,7 +74,7 @@ internal sealed class GetBacktestVsPaperHandler(
 
         var basis = n == 0 ? "none" : trades.All(t => t.RBasis == "net") ? "net" : trades.All(t => t.RBasis == "gross") ? "gross" : "mixed";
         var sheet = await SheetAsync(trades, cancellationToken);
-        var reference = n < PaperExitStatistics.ProvisionalFrom ? ReferenceRead.Unavailable("not read: too few counted trades") : await references.ReadAsync(epoch.StartedOn, cancellationToken);
+        var reference = n < PaperExitStatistics.ProvisionalFrom ? ReferenceRead.NotReadYet("not read: too few counted trades") : await references.ReadAsync(epoch.StartedOn, cancellationToken);
         var gate = n < PaperExitStatistics.ProvisionalFrom ? new BandGate("insufficient", string.Create(CultureInfo.InvariantCulture, $"{n} counted trades; at least {PaperExitStatistics.ProvisionalFrom} are needed")) : null;
         var analysis = CompareCells.Analyze(trades, reference);
         if (gate is null && reference.Problem is not null)
@@ -109,7 +109,7 @@ internal sealed class GetBacktestVsPaperHandler(
         {
             band = BacktestBand.Compute(
                 [.. trades.Select(t => new PaperSlot(t.CellKey, t.R))], analysis.References, options,
-                BacktestBand.SeedOf(epoch.Id, key, n), BacktestBand.IntervalSeedOf(epoch.Id, key, n));
+                BacktestBand.SeedOf(epoch.Id, key, n), BacktestBand.IntervalSeedOf(epoch.Id, key, n), cancellationToken);
         }
 
         var netBasis = basis == "net";
@@ -145,7 +145,7 @@ internal sealed class GetBacktestVsPaperHandler(
     private static MetricView Figure(double value, int n) => ReportViews.Metric(Shape(Metric.Of(value), n));
 
     private static Metric Shape(Metric metric, int n) =>
-        n < PaperExitStatistics.ValueFrom ? metric.AsProvisional(string.Create(CultureInfo.InvariantCulture, $"interim: {n} counted trades, {PaperExitStatistics.ValueFrom} are needed for a value")) : metric;
+        PaperExitStatistics.StateOf(n) == "provisional" ? metric.AsProvisional(string.Create(CultureInfo.InvariantCulture, $"interim: {n} counted trades, {PaperExitStatistics.ValueFrom} are needed for a value")) : metric;
 
     private static MetricView Gone(string state, string reason) => ReportViews.Metric(state switch
     {
@@ -230,7 +230,9 @@ internal sealed class GetBacktestVsPaperHandler(
         var mean = r.Average();
         return new CompareSensitivityView(label, r.Count, r.Count < PaperExitStatistics.ProvisionalFrom
             ? ReportViews.Metric(Metric.Insufficient(string.Create(CultureInfo.InvariantCulture, $"{r.Count} graded tickets; at least {PaperExitStatistics.ProvisionalFrom} are needed")))
-            : Figure(mean, r.Count));
+            : page.Truncated
+                ? ReportViews.Metric(Metric.Of(mean).AsProvisional(string.Create(CultureInfo.InvariantCulture, $"first {GradeLimit} tickets; more matched")))
+                : Figure(mean, r.Count));
     }
 
     private static BacktestVsPaperView Empty()

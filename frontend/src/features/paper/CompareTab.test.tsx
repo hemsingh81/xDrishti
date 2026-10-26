@@ -42,6 +42,7 @@ describe('Paper backtest vs paper tab', () => {
     open();
 
     expect(await screen.findByText(/paper is clearly worse than the backtest allows/)).toBeInTheDocument();
+    expect(screen.getByText(/Simulated; not an instruction to trade/)).toBeInTheDocument();
     expect(screen.getByText(/paper is below the backtest band/)).toBeInTheDocument();
     expect(screen.getByText('NOT MET')).toBeInTheDocument();
   });
@@ -55,5 +56,12 @@ describe('Paper backtest vs paper tab', () => {
     expect(screen.getByText(/No fan: the band is not a figure yet/)).toBeInTheDocument();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(screen.queryByText(/inside the backtest band/)).not.toBeInTheDocument();
+  });
+
+  it('labels the mean as not after-cost when the owner has not confirmed the sheet', async () => {
+    mountCompare(buildCompare({ chargeSheet: { id: 'flat-10', confirmedOn: null } }));
+    open();
+
+    expect(await screen.findByText('Paper mean R (basis net, costs not confirmed by the owner)')).toBeInTheDocument();
   });
 });

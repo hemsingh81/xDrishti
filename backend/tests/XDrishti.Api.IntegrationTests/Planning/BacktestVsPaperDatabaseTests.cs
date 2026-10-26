@@ -100,5 +100,6 @@ public sealed class BacktestVsPaperDatabaseTests(ApiFactory factory) : DataTestB
 
         (await Client.GetAsync(new Uri("/api/paper/backtest-vs-paper?epoch=999999999", UriKind.Relative), Ct)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await Client.GetAsync(new Uri("/api/paper/backtest-vs-paper?draws=5", UriKind.Relative), Ct)).StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        (await Client.GetAsync(new Uri("/api/paper/backtest-vs-paper?draws=100001", UriKind.Relative), Ct)).StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
     }
 }
