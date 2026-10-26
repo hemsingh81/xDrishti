@@ -10688,6 +10688,239 @@
         }
       }
     },
+    "/api/paper/reviews": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The stored weekly paper reviews, newest week first (optional epoch; limit 1 to 52, default 12). Read only. 422 paper.invalid",
+        "operationId": "ListPaperReviews",
+        "parameters": [
+          {
+            "name": "epoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperReviewList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/reviews/{isoWeek}": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The stored weekly paper review of an ISO week (2026-W43) and epoch (default the newest): the text exactly as it was built, and its sections. Opens with 'Paper only: no order was placed and none exists.' Read only. 404 paper.not_found, 422 paper.invalid",
+        "operationId": "GetPaperReview",
+        "parameters": [
+          {
+            "name": "isoWeek",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "epoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperReviewView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/review": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "A weekly paper review built now from stored records and not stored (week=2026-W43, default this week; optional epoch). An older week is the state as of today, and says so. Read only. 404 paper.not_found, 422 paper.invalid",
+        "operationId": "GetPaperReviewDryRun",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "epoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperReviewView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/discipline": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The discipline report of a window (epoch, from, to; default the whole epoch up to the last closed session): the seven categories of the primary tickets (they add up to the primary count), what skipping and resizing cost in R with n and state, added real fills, and the paper execution gap. No composite score. Read only. 404 paper.not_found, 422 paper.invalid",
+        "operationId": "GetPaperDiscipline",
+        "parameters": [
+          {
+            "name": "epoch",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisciplineView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/plans/{id}/alerts": {
       "get": {
         "tags": [
@@ -20068,6 +20301,175 @@
         },
         "description": "The weekly digest as the API and the verb show it."
       },
+      "DisciplineEvidenceView": {
+        "required": [
+          "sessions",
+          "primaryTickets",
+          "closedTrades"
+        ],
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "integer",
+            "description": "Closed sessions counted.",
+            "format": "int32"
+          },
+          "primaryTickets": {
+            "type": "integer",
+            "description": "Primary tickets of the window (the seven categories add up to this).",
+            "format": "int32"
+          },
+          "closedTrades": {
+            "type": "integer",
+            "description": "Closed primary paper trades of the window, once per ticket.",
+            "format": "int32"
+          }
+        },
+        "description": "What a discipline report rests on."
+      },
+      "DisciplineLineView": {
+        "required": [
+          "category",
+          "kind",
+          "title",
+          "n",
+          "sumR",
+          "rMetric",
+          "rupees",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "The category or line name."
+          },
+          "kind": {
+            "type": "string",
+            "description": "category, flag, deviation or total."
+          },
+          "title": {
+            "type": "string",
+            "description": "The words."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Tickets (or fills).",
+            "format": "int32"
+          },
+          "sumR": {
+            "description": "Sum of R of the graded tickets.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "rMetric": {
+            "description": "Mean R: insufficient below 15 graded tickets, provisional below 30.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "rupees": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DisciplineRupeesView"
+            },
+            "description": "Rupees per account."
+          },
+          "note": {
+            "type": "string",
+            "description": "What is counted apart."
+          }
+        },
+        "description": "One line of the discipline report on the wire."
+      },
+      "DisciplineRupeesView": {
+        "required": [
+          "accountId",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "The paper account.",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Rupees after the stored sheet's charges when charged.",
+            "format": "double"
+          }
+        },
+        "description": "Rupees of one account on a discipline line."
+      },
+      "DisciplineView": {
+        "required": [
+          "basis",
+          "epochId",
+          "from",
+          "to",
+          "lines",
+          "execution",
+          "evidence",
+          "unavailable",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "The label of the record."
+          },
+          "epochId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The epoch; null when there is none yet.",
+            "format": "int64"
+          },
+          "from": {
+            "type": "string",
+            "description": "The first day of the window.",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "description": "The last day of the window.",
+            "format": "date"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DisciplineLineView"
+            },
+            "description": "The lines in their fixed order."
+          },
+          "execution": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionRowView"
+            },
+            "description": "The execution waterfall."
+          },
+          "evidence": {
+            "description": "What it rests on.",
+            "$ref": "#/components/schemas/DisciplineEvidenceView"
+          },
+          "unavailable": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why the report could not be built; null when it was."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honest limits."
+          }
+        },
+        "description": "The discipline report of a window (spec P10-03, R19). Every R has its n and its state; there is no composite score."
+      },
       "DistributionBinView": {
         "required": [
           "lowerR",
@@ -21942,6 +22344,35 @@
           }
         },
         "description": "The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words."
+      },
+      "ExecutionRowView": {
+        "required": [
+          "id",
+          "label",
+          "value",
+          "n"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "plan, slippage, charges, net, missed_triggers or real_slippage."
+          },
+          "label": {
+            "type": "string",
+            "description": "The words."
+          },
+          "value": {
+            "description": "Mean R.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "n": {
+            "type": "integer",
+            "description": "Trades.",
+            "format": "int32"
+          }
+        },
+        "description": "One row of the paper execution waterfall on the wire."
       },
       "ExecutionView": {
         "required": [
@@ -29274,6 +29705,121 @@
         },
         "description": "Whether the derived ledger agrees with the stored rows."
       },
+      "PaperReviewList": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaperReviewListItem"
+            },
+            "description": "The rows."
+          }
+        },
+        "description": "The stored reviews, newest week first."
+      },
+      "PaperReviewListItem": {
+        "required": [
+          "id",
+          "week",
+          "epochId",
+          "builtAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row id.",
+            "format": "int64"
+          },
+          "week": {
+            "type": "string",
+            "description": "The ISO week."
+          },
+          "epochId": {
+            "type": "integer",
+            "description": "The epoch.",
+            "format": "int64"
+          },
+          "builtAt": {
+            "type": "string",
+            "description": "When it was built.",
+            "format": "date-time"
+          }
+        },
+        "description": "One row of the list of stored reviews."
+      },
+      "PaperReviewView": {
+        "required": [
+          "id",
+          "week",
+          "epochId",
+          "builtAt",
+          "builtBy",
+          "stored",
+          "repeated",
+          "text",
+          "sections"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The row id; null for a dry run that stored nothing.",
+            "format": "int64"
+          },
+          "week": {
+            "type": "string",
+            "description": "The ISO week."
+          },
+          "epochId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The epoch; null when there is none yet.",
+            "format": "int64"
+          },
+          "builtAt": {
+            "type": "string",
+            "description": "When it was built.",
+            "format": "date-time"
+          },
+          "builtBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who built it; null for a dry run."
+          },
+          "stored": {
+            "type": "boolean",
+            "description": "Whether this is the stored record."
+          },
+          "repeated": {
+            "type": "boolean",
+            "description": "The week already had a review: that one is shown and nothing was written."
+          },
+          "text": {
+            "type": "string",
+            "description": "The text."
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewSection"
+            },
+            "description": "The sections."
+          }
+        },
+        "description": "A weekly paper review as the API and the verb show it."
+      },
       "ParameterSensitivityView": {
         "required": [
           "param",
@@ -33578,6 +34124,132 @@
           }
         },
         "description": "What an owner decision did."
+      },
+      "ReviewMetric": {
+        "required": [
+          "id",
+          "label",
+          "state",
+          "number",
+          "reason",
+          "n"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The figure's name."
+          },
+          "label": {
+            "type": "string",
+            "description": "The words."
+          },
+          "state": {
+            "type": "string",
+            "description": "value, provisional, insufficient, unavailable, not_evaluable or empty."
+          },
+          "number": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The number; null unless value or provisional.",
+            "format": "double"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why it is not a plain value."
+          },
+          "n": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "How many items it rests on, when that is meaningful.",
+            "format": "int32"
+          }
+        },
+        "description": "One figure of a review section on the wire and in the stored record: a state and, only for value and provisional, a number (P8-00 D3)."
+      },
+      "ReviewSection": {
+        "required": [
+          "id",
+          "title",
+          "lines",
+          "metrics",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The section's name."
+          },
+          "title": {
+            "type": "string",
+            "description": "The words."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The text lines."
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewMetric"
+            },
+            "description": "The figures."
+          },
+          "limits": {
+            "type": "string",
+            "description": "The limits sentence."
+          },
+          "table": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "A table, or null.",
+                "$ref": "#/components/schemas/ReviewTable"
+              }
+            ]
+          }
+        },
+        "description": "One section of the weekly paper review (spec P10-03): lines of text, figures with their states, an optional table and the sentence of its limits that ends it."
+      },
+      "ReviewTable": {
+        "required": [
+          "columns",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The headers."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "The rows; each has one cell per column."
+          }
+        },
+        "description": "A small table of a review section (the closed trades of the week), as text cells."
       },
       "ReviewTicketView": {
         "required": [

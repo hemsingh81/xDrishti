@@ -34,4 +34,19 @@ internal static partial class PaperLog
 
     [LoggerMessage(EventId = 5213, Level = LogLevel.Warning, Message = "paper.reconcile found {Differences} difference(s)")]
     public static partial void ReconcileDifferences(ILogger logger, int differences);
+
+    [LoggerMessage(EventId = 5214, Level = LogLevel.Information, Message = "paper.review {Week} epoch {EpochId} built as a dry run")]
+    public static partial void ReviewDryRun(ILogger logger, string week, long epochId);
+
+    [LoggerMessage(EventId = 5215, Level = LogLevel.Information, Message = "paper.review {Week} epoch {EpochId} stored as {Id} ({Sections} sections)")]
+    public static partial void ReviewStored(ILogger logger, string week, long epochId, long id, int sections);
+
+    [LoggerMessage(EventId = 5216, Level = LogLevel.Information, Message = "paper.review {Week} epoch {EpochId} was stored already as {Id}; nothing written")]
+    public static partial void ReviewRepeat(ILogger logger, string week, long epochId, long id);
+
+    [LoggerMessage(EventId = 5217, Level = LogLevel.Warning, Message = "paper.review source {Source} unavailable: {Reason}")]
+    public static partial void ReviewSourceUnavailable(ILogger logger, string source, string reason);
+
+    [LoggerMessage(EventId = 5218, Level = LogLevel.Information, Message = "paper.discipline read: {Sessions} session(s), {Tickets} primary ticket(s)")]
+    public static partial void DisciplineRead(ILogger logger, int sessions, int tickets);
 }

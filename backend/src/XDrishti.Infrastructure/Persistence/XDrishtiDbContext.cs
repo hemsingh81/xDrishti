@@ -196,6 +196,7 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<ConfigSnapshotRecord> ConfigSnapshots => Set<ConfigSnapshotRecord>();
     internal DbSet<ConfigChangeRecord> ConfigChanges => Set<ConfigChangeRecord>();
     internal DbSet<EpochNoteRecord> EpochNotes => Set<EpochNoteRecord>();
+    internal DbSet<PaperReviewRecord> PaperReviews => Set<PaperReviewRecord>();
     internal DbSet<JournalEntryRecord> JournalEntries => Set<JournalEntryRecord>();
     internal DbSet<JournalFillRecord> JournalFills => Set<JournalFillRecord>();
     internal DbSet<FillGradeRecord> FillGrades => Set<FillGradeRecord>();

@@ -71,3 +71,6 @@ None. Owner act later (default paused): switch the `paper-review` service on.
 - AC3: `followed` defined (approved at full size, entered, closed); added `approved_not_entered` (with skip codes) and `pending`; the seven categories sum to the primary count; fixture extended (T11, T12).
 - AC6: `DiscretionaryAsync(DateOnly)` takes one day (verified in `JournalStore.cs`): one call per session of the window in one handler.
 - Size 3 -> 5 agent-days (P10-00 table to match).
+
+## Built 2026-10-26 (ADR 0121)
+- Built behind the paused service `paper-review`; the spec stays Draft until the owner approves it. Decisions made on ambiguities: Invalidated tickets are `invalidated_preopen` whatever the earlier approval and are left out of the owner's deviation sum; Proposed/Modified tickets are `pending` (`undecided`); a multi-account ticket takes the lowest account id's R; charges in the waterfall are `r_net - r_gross` (negative = cost); one lazy `Review` tab (with the discipline tables) instead of two, for the first-load budget; the backtest line comes from `IReviewComparisonLine` (default "not built", P10-04 replaces it); log ids 5214 to 5218 used.

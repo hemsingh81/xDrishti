@@ -71,7 +71,7 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             }
         }
 
-        names.ShouldBe(["paper.capture_runs", "paper.config_changes", "paper.config_snapshots", "paper.entries", "paper.epoch_accounts", "paper.epoch_notes", "paper.epochs", "paper.exits", "paper.skips"]);
+        names.ShouldBe(["paper.capture_runs", "paper.config_changes", "paper.config_snapshots", "paper.entries", "paper.epoch_accounts", "paper.epoch_notes", "paper.epochs", "paper.exits", "paper.skips", "paper.weekly_reviews"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })

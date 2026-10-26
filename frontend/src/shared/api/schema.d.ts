@@ -3302,6 +3302,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/paper/reviews': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored weekly paper reviews, newest week first (optional epoch; limit 1 to 52, default 12). Read only. 422 paper.invalid */
+    get: operations['ListPaperReviews'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/paper/reviews/{isoWeek}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored weekly paper review of an ISO week (2026-W43) and epoch (default the newest): the text exactly as it was built, and its sections. Opens with 'Paper only: no order was placed and none exists.' Read only. 404 paper.not_found, 422 paper.invalid */
+    get: operations['GetPaperReview'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/paper/review': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** A weekly paper review built now from stored records and not stored (week=2026-W43, default this week; optional epoch). An older week is the state as of today, and says so. Read only. 404 paper.not_found, 422 paper.invalid */
+    get: operations['GetPaperReviewDryRun'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/paper/discipline': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The discipline report of a window (epoch, from, to; default the whole epoch up to the last closed session): the seven categories of the primary tickets (they add up to the primary count), what skipping and resizing cost in R with n and state, added real fills, and the paper execution gap. No composite score. Read only. 404 paper.not_found, 422 paper.invalid */
+    get: operations['GetPaperDiscipline'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/plans/{id}/alerts': {
     parameters: {
       query?: never;
@@ -6360,6 +6428,89 @@ export interface components {
       /** @description The week already had a digest: that one is shown and nothing was written. */
       repeated: boolean;
     };
+    /** @description What a discipline report rests on. */
+    DisciplineEvidenceView: {
+      /**
+       * Format: int32
+       * @description Closed sessions counted.
+       */
+      sessions: number;
+      /**
+       * Format: int32
+       * @description Primary tickets of the window (the seven categories add up to this).
+       */
+      primaryTickets: number;
+      /**
+       * Format: int32
+       * @description Closed primary paper trades of the window, once per ticket.
+       */
+      closedTrades: number;
+    };
+    /** @description One line of the discipline report on the wire. */
+    DisciplineLineView: {
+      /** @description The category or line name. */
+      category: string;
+      /** @description category, flag, deviation or total. */
+      kind: string;
+      /** @description The words. */
+      title: string;
+      /**
+       * Format: int32
+       * @description Tickets (or fills).
+       */
+      n: number;
+      /** @description Sum of R of the graded tickets. */
+      sumR: components['schemas']['MetricView'];
+      /** @description Mean R: insufficient below 15 graded tickets, provisional below 30. */
+      rMetric: components['schemas']['MetricView'];
+      /** @description Rupees per account. */
+      rupees: components['schemas']['DisciplineRupeesView'][];
+      /** @description What is counted apart. */
+      note: string;
+    };
+    /** @description Rupees of one account on a discipline line. */
+    DisciplineRupeesView: {
+      /**
+       * Format: uuid
+       * @description The paper account.
+       */
+      accountId: string;
+      /**
+       * Format: double
+       * @description Rupees after the stored sheet's charges when charged.
+       */
+      amount: number;
+    };
+    /** @description The discipline report of a window (spec P10-03, R19). Every R has its n and its state; there is no composite score. */
+    DisciplineView: {
+      /** @description The label of the record. */
+      basis: string;
+      /**
+       * Format: int64
+       * @description The epoch; null when there is none yet.
+       */
+      epochId: null | number;
+      /**
+       * Format: date
+       * @description The first day of the window.
+       */
+      from: string;
+      /**
+       * Format: date
+       * @description The last day of the window.
+       */
+      to: string;
+      /** @description The lines in their fixed order. */
+      lines: components['schemas']['DisciplineLineView'][];
+      /** @description The execution waterfall. */
+      execution: components['schemas']['ExecutionRowView'][];
+      /** @description What it rests on. */
+      evidence: components['schemas']['DisciplineEvidenceView'];
+      /** @description Why the report could not be built; null when it was. */
+      unavailable: null | string;
+      /** @description The honest limits. */
+      limits: string[];
+    };
     /** @description One bin of an R distribution: trades with R from LowerR (included) to UpperR (excluded); a null edge is open. */
     DistributionBinView: {
       /**
@@ -7072,6 +7223,20 @@ export interface components {
       /** Format: double */
       calibrationErrorPp: number;
       method: string;
+    };
+    /** @description One row of the paper execution waterfall on the wire. */
+    ExecutionRowView: {
+      /** @description plan, slippage, charges, net, missed_triggers or real_slippage. */
+      id: string;
+      /** @description The words. */
+      label: string;
+      /** @description Mean R. */
+      value: components['schemas']['MetricView'];
+      /**
+       * Format: int32
+       * @description Trades.
+       */
+      n: number;
     };
     /** @description How a service is run: retries (0–5 after a failed attempt), the timeout of an attempt in minutes (1–240), whether a missed run is made up for when the application starts, and whether a failure raises a notice in the bell. */
     ExecutionView: {
@@ -9984,6 +10149,61 @@ export interface components {
       /** @description Each difference, in words (empty when ok). */
       differences: string[];
     };
+    /** @description The stored reviews, newest week first. */
+    PaperReviewList: {
+      /** @description The rows. */
+      items: components['schemas']['PaperReviewListItem'][];
+    };
+    /** @description One row of the list of stored reviews. */
+    PaperReviewListItem: {
+      /**
+       * Format: int64
+       * @description The row id.
+       */
+      id: number;
+      /** @description The ISO week. */
+      week: string;
+      /**
+       * Format: int64
+       * @description The epoch.
+       */
+      epochId: number;
+      /**
+       * Format: date-time
+       * @description When it was built.
+       */
+      builtAt: string;
+    };
+    /** @description A weekly paper review as the API and the verb show it. */
+    PaperReviewView: {
+      /**
+       * Format: int64
+       * @description The row id; null for a dry run that stored nothing.
+       */
+      id: null | number;
+      /** @description The ISO week. */
+      week: string;
+      /**
+       * Format: int64
+       * @description The epoch; null when there is none yet.
+       */
+      epochId: null | number;
+      /**
+       * Format: date-time
+       * @description When it was built.
+       */
+      builtAt: string;
+      /** @description Who built it; null for a dry run. */
+      builtBy: null | string;
+      /** @description Whether this is the stored record. */
+      stored: boolean;
+      /** @description The week already had a review: that one is shown and nothing was written. */
+      repeated: boolean;
+      /** @description The text. */
+      text: string;
+      /** @description The sections. */
+      sections: components['schemas']['ReviewSection'][];
+    };
     /** @description The sweep of one parameter and its judgement (`stable`, `fragile`, `no_base_edge`, `inconclusive`). */
     ParameterSensitivityView: {
       param: string;
@@ -11663,6 +11883,48 @@ export interface components {
       overriddenCodes: string[];
       /** @description Confirmations (or parts of them) that covered nothing, each with the reason, so the owner sees that nothing was overridden by them. */
       ignored?: null | string[];
+    };
+    /** @description One figure of a review section on the wire and in the stored record: a state and, only for value and provisional, a number (P8-00 D3). */
+    ReviewMetric: {
+      /** @description The figure's name. */
+      id: string;
+      /** @description The words. */
+      label: string;
+      /** @description value, provisional, insufficient, unavailable, not_evaluable or empty. */
+      state: string;
+      /**
+       * Format: double
+       * @description The number; null unless value or provisional.
+       */
+      number: null | number;
+      /** @description Why it is not a plain value. */
+      reason: null | string;
+      /**
+       * Format: int32
+       * @description How many items it rests on, when that is meaningful.
+       */
+      n: null | number;
+    };
+    /** @description One section of the weekly paper review (spec P10-03): lines of text, figures with their states, an optional table and the sentence of its limits that ends it. */
+    ReviewSection: {
+      /** @description The section's name. */
+      id: string;
+      /** @description The words. */
+      title: string;
+      /** @description The text lines. */
+      lines: string[];
+      /** @description The figures. */
+      metrics: components['schemas']['ReviewMetric'][];
+      /** @description The limits sentence. */
+      limits: string;
+      table?: null | components['schemas']['ReviewTable'];
+    };
+    /** @description A small table of a review section (the closed trades of the week), as text cells. */
+    ReviewTable: {
+      /** @description The headers. */
+      columns: string[];
+      /** @description The rows; each has one cell per column. */
+      rows: string[][];
     };
     /** @description One ticket on the review screen. */
     ReviewTicketView: {
@@ -21073,6 +21335,163 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['QueueView'];
+        };
+      };
+    };
+  };
+  ListPaperReviews: {
+    parameters: {
+      query?: {
+        epoch?: number;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PaperReviewList'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPaperReview: {
+    parameters: {
+      query?: {
+        epoch?: number;
+      };
+      header?: never;
+      path: {
+        isoWeek: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PaperReviewView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPaperReviewDryRun: {
+    parameters: {
+      query?: {
+        week?: string;
+        epoch?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PaperReviewView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPaperDiscipline: {
+    parameters: {
+      query?: {
+        epoch?: number;
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DisciplineView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };
