@@ -80,4 +80,18 @@ internal static class MigrationBuilderExtensions
                 END IF;
             END $$;
             """);
+
+    /// <summary>
+    /// Lets the runtime role UPDATE only the named columns of a table (a column privilege): the table itself stays without a table-level UPDATE, so every other column is still refused. No-op when the role does not exist
+    /// (e.g. integration-test databases).
+    /// </summary>
+    public static void GrantColumnUpdateToAppRole(this MigrationBuilder migrationBuilder, string schema, string table, params string[] columns) =>
+        migrationBuilder.Sql($"""
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT FROM pg_roles WHERE rolname = '{AppRole}') THEN
+                    GRANT UPDATE ({string.Join(", ", columns)}) ON {schema}.{table} TO {AppRole};
+                END IF;
+            END $$;
+            """);
 }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
@@ -50,6 +51,7 @@ internal sealed class GetContextCoverageHandler(
             }
         }
 
+        var breadth = Breadth(await store.ListBreadthAsync(cancellationToken));
         return new ContextCoverageView(
             settings.Enabled,
             missing,
@@ -72,6 +74,30 @@ internal sealed class GetContextCoverageHandler(
             health?.GapSessions ?? 0,
             skipped.Count,
             [.. skipped.Take(MaxSkippedListed).Select(s => new ContextSkippedView(s.Date, s.Reason.ToCode(), s.Bars))],
-            SourceNote);
+            SourceNote,
+            breadth);
     }
+
+    private static ContextBreadthView Breadth(IReadOnlyList<StoredBreadth> rows)
+    {
+        var computed = rows.Where(r => r.State is not null).ToList();
+        var thin = computed.Where(r => r.State == BreadthResult.Insufficient).Select(r => r.Date).ToList();
+        var latest = computed.Count > 0 ? computed[^1] : null;
+        return new ContextBreadthView(
+            latest?.Date,
+            latest?.Value,
+            latest?.State,
+            latest?.Voters,
+            latest?.Universe,
+            latest?.Excluded,
+            computed.Count,
+            rows.Count - computed.Count,
+            thin.Count,
+            [.. thin.TakeLast(MaxSkippedListed)],
+            BreadthLabel(latest?.Universe));
+    }
+
+    /// <summary>What the figure is, wherever it is shown (never "market breadth").</summary>
+    public static string BreadthLabel(int? universe) =>
+        universe is { } n ? string.Create(CultureInfo.InvariantCulture, $"breadth of your {n} tracked shares (members as of today), not of the market") : "breadth of your tracked shares (members as of today), not of the market";
 }

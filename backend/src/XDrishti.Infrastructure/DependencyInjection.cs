@@ -368,6 +368,7 @@ public static class DependencyInjection
         services.AddSingleton<ContextFiguresAdapter.Cache>();
         services.AddScoped<IContextBarSource, ContextBarSource>();
         services.AddScoped<IContextDayStore, ContextDayStore>();
+        services.AddScoped<IBreadthSource, BreadthSource>();
         services.AddScoped<IContextFigures, ContextFiguresAdapter>();
         services.AddSingleton<ICsvFolder, CsvFolder>();
         services.AddSingleton<IDataJobChannel, DataJobChannel>();

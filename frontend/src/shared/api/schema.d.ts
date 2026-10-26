@@ -6195,6 +6195,31 @@ export interface components {
       lastError: null | string;
     };
     /**
+     * @description The breadth of the owner's tracked shares (P3-01e): `Latest` is the percent (0 to 100) of the latest day that has one, null when that day was `insufficient`; `State` is `value` or `insufficient` (null when no day has any);
+     *     `Voters`, `Universe` and `Excluded` are that day's counts; `PendingDays` are stored days still without a breadth (the last closed session can still gain bars); `InsufficientDates` names the thin days. The `Label` says what it is.
+     */
+    ContextBreadthView: {
+      /** Format: date */
+      latestDate: null | string;
+      /** Format: double */
+      latest: null | number;
+      state: null | string;
+      /** Format: int32 */
+      voters: null | number;
+      /** Format: int32 */
+      universe: null | number;
+      /** Format: int32 */
+      excluded: null | number;
+      /** Format: int32 */
+      computedDays: number;
+      /** Format: int32 */
+      pendingDays: number;
+      /** Format: int32 */
+      insufficientDays: number;
+      insufficientDates: string[];
+      label: string;
+    };
+    /**
      * @description What the stored market context makes readable (`GET /api/data/context`, criterion 7). `Missing` names an unmet prerequisite (`index_not_tracked`, `vix_not_tracked`, `disabled`) with its `Fix`. `AgeSessions` is the number of
      *     trading sessions the newest day is behind the last closed one; `Stale` is more than one.
      */
@@ -6234,6 +6259,7 @@ export interface components {
       skippedTotal: number;
       skipped: components['schemas']['ContextSkippedView'][];
       source: string;
+      breadth: components['schemas']['ContextBreadthView'];
     };
     /** @description One day (or VIX leg) the derivation did not use, with the reason code and the bars it had. */
     ContextSkippedView: {

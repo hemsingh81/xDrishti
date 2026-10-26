@@ -231,6 +231,11 @@ internal sealed class SelectionPlanBuilder(
             parts.Add(string.Create(CultureInfo.InvariantCulture, $"Risk multiplier {smart.RiskMultiplier:0.###} applied to every size (market gate / equity throttle)."));
         }
 
+        if (ctx.MarketNote is { } marketNote)
+        {
+            parts.Add(marketNote); // last: a cut of the column takes this sentence before any flag line
+        }
+
         return Clamp(string.Join(' ', parts), MaxBasisLength);
     }
 

@@ -34,7 +34,7 @@ internal sealed class DataOptions
     [Required]
     public ContextDataOptions Context { get; set; } = new();
 
-    public const string InvalidMessage = "Data:Dhan:InitialDays must be 1 to 3650, Data:Dhan:InitialDaysIndex 365 to 1825 and Data:Dhan:RequestsPerSecond 1 to 5; Data:Csv:MaxRowsPerFile must be 1000 to 100000000, Data:Csv:MaxBytesPerFile 1048576 to 17179869184 and Data:Csv:MaxSpanDays 31 to 36500; Data:Gaps:LookbackSessions must be 1 to 250; Data:Eod:TimeIst must be a time of day as HH:mm (24-hour), India time, e.g. 15:50; Data:Quality:Sessions must be 1 to 60, Data:Quality:SpikeMultiple 2 to 1000, Data:Quality:MaxMissingPercent 0 to 100 and Data:Quality:MaxFailedPercent 0 to 100; Data:Context:VixGraceSessions must be 1 to 30 and Data:Context:MinDayFraction 0.5 to 1.";
+    public const string InvalidMessage = "Data:Dhan:InitialDays must be 1 to 3650, Data:Dhan:InitialDaysIndex 365 to 1825 and Data:Dhan:RequestsPerSecond 1 to 5; Data:Csv:MaxRowsPerFile must be 1000 to 100000000, Data:Csv:MaxBytesPerFile 1048576 to 17179869184 and Data:Csv:MaxSpanDays 31 to 36500; Data:Gaps:LookbackSessions must be 1 to 250; Data:Eod:TimeIst must be a time of day as HH:mm (24-hour), India time, e.g. 15:50; Data:Quality:Sessions must be 1 to 60, Data:Quality:SpikeMultiple 2 to 1000, Data:Quality:MaxMissingPercent 0 to 100 and Data:Quality:MaxFailedPercent 0 to 100; Data:Context:VixGraceSessions must be 1 to 30 and Data:Context:MinDayFraction 0.5 to 1; Data:Context:BreadthGraceSessions must be 1 to 30, Data:Context:Breadth:SmaSessions 2 to 250, MinVoters 1 to 1000 and MinShare 0.1 to 1.";
 
     /// <summary>The settings of the nested section are checked here: the data-annotation validation does not look into nested objects.</summary>
     public static bool IsValid(DataOptions options) =>
@@ -43,7 +43,7 @@ internal sealed class DataOptions
         && options.Gaps is { LookbackSessions: >= 1 and <= 250 }
         && options.Eod is { } eod && EodDataOptions.IsValidTime(eod.TimeIst)
         && options.Quality is { Sessions: >= 1 and <= 60, SpikeMultiple: >= 2 and <= 1000, MaxMissingPercent: >= 0 and <= 100, MaxFailedPercent: >= 0 and <= 100 }
-        && options.Context is { VixGraceSessions: >= 1 and <= 30, MinDayFraction: >= 0.5 and <= 1 };
+        && options.Context is { VixGraceSessions: >= 1 and <= 30, MinDayFraction: >= 0.5 and <= 1, BreadthGraceSessions: >= 1 and <= 30, Breadth: { SmaSessions: >= 2 and <= 250, MinVoters: >= 1 and <= 1000, MinShare: >= 0.1 and <= 1 } };
 }
 
 /// <summary>The fetch of 1-minute bars from Dhan's Data API (<c>Data:Dhan</c>).</summary>
@@ -141,4 +141,27 @@ internal sealed class ContextDataOptions
     /// <summary>The share of the calendar's expected minutes a leg needs to count.</summary>
     [Range(0.5, 1.0)]
     public double MinDayFraction { get; set; } = 0.96;
+
+    /// <summary>Sessions an insufficient breadth may still be recomputed after a late load of stock bars (P3-01e).</summary>
+    [Range(1, 30)]
+    public int BreadthGraceSessions { get; set; } = 5;
+
+    /// <summary>The breadth of the owner's tracked shares (<c>Data:Context:Breadth</c>, P3-01e).</summary>
+    public BreadthDataOptions Breadth { get; set; } = new();
+}
+
+/// <summary>The definition and thresholds of the breadth figure (<c>Data:Context:Breadth</c>, P3-01e).</summary>
+internal sealed class BreadthDataOptions
+{
+    /// <summary>Sessions of the average a close is compared with (20 by the definition; kept so tests can shrink it).</summary>
+    [Range(2, 250)]
+    public int SmaSessions { get; set; } = 20;
+
+    /// <summary>The fewest voters for a number.</summary>
+    [Range(1, 1000)]
+    public int MinVoters { get; set; } = 50;
+
+    /// <summary>The least share of the shares with a bar on the day that must vote.</summary>
+    [Range(0.1, 1.0)]
+    public double MinShare { get; set; } = 0.5;
 }

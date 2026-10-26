@@ -73,16 +73,29 @@ public sealed class ContextVerbTests
         public ValueTask<ContextCoverageView> HandleAsync(GetContextCoverageQuery query, CancellationToken cancellationToken) => ValueTask.FromResult(answer);
     }
 
+    private sealed class FixedRebuild(Result<BreadthRebuilt> answer) : ICommandHandler<RebuildBreadthCommand, BreadthRebuilt>
+    {
+        public RebuildBreadthCommand? Seen { get; private set; }
+
+        public ValueTask<Result<BreadthRebuilt>> HandleAsync(RebuildBreadthCommand command, CancellationToken cancellationToken)
+        {
+            Seen = command;
+            return ValueTask.FromResult(answer);
+        }
+    }
+
     private static ContextCoverageView View(string? missing = null) => new(
         true, missing, missing is null ? null : "Track NIFTY 50 on the Instruments screen and run Update data.", "NSE:NIFTY", "NSE:INDIAVIX", 3, new DateOnly(2026, 10, 7), new DateOnly(2026, 10, 9), 0, false,
-        null, null, null, null, 3, 0, null, false, 0, 1, [new ContextSkippedView(new DateOnly(2026, 10, 6), "index_thin", 300)], "derived from 1-minute bars; the official daily close can differ slightly");
+        null, null, null, null, 3, 0, null, false, 0, 1, [new ContextSkippedView(new DateOnly(2026, 10, 6), "index_thin", 300)], "derived from 1-minute bars; the official daily close can differ slightly",
+        new ContextBreadthView(null, null, null, null, null, null, 0, 3, 0, [], "breadth of your tracked shares (members as of today), not of the market"));
 
-    private static async Task<(int Exit, string Out, string Error)> RunAsync(string[] args, ContextRefreshed? refreshed = null, ContextCoverageView? coverage = null)
+    private static async Task<(int Exit, string Out, string Error)> RunAsync(string[] args, ContextRefreshed? refreshed = null, ContextCoverageView? coverage = null, FixedRebuild? rebuild = null)
     {
         using var host = SimulateHost.Create(NoDatabase, services =>
         {
             services.AddScoped<ICommandHandler<RefreshContextCommand, ContextRefreshed>>(_ => new FixedRefresh(refreshed ?? new ContextRefreshed(0, 0, 0, null, null, null)));
             services.AddScoped<IQueryHandler<GetContextCoverageQuery, ContextCoverageView>>(_ => new FixedCoverage(coverage ?? View()));
+            services.AddScoped<ICommandHandler<RebuildBreadthCommand, BreadthRebuilt>>(_ => rebuild ?? new FixedRebuild(Result.Success(new BreadthRebuilt(0, false, [], null))));
         }, "xd-context");
         var output = new StringWriter();
         var error = new StringWriter();
@@ -125,6 +138,51 @@ public sealed class ContextVerbTests
         output.ShouldContain("index_trend readable from: n/a");
         output.ShouldContain("  2026-10-06 index_thin 300 bars");
         output.ShouldContain("derived from 1-minute bars; the official daily close can differ slightly");
+        output.ShouldContain("breadth: none yet");
+        output.ShouldContain("days waiting for breadth: 3");
+        output.ShouldContain("breadth of your tracked shares (members as of today), not of the market");
+    }
+
+    [Fact]
+    public void Rebuild_breadth_needs_both_dates_and_takes_write_as_its_only_flag()
+    {
+        var (ok, _) = ContextOptions.Parse(["rebuild-breadth", "--from", "2026-01-02", "--to", "2026-03-31", "--write"]);
+        var (dry, _) = ContextOptions.Parse(["rebuild-breadth", "--to", "2026-03-31", "--from", "2026-01-02"]);
+
+        (ok!.Action, ok.From, ok.To, ok.Write).ShouldBe((ContextAction.RebuildBreadth, new DateOnly(2026, 1, 2), new DateOnly(2026, 3, 31), true));
+        dry!.Write.ShouldBeFalse("dry run by default");
+        foreach (var bad in new[] { new[] { "rebuild-breadth" }, ["rebuild-breadth", "--from", "2026-01-02"], ["rebuild-breadth", "--from", "yesterday", "--to", "2026-03-31"], ["rebuild-breadth", "--from", "2026-01-02", "--to", "2026-03-31", "--force"], ["rebuild-breadth", "--from"] })
+        {
+            ContextOptions.Parse(bad).Options.ShouldBeNull(string.Join(' ', bad));
+        }
+    }
+
+    [Fact]
+    public async Task Rebuild_breadth_prints_each_changed_day_with_the_old_and_the_new_figure_and_passes_the_range_and_the_write_flag()
+    {
+        var rebuild = new FixedRebuild(Result.Success(new BreadthRebuilt(3, false, [new BreadthChange(new DateOnly(2026, 3, 4), 40.0, "value", 60, 55.5, "value", 61, 214), new BreadthChange(new DateOnly(2026, 3, 5), null, null, null, null, "insufficient", 12, 214)], null)));
+
+        var (exit, output, _) = await RunAsync(["rebuild-breadth", "--from", "2026-03-04", "--to", "2026-03-06"], rebuild: rebuild);
+
+        exit.ShouldBe(0);
+        rebuild.Seen.ShouldBe(new RebuildBreadthCommand(new DateOnly(2026, 3, 4), new DateOnly(2026, 3, 6), false));
+        output.ShouldContain("write: no (dry run; add --write to store)");
+        output.ShouldContain("days that would change: 2");
+        output.ShouldContain("  2026-03-04 old 40.0 (60 voters) new 55.5 (61 voters)");
+        output.ShouldContain("  2026-03-05 old none new insufficient (12 voters)");
+        output.ShouldContain("not of the market");
+    }
+
+    [Fact]
+    public async Task A_refused_rebuild_exits_1_with_the_reason()
+    {
+        var rebuild = new FixedRebuild(Result.Failure<BreadthRebuilt>(Error.Validation("breadth.range_too_wide", "The range may span at most 400 sessions.")));
+
+        var (exit, output, error) = await RunAsync(["rebuild-breadth", "--from", "2020-01-01", "--to", "2026-03-06", "--write"], rebuild: rebuild);
+
+        exit.ShouldBe(1);
+        output.ShouldBeEmpty();
+        error.ShouldContain("breadth.range_too_wide");
     }
 
     [Fact]

@@ -303,6 +303,8 @@ public static class DependencyInjection
 
         // The market context (P3-01d, ADR 0033): written by the data job after the aggregates, read through IContextFigures, coverage at /api/data/context.
         services.AddScoped<ICommandHandler<RefreshContextCommand, ContextRefreshed>, RefreshContextHandler>();
+        services.AddScoped<ICommandHandler<ComputeBreadthCommand, BreadthComputed>, ComputeBreadthHandler>(); // the breadth of the owner's tracked shares, set once per context day (P3-01e)
+        services.AddScoped<ICommandHandler<RebuildBreadthCommand, BreadthRebuilt>, RebuildBreadthHandler>();
         services.AddScoped<IContextUpkeep, ContextUpkeep>();
         services.AddScoped<IQueryHandler<GetContextCoverageQuery, ContextCoverageView>, GetContextCoverageHandler>();
         services.AddScoped<IQueryHandler<GetCalendarQuery, Result<CalendarView>>, GetCalendarHandler>();

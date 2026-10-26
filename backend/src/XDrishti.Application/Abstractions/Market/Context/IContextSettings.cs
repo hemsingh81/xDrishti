@@ -17,4 +17,16 @@ public interface IContextSettings
 
     /// <summary>The share of the expected minutes a leg needs (<c>Data:Context:MinDayFraction</c>, default 0.96).</summary>
     double MinDayFraction { get; }
+
+    /// <summary>Sessions the average of the breadth is taken over (<c>Data:Context:Breadth:SmaSessions</c>, default 20, 2 to 250).</summary>
+    int BreadthSmaSessions { get; }
+
+    /// <summary>The fewest voters for a breadth number (<c>Data:Context:Breadth:MinVoters</c>, default 50).</summary>
+    int BreadthMinVoters { get; }
+
+    /// <summary>The least share of the shares with a bar that must vote (<c>Data:Context:Breadth:MinShare</c>, default 0.5).</summary>
+    double BreadthMinShare { get; }
+
+    /// <summary>Sessions an <c>insufficient</c> breadth may still be recomputed after a late load of stock bars (<c>Data:Context:BreadthGraceSessions</c>, default 5).</summary>
+    int BreadthGraceSessions { get; }
 }

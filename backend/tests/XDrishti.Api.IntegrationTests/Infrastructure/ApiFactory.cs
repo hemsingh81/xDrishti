@@ -114,6 +114,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("BrokerVault:Key", VaultKey);
         builder.UseSetting("Instruments:AutoRefresh:Enabled", "false"); // tests start refreshes themselves
         builder.UseSetting("Portfolio:AutoRefresh:Enabled", "false"); // tests drive the holdings schedule themselves
+        builder.UseSetting("Data:Context:Breadth:MinVoters", "3"); // the product default is 50 (unit-tested); the integration fixtures have a handful of shares
         builder.UseSetting("Data:Eod:Enabled", "false"); // first-start seed (ADR 0018): the end-of-day service starts paused; tests resume it and ask the scheduler themselves, with the clock pinned
         builder.UseSetting("Portfolio:BrokerHistory:Enabled", "false"); // first-start seed (ADR 0018): the trades and ledger service starts paused; tests use Sync now or run it themselves
         builder.UseSetting("Portfolio:BrokerHistory:CallSpacingMs", "0"); // no 250 ms between the calls to the fake Dhan

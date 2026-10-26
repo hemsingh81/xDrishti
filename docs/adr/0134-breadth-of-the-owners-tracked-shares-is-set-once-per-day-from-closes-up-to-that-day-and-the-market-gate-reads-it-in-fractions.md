@@ -1,0 +1,22 @@
+# 0134 — Breadth of the owner's tracked shares is set once per day from closes up to that day; the market gate reads it, with the VIX, in fractions
+
+- **Status:** Proposed (built under the owner's approval of the P3-01e plan, 2026-10-27; becomes Accepted when the owner has read it).
+- **Date:** 2026-10-27.
+- **Relation to other ADRs:** [0033](0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md) (decision 4, the `breadth` feature and the P3-01e amendment), [0133](0133-new-broker-endpoints-enter-the-allow-list-in-the-commit-of-the-slice-that-uses-them-index-and-vix-history-needs-none.md) (no allow-list change), [0092](0092-the-wired-plan-selection-smart-rules-fill-allocation-and-checklist-in-order-unavailable-never-passes-and-an-append-only-suggestion-inbox.md) (the plan context), spec [P3-01e](../specs/P3-01e-breadth-point-in-time.md).
+
+## Context
+The `breadth` context feature (P3-01c) was a plain field nobody wrote, and the market gate of the plan (P7-06) had `Gate = null`, so it read "unavailable" on every plan. Breadth has two traps: it can look ahead (a window that includes a later close) and it can silently change what a plan saw (a late load of stock bars rewrites an old day). Its universe is also the owner's own list, not the market.
+
+## Decision
+1. **Definition.** The percent of the tracked, not retired instruments of type `share` (ETFs out) whose close on day D is strictly greater than the simple mean of their raw closes on the 20 calendar sessions ending on D. A share votes only with a complete `1D` bar on every one of those sessions; a share with an ex-date of a corporate action of any status in the window leaves the vote (adjusting raw closes again would double-adjust the owner's already adjusted CSV prices); a non-positive close is `bad_bar`. Reasons are counted: `no_bar`, `warmup`, `bad_bar`, `action_in_window`.
+2. **A thin sample is not a number.** Under `MinVoters` (50) voters, or voters under `MinShare` (0.5) of the shares that have a bar on D, the state is `insufficient` and the value null; the counts are stored. No tracked share at all writes nothing.
+3. **Set once.** Six columns on `market.context_daily`; the runtime role gets a **column-level UPDATE on those six columns only** (the index and VIX figures stay insert-only; `ContextGrantsTests` pins both). The code updates `WHERE breadth_state IS NULL`, or `insufficient` while the day is within `BreadthGraceSessions` (5) of the last closed session (a late Dhan load must not freeze a transient `insufficient`). A day that can still gain bars is not written: the last closed session waits until every share has its bar or the day is older. Only the explicit `rebuild-breadth --from --to [--write]` replaces a stored figure; it previews by default, lists old and new for each changed day and logs one event.
+4. **Read-only inputs.** One streamed read of the `close` of the `1D` rows per share (never the adjusted column), no network, no allow-list entry.
+5. **Units, converted once.** The context and the feature carry a percent (0 to 100, ADR 0033); `SmartRulesOptions.BreadthMin` is a fraction (0 to 1). `StoredPlanContextSource` fills `PlanContext.Gate` from `IContextFigures` (the latest day strictly before the planned date) and divides by 100 there, nowhere else. The events figure stays unknown until P15, so the gate is `Reduced` or `NoTrade` on a real VIX or breadth and otherwise `Unavailable`; `HighImpactEventToday = false` is not invented. With no figures the gate stays null as before.
+6. **Labelled.** Every place that shows the number says "breadth of your N tracked shares (members as of today), not of the market"; the plan carries the sentence after its flag lines, so a cut of the 500-character basis takes it before any flag.
+
+## Consequences
+- The gate has a real VIX and breadth the day the owner tracks the two indices and the shares; until then it is unavailable and says so.
+- The series is inhomogeneous when the owner adds shares (`breadth_universe` is stored beside every value) and early days describe today's picks (ISS-22).
+- A day's breadth for the last closed session may appear one session late; the plan then reads the day before, and the gate's own age bound decides whether that is stale.
+- Rejected: adjusting closes by applied factors (double adjustment), tolerating gaps in the window (a halt would shift the mean silently), breadth recomputed on every read (a plan could change after the fact), `HighImpactEventToday = false` (claims a calendar that does not exist).

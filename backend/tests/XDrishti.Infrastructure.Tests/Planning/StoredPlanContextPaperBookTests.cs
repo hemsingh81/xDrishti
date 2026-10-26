@@ -2,10 +2,12 @@
 using NSubstitute;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Domain.Accounts;
+using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Paper;
 using XDrishti.Domain.Selection;
 using XDrishti.Domain.Selection.SmartRules;
@@ -44,7 +46,14 @@ public sealed class StoredPlanContextPaperBookTests
         holdings.ListAsync(Arg.Any<HoldingFilter>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<HoldingData>>([]));
         var reader = Substitute.For<IPaperBookReader>();
         reader.ReadAsync(Arg.Any<DateOnly>(), Arg.Any<IReadOnlyList<PaperAccountInput>>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(read?.Invoke(account.Id) ?? new PaperBookUnavailable("x")));
-        return (new StoredPlanContextSource(accounts, profiles, holdings, Substitute.For<IHoldingClassifications>(), Substitute.For<IBarQueries>(), new Settings(assumedEmpty, usePaper), reader), reader, account.Id);
+        return (new StoredPlanContextSource(accounts, profiles, holdings, Substitute.For<IHoldingClassifications>(), Substitute.For<IBarQueries>(), new Settings(assumedEmpty, usePaper), reader, NoContext()), reader, account.Id);
+    }
+
+    private static IContextFigures NoContext()
+    {
+        var figures = Substitute.For<IContextFigures>();
+        figures.AsOfAsync(Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(ContextRead.Not(ContextRead.NoContext)));
+        return figures;
     }
 
     private static PlanContextRequest Request => new(Session, Session.AddDays(1), []);

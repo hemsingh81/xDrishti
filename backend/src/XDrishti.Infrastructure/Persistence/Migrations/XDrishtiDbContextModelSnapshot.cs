@@ -4825,6 +4825,31 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("date");
 
+                    b.Property<double?>("Breadth")
+                        .HasColumnType("double precision")
+                        .HasColumnName("breadth");
+
+                    b.Property<DateTimeOffset?>("BreadthComputedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("breadth_computed_at");
+
+                    b.Property<short?>("BreadthExcluded")
+                        .HasColumnType("smallint")
+                        .HasColumnName("breadth_excluded");
+
+                    b.Property<string>("BreadthState")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("breadth_state");
+
+                    b.Property<short?>("BreadthUniverse")
+                        .HasColumnType("smallint")
+                        .HasColumnName("breadth_universe");
+
+                    b.Property<short?>("BreadthVoters")
+                        .HasColumnType("smallint")
+                        .HasColumnName("breadth_voters");
+
                     b.Property<short>("IndexBars")
                         .HasColumnType("smallint")
                         .HasColumnName("index_bars");
@@ -4869,6 +4894,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("context_daily", "market", t =>
                         {
                             t.HasCheckConstraint("ck_context_daily_bars", "index_bars > 0 AND (vix_bars IS NULL OR vix_bars > 0)");
+
+                            t.HasCheckConstraint("ck_context_daily_breadth", "breadth IS NULL OR (breadth >= 0 AND breadth <= 100)");
+
+                            t.HasCheckConstraint("ck_context_daily_breadth_state", "breadth_state IS NULL OR breadth_state IN ('value', 'insufficient')");
 
                             t.HasCheckConstraint("ck_context_daily_index", "index_low > 0 AND index_high >= index_low AND index_close >= index_low AND index_close <= index_high");
 

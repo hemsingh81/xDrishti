@@ -19,4 +19,12 @@ internal sealed class ContextSettings(IOptions<DataOptions> options) : IContextS
     public int VixGraceSessions => options.Value.Context.VixGraceSessions;
 
     public double MinDayFraction => options.Value.Context.MinDayFraction;
+
+    public int BreadthSmaSessions => options.Value.Context.Breadth.SmaSessions;
+
+    public int BreadthMinVoters => options.Value.Context.Breadth.MinVoters;
+
+    public double BreadthMinShare => options.Value.Context.Breadth.MinShare;
+
+    public int BreadthGraceSessions => options.Value.Context.BreadthGraceSessions;
 }

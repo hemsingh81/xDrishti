@@ -25,6 +25,23 @@ public sealed class ContextUpkeepTests
             ValueTask.FromResult(Result.Failure<ContextRefreshed>(Error.Validation("context.broken", "The context is broken.")));
     }
 
+    private sealed class FixedBreadth(Result<BreadthComputed>? answer = null) : ICommandHandler<ComputeBreadthCommand, BreadthComputed>
+    {
+        public int Runs { get; private set; }
+
+        public ValueTask<Result<BreadthComputed>> HandleAsync(ComputeBreadthCommand command, CancellationToken cancellationToken)
+        {
+            Runs++;
+            return ValueTask.FromResult(answer ?? Result.Success(new BreadthComputed(0, 0, 0, null)));
+        }
+    }
+
+    private sealed class OkRefresh : ICommandHandler<RefreshContextCommand, ContextRefreshed>
+    {
+        public ValueTask<Result<ContextRefreshed>> HandleAsync(RefreshContextCommand command, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(Result.Success(new ContextRefreshed(0, 0, 0, null, null, null)));
+    }
+
     private static (JobReporter Reporter, DataJob Job) Reporter()
     {
         var jobs = new FakeDataJobStore();
@@ -38,7 +55,7 @@ public sealed class ContextUpkeepTests
     {
         var (reporter, job) = Reporter();
 
-        await new ContextUpkeep(new ThrowingRefresh(new InvalidOperationException("password=hunter2 leaked")), NullLogger<ContextUpkeep>.Instance).RunAsync(reporter, Ct);
+        await new ContextUpkeep(new ThrowingRefresh(new InvalidOperationException("password=hunter2 leaked")), new FixedBreadth(), NullLogger<ContextUpkeep>.Instance).RunAsync(reporter, Ct);
 
         job.Warnings.ShouldBe(["The market context could not be updated. See the API log."]);
     }
@@ -48,7 +65,7 @@ public sealed class ContextUpkeepTests
     {
         var (reporter, job) = Reporter();
 
-        await new ContextUpkeep(new FailingRefresh(), NullLogger<ContextUpkeep>.Instance).RunAsync(reporter, Ct);
+        await new ContextUpkeep(new FailingRefresh(), new FixedBreadth(), NullLogger<ContextUpkeep>.Instance).RunAsync(reporter, Ct);
 
         job.Warnings.ShouldBe(["Market context: The context is broken."]);
     }
@@ -61,6 +78,30 @@ public sealed class ContextUpkeepTests
         await cancelled.CancelAsync();
 
         await Should.ThrowAsync<OperationCanceledException>(async () =>
-            await new ContextUpkeep(new ThrowingRefresh(new OperationCanceledException(cancelled.Token)), NullLogger<ContextUpkeep>.Instance).RunAsync(reporter, cancelled.Token));
+            await new ContextUpkeep(new ThrowingRefresh(new OperationCanceledException(cancelled.Token)), new FixedBreadth(), NullLogger<ContextUpkeep>.Instance).RunAsync(reporter, cancelled.Token));
+    }
+
+    [Fact]
+    public async Task The_breadth_step_runs_after_the_index_step_and_a_failure_of_it_is_a_warning_of_its_own()
+    {
+        var (reporter, job) = Reporter();
+        var breadth = new FixedBreadth(Result.Failure<BreadthComputed>(Error.Validation("breadth.broken", "Breadth is broken.")));
+
+        await new ContextUpkeep(new OkRefresh(), breadth, NullLogger<ContextUpkeep>.Instance).RunAsync(reporter, Ct);
+
+        breadth.Runs.ShouldBe(1);
+        job.Warnings.ShouldBe(["Breadth: Breadth is broken."]);
+    }
+
+    [Fact]
+    public async Task A_failed_index_step_does_not_stop_the_breadth_step()
+    {
+        var (reporter, job) = Reporter();
+        var breadth = new FixedBreadth();
+
+        await new ContextUpkeep(new FailingRefresh(), breadth, NullLogger<ContextUpkeep>.Instance).RunAsync(reporter, Ct);
+
+        breadth.Runs.ShouldBe(1);
+        job.Warnings.ShouldBe(["Market context: The context is broken."]);
     }
 }

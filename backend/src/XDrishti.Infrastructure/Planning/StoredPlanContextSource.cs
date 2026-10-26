@@ -1,5 +1,6 @@
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
@@ -13,7 +14,7 @@ namespace XDrishti.Infrastructure.Planning;
 /// <summary>
 /// The facts of a plan from stored data (spec P7-09, ADR 0092): the Trading-role accounts with their risk profile and overrides, the synced holdings, the sector and baskets of each instrument, and the correlation of daily returns up to the close
 /// of the session. Read only; nothing here talks to a broker or writes anything.
-/// <b>What has no data source is null</b> (unavailable downstream, never a pass): the market figures (VIX, breadth, events; P3-01d/e), real taken trades, the funds of a broker-funds account.
+/// <b>What has no data source is null</b> (unavailable downstream, never a pass): the events figure of the market gate (P15), real taken trades, the funds of a broker-funds account.
 /// <b>The open book is unavailable by default</b> (the system keeps no position record for a Trading account: no journal yet, P7-14): book, open risk and the loss today are null, so the fill takes nothing and the plan says so. Only when the owner sets
 /// <c>Planning:OpenBook:AssumedEmpty</c> are they the empty book and zero, and the plan says that instead. Positions held outside this system (the broker's own app) are NOT known and not counted.
 /// </summary>
@@ -24,7 +25,8 @@ internal sealed class StoredPlanContextSource(
     IHoldingClassifications classifications,
     IBarQueries bars,
     IOpenBookSettings openBook,
-    IPaperBookReader paperBook) : IPlanContextSource
+    IPaperBookReader paperBook,
+    IContextFigures contextFigures) : IPlanContextSource
 {
     /// <summary>Calendar days of daily bars read before the close of the session (about 60 sessions plus slack).</summary>
     public const int ReturnLookbackDays = 120;
@@ -67,6 +69,7 @@ internal sealed class StoredPlanContextSource(
         }
 
         var correlations = await CorrelationsAsync(request, cancellationToken);
+        var (gate, marketNote) = await GateAsync(request.ForDate, cancellationToken);
         var notes = new List<string> { paper switch { PaperBook b => string.Join(' ', b.Notes), PaperBookUnavailable u => u.Reason, _ => openBook.AssumedEmpty ? PlanContextNotes.NoBookNote : PlanContextNotes.BookUnavailableNote } };
         if (!contextAccounts.Any(a => a.Mode == TradingMode.Paper))
         {
@@ -74,8 +77,24 @@ internal sealed class StoredPlanContextSource(
         }
 
         return paper is PaperBook book
-            ? Result.Success(new PlanContext(book.Positions, facts, contextAccounts, correlations, null, book.Taken, notes, BookFromLedger: true))
-            : Result.Success(new PlanContext(openBook.AssumedEmpty ? [] : null, facts, contextAccounts, correlations, null, null, notes));
+            ? Result.Success(new PlanContext(book.Positions, facts, contextAccounts, correlations, gate, book.Taken, notes, BookFromLedger: true, MarketNote: marketNote))
+            : Result.Success(new PlanContext(openBook.AssumedEmpty ? [] : null, facts, contextAccounts, correlations, gate, null, notes, MarketNote: marketNote));
+    }
+
+    /// <summary>
+    /// The market figures of the latest stored context day before the planned date (P3-01d/e): the VIX, and the breadth of the owner's tracked shares. The context holds the breadth as a percent (0 to 100) and <c>SmartRulesOptions.BreadthMin</c> is a
+    /// fraction (0 to 1): the one conversion between them is here. The events figure has no source before P15 and stays unknown, so the gate reads normal only when it is known. No day, a stale day or no usable figure is no gate (unavailable, never a pass).
+    /// </summary>
+    private async ValueTask<(MarketGateInput? Gate, string? Note)> GateAsync(DateOnly forDate, CancellationToken cancellationToken)
+    {
+        var read = await contextFigures.AsOfAsync(forDate, cancellationToken);
+        if (read.Figures is not { } figures || (figures.Vix is null && figures.Breadth is null))
+        {
+            return (null, null);
+        }
+
+        var gate = new MarketGateInput(figures.AsOf, figures.Vix, figures.Breadth is { } percent ? percent / 100.0 : null, null);
+        return (gate, figures.Breadth is null ? null : PlanContextNotes.MarketBreadth(figures.BreadthUniverse));
     }
 
     /// <summary>A paper account with the ledger's equity, open risk, funds, held symbols and loss carried; an account the ledger has no capital for keeps null numbers (the plan treats its limits as unknown).</summary>

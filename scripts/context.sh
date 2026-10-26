@@ -2,6 +2,7 @@
 # Runs the `context` verb on the host: write and show the market context (NIFTY 50 / INDIA VIX daily figures, P3-01d, ADR 0033).
 #   scripts/context.sh refresh    # write the days that became final since the last run (the data job does this after every update; idempotent, insert-only)
 #   scripts/context.sh coverage   # print the stored days, the first readable date of index_trend / regime / vix_pct, the skipped days and any missing prerequisite (writes nothing)
+#   scripts/context.sh rebuild-breadth --from 2026-01-01 --to 2026-03-31 [--write]   # recompute the breadth of the owner's tracked shares for stored days (P3-01e): a dry run printing the old and new figure of each changed day; --write stores. At most 400 sessions.
 # Exit codes: 0 done (a missing prerequisite is printed with its fix and is still 0), 1 refused, 2 wrong command line or configuration, 3 failure, 130 cancelled.
 # Start the stack first with deploy/xd-up.sh and the developer database port (compose.dev.yaml, 127.0.0.1:5433). The one secret is the database password,
 # read from the Keychain item xdrishti/db/app; no broker key and no owner secret is read.

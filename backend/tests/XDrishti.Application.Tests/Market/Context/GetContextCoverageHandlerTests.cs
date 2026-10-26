@@ -97,4 +97,31 @@ public sealed class GetContextCoverageHandlerTests
         view.RegimeReadableFrom.ShouldBeNull();
         view.VixDays.ShouldBe(56);
     }
+
+    [Fact]
+    public async Task The_breadth_of_the_latest_day_its_counts_the_thin_dates_and_the_honest_label_are_shown()
+    {
+        _store.Rows.AddRange([Day(S1), Day(S1.AddDays(1)), Day(S1.AddDays(2)), Day(S1.AddDays(3))]);
+        _store.Breadth[S1] = new StoredBreadth(S1, null, 10, 214, 204, BreadthResult.Insufficient);
+        _store.Breadth[S1.AddDays(1)] = new StoredBreadth(S1.AddDays(1), 27.5, 120, 214, 94, BreadthResult.ValueState);
+
+        var view = await Handler.HandleAsync(new GetContextCoverageQuery(), Ct);
+
+        var b = view.Breadth;
+        (b.LatestDate, b.Latest, b.State, b.Voters, b.Universe, b.Excluded).ShouldBe((S1.AddDays(1), 27.5, "value", 120, 214, 94));
+        (b.ComputedDays, b.PendingDays, b.InsufficientDays).ShouldBe((2, 2, 1));
+        b.InsufficientDates.ShouldBe([S1], "the coverage names the dates");
+        b.Label.ShouldBe("breadth of your 214 tracked shares (members as of today), not of the market");
+    }
+
+    [Fact]
+    public async Task With_no_breadth_yet_the_view_says_none_and_the_label_names_no_count()
+    {
+        _store.Rows.Add(Day(S1));
+
+        var view = await Handler.HandleAsync(new GetContextCoverageQuery(), Ct);
+
+        (view.Breadth.State, view.Breadth.Latest, view.Breadth.PendingDays).ShouldBe((null, null, 1));
+        view.Breadth.Label.ShouldBe("breadth of your tracked shares (members as of today), not of the market");
+    }
 }

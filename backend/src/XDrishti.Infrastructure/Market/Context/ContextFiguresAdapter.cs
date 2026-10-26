@@ -20,8 +20,8 @@ internal sealed class ContextFiguresAdapter(IContextDayStore store, ContextFigur
         public void Store(Built built) => _built = built;
     }
 
-    /// <summary>A context built from <paramref name="Stamp"/>'s days; <paramref name="Context"/> is null when the library refused a row, <paramref name="First"/> the oldest date.</summary>
-    internal sealed record Built(ContextStamp Stamp, MarketContext? Context, DateOnly? First);
+    /// <summary>A context built from <paramref name="Stamp"/>'s days; <paramref name="Context"/> is null when the library refused a row, <paramref name="First"/> the oldest date, <paramref name="Universe"/> the number of shares asked on each day that has a breadth.</summary>
+    internal sealed record Built(ContextStamp Stamp, MarketContext? Context, DateOnly? First, IReadOnlyDictionary<DateOnly, int>? Universe = null);
 
     public async ValueTask<ContextRead> AsOfAsync(DateOnly date, CancellationToken cancellationToken)
     {
@@ -38,7 +38,8 @@ internal sealed class ContextFiguresAdapter(IContextDayStore store, ContextFigur
 
         if (context.TryAsOf(date, out var values))
         {
-            return ContextRead.Of(Figures(values));
+            var figures = Figures(values);
+            return ContextRead.Of(built.Universe is { } universe && universe.TryGetValue(values.Date, out var asked) ? figures with { BreadthUniverse = asked } : figures);
         }
 
         return ContextRead.Not(built.First is { } first && date <= first ? ContextRead.BeforeHistory : ContextRead.Stale);
@@ -62,7 +63,7 @@ internal sealed class ContextFiguresAdapter(IContextDayStore store, ContextFigur
     /// <summary>The context the stored days make, for a test that compares it with one built from the same records.</summary>
     internal static MarketContext? Build(IEnumerable<ContextDayRecord> records)
     {
-        var days = records.Select(r => new ContextDay(r.Date, r.IndexHigh, r.IndexLow, r.IndexClose, r.VixClose));
+        var days = records.Select(r => new ContextDay(r.Date, r.IndexHigh, r.IndexLow, r.IndexClose, r.VixClose, r.Breadth));
         var result = MarketContext.Create(days);
         return result.IsSuccess ? result.Value : null;
     }
@@ -78,7 +79,8 @@ internal sealed class ContextFiguresAdapter(IContextDayStore store, ContextFigur
         }
 
         var records = await store.ListAsync(cancellationToken);
-        var built = new Built(new ContextStamp(records.Count, records.Count > 0 ? records[^1].Date : null), records.Count == 0 ? null : Build(records), records.Count > 0 ? records[0].Date : null);
+        var universe = records.Where(r => r is { Breadth: not null, BreadthUniverse: not null }).ToDictionary(r => r.Date, r => r.BreadthUniverse!.Value);
+        var built = new Built(stamp, records.Count == 0 ? null : Build(records), records.Count > 0 ? records[0].Date : null, universe);
         cache.Store(built);
         return built;
     }

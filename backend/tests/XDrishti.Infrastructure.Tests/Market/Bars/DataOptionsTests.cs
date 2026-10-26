@@ -196,4 +196,29 @@ public sealed class DataOptionsTests
     {
         DataOptions.IsValid(new DataOptions { Context = new ContextDataOptions { VixGraceSessions = grace, MinDayFraction = fraction } }).ShouldBeFalse();
     }
+
+    [Fact]
+    public void The_breadth_defaults_are_the_documented_ones_and_valid()
+    {
+        var options = new DataOptions();
+
+        (options.Context.Breadth.SmaSessions, options.Context.Breadth.MinVoters, options.Context.Breadth.MinShare, options.Context.BreadthGraceSessions).ShouldBe((20, 50, 0.5, 5));
+        DataOptions.IsValid(options).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(1, 50, 0.5, 5)]
+    [InlineData(251, 50, 0.5, 5)]
+    [InlineData(20, 0, 0.5, 5)]
+    [InlineData(20, 1001, 0.5, 5)]
+    [InlineData(20, 50, 0.09, 5)]
+    [InlineData(20, 50, 1.01, 5)]
+    [InlineData(20, 50, 0.5, 0)]
+    [InlineData(20, 50, 0.5, 31)]
+    public void Breadth_settings_outside_their_range_are_refused(int sma, int voters, double share, int grace)
+    {
+        var context = new ContextDataOptions { BreadthGraceSessions = grace, Breadth = new BreadthDataOptions { SmaSessions = sma, MinVoters = voters, MinShare = share } };
+
+        DataOptions.IsValid(new DataOptions { Context = context }).ShouldBeFalse();
+    }
 }

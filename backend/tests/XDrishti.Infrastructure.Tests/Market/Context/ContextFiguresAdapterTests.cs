@@ -16,7 +16,7 @@ public sealed class ContextFiguresAdapterTests
 
         public int Lists { get; private set; }
 
-        public ValueTask<ContextStamp> StampAsync(CancellationToken cancellationToken) => ValueTask.FromResult(new ContextStamp(Rows.Count, Rows.Count == 0 ? null : Rows[^1].Date));
+        public ValueTask<ContextStamp> StampAsync(CancellationToken cancellationToken) => ValueTask.FromResult(new ContextStamp(Rows.Count, Rows.Count == 0 ? null : Rows[^1].Date, Rows.Count(r => r.Breadth is not null), null, Rows.Sum(r => r.Breadth ?? 0)));
 
         public ValueTask<IReadOnlyList<DateOnly>> ListDatesAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<DateOnly>>([.. Rows.Select(r => r.Date)]);
 
@@ -31,6 +31,12 @@ public sealed class ContextFiguresAdapterTests
             Rows.AddRange(records);
             return ValueTask.FromResult(records.Count);
         }
+
+        public ValueTask<IReadOnlyList<StoredBreadth>> ListBreadthAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<StoredBreadth>>([]);
+
+        public ValueTask<int> SetBreadthAsync(IReadOnlyList<BreadthWrite> writes, CancellationToken cancellationToken) => ValueTask.FromResult(0);
+
+        public ValueTask<int> ReplaceBreadthAsync(IReadOnlyList<BreadthWrite> writes, CancellationToken cancellationToken) => ValueTask.FromResult(0);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -201,5 +207,42 @@ public sealed class ContextFiguresAdapterTests
         var read = await Adapter(store).AsOfAsync(Start.AddDays(60), Ct);
 
         (read.Figures, read.Unavailable).ShouldBe((null, "context_invalid"));
+    }
+
+    // P3-01e criterion 9: the breadth feature reads the previous session's stored value, in percent.
+
+    [Fact]
+    public async Task The_breadth_of_the_latest_day_before_the_date_is_read_in_percent_with_the_shares_asked_and_a_day_without_one_is_null()
+    {
+        var store = new MemoryStore();
+        store.Rows.AddRange(Days(4, 30).Select((r, i) => i == 10 ? r : r with { Breadth = 20 + i, BreadthUniverse = 214 }));
+        var adapter = Adapter(store);
+
+        var withBreadth = await adapter.AsOfAsync(store.Rows[11].Date, Ct);
+        var without = await adapter.AsOfAsync(store.Rows[11].Date.AddDays(0), Ct);
+        var gap = await adapter.AsOfAsync(store.Rows[10].Date.AddDays(1), Ct);
+
+        withBreadth.Figures!.AsOf.ShouldBe(store.Rows[10].Date, "strictly before the date asked");
+        withBreadth.Figures.Breadth.ShouldBeNull("the row of that day has no breadth: NaN of the library, null here");
+        withBreadth.Figures.BreadthUniverse.ShouldBeNull();
+        without.Figures!.Breadth.ShouldBeNull();
+        gap.Figures!.AsOf.ShouldBe(store.Rows[10].Date);
+        var next = await adapter.AsOfAsync(store.Rows[12].Date, Ct);
+        next.Figures!.Breadth.ShouldBe(31.0);
+        next.Figures.BreadthUniverse.ShouldBe(214);
+    }
+
+    [Fact]
+    public async Task A_breadth_that_is_set_later_makes_the_context_rebuild_without_new_days()
+    {
+        var store = new MemoryStore();
+        store.Rows.AddRange(Days(2, 20));
+        var adapter = Adapter(store);
+        var before = await adapter.AsOfAsync(Start.AddDays(30), Ct);
+        store.Rows[^1] = store.Rows[^1] with { Breadth = 61, BreadthUniverse = 100 };
+
+        var after = await adapter.AsOfAsync(Start.AddDays(30), Ct);
+
+        (before.Figures!.Breadth, after.Figures!.Breadth).ShouldBe((null, 61.0));
     }
 }

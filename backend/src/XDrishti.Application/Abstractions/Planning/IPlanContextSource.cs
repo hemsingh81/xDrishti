@@ -59,6 +59,7 @@ public sealed record PlanContextRequest(DateOnly Session, DateOnly ForDate, IRea
 /// <param name="Gate">Market figures before the plan date; null when there is no source.</param>
 /// <param name="TakenTrades">Real taken trades; null when there is no source.</param>
 /// <param name="Notes">Honest-limit sentences to show beside the plan (for example "no position records exist").</param>
+/// <param name="MarketNote">What the breadth in <paramref name="Gate"/> is (P3-01e); null when the gate has no breadth. Written after the flag lines of the basis.</param>
 /// <param name="BookFromLedger">True when <paramref name="Book"/> is the paper ledger's (P10-02): an empty list is then a known empty book, not the owner's assumption.</param>
 public sealed record PlanContext(
     IReadOnlyList<BookPosition>? Book,
@@ -68,7 +69,8 @@ public sealed record PlanContext(
     MarketGateInput? Gate,
     IReadOnlyList<TakenTrade>? TakenTrades,
     IReadOnlyList<string> Notes,
-    bool BookFromLedger = false);
+    bool BookFromLedger = false,
+    string? MarketNote = null);
 
 /// <summary>Where the portfolio, account and market facts of a plan come from. Read only: nothing behind it may place, modify or cancel an order or write to an account.</summary>
 public interface IPlanContextSource

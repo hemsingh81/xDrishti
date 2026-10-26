@@ -19949,6 +19949,88 @@
         },
         "description": "The account's connection to Dhan. Status is \"not_connected\", \"connected\", \"expired\" (the expiry has passed — derived when read,\nno broker call needed). ExpiresAt is when the token stops working (as Dhan states, otherwise 24 hours after sign-in).\nBrokerUserName and BrokerUserId (masked like the client id) are what Dhan reported for the token. LastError is a short safe text (at most\nDhan's error code). The token itself is never returned."
       },
+      "ContextBreadthView": {
+        "required": [
+          "latestDate",
+          "latest",
+          "state",
+          "voters",
+          "universe",
+          "excluded",
+          "computedDays",
+          "pendingDays",
+          "insufficientDays",
+          "insufficientDates",
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "latestDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "latest": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "voters": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "universe": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "excluded": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "computedDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pendingDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "insufficientDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "insufficientDates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "description": "The breadth of the owner's tracked shares (P3-01e): `Latest` is the percent (0 to 100) of the latest day that has one, null when that day was `insufficient`; `State` is `value` or `insufficient` (null when no day has any);\n`Voters`, `Universe` and `Excluded` are that day's counts; `PendingDays` are stored days still without a breadth (the last closed session can still gain bars); `InsufficientDates` names the thin days. The `Label` says what it is."
+      },
       "ContextCoverageView": {
         "required": [
           "enabled",
@@ -19972,7 +20054,8 @@
           "gapSessions",
           "skippedTotal",
           "skipped",
-          "source"
+          "source",
+          "breadth"
         ],
         "type": "object",
         "properties": {
@@ -20093,6 +20176,9 @@
           },
           "source": {
             "type": "string"
+          },
+          "breadth": {
+            "$ref": "#/components/schemas/ContextBreadthView"
           }
         },
         "description": "What the stored market context makes readable (`GET /api/data/context`, criterion 7). `Missing` names an unmet prerequisite (`index_not_tracked`, `vix_not_tracked`, `disabled`) with its `Fix`. `AgeSessions` is the number of\ntrading sessions the newest day is behind the last closed one; `Stale` is more than one."

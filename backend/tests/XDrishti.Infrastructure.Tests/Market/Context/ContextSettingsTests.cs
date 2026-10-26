@@ -27,4 +27,12 @@ public sealed class ContextSettingsTests
         settings.VixSymbols.ShouldBe(["NSE:VIX"]);
         settings.Enabled.ShouldBeFalse();
     }
+
+    [Fact]
+    public void The_breadth_settings_are_read_from_the_nested_section()
+    {
+        var settings = Of(new ContextDataOptions { BreadthGraceSessions = 7, Breadth = new BreadthDataOptions { SmaSessions = 10, MinVoters = 30, MinShare = 0.6 } });
+
+        (settings.BreadthSmaSessions, settings.BreadthMinVoters, settings.BreadthMinShare, settings.BreadthGraceSessions).ShouldBe((10, 30, 0.6, 7));
+    }
 }

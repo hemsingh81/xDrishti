@@ -1,6 +1,6 @@
 # P3-01e — Breadth of the owner's tracked shares, point-in-time, and the market gate's VIX and breadth
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-27 (owner approved the plan; see *Build notes and deviations* at the end; [ADR 0134](../adr/0134-breadth-of-the-owners-tracked-shares-is-set-once-per-day-from-closes-up-to-that-day-and-the-market-gate-reads-it-in-fractions.md))
 - **Phase / roadmap row:** P3 — row P3-01e (Later, "before P7"); feeds the `breadth` context feature (P3-01c) and the market gate of P7-06.
 - **Design refs:** docs/design/09-learning-engine.md §14 (market gate) · docs/design/11-strategy-lab.md §2 (market context, "Not yet built") · docs/design/05-data-and-brokers.md §4, §9 · docs/design/16-configuration.md (`smart_rules.market_gate`) · docs/design/18-roadmap.md (P3-01e row, ISS-22) · ADR 0033 (decision 4, "Known risk")
 - **Needs:** [P3-01d](P3-01d-context-data-job-index-and-vix.md) (the table `market.context_daily`, `ContextUpkeep`, `IContextFigures`); built: `market.bars_agg` 1D rows, `IDailySeries`, `ICorporateActionQueries`, the smart rules (P7-06) and `StoredPlanContextSource` (P7-09).
@@ -71,3 +71,14 @@ None. (Owner acts that change the data: tracking more shares; running the Dhan p
 ## Review fixes 2026-10-25 (2)
 - Late Dhan load (for example 15:50) no longer freezes a transient `insufficient`: a day inside `BreadthGraceSessions` may be recomputed (update only while `breadth_state IS NULL` or insufficient within the grace), then final.
 - Criterion 1 fixture states its options: `MinVoters` 5 (default is 50), otherwise 6 voters would be `insufficient`.
+
+## Build notes and deviations (2026-10-27)
+- **`IContextFigures.LatestAsync(beforeDate)` was not added.** `AsOfAsync(date)` already returns the latest stored day strictly before the date; the plan calls it with the planned date. `ContextFigures` gains a trailing `BreadthUniverse` (how many shares were asked) for the plan note; `ContextStamp` gains the breadth count, last computation time and sum so that the cached context is rebuilt when a breadth is set or rebuilt.
+- **A day that can still gain bars is not written (review pitfall of P3-01d).** The last closed session is computed only when every tracked share has its complete bar on it, otherwise it waits (`Pending`) until the day is older; older days follow criterion 5 and the grace rule. So the breadth of the session that just closed may appear one session late and the plan then reads the day before.
+- **No tracked share writes nothing** (`no_shares` in the answer), instead of an `insufficient` day with a universe of 0.
+- **`BreadthGraceSessions`** is `Data:Context:BreadthGraceSessions` (next to `VixGraceSessions`); the other three are under `Data:Context:Breadth:`.
+- **Coverage** `breadth` also has `latestDate`, `computedDays`, `pendingDays` and `insufficientDates` (the dates named by criterion 4).
+- **Plan note.** `PlanContext.MarketNote` is appended after the flag lines (not among the leading notes) so the 500-character cut of the basis takes it before any gate flag; the full label is always on the coverage endpoint.
+- **Back-fill** reads once per share from the window of the oldest pending day (the daily run reads only what its oldest pending day needs, and nothing when no day is pending) and computes each day from dictionary lookups, not a rolling sum; 1,100 days for 214 shares run well inside 3 s on the integration database (asserted).
+- **Test settings.** The integration host sets `Data:Context:Breadth:MinVoters` to 3 (the product default 50 is unit-tested); nothing else in a host changes.
+- `docs/site` was not rebuilt in this commit (the generated site was being edited by another session); run `scripts/build-docs.sh` when it is clean.

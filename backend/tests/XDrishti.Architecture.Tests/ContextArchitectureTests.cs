@@ -45,17 +45,17 @@ public sealed class ContextArchitectureTests
     }
 
     [Fact]
-    public void The_two_handlers_are_internal_and_sealed_the_ports_are_public_interfaces_and_the_adapters_are_internal_sealed()
+    public void The_handlers_are_internal_and_sealed_the_ports_are_public_interfaces_and_the_adapters_are_internal_sealed()
     {
         ShouldHaveNone(Types.InAssembly(Application).That().ResideInNamespace("XDrishti.Application.Market.Context").And().HaveNameEndingWith("Handler").Should().NotBePublic().And().BeSealed().GetResult());
-        Application.GetTypes().Count(t => t.Namespace == "XDrishti.Application.Market.Context" && t.Name.EndsWith("Handler", StringComparison.Ordinal)).ShouldBe(2);
-        foreach (var name in new[] { "IContextBarSource", "IContextDayStore", "IContextFigures", "IContextSettings" })
+        Application.GetTypes().Count(t => t.Namespace == "XDrishti.Application.Market.Context" && t.Name.EndsWith("Handler", StringComparison.Ordinal)).ShouldBe(4, "refresh, coverage, compute breadth, rebuild breadth");
+        foreach (var name in new[] { "IContextBarSource", "IContextDayStore", "IContextFigures", "IContextSettings", "IBreadthSource" })
         {
             var port = Application.GetType("XDrishti.Application.Abstractions.Market.Context." + name).ShouldNotBeNull();
             (port.IsInterface && port.IsPublic).ShouldBeTrue(name);
         }
 
-        foreach (var name in new[] { "ContextBarSource", "ContextDayStore", "ContextFiguresAdapter", "ContextSettings" })
+        foreach (var name in new[] { "ContextBarSource", "ContextDayStore", "ContextFiguresAdapter", "ContextSettings", "BreadthSource" })
         {
             var adapter = Infrastructure.GetType("XDrishti.Infrastructure.Market.Context." + name).ShouldNotBeNull();
             (adapter.IsNotPublic && adapter.IsSealed).ShouldBeTrue(name);
@@ -90,5 +90,31 @@ public sealed class ContextArchitectureTests
         allowed.ShouldNotContain("charts/historical", Case.Sensitive, "the daily-history endpoint is fallback C: an owner decision and a separate slice (ADR 0133)");
         var folder = Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Market", "Context", "ContextBarSource.cs"))!;
         Directory.GetFiles(folder, "*.cs").Select(File.ReadAllText).ShouldAllBe(text => !text.Contains("HttpClient", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_breadth_calculator_is_pure_and_static_in_the_domain_and_the_source_is_read_only()
+    {
+        var calculator = Domain.GetType("XDrishti.Domain.Market.Context.BreadthCalculator").ShouldNotBeNull();
+        (calculator.IsAbstract && calculator.IsSealed && calculator.IsPublic).ShouldBeTrue("a public static class");
+        ShouldHaveNone(Types.InAssembly(Domain).That().HaveNameStartingWith("Breadth").And().ResideInNamespace("XDrishti.Domain.Market.Context").ShouldNot()
+            .HaveDependencyOnAny("XDrishti.Application", "XDrishti.Infrastructure", "Microsoft.EntityFrameworkCore", "Npgsql", "System.Net.Http", "Microsoft.Extensions").GetResult());
+
+        var source = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Market", "Context", "BreadthSource.cs"));
+        foreach (var write in new[] { "INSERT", "UPDATE", "DELETE" })
+        {
+            source.ShouldNotContain(write, Case.Sensitive, "the breadth source reads only");
+            source.ShouldContain("SELECT ts, close FROM market.bars_agg", Case.Sensitive, "the raw close, never the adjusted column");
+        }
+    }
+
+    [Fact]
+    public void The_column_grant_lives_in_a_migration_extension_and_no_table_level_update_is_granted_to_the_context_table()
+    {
+        var migration = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Persistence", "Migrations", "20261026220459_AddContextBreadth.cs"));
+
+        migration.ShouldContain("GrantColumnUpdateToAppRole(\"market\", \"context_daily\"");
+        migration.ShouldNotContain("GrantTableToAppRole");
+        migration.ShouldNotContain("GrantSchemaUsageToAppRole");
     }
 }

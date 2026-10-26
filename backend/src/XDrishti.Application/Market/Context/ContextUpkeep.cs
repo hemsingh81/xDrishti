@@ -4,9 +4,10 @@ using XDrishti.Application.Market.Bars.Pipeline;
 
 namespace XDrishti.Application.Market.Context;
 
-/// <summary>After a data job that aggregated, writes the context days that became final (P3-01d). Never fails the job: whatever goes wrong is a warning of the job, a missing index is only logged (the coverage endpoint names it).</summary>
+/// <summary>After a data job that aggregated, writes the context days that became final (P3-01d) and then the breadth of the days that have none (P3-01e). Never fails the job: whatever goes wrong is a warning of the job, a missing index is only logged (the coverage endpoint names it).</summary>
 internal sealed class ContextUpkeep(
     ICommandHandler<RefreshContextCommand, ContextRefreshed> refresh,
+    ICommandHandler<ComputeBreadthCommand, BreadthComputed> breadth,
     ILogger<ContextUpkeep> logger) : IContextUpkeep
 {
     private const string Crashed = "The market context could not be updated. See the API log.";
@@ -20,6 +21,13 @@ internal sealed class ContextUpkeep(
             if (result.IsFailure)
             {
                 await reporter.WarnAsync("Market context: " + result.Error.Message, cancellationToken);
+            }
+
+            // The breadth of the days just written (and of any day still without one); a failure here is a warning of its own, the index figures are already stored.
+            var computed = await breadth.HandleAsync(new ComputeBreadthCommand(), cancellationToken);
+            if (computed.IsFailure)
+            {
+                await reporter.WarnAsync("Breadth: " + computed.Error.Message, cancellationToken);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

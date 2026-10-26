@@ -16,6 +16,14 @@ internal sealed class FakeContextSettings : IContextSettings
     public int VixGraceSessions { get; set; } = 5;
 
     public double MinDayFraction { get; set; } = 0.96;
+
+    public int BreadthSmaSessions { get; set; } = 20;
+
+    public int BreadthMinVoters { get; set; } = 50;
+
+    public double BreadthMinShare { get; set; } = 0.5;
+
+    public int BreadthGraceSessions { get; set; } = 5;
 }
 
 internal sealed class FakeContextBarSource : IContextBarSource
@@ -58,6 +66,59 @@ internal sealed class FakeContextDayStore : IContextDayStore
         }
 
         return ValueTask.FromResult(inserted);
+    }
+
+    /// <summary>The breadth of each day that has one, with the same once-only rule as the table.</summary>
+    public Dictionary<DateOnly, StoredBreadth> Breadth { get; } = [];
+
+    public int BreadthWrites { get; private set; }
+
+    public ValueTask<IReadOnlyList<StoredBreadth>> ListBreadthAsync(CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<StoredBreadth>>([.. Rows.OrderBy(r => r.Date).Select(r => Breadth.GetValueOrDefault(r.Date) ?? new StoredBreadth(r.Date, null, null, null, null, null))]);
+
+    public ValueTask<int> SetBreadthAsync(IReadOnlyList<BreadthWrite> writes, CancellationToken cancellationToken)
+    {
+        var changed = 0;
+        foreach (var write in writes)
+        {
+            var state = Breadth.GetValueOrDefault(write.Date)?.State;
+            if (Rows.Any(r => r.Date == write.Date) && (state is null || (write.ReplaceInsufficient && state == BreadthResult.Insufficient)))
+            {
+                Put(write);
+                changed++;
+            }
+        }
+
+        return ValueTask.FromResult(changed);
+    }
+
+    public ValueTask<int> ReplaceBreadthAsync(IReadOnlyList<BreadthWrite> writes, CancellationToken cancellationToken)
+    {
+        foreach (var write in writes.Where(w => Rows.Any(r => r.Date == w.Date)))
+        {
+            Put(write);
+        }
+
+        return ValueTask.FromResult(writes.Count);
+    }
+
+    private void Put(BreadthWrite write)
+    {
+        BreadthWrites++;
+        Breadth[write.Date] = new StoredBreadth(write.Date, write.Result.Value, write.Result.Voters, write.Result.Universe, write.Result.Excluded, write.Result.State);
+    }
+}
+
+internal sealed class FakeBreadthSource : IBreadthSource
+{
+    public BreadthData Data { get; set; } = new([], new Dictionary<Guid, IReadOnlySet<DateOnly>>());
+
+    public List<DateOnly> Reads { get; } = [];
+
+    public ValueTask<BreadthData> ReadAsync(DateOnly from, CancellationToken cancellationToken)
+    {
+        Reads.Add(from);
+        return ValueTask.FromResult(Data);
     }
 }
 

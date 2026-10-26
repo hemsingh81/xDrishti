@@ -34,9 +34,12 @@ internal static class ContextCommand
         try
         {
             await using var scope = services.CreateAsyncScope();
-            return options.Action == ContextAction.Refresh
-                ? await RefreshAsync(scope.ServiceProvider, console, logger, cancellationToken)
-                : await CoverageAsync(scope.ServiceProvider, console, logger, cancellationToken);
+            return options.Action switch
+            {
+                ContextAction.Refresh => await RefreshAsync(scope.ServiceProvider, console, logger, cancellationToken),
+                ContextAction.RebuildBreadth => await RebuildBreadthAsync(options, scope.ServiceProvider, console, cancellationToken),
+                _ => await CoverageAsync(scope.ServiceProvider, console, logger, cancellationToken),
+            };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -76,6 +79,45 @@ internal static class ContextCommand
         return SimulateCommand.Done;
     }
 
+    private static async Task<int> RebuildBreadthAsync(ContextOptions options, IServiceProvider provider, SimulateConsole console, CancellationToken cancellationToken)
+    {
+        var handler = provider.GetRequiredService<ICommandHandler<RebuildBreadthCommand, BreadthRebuilt>>();
+        var result = await handler.HandleAsync(new RebuildBreadthCommand(options.From!.Value, options.To!.Value, options.Write), cancellationToken);
+        if (result.IsFailure)
+        {
+            await console.Error.WriteLineAsync(result.Error.Code + ": " + result.Error.Message);
+            return SimulateCommand.Refused;
+        }
+
+        await console.Out.WriteAsync(Text(result.Value));
+        return SimulateCommand.Done;
+    }
+
+    internal static string Text(BreadthRebuilt done)
+    {
+        var output = new StringBuilder();
+        output.Append(done.Written ? "write: yes\n" : "write: no (dry run; add --write to store)\n");
+        if (done.Missing is not null)
+        {
+            output.Append("missing: ").Append(done.Missing).Append(" - track shares on the Instruments screen and run Update data\n");
+        }
+
+        Line(output, "days looked at", done.Days);
+        Line(output, "days " + (done.Written ? "changed" : "that would change"), done.Changes.Count);
+        foreach (var change in done.Changes)
+        {
+            output.Append("  ").Append(change.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
+                .Append(" old ").Append(Figure(change.OldValue, change.OldState, change.OldVoters))
+                .Append(" new ").Append(Figure(change.NewValue, change.NewState, change.NewVoters)).Append('\n');
+        }
+
+        output.Append("breadth of your tracked shares, not of the market\n");
+        return output.ToString();
+    }
+
+    private static string Figure(double? value, string? state, int? voters) =>
+        state is null ? "none" : (value is { } v ? v.ToString("0.0", CultureInfo.InvariantCulture) : state) + " (" + (voters?.ToString(CultureInfo.InvariantCulture) ?? "0") + " voters)";
+
     private static async Task<int> CoverageAsync(IServiceProvider provider, SimulateConsole console, ILogger logger, CancellationToken cancellationToken)
     {
         var handler = provider.GetRequiredService<IQueryHandler<GetContextCoverageQuery, ContextCoverageView>>();
@@ -113,6 +155,18 @@ internal static class ContextCommand
             output.Append("  ").Append(skipped.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).Append(' ').Append(skipped.Reason).Append(' ').Append(skipped.Bars.ToString(CultureInfo.InvariantCulture)).Append(" bars\n");
         }
 
+        var b = v.Breadth;
+        output.Append("breadth: ").Append(b.State is null ? "none yet" : (b.Latest is { } latest ? latest.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "insufficient") + " on " + b.LatestDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            + " (" + b.Voters?.ToString(CultureInfo.InvariantCulture) + " voted of " + b.Universe?.ToString(CultureInfo.InvariantCulture) + ", " + b.Excluded?.ToString(CultureInfo.InvariantCulture) + " left out)").Append('\n');
+        Line(output, "days with breadth", b.ComputedDays);
+        Line(output, "days waiting for breadth", b.PendingDays);
+        Line(output, "days with too few voters", b.InsufficientDays);
+        foreach (var date in b.InsufficientDates)
+        {
+            output.Append("  ").Append(date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).Append(" insufficient\n");
+        }
+
+        output.Append(b.Label).Append('\n');
         output.Append(v.Source).Append('\n');
         return output.ToString();
     }
