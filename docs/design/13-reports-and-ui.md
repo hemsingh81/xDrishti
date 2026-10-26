@@ -286,6 +286,8 @@ What the app can mend by itself it mends quietly ([doc 12](12-portfolio-monitori
 **As built (P10-03, ADR 0121):** R19 for the paper phase is the seven-category discipline report with the skipped (plan-price grade), resized and added lines and no composite score; R32 for paper has the rows plan, modelled slippage, charges and net, with missed triggers and real slippage `not_evaluable` until P11. Both are in the weekly paper review (`/paper` Review tab, `xd paper review`).
 **R14 as built for paper (P10-04, [ADR 0122](../adr/0122-backtest-versus-paper-is-a-composition-matched-bootstrap-of-the-pre-epoch-backtest-trades-computed-on-read.md)):** the `/paper` tab Backtest vs paper draws the paper's cumulative R over the 5th, 50th and 95th percentile fan of a composition-matched bootstrap of the pre-epoch backtest trades, with the mean's band, the largest fall against the 90th percentile at the paper's n and the two exit statistics (met, not met, not evaluable). The live line and the slippage distribution wait for P11. R15 for the paper count is drawn at the paper's n, not the Lab's.
 
+**Paper phase check (P10-06, [ADR 0123]../adr/0123-the-paper-phase-check-judges-the-p10-exit-from-stored-records-with-its-caveats-in-the-label-and-reads-only.md):** the `/paper` tab Phase check lists the four exit criteria and capture integrity as MET, NOT MET or NOT EVALUABLE with their facts and blockers, the caveats of a MET inside the headline label, the week lines and every epoch (only the current one is judged); it has no write control.
+
 **Standard KPIs:** trades · win rate · avg win/loss R · expectancy · profit factor · total R · net ₹ after
 costs · max drawdown (R, %) · Sharpe/Sortino · avg holding · exposure · longest loss streak.
 

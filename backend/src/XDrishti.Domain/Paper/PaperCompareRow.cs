@@ -12,6 +12,7 @@ namespace XDrishti.Domain.Paper;
 /// <param name="RSim">The trade's R; null while open.</param>
 /// <param name="RBasis">net or gross; null while open.</param>
 /// <param name="ChargeSheetId">The sheet that charged the exit; null without one.</param>
+/// <param name="ApprovalKind">owner or auto.</param>
 public sealed record PaperCompareRow(
     long EntryId,
     long PlanItemId,
@@ -23,4 +24,5 @@ public sealed record PaperCompareRow(
     DateTimeOffset? ExitAt,
     double? RSim,
     string? RBasis,
-    string? ChargeSheetId);
+    string? ChargeSheetId,
+    string ApprovalKind = "owner");

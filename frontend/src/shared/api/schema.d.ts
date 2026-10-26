@@ -3387,6 +3387,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/paper/phase-check': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The P10 exit judged from stored records for one epoch (default the newest): duration and coverage, counted trades, expectancy within the backtest band after costs, drawdown within the 90th percentile and capture integrity, each MET, NOT MET or NOT EVALUABLE with its facts and blockers; the caveats sit in the label of a MET (exitCriterion); the week lines, every epoch (only the current one is judged), the discipline lines, the P7 phase check, the services and settings, what is never judged here and the honest limits. The report and the printable text. Optional through (rounded down to a trading session; default the last closed session) and epoch. Read only; simulated, no order exists. 404 paper.not_found, 422 paper.invalid */
+    get: operations['GetPaperPhaseCheck'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/plans/{id}/alerts': {
     parameters: {
       query?: never;
@@ -10293,6 +10310,41 @@ export interface components {
       /** @description Why unavailable; null for a value. */
       reason: null | string;
     };
+    /** @description The paper phase check as the verb prints it and the endpoint returns it. */
+    PaperPhaseCheckView: {
+      /** @description The criteria, the weeks, the epochs, what is printed and the limits. */
+      report: components['schemas']['PaperPhaseReport'];
+      /** @description The printable report, limits included. */
+      text: string;
+    };
+    /** @description The paper phase check (spec P10-06, ADR 0123): the P10 exit judged from stored records, with its caveats in the label. */
+    PaperPhaseReport: {
+      epoch: null | components['schemas']['PhaseEpochLine'];
+      /**
+       * Format: date
+       * @description The last closed session counted.
+       */
+      through: string;
+      /**
+       * Format: int32
+       * @description Days from the epoch start to Through, both included.
+       */
+      elapsedDays: number;
+      /** @description C1 to C4 and I. */
+      criteria: components['schemas']['PhaseCriterion'][];
+      /** @description The bare word: MET, NOT MET or NOT EVALUABLE. */
+      exitVerdict: string;
+      /** @description The same call with its caveats, e.g. MET (point estimate; ...). */
+      exitCriterion: string;
+      /** @description One line per ISO week. */
+      weeks: components['schemas']['PhaseWeekLine'][];
+      /** @description Every epoch of the history. */
+      epochs: components['schemas']['PhaseEpochLine'][];
+      /** @description What is printed and not judged. */
+      printed: components['schemas']['PhasePrinted'];
+      /** @description The honest limits; never empty. */
+      limits: string[];
+    };
     /** @description The open positions and the closed trades of a paper account. */
     PaperPositionList: {
       /** @description The label. */
@@ -10495,6 +10547,98 @@ export interface components {
        */
       value: number;
     };
+    /** @description One criterion of the paper phase check (spec P10-06): a verdict, the fact in words, the facts behind it and what stops it. */
+    PhaseCriterion: {
+      /** @description C1 to C4 and I. */
+      id: string;
+      /** @description The criterion. */
+      title: string;
+      /** @description MET, NOT MET or NOT EVALUABLE. */
+      verdict: string;
+      /** @description The call and its reason in one line. */
+      label: string;
+      /** @description The facts behind it. */
+      facts: string[];
+      /** @description What stops it and whose act it is; empty when nothing does. */
+      blockers: string[];
+    };
+    /** @description An epoch of the history, with whether it is the one judged. */
+    PhaseEpochLine: {
+      /**
+       * Format: int64
+       * @description The id.
+       */
+      id: number;
+      /**
+       * Format: date
+       * @description The first session.
+       */
+      startedOn: string;
+      /** @description first, detected_change or owner_restart. */
+      kind: string;
+      /** @description Why. */
+      reason: string;
+      /**
+       * Format: int32
+       * @description Entries that count, as stored.
+       */
+      counted: number;
+      /**
+       * Format: int32
+       * @description Changes with no explanation.
+       */
+      unexplainedChanges: number;
+      /** @description True for the epoch judged; earlier epochs are never pooled into it. */
+      current: boolean;
+    };
+    /** @description A thing the check never judges, and the tests that prove it. */
+    PhaseNotJudged: {
+      /** @description The property. */
+      name: string;
+      /** @description Always NOT EVALUABLE here. */
+      verdict: string;
+      /** @description The test names (or where it is settled). */
+      proof: string;
+    };
+    /** @description What is printed beside the criteria and never judged by them. */
+    PhasePrinted: {
+      /** @description The discipline lines of P10-03, one each. */
+      disciplineLines: string[];
+      /** @description The plan-price mean over all primary proposals (P10-04), in words. */
+      sensitivityMean: string;
+      /**
+       * Format: int32
+       * @description Counted trades auto-approved.
+       */
+      autoApproved: number;
+      /**
+       * Format: int32
+       * @description Counted trades the owner approved.
+       */
+      ownerApproved: number;
+      /**
+       * Format: int32
+       * @description Sessions whose plan had no primary ticket.
+       */
+      plansWithoutPrimary: number;
+      /**
+       * Format: int32
+       * @description Manual nightly attempts in the window.
+       */
+      manualRuns: number;
+      /** @description The P7 phase check's label, or why it is unavailable. */
+      p7: string;
+      /** @description Whether the owner confirmed the charge sheet(s) of the counted trades. */
+      chargeSheetConfirmed: boolean;
+      /** @description The pipeline's services. */
+      services: components['schemas']['PhaseService'][];
+      /** @description The settings. */
+      switches: components['schemas']['PhaseSwitch'][];
+      /** @description Every blocker, with whose act it is. */
+      blockers: string[];
+      /** @description What the check does not judge. */
+      notJudged: components['schemas']['PhaseNotJudged'][];
+    };
     /** @description A service of the framework and whether it runs. */
     PhaseService: {
       /** @description The service id. */
@@ -10516,6 +10660,61 @@ export interface components {
       effect: string;
       /** @description True when the pipeline cannot publish real tickets without it. */
       needed: boolean;
+    };
+    /** @description One ISO week of the epoch. */
+    PhaseWeekLine: {
+      /** @description The ISO week, e.g. 2026-W45. */
+      week: string;
+      /**
+       * Format: int32
+       * @description Trading sessions of the week inside the window.
+       */
+      sessions: number;
+      /**
+       * Format: int32
+       * @description Sessions with a published plan.
+       */
+      plansPublished: number;
+      /**
+       * Format: int32
+       * @description Failed-closed nightly attempts.
+       */
+      failedClosed: number;
+      /**
+       * Format: int32
+       * @description Nightly attempts a person started.
+       */
+      manualRuns: number;
+      /**
+       * Format: int32
+       * @description Sessions whose capture finished with nothing pending.
+       */
+      captureFinished: number;
+      /**
+       * Format: int32
+       * @description Trades counted that week (by exit day).
+       */
+      tradesCounted: number;
+      /**
+       * Format: int32
+       * @description Counted trades up to the end of the week.
+       */
+      cumulativeCounted: number;
+      /**
+       * Format: double
+       * @description Their summed R.
+       */
+      cumulativeR: number;
+      /**
+       * Format: int32
+       * @description Frozen changes found that week.
+       */
+      frozenChanges: number;
+      /**
+       * Format: int32
+       * @description Risk-down changes found that week.
+       */
+      riskDownChanges: number;
     };
     /** @description One cell of a pivot: the trade count and one figure. A cell with no trade is `empty`, a cell below the minimum is `insufficient` (masked, with its count), never a zero. */
     PivotCellView: {
@@ -21762,6 +21961,47 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['BacktestVsPaperView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPaperPhaseCheck: {
+    parameters: {
+      query?: {
+        through?: string;
+        epoch?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PaperPhaseCheckView'];
         };
       };
       /** @description Not Found */

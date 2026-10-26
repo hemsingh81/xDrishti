@@ -621,7 +621,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetPaperEquityQuery, Result<PaperEquityView>>, GetPaperEquityHandler>();
         services.AddScoped<IQueryHandler<ReconcilePaperQuery, Result<PaperReconcileView>>, ReconcilePaperHandler>();
         services.AddScoped<IPaperReviewSource, PaperReviewSource>(); // the read-only door of the weekly paper review (P10-03, ADR 0121)
-        services.AddScoped<IReviewComparisonLine, ComparisonLineNotBuilt>(); // replaced by P10-04
+        services.AddScoped<IReviewComparisonLine, BacktestReviewComparisonLine>(); // the review's backtest line reads the P10-04 report (P10-06)
         services.AddScoped<PaperReviewGatherer>();
         services.AddScoped<ICommandHandler<BuildPaperReviewCommand, PaperReviewView>, BuildPaperReviewHandler>();
         services.AddScoped<IQueryHandler<GetPaperReviewQuery, Result<PaperReviewView>>, GetPaperReviewHandler>();
@@ -629,6 +629,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetDisciplineQuery, Result<DisciplineView>>, GetDisciplineHandler>();
         services.AddScoped<BacktestReferenceReader>(); // the point-in-time backtest reference of the paper comparison (P10-04)
         services.AddSingleton<ICostConfirmationFact, NotConfirmed>(); // no sheet is confirmed until the slice that writes the confirmation exists (P10-04, criterion 7)
+        services.AddScoped<IQueryHandler<EvaluatePaperPhaseCheckQuery, Result<PaperPhaseCheckView>>, EvaluatePaperPhaseCheckHandler>(); // the paper phase check: reads only, judges nothing it cannot read (P10-06, ADR 0123)
         services.AddScoped<IQueryHandler<GetBacktestVsPaperQuery, Result<BacktestVsPaperView>>, GetBacktestVsPaperHandler>(); // backtest vs paper, computed on read (P10-04, ADR 0122)
         services.AddScoped<ICommandHandler<JournalPlansCommand, JournalOutcome>, JournalPlansHandler>(); // auto-journal (P7-14, ADR 0093): reads stored fills, insert-only links, no order
         services.AddScoped<IQueryHandler<GetPlanJournalQuery, Result<PlanJournalView>>, GetPlanJournalHandler>();

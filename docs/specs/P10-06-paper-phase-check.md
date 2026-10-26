@@ -36,7 +36,7 @@ Say, from stored records only, whether the current measurement epoch meets the P
 - **API:** `GET /api/paper/phase-check?through=YYYY-MM-DD&epoch=ID` -> `PaperPhaseCheckView` { `report` { `epoch`, `through`, `criteria[]` { `id`, `title`, `verdict`, `label`, `facts[]`, `blockers[]` }, `exitVerdict`, `exitCriterion`, `weeks[]`, `epochs[]`, `printed` {...}, `setup`, `limits[]` }, `text` }.
 - **CLI:** `xd paper phase-check [--through DATE] [--epoch ID]`, `scripts/xd.sh paper phase-check`.
 - **Data:** none, no migration. Reads through ports: `paper.*`, `trading.plan_runs`, `plans`, `grades`, the P7 phase check handler, the service schedules, settings.
-- **Events/jobs:** none. Log ids 5250 to 5254.
+- **Events/jobs:** none. Log ids 5219 to 5223 (5250 to 5254 were taken by P10-04).
 
 ## Non-functional
 One epoch read (entries, exits, skips, runs, about 100 rows), the P10-04 evaluation (under 4 s including the reference runs), 12 weekly lines; not a polling target.
@@ -73,3 +73,6 @@ None for the build. For the owner (wall-clock): complete the pre-flight of P10-0
 ## Review fixes 2026-10-25 (2)
 - Dates: 2027-01-24 and 2027-01-10 are Sundays; 'through is rounded down to the last closed session' defined; hand table uses 2027-01-25 (day 85) and 2027-01-11 (day 71); the 84-day boundary noted.
 - The seeded 12-week epoch needs a stub `ICostConfirmationFact`; real MET is unreachable until the confirmation-writer slice exists. Label 'P10-07 or P8-06b' replaced.
+
+## Built 2026-10-26 (ADR 0123)
+- Built with the decisions above; the pending-pair part of I reads the stored capture row (it cannot tell missing bars from a late replay); the review's backtest line (P10-03 port) now reads P10-04.

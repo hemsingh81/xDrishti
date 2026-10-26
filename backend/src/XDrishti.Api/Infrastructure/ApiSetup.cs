@@ -100,6 +100,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, PaperGovernanceEndpoints>();
         services.AddSingleton<IEndpointModule, PaperReviewEndpoints>();
         services.AddSingleton<IEndpointModule, PaperCompareEndpoints>(); // backtest versus paper (P10-04): one GET, computed on read
+        services.AddSingleton<IEndpointModule, PaperPhaseCheckEndpoints>(); // the paper phase check (P10-06): one GET, computed on read
         services.AddSingleton<IEndpointModule, TicketAlertsEndpoints>(); // price-crossing alerts and prompts on the plan screen (P7-20); preferences only, no order
         services.AddSingleton<IEndpointModule, ReportsEndpoints>();
         services.AddSingleton<IEndpointModule, AutonomyEndpoints>();

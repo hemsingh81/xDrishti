@@ -79,7 +79,8 @@ public sealed record GovernanceCommitted(long SnapshotId, long EpochId);
 /// <param name="Effect">new_epoch or noted.</param>
 /// <param name="EpochId">The epoch it led to or belongs to.</param>
 /// <param name="ExplainedBy">hypothesis:id, changelog:id or null.</param>
-public sealed record StoredChange(long Id, long FromSnapshotId, long ToSnapshotId, string Key, string Class, string? Before, string? After, string Effect, long EpochId, string? ExplainedBy);
+/// <param name="SessionDate">The newest session of the capture run that found it (the later snapshot's session), or null when unknown.</param>
+public sealed record StoredChange(long Id, long FromSnapshotId, long ToSnapshotId, string Key, string Class, string? Before, string? After, string Effect, long EpochId, string? ExplainedBy, DateOnly? SessionDate = null);
 
 /// <summary>An epoch with its counts.</summary>
 /// <param name="Epoch">The epoch row.</param>
