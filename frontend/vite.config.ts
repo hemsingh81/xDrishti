@@ -46,6 +46,8 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    // The browser runner (e2e/, Playwright) is manual and has its own config.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,

@@ -67,7 +67,7 @@ function CounterfactualPanels({ report, journey }: { report: Counterfactual; jou
         </Box>
       </Panel>
       <Panel title="Period and knobs">
-        <Box component="dl" sx={{ m: 0, display: 'grid', gap: 0.5 }}>
+        <Box sx={{ m: 0, display: 'grid', gap: 0.5 }}>
           <Box>
             Frozen at {report.cut === null ? 'no date (no period could be made)' : formatDate(report.cut)} on{' '}
             {formatCount(report.frozenTrainRows)} trades; {report.frozenAgeMonths} months of stopped learning to{' '}

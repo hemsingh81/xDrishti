@@ -281,4 +281,18 @@ describe.each(['light', 'dark'] as const)('%s theme', (mode) => {
     for (const id of ['plain', 'icon', 'tab', 'chip']) expect(hit(id)).toBe(true);
     for (const id of ['small', 'small-chip', 'in-cell', 'in-autocomplete', 'dense']) expect(hit(id)).toBe(false);
   });
+
+  it('keeps the small buttons of the top bar (search, accounts) at 44 px on phones', () => {
+    renderThemed(
+      mode,
+      <header className="MuiAppBar-root">
+        <button className="MuiButton-root MuiButton-sizeSmall" data-testid="in-bar" />
+      </header>,
+    );
+    // Whitespace is stripped from the injected CSS, so the descendant selector reads `.MuiAppBar-root.MuiButton-root`.
+    expect(injectedCss()).toMatch(
+      /@media\(max-width:479\.95px\)\{[^]*?\.MuiAppBar-root\.MuiButton-root\{min-height:44px;min-width:44px/,
+    );
+    expect(screen.getByTestId('in-bar').matches('.MuiAppBar-root .MuiButton-root')).toBe(true);
+  });
 });

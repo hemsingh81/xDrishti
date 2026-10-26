@@ -32,9 +32,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       {navigation.map((section) => (
         <List
           key={section.title}
+          component="div"
           disablePadding
           subheader={
             <ListSubheader
+              component="div"
               disableSticky
               sx={{
                 bgcolor: 'transparent',

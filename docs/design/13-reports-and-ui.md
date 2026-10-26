@@ -101,6 +101,7 @@ As built (P8-16, global rules in place, pinned by CSS-text/jsdom tests, NOT veri
 chips, anything inside a table cell, text field or autocomplete, and `data-dense`; the shell has a "Skip to content" link as the
 first tab stop and a focusable `main`; `scroll-padding-top` on `html` clears the sticky top bar below `md`; `ButtonTabs` scroll
 sideways inside their strip. The Playwright and axe runner is not built.
+Browser run (P8-16, ADR 0124): the rules above were measured in Chrome at 360, 768, 1440 and 2560 px; the run found and fixed a 100 %-wide skip link (page scrolled 8 px sideways), small top-bar and legend buttons under 44 px on phones, and two contrast pairs; the remaining findings are listed in the ADR.
 
 ## 1e. Visual system (P1-19)
 

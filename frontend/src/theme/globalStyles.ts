@@ -59,6 +59,8 @@ export function createGlobalStyles(theme: Theme) {
     // links are not listed.
     [`@media (max-width:${touchTarget.phoneMaxWidth}px)`]: {
       [`:is(${touchControls}):not(${touchExempt})`]: { minHeight: touchTarget.phone, minWidth: touchTarget.phone },
+      // The top bar's search and accounts buttons are small buttons, but on a phone they are the bar's targets too.
+      '.MuiAppBar-root .MuiButton-root': { minHeight: touchTarget.phone, minWidth: touchTarget.phone },
     },
     body: {
       WebkitFontSmoothing: 'antialiased',

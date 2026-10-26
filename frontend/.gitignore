@@ -6,3 +6,7 @@ coverage/
 
 # vitest run artefacts
 .vitest/
+
+# Playwright runner (P8-16)
+test-results/
+playwright-report/

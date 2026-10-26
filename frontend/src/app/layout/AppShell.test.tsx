@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { appliedCss } from '@/test/css';
 import { renderRoutes } from '@/test/render';
@@ -97,5 +97,14 @@ describe('Instruments layout', () => {
     expect(skip).toHaveFocus();
     await userEvent.keyboard('{Enter}');
     expect(screen.getByRole('main')).toHaveFocus();
+  });
+
+  it('marks main with data-ready once the route has loaded and nothing is fetching', async () => {
+    renderRoutes(routes, { initialPath: '/system' });
+    await screen.findByRole('heading', { level: 1, name: 'System status' });
+    const main = screen.getByRole('main');
+    await waitFor(() => {
+      expect(main).toHaveAttribute('data-ready');
+    });
   });
 });

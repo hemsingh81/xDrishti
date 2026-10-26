@@ -79,6 +79,15 @@ describe('Learning, Journey tab', () => {
     expect(document.querySelector('[data-state="value"]')).not.toBeNull();
   });
 
+  it('prints the period and knobs as plain text, not as a definition list without terms (axe definition-list)', async () => {
+    const report = buildCounterfactual();
+    mountJourney(journeyOf(report), report);
+    await open();
+
+    await screen.findByText('Period and knobs');
+    for (const list of document.querySelectorAll('dl')) expect(list.querySelector('dt')).not.toBeNull();
+  });
+
   it('reads no difference as an ordinary answer', async () => {
     const report = buildCounterfactual({ outcome: 'NoDifference', judgedWindows: 4 });
     mountJourney(journeyOf(report), report);

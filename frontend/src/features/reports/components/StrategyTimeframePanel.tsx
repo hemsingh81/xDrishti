@@ -57,7 +57,7 @@ export function StrategyTimeframePanel({ query, min }: ReportPanelProps) {
             content: (
               <>
                 <MetricValue state={state} format={formatR} />
-                <Typography component="span" variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                <Typography component="span" variant="caption" color="text.primary" sx={{ display: 'block' }}>
                   n {formatCount(cell.n)}
                 </Typography>
               </>

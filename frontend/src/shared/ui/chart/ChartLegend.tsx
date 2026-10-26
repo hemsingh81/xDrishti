@@ -1,5 +1,6 @@
 import { Box, Button, Stack } from '@mui/material';
 import { useId } from 'react';
+import { touchTarget } from '@/theme/tokens';
 import type { ChartTokens } from './chartTheme';
 import type { ChartDash, ChartSeries } from './types';
 
@@ -48,6 +49,8 @@ export function ChartLegend({ series, hidden, colors, onToggle }: ChartLegendPro
             }}
             startIcon={<Swatch color={colors[s.color]} dash={s.dash} />}
             sx={{
+              // Small on a desktop, a full touch target on a phone (the global phone rule leaves small buttons alone).
+              [`@media (max-width:${touchTarget.phoneMaxWidth}px)`]: { minHeight: touchTarget.phone },
               textDecoration: on ? 'none' : 'line-through',
               color: on ? 'text.primary' : 'text.secondary',
               borderColor: 'divider',
@@ -75,8 +78,8 @@ export function ChartLegend({ series, hidden, colors, onToggle }: ChartLegendPro
           id={reasonId}
           sx={{
             position: 'absolute',
-            width: 1,
-            height: 1,
+            width: '1px',
+            height: '1px',
             overflow: 'hidden',
             clip: 'rect(0 0 0 0)',
             whiteSpace: 'nowrap',

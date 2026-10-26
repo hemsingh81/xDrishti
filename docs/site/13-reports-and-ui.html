@@ -272,7 +272,8 @@ win-rate bound the cell stores; no interval on expectancy exists yet.</p>
 <code>[role=button]</code> get a 44 px minimum (<code>touchTarget</code>) with doubled specificity; exempt (dense) are small buttons, icon buttons and
 chips, anything inside a table cell, text field or autocomplete, and <code>data-dense</code>; the shell has a &quot;Skip to content&quot; link as the
 first tab stop and a focusable <code>main</code>; <code>scroll-padding-top</code> on <code>html</code> clears the sticky top bar below <code>md</code>; <code>ButtonTabs</code> scroll
-sideways inside their strip. The Playwright and axe runner is not built.</p>
+sideways inside their strip. The Playwright and axe runner is not built.
+Browser run (P8-16, ADR 0124): the rules above were measured in Chrome at 360, 768, 1440 and 2560 px; the run found and fixed a 100 %-wide skip link (page scrolled 8 px sideways), small top-bar and legend buttons under 44 px on phones, and two contrast pairs; the remaining findings are listed in the ADR.</p>
 <h2 id="1e-visual-system-p1-19">1e. Visual system (P1-19)<a class="hash" href="#1e-visual-system-p1-19" aria-label="Link to this section">#</a></h2>
 <p>Calm, data-first, trustworthy: cool-neutral base, one deliberate accent. Tokens live in <code>frontend/src/theme/tokens.ts</code>
 and the prototype&#39;s <code>proto.css</code>; the MUI theme and the prototype read the same values. All text pairs meet WCAG AA
@@ -896,7 +897,7 @@ nightly; responses are chart-ready series.</li>
     <a class="prev" href="12-portfolio-monitoring.html"><small>← Previous  [</small>12 · Portfolio monitoring</a>
     <a class="next" href="14-ai-assistant.html"><small>Next  ] →</small>14 · AI assistant</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-26 02:30</footer>
+  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-26 05:37</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-screens" class="d2">1. Screens</a>
 <a href="#1b-clickable-prototype" class="d2">1b. Clickable prototype</a>

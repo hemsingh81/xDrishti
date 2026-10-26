@@ -42,7 +42,7 @@ export function PivotGrid({ pivot, min, names, label, onOpen, selectedKey }: Piv
       content: (
         <>
           <MetricValue state={state} format={format} />
-          <Typography component="span" variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+          <Typography component="span" variant="caption" color="text.primary" sx={{ display: 'block' }}>
             n {formatCount(cell.n)}
           </Typography>
         </>
