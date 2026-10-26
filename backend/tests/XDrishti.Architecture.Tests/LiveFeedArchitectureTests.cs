@@ -75,13 +75,16 @@ public sealed class LiveFeedArchitectureTests
     }
 
     [Fact]
-    public void Only_the_dhan_feed_client_opens_a_web_socket_and_it_checks_the_allow_list()
+    public void Only_the_dhan_feed_clients_open_a_web_socket_and_each_connector_checks_the_allow_list()
     {
+        // the live feed's socket (ADR 0024) and the 20-level depth socket (P7-16, ADR 0133 and 0135): nothing else opens one
         var sockets = Types.InAssembly(Infrastructure).That().HaveDependencyOn("System.Net.WebSockets.ClientWebSocket").GetTypes().Select(t => t.Name).ToList();
         var checking = Types.InAssembly(Infrastructure).That().HaveNameStartingWith("DhanFeedConnector").And().HaveDependencyOn("XDrishti.Infrastructure.Brokers.BrokerEndpoints").GetTypes().ToList();
+        var checkingDepth = Types.InAssembly(Infrastructure).That().HaveNameStartingWith("DhanDepthConnector").And().HaveDependencyOn("XDrishti.Infrastructure.Brokers.BrokerEndpoints").GetTypes().ToList();
 
-        sockets.ShouldBe(["DhanFeedConnector", "DhanFeedConnection"], ignoreOrder: true);
+        sockets.ShouldBe(["DhanFeedConnector", "DhanFeedConnection", "DhanDepthConnector", "DhanDepthConnection"], ignoreOrder: true);
         checking.ShouldNotBeEmpty();
+        checkingDepth.ShouldNotBeEmpty();
     }
 
     [Fact]

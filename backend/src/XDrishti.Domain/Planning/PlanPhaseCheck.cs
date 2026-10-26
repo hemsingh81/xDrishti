@@ -50,6 +50,7 @@ public static class PlanPhaseCheck
         "POST auth.dhan.co/app/consumeApp-consent?tokenId",
         "POST auth.dhan.co/app/generate-consent?client_id",
         "WSS api-feed.dhan.co?authType&clientId&token&version",
+        "WSS depth-api-feed.dhan.co/twentydepth?authType&clientId&token",
     ];
 
     /// <summary>Requests that name an order, position or fund endpoint; the allow-list must refuse every one.</summary>

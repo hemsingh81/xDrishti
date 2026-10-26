@@ -154,10 +154,13 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
 
         var list = await response.ReadAsync<ServiceList>(Ct);
 
-        list.Items.Select(s => s.Id).ShouldBe(["eod", "instrument-master", "holdings-quotes", "portfolio-broker-history", "nightly", "suggestions", "review-cutoff", "preopen", "plan-expiry", "paper-capture", "weekly", "paper-review", "live-feed", "post-trade-prompts", "fake-job", "account-sync"]);
+        list.Items.Select(s => s.Id).ShouldBe(["eod", "instrument-master", "holdings-quotes", "portfolio-broker-history", "nightly", "suggestions", "review-cutoff", "preopen", "plan-expiry", "paper-capture", "weekly", "paper-review", "live-feed", "depth-recorder", "post-trade-prompts", "fake-job", "account-sync"]);
         var feed = list.Items.Single(s => s.Id == "live-feed");
         (feed.Name, feed.RunsAs, feed.Enabled, feed.Schedule.Type, feed.Schedule.From, feed.Schedule.To).ShouldBe(("Live feed", "xd-feed", true, "window", "09:00", "15:35")); // run by xd-feed, shown and edited here
         feed.Live.ShouldNotBeNull();
+        var depth = list.Items.Single(s => s.Id == "depth-recorder");
+        (depth.RunsAs, depth.Enabled, depth.Schedule.Type, depth.Schedule.From, depth.Schedule.To).ShouldBe(("xd-feed", false, "window", "09:14", "15:31")); // starts paused, run by xd-feed
+        depth.Live.ShouldBeNull(); // the live feed's health and manual run are not the depth recorder's
         var fake = list.Items.Single(s => s.Id == FakeJobService.Id);
         (fake.Name, fake.RunsAs, fake.Enabled, fake.Status, fake.IsDefault, fake.Revision, fake.NextRun).ShouldBe(("Fake job", "xd-test", true, "healthy", true, 0L, new DateTimeOffset(2026, 10, 13, 10, 0, 0, TimeSpan.FromMinutes(330))));
         fake.Parameters.Single().Name.ShouldBe("lookback");

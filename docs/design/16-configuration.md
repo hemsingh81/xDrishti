@@ -411,6 +411,22 @@ Live:
   ManualRunMinutes: 30           # 1–240: how long Run now keeps the connection open outside the window
 ```
 
+### Depth recorder (`Depth:*`, [ADR 0135](../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.md), P7-16)
+
+`appsettings.json` / environment of `xd-feed` (`Depth__Enabled`; compose passes `XD_DEPTH_ENABLED`); bounds are checked at start-up. **Off by default, three gates:** this deployment flag (restart to change), the owner's stored switch (`PUT /api/depth/recorder`, the password typed again for every change, ON and OFF) and the service `depth-recorder` (starts paused; window 09:14–15:31 on trading days, edited on the Services screen). Only 09:15:00–15:30:00 is stored.
+
+```yaml
+Depth:
+  Enabled: false          # the deployment gate; false = nothing is read, built or opened
+  MaxInstruments: 50      # 1–50: Dhan allows 50 on one 20-level connection
+  MaxArmed: 20            # 0–50: how many of them are today's armed tickets (rank order), then PinnedSymbols, then the most liquid
+  PinnedSymbols: []       # canonical symbols always recorded, e.g. ["NSE:RELIANCE"]
+  SampleMs: 1000          # 500–5000: at most one snapshot per instrument per this long, only when the book changed
+  FlushSeconds: 5         # 1–30: how often the queue is written (COPY); rows unwritten for 30 s are dropped, oldest first
+  MaxStoredGb: 40         # 1–500: the stored size above which recording stops (the app never deletes data)
+  MinFreeGb: 20           # 5–500: free disk space below which recording stops
+```
+
 ## 4. Most-used settings
 
 | Setting | Meaning | Default |

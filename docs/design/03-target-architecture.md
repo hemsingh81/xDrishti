@@ -26,7 +26,7 @@ flowchart TB
         VOL[("models volume<br/>ML.NET models · LLM weights")]
         SEQ["xd-seq · Seq<br/>logs"]
         BAK["xd-backup · restic"]
-        FEED["xd-feed · .NET<br/>live feed for active set<br/>(later: depth recorder)"]
+        FEED["xd-feed · .NET<br/>live feed for active set<br/>+ depth recorder (P7-16, off)"]
         EXEC["xd-exec · .NET (later)<br/>orders · kill switch"]
     end
 
@@ -221,7 +221,7 @@ xDrishti/
 │   │   ├── XDrishti.Worker/         # host: Hangfire server, scheduled services
 │   │   ├── XDrishti.Mcp/            # host: MCP read-only tool server
 │   │   ├── XDrishti.Cli/            # `xd` command-line tool
-│   │   ├── XDrishti.Feed/           # host: market-hours live feed for the active set (later: depth recorder)
+│   │   ├── XDrishti.Feed/           # host: market-hours live feed for the active set and the depth recorder (P7-16, off by default)
 │   │   └── XDrishti.Execution/      # host (later): order service
 │   └── tests/                       # Domain/Application unit, Architecture (layer rules), Api.IntegrationTests (Testcontainers)
 ├── frontend/                        # React 19 + TypeScript + Vite + MUI; Dockerfile builds xd-proxy (Caddy + app)
@@ -374,7 +374,7 @@ The labels, the banner and the readme carry the roadmap's "what a P3 number mean
 
 | Schema | Key tables |
 |--------|-----------|
-| `market` | `instruments`, `instrument_broker_ids`, `master_refreshes`, `bars_1m` (hypertable, source csv/dhan), `bars_1m_live`, `bars_1d`, continuous aggregates `bars_5m…bars_1h`, `context_daily`, `calendar`, `corporate_actions`, (later) `ticks`, `depth` |
+| `market` | `instruments`, `instrument_broker_ids`, `master_refreshes`, `bars_1m` (hypertable, source csv/dhan), `bars_1m_live`, `bars_1d`, continuous aggregates `bars_5m…bars_1h`, `context_daily`, `calendar`, `corporate_actions`, `depth_snapshots` (hypertable, 20-level book, P7-16, [ADR 0135](../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.md)), `depth_session_instruments`, `depth_sessions`, `depth_recorder_switch` (all insert-only), (later) `ticks` |
 | `catalog` | `tracked_instruments`, `baskets`, `basket_members` (valid_from/to), `index_membership` |
 | `data` | `import_profiles`, `import_jobs`, `import_issues` |
 | `portfolio` | `transactions`, `lots`, `lot_closures`, `positions`, `buckets`, `cash_flows`, `valuations_daily`, `corporate_action_adjustments` |

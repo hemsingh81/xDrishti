@@ -189,6 +189,59 @@ public sealed class BrokerEndpointsTests
     public void Every_other_socket_is_refused(string url) =>
         BrokerEndpoints.IsAllowedWebSocket(new Uri(url)).ShouldBeFalse();
 
+    // ---- the 20-level depth WebSocket (ADR 0133, P7-16) ----
+
+    [Theory]
+    [InlineData("wss://depth-api-feed.dhan.co/twentydepth?token=abc&clientId=1000000001&authType=2")]
+    [InlineData("wss://depth-api-feed.dhan.co/twentydepth?authType=2&clientId=1000000001&token=abc")] // any order
+    [InlineData("wss://DEPTH-API-FEED.DHAN.CO/twentydepth?token=abc&clientId=1&authType=2")]
+    public void The_depth_url_with_exactly_its_three_query_keys_is_allowed(string url) =>
+        BrokerEndpoints.IsAllowedDepthSocket(new Uri(url)).ShouldBeTrue();
+
+    [Theory]
+    [InlineData("wss://depth-api-feed.dhan.co/twentydepth?version=2&token=abc&clientId=1&authType=2")] // version is not a key of this socket
+    [InlineData("wss://depth-api-feed.dhan.co/twentydepth?token=abc&clientId=1&authType=2&extra=1")]
+    [InlineData("wss://depth-api-feed.dhan.co/twentydepth?token=abc&clientId=1")] // a key missing
+    [InlineData("wss://depth-api-feed.dhan.co/twentydepth?token=abc&clientId=1&authType=2&token=def")] // a key twice
+    [InlineData("wss://depth-api-feed.dhan.co/twentydepth?token=abc&clientid=1&authType=2")] // spelled exactly
+    [InlineData("wss://depth-api-feed.dhan.co/twentydepth?token=&clientId=1&authType=2")] // a value is needed
+    [InlineData("wss://depth-api-feed.dhan.co/twentydepth")] // no query
+    [InlineData("wss://depth-api-feed.dhan.co/twentydepth?token=abc&clientId=1&authType=2#x")]
+    [InlineData("wss://depth-api-feed.dhan.co/?token=abc&clientId=1&authType=2")] // no path
+    [InlineData("wss://depth-api-feed.dhan.co/twohundreddepth?token=abc&clientId=1&authType=2")] // another path
+    [InlineData("wss://depth-api-feed.dhan.co/twentydepth/?token=abc&clientId=1&authType=2")]
+    [InlineData("wss://full-depth-api.dhan.co/twohundreddepth?token=abc&clientId=1&authType=2&version=2")] // the 200-level host
+    [InlineData("wss://full-depth-api.dhan.co/twentydepth?token=abc&clientId=1&authType=2")]
+    [InlineData("wss://depth-api-feed.dhan.co.example.invalid/twentydepth?token=abc&clientId=1&authType=2")]
+    [InlineData("wss://api-feed.dhan.co/twentydepth?token=abc&clientId=1&authType=2")] // the live feed's host
+    [InlineData("ws://depth-api-feed.dhan.co/twentydepth?token=abc&clientId=1&authType=2")] // not TLS
+    [InlineData("wss://depth-api-feed.dhan.co:8443/twentydepth?token=abc&clientId=1&authType=2")] // other port
+    [InlineData("wss://user@depth-api-feed.dhan.co/twentydepth?token=abc&clientId=1&authType=2")]
+    public void Every_other_depth_socket_is_refused(string url) =>
+        BrokerEndpoints.IsAllowedDepthSocket(new Uri(url)).ShouldBeFalse();
+
+    [Fact]
+    public void The_two_sockets_do_not_allow_each_others_urls_and_the_built_depth_url_is_allowed()
+    {
+        var depth = BrokerEndpoints.BuildDepthUri("1000000001", "a b/c+d");
+        var live = BrokerEndpoints.BuildFeedUri("1000000001", "abc");
+
+        BrokerEndpoints.IsAllowedDepthSocket(depth).ShouldBeTrue();
+        BrokerEndpoints.IsAllowedWebSocket(depth).ShouldBeFalse();
+        BrokerEndpoints.IsAllowedWebSocket(live).ShouldBeTrue();
+        BrokerEndpoints.IsAllowedDepthSocket(live).ShouldBeFalse();
+        BrokerEndpoints.IsAllowedDepthSocket(null).ShouldBeFalse();
+        BrokerEndpoints.IsAllowed(HttpMethod.Get, new Uri("https://depth-api-feed.dhan.co/twentydepth?token=abc&clientId=1&authType=2")).ShouldBeFalse();
+        depth.Query.ShouldNotContain("version");
+    }
+
+    [Fact]
+    public void The_depth_socket_is_listed_in_the_describe_text_of_the_phase_check()
+    {
+        BrokerEndpoints.Describe().ShouldContain("WSS depth-api-feed.dhan.co/twentydepth?authType&clientId&token");
+        BrokerEndpoints.Describe().ShouldContain("WSS api-feed.dhan.co?authType&clientId&token&version");
+    }
+
     [Fact]
     public void No_socket_endpoint_is_also_a_plain_http_endpoint()
     {

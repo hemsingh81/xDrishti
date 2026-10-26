@@ -1,6 +1,6 @@
 # P7-16 — Depth recording service: Dhan 20-level market depth recorded from the Data account, stored compressed, no trading use
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-27 (decisions researched under the owner's delegation, treated as Approved for the build; [ADR 0135](../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.md) Proposed; criterion 12, the five-session pilot, is the owner's and still open; deviations are listed in the ADR)
 - **Phase / roadmap row:** P7 — slice P7-16 of [P7-00](P7-00-selection-accounts-and-nightly-plan.md) ("Start depth recording", SAFETY, Q9; first on the P7 cut line).
 - **Design refs:** docs/design/20 §B (record our own depth; "start in P7 so >= 6 months exist by P13"), 16 (`feed_recorder`), 17 §1-2 (VM disk 120 GB, "revisit before tick data"), 03 §5 (`market.depth`), 19 §5 · ADR 0024 (live feed, allow-list), 0083 (no order by name). New ADR: **next free ADR number at build time**.
 - **Needs:** P2-10, P7-11 (built). **Needed by:** P13-00 and its slices (sole consumer).

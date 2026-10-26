@@ -28,3 +28,14 @@ What the owner checks on the first real session of the feed (ADR 0024) - every i
 - ticks arrive for all 3 context indices (NIFTY 50, NIFTY BANK, INDIA VIX) and at the subscription of a share the last known price is sent at once.
 
 What the owner checks on the first real run (ADR 0019): the `client-id` header is accepted, `last_price` and `ohlc.close` are the names in the answer, `ohlc.close` is the previous session's close (compare day change with the Dhan app), and the rate limit of 1 request/s holds.
+
+## 20-level depth (P7-16, ADR 0135)
+
+| File | Endpoint | Status |
+|------|----------|--------|
+| `depth20-bid.hex` | Depth WebSocket `wss://depth-api-feed.dhan.co/twentydepth`, bid packet (code 41), 332 bytes, security 1333 | UNVERIFIED (constructed from the documentation, until the owner's first real depth session) |
+| `depth20-ask.hex` | The ask packet (code 51) of the same book | UNVERIFIED |
+
+Hex text as above. Little-endian (UNVERIFIED); a 12-byte header (message length int16, response code, segment, security id int32, sequence uint32) and 20 levels of 16 bytes (price float64, quantity uint32, orders uint32). The subscription is JSON text: `{"RequestCode":23,"InstrumentCount":n,"InstrumentList":[{"ExchangeSegment":"NSE_EQ","SecurityId":"1333"}]}` (50 instruments per connection); the URL is `wss://depth-api-feed.dhan.co/twentydepth?token=…&clientId=…&authType=2` (no `version`).
+
+What the owner checks on the first real depth session: the plan includes depth (806 means it does not); the byte order is little endian; the code sits at byte 3 of the header (the documentation's text says "byte 12", its table says byte 3 - the parser follows the table and the length check); the sequence number's meaning; how many packets per second arrive per instrument; the disconnect packet's layout (reason code after the header); the codes 805 and 806. Then replace these two files with sanitised captures.

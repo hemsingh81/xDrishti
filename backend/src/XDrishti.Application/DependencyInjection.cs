@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Capabilities;
+using XDrishti.Application.Abstractions.Depth;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
@@ -20,6 +21,7 @@ using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
 using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
+using XDrishti.Application.Depth;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
@@ -79,6 +81,9 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetSystemStatusQuery, SystemStatusResponse>, GetSystemStatusHandler>();
         services.AddScoped<ICommandHandler<RecordHeartbeatCommand>, RecordHeartbeatHandler>();
         services.AddScoped<IFeedHeartbeats, FeedHeartbeats>();
+        services.AddScoped<IDepthHeartbeats, DepthHeartbeats>(); // the depth recorder's own row xd-depth (P7-16)
+        services.AddScoped<IQueryHandler<GetDepthRecorderQuery, DepthRecorderView>, GetDepthRecorderHandler>(); // the owner's depth switch (P7-16): read
+        services.AddScoped<ICommandHandler<ChangeDepthRecorderCommand, DepthRecorderSwitched>, ChangeDepthRecorderHandler>(); // and change, insert-only, behind a fresh password in the endpoint
 
         services.AddScoped<ICommandHandler<LoginCommand, LoginResult>, LoginHandler>();
         services.AddScoped<ICommandHandler<LogoutCommand>, LogoutHandler>();
@@ -130,6 +135,17 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// The depth recorder (P7-16) - only for the <c>xd-feed</c> host: the supervisor that owns the three gates, the window, the run record and the heartbeat, and the session that records. The host provides <see cref="DepthSettings"/> (from its
+    /// checked <c>Depth:*</c> options) and, through <c>AddDepthRecording</c>, the ports they use. Registered paused and off: the supervisor opens nothing until the deployment flag, the owner's switch and the service are all on.
+    /// </summary>
+    public static IServiceCollection AddDepthRecorder(this IServiceCollection services)
+    {
+        services.AddSingleton<IDepthSession, DepthRecorder>();
+        services.AddSingleton<IDepthSupervisor, DepthRecorderSupervisor>();
+        return services;
+    }
+
+    /// <summary>
     /// The SignalR hub's push (ADR 0024 §7, P2-10a) - only for the <c>xd-api</c> host: the coordinator that follows the connected screens (a singleton; the host runs its loop) and the status query. The host provides <see cref="ILiveClients"/>
     /// (the way out to the connections); <c>AddInfrastructure</c> provides the listener, the scope resolver and the price reader.
     /// </summary>
@@ -163,6 +179,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, PaperReviewService>(); // the weekly paper review (P10-03); starts paused, builds and stores one text per week and epoch, applies nothing
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
+        services.AddSingleton<IScheduledService, DepthRecorderService>(); // the depth recorder (P7-16): shown and edited here, run by xd-feed; starts paused, Run now is refused
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
         services.AddSingleton<ServiceScheduler>();

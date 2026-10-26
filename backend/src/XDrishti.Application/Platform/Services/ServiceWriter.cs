@@ -71,7 +71,7 @@ internal sealed class ServiceWriter(ServiceRegistry registry, IServiceScheduleSt
             row.Apply(next, actor, now);
         }
 
-        if (!next.Enabled && registry.IsExternal(service.Id))
+        if (!next.Enabled && registry.UsesLiveFeedMarker(service.Id))
         {
             await manualRun.ClearAsync(actor, now, cancellationToken);
         }

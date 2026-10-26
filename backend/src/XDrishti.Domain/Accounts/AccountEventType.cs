@@ -84,4 +84,5 @@ public enum AccountEventType
     ChangelogReverted,
     AutonomySettingsChanged,
     ReportExported,
+    DepthRecorderSwitched,
 }

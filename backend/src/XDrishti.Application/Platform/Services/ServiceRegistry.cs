@@ -35,5 +35,8 @@ public sealed class ServiceRegistry
     /// <summary>Whether the service is registered and run by another process.</summary>
     public bool IsExternal(string id) => _byId.GetValueOrDefault(id) is IExternallyRunService;
 
+    /// <summary>True for the one external service that has the "Run now" marker and the heartbeat of <c>xd-feed</c> (the live feed). The depth recorder (P7-16) is run by the same host but shares neither: pausing, resuming or "Run now" of it never touches the live feed's manual run.</summary>
+    public bool UsesLiveFeedMarker(string id) => _byId.GetValueOrDefault(id) is XDrishti.Application.Live.LiveFeedService;
+
     public string NameOf(string id) => _byId.TryGetValue(id, out var service) ? service.Definition.Name : id;
 }

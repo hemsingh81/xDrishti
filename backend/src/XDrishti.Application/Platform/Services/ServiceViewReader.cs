@@ -29,7 +29,7 @@ internal sealed class ServiceViewReader(
         var issues = ScheduleRules.Evaluate(ServiceMapper.Subjects(all)).ToList();
         issues.InsertRange(0, all.Where(s => s.StoredInvalid).Select(s => ScheduleIssue.Error(s.Id, "schedule", ScheduleIssueCodes.StoredInvalid, "The stored schedule could not be read. The service runs on its default schedule until a new one is saved.")));
         var now = clock.GetUtcNow();
-        var (heartbeat, manualUntil) = registry.ExternalIds.Count > 0
+        var (heartbeat, manualUntil) = registry.All.Any(s => registry.UsesLiveFeedMarker(s.Definition.Id))
             ? (await heartbeats.GetAsync(cancellationToken), await manualRun.GetManualUntilAsync(cancellationToken))
             : (null, null);
         var views = all.Select(s => ServiceMapper.ToView(
@@ -40,7 +40,7 @@ internal sealed class ServiceViewReader(
             tradingCalendar,
             now,
             registry.NameOf,
-            registry.IsExternal(s.Id) ? LiveFeedHealth.Evaluate(s, latest.GetValueOrDefault(s.Id), running.Contains(s.Id), tradingCalendar, now, heartbeat, manualUntil) : null)).ToList();
+            registry.UsesLiveFeedMarker(s.Id) ? LiveFeedHealth.Evaluate(s, latest.GetValueOrDefault(s.Id), running.Contains(s.Id), tradingCalendar, now, heartbeat, manualUntil) : null)).ToList();
         views.Add(await accountSync.ReadAsync(cancellationToken));
         return views;
     }

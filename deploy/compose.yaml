@@ -177,6 +177,8 @@ services:
       <<: *dotnet-env
       # Must equal xd-api's value (same variable): the observer exists only while this is true (P7-20, ADR 0115).
       Planning__TicketAlerts__Enabled: ${XD_TICKET_ALERTS:-false}
+      # The depth recorder (P7-16, ADR 0135): the deployment gate, OFF by default. Recording also needs the owner's switch (PUT /api/depth/recorder, password) and the resumed service depth-recorder.
+      Depth__Enabled: ${XD_DEPTH_ENABLED:-false}
     secrets:
       - source: db_app_password
         target: Database__Password

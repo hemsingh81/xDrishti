@@ -11,6 +11,7 @@ using XDrishti.Application.Abstractions.Auth;
 using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Capabilities;
 using XDrishti.Application.Abstractions.ChargeSheet;
+using XDrishti.Application.Abstractions.Depth;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
@@ -34,6 +35,7 @@ using XDrishti.Infrastructure.Audit;
 using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Capabilities;
+using XDrishti.Infrastructure.Depth;
 using XDrishti.Infrastructure.Lab;
 using XDrishti.Infrastructure.Learning;
 using XDrishti.Infrastructure.Market;
@@ -185,6 +187,7 @@ public static class DependencyInjection
         services.AddScoped<IArmedTicketReader>(sp => (PlanStore)sp.GetRequiredService<IPlanStore>()); // P7-11: the armed tickets of a session, read only (the feed's active-set provider and the expiry job)
         services.AddScoped<IInstrumentSecurities, InstrumentSecurities>(); // shares by canonical symbol with their Dhan NSE equity id (P7-11)
         services.AddScoped<IPreOpenSource, PreOpenSource>(); // the pre-open price, previous close and ATR: the existing read-only quote and stored day bars (P7-11)
+        services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IBrokerAllowList, BrokerAllowList>(); // the broker allow-list read only, for the P7 phase check (P7-18, ADR 0097)
         services.AddSingleton<IPlanBuilderSettings, PlanBuilderSettings>(); // off by default: the empty skeleton stays the nightly builder (P7-04, ADR 0088)
@@ -409,6 +412,17 @@ public static class DependencyInjection
         services.AddSingleton<ILiveFeedConnector, DhanFeedConnector>();
         services.AddSingleton<IActiveSetChanges, ActiveSetChanges>();
         services.AddScoped<IIndexSecurities, IndexSecurities>();
+        return services;
+    }
+
+    /// <summary>
+    /// The adapters of the depth recorder (P7-16) - for the <c>xd-feed</c> host: the Dhan 20-level depth connector (behind its own allow-list entry), the write-only depth store and the read-only liquidity ranking. No port here reads a depth row.
+    /// </summary>
+    public static IServiceCollection AddDepthRecording(this IServiceCollection services)
+    {
+        services.AddSingleton<IDepthFeedConnector, DhanDepthConnector>();
+        services.AddScoped<IDepthStore, DepthStore>();
+        services.AddScoped<IDepthUniverse, DepthUniverse>();
         return services;
     }
 

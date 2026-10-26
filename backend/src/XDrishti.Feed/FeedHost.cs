@@ -19,7 +19,9 @@ internal static class FeedHost
             .AddApplication()
             .AddInfrastructure(builder.Configuration)
             .AddLiveFeed()
-            .AddFeedEngine();
+            .AddFeedEngine()
+            .AddDepthRecording()
+            .AddDepthRecorder();
 
         // The feed reads the Data account's token from the vault: it refuses to start without the key.
         builder.Services.RequireBrokerVaultKey();
@@ -28,8 +30,15 @@ internal static class FeedHost
             .ValidateDataAnnotations()
             .ValidateOnStart();
         builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<LiveOptions>>().Value.ToSettings());
+
+        // The depth recorder (P7-16): off by default (Depth:Enabled false), registered paused, behind the owner's stored switch.
+        builder.Services.AddOptions<DepthOptions>()
+            .Bind(builder.Configuration.GetSection(DepthOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<DepthOptions>>().Value.ToSettings());
         return builder;
     }
 
-    public static IServiceCollection AddFeedService(this IServiceCollection services) => services.AddHostedService<FeedService>();
+    public static IServiceCollection AddFeedService(this IServiceCollection services) => services.AddHostedService<FeedService>().AddHostedService<DepthService>();
 }

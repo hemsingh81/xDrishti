@@ -16,6 +16,7 @@ using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
 using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
+using XDrishti.Application.Depth;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
@@ -91,6 +92,9 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(JourneyView))]
 [JsonSerializable(typeof(LessonView))]
 [JsonSerializable(typeof(IReadOnlyList<LessonView>))]
+[JsonSerializable(typeof(DepthRecorderView))]
+[JsonSerializable(typeof(DepthRecorderSwitched))]
+[JsonSerializable(typeof(DepthSwitchRequest))]
 [JsonSerializable(typeof(AutonomySettingsView))]
 [JsonSerializable(typeof(ChangeAutonomyRequest))]
 [JsonSerializable(typeof(ChargeSheetStatusView))]

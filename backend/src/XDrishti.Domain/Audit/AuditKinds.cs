@@ -34,7 +34,7 @@ public static class AuditKinds
     private static readonly Dictionary<AccountEventType, string> AccountCategories = Build<AccountEventType>(
         (Security, [AccountEventType.RolesChanged, AccountEventType.PrimaryDataChanged, AccountEventType.SecretsReplaced]),
         (Broker, [AccountEventType.ConnectionUpdated, AccountEventType.BrokerConnected, AccountEventType.BrokerConnectFailed, AccountEventType.BrokerDisconnected]),
-        (Service, [AccountEventType.ServiceScheduleChanged, AccountEventType.ServicePaused, AccountEventType.ServiceResumed, AccountEventType.ServiceRunRequested]),
+        (Service, [AccountEventType.ServiceScheduleChanged, AccountEventType.ServicePaused, AccountEventType.ServiceResumed, AccountEventType.ServiceRunRequested, AccountEventType.DepthRecorderSwitched]),
         (Alert, [AccountEventType.ActionSnoozed, AccountEventType.ActionDone, AccountEventType.ActionReopened, AccountEventType.ActionThresholdsChanged, AccountEventType.PriceAlertCreated, AccountEventType.PriceAlertTriggered, AccountEventType.PriceAlertCancelled]),
         (Configuration,
         [

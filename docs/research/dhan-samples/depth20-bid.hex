@@ -1,0 +1,14 @@
+# UNVERIFIED - constructed from Dhan's documentation (https://dhanhq.co/docs/v2/full-market-depth/), made-up id and prices; not recorded from the real feed. Replace with a sanitised capture after the first real depth session (P7-16).
+# 20-level depth, bid side (response code 41), little-endian, 332 bytes: header 12 bytes = message length int16 (332) | code 29 | segment 01 (NSE_EQ) | security id int32 1333 | sequence uint32
+# body: 20 levels x 16 bytes = price float64 | quantity uint32 | orders uint32; best price 1650.0 stepping -0.05; quantity 100, 110 ... ; orders 3, 4 ...
+4c 01 29 01 35 05 00 00 91 5f 01 00 00 00 00 00 00 c8 99 40 64 00 00 00 03 00 00 00 cd cc cc cc
+cc c7 99 40 6e 00 00 00 04 00 00 00 9a 99 99 99 99 c7 99 40 78 00 00 00 05 00 00 00 66 66 66 66
+66 c7 99 40 82 00 00 00 06 00 00 00 33 33 33 33 33 c7 99 40 8c 00 00 00 07 00 00 00 00 00 00 00
+00 c7 99 40 96 00 00 00 08 00 00 00 cd cc cc cc cc c6 99 40 a0 00 00 00 09 00 00 00 9a 99 99 99
+99 c6 99 40 aa 00 00 00 0a 00 00 00 66 66 66 66 66 c6 99 40 b4 00 00 00 0b 00 00 00 33 33 33 33
+33 c6 99 40 be 00 00 00 0c 00 00 00 00 00 00 00 00 c6 99 40 c8 00 00 00 0d 00 00 00 cd cc cc cc
+cc c5 99 40 d2 00 00 00 0e 00 00 00 9a 99 99 99 99 c5 99 40 dc 00 00 00 0f 00 00 00 66 66 66 66
+66 c5 99 40 e6 00 00 00 10 00 00 00 33 33 33 33 33 c5 99 40 f0 00 00 00 11 00 00 00 00 00 00 00
+00 c5 99 40 fa 00 00 00 12 00 00 00 cd cc cc cc cc c4 99 40 04 01 00 00 13 00 00 00 9a 99 99 99
+99 c4 99 40 0e 01 00 00 14 00 00 00 66 66 66 66 66 c4 99 40 18 01 00 00 15 00 00 00 33 33 33 33
+33 c4 99 40 22 01 00 00 16 00 00 00

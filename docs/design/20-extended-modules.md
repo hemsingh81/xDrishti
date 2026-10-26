@@ -43,6 +43,7 @@ stateDiagram-v2
 
 - Dhan live feed + **20-level depth** (up to 50 instruments/connection) and **200-level depth** (NSE equity
   & derivatives) over WebSocket (binary). No historical depth from brokers ⇒ record our own.
+  **Built in P7-16 ([ADR 0135](../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.md)):** the 20-level book of up to 50 shares, about once a second, in `market.depth_snapshots`; off by default behind three gates; nothing reads it until P13.
 - Extends the v1 `xd-feed` (which already streams the active set): adds 20-level depth subscriptions for a
   configured recording list; writes to Timescale hypertables (compressed); ~50–100 GB/year.
 - **Start recording in P7** so ≥ 6 months exist by P13.

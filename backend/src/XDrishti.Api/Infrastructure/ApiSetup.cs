@@ -117,6 +117,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, ReportsPhaseCheckEndpoints>(); // the P8 phase check (P8-17): one GET, computed on read
         services.AddSingleton<IEndpointCatalogue, EndpointCatalogue>(); // the route table for the phase check's read-only criterion
         services.AddSingleton<IEndpointModule, AutonomyEndpoints>();
+        services.AddSingleton<IEndpointModule, DepthEndpoints>(); // the owner's depth-recorder switch (P7-16): fresh password per change, insert-only; no depth data is readable
         services.AddSingleton<IEndpointModule, ChargeSheetEndpoints>(); // the owner's confirmation of the charge sheet (P8-23, ADR 0127)
         services.AddSingleton<SwitchOnLimiter>();
         services.AddSingleton<IEndpointModule, CapabilitiesEndpoints>(); // the owner's capability switches of the owner-act slices (P8-18 Part A, ADR 0128)

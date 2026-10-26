@@ -41,7 +41,7 @@ internal static class ServiceToggle
                 return Result.Failure<ServiceView>(written.Error);
             }
         }
-        else if (!enabled && registry.IsExternal(serviceId))
+        else if (!enabled && registry.UsesLiveFeedMarker(serviceId))
         {
             // paused already, but a "Run now" may keep the service up: pausing ends it
             await writer.EndManualRunAsync(actor, cancellationToken);

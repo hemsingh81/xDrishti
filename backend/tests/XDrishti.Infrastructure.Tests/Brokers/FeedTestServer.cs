@@ -14,6 +14,7 @@ internal sealed class FeedTestServer : IDisposable
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
     private readonly List<string> _queries = [];
+    private readonly List<string> _paths = [];
 
     public FeedTestServer()
     {
@@ -45,6 +46,18 @@ internal sealed class FeedTestServer : IDisposable
         }
     }
 
+    /// <summary>The paths of the upgrade requests so far.</summary>
+    public IReadOnlyList<string> Paths
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _paths];
+            }
+        }
+    }
+
     public ValueTask<ServerConnection> NextConnectionAsync(CancellationToken cancellationToken) => _connections.Reader.ReadAsync(cancellationToken);
 
     public void Dispose()
@@ -71,6 +84,7 @@ internal sealed class FeedTestServer : IDisposable
             lock (_gate)
             {
                 _queries.Add(context.Request.Url!.Query);
+                _paths.Add(context.Request.Url.AbsolutePath);
             }
 
             if (RejectWith is { } status)
