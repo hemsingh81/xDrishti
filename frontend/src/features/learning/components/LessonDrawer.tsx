@@ -8,6 +8,7 @@ import { lessonResultWord, moveNote } from '../lib/roleText';
 import { DrawerSection, StepList } from './DrawerSection';
 import { RecordDrawer } from './RecordDrawer';
 import { RValue } from './RValue';
+import { MoveLink } from './MoveLink';
 import { TermRow } from './TermRow';
 
 /** One lesson in full: its history and, when it has a result, the before and after with their n from the experiment. */
@@ -36,6 +37,7 @@ function Body({ lesson }: { lesson: Lesson }) {
       <Typography variant="body2">
         May move to: {lesson.nextStates.length > 0 ? lesson.nextStates.join(', ') : 'nowhere'}. {moveNote('lesson')}
       </Typography>
+      <MoveLink capability="learning_moves_ui" to={`/owner-acts/lesson/${lesson.id}`} label="Move this lesson" />
       <Typography variant="caption" color="text.secondary">
         {lesson.note}
       </Typography>

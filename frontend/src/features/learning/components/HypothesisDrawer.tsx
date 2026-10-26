@@ -6,6 +6,7 @@ import { hypothesisQuery } from '../api/learningQueries';
 import { moveNote } from '../lib/roleText';
 import { DrawerSection, StepList } from './DrawerSection';
 import { RecordDrawer } from './RecordDrawer';
+import { MoveLink } from './MoveLink';
 import { TermRow } from './TermRow';
 
 /** One hypothesis with its history. The states it may move to are text; the move is not made here. */
@@ -33,6 +34,7 @@ export function HypothesisDrawer({ id, onClose }: { id: number; onClose: () => v
           <Typography variant="body2">
             May move to: {h.nextStates.length > 0 ? h.nextStates.join(', ') : 'nowhere'}. {moveNote('hypothesis')}
           </Typography>
+          <MoveLink capability="learning_moves_ui" to={`/owner-acts/hypothesis/${h.id}`} label="Move this hypothesis" />
           <Typography variant="caption" color="text.secondary">
             {h.note}
           </Typography>

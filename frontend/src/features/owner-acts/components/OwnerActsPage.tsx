@@ -2,6 +2,7 @@ import { Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
 import { capabilitiesQuery } from '../api/capabilitiesRead';
+import { AutonomySection } from './AutonomySection';
 import { CapabilityCard } from './CapabilityCard';
 import { CapabilityHistory } from './CapabilityHistory';
 
@@ -21,6 +22,7 @@ export function OwnerActsPage() {
           {query.data.items.map((item) => (
             <CapabilityCard key={item.name} item={item} />
           ))}
+          <AutonomySection />
           <Typography variant="h2" component="h2" sx={{ fontSize: '1.1rem' }}>
             Latest switches
           </Typography>

@@ -37,6 +37,7 @@ using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Tracking;
+using XDrishti.Application.OwnerActs;
 using XDrishti.Application.Paper;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Platform.Heartbeats;
@@ -659,6 +660,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetChargeSheetStatusQuery, Result<ChargeSheetStatusView>>, GetChargeSheetStatusHandler>();
         services.AddScoped<ICommandHandler<RecordChargeSheetActCommand, ChargeSheetActOutcome>, RecordChargeSheetActHandler>();
         services.AddScoped<ICapabilityGate, CapabilityGate>(); // the generic owner-act capability gate: reads the log, switches nothing (P8-18 Part A, ADR 0128)
+        services.AddScoped<IOwnerActRunner, OwnerActRunner>(); // the gate again and the audit row of the web owner acts that existing handlers perform (P8-19, ADR 0130)
         services.AddScoped<CapabilityViews>();
         services.AddScoped<IQueryHandler<GetCapabilitiesQuery, CapabilitiesView>, GetCapabilitiesHandler>();
         services.AddScoped<ICommandHandler<ChangeCapabilityCommand, CapabilityChangeOutcome>, ChangeCapabilityHandler>(); // the one writer of the capability log; only the owner's endpoint calls it

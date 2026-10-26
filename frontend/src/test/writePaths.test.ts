@@ -64,3 +64,33 @@ describe('write paths are only in the features that may write', () => {
     expect(unknown).toEqual([]);
   });
 });
+
+// P8-19: the six owner-act writes of the learning forms are named in one feature only (the generated schema and the shared client's password-path list are outside `features`).
+const moveRoutes = [
+  '/api/lessons/{id}/link',
+  '/api/lessons/{id}/close',
+  '/api/lessons/{id}/dismiss',
+  '/api/hypotheses/{id}/move',
+  '/api/changelog/{id}/revert',
+  '/api/autonomy/settings',
+];
+
+describe('the learning move routes are written from owner-acts only', () => {
+  const writes = (route: string, text: string) =>
+    new RegExp(`\\.(POST|PUT)\\(\\s*'${route.replace(/[{}/]/g, (c) => `\\${c}`)}'`).test(text);
+  const holders = (route: string) =>
+    [...byFeature.entries()]
+      .filter(([, files]) => files.some(([, text]) => writes(route, text)))
+      .map(([feature]) => feature)
+      .sort();
+
+  it.each(moveRoutes)('%s', (route) => {
+    expect(holders(route)).toEqual(['owner-acts']);
+  });
+
+  it('the scan sees a planted write and ignores a read', () => {
+    expect(writes('/api/lessons/{id}/link', "api.POST('/api/lessons/{id}/link', {})")).toBe(true);
+    expect(writes('/api/autonomy/settings', "api.PUT(\n '/api/autonomy/settings', {})")).toBe(true);
+    expect(writes('/api/autonomy/settings', "api.GET('/api/autonomy/settings', {})")).toBe(false);
+  });
+});

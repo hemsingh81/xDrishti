@@ -1,13 +1,17 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using XDrishti.Api.Auth;
+using XDrishti.Application.Abstractions.Capabilities;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
+using XDrishti.Domain.Accounts;
+using XDrishti.Domain.Common;
 
 namespace XDrishti.Api.Endpoints;
 
 /// <summary>
-/// The autonomy switches (spec P7-12, ADR 0091): read them, and change them as the owner. The change needs a session, the CSRF token and a recent password re-entry (step-up); the actor is built from the signed-in identity, never from the body.
+/// The autonomy switches (spec P7-12, ADR 0091, P8-19, ADR 0130): read them, and change them as the owner. The change needs a session, the CSRF token, the capability autonomy_form and a fresh password for this change; the actor is built from the signed-in identity, never from the body.
 /// No setting lets anything place an order; there is no order in P7.
 /// </summary>
 internal sealed class AutonomyEndpoints : IEndpointModule
@@ -23,28 +27,26 @@ internal sealed class AutonomyEndpoints : IEndpointModule
         group.MapPut("/settings", ChangeAsync)
             .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy) // a password is checked here, so the sign-in limit applies
             .WithName("ChangeAutonomySettings")
-            .WithSummary("Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale, 429 auth.rate_limited")
+            .WithSummary("Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token, the capability autonomy_form (off by default) and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up); optional expectedSettingsId (the row the form was loaded at, 0 for none) makes a stale form a 409. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale, 429 auth.rate_limited")
             .ProducesRejections(conflict: true, notFound: false);
     }
 
     private static async Task<Ok<AutonomySettingsView>> GetAsync(IQueryHandler<GetAutonomySettingsQuery, AutonomySettingsView> handler, CancellationToken cancellationToken) =>
         TypedResults.Ok(await handler.HandleAsync(new GetAutonomySettingsQuery(), cancellationToken));
 
-    private static async Task<Results<Ok<AutonomySettingsView>, ProblemHttpResult>> ChangeAsync(
+    private static Task<Results<Ok<AutonomySettingsView>, ProblemHttpResult>> ChangeAsync(
         ChangeAutonomyRequest request,
         HttpContext http,
+        ICapabilityGate gate,
         ICommandHandler<StepUpCommand, StepUpResult> passwordCheck,
+        IOwnerActRunner runner,
         ICommandHandler<ChangeAutonomySettingsCommand, AutonomySettingsView> handler,
-        CancellationToken cancellationToken)
-    {
-        // A fresh password for this change, and the owner from the session (shared with the other owner acts).
-        var owner = await OwnerAct.AuthorizeAsync(http, passwordCheck, request.Password, cancellationToken);
-        if (owner.IsFailure)
-        {
-            return ProblemResults.From(owner.Error, http);
-        }
-
-        var result = await handler.HandleAsync(new ChangeAutonomySettingsCommand(owner.Value, request.Reason, request.AutoApproveTickets, request.PromoteFromReserve, request.MinPWin, request.MaxAutoPerDay), cancellationToken);
-        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
-    }
+        CancellationToken cancellationToken) =>
+        // The capability autonomy_form first, then a fresh password for this change, then the owner from the session (spec P8-19, ADR 0130). There is no other path: nothing writes these switches except this call and the owner's command line.
+        OwnerActFlow.RunAsync(
+            http, gate, passwordCheck, runner, handler, Domain.Capabilities.Capabilities.AutonomyForm, request.Password,
+            actor => Result.Success(new ChangeAutonomySettingsCommand(actor, request.Reason, request.AutoApproveTickets, request.PromoteFromReserve, request.MinPWin, request.MaxAutoPerDay, request.ExpectedSettingsId)),
+            AccountEventType.AutonomySettingsChanged,
+            view => string.Create(CultureInfo.InvariantCulture, $"settings={view.Id} auto_approve={(view.AutoApproveTickets ? "on" : "off")} reserve={(view.PromoteFromReserve ? "on" : "off")}"),
+            cancellationToken);
 }

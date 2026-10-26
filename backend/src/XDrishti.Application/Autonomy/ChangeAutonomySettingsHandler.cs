@@ -23,6 +23,13 @@ internal sealed class ChangeAutonomySettingsHandler(IAutonomySettingsStore store
         }
 
         var current = await store.CurrentAsync(cancellationToken);
+        if (command.ExpectedSettingsId is { } expected && expected != (current.Id ?? 0))
+        {
+            // The form was loaded at another row (P8-19): nothing is written; the owner reads the settings again.
+            AutonomyLog.Refused(logger, "autonomy.stale");
+            return Result.Failure<AutonomySettingsView>(Error.Conflict("autonomy.stale", "The settings were changed meanwhile; read them again."));
+        }
+
         var row = await store.AppendAsync(change.Value, current.Id, cancellationToken);
         if (row is null)
         {

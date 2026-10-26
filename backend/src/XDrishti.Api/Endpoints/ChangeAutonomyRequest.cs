@@ -6,5 +6,6 @@ namespace XDrishti.Api.Endpoints;
 /// <param name="MinPWin">The least lower-bound P(win), 0.5 to 0.99 (design default 0.58).</param>
 /// <param name="MaxAutoPerDay">The most automatic approvals per planned session, 1 to 20.</param>
 /// <param name="Reason">Why, 1 to 500 characters.</param>
+/// <param name="ExpectedSettingsId">Optional: the settings row the form was loaded at (0 when nothing was stored). When another change was made meanwhile the answer is 409 <c>autonomy.stale</c> and nothing is written; absent, the current row is read at submit as before.</param>
 /// <param name="Password">The owner's password, re-entered for THIS change. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout.</param>
-internal sealed record ChangeAutonomyRequest(bool AutoApproveTickets, bool PromoteFromReserve, double MinPWin, int MaxAutoPerDay, string Reason, string? Password);
+internal sealed record ChangeAutonomyRequest(bool AutoApproveTickets, bool PromoteFromReserve, double MinPWin, int MaxAutoPerDay, string Reason, string? Password, long? ExpectedSettingsId = null);

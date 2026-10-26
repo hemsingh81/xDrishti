@@ -1,6 +1,6 @@
 # P8-19 — Owner-act forms: autonomy, changelog revert, lesson and hypothesis moves
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-10-26); built 2026-10-26 ([ADR 0130](../adr/0130-the-owner-act-forms-are-endpoints-behind-a-capability-a-fresh-password-and-an-audit-row-over-the-existing-handlers-and-state-machines-and-apply-nothing.md)). Written 2026-10-24; the decisions D1 to D8 were researched under the owner's delegation.
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-19 of [P8-00](P8-00-reports-and-ui-plan.md) (Q1, Q2, Q8)
 - **Design refs:** docs/design/09-learning-engine.md §5 (hypothesis loop), §10 (lessons), §13 (autonomy, "password re-entry", "one-click Revert") · 04 §4.1 ("Only you"), §4.2 · 13 §1c · 19 §4 (automation over-reach) · P7-12 (autonomy) · ADR 0073 (changelog: the log is the state), 0076 (hypotheses), 0078 (lessons), 0091 (auto-approval option)
 - **Needs:** P8-18 (the capability gate and the shared fresh-password helper, built there), P8-03 (the Lessons / Experiments / Hypotheses tabs that link to the forms), P8-04 (the Autonomy tab). P6-08, P6-10, P6-16, P7-12 are built and are the only logic used. An ADR at build time (next free ADR number at build time).
@@ -68,6 +68,18 @@ Latency: a move is one read and one insert (under 200 ms, excluding the password
 - **D7 Stale protection.** `expectedSettingsId` is additive and optional so P7-12 callers do not break; the form always sends it. Rejected: ETag headers (nothing else here uses them).
 - **D8 Revert wording and scope.** The form says what the revert will change (cell, from state, to state) and that published plans are not changed; it is limited by the domain to less trusted states. Source: `CellLifecycle.RevertRefusals`, ADR 0073.
 
+## Decisions at build time (2026-10-26; gaps of the spec, the safer option each time; [ADR 0130](../adr/0130-the-owner-act-forms-are-endpoints-behind-a-capability-a-fresh-password-and-an-audit-row-over-the-existing-handlers-and-state-machines-and-apply-nothing.md))
+- **D9 The gate is asked three times, not in the handlers.** The six handlers are also the command line's: gating them would gate the owner's terminal. The endpoint asks the gate before the password (a switched-off act says nothing about the password), then `IOwnerActRunner` asks it again and calls the one handler, then writes the audit row. There is no database layer (no table is added; the rows are the existing insert-only logs); an architecture test pins that one module names the five commands and one flow runs every write.
+- **D10 The gate covers the existing autonomy PUT.** As the spec says (assumption 6); the P7-12 tests that use the PUT seed `autonomy_form` ON.
+- **D11 `expectedSettingsId` 0 means nothing stored.** The view has `id: null` while no row exists, and the field is a number; the form sends 0 then. Absent keeps the P7-12 behaviour.
+- **D12 The audit detail names the target state only** (`lesson=12 link to=linked`, `hypothesis=3 to=approved`), because the handlers' outcome carries the state after; reading the state before would add a second read in the endpoint. The revert detail has both states.
+- **D13 One lazy route `/owner-acts/:kind/:id`** (`lesson`, `hypothesis`, `revert`; the revert id is the changelog row id) instead of three: the first-load script has under 2 KB of room and each route definition is eager.
+- **D14 The revert link is drawn on the newest transition row of one cell's own changelog only.** The server alone decides whether the row can be reverted and lists every reason; a row that is not a transition (a designation or a revert) gets the server's sentence and no form (no password for a certain refusal).
+- **D15 The sign-in rate limit applies as for every password-checked act** (10 a minute per address). A refusal there is a 429 with its words, never a sign-out. There is no OFF-direction shortcut in this slice (no move is a kill switch); turning a capability OFF stays the switches page, which is never limited.
+- **D16 Statuses.** A refused input of the learning moves is 422 `learning.invalid` (also an unparseable `to` word, raised by the endpoint after the password so a wrong body costs nothing before it); the autonomy `PUT` keeps its 400 `autonomy.values_invalid` and `autonomy.reason_invalid` as built (the spec's 422 is for `learning.*`). The server's sentence is the `title` of the problem; the screen shows it with its code, as text.
+- **D17 A success keeps the screen.** After a move the form stays mounted and shows the server's sentence; the record is read again, so the moves it lists change under it. A second try on a final record is a 409 shown as such.
+- **D18 The Learning and Autonomy screens keep no write control.** They show a plain link to the form while the switch is ON, and the words with a link to `/owner-acts` while it is OFF (the `useCapability` hook is the one allowed import; `readOnly.test.ts` still holds).
+
 ## Risks and honest limits
 - A form makes accidental clicks possible: the reason is required, the password is required, the consequence sentence is shown, and the move list is the legal list only. There is no undo of a lesson move (closed and dismissed are final); the history keeps both rows.
 - "Owner" and "rule" are strings in the database (P7-12 limit): a compromised process holding `xd_app` could write rows; the control is that the only writer is the endpoint behind session, CSRF, capability and password.
@@ -79,12 +91,12 @@ Latency: a move is one read and one insert (under 200 ms, excluding the password
 None blocking. Owner acts after the build: switch `learning_moves_ui` and `autonomy_form` ON in `/owner-acts` when wanted (both OFF by default); the autonomy switches themselves stay OFF until the owner turns them on.
 
 ## Done when
-- [ ] All acceptance criteria have evidence (criterion 11 includes the amended guard)
-- [ ] `scripts/check.sh` green; reviewer agent told to look for any path from a screen to a state change without the gate, the password or the audit row
-- [ ] Contract regenerated (`scripts/gen-api.sh`); no migration unless the event-type check exists
-- [ ] Each new `AccountEventType` value has its category row in the audit screen table (P8-22 criterion 9 fails otherwise)
-- [ ] ADR (next free number at build time), docs 09 §10/§13 and 04 §4.1 "as built" notes, roadmap row, `scripts/build-docs.sh`
-- [ ] The owner's recorded Approved; both capabilities still OFF after deploy
+- [x] All acceptance criteria have evidence (criterion 11 includes the amended guard): `OwnerMovesApiTests`, `OwnerActRunnerTests`, `AutonomyHandlersTests`, `OwnerMovesArchitectureTests`, `OwnerMoves.test.tsx`, `MoveLinks.test.tsx`, `writePaths.test.ts`
+- [x] `scripts/check.sh` green; reviewer agent told to look for any path from a screen to a state change without the gate, the password or the audit row
+- [x] Contract regenerated (`scripts/gen-api.sh`); no migration (the event column has no check constraint: `AccountEventType` is stored by name, max length 48)
+- [x] Each new `AccountEventType` value has its category row in the audit screen table (P8-22 criterion 9 fails otherwise)
+- [x] ADR 0130, docs 09 §10/§13 and 04 §4.1 "as built" notes, roadmap row, `scripts/build-docs.sh`
+- [x] The owner's recorded Approved (2026-10-26); both capabilities are OFF by default and nothing switched them on (the owner switches them at /owner-acts after deploy)
 
 ## Review fixes 2026-10-25
 - **One step-up rule for every UI write (fresh password per action + capability gate, D3).** Proposing a hypothesis stays verb-only in P8-19; the other UI path that creates or accepts hypotheses is P9-08 "Accept", which must use the same rules: capability on, fresh password per action, owner actor from the session, an audit row. P9-07 "Confirm" likewise.

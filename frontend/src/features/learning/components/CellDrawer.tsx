@@ -47,7 +47,11 @@ export function CellDrawer({ cellKey, onClose }: CellDrawerProps) {
           <Lifecycle cellKey={cellKey} />
         </Section>
         <Section title="Changelog of this cell">
-          <ChangelogTimeline scope={{ subjectKind: 'cell', subject: cellKey }} label="Changelog of this cell" />
+          <ChangelogTimeline
+            scope={{ subjectKind: 'cell', subject: cellKey }}
+            label="Changelog of this cell"
+            revertNewest
+          />
         </Section>
       </Box>
     </Drawer>
@@ -88,7 +92,8 @@ function Lifecycle({ cellKey }: { cellKey: string }) {
           ? 'The lifecycle allows no move from this state.'
           : `The lifecycle allows a move to: ${legalNext.join(' or ')}.`}{' '}
         Needs {formatCount(paperDaysBeforeActive)} paper days before active. This is what the rules allow, not a
-        control: moves are made with the CLI (<code>xd learn lifecycle</code>), never on this screen.
+        control: moves are made with the CLI (<code>xd learn lifecycle</code>); this screen only links to the owner-act
+        form that can revert the newest one.
       </Typography>
       {problems.length > 0 && (
         <Alert severity="warning">

@@ -2,6 +2,7 @@ import { Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { EvidenceBlock, formatAsOf, formatCount, NonValue } from '@/shared/analytics';
 import { ErrorState, LoadingState } from '@/shared/ui';
+import { MoveLink } from './MoveLink';
 import { changelogLimit, changelogQuery, type ChangelogEntry, type ChangelogScope } from '../api/learningQueries';
 
 /** Rows shown; the rest are counted, never hidden silently. */
@@ -11,10 +12,12 @@ interface ChangelogTimelineProps {
   scope?: ChangelogScope;
   /** Names the list; unique on a page that shows two. */
   label: string;
+  /** On the list of one cell: the newest row, when it is a transition, links to the revert form (the server decides whether it can be reverted). */
+  revertNewest?: boolean;
 }
 
 /** The learning changelog, newest first. Every field is the server's text, drawn as text. Rows are never changed here. */
-export function ChangelogTimeline({ scope = {}, label }: ChangelogTimelineProps) {
+export function ChangelogTimeline({ scope = {}, label, revertNewest = false }: ChangelogTimelineProps) {
   const query = useQuery(changelogQuery(scope));
   if (query.isPending) return <LoadingState label="Loading the changelog…" />;
   if (query.isError) return <ErrorState error={query.error} />;
@@ -29,8 +32,8 @@ export function ChangelogTimeline({ scope = {}, label }: ChangelogTimelineProps)
         aria-label={label}
         sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 1.5 }}
       >
-        {rows.slice(0, show).map((row) => (
-          <Entry key={row.id} row={row} />
+        {rows.slice(0, show).map((row, index) => (
+          <Entry key={row.id} row={row} revertable={revertNewest && index === 0 && row.kind === 'transition'} />
         ))}
       </Box>
       <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
@@ -45,7 +48,7 @@ export function ChangelogTimeline({ scope = {}, label }: ChangelogTimelineProps)
   );
 }
 
-function Entry({ row }: { row: ChangelogEntry }) {
+function Entry({ row, revertable }: { row: ChangelogEntry; revertable: boolean }) {
   return (
     <Box component="li" sx={{ borderLeft: 3, borderColor: 'divider', pl: 1.5, minWidth: 0 }}>
       <Typography variant="body2" sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
@@ -69,6 +72,9 @@ function Entry({ row }: { row: ChangelogEntry }) {
         <Typography variant="caption" component="p" sx={{ m: 0 }}>
           Paper days stated: {formatCount(row.paperDays)}
         </Typography>
+      )}
+      {revertable && (
+        <MoveLink capability="learning_moves_ui" to={`/owner-acts/revert/${row.id}`} label="Revert this move" />
       )}
       {row.evidenceIds.length > 0 && (
         <Typography variant="caption" color="text.secondary" component="p" sx={{ m: 0, overflowWrap: 'anywhere' }}>

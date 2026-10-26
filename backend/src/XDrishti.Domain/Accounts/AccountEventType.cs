@@ -79,4 +79,8 @@ public enum AccountEventType
     CapabilityChanged,
     ExperimentJobStarted,
     ExperimentJobCancelled,
+    LessonMoved,
+    HypothesisMoved,
+    ChangelogReverted,
+    AutonomySettingsChanged,
 }

@@ -2486,6 +2486,91 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/lessons/{id}/link': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Link an OPEN lesson to a hypothesis or an experiment that is meant to fix it (fixKind hypothesis|experiment, fixId); applies nothing. Needs a session, the CSRF token, the capability learning_moves_ui and the password in the body, checked on EVERY request. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid, 404 lessons.not_found or lessons.fix_not_found, 409 lessons.move_refused or lessons.stale, 429 auth.rate_limited */
+    post: operations['LinkLesson'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lessons/{id}/close': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Close a LINKED lesson. The body holds a reason and the password only: the result is read from the fix's stored experiment (improved only when it was Better), never typed. Same gate as the link. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid, 404 lessons.not_found, 409 lessons.move_refused (including a fix with no recorded experiment) or lessons.stale, 429 auth.rate_limited */
+    post: operations['CloseLesson'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lessons/{id}/dismiss': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Set an open or linked lesson aside; the lesson is kept. Same gate as the link. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid, 404 lessons.not_found, 409 lessons.move_refused or lessons.stale, 429 auth.rate_limited */
+    post: operations['DismissLesson'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/hypotheses/{id}/move': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Move a hypothesis to approved, rejected, expired or accepted by the table of the lifecycle (proposed, running and judged have their own commands and are refused here). Accepting records a verdict and applies nothing. Same gate as the lesson moves. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid, 404 hypotheses.not_found, 409 hypotheses.move_refused or hypotheses.stale, 429 auth.rate_limited */
+    post: operations['MoveHypothesis'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/changelog/{id}/revert': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Revert the LATEST transition of a cell with a NEW changelog row that points at it (rows are never changed). It only restores a less trusted state; it never makes a cell active, never un-retires, and changes no published plan. Same gate as the lesson moves. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid, 404 changelog.not_found, 409 changelog.not_revertible (every reason listed) or changelog.stale, 429 auth.rate_limited */
+    post: operations['RevertChangelogEntry'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/learning/overview': {
     parameters: {
       query?: never;
@@ -3822,7 +3907,7 @@ export interface paths {
     };
     /** The autonomy settings in force (automatic approval and reserve promotion, both OFF = manual approval by default) with the history of changes. No order is placed in any setting */
     get: operations['GetAutonomySettings'];
-    /** Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale, 429 auth.rate_limited */
+    /** Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token, the capability autonomy_form (off by default) and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up); optional expectedSettingsId (the row the form was loaded at, 0 for none) makes a stale form a 409. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale, 429 auth.rate_limited */
     put: operations['ChangeAutonomySettings'];
     post?: never;
     delete?: never;
@@ -5530,6 +5615,11 @@ export interface components {
       reason: string;
       /** @description The owner's password, re-entered for THIS change. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
       password: null | string;
+      /**
+       * Format: int64
+       * @description Optional: the settings row the form was loaded at (0 when nothing was stored). When another change was made meanwhile the answer is 409 `autonomy.stale` and nothing is written; absent, the current row is read at submit as before.
+       */
+      expectedSettingsId?: null | number;
     };
     /** @description The body of a capability switch. The owner is never part of it: the actor comes from the signed-in session. */
     ChangeCapabilityRequest: {
@@ -5596,6 +5686,20 @@ export interface components {
        * @description When.
        */
       at: string;
+    };
+    /** @description What recording a transition or a revert wrote (P6-08). */
+    ChangelogOutcome: {
+      /**
+       * Format: int64
+       * @description The new row.
+       */
+      id: number;
+      /** @description The cell. */
+      subject: string;
+      /** @description The state before. */
+      from: string;
+      /** @description The state after. */
+      to: string;
     };
     /** @description What the act did, and what stands afterwards. */
     ChargeSheetActOutcome: {
@@ -8885,6 +8989,18 @@ export interface components {
        */
       wouldClose?: number;
     };
+    /** @description What a hypothesis command did. */
+    HypothesisMoveOutcome: {
+      /**
+       * Format: int64
+       * @description The hypothesis id.
+       */
+      id: number;
+      /** @description The state after the command. */
+      state: string;
+      /** @description A plain sentence, including what was not done. */
+      text: string;
+    };
     /** @description One row of a hypothesis's history. */
     HypothesisStepView: {
       /**
@@ -9779,6 +9895,18 @@ export interface components {
       /** Format: date */
       to: string;
     };
+    /** @description What a lesson move did. */
+    LessonMoveOutcome: {
+      /**
+       * Format: int64
+       * @description The lesson id.
+       */
+      id: number;
+      /** @description The state after the move. */
+      state: string;
+      /** @description A sentence for the caller. */
+      text: string;
+    };
     /** @description One row of a lesson's history. */
     LessonStepView: {
       /**
@@ -9869,6 +9997,20 @@ export interface components {
       history: components['schemas']['LessonStepView'][];
       /** @description What a lesson does and does not do. */
       note: string;
+    };
+    /** @description The body of a lesson link: the fix to link is a hypothesis or an experiment. */
+    LinkLessonRequest: {
+      /** @description `hypothesis` or `experiment`. */
+      fixKind: null | string;
+      /**
+       * Format: int64
+       * @description The id of the fix, 1 or more.
+       */
+      fixId: null | number;
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, typed again for THIS act. */
+      password: null | string;
     };
     /**
      * @description The state of the live feed as the screen needs it: hub event `feedStatus` (pushed on connect, on a change of `state` or `subscribed`, and every 15 seconds) and the body of `GET /api/live/status` (the fallback when the hub is not connected).
@@ -10370,6 +10512,15 @@ export interface components {
       /** Format: double */
       shareNotPositive: number;
     };
+    /** @description The body of a hypothesis move. */
+    MoveHypothesisRequest: {
+      /** @description `approved`, `rejected`, `expired` or `accepted` (running and judged have their own commands). */
+      to: null | string;
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, typed again for THIS act. */
+      password: null | string;
+    };
     /** @description Names a depository or demat file teaches: `Known` are remembered already, `New` would be remembered by an import. */
     NameLearning: {
       /** Format: int32 */
@@ -10440,6 +10591,13 @@ export interface components {
       split: components['schemas']['OverviewCount'][];
       newest: null | components['schemas']['OverviewHeadline'];
       champion: null | components['schemas']['OverviewHeadline'];
+    };
+    /** @description The body of a lesson close or dismiss and of a changelog revert (P8-19). The actor, a state and any number are never part of it: a field the server does not read is ignored. */
+    OwnerMoveRequest: {
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, typed again for THIS act and checked on every request (an earlier step-up window does not count and is not used up). */
+      password: null | string;
     };
     /** @description The paper accounts with the label every paper response carries. */
     PaperAccountList: {
@@ -21080,6 +21238,316 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  LinkLesson: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LinkLessonRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LessonMoveOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  CloseLesson: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OwnerMoveRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LessonMoveOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DismissLesson: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OwnerMoveRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LessonMoveOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  MoveHypothesis: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MoveHypothesisRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HypothesisMoveOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RevertChangelogEntry: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OwnerMoveRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChangelogOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };

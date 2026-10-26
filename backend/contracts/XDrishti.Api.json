@@ -8538,6 +8538,416 @@
         }
       }
     },
+    "/api/lessons/{id}/link": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Link an OPEN lesson to a hypothesis or an experiment that is meant to fix it (fixKind hypothesis|experiment, fixId); applies nothing. Needs a session, the CSRF token, the capability learning_moves_ui and the password in the body, checked on EVERY request. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid, 404 lessons.not_found or lessons.fix_not_found, 409 lessons.move_refused or lessons.stale, 429 auth.rate_limited",
+        "operationId": "LinkLesson",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkLessonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonMoveOutcome"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lessons/{id}/close": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Close a LINKED lesson. The body holds a reason and the password only: the result is read from the fix's stored experiment (improved only when it was Better), never typed. Same gate as the link. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid, 404 lessons.not_found, 409 lessons.move_refused (including a fix with no recorded experiment) or lessons.stale, 429 auth.rate_limited",
+        "operationId": "CloseLesson",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerMoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonMoveOutcome"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lessons/{id}/dismiss": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Set an open or linked lesson aside; the lesson is kept. Same gate as the link. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid, 404 lessons.not_found, 409 lessons.move_refused or lessons.stale, 429 auth.rate_limited",
+        "operationId": "DismissLesson",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerMoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonMoveOutcome"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hypotheses/{id}/move": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Move a hypothesis to approved, rejected, expired or accepted by the table of the lifecycle (proposed, running and judged have their own commands and are refused here). Accepting records a verdict and applies nothing. Same gate as the lesson moves. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid, 404 hypotheses.not_found, 409 hypotheses.move_refused or hypotheses.stale, 429 auth.rate_limited",
+        "operationId": "MoveHypothesis",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveHypothesisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisMoveOutcome"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/changelog/{id}/revert": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Revert the LATEST transition of a cell with a NEW changelog row that points at it (rows are never changed). It only restores a less trusted state; it never makes a cell active, never un-retires, and changes no published plan. Same gate as the lesson moves. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid, 404 changelog.not_found, 409 changelog.not_revertible (every reason listed) or changelog.stale, 429 auth.rate_limited",
+        "operationId": "RevertChangelogEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerMoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangelogOutcome"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/learning/overview": {
       "get": {
         "tags": [
@@ -13095,7 +13505,7 @@
         "tags": [
           "Autonomy"
         ],
-        "summary": "Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale, 429 auth.rate_limited",
+        "summary": "Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token, the capability autonomy_form (off by default) and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up); optional expectedSettingsId (the row the form was loaded at, 0 for none) makes a stale form a 409. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale, 429 auth.rate_limited",
         "operationId": "ChangeAutonomySettings",
         "requestBody": {
           "content": {
@@ -18033,6 +18443,14 @@
               "string"
             ],
             "description": "The owner's password, re-entered for THIS change. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout."
+          },
+          "expectedSettingsId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Optional: the settings row the form was loaded at (0 when nothing was stored). When another change was made meanwhile the answer is 409 `autonomy.stale` and nothing is written; absent, the current row is read at submit as before.",
+            "format": "int64"
           }
         },
         "description": "The body of the autonomy change. The owner is never part of it: the actor comes from the signed-in session."
@@ -18207,6 +18625,35 @@
           }
         },
         "description": "A changelog row as the API shows it (P6-08): what changed, by whom, why, before and after, and the evidence. A revert has long? ChangelogEntryView.RevertsId."
+      },
+      "ChangelogOutcome": {
+        "required": [
+          "id",
+          "subject",
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The new row.",
+            "format": "int64"
+          },
+          "subject": {
+            "type": "string",
+            "description": "The cell."
+          },
+          "from": {
+            "type": "string",
+            "description": "The state before."
+          },
+          "to": {
+            "type": "string",
+            "description": "The state after."
+          }
+        },
+        "description": "What recording a transition or a revert wrote (P6-08)."
       },
       "ChargeSheetActOutcome": {
         "required": [
@@ -26673,6 +27120,30 @@
           }
         }
       },
+      "HypothesisMoveOutcome": {
+        "required": [
+          "id",
+          "state",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The hypothesis id.",
+            "format": "int64"
+          },
+          "state": {
+            "type": "string",
+            "description": "The state after the command."
+          },
+          "text": {
+            "type": "string",
+            "description": "A plain sentence, including what was not done."
+          }
+        },
+        "description": "What a hypothesis command did."
+      },
       "HypothesisStepView": {
         "required": [
           "rowId",
@@ -29358,6 +29829,30 @@
         },
         "description": "The window of a run."
       },
+      "LessonMoveOutcome": {
+        "required": [
+          "id",
+          "state",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The lesson id.",
+            "format": "int64"
+          },
+          "state": {
+            "type": "string",
+            "description": "The state after the move."
+          },
+          "text": {
+            "type": "string",
+            "description": "A sentence for the caller."
+          }
+        },
+        "description": "What a lesson move did."
+      },
       "LessonStepView": {
         "required": [
           "rowId",
@@ -29544,6 +30039,47 @@
           }
         },
         "description": "A lesson as the API shows it (P6-16, ADR 0078): the newest row of its log, with the legal next states and, for one lesson, its history."
+      },
+      "LinkLessonRequest": {
+        "required": [
+          "fixKind",
+          "fixId",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "fixKind": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`hypothesis` or `experiment`."
+          },
+          "fixId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The id of the fix, 1 or more.",
+            "format": "int64"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, typed again for THIS act."
+          }
+        },
+        "description": "The body of a lesson link: the fix to link is a hypothesis or an experiment."
       },
       "LiveFeedStatus": {
         "required": [
@@ -30801,6 +31337,38 @@
         },
         "description": "The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number)."
       },
+      "MoveHypothesisRequest": {
+        "required": [
+          "to",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`approved`, `rejected`, `expired` or `accepted` (running and judged have their own commands)."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, typed again for THIS act."
+          }
+        },
+        "description": "The body of a hypothesis move."
+      },
       "NameLearning": {
         "required": [
           "known",
@@ -30992,6 +31560,30 @@
           }
         },
         "description": "One kind of learning record in the overview (P6-18): how many were counted, the split by role, outcome or state, and the newest record."
+      },
+      "OwnerMoveRequest": {
+        "required": [
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, typed again for THIS act and checked on every request (an earlier step-up window does not count and is not used up)."
+          }
+        },
+        "description": "The body of a lesson close or dismiss and of a changelog revert (P8-19). The actor, a state and any number are never part of it: a field the server does not read is ignored."
       },
       "PaperAccountList": {
         "required": [

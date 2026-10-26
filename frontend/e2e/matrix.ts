@@ -4,6 +4,7 @@ import { buildCompare, buildThinCompare, mountCompare } from '../src/test/compar
 import { buildCounterfactual, buildJourney, journeyOf, mountJourney } from '../src/test/journeyFixtures';
 import { createCapabilitiesFake } from '../src/test/capabilitiesFake';
 import { buildJob, jobId, mountExperiments } from '../src/test/experimentsFake';
+import { mountOwnerMoves } from '../src/test/ownerMovesFake';
 import { createChargeSheetFake } from '../src/test/chargeSheetFake';
 import { lossTags, rule, smart } from '../src/test/evidenceFixtures';
 import { mountPaper } from '../src/test/paperFixtures';
@@ -155,6 +156,24 @@ export const screens: Screen[] = [
     mounts: {
       full: () => {
         mountExperiments({ job: buildJob() });
+      },
+    },
+  },
+  {
+    id: 'P8-19-lesson-move',
+    route: '/owner-acts/lesson/1',
+    mounts: {
+      full: () => {
+        mountOwnerMoves();
+      },
+    },
+  },
+  {
+    id: 'P8-19-revert',
+    route: '/owner-acts/revert/5',
+    mounts: {
+      full: () => {
+        mountOwnerMoves();
       },
     },
   },

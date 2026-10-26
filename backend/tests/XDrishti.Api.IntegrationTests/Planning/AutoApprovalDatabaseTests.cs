@@ -370,9 +370,17 @@ public sealed class AutoApprovalDatabaseTests(ApiFactory factory) : DataTestBase
 
     private static readonly Uri SettingsUri = new("/api/autonomy/settings", UriKind.Relative);
 
+    /// <summary>The form of the switches is off by default (spec P8-19, ADR 0130): the owner's switch is a row of the capability log, written here as the stamped insert the endpoint of the capabilities makes.</summary>
+    private async Task FormOnAsync()
+    {
+        await using var connection = await OpenAsync();
+        await ExecuteAsync(connection, "INSERT INTO platform.capability_changes (capability, enabled, reason, actor) VALUES ('autonomy_form', true, 'test', 'owner:test@example.test')");
+    }
+
     [Fact]
     public async Task Every_change_needs_the_password_again_also_inside_an_open_step_up_window_and_the_actor_is_the_session()
     {
+        await FormOnAsync();
         var elevated = await Factory.SignInElevatedAsync(Ct);
 
         using var none = await elevated.Client.PutAsJsonAsync(SettingsUri, Body(true, null), Ct);
@@ -398,6 +406,7 @@ public sealed class AutoApprovalDatabaseTests(ApiFactory factory) : DataTestBase
     [Fact]
     public async Task A_signed_in_session_that_never_stepped_up_can_change_with_the_password_and_the_change_does_not_open_the_step_up_window()
     {
+        await FormOnAsync();
         var plainSession = await Factory.SignInAsync(Ct);
         using var probeBefore = await plainSession.Client.PostAsJsonAsync(new Uri("/api/risk-profiles", UriKind.Relative), new { }, Ct);
 
@@ -412,6 +421,7 @@ public sealed class AutoApprovalDatabaseTests(ApiFactory factory) : DataTestBase
     [Fact]
     public async Task An_open_step_up_window_is_neither_closed_nor_extended_by_a_change()
     {
+        await FormOnAsync();
         var elevated = await Factory.SignInElevatedAsync(Ct);
         var before = await ScalarAsync<DateTime>("SELECT elevated_until FROM auth.sessions WHERE elevated_until IS NOT NULL ORDER BY elevated_until DESC LIMIT 1");
 
@@ -426,6 +436,7 @@ public sealed class AutoApprovalDatabaseTests(ApiFactory factory) : DataTestBase
     [Fact]
     public async Task A_bad_value_or_a_blank_reason_with_the_right_password_is_a_bad_request()
     {
+        await FormOnAsync();
         var signedIn = await Factory.SignInAsync(Ct);
 
         using var bad = await signedIn.Client.PutAsJsonAsync(SettingsUri, Body(true, Factory.OwnerPassword, min: 0.1), Ct);

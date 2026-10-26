@@ -295,6 +295,9 @@ and two actions: <strong>Revert</strong> and <strong>Re-run with a different val
 <blockquote>
 <p><strong>As built (P8-04, ADR 0103).</strong> The weekly decomposition is shown on the Learning screen as <em>Plan vs actual</em>: plan prices, entry slippage, charges, a remainder &quot;not attributed&quot; (exit slippage and anything else; the plan grade stores no simulated exit price) and the actual R after recorded charges, as means over the same tickets, <code>insufficient</code> below 15 graded tickets. Missed triggers are a count outside the chain. Exit slippage and the effect of overrides are listed as not decomposed. Nothing is graded on fills before paper and live trading, so today the chain is empty.</p>
 </blockquote>
+<blockquote>
+<p><strong>As built (P8-19, <a href="../adr/0130-the-owner-act-forms-are-endpoints-behind-a-capability-a-fresh-password-and-an-audit-row-over-the-existing-handlers-and-state-machines-and-apply-nothing.html">ADR 0130</a>).</strong> A lesson can be linked to a hypothesis or an experiment, closed and dismissed, and a hypothesis approved, rejected, expired or accepted, from <code>/owner-acts/lesson/:id</code> and <code>/owner-acts/hypothesis/:id</code> once the owner switches <code>learning_moves_ui</code> on (off by default). Each move is the existing handler behind the same state table, with a reason and a fresh password, and writes one new row; closing a lesson takes no number (the result is read from the fix&#39;s stored experiment); accepting records a verdict and applies nothing. Proposing, starting and judging a hypothesis and opening lessons stay command-line verbs.</p>
+</blockquote>
 <h2 id="11-making-learning-visible-learning-screen">11. Making learning visible (Learning screen)<a class="hash" href="#11-making-learning-visible-learning-screen" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -405,6 +408,7 @@ is audited, and is monitored for 60 trades with <strong>automatic rollback</stro
 <h2 id="13-autonomy-less-intervention-same-control">13. Autonomy: less intervention, same control<a class="hash" href="#13-autonomy-less-intervention-same-control" aria-label="Link to this section">#</a></h2>
 <blockquote>
 <p><strong>As built (P8-04).</strong> The Learning screen shows the autonomy switches, their history and the owner/auto approval counts read only; no control exists there (changing them needs a fresh password, P8-19).</p>
+<p><strong>As built (P8-19, <a href="../adr/0130-the-owner-act-forms-are-endpoints-behind-a-capability-a-fresh-password-and-an-audit-row-over-the-existing-handlers-and-state-machines-and-apply-nothing.html">ADR 0130</a>).</strong> The switches can be changed from <code>/owner-acts</code> once the owner switches <code>autonomy_form</code> on there (off by default): a form over the existing <code>PUT /api/autonomy/settings</code> with a reason and a fresh password for every change, a new row each time (re-using an old row only fills the fields), a stale form refused. The Learning screen itself still has no control; it links to the form while the switch is on. No setting lets anything place an order; an automatic approval only makes a ticket Approved, and <code>auto</code> is never recorded as an owner approval.</p>
 </blockquote>
 <table>
 <thead>
@@ -534,7 +538,7 @@ the last 100 trades, is flagged for review instead of being trusted blindly.</p>
     <a class="prev" href="08-exits-and-risk.html"><small>← Previous  [</small>08 · Exits &amp; risk</a>
     <a class="next" href="10-trade-selection.html"><small>Next  ] →</small>10 · Trade selection</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-26 17:20</footer>
+  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-26 18:12</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-four-layers" class="d2">1. Four layers</a>
 <a href="#2-validation-purged-walk-forward" class="d2">2. Validation: purged walk-forward</a>

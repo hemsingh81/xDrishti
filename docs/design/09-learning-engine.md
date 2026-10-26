@@ -193,6 +193,8 @@ Built (P6-16, [ADR 0078](../adr/0078-lessons-a-finding-a-linked-fix-and-a-result
 
 > **As built (P8-04, ADR 0103).** The weekly decomposition is shown on the Learning screen as *Plan vs actual*: plan prices, entry slippage, charges, a remainder "not attributed" (exit slippage and anything else; the plan grade stores no simulated exit price) and the actual R after recorded charges, as means over the same tickets, `insufficient` below 15 graded tickets. Missed triggers are a count outside the chain. Exit slippage and the effect of overrides are listed as not decomposed. Nothing is graded on fills before paper and live trading, so today the chain is empty.
 
+> **As built (P8-19, [ADR 0130](../adr/0130-the-owner-act-forms-are-endpoints-behind-a-capability-a-fresh-password-and-an-audit-row-over-the-existing-handlers-and-state-machines-and-apply-nothing.md)).** A lesson can be linked to a hypothesis or an experiment, closed and dismissed, and a hypothesis approved, rejected, expired or accepted, from `/owner-acts/lesson/:id` and `/owner-acts/hypothesis/:id` once the owner switches `learning_moves_ui` on (off by default). Each move is the existing handler behind the same state table, with a reason and a fresh password, and writes one new row; closing a lesson takes no number (the result is read from the fix's stored experiment); accepting records a verdict and applies nothing. Proposing, starting and judging a hypothesis and opening lessons stay command-line verbs.
+
 ## 11. Making learning visible (Learning screen)
 
 | View | Question it answers |
@@ -244,6 +246,8 @@ Rules that keep experiments honest:
 ## 13. Autonomy: less intervention, same control
 
 > **As built (P8-04).** The Learning screen shows the autonomy switches, their history and the owner/auto approval counts read only; no control exists there (changing them needs a fresh password, P8-19).
+>
+> **As built (P8-19, [ADR 0130](../adr/0130-the-owner-act-forms-are-endpoints-behind-a-capability-a-fresh-password-and-an-audit-row-over-the-existing-handlers-and-state-machines-and-apply-nothing.md)).** The switches can be changed from `/owner-acts` once the owner switches `autonomy_form` on there (off by default): a form over the existing `PUT /api/autonomy/settings` with a reason and a fresh password for every change, a new row each time (re-using an old row only fills the fields), a stale form refused. The Learning screen itself still has no control; it links to the form while the switch is on. No setting lets anything place an order; an automatic approval only makes a ticket Approved, and `auto` is never recorded as an owner approval.
 
 | Level | Plan tickets | Learning changes | Always asks you |
 |-------|--------------|------------------|-----------------|

@@ -15,7 +15,8 @@ public sealed record GetAutonomySettingsQuery : IQuery<AutonomySettingsView>;
 /// <param name="PromoteFromReserve">The new value of <c>autonomy.promote_from_reserve</c>.</param>
 /// <param name="MinPWin">The least lower-bound P(win), 0.5 to 0.99.</param>
 /// <param name="MaxAutoPerDay">The most auto approvals per session, 1 to 20.</param>
-public sealed record ChangeAutonomySettingsCommand(string Actor, string Reason, bool AutoApproveTickets, bool PromoteFromReserve, double MinPWin, int MaxAutoPerDay) : ICommand;
+/// <param name="ExpectedSettingsId">Optional (the form always sends it): the row the form was loaded at, 0 when nothing was stored. When it is not the row in force now nothing is written (<c>autonomy.stale</c>); null reads the current row at submit, as before (P8-19).</param>
+public sealed record ChangeAutonomySettingsCommand(string Actor, string Reason, bool AutoApproveTickets, bool PromoteFromReserve, double MinPWin, int MaxAutoPerDay, long? ExpectedSettingsId = null) : ICommand;
 
 /// <summary>
 /// Runs the auto-approval rule over the primary Proposed tickets of a plan, before its review cutoff (P7-12). With the switch OFF it does nothing at all. It has no actor argument: the actor is always the rule. It never moves a plan and never

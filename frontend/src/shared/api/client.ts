@@ -42,6 +42,11 @@ const passwordCheckPaths = new Set<string>([
   '/api/charge-sheet/confirmation/revoke',
   '/api/charge-sheet/capability',
   '/api/experiments',
+  '/api/lessons/{id}/link',
+  '/api/lessons/{id}/close',
+  '/api/lessons/{id}/dismiss',
+  '/api/hypotheses/{id}/move',
+  '/api/changelog/{id}/revert',
 ]);
 
 api.use({

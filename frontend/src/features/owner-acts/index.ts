@@ -3,3 +3,4 @@
 export { useCapability } from './api/capabilitiesRead';
 export const loadOwnerActsPage = async () => (await import('./components/OwnerActsPage')).OwnerActsPage;
 export const loadExperimentPage = async () => (await import('./components/ExperimentPage')).ExperimentPage;
+export const loadMovePage = async () => (await import('./components/MovePage')).MovePage;

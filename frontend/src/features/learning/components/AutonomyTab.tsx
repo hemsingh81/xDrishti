@@ -6,6 +6,7 @@ import { formatRate } from '@/shared/analytics';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { autonomyQuery } from '../api/learningQueries';
 import { AutonomyHistory } from './AutonomyHistory';
+import { MoveLink } from './MoveLink';
 import { Panel } from './Panel';
 
 function Switch({ name, on }: { name: string; on: boolean }) {
@@ -43,8 +44,9 @@ export function AutonomyTab() {
             No setting lets anything place an order; there is no order in this system yet.
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            There is no screen for changing these in this build: P8-19 decides. A change needs a fresh password.
+            A change needs a fresh password and leaves a new row; this tab never changes a setting.
           </Typography>
+          <MoveLink capability="autonomy_form" to="/owner-acts" label="Change these switches" />
         </Box>
       </Panel>
       <Panel title="Change history">

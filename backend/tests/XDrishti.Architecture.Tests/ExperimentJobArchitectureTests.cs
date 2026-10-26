@@ -161,10 +161,11 @@ public sealed partial class ExperimentJobArchitectureTests
     }
 
     [Fact]
-    public void The_two_approved_writes_under_the_guarded_prefix_are_the_start_and_the_cancel_and_nothing_else()
+    public void The_two_approved_writes_under_the_experiments_prefix_are_the_start_and_the_cancel_and_nothing_else()
     {
-        XDrishti.Domain.Reporting.ApprovedReportWrites.All.Count.ShouldBe(2);
-        XDrishti.Domain.Reporting.ApprovedReportWrites.All.ShouldAllBe(w => w.StartsWith("POST /api/experiments", StringComparison.Ordinal));
+        var experiments = XDrishti.Domain.Reporting.ApprovedReportWrites.All.Where(w => w.Contains("/api/experiments", StringComparison.Ordinal)).ToList();
+        experiments.Count.ShouldBe(2);
+        experiments.ShouldAllBe(w => w.StartsWith("POST /api/experiments", StringComparison.Ordinal));
     }
 }
 

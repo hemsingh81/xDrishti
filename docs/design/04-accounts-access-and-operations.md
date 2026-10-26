@@ -244,6 +244,8 @@ of the next three runs while editing.
 | **Proposed → you confirm** | Next-day trade tickets · AI instrument suggestions (track, add to / remove from basket) · hypothesis promotions · cell promotions to Active · config change proposals · (later) semi-auto orders | You |
 | **Only you** | Accounts & roles, credentials, baskets you create, risk limits, enabling execution, **confirming your charge sheet as your own** (the password is typed again for that act; switched off until you switch it on; [ADR 0127](../adr/0127-the-owners-confirmation-of-the-charge-sheet-is-an-insert-only-log-written-only-by-the-owners-endpoint-after-a-fresh-password-bound-to-the-rates-hash-and-off-by-default.md)) | You |
 
+> **As built (P8-19, [ADR 0130](../adr/0130-the-owner-act-forms-are-endpoints-behind-a-capability-a-fresh-password-and-an-audit-row-over-the-existing-handlers-and-state-machines-and-apply-nothing.md)).** The learning moves that are "Proposed → you confirm" (link, close or dismiss a lesson; approve, reject, expire or accept a hypothesis; revert the latest cell transition) and the autonomy switches can be made from `/owner-acts` once the owner switches `learning_moves_ui` or `autonomy_form` on (both off by default). Each asks for the password again, for that act only, records the actor from the session and leaves an insert-only row and an audit event with ids and state words only. None applies a change or places an order.
+
 ### 4.2 Next-day plan approval
 
 ```mermaid

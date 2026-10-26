@@ -14,7 +14,7 @@ describe('Autonomy', () => {
     expect(
       screen.getByText('No setting lets anything place an order; there is no order in this system yet.'),
     ).toBeInTheDocument();
-    expect(screen.getByText(/P8-19 decides/)).toHaveTextContent('A change needs a fresh password');
+    expect(screen.getByText(/this tab never changes a setting/)).toHaveTextContent('A change needs a fresh password');
     const panel = screen.getByRole('tabpanel');
     expect(within(panel).queryAllByRole('switch')).toHaveLength(0);
     expect(within(panel).queryAllByRole('checkbox')).toHaveLength(0);

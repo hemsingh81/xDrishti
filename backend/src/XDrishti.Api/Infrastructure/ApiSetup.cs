@@ -96,6 +96,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, ModelsEndpoints>();
         services.AddSingleton<IEndpointModule, ExperimentsEndpoints>();
         services.AddSingleton<IEndpointModule, ExperimentJobsEndpoints>(); // the replay job started from the Learning area (P8-18 Part B, ADR 0129): capability off by default, fresh password, never applies
+        services.AddSingleton<IEndpointModule, OwnerMovesEndpoints>(); // the lesson, hypothesis and revert moves of the owner-acts forms (P8-19, ADR 0130): capability off by default, fresh password, writes one row
         services.AddSingleton<IEndpointModule, ChangelogEndpoints>();
         services.AddSingleton<IEndpointModule, AuditEndpoints>();
         services.AddSingleton<IEndpointModule, HypothesesEndpoints>();

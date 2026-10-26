@@ -216,6 +216,40 @@ public sealed class AutonomyHandlersTests
     }
 
     [Fact]
+    public async Task A_form_loaded_at_another_row_is_stale_and_writes_nothing_while_the_right_row_or_none_given_goes_through()
+    {
+        var row = new AutonomyChangeRow(8, new string('c', 64), true, false, 0.6, 2, "owner:hem", "go", Cutoff);
+        _settings.CurrentAsync(Ct).Returns(On);
+        _settings.AppendAsync(Arg.Any<AutonomyChange>(), 7, Ct).Returns(row);
+        _settings.HistoryAsync(Arg.Any<int>(), Ct).Returns([row]);
+        var handler = new ChangeAutonomySettingsHandler(_settings, NullLogger<ChangeAutonomySettingsHandler>.Instance);
+
+        var old = await handler.HandleAsync(new ChangeAutonomySettingsCommand("owner:hem", "go", true, false, 0.6, 2, 6), Ct);
+        var none = await handler.HandleAsync(new ChangeAutonomySettingsCommand("owner:hem", "go", true, false, 0.6, 2, 0), Ct);
+        await _settings.DidNotReceive().AppendAsync(Arg.Any<AutonomyChange>(), Arg.Any<long?>(), Arg.Any<CancellationToken>());
+        var right = await handler.HandleAsync(new ChangeAutonomySettingsCommand("owner:hem", "go", true, false, 0.6, 2, 7), Ct);
+        var absent = await handler.HandleAsync(new ChangeAutonomySettingsCommand("owner:hem", "go", true, false, 0.6, 2), Ct);
+
+        old.Error.Code.ShouldBe("autonomy.stale");
+        none.Error.Code.ShouldBe("autonomy.stale");
+        right.IsSuccess.ShouldBeTrue();
+        absent.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task With_nothing_stored_the_form_sends_zero_and_that_is_the_current_row()
+    {
+        var row = new AutonomyChangeRow(1, new string('c', 64), true, false, 0.6, 2, "owner:hem", "go", Cutoff);
+        _settings.CurrentAsync(Ct).Returns(AutonomySettings.Defaults);
+        _settings.AppendAsync(Arg.Any<AutonomyChange>(), null, Ct).Returns(row);
+        _settings.HistoryAsync(Arg.Any<int>(), Ct).Returns([row]);
+        var handler = new ChangeAutonomySettingsHandler(_settings, NullLogger<ChangeAutonomySettingsHandler>.Instance);
+
+        (await handler.HandleAsync(new ChangeAutonomySettingsCommand("owner:hem", "go", true, false, 0.6, 2, 0), Ct)).IsSuccess.ShouldBeTrue();
+        (await handler.HandleAsync(new ChangeAutonomySettingsCommand("owner:hem", "go", true, false, 0.6, 2, 3), Ct)).Error.Code.ShouldBe("autonomy.stale");
+    }
+
+    [Fact]
     public async Task Reading_with_nothing_stored_shows_everything_off()
     {
         _settings.CurrentAsync(Ct).Returns(AutonomySettings.Defaults);

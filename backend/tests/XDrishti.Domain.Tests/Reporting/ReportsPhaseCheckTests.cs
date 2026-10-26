@@ -257,8 +257,12 @@ public sealed class ReportsPhaseCheckTests
     }
 
     [Fact]
-    public void The_approved_write_list_is_the_start_and_the_cancel_of_the_replay_job_and_nothing_else()
+    public void The_approved_write_list_is_the_replay_job_start_and_cancel_and_the_five_learning_moves_and_nothing_else()
     {
-        ApprovedReportWrites.All.ShouldBe(["POST /api/experiments/", "POST /api/experiments/jobs/{id:guid}/cancel"]);
+        ApprovedReportWrites.All.ShouldBe(
+        [
+            "POST /api/experiments/", "POST /api/experiments/jobs/{id:guid}/cancel",
+            "POST /api/lessons/{id:long}/link", "POST /api/lessons/{id:long}/close", "POST /api/lessons/{id:long}/dismiss", "POST /api/hypotheses/{id:long}/move", "POST /api/changelog/{id:long}/revert",
+        ]);
     }
 }
