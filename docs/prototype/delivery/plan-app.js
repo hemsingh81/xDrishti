@@ -121,7 +121,7 @@
   views.progress = () => {
     const P = window.XDP;
     const STATE = { built: ["Built", "st-done"], building: ["In progress", "st-doing"], planned: ["Planned", ""] };
-    const SL = { built: ["Built", "st-done"], draft: ["Draft", ""], later: ["Later", ""], blocked: ["Blocked", "st-blocked"], optional: ["Optional", ""] };
+    const SL = { built: ["Built", "st-done"], draft: ["Draft", ""], later: ["Later", ""], approved: ["Approved, not built", "st-ready"], blocked: ["Blocked", "st-blocked"], optional: ["Optional", ""] };
     const sl = (p) => p.slices || [];
     const specLink = (f) => (location.protocol === "file:" ? `<a href="../../specs/${esc(f)}.md" target="_blank" rel="noopener">docs/specs/${esc(f)}.md</a>` : `docs/specs/${esc(f)}.md`);
     const nb = (p) => sl(p).filter((x) => x[2] === "built").length;
@@ -130,6 +130,7 @@
     const slices = phases.flatMap(sl);
     const sBuilt = slices.filter((x) => x[2] === "built").length;
     const sOpen = slices.filter((x) => x[2] !== "built" && x[2] !== "optional");
+    const sApproved = slices.filter((x) => x[2] === "approved");
     const meta = (x) => x[4] || {};
     const sDraft = slices.filter((x) => x[2] === "draft");
     const sOwner = sDraft.filter((x) => meta(x).o);
@@ -141,7 +142,7 @@
     <div class="tiles">
       <div class="tile"><div class="k">Phases built</div><div class="v">${built}<small class="dim"> / ${phases.length}</small></div><div class="s">${esc(builtIds.join(", "))} built · others under way or planned</div></div>
       <div class="tile"><div class="k">Tracked slices built</div><div class="v">${sBuilt}<small class="dim"> / ${sBuilt + sOpen.length}</small></div><div class="s">slices of ${esc(sPhases.join(", "))} listed below</div></div>
-      <div class="tile"><div class="k">Open or blocked</div><div class="v">${sOpen.length}</div><div class="s">${sDraft.length} Draft specs waiting for your Approved (about ${Math.round(sDays)} agent-days), ${sOwner.length} of them SAFETY; ${sOpen.length - sDraft.length} later or blocked</div></div>
+      <div class="tile"><div class="k">Open or blocked</div><div class="v">${sOpen.length}</div><div class="s">${sDraft.length} Draft specs waiting for your Approved (about ${Math.round(sDays)} agent-days), ${sOwner.length} of them SAFETY; ${sApproved.length} approved and waiting to be built, ${sOpen.length - sDraft.length - sApproved.length} later or blocked</div></div>
     </div>
     <div class="card" style="margin:14px 0"><h2>Needs you</h2><ul style="padding-left:18px">${P.owner.map((t) => `<li style="margin:4px 0">${esc(t)}</li>`).join("")}</ul></div>
     <div class="card" style="margin:14px 0"><h2>What "built" means here</h2><ul style="padding-left:18px">${P.honest.map((t) => `<li style="margin:4px 0">${esc(t)}</li>`).join("")}</ul></div>

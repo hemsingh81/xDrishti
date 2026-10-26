@@ -1032,8 +1032,8 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Drill-down and trade replay</strong>, shared price chart (Lightweight Charts, lazy; dependency is owner question 15).</td>
 <td>P8</td>
 <td>4 d</td>
-<td>Spec Draft (plan)</td>
-<td><a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
+<td>Built 2026-10-26 (<a href="../adr/0125-the-trade-replay-reads-one-stored-trade-on-server-built-adjusted-bars-with-an-entry-check-and-draws-it-with-lightweight-charts-behind-one-wrapper.html">ADR 0125</a>): replay endpoint and the shared price chart</td>
+<td><a href="../specs/P8-11-drill-down-and-trade-replay-shared-price-chart.html">spec</a>, <a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
 <td>Trade with legs, gap through the stop, swing across sessions</td>
 </tr>
 <tr>
@@ -1077,8 +1077,8 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Responsive, accessibility and performance pass</strong> 360 px to 4K with a real-browser checklist per screen.</td>
 <td>P8</td>
 <td>3 d</td>
-<td>Spec Draft (plan)</td>
-<td><a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
+<td>Partial 2026-10-26 (<a href="../adr/0124-the-browser-runner-is-playwright-and-axe-over-the-installed-chrome-answered-from-the-msw-handlers-and-kept-out-of-check-sh.html">ADR 0124</a>): global rules and the Playwright and axe runner are built; C14 load time and some layout-shift cells still fail</td>
+<td><a href="../specs/P8-16-responsive-accessibility-and-performance-pass.html">spec</a>, <a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
 <td>No horizontal page scroll; keyboard; chart tables</td>
 </tr>
 <tr>
@@ -1104,7 +1104,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Tweak and re-run from the UI</strong> (starts a replay job). <strong>SAFETY (job start, writes): stops for the owner (Q3); never an apply button.</strong></td>
 <td>P8</td>
 <td>5 d</td>
-<td>Draft (plan)</td>
+<td>Approved 2026-10-26, not built (SAFETY: settings default OFF, fresh password per UI write)</td>
 <td><a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
 <td>Not started before the owner&#39;s answer</td>
 </tr>
@@ -1113,7 +1113,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Owner-act forms</strong>: autonomy form on the existing <code>PUT</code>, changelog revert, lesson and hypothesis moves. <strong>SAFETY (writes, autonomy): stops for the owner (Q1, Q2, Q8).</strong></td>
 <td>P8</td>
 <td>4 d</td>
-<td>Draft (plan)</td>
+<td>Approved 2026-10-26, not built (SAFETY: settings default OFF, fresh password per UI write)</td>
 <td><a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
 <td>Not started before the owner&#39;s answer</td>
 </tr>
@@ -1122,7 +1122,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Exports</strong> (research tables as CSV with the evidence block). <strong>SAFETY (data leaves the app): stops for the owner (Q4).</strong></td>
 <td>P8</td>
 <td>2.5 d</td>
-<td>Draft (plan)</td>
+<td>Approved 2026-10-26, not built (SAFETY: settings default OFF, fresh password per UI write)</td>
 <td><a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
 <td>Not started before the owner&#39;s answer</td>
 </tr>
@@ -1131,7 +1131,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>PWA installable shell</strong> (assets only, no offline data, cleared on sign-out). <strong>SAFETY (offline cache, LAN exposure): stops for the owner (Q5, Q7).</strong></td>
 <td>P8</td>
 <td>3 d</td>
-<td>Draft (plan)</td>
+<td>Approved 2026-10-26, not built (SAFETY: settings default OFF, fresh password per UI write)</td>
 <td><a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
 <td>Not started before the owner&#39;s answer</td>
 </tr>
@@ -1595,7 +1595,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-26 13:57</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-26 15:01</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>
