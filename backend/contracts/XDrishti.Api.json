@@ -12686,6 +12686,96 @@
         }
       }
     },
+    "/api/reports/trades/{runKey}/{ordinal}": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "One stored simulated trade on its own bars (the replay of the drill-down): the trade facts in adjusted prices, its legs, the costing (figures only for a charge sheet the owner confirmed), the bars of its window at the chosen timeframe built on the server from the 1-minute bars and adjusted for the corporate actions applied now, a check that the stored entry still fits the bars (ok, entry_mismatch, no_bars), the decision-time features stored for the trade (a number only where one is stored) and the evidence block. Takes openAtEnd (default false), timeframe (1m, 5m, 15m, 1h, 1D; default 5m), before and after (sessions around the trade: 0 to 3, or 0 to 60 for 1D). A window above 5,000 bars is refused, never thinned. Read only. 422 reports.invalid or reports.window_too_large; 404 reports.not_found.",
+        "operationId": "GetTradeReplay",
+        "parameters": [
+          {
+            "name": "runKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ordinal",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "openAtEnd",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeReplayView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/phase-check": {
       "get": {
         "tags": [
@@ -34483,6 +34573,420 @@
         },
         "description": "What a removal did: `removed` were members, `notMembers` were not. Untracking never happens. `memberCount` = members now."
       },
+      "ReplayBarView": {
+        "required": [
+          "t",
+          "o",
+          "h",
+          "l",
+          "c",
+          "v"
+        ],
+        "type": "object",
+        "properties": {
+          "t": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "o": {
+            "type": "number",
+            "format": "double"
+          },
+          "h": {
+            "type": "number",
+            "format": "double"
+          },
+          "l": {
+            "type": "number",
+            "format": "double"
+          },
+          "c": {
+            "type": "number",
+            "format": "double"
+          },
+          "v": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "description": "One bar: `t` is the epoch seconds of its start."
+      },
+      "ReplayChartView": {
+        "required": [
+          "timeframe",
+          "adjusted",
+          "adjustedThrough",
+          "from",
+          "to",
+          "barCount",
+          "bars",
+          "coherence"
+        ],
+        "type": "object",
+        "properties": {
+          "timeframe": {
+            "type": "string",
+            "description": "1m, 5m, 15m, 1h or 1D."
+          },
+          "adjusted": {
+            "type": "boolean",
+            "description": "Always true: the bars are adjusted like the stored trade."
+          },
+          "adjustedThrough": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The ex-date of the last corporate action applied to the bars; null when none is.",
+            "format": "date"
+          },
+          "from": {
+            "type": "string",
+            "description": "First instant of the window.",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "description": "Last instant of the window.",
+            "format": "date-time"
+          },
+          "barCount": {
+            "type": "integer",
+            "description": "Bars returned (never above 5,000).",
+            "format": "int32"
+          },
+          "bars": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayBarView"
+            },
+            "description": "The bars, oldest first."
+          },
+          "coherence": {
+            "description": "Whether the bars agree with the stored entry.",
+            "$ref": "#/components/schemas/ReplayCoherenceView"
+          }
+        },
+        "description": "The bars of the replay window at one timeframe, adjusted for the corporate actions applied now, with the coherence of the stored entry against them."
+      },
+      "ReplayCoherenceView": {
+        "required": [
+          "state",
+          "entryStored",
+          "entryOnBars",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "entryStored": {
+            "type": "number",
+            "format": "double"
+          },
+          "entryOnBars": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "description": "`state` is ok, entry_mismatch or no_bars; `entryOnBars` is null with no bar."
+      },
+      "ReplayCostingView": {
+        "required": [
+          "sheetId",
+          "confirmed",
+          "quantity",
+          "totalCharges",
+          "costR",
+          "rNet"
+        ],
+        "type": "object",
+        "properties": {
+          "sheetId": {
+            "type": "string"
+          },
+          "confirmed": {
+            "type": "boolean"
+          },
+          "quantity": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "totalCharges": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "costR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "rNet": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "What the run charged the trade. The figures are present only when the owner confirmed this very charge sheet (`confirmed`); otherwise only the sheet id is, and the screen says \"costed on sheet X, not confirmed as yours\" beside the gross figures."
+      },
+      "ReplayFeatureItemView": {
+        "required": [
+          "name",
+          "source",
+          "state",
+          "value",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One stored feature: its group (`bars`, `context`, `plan`), and a number only when `state` is value."
+      },
+      "ReplayFeaturesView": {
+        "required": [
+          "state",
+          "version",
+          "reason",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayFeatureItemView"
+            }
+          }
+        },
+        "description": "The decision-time features stored for the trade (catalog `version`): `state` is value, or unavailable with the `reason` (no row stored, or a row of another decision). Never a zero for an unknown."
+      },
+      "ReplayLegView": {
+        "required": [
+          "at",
+          "kind",
+          "price",
+          "filledPrice",
+          "share",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "filledPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "share": {
+            "type": "number",
+            "format": "double"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "One fill of a trade with legs: `kind` is entry, add or exit; `share` the fraction of the maximum quantity; `reason` empty for an entry or an add."
+      },
+      "ReplayTradeView": {
+        "required": [
+          "strategyId",
+          "instrumentId",
+          "symbol",
+          "side",
+          "tradeDate",
+          "triggerTimeframe",
+          "decisionAt",
+          "entryAt",
+          "entryPrice",
+          "entryFilledPrice",
+          "stopPrice",
+          "targetPrice",
+          "exitAt",
+          "exitPrice",
+          "exitFilledPrice",
+          "exitReason",
+          "rExact",
+          "rFilled",
+          "slippageR",
+          "maeR",
+          "mfeR",
+          "sessionsHeld",
+          "sessionsUnseen",
+          "fills",
+          "entryFill",
+          "tickFallback",
+          "basketIds"
+        ],
+        "type": "object",
+        "properties": {
+          "strategyId": {
+            "type": "string"
+          },
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "tradeDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "triggerTimeframe": {
+            "type": "string"
+          },
+          "decisionAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entryAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entryPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "entryFilledPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "stopPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "targetPrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "exitAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "exitPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "exitFilledPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "exitReason": {
+            "type": "string"
+          },
+          "rExact": {
+            "type": "number",
+            "format": "double"
+          },
+          "rFilled": {
+            "type": "number",
+            "format": "double"
+          },
+          "slippageR": {
+            "type": "number",
+            "format": "double"
+          },
+          "maeR": {
+            "type": "number",
+            "format": "double"
+          },
+          "mfeR": {
+            "type": "number",
+            "format": "double"
+          },
+          "sessionsHeld": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sessionsUnseen": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fills": {
+            "type": "string"
+          },
+          "entryFill": {
+            "type": "string"
+          },
+          "tickFallback": {
+            "type": "boolean"
+          },
+          "basketIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The stored facts of a replayed trade, in adjusted prices. Times are instants (the screen shows India time); a target is null without a fixed reward-to-risk, never zero."
+      },
       "ReportBenchmarksView": {
         "required": [
           "window",
@@ -38966,6 +39470,12 @@
           "provisional": {
             "type": "boolean",
             "description": "The run is marked provisional."
+          },
+          "ordinal": {
+            "type": "integer",
+            "description": "The trade's position in its run: with the run key, the address of its replay (a closed trade, so open-at-end is false).",
+            "format": "int32",
+            "default": 0
           }
         },
         "description": "One closed trade of a report: what it was, when, and its R on the basis of the report (gross or net)."
@@ -39167,6 +39677,88 @@
           }
         },
         "description": "What rebuilding a holding's lots from its trades does. `Status`: `ok` (the lots would change), `unchanged`, `quantity_mismatch` (see `Reason`: `negative_opening`, `sell_exceeds_open`,\n`fractional_after_adjustment`; nothing is applied), `no_holding`, `ambiguous`. `Q` is the broker's quantity, `Net` bought minus sold (today's shares). `HandDatedLotsReplaced` counts the lots whose date the owner chose\nand `SyncLotsReplaced` the lots a sync added, among the `LotsBefore` lots that an `ok` rebuild replaces by `LotsAfter` lots. `RealisedPnl` is the profit of the pieces the trades sold. `AdjustedFor` counts the corporate\nactions that changed a trade. `Digest` fingerprints this rebuild. `OpenCostAfter` is what the open lots cost after the rebuild (Σ open quantity × unit cost; also for `unchanged`), `BrokerCost` the broker's `Q × A`\nand `CostDelta` their difference. The open quantities always add up to `Q`. With no sales in the file and an opening lot (the file does not explain the whole holding) `CostDelta` is 0, to within the rounding of the opening\nlot's unit cost to 4 decimals (0.0001 × its quantity); with sales — or without an opening lot — the first-in first-out cost basis of the trades can differ from the broker's average-cost figure (brokers keep the average by the\nweighted-average-cost method, a sale does not change it), which is shown, not hidden. `CostNote` is `opening_cost_fallback` when the trades cost more than the broker's average cost allows and the opening lot therefore costs the\naverage cost. The four are null unless the trades fit (`ok` or `unchanged`)."
+      },
+      "TradeReplayView": {
+        "required": [
+          "runKey",
+          "ordinal",
+          "openAtEnd",
+          "tradeKey",
+          "basis",
+          "trade",
+          "legs",
+          "costing",
+          "chart",
+          "features",
+          "evidence",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "runKey": {
+            "type": "string",
+            "description": "The run."
+          },
+          "ordinal": {
+            "type": "integer",
+            "description": "The trade's place in the run.",
+            "format": "int32"
+          },
+          "openAtEnd": {
+            "type": "boolean",
+            "description": "The trade was still open at the end of the data."
+          },
+          "tradeKey": {
+            "type": "string",
+            "description": "The stored signal key."
+          },
+          "basis": {
+            "type": "string",
+            "description": "gross, or net only when the owner confirmed the charge sheet the run was costed with."
+          },
+          "trade": {
+            "description": "The stored facts.",
+            "$ref": "#/components/schemas/ReplayTradeView"
+          },
+          "legs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplayLegView"
+            },
+            "description": "The fills, in the record's order; empty for a trade that entered and left in one fill each."
+          },
+          "costing": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The costing, or null for a gross run.",
+                "$ref": "#/components/schemas/ReplayCostingView"
+              }
+            ]
+          },
+          "chart": {
+            "description": "The bars and the coherence.",
+            "$ref": "#/components/schemas/ReplayChartView"
+          },
+          "features": {
+            "description": "The stored decision-time features.",
+            "$ref": "#/components/schemas/ReplayFeaturesView"
+          },
+          "evidence": {
+            "description": "The evidence block.",
+            "$ref": "#/components/schemas/ReportEvidenceView"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What this picture does not show."
+          }
+        },
+        "description": "One stored simulated trade drawn on its own bars (P8-11): the trade, its legs and costing, the bars of its window at one timeframe with the coherence check, the decision-time features it has, and the evidence block (n = 1). Read only."
       },
       "TradeSecurityView": {
         "required": [
