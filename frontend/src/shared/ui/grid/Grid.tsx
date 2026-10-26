@@ -129,6 +129,8 @@ export function Grid<Row>({
         ref={scroller}
         role="region"
         aria-label={`${label}, scrolls sideways`}
+        // With rows the rows are the tab stop; with none (empty, failed) the region itself must take focus to scroll by keyboard.
+        tabIndex={rows.length === 0 ? 0 : undefined}
         sx={{
           flex: '1 1 auto',
           minHeight: 0,

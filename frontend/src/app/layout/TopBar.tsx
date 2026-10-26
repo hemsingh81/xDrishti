@@ -52,11 +52,20 @@ export function TopBar({ title, onMenu }: { title: string; onMenu: () => void })
         {/* India time, whatever the browser's zone: next to the other status controls. */}
         <IstClock />
         {/* Same size as the control's button, so it loading in does not move the other controls. */}
-        <Suspense fallback={<Skeleton variant="rounded" width={64} height={30} sx={{ minWidth: { sm: 250 } }} />}>
+        <Suspense
+          fallback={
+            <Skeleton
+              variant="rounded"
+              sx={{ width: { xs: 58, sm: 64 }, height: { xs: 44, sm: 30 }, minWidth: { sm: 250 } }}
+            />
+          }
+        >
           <HeaderAccounts />
         </Suspense>
         {/* Same size as the bell, so it loading in does not move the other controls. */}
-        <Suspense fallback={<Skeleton variant="rounded" width={36} height={36} />}>
+        <Suspense
+          fallback={<Skeleton variant="rounded" sx={{ width: { xs: 44, sm: 36 }, height: { xs: 44, sm: 36 } }} />}
+        >
           <NotificationBell />
         </Suspense>
         <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>

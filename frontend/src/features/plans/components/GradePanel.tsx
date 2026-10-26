@@ -2,6 +2,7 @@ import { Card, CardContent, Link, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { Link as RouterLink } from 'react-router';
 import { ErrorState, LoadingState } from '@/shared/ui';
+import { touchTarget } from '@/theme/tokens';
 import { gradeQuery } from '../api/planQueries';
 
 const r = (v: number | null) => (v === null ? '-' : `${v.toFixed(2)} R`);
@@ -50,7 +51,12 @@ export function GradePanel({ planId }: { planId: number }) {
                 </tbody>
               </table>
             )}
-            <Link component={RouterLink} to="/learning?tab=plan" sx={{ display: 'inline-block', mt: 1 }}>
+            <Link
+              component={RouterLink}
+              to="/learning?tab=plan"
+              // A link on its own line is a touch target: 44 px high on a phone, padded not stretched.
+              sx={{ display: 'inline-flex', alignItems: 'center', mt: 1, minHeight: { xs: touchTarget.phone, sm: 24 } }}
+            >
               Plan vs actual in Learning
             </Link>
           </>

@@ -34,7 +34,11 @@ export function BarList({ label, rows, format, diverging = true }: BarListProps)
     }),
   );
   return (
-    <Box component="ul" aria-label={label} sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gap: 1.25 }}>
+    <Box
+      component="ul"
+      aria-label={label}
+      sx={{ listStyle: 'none', m: 0, p: 0, display: 'grid', gap: 1.25, minWidth: 0 }}
+    >
       {rows.map((row) => {
         const state = resolveMetric(row.state);
         const share = carriesNumber(state) && scale > 0 ? Math.abs(state.value) / scale : 0;
@@ -45,7 +49,7 @@ export function BarList({ label, rows, format, diverging = true }: BarListProps)
             key={row.id}
             sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: 'minmax(72px, 1fr) minmax(0, 1.4fr)', sm: '140px minmax(0, 1fr) 150px' },
+              gridTemplateColumns: { xs: 'minmax(0, 1fr) minmax(0, 1.4fr)', sm: '140px minmax(0, 1fr) 150px' },
               alignItems: 'center',
               columnGap: 1.5,
               rowGap: 0.25,
@@ -84,7 +88,8 @@ export function BarList({ label, rows, format, diverging = true }: BarListProps)
                         top: -2,
                         bottom: -2,
                         left: '50%',
-                        width: 1,
+                        // 1px: a bare `1` is 100 % in MUI's sx, which drew a track-wide band from the centre and overflowed the card.
+                        width: '1px',
                         backgroundColor: 'divider',
                       }}
                     />

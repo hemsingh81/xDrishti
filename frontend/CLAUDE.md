@@ -32,6 +32,7 @@ src/
   not. Below 3 KB of headroom the guard prints a WARNING; the first slice to see it must free space first (the preload path,
   splitting the entry chunk) before adding eager code.
 - Errors: every query shows `LoadingState`/`ErrorState`; routes have an `errorElement`.
+  `LoadingState` is a silent status region (`aria-live="off"`, the words stay visible); the app shell's `LoadingAnnouncer` says "Loading…" / "Loaded" once per screen. Outside the shell pass `announce`.
 
 ## Tests
 - Vitest + Testing Library + MSW (network-level mocks; unhandled requests fail the test).

@@ -1,31 +1,18 @@
 import './shim';
 import { http, HttpResponse } from 'msw';
-import type { Schemas } from '../src/shared/api';
 import { buildCompare, buildThinCompare, mountCompare } from '../src/test/compareFixtures';
 import { buildCounterfactual, buildJourney, journeyOf, mountJourney } from '../src/test/journeyFixtures';
-import {
-  buildCell,
-  buildDigest,
-  buildEntry,
-  buildExperiment,
-  buildGradedPlanVsActual,
-  buildHypothesis,
-  buildLesson,
-  buildModel,
-  buildModelDetail,
-  buildOverview,
-  buildThinCell,
-  mountLearning,
-  mountRecords,
-} from '../src/test/learningFixtures';
+import { createChargeSheetFake } from '../src/test/chargeSheetFake';
+import { lossTags, rule, smart } from '../src/test/evidenceFixtures';
 import { mountPaper } from '../src/test/paperFixtures';
 import { buildDiscipline, buildReview, mountReview } from '../src/test/paperReviewFixtures';
 import { buildPhase, mountPhase } from '../src/test/phaseFixtures';
 import { mount as mountPlans } from '../src/test/planScreen';
 import { replayServer } from '../src/test/replayFixtures';
-import { buildEvidence, buildRunsView, rankedWhatWorks, runKeyA } from '../src/test/reportFixtures';
-import { reportServer } from '../src/test/reportScreen';
+import { runKeyA } from '../src/test/reportFixtures';
 import { problemResponse, server } from '../src/test/server';
+import { learningEmpty, learningFull, learningThin, records, recordsEmpty } from './learningMounts';
+import { mountTrades, reportBase, reportEmpty } from './reportMounts';
 import { auditEntry, mountAudit } from './auditFixtures';
 import type { State } from './checks/types';
 
@@ -44,46 +31,6 @@ export interface Screen {
   mounts: Partial<Record<State, () => void>>;
 }
 
-type Cell = ReturnType<typeof buildCell>;
-const cells = (): Cell[] => [
-  buildCell(),
-  buildCell({ strategy: 'vwap', timeframe: '5m', expectancyR: -0.12 }),
-  buildCell({ strategy: 'orb', timeframe: '5m', side: 'SELL' }),
-  buildThinCell({ strategy: 'gap' }),
-];
-const learningFull = () => {
-  mountLearning({
-    overview: buildOverview({ cellRows: 12, cellsAsOf: '2026-10-20' }),
-    cells: { all: cells(), '250d': cells(), '60d': cells() },
-    changelog: [buildEntry()],
-    planVsActual: buildGradedPlanVsActual(),
-  });
-};
-const learningThin = () => {
-  mountLearning({
-    overview: buildOverview({ cellRows: 2, cellsAsOf: '2026-10-20' }),
-    cells: { all: [buildThinCell(), buildThinCell({ strategy: 'vwap' })] },
-  });
-};
-const learningEmpty = () => {
-  mountLearning({});
-};
-const records = () => {
-  mountRecords({
-    lessons: [buildLesson(), buildLesson({ id: 2 })],
-    experiments: [buildExperiment(), buildExperiment({ id: 2 })],
-    hypotheses: [buildHypothesis()],
-    models: [buildModel()],
-    modelDetails: [buildModelDetail()],
-    digests: [buildDigest()],
-  });
-  learningFull();
-};
-const recordsEmpty = () => {
-  mountRecords({});
-  learningEmpty();
-};
-
 const learning = (id: string, tab: string, mounts: Screen['mounts'], review = false): Screen => ({
   id: `P8-${id}`,
   route: tab ? `/learning?tab=${tab}` : '/learning',
@@ -91,57 +38,58 @@ const learning = (id: string, tab: string, mounts: Screen['mounts'], review = fa
   mounts,
 });
 
-const reportBase = () => {
-  reportServer({ whatWorks: rankedWhatWorks() });
+const noStudies = () => {
   server.use(
-    http.get('/api/reports/benchmarks', () => problemResponse({ title: 'Not found', code: 'reports.not_found' }, 404)),
+    http.get('/api/learning/entry-windows', () =>
+      problemResponse({ title: 'None stored.', code: 'learning.entry_windows_not_found' }, 404),
+    ),
+    http.get('/api/learning/meta-policy', () =>
+      problemResponse({ title: 'None stored.', code: 'learning.meta_policy_not_found' }, 404),
+    ),
   );
 };
-const reportEmpty = () => {
-  reportServer({ runs: buildRunsView([]) });
+const smartRulesFull = () => {
+  learningFull();
+  noStudies();
   server.use(
-    http.get('/api/reports/benchmarks', () => problemResponse({ title: 'Not found', code: 'reports.not_found' }, 404)),
+    http.get('/api/learning/smart-rules', () =>
+      HttpResponse.json(
+        smart({
+          state: 'observed',
+          plansRead: 12,
+          rules: [
+            rule('gate', 'Market gate', { state: 'observed', ranOn: 10, unavailableOn: 2 }),
+            rule('throttle', 'Equity throttle'),
+          ],
+        }),
+      ),
+    ),
   );
 };
-const reports = (id: string, view: string, review = false, scrollToEnd = false): Screen => ({
+const smartRulesEmpty = () => {
+  learningFull();
+  noStudies();
+  server.use(http.get('/api/learning/smart-rules', () => HttpResponse.json(smart())));
+};
+const lossTagsMount = (view: Parameters<typeof lossTags>[0]) => () => {
+  learningFull();
+  noStudies();
+  server.use(http.get('/api/learning/loss-tags', () => HttpResponse.json(lossTags(view))));
+};
+
+const reports = (id: string, view: string, review = false, scrollToEnd = false, extra?: () => void): Screen => ({
   id: `P8-${id}`,
   route: view ? `/reports?view=${view}` : '/reports',
   review,
   scrollToEnd,
-  mounts: { full: reportBase, empty: reportEmpty },
+  mounts: {
+    full: () => {
+      reportBase();
+      extra?.();
+    },
+    empty: reportEmpty,
+  },
 });
-
-const tradeLine = (ordinal: number): Schemas['TradeLineView'] => ({
-  runKey: runKeyA,
-  tradeKey: `ORB|NSE:S${String(ordinal)}|BUY|2026-03-02`,
-  strategy: 'ORB',
-  timeframe: '15m',
-  side: 'BUY',
-  symbol: `S${String(ordinal)}`,
-  basketIds: [],
-  entryDate: '2026-03-02',
-  exitDate: '2026-03-03',
-  r: ordinal % 2 === 0 ? 1.5 : -1,
-  sessionsHeld: 1,
-  style: 'intraday',
-  exit: 'fixed_r',
-  provisional: false,
-  ordinal,
-});
-const mountTrades = (count: number) => () => {
-  reportBase();
-  const items = Array.from({ length: count }, (_, i) => tradeLine(i + 1));
-  server.use(
-    http.get('/api/reports/trades', () =>
-      HttpResponse.json({
-        items,
-        total: count,
-        nextCursor: null,
-        evidence: buildEvidence({ n: count }),
-      } satisfies Schemas['TradesView']),
-    ),
-  );
-};
 
 /** The built P8 screens the runner covers (P8-02 to P8-04, P8-08, P8-09, P8-12, plans, audit, paper). */
 export const screens: Screen[] = [
@@ -169,6 +117,36 @@ export const screens: Screen[] = [
   reports('09-pivot', 'pivot'),
   reports('10-strategies', 'strategies'),
   reports('10-distribution', 'distribution'),
+  reports('10-side', 'side'),
+  reports('10-calendar', 'calendar'),
+  reports('10-maemfe', 'maemfe'),
+  // Exits and Monte Carlo are answered with empty lists here (their rich builders live inside their test files): the checks cover the
+  // screen, its states and its layout, not a populated comparison table.
+  reports('10-exits', 'exits', false, false, () => {
+    server.use(
+      http.get('/api/reports/comparisons', () => HttpResponse.json({ comparisons: [], limits: [] })),
+      http.get('/api/reports/exit-selections', () => HttpResponse.json({ selections: [], limits: [] })),
+    );
+  }),
+  reports('10-montecarlo', 'montecarlo', false, false, () => {
+    server.use(http.get('/api/lab/runs', () => HttpResponse.json([])));
+  }),
+  reports('10-instruments', 'instruments'),
+  reports('10-sectors', 'sectors'),
+  learning('13-smart-rules', 'smart-rules', { full: smartRulesFull, empty: smartRulesEmpty }),
+  learning('13-loss-tags', 'loss-tags', {
+    full: lossTagsMount({}),
+    empty: lossTagsMount({ state: 'empty', tradesRead: 0, losses: 0, cells: [], worst: [] }),
+  }),
+  {
+    id: 'settings-charge-sheet',
+    route: '/settings?tab=charge-sheet',
+    mounts: {
+      full: () => {
+        server.use(...createChargeSheetFake().handlers);
+      },
+    },
+  },
   {
     id: 'P8-11-cell',
     route: '/reports/cell?strategy=ORB&timeframe=15m&cell=ORB%20%C2%B7%2015m',

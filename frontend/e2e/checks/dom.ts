@@ -34,7 +34,8 @@ export function installProbes(): void {
   } catch {
     // layout-shift entries are not supported: CLS stays 0 and the check says so.
   }
-  const liveSelector = '[role=status],[role=alert],[aria-live]:not([aria-live=off])';
+  // A status region with aria-live="off" is silent by design (per-panel loading text): it is not an announcement.
+  const liveSelector = '[role=status]:not([aria-live=off]),[role=alert],[aria-live]:not([aria-live=off])';
   const note = (region: Element) => {
     const text = region.textContent.trim();
     const line = `${region.getAttribute('role') ?? 'live'}: ${text.slice(0, 80)}`;

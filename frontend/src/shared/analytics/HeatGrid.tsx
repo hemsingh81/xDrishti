@@ -155,13 +155,14 @@ export function HeatGrid({
   }
 
   return (
-    <Box>
+    <Box sx={{ minWidth: 0 }}>
       {legend && (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
           {legend}
         </Typography>
       )}
-      <TableContainer role="region" aria-label={regionLabel} tabIndex={0}>
+      {/* `position: relative`: the hidden cell names are absolutely placed; unpositioned they would widen the page, not be clipped. */}
+      <TableContainer role="region" aria-label={regionLabel} tabIndex={0} sx={{ position: 'relative' }}>
         <Table
           role="grid"
           size="small"

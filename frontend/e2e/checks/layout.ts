@@ -119,7 +119,8 @@ export async function c10WideTables(page: Page): Promise<Result> {
       }
       const named = scroller.hasAttribute('aria-label') || scroller.hasAttribute('aria-labelledby');
       const focusable =
-        scroller.getAttribute('tabindex') !== null || scroller.querySelector('a, button, input') !== null;
+        scroller.getAttribute('tabindex') !== null ||
+        scroller.querySelector('a, button, input, [tabindex]:not([tabindex="-1"])') !== null;
       if (!named || !focusable)
         bad.push(
           `${sel(container)} scrolls but is ${named ? '' : 'unlabelled'}${named || focusable ? '' : ' and '}${focusable ? '' : 'not keyboard reachable'}`,
@@ -153,6 +154,8 @@ export async function c12Reflow(page: Page): Promise<Result> {
     for (const el of document.querySelectorAll('main *')) {
       const s = getComputedStyle(el);
       if (!/(hidden|clip)/.test(s.overflowX) || s.textOverflow === 'ellipsis') continue;
+      // Not text a reader sees: the notch of an outlined field (a hidden legend) and the visually-hidden 1 px spans.
+      if (el.tagName === 'LEGEND' || el.clientWidth <= 1) continue;
       if (el.scrollWidth > el.clientWidth + 2 && el.textContent.trim())
         out.push(`${sel(el)} ${el.scrollWidth}>${el.clientWidth}`);
     }

@@ -59,6 +59,22 @@ export async function keyboardChecks(page: Page): Promise<Result[]> {
       };
     });
     if (!stop) break; // focus left the page: the cycle is complete
+    // A field's border widens by a transition (0.01 ms under reduced motion) that can still be running in the frame the
+    // style was read, more so on a busy machine: ask again a few times before calling a stop ringless.
+    for (let again = 0; again < 4 && !stop.ring; again += 1) {
+      await page.waitForTimeout(80);
+      stop.ring = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!el) return false;
+        const style = getComputedStyle(el);
+        const field = el.closest('.MuiInputBase-root')?.querySelector('.MuiOutlinedInput-notchedOutline');
+        return (
+          (style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) >= 2) ||
+          (field ? parseFloat(getComputedStyle(field).borderTopWidth) >= 2 : false) ||
+          (style.boxShadow !== 'none' && /\b[2-9]px/.test(style.boxShadow))
+        );
+      });
+    }
     if (stop.visits >= 3) {
       trapped = stop.at;
       break;

@@ -2,11 +2,25 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { renderKit } from '@/test/analyticsKit';
+import { appliedCss } from '@/test/css';
 import { BarList } from './BarList';
 import { ColumnBars } from './ColumnBars';
 import { formatR } from './format';
 
 describe('BarList', () => {
+  it('draws the centre line one pixel wide (a bare 1 is 100 % in sx and overflowed the card)', () => {
+    const { container } = renderKit(
+      <BarList
+        label="Months"
+        format={formatR}
+        rows={[{ id: 'a', label: 'Mar', state: { kind: 'value', value: 4.2 } }]}
+      />,
+    );
+    const widths = [...container.querySelectorAll('li [aria-hidden="true"] *')].map((el) => appliedCss(el).base);
+    expect(widths.some((css) => css.includes('width: 1px'))).toBe(true);
+    expect(widths.some((css) => /(^|[^-])width: 100%/.test(css) && css.includes('left: 50%'))).toBe(false);
+  });
+
   it('prints the figure as text and a state instead of a bar for a non-value', () => {
     const { container } = renderKit(
       <BarList

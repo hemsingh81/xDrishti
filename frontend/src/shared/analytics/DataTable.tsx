@@ -42,7 +42,8 @@ export function DataTable<Row>({ label, columns, rows, rowKey, status, evidence 
   const state: TableStatus | undefined = status ?? (rows.length === 0 ? { kind: 'empty' } : undefined);
   const rowHeader = columns.findIndex((c) => c.kind === 'text');
   return (
-    <Box>
+    // minWidth 0: inside a grid card the table scrolls in its own region instead of widening the card (reflow at 200% text).
+    <Box sx={{ minWidth: 0 }}>
       <TableContainer role="region" aria-label={`${label}, scrolls sideways`} tabIndex={0}>
         <Table size="small" aria-label={label} aria-busy={status?.kind === 'loading'}>
           <TableHead>
