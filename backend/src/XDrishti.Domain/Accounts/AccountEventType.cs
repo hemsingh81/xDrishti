@@ -77,4 +77,6 @@ public enum AccountEventType
     SecurityNamesLearned,
     TradesSuperseded,
     CapabilityChanged,
+    ExperimentJobStarted,
+    ExperimentJobCancelled,
 }

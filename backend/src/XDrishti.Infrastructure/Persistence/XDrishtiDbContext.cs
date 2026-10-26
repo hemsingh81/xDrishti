@@ -206,6 +206,7 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<ChargeSheetEventRecord> ChargeSheetEvents => Set<ChargeSheetEventRecord>();
     internal DbSet<CapabilityChangeRecord> CapabilityChanges => Set<CapabilityChangeRecord>();
+    internal DbSet<ExperimentJobRecord> ExperimentJobs => Set<ExperimentJobRecord>();
     internal DbSet<TicketAlertRecord> TicketAlerts => Set<TicketAlertRecord>();
     internal DbSet<TicketPromptRecord> TicketPrompts => Set<TicketPromptRecord>();
     internal DbSet<TicketNoticeAckRecord> TicketNoticeAcks => Set<TicketNoticeAckRecord>();

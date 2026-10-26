@@ -27,6 +27,12 @@ public static class LiveHubContract
     /// <summary>Client event <c>labRunFinished(LabRunFinished)</c> (spec P5-02, D5): the last event of a Lab run, with its final state.</summary>
     public const string LabRunFinishedEvent = "labRunFinished";
 
+    /// <summary>Client event <c>experimentProgress(ExperimentJobProgress)</c> (spec P8-18 Part B): a replay job entered a stage or advanced; at most four a second.</summary>
+    public const string ExperimentProgressEvent = "experimentProgress";
+
+    /// <summary>Client event <c>experimentFinished(ExperimentJobFinished)</c> (spec P8-18 Part B): the last event of a replay job, with its final state.</summary>
+    public const string ExperimentFinishedEvent = "experimentFinished";
+
     /// <summary>Most instruments in one <c>pricesChanged</c>.</summary>
     public const int MaxInstrumentsPerMessage = 500;
 

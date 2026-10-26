@@ -1,6 +1,6 @@
 # P8-18 — Tweak and re-run from the UI (start one replay job, judge it, never apply it)
 
-- **Status:** Approved (by the owner on 2026-10-26). Part A (the capability gate) built 2026-10-26; Part B (the job) is built in the second commit.
+- **Status:** Approved (by the owner on 2026-10-26). Built 2026-10-26: Part A (capability gate, ADR 0128) and Part B (the job, ADR 0129). Both capabilities are OFF after deploy.
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-18 of [P8-00](P8-00-reports-and-ui-plan.md) (Q3, Q1, Q2)
 - **Design refs:** docs/design/09-learning-engine.md §12 (tweak & re-run, five honesty rules) · 04 §3-§4 (control plane vs services, human in the loop) · 13 §1c · 17 §2 (`xd-api` hosts the background services) · 19 §4 (automation over-reach, overfitting through repeated experiments) · ADR 0072 (experiments), ADR 0058 (Lab runs: queue table, dispatcher, hub), ADR 0083/0091 (owner-only acts, fresh password, auto never the owner)
 - **Needs:** P6-11 (built: `RunExperimentHandler`, `research.experiments`), P5-02 (built: the queue/dispatcher/hub pattern), P3-10 (built: `IRunStore`), P8-03 (the Experiments tab that shows the result), P8-06 (the stored-run list for the baseline picker; until then a run key typed or pasted). An ADR at build time (next free ADR number at build time).
@@ -108,3 +108,15 @@ None blocking. Owner acts after the build: switching `experiments_ui` ON in `/ow
 - **A3 Audit.** One `AccountEventType.CapabilityChanged` row per real change (detail `name=<capability> on|off`, no reason, no password) beside the log row; a repeat writes neither. The two writes are two transactions (the log is the record; the event is the audit view): a failed event save leaves the log row, which the capability history shows.
 - **A4 Validation code.** `capabilities.invalid` is answered 422 and an unknown name 404 before any password check (safer: no password oracle).
 - **A5 Write-path guard.** `frontend/src/test/writePaths.test.ts` classifies every feature folder: the listed writers may write, every other folder (including a new one) may not.
+
+## Decisions at build (2026-10-26, Part B)
+- **B1 Baseline.** A stored run is replayable when its record (schema 6) rebuilds: the fill rules must rebuild to the stored text and the compiled definition hash must equal the baseline's (`ReplayPlanner`, no bar read). A baseline made with an exit override of a STORED strategy has a hash no version has: refused (`experiments.baseline_not_rebuildable`), never guessed (the safer option). A comparison has no run key; its members are ordinary stored runs and are accepted.
+- **B2 Knobs.** Exit parameters of the four policies whose parameters are one plain number (FIXED_RR, PARTIAL_BE, PARTIAL_TRAIL, ATR_TRAIL) and slippage upward; an exit read through a strategy parameter name uses the run's effective value; PYRAMID, the catalog trails and list parameters are not offered (safer).
+- **B3 Order of refusals.** Capability first (before the password: no lockout count, no password oracle), password, owner and input, baseline, rebuild proof, knob, one at a time, daily limit.
+- **B4 Identical input.** Returns the job while it is queued, running or SUCCEEDED (a failed or cancelled one may be started again and counts); this avoids a second replay for an experiment that is recorded already.
+- **B5 Hold-out.** Default 6 months, 0 to 120 accepted; the preview counts the folds the baseline's own trades fill (an upper bound: the candidate side is unknown before the replay).
+- **B6 Cancel and timeout.** Cancel needs the session and CSRF only and no capability (the safe direction). A timeout is the job's own clock (`TimeProvider`), so a test moves it.
+- **B7 Universe.** After the replay the candidate's instruments must equal the baseline's in order (a basket that changed fails the job `experiments.universe_changed`, nothing stored).
+- **B8 Database layers.** Insert trigger (capability on, state queued), update trigger (a final state is final, running never back to queued), partial unique index (one active), column-level UPDATE grant, no DELETE.
+- **B9 Report set.** `RunSelection` leaves out `created_by LIKE 'experiment:%'` runs with the note "experiment candidate" (decided in the spec's review fixes, not an owner question).
+- **B10 Approved writes.** `ApprovedReportWrites` names exactly the start and the cancel, so the P8 phase check keeps judging every other write under the guarded prefixes.

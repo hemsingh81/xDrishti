@@ -20,7 +20,7 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
     private const string RunsSql = """
         SELECT r.run_key, r.strategy_id, r.universe_kind, r.universe_label, r.instruments, r.instruments_run, r.from_date, r.to_date, r.costs_sheet_id,
                r.trade_count, r.open_at_end_count, r.created_at, s.style,
-               (SELECT t.basket_ids FROM research.sim_trades t WHERE t.run_id = r.id ORDER BY t.open_at_end, t.ordinal LIMIT 1) AS first_baskets, r.costs_rates_sha256
+               (SELECT t.basket_ids FROM research.sim_trades t WHERE t.run_id = r.id ORDER BY t.open_at_end, t.ordinal LIMIT 1) AS first_baskets, r.costs_rates_sha256, r.created_by LIKE 'experiment:%' AS experiment_candidate
         FROM research.sim_runs r
         LEFT JOIN lab.strategies s ON s.id = r.strategy_id
         ORDER BY r.created_at DESC, r.id DESC
@@ -79,7 +79,8 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
                 reader.GetInt32(9),
                 reader.GetInt32(10),
                 reader.GetFieldValue<DateTimeOffset>(11),
-                reader.IsDBNull(14) ? null : reader.GetString(14).Trim()));
+                reader.IsDBNull(14) ? null : reader.GetString(14).Trim(),
+                reader.GetBoolean(15)));
         }
 
         return runs.AsReadOnly();

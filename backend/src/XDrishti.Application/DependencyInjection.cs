@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Capabilities;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
@@ -21,6 +22,7 @@ using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
+using XDrishti.Application.Learning.Jobs;
 using XDrishti.Application.Live;
 using XDrishti.Application.Live.Push;
 using XDrishti.Application.Market.Actions;
@@ -476,6 +478,16 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetLedgerQuery, Result<LedgerView>>, GetLedgerHandler>(); // the test ledger (P5-03, ADR 0059)
         services.TryAddSingleton(LabSettings.Default); // the host replaces it with its configuration
         services.TryAddSingleton<ILabProgress, NullLabProgress>(); // the host that sends events replaces it
+
+        // Replay jobs started from the screen (P8-18 Part B, ADR 0129): the API's use cases; the executor and dispatcher are AddExperimentJobRunner, called by the host that runs them. The start needs the capability, which only the owner switches on.
+        services.TryAddSingleton(new ExperimentJobSettings()); // the host replaces it with its configuration
+        services.TryAddSingleton<IExperimentJobProgress, NullExperimentJobProgress>(); // the host that sends events replaces it
+        services.AddScoped<ReplayPlanner>();
+        services.AddScoped<IQueryHandler<GetExperimentPreviewQuery, Result<ExperimentPreviewView>>, GetExperimentPreviewHandler>();
+        services.AddScoped<ICommandHandler<StartExperimentJobCommand, StartedExperimentJob>, StartExperimentJobHandler>();
+        services.AddScoped<ICommandHandler<CancelExperimentJobCommand, ExperimentJobView>, CancelExperimentJobHandler>();
+        services.AddScoped<IQueryHandler<GetExperimentJobQuery, Result<ExperimentJobView>>, GetExperimentJobHandler>();
+        services.AddScoped<IQueryHandler<ListExperimentJobsQuery, Result<ExperimentJobList>>, ListExperimentJobsHandler>();
     }
 
     /// <summary>The executor and the dispatcher of Lab runs (P5-02): only the host that runs them (the API, ADR 0058) calls this; it also registers <see cref="IRunRecordWriter"/>.</summary>
@@ -485,6 +497,14 @@ public static class DependencyInjection
         services.AddScoped<LabRobustness>(); // the robustness checks of a robust run (P5-05, ADR 0062)
         services.AddScoped<LabFullTest>(); // the full test of a run (P5-04, ADR 0060)
         services.AddSingleton<LabRunDispatcher>();
+        return services;
+    }
+
+    /// <summary>The executor and the dispatcher of replay jobs (P8-18 Part B): only the host that runs them (the API) calls this; the host also registers <see cref="IRunRecordWriter"/>.</summary>
+    public static IServiceCollection AddExperimentJobRunner(this IServiceCollection services)
+    {
+        services.AddScoped<IExperimentJobExecutor, ExperimentJobRunner>();
+        services.AddSingleton<ExperimentJobDispatcher>();
         return services;
     }
 

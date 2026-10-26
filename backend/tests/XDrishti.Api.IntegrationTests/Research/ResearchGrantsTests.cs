@@ -100,7 +100,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             }
         }
 
-        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiments", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "training_sets"]);
+        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "training_sets"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -213,7 +213,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(18);
+        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(19);
     }
 
     [Fact]

@@ -5,6 +5,7 @@ using XDrishti.Api.Auth;
 using XDrishti.Api.Endpoints;
 using XDrishti.Api.Lab;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
@@ -17,6 +18,7 @@ using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
+using XDrishti.Application.Learning.Jobs;
 using XDrishti.Application.Live.Push;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
@@ -98,6 +100,12 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(CapabilitiesView))]
 [JsonSerializable(typeof(CapabilityChangeOutcome))]
 [JsonSerializable(typeof(ChangeCapabilityRequest))]
+[JsonSerializable(typeof(ExperimentPreviewView))]
+[JsonSerializable(typeof(ExperimentJobView))]
+[JsonSerializable(typeof(ExperimentJobList))]
+[JsonSerializable(typeof(StartExperimentRequest))]
+[JsonSerializable(typeof(ExperimentJobProgress))]
+[JsonSerializable(typeof(ExperimentJobFinished))]
 [JsonSerializable(typeof(PlanReviewView))]
 [JsonSerializable(typeof(ReviewDecisionOutcome))]
 [JsonSerializable(typeof(ApproveAllOutcome))]

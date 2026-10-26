@@ -257,8 +257,8 @@ public sealed class ReportsPhaseCheckTests
     }
 
     [Fact]
-    public void The_approved_write_list_is_empty_in_this_slice()
+    public void The_approved_write_list_is_the_start_and_the_cancel_of_the_replay_job_and_nothing_else()
     {
-        ApprovedReportWrites.All.ShouldBeEmpty();
+        ApprovedReportWrites.All.ShouldBe(["POST /api/experiments/", "POST /api/experiments/jobs/{id:guid}/cancel"]);
     }
 }

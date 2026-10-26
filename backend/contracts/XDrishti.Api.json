@@ -9195,6 +9195,85 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Start ONE replay job of a stored run with one entry-neutral knob changed (an exit parameter, or slippage upward); 202 with the job, or 200 with the existing job for the identical input. The result is judged by the experiment rules of ADR 0072 and is a proposal: nothing is applied. Needs a session, the CSRF token, the capability experiments_ui and the password in the body, checked on EVERY request. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid or experiments.knob_not_allowed or experiments.baseline_not_rebuildable, 404 learning.run_not_found, 409 experiments.job_active, 429 experiments.daily_limit or auth.rate_limited",
+        "operationId": "StartExperimentJob",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartExperimentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentJobView"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentJobView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/experiments/{id}": {
@@ -9228,6 +9307,191 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/preview": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "What starting a replay on a stored run would mean, before the owner clicks: the baseline, the knobs offered (exit parameters and slippage upward), the next trial number and the improvement it must show, the folds the data has and the best possible outcome (Inconclusive when fewer than 6), the measured replay time (not_evaluable until a job measured one), and the starts left today. Read only. 422 learning.invalid, 404 learning.run_not_found",
+        "operationId": "PreviewExperiment",
+        "parameters": [
+          {
+            "name": "baselineRunKey",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentPreviewView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/jobs": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The replay jobs, newest first (limit 1 to 200, default 20), with their state, stage, progress and the measured replay time. 422 learning.invalid",
+        "operationId": "ListExperimentJobs",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentJobList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/jobs/{id}": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "One replay job: state, stage, progress, the candidate run and the experiment it produced, the measured replay time with the instrument count and whether other heavy jobs ran, and the limits. 404 experiments.job_not_found",
+        "operationId": "GetExperimentJob",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentJobView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/jobs/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Stop a job: a queued one at once, a running one at its next safe point between instruments (nothing is stored, no ledger row, not a trial). Needs the session and the CSRF token; no password, because stopping is the safe direction. 202, 409 experiments.job_not_cancellable, 404 experiments.job_not_found",
+        "operationId": "CancelExperimentJob",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentJobView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -24028,6 +24292,380 @@
         },
         "description": "A stored exit choice for one cell. `Stable` is null when the record makes no statement, and `StabilityReason` says why."
       },
+      "ExperimentJobFinished": {
+        "required": [
+          "jobId",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "description": "Client event `experimentFinished`: the last event of a job, with its final state."
+      },
+      "ExperimentJobList": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExperimentJobView"
+            }
+          }
+        },
+        "description": "The jobs, newest first."
+      },
+      "ExperimentJobProgress": {
+        "required": [
+          "jobId",
+          "state",
+          "stage",
+          "done",
+          "total",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Client event `experimentProgress` (spec P8-18 Part B): a job entered a stage or advanced in it; at most four a second."
+      },
+      "ExperimentJobView": {
+        "required": [
+          "id",
+          "state",
+          "stage",
+          "done",
+          "total",
+          "baselineRunKey",
+          "knob",
+          "candidateRunKey",
+          "experimentId",
+          "errorCode",
+          "errorText",
+          "queuedAt",
+          "startedAt",
+          "finishedAt",
+          "replayMs",
+          "compareMs",
+          "instruments",
+          "otherHeavyJobsSeen",
+          "cancelRequested",
+          "timing",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "stage": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "done": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "baselineRunKey": {
+            "type": "string"
+          },
+          "knob": {
+            "$ref": "#/components/schemas/ExperimentKnobView"
+          },
+          "candidateRunKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "experimentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "errorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "errorText": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "queuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "replayMs": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "compareMs": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "instruments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "otherHeavyJobsSeen": {
+            "type": "boolean"
+          },
+          "cancelRequested": {
+            "type": "boolean"
+          },
+          "timing": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExperimentTimingView"
+              }
+            ]
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "A replay job as the screen shows it (spec P8-18 Part B)."
+      },
+      "ExperimentKnobRequest": {
+        "required": [
+          "kind",
+          "name",
+          "candidateValue"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`exit` or `slippage` (a `parameter` is refused)."
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The knob name from the preview, for example `FIXED_RR.rr` or `slippage.ticks`."
+          },
+          "candidateValue": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The new value.",
+            "format": "double"
+          }
+        },
+        "description": "The knob of a replay: exactly one thing changed."
+      },
+      "ExperimentKnobView": {
+        "required": [
+          "kind",
+          "name",
+          "baselineValue",
+          "candidateValue"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "baselineValue": {
+            "type": "string"
+          },
+          "candidateValue": {
+            "type": "string"
+          }
+        },
+        "description": "The knob of a job."
+      },
+      "ExperimentPreviewView": {
+        "required": [
+          "baseline",
+          "rebuildable",
+          "notRebuildableReason",
+          "knobs",
+          "nextTrial",
+          "requiredImprovementR",
+          "foldsAvailable",
+          "minFoldsForBetter",
+          "bestPossibleOutcome",
+          "bestPossibleSentence",
+          "replayEstimate",
+          "jobsToday",
+          "jobsPerDay",
+          "activeJobId",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/PreviewBaselineView"
+          },
+          "rebuildable": {
+            "type": "boolean"
+          },
+          "notRebuildableReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "knobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreviewKnobView"
+            }
+          },
+          "nextTrial": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requiredImprovementR": {
+            "type": "number",
+            "format": "double"
+          },
+          "foldsAvailable": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minFoldsForBetter": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bestPossibleOutcome": {
+            "type": "string"
+          },
+          "bestPossibleSentence": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "replayEstimate": {
+            "$ref": "#/components/schemas/PreviewEstimateView"
+          },
+          "jobsToday": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "jobsPerDay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeJobId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "What starting a replay on a baseline would mean, before the owner clicks (spec P8-18 criterion 12). Read only. Every look is a trial: the number it would be, the improvement it would have to show, the folds the data has and the best it can be called."
+      },
+      "ExperimentTimingView": {
+        "required": [
+          "text",
+          "targetStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The sentence."
+          },
+          "targetStatus": {
+            "type": "string",
+            "description": "`met` or `not_met` only at exactly 214 instruments, else `not_comparable`."
+          }
+        },
+        "description": "The replay time of a finished job, as it is printed (spec P8-18 criterion 10): measured on this machine, with the instrument count and whether other heavy jobs ran."
+      },
       "ExperimentView": {
         "required": [
           "id",
@@ -33631,6 +34269,44 @@
         },
         "description": "What a track action did. `Requested` distinct master-list instruments were asked to be tracked, `Added` of them are newly tracked (or tracked again), `AlreadyTracked` were; `NotInMaster` open holdings in scope\nare not in the instrument master (nothing to track), `Retired` instruments are no longer listed and were skipped. `TotalTracked` is the number tracked now. No job is started: `Hint` says the next <i>Update data</i> builds the bars."
       },
+      "PreviewBaselineView": {
+        "required": [
+          "strategyId",
+          "from",
+          "to",
+          "instruments",
+          "costed",
+          "exit"
+        ],
+        "type": "object",
+        "properties": {
+          "strategyId": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "instruments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "costed": {
+            "type": "boolean"
+          },
+          "exit": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The baseline a preview is about."
+      },
       "PreviewCsvFilesRequest": {
         "required": [
           "files"
@@ -33648,6 +34324,68 @@
           }
         },
         "description": "The files to preview: names from the folder listing, at most int PreviewCsvFilesHandler.MaxFiles."
+      },
+      "PreviewEstimateView": {
+        "required": [
+          "state",
+          "ms",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "`value` or `not_evaluable`."
+          },
+          "ms": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Milliseconds, for a value.",
+            "format": "int64"
+          },
+          "text": {
+            "type": "string",
+            "description": "The sentence."
+          }
+        },
+        "description": "The measured replay time the next job may be compared with: a value only after a job measured one."
+      },
+      "PreviewKnobView": {
+        "required": [
+          "kind",
+          "name",
+          "current",
+          "min",
+          "max",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "current": {
+            "type": "number",
+            "format": "double"
+          },
+          "min": {
+            "type": "number",
+            "format": "double"
+          },
+          "max": {
+            "type": "number",
+            "format": "double"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "description": "One knob of the form."
       },
       "PreviewRow": {
         "required": [
@@ -38481,6 +39219,59 @@
         },
         "description": "Starts a data job. `steps`: any of csv · dhan · aggregate · quality (default csv, dhan and aggregate; always run in that order); `forceCsv` loads CSV files again that were loaded already\nand have not changed; `refetchGaps` makes the Dhan phase also retry the sessions it gave up on (status `unfillable`); `csvFiles` (at most 214 names from the CSV folder, only with the csv step) loads only\nthose files, still skipping the ones that are unchanged unless `forceCsv` — a name the folder does not have, or a list that is empty, is `data.invalid` (400)."
       },
+      "StartExperimentRequest": {
+        "required": [
+          "baselineRunKey",
+          "knob",
+          "holdOutMonths",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "baselineRunKey": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The stored run to change one thing of (64 lower-case hex)."
+          },
+          "knob": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The one knob.",
+                "$ref": "#/components/schemas/ExperimentKnobRequest"
+              }
+            ]
+          },
+          "holdOutMonths": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Months kept out of the judgement (0 to 120, default 6).",
+            "format": "int32"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS start and checked on every request (an earlier step-up window does not count and is not used up)."
+          }
+        },
+        "description": "The body of a replay start. The owner is never part of it: the actor comes from the signed-in session."
+      },
       "StartLabRunRequest": {
         "type": "object",
         "properties": {
@@ -41581,6 +42372,8 @@
         "PricesChanged",
         "LabRunProgress",
         "LabRunFinished",
+        "ExperimentJobProgress",
+        "ExperimentJobFinished",
         "LiveFeedStatus"
       ],
       "methods": {
@@ -41610,6 +42403,12 @@
         },
         "labRunFinished": {
           "payload": "LabRunFinished"
+        },
+        "experimentProgress": {
+          "payload": "ExperimentJobProgress"
+        },
+        "experimentFinished": {
+          "payload": "ExperimentJobFinished"
         }
       },
       "limits": {

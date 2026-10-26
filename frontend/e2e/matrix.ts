@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { buildCompare, buildThinCompare, mountCompare } from '../src/test/compareFixtures';
 import { buildCounterfactual, buildJourney, journeyOf, mountJourney } from '../src/test/journeyFixtures';
 import { createCapabilitiesFake } from '../src/test/capabilitiesFake';
+import { buildJob, jobId, mountExperiments } from '../src/test/experimentsFake';
 import { createChargeSheetFake } from '../src/test/chargeSheetFake';
 import { lossTags, rule, smart } from '../src/test/evidenceFixtures';
 import { mountPaper } from '../src/test/paperFixtures';
@@ -145,6 +146,15 @@ export const screens: Screen[] = [
     mounts: {
       full: () => {
         server.use(...createCapabilitiesFake().handlers);
+      },
+    },
+  },
+  {
+    id: 'P8-18-experiment',
+    route: `/owner-acts/experiment?job=${jobId}`,
+    mounts: {
+      full: () => {
+        mountExperiments({ job: buildJob() });
       },
     },
   },

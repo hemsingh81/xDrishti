@@ -1,5 +1,7 @@
-import { Box } from '@mui/material';
+import { Box, Link } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { Link as RouterLink } from 'react-router';
+import { useCapability } from '@/features/owner-acts';
 import { NonValue, useUrlState } from '@/shared/analytics';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { experimentsQuery } from '../api/learningQueries';
@@ -14,8 +16,14 @@ export function ExperimentsTab() {
   const url = useUrlState();
   const open = parseId(url.text('experiment'));
   const query = useQuery(experimentsQuery);
+  const replay = useCapability('experiments_ui');
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 2 }}>
+      {replay.enabled && (
+        <Link component={RouterLink} to="/owner-acts/experiment">
+          Replay one change
+        </Link>
+      )}
       <Panel title="Experiments">
         {query.isPending && <LoadingState label="Loading the experiments…" />}
         {query.isError && <ErrorState error={query.error} />}

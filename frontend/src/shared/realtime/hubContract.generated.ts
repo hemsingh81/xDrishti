@@ -4,6 +4,8 @@
 // </auto-generated>
 import type { components } from '../api/schema';
 
+export type ExperimentJobFinished = components['schemas']['ExperimentJobFinished'];
+export type ExperimentJobProgress = components['schemas']['ExperimentJobProgress'];
 export type InstrumentPrice = components['schemas']['InstrumentPrice'];
 export type LabRunFinished = components['schemas']['LabRunFinished'];
 export type LabRunProgress = components['schemas']['LabRunProgress'];
@@ -22,6 +24,8 @@ export const eventsHub = {
     feedStatus: 'feedStatus',
     labRunProgress: 'labRunProgress',
     labRunFinished: 'labRunFinished',
+    experimentProgress: 'experimentProgress',
+    experimentFinished: 'experimentFinished',
   },
   limits: {
     maxInstrumentsPerMessage: 500,
@@ -43,4 +47,6 @@ export interface EventsHubEvents {
   feedStatus: (message: LiveFeedStatus) => void;
   labRunProgress: (message: LabRunProgress) => void;
   labRunFinished: (message: LabRunFinished) => void;
+  experimentProgress: (message: ExperimentJobProgress) => void;
+  experimentFinished: (message: ExperimentJobFinished) => void;
 }

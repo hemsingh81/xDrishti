@@ -399,6 +399,9 @@ if the system had stopped learning&quot;, on the same days and instruments.</p>
 <li>Next step after &quot;better&quot; is <strong>shadow</strong> (paper alongside live for 30 trades); <strong>Apply</strong> needs your password,
 is audited, and is monitored for 60 trades with <strong>automatic rollback</strong> if live results fall below the old version.</li>
 </ol>
+<blockquote>
+<p><strong>As built (P8-18).</strong> Only two of the knobs above are replays of the simulator: an exit parameter of a stored run and a slippage assumption (dearer only). They can be started from the Learning area, one job at a time and at most three a day, after the owner has switched the capability <code>experiments_ui</code> on (off by default) and typed the password again for that start. The job rebuilds the stored run&#39;s request with exactly one field changed, replays it by the existing simulation, stores the candidate run (<code>experiment:&lt;job&gt;</code>) and judges it with the rules above; the replay time is measured and printed with the instrument count. The result is a proposal: nothing is applied to a strategy, a plan, a cell, a model or a setting, and no screen has an apply control. Learning-side knobs stay out (they are not replays). On today&#39;s data (about 3 folds) every result is at best Inconclusive, and the screen says so before the start. <a href="../adr/0129-a-replay-job-started-from-the-screen-rebuilds-one-stored-run-with-one-field-changed-runs-the-existing-experiment-path-one-at-a-time-and-never-applies-anything.html">ADR 0129</a>.</p>
+</blockquote>
 <h2 id="13-autonomy-less-intervention-same-control">13. Autonomy: less intervention, same control<a class="hash" href="#13-autonomy-less-intervention-same-control" aria-label="Link to this section">#</a></h2>
 <blockquote>
 <p><strong>As built (P8-04).</strong> The Learning screen shows the autonomy switches, their history and the owner/auto approval counts read only; no control exists there (changing them needs a fresh password, P8-19).</p>
@@ -531,7 +534,7 @@ the last 100 trades, is flagged for review instead of being trusted blindly.</p>
     <a class="prev" href="08-exits-and-risk.html"><small>← Previous  [</small>08 · Exits &amp; risk</a>
     <a class="next" href="10-trade-selection.html"><small>Next  ] →</small>10 · Trade selection</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-26 15:36</footer>
+  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-26 16:38</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-four-layers" class="d2">1. Four layers</a>
 <a href="#2-validation-purged-walk-forward" class="d2">2. Validation: purged walk-forward</a>

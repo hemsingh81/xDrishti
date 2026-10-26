@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Live.Push;
 
@@ -24,6 +25,8 @@ internal static class HubContractDocument
         (nameof(PricesChanged), typeof(PricesChanged)),
         (nameof(LabRunProgress), typeof(LabRunProgress)),
         (nameof(LabRunFinished), typeof(LabRunFinished)),
+        (nameof(ExperimentJobProgress), typeof(ExperimentJobProgress)),
+        (nameof(ExperimentJobFinished), typeof(ExperimentJobFinished)),
     ];
 
     public static async Task AddAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
@@ -52,6 +55,8 @@ internal static class HubContractDocument
                     [LiveHubContract.FeedStatusEvent] = new JsonObject { ["payload"] = nameof(LiveFeedStatus) },
                     [LiveHubContract.LabRunProgressEvent] = new JsonObject { ["payload"] = nameof(LabRunProgress) },
                     [LiveHubContract.LabRunFinishedEvent] = new JsonObject { ["payload"] = nameof(LabRunFinished) },
+                    [LiveHubContract.ExperimentProgressEvent] = new JsonObject { ["payload"] = nameof(ExperimentJobProgress) },
+                    [LiveHubContract.ExperimentFinishedEvent] = new JsonObject { ["payload"] = nameof(ExperimentJobFinished) },
                 },
                 ["limits"] = new JsonObject
                 {

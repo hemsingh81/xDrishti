@@ -1104,9 +1104,9 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Tweak and re-run from the UI</strong> (starts a replay job). <strong>SAFETY (job start, writes): stops for the owner (Q3); never an apply button.</strong></td>
 <td>P8</td>
 <td>5 d</td>
-<td>Approved 2026-10-26; Part A (capability gate, <a href="../adr/0128-owner-act-capabilities-are-one-insert-only-log-with-a-generic-gate-by-name-off-by-default-and-switched-on-only-by-the-owner-with-a-fresh-password.html">ADR 0128</a>) built 2026-10-26, Part B (job) not built (SAFETY: settings default OFF, fresh password per UI write)</td>
+<td>Built 2026-10-26: Part A (capability gate, <a href="../adr/0128-owner-act-capabilities-are-one-insert-only-log-with-a-generic-gate-by-name-off-by-default-and-switched-on-only-by-the-owner-with-a-fresh-password.html">ADR 0128</a>) and Part B (replay job, <a href="../adr/0129-a-replay-job-started-from-the-screen-rebuilds-one-stored-run-with-one-field-changed-runs-the-existing-experiment-path-one-at-a-time-and-never-applies-anything.html">ADR 0129</a>) (SAFETY: settings default OFF, fresh password per UI write)</td>
 <td><a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
-<td>Not started before the owner&#39;s answer</td>
+<td>The owner switches <code>experiments_ui</code> on at /owner-acts; off after deploy</td>
 </tr>
 <tr>
 <td>P8-19</td>
@@ -1595,7 +1595,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-26 15:36</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-26 16:38</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

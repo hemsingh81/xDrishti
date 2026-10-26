@@ -64,6 +64,8 @@ function setup(failures = 0, ack: SubscribeAck = { subscribed: 2, truncated: fal
         },
         onLabRunProgress: () => undefined,
         onLabRunFinished: () => undefined,
+        onExperimentProgress: () => undefined,
+        onExperimentFinished: () => undefined,
         onClose: (handler) => {
           link.close = handler;
         },

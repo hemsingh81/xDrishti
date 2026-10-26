@@ -21,6 +21,7 @@ namespace XDrishti.Application.Abstractions.Reporting;
 /// <param name="ClosedTrades">Trades closed within the run window: the ones a report counts.</param>
 /// <param name="OpenAtEnd">Trades still open at the end of the data: never counted by a report.</param>
 /// <param name="CreatedAt">When the run was stored.</param>
+/// <param name="IsExperimentCandidate">The run was stored by a replay job of the Learning area (<c>created_by</c> is <c>experiment:&lt;job&gt;</c>, spec P8-18 D5): a stressed run that the default report set never picks up; it stays selectable by name.</param>
 /// <param name="CostsRatesSha256">The hash of the rates of the charge sheet the run was costed with (the sheet is overwritten in place, so the id alone does not say which rates); null for a gross run.</param>
 public sealed record ReportRunInfo(
     string RunKey,
@@ -38,7 +39,8 @@ public sealed record ReportRunInfo(
     int ClosedTrades,
     int OpenAtEnd,
     DateTimeOffset CreatedAt,
-    string? CostsRatesSha256 = null)
+    string? CostsRatesSha256 = null,
+    bool IsExperimentCandidate = false)
 {
     /// <summary>The run's trades carry net R (a charge sheet was applied).</summary>
     public bool Costed => CostsSheetId is not null;

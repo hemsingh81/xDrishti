@@ -118,6 +118,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Portfolio:BrokerHistory:Enabled", "false"); // first-start seed (ADR 0018): the trades and ledger service starts paused; tests use Sync now or run it themselves
         builder.UseSetting("Portfolio:BrokerHistory:CallSpacingMs", "0"); // no 250 ms between the calls to the fake Dhan
         builder.UseSetting("StrategyLab:RunWorker", "false"); // Lab runs are driven by the tests through LabRunDispatcher.DrainAsync
+        builder.UseSetting("Experiments:RunWorker", "false"); // replay jobs are driven by the tests through ExperimentJobDispatcher.DrainAsync
         builder.UseSetting("Data:CsvFolder", CsvFolder);
         builder.UseSetting("Auth:Owner:Email", OwnerEmail);
         builder.UseSetting("Auth:Owner:Name", OwnerName);

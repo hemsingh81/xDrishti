@@ -57,6 +57,8 @@ title shows the current screen.
 
 ## 1c. Reports experience
 
+> **As built (P8-18, P8-18 Part A).** The first writes of the web are owner acts behind switches that are all off by default (`/owner-acts`, one capability each, switched on only with the password; switched off without it). The Learning > Experiments tab shows a plain link to "Replay one change" when `experiments_ui` is on; that page is a lazy panel in the owner-acts feature (the only feature allowed to write, with `exports` later): it previews what a replay means (next trial number and required improvement, folds available, the best possible outcome, the measured replay time), starts one job after a fresh password, follows it by the hub (or by polling every 2 s), can cancel it, and prints the result card ending with "Nothing was changed. Applying a change is your own separate act." ([ADR 0128](../adr/0128-owner-act-capabilities-are-one-insert-only-log-with-a-generic-gate-by-name-off-by-default-and-switched-on-only-by-the-owner-with-a-fresh-password.md), [ADR 0129](../adr/0129-a-replay-job-started-from-the-screen-rebuilds-one-stored-run-with-one-field-changed-runs-the-existing-experiment-path-one-at-a-time-and-never-applies-anything.md)).
+
 - **Landing = Overview:** KPI tiles (trades, win rate, expectancy, total R & ₹, profit factor, max drawdown),
   **auto-insights** in plain sentences ([doc 15](15-smart-insights-and-automation.md) §6), equity & drawdown,
   monthly results, strategy × timeframe heatmap, expectancy by basket, R distribution, win rate by weekday.

@@ -107,7 +107,11 @@ export const routes: RouteObject[] = [
           {
             // Not in the sidebar: reached by the links of the screens whose write control a switch holds back.
             path: 'owner-acts',
-            lazy: async () => ({ Component: (await import('@/features/owner-acts')).OwnerActsPage }),
+            lazy: async () => ({ Component: await (await import('@/features/owner-acts')).loadOwnerActsPage() }),
+          },
+          {
+            path: 'owner-acts/experiment',
+            lazy: async () => ({ Component: await (await import('@/features/owner-acts')).loadExperimentPage() }),
           },
           { path: '*', element: <NotFoundPage /> },
         ],

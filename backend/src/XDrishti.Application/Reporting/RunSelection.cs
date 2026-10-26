@@ -11,12 +11,23 @@ internal static class RunSelection
     /// <summary>The rule, as text for the runs list.</summary>
     public const string RuleText = "For each strategy and universe the newest run; and only runs costed the same way as the newest run of all, so gross and net results are never mixed. Name the runs to choose differently.";
 
+    /// <summary>The note of a run stored by a replay job.</summary>
+    public const string CandidateNote = "experiment candidate: stored by a replay of the Learning area, left out of the default set; name it to read it";
+
     /// <summary>The default set and, for every run it leaves out, why.</summary>
     /// <param name="runs">Every stored run.</param>
     public static (IReadOnlyList<ReportRunInfo> Chosen, IReadOnlyDictionary<string, string> Notes) Default(IReadOnlyList<ReportRunInfo> runs)
     {
         ArgumentNullException.ThrowIfNull(runs);
         var notes = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        // A run stored by a replay job of the Learning area (P8-18, D5) is a stressed variant: it never becomes the default view, it stays selectable by name and is labelled.
+        foreach (var candidate in runs.Where(r => r.IsExperimentCandidate))
+        {
+            notes[candidate.RunKey] = CandidateNote;
+        }
+
+        runs = [.. runs.Where(r => !r.IsExperimentCandidate)];
         if (runs.Count == 0)
         {
             return ([], notes);

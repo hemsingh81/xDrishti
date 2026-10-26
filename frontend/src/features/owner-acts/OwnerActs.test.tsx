@@ -5,7 +5,8 @@ import type { ReactNode } from 'react';
 import { createCapabilitiesFake } from '@/test/capabilitiesFake';
 import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
-import { OwnerActsPage, useCapability } from '.';
+import { useCapability } from '.';
+import { OwnerActsPage } from './components/OwnerActsPage';
 
 function renderPage(options: Parameters<typeof createCapabilitiesFake>[0] = {}) {
   const fake = createCapabilitiesFake(options);

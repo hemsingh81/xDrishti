@@ -11,6 +11,8 @@ export {
 } from './eventsHub';
 export { eventsHub, type EventsHubEvents, type EventsHubServer } from './hubContract.generated';
 export type {
+  ExperimentJobFinished,
+  ExperimentJobProgress,
   InstrumentPrice,
   LabRunFinished,
   LabRunProgress,

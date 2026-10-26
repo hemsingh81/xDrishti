@@ -68,4 +68,19 @@ public sealed class RunSelectionTests
         forward.ShouldBe(backward);
         forward.Count.ShouldBe(2);
     }
+
+    [Fact]
+    public void A_run_stored_by_a_replay_job_never_joins_the_default_set_even_when_it_is_the_newest_and_says_it_is_an_experiment_candidate()
+    {
+        var baseline = Run('a', "ORB", "basket:b1", 0);
+        var candidate = Run('b', "ORB", "basket:b1", 5) with { IsExperimentCandidate = true };
+        var costedCandidate = Run('c', "ORB", "basket:b1", 9, sheet: "sheet-1") with { IsExperimentCandidate = true };
+
+        var (chosen, notes) = RunSelection.Default([baseline, candidate, costedCandidate]);
+
+        chosen.Select(r => r.RunKey).ShouldBe([baseline.RunKey]);
+        notes[candidate.RunKey].ShouldContain("experiment candidate");
+        notes[costedCandidate.RunKey].ShouldContain("experiment candidate"); // the newest run of all is not a candidate, so it cannot decide gross against net either
+        RunSelection.Default([candidate]).Chosen.ShouldBeEmpty();
+    }
 }

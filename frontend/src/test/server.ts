@@ -41,6 +41,8 @@ export const dhanRedirectUrl = 'http://localhost:8080/api/brokers/dhan/callback'
 /** Default API mocks (network level): a signed-in owner. Override per test with server.use(...). */
 export const handlers = [
   http.get('/api/auth/session', () => HttpResponse.json(buildSession())),
+  // Owner-act switches: none listed (every switch off); the owner-acts tests bring `createCapabilitiesFake`.
+  http.get('/api/capabilities', () => HttpResponse.json({ items: [], history: [] })),
   http.get('/api/system/status', () => HttpResponse.json(buildSystemStatus())),
   // Plans (P7-17): only the list, empty; a plan's own endpoints are never defaulted (see planFixtures).
   ...planHandlers,

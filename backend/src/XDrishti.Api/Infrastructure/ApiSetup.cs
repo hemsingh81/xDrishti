@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
 using Serilog;
 using XDrishti.Api.Auth;
@@ -16,8 +17,10 @@ using XDrishti.Api.Platform;
 using XDrishti.Api.Portfolio;
 using XDrishti.Application;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Learning.Jobs;
 using XDrishti.Application.Live.Push;
 using XDrishti.Strategies.Compilation;
 
@@ -92,6 +95,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, CellsEndpoints>();
         services.AddSingleton<IEndpointModule, ModelsEndpoints>();
         services.AddSingleton<IEndpointModule, ExperimentsEndpoints>();
+        services.AddSingleton<IEndpointModule, ExperimentJobsEndpoints>(); // the replay job started from the Learning area (P8-18 Part B, ADR 0129): capability off by default, fresh password, never applies
         services.AddSingleton<IEndpointModule, ChangelogEndpoints>();
         services.AddSingleton<IEndpointModule, AuditEndpoints>();
         services.AddSingleton<IEndpointModule, HypothesesEndpoints>();
@@ -130,6 +134,7 @@ internal static class ApiSetup
         services.AddHostedService(sp => new StrategyWarmupService(sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILogger<StrategyWarmupService>>(), CompilerWarmup.Run));
 
         services.AddLabRuns();
+        services.AddExperimentJobs();
         services.AddLiveHub();
         return services;
     }
@@ -145,6 +150,18 @@ internal static class ApiSetup
         services.AddSingleton<IRunRecordWriter, ExportRunRecordWriter>();
         services.Replace(ServiceDescriptor.Singleton<ILabProgress, HubLabProgress>());
         services.AddHostedService<LabRunService>();
+    }
+
+    /// <summary>
+    /// Replay jobs (P8-18 Part B, ADR 0129): the executor and dispatcher of the Application layer, run by a hosted service of this host, the hub as the progress port, and the <c>Experiments</c> section as settings (a value out of range stops the host at start).
+    /// </summary>
+    private static void AddExperimentJobs(this IServiceCollection services)
+    {
+        services.AddOptions<ExperimentJobSettings>().BindConfiguration(ExperimentJobSettings.Section).ValidateDataAnnotations().ValidateOnStart();
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ExperimentJobSettings>>().Value));
+        services.AddExperimentJobRunner();
+        services.Replace(ServiceDescriptor.Singleton<IExperimentJobProgress, HubExperimentProgress>());
+        services.AddHostedService<ExperimentJobService>();
     }
 
     /// <summary>

@@ -2751,7 +2751,8 @@ export interface paths {
     /** The recorded experiments (knob changes judged against a baseline run), newest first (limit 1 to 200, default 50): the knob, the outcome (Better, NotBetter, Inconclusive or CheaperAssumption), folds better of folds used, the improvement required after the trials, totals after the expected live gap, and the measured time of the comparison. Empty before the first experiment. 422 learning.invalid */
     get: operations['ListExperiments'];
     put?: never;
-    post?: never;
+    /** Start ONE replay job of a stored run with one entry-neutral knob changed (an exit parameter, or slippage upward); 202 with the job, or 200 with the existing job for the identical input. The result is judged by the experiment rules of ADR 0072 and is a proposal: nothing is applied. Needs a session, the CSRF token, the capability experiments_ui and the password in the body, checked on EVERY request. 403 capabilities.off, 401 auth.invalid_credentials, 423 auth.locked, 422 learning.invalid or experiments.knob_not_allowed or experiments.baseline_not_rebuildable, 404 learning.run_not_found, 409 experiments.job_active, 429 experiments.daily_limit or auth.rate_limited */
+    post: operations['StartExperimentJob'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2769,6 +2770,74 @@ export interface paths {
     get: operations['GetExperiment'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/experiments/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What starting a replay on a stored run would mean, before the owner clicks: the baseline, the knobs offered (exit parameters and slippage upward), the next trial number and the improvement it must show, the folds the data has and the best possible outcome (Inconclusive when fewer than 6), the measured replay time (not_evaluable until a job measured one), and the starts left today. Read only. 422 learning.invalid, 404 learning.run_not_found */
+    get: operations['PreviewExperiment'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/experiments/jobs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The replay jobs, newest first (limit 1 to 200, default 20), with their state, stage, progress and the measured replay time. 422 learning.invalid */
+    get: operations['ListExperimentJobs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/experiments/jobs/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One replay job: state, stage, progress, the candidate run and the experiment it produced, the measured replay time with the instrument count and whether other heavy jobs ran, and the limits. 404 experiments.job_not_found */
+    get: operations['GetExperimentJob'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/experiments/jobs/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Stop a job: a queued one at once, a running one at its next safe point between instruments (nothing is stored, no ledger row, not a trial). Needs the session and the CSRF token; no password, because stopping is the safe direction. 202, 409 experiments.job_not_cancellable, 404 experiments.job_not_found */
+    post: operations['CancelExperimentJob'];
     delete?: never;
     options?: never;
     head?: never;
@@ -7879,6 +7948,113 @@ export interface components {
        */
       minTrades: number;
     };
+    /** @description Client event `experimentFinished`: the last event of a job, with its final state. */
+    ExperimentJobFinished: {
+      /** Format: uuid */
+      jobId: string;
+      state: string;
+    };
+    /** @description The jobs, newest first. */
+    ExperimentJobList: {
+      items: components['schemas']['ExperimentJobView'][];
+    };
+    /** @description Client event `experimentProgress` (spec P8-18 Part B): a job entered a stage or advanced in it; at most four a second. */
+    ExperimentJobProgress: {
+      /** Format: uuid */
+      jobId: string;
+      state: string;
+      stage: string;
+      /** Format: int32 */
+      done: number;
+      /** Format: int32 */
+      total: number;
+      message: null | string;
+    };
+    /** @description A replay job as the screen shows it (spec P8-18 Part B). */
+    ExperimentJobView: {
+      /** Format: uuid */
+      id: string;
+      state: string;
+      stage: null | string;
+      /** Format: int32 */
+      done: number;
+      /** Format: int32 */
+      total: number;
+      baselineRunKey: string;
+      knob: components['schemas']['ExperimentKnobView'];
+      candidateRunKey: null | string;
+      /** Format: int64 */
+      experimentId: null | number;
+      errorCode: null | string;
+      errorText: null | string;
+      /** Format: date-time */
+      queuedAt: string;
+      /** Format: date-time */
+      startedAt: null | string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      /** Format: int64 */
+      replayMs: null | number;
+      /** Format: int64 */
+      compareMs: null | number;
+      /** Format: int32 */
+      instruments: number;
+      otherHeavyJobsSeen: boolean;
+      cancelRequested: boolean;
+      timing: null | components['schemas']['ExperimentTimingView'];
+      limits: string[];
+    };
+    /** @description The knob of a replay: exactly one thing changed. */
+    ExperimentKnobRequest: {
+      /** @description `exit` or `slippage` (a `parameter` is refused). */
+      kind: null | string;
+      /** @description The knob name from the preview, for example `FIXED_RR.rr` or `slippage.ticks`. */
+      name: null | string;
+      /**
+       * Format: double
+       * @description The new value.
+       */
+      candidateValue: null | number;
+    };
+    /** @description The knob of a job. */
+    ExperimentKnobView: {
+      kind: string;
+      name: string;
+      baselineValue: string;
+      candidateValue: string;
+    };
+    /** @description What starting a replay on a baseline would mean, before the owner clicks (spec P8-18 criterion 12). Read only. Every look is a trial: the number it would be, the improvement it would have to show, the folds the data has and the best it can be called. */
+    ExperimentPreviewView: {
+      baseline: components['schemas']['PreviewBaselineView'];
+      rebuildable: boolean;
+      notRebuildableReason: null | string;
+      knobs: components['schemas']['PreviewKnobView'][];
+      /** Format: int32 */
+      nextTrial: number;
+      /** Format: double */
+      requiredImprovementR: number;
+      /** Format: int32 */
+      foldsAvailable: number;
+      /** Format: int32 */
+      minFoldsForBetter: number;
+      bestPossibleOutcome: string;
+      bestPossibleSentence: null | string;
+      replayEstimate: components['schemas']['PreviewEstimateView'];
+      /** Format: int32 */
+      jobsToday: number;
+      /** Format: int32 */
+      jobsPerDay: number;
+      /** Format: uuid */
+      activeJobId: null | string;
+      limits: string[];
+    };
+    /** @description The replay time of a finished job, as it is printed (spec P8-18 criterion 10): measured on this machine, with the instrument count and whether other heavy jobs ran. */
+    ExperimentTimingView: {
+      /** @description The sentence. */
+      text: string;
+      /** @description `met` or `not_met` only at exactly 214 instruments, else `not_comparable`. */
+      targetStatus: string;
+    };
     /** @description An experiment as the API shows it (P6-11, ADR 0072). The report text and the parameters are empty in a list and filled for one experiment. */
     ExperimentView: {
       /**
@@ -11803,9 +11979,45 @@ export interface components {
       totalTracked: number;
       hint: string;
     };
+    /** @description The baseline a preview is about. */
+    PreviewBaselineView: {
+      strategyId: string;
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      /** Format: int32 */
+      instruments: number;
+      costed: boolean;
+      exit: null | string;
+    };
     /** @description The files to preview: names from the folder listing, at most int PreviewCsvFilesHandler.MaxFiles. */
     PreviewCsvFilesRequest: {
       files: null | string[];
+    };
+    /** @description The measured replay time the next job may be compared with: a value only after a job measured one. */
+    PreviewEstimateView: {
+      /** @description `value` or `not_evaluable`. */
+      state: string;
+      /**
+       * Format: int64
+       * @description Milliseconds, for a value.
+       */
+      ms: null | number;
+      /** @description The sentence. */
+      text: string;
+    };
+    /** @description One knob of the form. */
+    PreviewKnobView: {
+      kind: string;
+      name: string;
+      /** Format: double */
+      current: number;
+      /** Format: double */
+      min: number;
+      /** Format: double */
+      max: number;
+      note: string;
     };
     /**
      * @description A holding Dhan reports, for the first import in the portfolio settings. Key identifies it in the import request (the ISIN, otherwise "securityId:EXCHANGE").
@@ -13531,6 +13743,21 @@ export interface components {
       forceCsv?: null | boolean;
       refetchGaps?: null | boolean;
       csvFiles?: null | string[];
+    };
+    /** @description The body of a replay start. The owner is never part of it: the actor comes from the signed-in session. */
+    StartExperimentRequest: {
+      /** @description The stored run to change one thing of (64 lower-case hex). */
+      baselineRunKey: null | string;
+      knob: null | components['schemas']['ExperimentKnobRequest'];
+      /**
+       * Format: int32
+       * @description Months kept out of the judgement (0 to 120, default 6).
+       */
+      holdOutMonths: null | number;
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS start and checked on every request (an earlier step-up window does not count and is not used up). */
+      password: null | string;
     };
     /** @description Body of `POST /api/lab/runs` (spec P5-02): a stored strategy version (the latest when `version` is omitted), the universe, the method (`quick`) and optionally the window (default: the last year of stored data). */
     StartLabRunRequest: {
@@ -21354,6 +21581,75 @@ export interface operations {
       };
     };
   };
+  StartExperimentJob: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['StartExperimentRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExperimentJobView'];
+        };
+      };
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExperimentJobView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
   GetExperiment: {
     parameters: {
       query?: never;
@@ -21376,6 +21672,148 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  PreviewExperiment: {
+    parameters: {
+      query?: {
+        baselineRunKey?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExperimentPreviewView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListExperimentJobs: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExperimentJobList'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExperimentJob: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExperimentJobView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  CancelExperimentJob: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExperimentJobView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

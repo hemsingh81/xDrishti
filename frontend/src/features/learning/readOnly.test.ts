@@ -9,6 +9,33 @@ const sources = import.meta.glob<string>(['./**/*.{ts,tsx}', '!./**/*.test.{ts,t
   eager: true,
 });
 
+// P8-18: the one allowed import of another feature: the switch hook, to draw a plain link to the replay screen.
+const allowedImports = /^import \{ useCapability \} from '@\/features\/owner-acts';$/m;
+
+/** The text with the one allowed import taken out, then asked for any other feature import. */
+const otherFeatureImports = (text: string): string[] =>
+  text.replace(allowedImports, '').match(/@\/features\/[^'"]*/g) ?? [];
+
+describe('the allow-list holds exactly one import', () => {
+  it('lets the switch hook through', () => {
+    expect(otherFeatureImports("import { useCapability } from '@/features/owner-acts';")).toEqual([]);
+  });
+
+  it.each([
+    "import { OwnerActsPage } from '@/features/owner-acts';",
+    "import { useCapability, loadExperimentPage } from '@/features/owner-acts';",
+    "import { useCapability } from '@/features/owner-acts/api/capabilitiesApi';",
+    "import { ExportMenu } from '@/features/exports';",
+    "import { useCapability } from '@/features/lab';",
+  ])('refuses %s', (text) => {
+    expect(otherFeatureImports(text)).not.toEqual([]);
+  });
+
+  it('still finds a write call', () => {
+    expect(findWrites("api.POST('/api/experiments', {})")).not.toEqual([]);
+  });
+});
+
 describe('the Learning feature is read only', () => {
   const files = Object.entries(sources);
 
@@ -19,6 +46,6 @@ describe('the Learning feature is read only', () => {
 
   it.each(files)('%s has no write call and no mutation', (_name, text) => {
     expect(findWrites(text)).toEqual([]);
-    expect(text).not.toMatch(/@\/features\//);
+    expect(otherFeatureImports(text)).toEqual([]);
   });
 });

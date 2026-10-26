@@ -3411,6 +3411,169 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.ExperimentJobRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BaselineRunKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("baseline_run_key");
+
+                    b.Property<string>("BaselineValue")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("baseline_value");
+
+                    b.Property<bool>("CancelRequested")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("cancel_requested");
+
+                    b.Property<string>("CandidateRunKey")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("candidate_run_key");
+
+                    b.Property<string>("CandidateValue")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("candidate_value");
+
+                    b.Property<long?>("CompareMs")
+                        .HasColumnType("bigint")
+                        .HasColumnName("compare_ms");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("error_code");
+
+                    b.Property<string>("ErrorText")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("error_text");
+
+                    b.Property<long?>("ExperimentId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("experiment_id");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<int>("HoldOutMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("hold_out_months");
+
+                    b.Property<string>("Host")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("host");
+
+                    b.Property<int>("Instruments")
+                        .HasColumnType("integer")
+                        .HasColumnName("instruments");
+
+                    b.Property<string>("JobKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("job_key");
+
+                    b.Property<string>("KnobKind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("knob_kind");
+
+                    b.Property<string>("KnobName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("knob_name");
+
+                    b.Property<bool>("OtherHeavyJobsSeen")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("other_heavy_jobs_seen");
+
+                    b.Property<int>("ProgressDone")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("progress_done");
+
+                    b.Property<int>("ProgressTotal")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("progress_total");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<long?>("ReplayMs")
+                        .HasColumnType("bigint")
+                        .HasColumnName("replay_ms");
+
+                    b.Property<string>("Stage")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("stage");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_experiment_jobs");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_experiment_jobs_queued")
+                        .HasFilter("state = 'queued'");
+
+                    b.HasIndex("JobKey", "CreatedAt")
+                        .HasDatabaseName("ix_experiment_jobs_job_key");
+
+                    b.ToTable("experiment_jobs", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_experiment_jobs_progress", "progress_done >= 0 AND progress_total >= 0");
+
+                            t.HasCheckConstraint("ck_experiment_jobs_shape", "job_key ~ '^[0-9a-f]{64}$' AND baseline_run_key ~ '^[0-9a-f]{64}$' AND knob_kind IN ('exit', 'slippage') AND created_by LIKE 'owner:%' AND length(btrim(created_by)) > 6 AND length(btrim(reason)) > 0 AND hold_out_months BETWEEN 0 AND 120 AND instruments >= 1");
+
+                            t.HasCheckConstraint("ck_experiment_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed', 'cancelled', 'interrupted')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.ExperimentRecord", b =>
                 {
                     b.Property<long>("Id")

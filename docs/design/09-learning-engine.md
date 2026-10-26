@@ -239,6 +239,8 @@ Rules that keep experiments honest:
 6. Next step after "better" is **shadow** (paper alongside live for 30 trades); **Apply** needs your password,
    is audited, and is monitored for 60 trades with **automatic rollback** if live results fall below the old version.
 
+> **As built (P8-18).** Only two of the knobs above are replays of the simulator: an exit parameter of a stored run and a slippage assumption (dearer only). They can be started from the Learning area, one job at a time and at most three a day, after the owner has switched the capability `experiments_ui` on (off by default) and typed the password again for that start. The job rebuilds the stored run's request with exactly one field changed, replays it by the existing simulation, stores the candidate run (`experiment:<job>`) and judges it with the rules above; the replay time is measured and printed with the instrument count. The result is a proposal: nothing is applied to a strategy, a plan, a cell, a model or a setting, and no screen has an apply control. Learning-side knobs stay out (they are not replays). On today's data (about 3 folds) every result is at best Inconclusive, and the screen says so before the start. [ADR 0129](../adr/0129-a-replay-job-started-from-the-screen-rebuilds-one-stored-run-with-one-field-changed-runs-the-existing-experiment-path-one-at-a-time-and-never-applies-anything.md).
+
 ## 13. Autonomy: less intervention, same control
 
 > **As built (P8-04).** The Learning screen shows the autonomy switches, their history and the owner/auto approval counts read only; no control exists there (changing them needs a fresh password, P8-19).

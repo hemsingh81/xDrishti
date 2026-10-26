@@ -1,6 +1,8 @@
 import { act } from '@testing-library/react';
 import {
   setHubTransport,
+  type ExperimentJobFinished,
+  type ExperimentJobProgress,
   type HubTransport,
   type InstrumentPrice,
   type LabRunFinished,
@@ -44,6 +46,8 @@ export function createHubFake(behaviour: HubBehaviour = 'connect') {
   let statusHandler: ((message: LiveFeedStatus) => void) | undefined;
   let labProgressHandler: ((message: LabRunProgress) => void) | undefined;
   let labFinishedHandler: ((message: LabRunFinished) => void) | undefined;
+  let experimentProgressHandler: ((message: ExperimentJobProgress) => void) | undefined;
+  let experimentFinishedHandler: ((message: ExperimentJobFinished) => void) | undefined;
   let closeHandler: (() => void) | undefined;
   let alive = false;
 
@@ -108,6 +112,12 @@ export function createHubFake(behaviour: HubBehaviour = 'connect') {
         onLabRunFinished: (handler) => {
           labFinishedHandler = handler;
         },
+        onExperimentProgress: (handler) => {
+          experimentProgressHandler = handler;
+        },
+        onExperimentFinished: (handler) => {
+          experimentFinishedHandler = handler;
+        },
         onClose: (handler) => {
           closeHandler = handler;
         },
@@ -138,6 +148,18 @@ export function createHubFake(behaviour: HubBehaviour = 'connect') {
     labFinished: (message: LabRunFinished) => {
       act(() => {
         labFinishedHandler?.(message);
+      });
+    },
+    /** The server reports an experiment job's progress. */
+    experimentProgress: (message: ExperimentJobProgress) => {
+      act(() => {
+        experimentProgressHandler?.(message);
+      });
+    },
+    /** The server reports an experiment job's end. */
+    experimentFinished: (message: ExperimentJobFinished) => {
+      act(() => {
+        experimentFinishedHandler?.(message);
       });
     },
     /** The server (or the network) ends the connection. */

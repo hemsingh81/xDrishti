@@ -139,6 +139,9 @@ public static class DependencyInjection
         services.AddScoped<CapabilityLogStore>(); // the owner's switches of the capabilities, insert-only (P8-18 Part A, ADR 0128)
         services.AddScoped<ICapabilityLog>(sp => sp.GetRequiredService<CapabilityLogStore>());
         services.AddScoped<ICapabilityLogWriter>(sp => sp.GetRequiredService<CapabilityLogStore>());
+        services.AddScoped<IExperimentJobStore, ExperimentJobStore>(); // the replay jobs the owner started: table is the queue (P8-18 Part B, ADR 0129)
+        services.AddScoped<IHeavyJobProbe, LabHeavyJobProbe>();
+        services.AddScoped<IReplayStrategySource, StoredReplayStrategySource>();
         services.Replace(ServiceDescriptor.Scoped<ICostConfirmationFact, StoredCostConfirmation>()); // the paper statistics read the same stored confirmation; the Application default (NotConfirmed) stays the test default (P8-23)
         services.AddScoped<IExitSelectionStore, ExitSelectionStore>(); // the exit choices (spec P4-06)
         services.AddScoped<IStrategyStore, StrategyStore>(); // the stored strategies of the lab schema (spec P3-02d)

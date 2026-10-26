@@ -1,4 +1,7 @@
+import { leave, loadSignalrTransport, register } from './hubSupport';
 import type {
+  ExperimentJobFinished,
+  ExperimentJobProgress,
   LabRunFinished,
   LabRunProgress,
   LiveFeedStatus,
@@ -22,6 +25,8 @@ export interface HubTransport {
   onFeedStatus(handler: (message: LiveFeedStatus) => void): void;
   onLabRunProgress(handler: (message: LabRunProgress) => void): void;
   onLabRunFinished(handler: (message: LabRunFinished) => void): void;
+  onExperimentProgress(handler: (message: ExperimentJobProgress) => void): void;
+  onExperimentFinished(handler: (message: ExperimentJobFinished) => void): void;
   /** Called once when a started connection ends (the server closed it, the network was lost, the session ended). */
   onClose(handler: () => void): void;
 }
@@ -80,6 +85,8 @@ export class EventsHub {
   private readonly priceHandlers = new Set<(message: PricesChanged) => void>();
   private readonly labProgressHandlers = new Set<(message: LabRunProgress) => void>();
   private readonly labFinishedHandlers = new Set<(message: LabRunFinished) => void>();
+  private readonly experimentProgressHandlers = new Set<(message: ExperimentJobProgress) => void>();
+  private readonly experimentFinishedHandlers = new Set<(message: ExperimentJobFinished) => void>();
   private leases = 0;
   /** Grows with every open and close, so a late answer of an earlier connection is recognised and dropped. */
   private generation = 0;
@@ -109,14 +116,18 @@ export class EventsHub {
     return register(this.priceHandlers, handler);
   };
 
-  /** Adds a handler of `labRunProgress` / `labRunFinished`; returns the function that removes it. */
+  /** Adds a handler of `labRun…` / `experiment…` (P8-18) events; returns the function that removes it. */
   readonly onLabProgress = (handler: (message: LabRunProgress) => void): (() => void) => {
     return register(this.labProgressHandlers, handler);
   };
-
   readonly onLabFinished = (handler: (message: LabRunFinished) => void): (() => void) => {
     return register(this.labFinishedHandlers, handler);
   };
+
+  readonly onExperimentProgress = (handler: (message: ExperimentJobProgress) => void): (() => void) =>
+    register(this.experimentProgressHandlers, handler);
+  readonly onExperimentFinished = (handler: (message: ExperimentJobFinished) => void): (() => void) =>
+    register(this.experimentFinishedHandlers, handler);
 
   /** Asks for the connection; the returned function gives it back (call it once). */
   acquire(): () => void {
@@ -181,6 +192,14 @@ export class EventsHub {
       transport.onLabRunFinished((message) => {
         if (generation !== this.generation) return;
         for (const handler of this.labFinishedHandlers) handler(message);
+      });
+      transport.onExperimentProgress((message) => {
+        if (generation !== this.generation) return;
+        for (const handler of this.experimentProgressHandlers) handler(message);
+      });
+      transport.onExperimentFinished((message) => {
+        if (generation !== this.generation) return;
+        for (const handler of this.experimentFinishedHandlers) handler(message);
       });
       transport.onFeedStatus((status) => {
         if (generation === this.generation) this.set({ status });
@@ -283,35 +302,6 @@ export class EventsHub {
       if (generation === this.generation) this.sync();
     }, this.options.resubscribeMs);
   }
-}
-
-/** Adds a handler to a set; returns the function that removes it. */
-function register<T>(handlers: Set<T>, handler: T): () => void {
-  handlers.add(handler);
-  return () => {
-    handlers.delete(handler);
-  };
-}
-
-/** How long a connection that is being closed waits for the server to acknowledge `Unsubscribe`. */
-const leaveWaitMs = 1000;
-
-/** Tells the server the screen is leaving (when it was following something), then closes the connection; never throws. */
-async function leave(transport: HubTransport, following: boolean): Promise<void> {
-  try {
-    if (following) {
-      await Promise.race([transport.unsubscribe(), new Promise((resolve) => setTimeout(resolve, leaveWaitMs))]);
-    }
-  } catch {
-    // The connection may already be gone; closing it is all that is left.
-  }
-  await transport.stop().catch(() => undefined);
-}
-
-/** The library is loaded here, when the first screen asks for a connection (it ships with the Portfolio chunk). */
-async function loadSignalrTransport(): Promise<HubTransport> {
-  const { createSignalrTransport } = await import('./signalrTransport');
-  return createSignalrTransport();
 }
 
 let shared: EventsHub | undefined;
