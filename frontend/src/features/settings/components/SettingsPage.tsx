@@ -1,14 +1,19 @@
 import TuneIcon from '@mui/icons-material/TuneOutlined';
 import { Box, Tab, Tabs } from '@mui/material';
+import { lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router';
 import { RiskProfilesView, RoleMatrixView } from '@/features/accounts';
-import { PageHeader } from '@/shared/ui';
+import { LoadingState, PageHeader } from '@/shared/ui';
 import { ActionThresholdsCard } from './ActionThresholdsCard';
+
+// The owner's confirmation of the charge sheet loads on demand: the first load of Settings does not carry it.
+const ChargeSheetCard = lazy(() => import('./ChargeSheetCard'));
 
 const settingsTabs = [
   { key: 'profiles', label: 'Risk profiles' },
   { key: 'roles', label: 'Account roles' },
   { key: 'actions', label: 'Action center' },
+  { key: 'charge-sheet', label: 'Charge sheet' },
 ] as const;
 
 type SettingsTab = (typeof settingsTabs)[number]['key'];
@@ -16,7 +21,7 @@ type SettingsTab = (typeof settingsTabs)[number]['key'];
 const parseTab = (value: string | null): SettingsTab =>
   settingsTabs.find((tab) => tab.key === value)?.key ?? 'profiles';
 
-/** Settings shared across accounts: risk profiles, which account has which role and the Action center thresholds. The tab lives in the URL. */
+/** Settings shared across accounts: risk profiles, which account has which role and the Action center thresholds. in the URL. */
 export function SettingsPage() {
   const [params, setParams] = useSearchParams();
   const tab = parseTab(params.get('tab'));
@@ -48,6 +53,11 @@ export function SettingsPage() {
         {tab === 'profiles' && <RiskProfilesView />}
         {tab === 'roles' && <RoleMatrixView />}
         {tab === 'actions' && <ActionThresholdsCard />}
+        {tab === 'charge-sheet' && (
+          <Suspense fallback={<LoadingState label="Loading the confirmation" />}>
+            <ChargeSheetCard />
+          </Suspense>
+        )}
       </Box>
     </>
   );

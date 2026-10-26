@@ -1,6 +1,6 @@
 namespace XDrishti.Domain.Audit;
 
-/// <summary>The six insert-only stores the audit screen reads (spec P8-22, ADR 0117). The ordinal is part of the order and of the cursor: never reorder.</summary>
+/// <summary>The seven insert-only stores the audit screen reads (spec P8-22, ADR 0117). The ordinal is part of the order and of the cursor: never reorder.</summary>
 public enum AuditSource
 {
     Auth = 0,
@@ -9,12 +9,13 @@ public enum AuditSource
     Plan = 3,
     Autonomy = 4,
     Learning = 5,
+    ChargeSheet = 6,
 }
 
 /// <summary>The wire names of the sources.</summary>
 public static class AuditSources
 {
-    public static IReadOnlyList<AuditSource> All { get; } = [AuditSource.Auth, AuditSource.Account, AuditSource.Approval, AuditSource.Plan, AuditSource.Autonomy, AuditSource.Learning];
+    public static IReadOnlyList<AuditSource> All { get; } = [AuditSource.Auth, AuditSource.Account, AuditSource.Approval, AuditSource.Plan, AuditSource.Autonomy, AuditSource.Learning, AuditSource.ChargeSheet];
 
     public static string Code(AuditSource source) => source switch
     {
@@ -24,6 +25,7 @@ public static class AuditSources
         AuditSource.Plan => "plan",
         AuditSource.Autonomy => "autonomy",
         AuditSource.Learning => "learning",
+        AuditSource.ChargeSheet => "chargesheet",
         _ => throw new ArgumentOutOfRangeException(nameof(source)),
     };
 

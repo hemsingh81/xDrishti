@@ -20,7 +20,7 @@ internal sealed class AuditEndpoints : IEndpointModule
 
         audit.MapGet("/entries", ListAsync)
             .WithName("ListAuditEntries")
-            .WithSummary("The audit, newest first, merged from the sign-in, account, approval, plan, autonomy and learning records (limit 1 to 200, default 50; from/to India dates, default the last 30 days; source, category, kind, outcome, actor take comma lists; account; q 3 to 64 characters, matched against the redacted summary only). Cursor paging. A record that cannot be read is named in sources. 422 audit.invalid")
+            .WithSummary("The audit, newest first, merged from the sign-in, account, approval, plan, autonomy, learning and charge-sheet confirmation records (limit 1 to 200, default 50; from/to India dates, default the last 30 days; source, category, kind, outcome, actor take comma lists; account; q 3 to 64 characters, matched against the redacted summary only). Cursor paging. A record that cannot be read is named in sources. 422 audit.invalid")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         audit.MapGet("/entries/{id}", GetAsync)

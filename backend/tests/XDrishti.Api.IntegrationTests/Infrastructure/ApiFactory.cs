@@ -234,6 +234,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM trading.plan_events;
                 DELETE FROM workflow.approvals;
                 DELETE FROM workflow.autonomy_settings;
+                DELETE FROM workflow.charge_sheet_events;
                 DELETE FROM workflow.suggestion_seen;
                 DELETE FROM workflow.suggestions;
                 DELETE FROM trading.plan_item_allocations;

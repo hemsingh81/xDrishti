@@ -9384,7 +9384,7 @@
         "tags": [
           "Audit"
         ],
-        "summary": "The audit, newest first, merged from the sign-in, account, approval, plan, autonomy and learning records (limit 1 to 200, default 50; from/to India dates, default the last 30 days; source, category, kind, outcome, actor take comma lists; account; q 3 to 64 characters, matched against the redacted summary only). Cursor paging. A record that cannot be read is named in sources. 422 audit.invalid",
+        "summary": "The audit, newest first, merged from the sign-in, account, approval, plan, autonomy, learning and charge-sheet confirmation records (limit 1 to 200, default 50; from/to India dates, default the last 30 days; source, category, kind, outcome, actor take comma lists; account; q 3 to 64 characters, matched against the redacted summary only). Cursor paging. A record that cannot be read is named in sources. 422 audit.invalid",
         "operationId": "ListAuditEntries",
         "parameters": [
           {
@@ -11275,7 +11275,7 @@
         "tags": [
           "Reports"
         ],
-        "summary": "The stored simulation runs a report may use, newest first: strategy, universe, window, costed or gross, the style and exit labels and where they come from, closed and open-at-end trades, whether the default run set takes the run (and why not), and whether net figures are possible at all (unavailable with the reason until the owner has confirmed the stored charge sheet). Takes no parameter. Read only.",
+        "summary": "The stored simulation runs a report may use, newest first: strategy, universe, window, costed or gross, the style and exit labels and where they come from, closed and open-at-end trades, whether the default run set takes the run (and why not), and whether net figures are possible at all (unavailable with the reason until the owner has confirmed the stored charge sheet, on the Settings screen, tab Charge sheet). Takes no parameter. Read only.",
         "operationId": "ListReportRuns",
         "responses": {
           "200": {
@@ -12870,6 +12870,187 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/charge-sheet/confirmation": {
+      "get": {
+        "tags": [
+          "ChargeSheet"
+        ],
+        "summary": "What stands about the owner's confirmation of the charge sheet (not_confirmed, confirmed, stale, sheet_missing, revoked), whether confirming is switched on (off by default), a preview of the stored sheet (the one named by sheetId, else the one in force) with the rates hash a confirmation must carry, and the history. 400 chargesheet.sheet_invalid",
+        "operationId": "GetChargeSheetConfirmation",
+        "parameters": [
+          {
+            "name": "sheetId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeSheetStatusView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ChargeSheet"
+        ],
+        "summary": "Confirm ONE stored charge sheet as the owner, at the SHA-256 of its rates as shown; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY request. 401 auth.invalid_credentials, 423 auth.locked, 403 chargesheet.capability_off or chargesheet.owner_only, 404 chargesheet.sheet_not_found, 400 chargesheet.sheet_invalid, chargesheet.rates_invalid or chargesheet.reason_invalid, 409 chargesheet.rates_changed, 429 auth.rate_limited. Repeating the same confirmation writes nothing and answers changed=false",
+        "operationId": "ConfirmChargeSheet",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmChargeSheetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeSheetActOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/charge-sheet/confirmation/revoke": {
+      "post": {
+        "tags": [
+          "ChargeSheet"
+        ],
+        "summary": "Withdraw the confirmation in force as the owner; appends an audited row (a revoke never edits the confirmation it withdraws). Works also while confirming is switched off. Revoking when nothing is confirmed writes nothing and answers changed=false. Needs a session, the CSRF token and the password in the body, checked on EVERY request. 401 auth.invalid_credentials, 423 auth.locked, 400 chargesheet.reason_invalid, 429 auth.rate_limited",
+        "operationId": "RevokeChargeSheetConfirmation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeChargeSheetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeSheetActOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/charge-sheet/capability": {
+      "put": {
+        "tags": [
+          "ChargeSheet"
+        ],
+        "summary": "Switch on or off the capability to confirm a charge sheet (off by default; no setting confirms anything by itself). Appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY request. 401 auth.invalid_credentials, 423 auth.locked, 400 chargesheet.reason_invalid, 429 auth.rate_limited",
+        "operationId": "ChangeChargeSheetCapability",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeChargeSheetCapabilityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeSheetActOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
                 }
               }
             }
@@ -17363,6 +17544,35 @@
         },
         "description": "The body of the autonomy change. The owner is never part of it: the actor comes from the signed-in session."
       },
+      "ChangeChargeSheetCapabilityRequest": {
+        "required": [
+          "on",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean",
+            "description": "True to allow the owner to confirm a sheet, false to stop allowing it. Switching it off does not revoke a confirmation."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS act."
+          }
+        },
+        "description": "The body of the switch that allows confirming (off until the owner switches it on)."
+      },
       "ChangePasswordRequest": {
         "required": [
           "currentPassword",
@@ -17475,6 +17685,232 @@
           }
         },
         "description": "A changelog row as the API shows it (P6-08): what changed, by whom, why, before and after, and the evidence. A revert has long? ChangelogEntryView.RevertsId."
+      },
+      "ChargeSheetActOutcome": {
+        "required": [
+          "changed",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "boolean",
+            "description": "True when a row was written; false when the log already said the same."
+          },
+          "status": {
+            "description": "The status after the act.",
+            "$ref": "#/components/schemas/ChargeSheetStatusView"
+          }
+        },
+        "description": "What the act did, and what stands afterwards."
+      },
+      "ChargeSheetHistoryView": {
+        "required": [
+          "id",
+          "kind",
+          "sheetId",
+          "ratesSha256",
+          "actor",
+          "reason",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row.",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`confirm`, `revoke`, `gate_on` or `gate_off`."
+          },
+          "sheetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The sheet, for a confirmation or revoke."
+          },
+          "ratesSha256": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Its rates hash, for a confirmation or revoke."
+          },
+          "actor": {
+            "type": "string",
+            "description": "Who."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why."
+          },
+          "at": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          }
+        },
+        "description": "One act in the history."
+      },
+      "ChargeSheetInForceView": {
+        "required": [
+          "sheetId",
+          "ratesSha256",
+          "confirmedOn",
+          "actor",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "sheetId": {
+            "type": "string",
+            "description": "The sheet."
+          },
+          "ratesSha256": {
+            "type": "string",
+            "description": "The hash of its rates as confirmed."
+          },
+          "confirmedOn": {
+            "type": "string",
+            "description": "India date of the confirmation.",
+            "format": "date"
+          },
+          "actor": {
+            "type": "string",
+            "description": "Who."
+          },
+          "at": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          }
+        },
+        "description": "The confirmation that is the newest act on the confirmation."
+      },
+      "ChargeSheetPreviewView": {
+        "required": [
+          "id",
+          "label",
+          "source",
+          "checked",
+          "schedules",
+          "firstEffective",
+          "lastEffective",
+          "ratesSha256"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The id."
+          },
+          "label": {
+            "type": "string",
+            "description": "Its label."
+          },
+          "source": {
+            "type": "string",
+            "description": "Where its figures came from."
+          },
+          "checked": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What it was checked against; null means unchecked."
+          },
+          "schedules": {
+            "type": "integer",
+            "description": "How many dated schedules it has.",
+            "format": "int32"
+          },
+          "firstEffective": {
+            "type": "string",
+            "description": "The first schedule's start.",
+            "format": "date"
+          },
+          "lastEffective": {
+            "type": "string",
+            "description": "The last schedule's start.",
+            "format": "date"
+          },
+          "ratesSha256": {
+            "type": "string",
+            "description": "The SHA-256 of its rates now: what a confirmation must carry."
+          }
+        },
+        "description": "A stored sheet as the owner is asked to confirm it."
+      },
+      "ChargeSheetStatusView": {
+        "required": [
+          "capabilityOn",
+          "state",
+          "text",
+          "inForce",
+          "sheet",
+          "sheetNote",
+          "meaning",
+          "history"
+        ],
+        "type": "object",
+        "properties": {
+          "capabilityOn": {
+            "type": "boolean",
+            "description": "Whether the owner switched the capability to confirm on. OFF by default; nothing confirms while it is off."
+          },
+          "state": {
+            "type": "string",
+            "description": "`not_confirmed`, `confirmed`, `stale` (the stored sheet has other rates now), `sheet_missing` or `revoked`."
+          },
+          "text": {
+            "type": "string",
+            "description": "One sentence of what stands, as the reports will print it."
+          },
+          "inForce": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The newest confirmation (confirmed, stale or missing), or null.",
+                "$ref": "#/components/schemas/ChargeSheetInForceView"
+              }
+            ]
+          },
+          "sheet": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The stored sheet shown, or null.",
+                "$ref": "#/components/schemas/ChargeSheetPreviewView"
+              }
+            ]
+          },
+          "sheetNote": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why there is no sheet to show, or null."
+          },
+          "meaning": {
+            "type": "string",
+            "description": "What confirming means, and what it does not."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChargeSheetHistoryView"
+            },
+            "description": "The acts, newest first (the latest 20)."
+          }
+        },
+        "description": "What stands about the confirmation now (spec P8-23)."
       },
       "CheckConfirmationRequest": {
         "required": [
@@ -18230,6 +18666,46 @@
           }
         },
         "description": "The configuration now, its class rules, the last snapshot and the differences not yet captured (spec P10-05 criteria 10 and 11a). A preview: nothing is stored."
+      },
+      "ConfirmChargeSheetRequest": {
+        "required": [
+          "sheetId",
+          "ratesSha256",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "sheetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The stored sheet the owner confirms."
+          },
+          "ratesSha256": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The SHA-256 of its rates as the screen showed it; if the stored sheet has other rates now the answer is 409 `chargesheet.rates_changed`."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters (for example what the sheet was checked against)."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS act and checked on every request."
+          }
+        },
+        "description": "The body of a confirmation of one stored charge sheet. The owner is never part of it: the actor comes from the signed-in session. There is no flag that says \"confirmed\": the body names the sheet and the rates hash the owner was shown."
       },
       "ConnectStartView": {
         "required": [
@@ -36016,6 +36492,30 @@
         },
         "description": "One ticket on the review screen."
       },
+      "RevokeChargeSheetRequest": {
+        "required": [
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS act."
+          }
+        },
+        "description": "The body of a revocation: it withdraws the confirmation in force, whatever sheet that is."
+      },
       "RiskProfileInput": {
         "required": [
           "name",
@@ -40802,6 +41302,9 @@
     },
     {
       "name": "Autonomy"
+    },
+    {
+      "name": "ChargeSheet"
     },
     {
       "name": "Plan review"

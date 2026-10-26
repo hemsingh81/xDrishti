@@ -3,7 +3,6 @@ using XDrishti.Api.Auth;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
-using XDrishti.Domain.Checklist;
 
 namespace XDrishti.Api.Endpoints;
 
@@ -38,23 +37,14 @@ internal sealed class AutonomyEndpoints : IEndpointModule
         ICommandHandler<ChangeAutonomySettingsCommand, AutonomySettingsView> handler,
         CancellationToken cancellationToken)
     {
-        // A fresh password for this change: verified here with the sign-in lockout rules and audit, without opening or using the 5-minute step-up window.
-        var session = http.GetVerifiedSession();
-        if (session is null)
+        // A fresh password for this change, and the owner from the session (shared with the other owner acts).
+        var owner = await OwnerAct.AuthorizeAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
         {
-            return ProblemResults.From(AuthErrors.Unauthenticated, http);
+            return ProblemResults.From(owner.Error, http);
         }
 
-        var confirmed = await passwordCheck.HandleAsync(new StepUpCommand(session.SessionId, request.Password, http.GetClientInfo(), Elevate: false), cancellationToken);
-        if (confirmed.IsFailure)
-        {
-            return ProblemResults.From(confirmed.Error, http);
-        }
-
-        // The owner is the signed-in session's e-mail address; with no verified session there is no owner and the handler refuses.
-        var email = session.Info.User.Email;
-        var actor = string.IsNullOrWhiteSpace(email) ? string.Empty : OwnerConfirmation.OwnerPrefix + email;
-        var result = await handler.HandleAsync(new ChangeAutonomySettingsCommand(actor, request.Reason, request.AutoApproveTickets, request.PromoteFromReserve, request.MinPWin, request.MaxAutoPerDay), cancellationToken);
+        var result = await handler.HandleAsync(new ChangeAutonomySettingsCommand(owner.Value, request.Reason, request.AutoApproveTickets, request.PromoteFromReserve, request.MinPWin, request.MaxAutoPerDay), cancellationToken);
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 }

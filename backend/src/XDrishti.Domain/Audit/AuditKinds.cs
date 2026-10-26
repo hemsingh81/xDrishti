@@ -58,7 +58,7 @@ public static class AuditKinds
 
     public static IReadOnlyList<string> Outcomes { get; } = [Ok, Failed, Refused];
 
-    /// <summary>The kinds of the four stores whose rows carry no event name, and what they are called on screen.</summary>
+    /// <summary>The kinds of the five stores whose rows carry no event name, and what they are called on screen.</summary>
     public static IReadOnlyDictionary<string, (AuditSource Source, string Category, string Label)> Synthetic { get; } = new Dictionary<string, (AuditSource, string, string)>(StringComparer.Ordinal)
     {
         ["approval.approve"] = (AuditSource.Approval, PlanDecision, "Ticket approved"),
@@ -70,6 +70,10 @@ public static class AuditKinds
         ["learning.transition"] = (AuditSource.Learning, Learning, "Cell moved"),
         ["learning.designation"] = (AuditSource.Learning, Learning, "Model designated"),
         ["learning.revert"] = (AuditSource.Learning, Learning, "Move reverted"),
+        ["chargesheet.confirm"] = (AuditSource.ChargeSheet, Configuration, "Charge sheet confirmed"),
+        ["chargesheet.revoke"] = (AuditSource.ChargeSheet, Configuration, "Charge-sheet confirmation revoked"),
+        ["chargesheet.gate_on"] = (AuditSource.ChargeSheet, Configuration, "Charge-sheet confirmation switched on"),
+        ["chargesheet.gate_off"] = (AuditSource.ChargeSheet, Configuration, "Charge-sheet confirmation switched off"),
     };
 
     /// <summary>The category of a sign-in or security event; null for a value that has no row.</summary>

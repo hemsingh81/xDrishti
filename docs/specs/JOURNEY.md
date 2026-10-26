@@ -81,7 +81,7 @@ Suggested splits when a slice overruns (all 3 d or more): P8-06 (A spike, reader
 | P12-01 criterion 10 (grants) and `ExecSettingRegistry` home | amended in P12-01; P12-03 Soft-only rule amended in P12-03 | done in the files |
 | ADR 0033 deviations (open Q8), ISS-24 etc. | settled in P3-01d | owner may revert |
 
-Log event ids (existing code ends at 4801): P8-18 4900-4919, P8-19 4920-4939, P8-20 4940-4949, P11 5100-5159, P10 5200-5254, P9 6000-6199, P12 6600-6799; other P3/P7/P8 specs take the next free range at build and `LogEventIdTests` keeps them unique. ADR numbers are never reserved: "next free number at build time" (0102 onward: 0100 and 0101 are taken).
+Log event ids (existing code ends at 4801): P8-18 4900-4919, P8-19 4920-4939, P8-20 4940-4949, P8-23 4950-4952 (built), P11 5100-5159, P10 5200-5254, P9 6000-6199, P12 6600-6799; other P3/P7/P8 specs take the next free range at build and `LogEventIdTests` keeps them unique. ADR numbers are never reserved: "next free number at build time" (0102 onward: 0100 and 0101 are taken).
 
 ## 5. What only the owner can do (the specs cannot decide these)
 

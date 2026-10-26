@@ -178,6 +178,27 @@ internal sealed class LearningAuditSource(NpgsqlDataSource dataSource) : SqlAudi
     }
 }
 
+/// <summary><c>workflow.charge_sheet_events</c> (P8-23): the owner's confirmations and revocations of the charge sheet and the switch that allows confirming. The detail adds the sheet and the first 12 characters of the rates hash.</summary>
+internal sealed class ChargeSheetAuditSource(NpgsqlDataSource dataSource) : SqlAuditSource(dataSource)
+{
+    public override AuditSource Source => AuditSource.ChargeSheet;
+
+    protected override string Table => "workflow.charge_sheet_events";
+
+    protected override string TimeColumn => "created_at";
+
+    protected override string KindExpression => "'chargesheet.' || kind";
+
+    protected override string ListColumns => "id, created_at, 'chargesheet.' || kind, actor, NULL::uuid, NULL::bigint, NULL::bigint, COALESCE(sheet_id || ': ', '') || reason";
+
+    protected override string DetailColumns => ", sheet_id, left(rates_sha256, 12)";
+
+    protected override IReadOnlyList<AuditField> Fields(NpgsqlDataReader reader) =>
+    [
+        .. new[] { new AuditField("Charge sheet", Text(reader, 8) ?? string.Empty), new AuditField("Rates (first 12 of the SHA-256)", Text(reader, 9) ?? string.Empty) }.Where(f => f.Value.Length > 0),
+    ];
+}
+
 /// <summary>The names of accounts (<c>accounts.broker_accounts</c>: id and name only).</summary>
 internal sealed class AuditAccountNames(NpgsqlDataSource dataSource) : IAuditAccountNames
 {
@@ -213,6 +234,7 @@ internal static class AuditServiceCollectionExtensions
         services.AddScoped<IAuditSource, PlanAuditSource>();
         services.AddScoped<IAuditSource, AutonomyAuditSource>();
         services.AddScoped<IAuditSource, LearningAuditSource>();
+        services.AddScoped<IAuditSource, ChargeSheetAuditSource>();
         services.AddScoped<IAuditAccountNames, AuditAccountNames>();
         return services;
     }

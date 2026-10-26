@@ -6764,6 +6764,63 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("ticket_prompts", "trading");
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Reporting.ChargeSheetEventRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<DateOnly?>("ConfirmedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("confirmed_on");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("RatesSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("rates_sha256");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("SheetId")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("sheet_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_charge_sheet_events");
+
+                    b.HasIndex("Kind", "Id")
+                        .HasDatabaseName("ix_charge_sheet_events_kind_id");
+
+                    b.ToTable("charge_sheet_events", "workflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_charge_sheet_events_shape", "kind IN ('gate_on', 'gate_off', 'confirm', 'revoke') AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND length(btrim(reason)) > 0 AND ((kind IN ('gate_on', 'gate_off') AND sheet_id IS NULL AND rates_sha256 IS NULL AND confirmed_on IS NULL) OR (kind = 'confirm' AND sheet_id ~ '^[a-z0-9][a-z0-9._-]{0,39}$' AND sheet_id NOT LIKE 'test-%' AND rates_sha256 ~ '^[0-9a-f]{64}$' AND confirmed_on IS NOT NULL) OR (kind = 'revoke' AND sheet_id ~ '^[a-z0-9][a-z0-9._-]{0,39}$' AND rates_sha256 ~ '^[0-9a-f]{64}$' AND confirmed_on IS NULL))");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionFoldRow", b =>
                 {
                     b.Property<long>("SelectionId")

@@ -17,6 +17,7 @@ using XDrishti.Infrastructure.Market.Bars;
 using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Paper;
 using XDrishti.Infrastructure.Planning;
+using XDrishti.Infrastructure.Reporting;
 using XDrishti.Infrastructure.Research;
 
 namespace XDrishti.Infrastructure.Persistence;
@@ -201,6 +202,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<JournalFillRecord> JournalFills => Set<JournalFillRecord>();
     internal DbSet<FillGradeRecord> FillGrades => Set<FillGradeRecord>();
     internal DbSet<AutonomySettingRecord> AutonomySettings => Set<AutonomySettingRecord>();
+
+    internal DbSet<ChargeSheetEventRecord> ChargeSheetEvents => Set<ChargeSheetEventRecord>();
     internal DbSet<TicketAlertRecord> TicketAlerts => Set<TicketAlertRecord>();
     internal DbSet<TicketPromptRecord> TicketPrompts => Set<TicketPromptRecord>();
     internal DbSet<TicketNoticeAckRecord> TicketNoticeAcks => Set<TicketNoticeAckRecord>();

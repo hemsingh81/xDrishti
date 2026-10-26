@@ -107,6 +107,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, ReportsPhaseCheckEndpoints>(); // the P8 phase check (P8-17): one GET, computed on read
         services.AddSingleton<IEndpointCatalogue, EndpointCatalogue>(); // the route table for the phase check's read-only criterion
         services.AddSingleton<IEndpointModule, AutonomyEndpoints>();
+        services.AddSingleton<IEndpointModule, ChargeSheetEndpoints>(); // the owner's confirmation of the charge sheet (P8-23, ADR 0127)
         services.AddSingleton<IEndpointModule, PlanReviewEndpoints>(); // the owner's approve / modify / reject / approve-all of a plan (P7-10); session + CSRF, manual approval, no order
 
         // Instrument master (ADR 0010): the worker that carries out registered refreshes.

@@ -1145,6 +1145,15 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td>Filters; no secret in any row</td>
 </tr>
 <tr>
+<td>P8-23</td>
+<td><strong>Charge-sheet confirmation writer (SAFETY, owner act)</strong>: the owner confirms ONE stored sheet at the SHA-256 of its rates, with a fresh password per act, behind a capability that is OFF by default; insert-only log, revoke is a row, audit source, read endpoint, a lazy Settings tab; the reports and the paper comparison read it, so a net figure and a real MET of the paper check become reachable only with the owner&#39;s act.</td>
+<td>P8</td>
+<td>3 d</td>
+<td>Built 2026-10-26 (<a href="../adr/0127-the-owners-confirmation-of-the-charge-sheet-is-an-insert-only-log-written-only-by-the-owners-endpoint-after-a-fresh-password-bound-to-the-rates-hash-and-off-by-default.html">ADR 0127</a>); the owner&#39;s own act (switch on, confirm) is still to do</td>
+<td><a href="../specs/P8-23-charge-sheet-confirmation-writer.html">spec</a></td>
+<td>A report is net only after the owner&#39;s confirmation of the stored sheet at its current rates</td>
+</tr>
+<tr>
 <td>BK-01</td>
 <td><strong>Index basket catalogue, fetcher and versioned membership</strong> (adds <code>kind</code>/<code>system</code> to baskets; NSE index lists, forward-only dated membership). <strong>SAFETY (network fetch of NSE files; <code>Baskets:System:Fetch:Enabled</code> OFF until the owner reads the terms and records an ADR).</strong></td>
 <td>P1/P8 baskets</td>
@@ -1586,7 +1595,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-26 08:35</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-26 10:28</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

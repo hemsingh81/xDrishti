@@ -183,7 +183,7 @@ public static class PaperPhaseCheck
         var blockers = new List<string>();
         if (!facts.Exit.ChargeSheetConfirmed)
         {
-            blockers.Add("costs not confirmed: the owner's confirmation of the charge sheet is missing, and the slice that writes it is not built yet");
+            blockers.Add("costs not confirmed: the owner's confirmation of the charge sheet is missing or no longer stands (the owner's act: Settings, tab Charge sheet)");
         }
 
         if (verdict == No && facts.Counted.Count < RequiredTrades)
