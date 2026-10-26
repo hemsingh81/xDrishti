@@ -36,6 +36,7 @@
     "@mui/material": "9.4.0",
     "@tanstack/react-query": "5.104.1",
     "echarts": "6.1.0",
+    "lightweight-charts": "5.2.1",
     "monaco-editor": "0.57.0",
     "monaco-yaml": "5.5.1",
     "openapi-fetch": "0.17.0",
@@ -44,7 +45,9 @@
     "react-router": "8.4.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
     "@tanstack/react-query-devtools": "5.104.1",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
