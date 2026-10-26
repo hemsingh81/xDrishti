@@ -27,6 +27,9 @@ public interface IContextSettings
     /// <summary>The least share of the shares with a bar that must vote (<c>Data:Context:Breadth:MinShare</c>, default 0.5).</summary>
     double BreadthMinShare { get; }
 
+    /// <summary>The least share of the universe that must have a bar on the day for a breadth number (<c>Data:Context:Breadth:MinBarShare</c>, default 0.9): a partial load is <c>insufficient</c>, so it is recomputed inside the grace and never frozen.</summary>
+    double BreadthMinBarShare { get; }
+
     /// <summary>Sessions an <c>insufficient</c> breadth may still be recomputed after a late load of stock bars (<c>Data:Context:BreadthGraceSessions</c>, default 5).</summary>
     int BreadthGraceSessions { get; }
 }

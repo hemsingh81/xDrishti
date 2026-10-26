@@ -202,7 +202,7 @@ public sealed class DataOptionsTests
     {
         var options = new DataOptions();
 
-        (options.Context.Breadth.SmaSessions, options.Context.Breadth.MinVoters, options.Context.Breadth.MinShare, options.Context.BreadthGraceSessions).ShouldBe((20, 50, 0.5, 5));
+        (options.Context.Breadth.SmaSessions, options.Context.Breadth.MinVoters, options.Context.Breadth.MinShare, options.Context.BreadthGraceSessions, options.Context.Breadth.MinBarShare).ShouldBe((20, 50, 0.5, 5, 0.9));
         DataOptions.IsValid(options).ShouldBeTrue();
     }
 
@@ -220,5 +220,13 @@ public sealed class DataOptionsTests
         var context = new ContextDataOptions { BreadthGraceSessions = grace, Breadth = new BreadthDataOptions { SmaSessions = sma, MinVoters = voters, MinShare = share } };
 
         DataOptions.IsValid(new DataOptions { Context = context }).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(-0.1)]
+    [InlineData(1.1)]
+    public void A_bar_share_outside_zero_to_one_is_refused(double share)
+    {
+        DataOptions.IsValid(new DataOptions { Context = new ContextDataOptions { Breadth = new BreadthDataOptions { MinBarShare = share } } }).ShouldBeFalse();
     }
 }

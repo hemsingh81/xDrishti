@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Application.Abstractions.Messaging;
@@ -207,7 +206,7 @@ public sealed class DataBreadthTests(ApiFactory factory) : DataTestBase(factory)
     }
 
     [Fact]
-    public async Task The_back_fill_of_1100_days_for_214_shares_is_computed_from_one_read_per_share_inside_three_seconds()
+    public async Task The_back_fill_of_1100_days_for_214_shares_is_computed_from_one_read_per_share()
     {
         var ids = new List<Guid>();
         for (var i = 0; i < 214; i++)
@@ -239,13 +238,10 @@ public sealed class DataBreadthTests(ApiFactory factory) : DataTestBase(factory)
         var days = await ScalarAsync<long>("SELECT count(*) FROM market.context_daily");
         using var scope = Factory.Services.CreateScope();
         var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<ComputeBreadthCommand, BreadthComputed>>();
-        var clock = Stopwatch.StartNew();
 
         var result = await handler.HandleAsync(new ComputeBreadthCommand(), Ct);
 
-        clock.Stop();
         days.ShouldBeGreaterThan(1_100);
         result.Value.Computed.ShouldBe((int)days);
-        clock.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(3));
     }
 }

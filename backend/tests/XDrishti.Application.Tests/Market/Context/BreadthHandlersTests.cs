@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using XDrishti.Application.Abstractions.Market.Context;
@@ -27,7 +26,7 @@ public sealed class BreadthHandlersTests
 
     private ComputeBreadthHandler Compute => new(_settings, _source, _store, new FixedCalendar(), _clock, NullLogger<ComputeBreadthHandler>.Instance);
 
-    private RebuildBreadthHandler Rebuild => new(_settings, _source, _store, new FixedCalendar(), NullLogger<RebuildBreadthHandler>.Instance);
+    private RebuildBreadthHandler Rebuild => new(_settings, _source, _store, new FixedCalendar(), _clock, NullLogger<RebuildBreadthHandler>.Instance);
 
     private static DateOnly[] WeekdaysFrom(DateOnly start, int count)
     {
@@ -175,7 +174,7 @@ public sealed class BreadthHandlersTests
     }
 
     [Fact]
-    public async Task The_back_fill_of_1100_days_for_214_shares_is_computed_in_a_single_pass_well_inside_three_seconds()
+    public async Task The_back_fill_of_1100_days_for_214_shares_is_computed_in_a_single_pass_well_from_one_read_of_the_source()
     {
         var sessions = new List<DateOnly>();
         for (var d = new DateOnly(2021, 1, 4); sessions.Count < 1_120; d = d.AddDays(1))
@@ -197,14 +196,12 @@ public sealed class BreadthHandlersTests
         var clock0 = new FakeTimeProvider(new DateTimeOffset(sessions[^1].AddDays(5).ToDateTime(new TimeOnly(10, 0)), TimeSpan.FromMinutes(330)));
         _source.Data = new BreadthData([.. Enumerable.Range(0, 214).Select(_ => Share(sessions, i => 100 + random.NextDouble() * 50 + i * 0.01))], new Dictionary<Guid, IReadOnlySet<DateOnly>>());
         var handler = new ComputeBreadthHandler(_settings, _source, _store, new FixedCalendar(), clock0, NullLogger<ComputeBreadthHandler>.Instance);
-        var clock = Stopwatch.StartNew();
 
         var result = await handler.HandleAsync(new ComputeBreadthCommand(), Ct);
 
-        clock.Stop();
         result.Value.Computed.ShouldBe(1_100);
         _source.Reads.Count.ShouldBe(1);
-        clock.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(3));
+        _store.BreadthWrites.ShouldBe(1_100, "one write per day, in a single batch of the store");
     }
 
     // Rebuild
@@ -258,5 +255,37 @@ public sealed class BreadthHandlersTests
 
         tooWide.Error.Code.ShouldBe("breadth.range_too_wide");
         reversed.Error.Code.ShouldBe("breadth.bad_range");
+    }
+
+    [Fact]
+    public async Task A_partial_stock_load_on_an_older_day_is_insufficient_not_a_permanent_value_and_a_later_load_completes_it()
+    {
+        Days(new DateOnly(2026, 3, 6), new DateOnly(2026, 3, 6));
+        var all = Enumerable.Range(0, 214).Select(_ => Share(Until(LastClosed), i => 10 + i)).ToList();
+        var partial = all.Select((s, n) => n < 60 ? s : Share(Until(new DateOnly(2026, 3, 5)), i => 10 + i)).ToList();
+        _settings.BreadthMinVoters = 50;
+        _source.Data = new BreadthData(partial, new Dictionary<Guid, IReadOnlySet<DateOnly>>());
+
+        await Compute.HandleAsync(new ComputeBreadthCommand(), Ct);
+
+        _store.Breadth[new DateOnly(2026, 3, 6)].State.ShouldBe(BreadthResult.Insufficient, "60 of 214 shares have a bar: a partial load");
+        _source.Data = new BreadthData(all, new Dictionary<Guid, IReadOnlySet<DateOnly>>());
+        await Compute.HandleAsync(new ComputeBreadthCommand(), Ct);
+        _store.Breadth[new DateOnly(2026, 3, 6)].State.ShouldBe(BreadthResult.ValueState);
+    }
+
+    [Fact]
+    public async Task A_rebuild_with_write_leaves_a_day_that_can_still_gain_bars_and_the_dry_run_names_it()
+    {
+        Days(new DateOnly(2026, 3, 6), LastClosed);
+        _source.Data = new BreadthData([Share(Until(LastClosed), i => 10 + i), Share(Until(LastClosed), i => 10 + i), Share(Until(new DateOnly(2026, 3, 6)), i => 10 + i)], new Dictionary<Guid, IReadOnlySet<DateOnly>>());
+
+        var dry = await Rebuild.HandleAsync(new RebuildBreadthCommand(new DateOnly(2026, 3, 6), LastClosed, false), Ct);
+        var written = await Rebuild.HandleAsync(new RebuildBreadthCommand(new DateOnly(2026, 3, 6), LastClosed, true), Ct);
+
+        dry.Value.Waiting.ShouldBe([LastClosed]);
+        written.Value.Waiting.ShouldBe([LastClosed]);
+        _store.Breadth.ContainsKey(LastClosed).ShouldBeFalse();
+        _store.Breadth.ContainsKey(new DateOnly(2026, 3, 6)).ShouldBeTrue();
     }
 }

@@ -51,7 +51,7 @@ internal sealed class ComputeBreadthHandler(
             return Result.Success(new BreadthComputed(0, 0, 0, NoShares));
         }
 
-        var options = new BreadthOptions(sma, settings.BreadthMinVoters, settings.BreadthMinShare);
+        var options = new BreadthOptions(sma, settings.BreadthMinVoters, settings.BreadthMinShare, settings.BreadthMinBarShare);
         var writes = new List<BreadthWrite>();
         var pending = 0;
         var insufficient = 0;

@@ -1,4 +1,3 @@
-using System.Globalization;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
@@ -94,10 +93,6 @@ internal sealed class GetContextCoverageHandler(
             rows.Count - computed.Count,
             thin.Count,
             [.. thin.TakeLast(MaxSkippedListed)],
-            BreadthLabel(latest?.Universe));
+            BreadthWording.Label(latest?.Universe));
     }
-
-    /// <summary>What the figure is, wherever it is shown (never "market breadth").</summary>
-    public static string BreadthLabel(int? universe) =>
-        universe is { } n ? string.Create(CultureInfo.InvariantCulture, $"breadth of your {n} tracked shares (members as of today), not of the market") : "breadth of your tracked shares (members as of today), not of the market";
 }

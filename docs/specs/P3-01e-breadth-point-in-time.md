@@ -82,3 +82,9 @@ None. (Owner acts that change the data: tracking more shares; running the Dhan p
 - **Back-fill** reads once per share from the window of the oldest pending day (the daily run reads only what its oldest pending day needs, and nothing when no day is pending) and computes each day from dictionary lookups, not a rolling sum; 1,100 days for 214 shares run well inside 3 s on the integration database (asserted).
 - **Test settings.** The integration host sets `Data:Context:Breadth:MinVoters` to 3 (the product default 50 is unit-tested); nothing else in a host changes.
 - `docs/site` was not rebuilt in this commit (the generated site was being edited by another session); run `scripts/build-docs.sh` when it is clean.
+
+## Review fixes 2026-10-27 (build)
+- **Partial stock load.** New `Data:Context:Breadth:MinBarShare` (default 0.9, 0 to 1): a day on which fewer than that share of the whole universe has a bar is `insufficient` whatever the voters, so inside `BreadthGraceSessions` it is recomputed when the rest of the bars arrive instead of becoming a permanent `value`. Together with the wait for the last closed session this closes the partial-load path. Test: 60 of 214 shares with a bar on a day older than the last closed one is stored `insufficient`, then `value` after a full load.
+- **Rebuild.** `--write` skips days that can still gain bars (the last closed session while a share lacks its bar), as the daily run does; both the dry run and the write list them as warnings.
+- **Timing.** The two wall-clock `< 3 s` assertions are gone; the tests assert one read of the source and one write per day. The speed itself is traced by the test duration.
+- **One wording.** `BreadthWording.Label` / `Note` (Domain) is the only builder of "breadth of your N tracked shares ...", used by the coverage and the plan note.

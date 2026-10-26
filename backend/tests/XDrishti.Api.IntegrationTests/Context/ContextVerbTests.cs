@@ -160,7 +160,7 @@ public sealed class ContextVerbTests
     [Fact]
     public async Task Rebuild_breadth_prints_each_changed_day_with_the_old_and_the_new_figure_and_passes_the_range_and_the_write_flag()
     {
-        var rebuild = new FixedRebuild(Result.Success(new BreadthRebuilt(3, false, [new BreadthChange(new DateOnly(2026, 3, 4), 40.0, "value", 60, 55.5, "value", 61, 214), new BreadthChange(new DateOnly(2026, 3, 5), null, null, null, null, "insufficient", 12, 214)], null)));
+        var rebuild = new FixedRebuild(Result.Success(new BreadthRebuilt(3, false, [new BreadthChange(new DateOnly(2026, 3, 4), 40.0, "value", 60, 55.5, "value", 61, 214), new BreadthChange(new DateOnly(2026, 3, 5), null, null, null, null, "insufficient", 12, 214)], null, [new DateOnly(2026, 3, 6)])));
 
         var (exit, output, _) = await RunAsync(["rebuild-breadth", "--from", "2026-03-04", "--to", "2026-03-06"], rebuild: rebuild);
 
@@ -170,6 +170,7 @@ public sealed class ContextVerbTests
         output.ShouldContain("days that would change: 2");
         output.ShouldContain("  2026-03-04 old 40.0 (60 voters) new 55.5 (61 voters)");
         output.ShouldContain("  2026-03-05 old none new insufficient (12 voters)");
+        output.ShouldContain("warning: 2026-03-06 can still gain bars");
         output.ShouldContain("not of the market");
     }
 

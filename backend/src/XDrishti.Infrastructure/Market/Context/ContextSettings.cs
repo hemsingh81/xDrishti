@@ -26,5 +26,7 @@ internal sealed class ContextSettings(IOptions<DataOptions> options) : IContextS
 
     public double BreadthMinShare => options.Value.Context.Breadth.MinShare;
 
+    public double BreadthMinBarShare => options.Value.Context.Breadth.MinBarShare;
+
     public int BreadthGraceSessions => options.Value.Context.BreadthGraceSessions;
 }

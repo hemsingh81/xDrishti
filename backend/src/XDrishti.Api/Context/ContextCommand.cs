@@ -102,6 +102,11 @@ internal static class ContextCommand
             output.Append("missing: ").Append(done.Missing).Append(" - track shares on the Instruments screen and run Update data\n");
         }
 
+        foreach (var date in done.Waiting ?? [])
+        {
+            output.Append("warning: ").Append(date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).Append(" can still gain bars (a share has no bar yet); it is not rebuilt, the daily run sets it once the day is older\n");
+        }
+
         Line(output, "days looked at", done.Days);
         Line(output, "days " + (done.Written ? "changed" : "that would change"), done.Changes.Count);
         foreach (var change in done.Changes)

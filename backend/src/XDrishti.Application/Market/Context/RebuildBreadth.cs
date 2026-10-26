@@ -15,14 +15,15 @@ public sealed record RebuildBreadthCommand(DateOnly From, DateOnly To, bool Writ
 /// <summary>One day whose breadth differs from the stored one: the old figure (null when it had none) and the new.</summary>
 public sealed record BreadthChange(DateOnly Date, double? OldValue, string? OldState, int? OldVoters, double? NewValue, string NewState, int NewVoters, int NewUniverse);
 
-/// <summary>What a rebuild looked at and changed; <paramref name="Written"/> is false for a dry run.</summary>
-public sealed record BreadthRebuilt(int Days, bool Written, IReadOnlyList<BreadthChange> Changes, string? Missing);
+/// <summary>What a rebuild looked at and changed; <paramref name="Written"/> is false for a dry run. <paramref name="Waiting"/> are days that can still gain bars (the last closed session while a share lacks its bar): never written, as in the daily run.</summary>
+public sealed record BreadthRebuilt(int Days, bool Written, IReadOnlyList<BreadthChange> Changes, string? Missing, IReadOnlyList<DateOnly>? Waiting = null);
 
 internal sealed class RebuildBreadthHandler(
     IContextSettings settings,
     IBreadthSource source,
     IContextDayStore store,
     ITradingCalendar tradingCalendar,
+    TimeProvider clock,
     ILogger<RebuildBreadthHandler> logger) : ICommandHandler<RebuildBreadthCommand, BreadthRebuilt>
 {
     public const int MaxSessions = 400;
@@ -59,12 +60,20 @@ internal sealed class RebuildBreadthHandler(
             return Result.Success(new BreadthRebuilt(days.Count, command.Write, [], ComputeBreadthHandler.NoShares));
         }
 
-        var options = new BreadthOptions(sma, settings.BreadthMinVoters, settings.BreadthMinShare);
+        var options = new BreadthOptions(sma, settings.BreadthMinVoters, settings.BreadthMinShare, settings.BreadthMinBarShare);
         var changes = new List<BreadthChange>();
         var writes = new List<BreadthWrite>();
+        var waiting = new List<DateOnly>();
+        var lastClosed = calendar.LastClosedSession(clock.GetUtcNow());
         foreach (var row in days)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (row.Date >= lastClosed && !data.Shares.All(s => s.Closes.ContainsKey(row.Date)))
+            {
+                waiting.Add(row.Date); // can still gain bars: not rebuilt, as the daily run leaves it
+                continue;
+            }
+
             var result = BreadthCalculator.Compute(row.Date, sessions, data.Shares, data.ExDates, options);
             if (row.State is not null && ComputeBreadthHandler.Same(row, result))
             {
@@ -81,6 +90,6 @@ internal sealed class RebuildBreadthHandler(
         }
 
         ContextLog.BreadthRebuilt(logger, days.Count, changes.Count, command.Write);
-        return Result.Success(new BreadthRebuilt(days.Count, command.Write, changes, null));
+        return Result.Success(new BreadthRebuilt(days.Count, command.Write, changes, null, waiting));
     }
 }

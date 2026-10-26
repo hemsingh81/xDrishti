@@ -73,7 +73,7 @@ public static class BreadthCalculator
             }
         }
 
-        var enough = voters > 0 && voters >= options.MinVoters && voters >= options.MinShare * withBar;
+        var enough = voters > 0 && withBar >= options.MinBarShare * shares.Count && voters >= options.MinVoters && voters >= options.MinShare * withBar;
         return new BreadthResult(
             enough ? 100.0 * above / voters : null,
             voters,

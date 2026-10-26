@@ -282,4 +282,13 @@ public sealed class BreadthCalculatorTests
         (after.Value, after.Voters).ShouldBe((before.Value, before.Voters));
         (after.Universe, after.Excluded).ShouldBe((before.Universe + 1, before.Excluded + 1));
     }
+
+    [Fact]
+    public void A_day_where_too_few_of_all_the_shares_have_a_bar_is_a_partial_load_and_insufficient()
+    {
+        var shares = Enumerable.Range(0, 10).Select(i => i < 6 ? Share(Guid.NewGuid(), Up) : Share(Guid.NewGuid(), Up.Take(19))).ToList();
+
+        BreadthCalculator.Compute(D, Sessions, shares, NoActions, new BreadthOptions(20, 2, 0.5, 0.6)).State.ShouldBe(BreadthResult.ValueState);
+        BreadthCalculator.Compute(D, Sessions, shares, NoActions, new BreadthOptions(20, 2, 0.5, 0.61)).State.ShouldBe(BreadthResult.Insufficient);
+    }
 }

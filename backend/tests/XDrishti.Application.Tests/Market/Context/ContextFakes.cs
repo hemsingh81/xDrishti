@@ -23,6 +23,8 @@ internal sealed class FakeContextSettings : IContextSettings
 
     public double BreadthMinShare { get; set; } = 0.5;
 
+    public double BreadthMinBarShare { get; set; } = 0.9;
+
     public int BreadthGraceSessions { get; set; } = 5;
 }
 
