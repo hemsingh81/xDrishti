@@ -28,7 +28,11 @@ function Summary({ draft }: { draft: Draft }) {
     <Alert severity="success">
       {draftWords.confirmed} {draft.confirmed.strategyId} version {draft.confirmed.version}
       {draft.confirmed.edited ? ' (you edited the text)' : ''}.
-      {draft.confirmed.labRunId === null ? ' No quick test was started.' : ` ${draftWords.quickTest}`}
+      {draft.confirmed.runError !== null
+        ? ` The quick test could not be started (${draft.confirmed.runError}); the version is stored. Start a test from the Lab.`
+        : draft.confirmed.labRunId === null
+          ? ' No quick test was started.'
+          : ` ${draftWords.quickTest}`}
       {run && (
         <Box component="span" sx={{ display: 'block' }}>
           Quick test {run.state}

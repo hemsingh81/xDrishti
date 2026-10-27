@@ -6464,6 +6464,11 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("lab_run_id");
 
+                    b.Property<string>("RunError")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("run_error");
+
                     b.Property<long?>("SettingsId")
                         .HasColumnType("bigint")
                         .HasColumnName("settings_id");

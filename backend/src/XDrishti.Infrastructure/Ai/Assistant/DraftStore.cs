@@ -73,15 +73,49 @@ internal sealed class DraftStore(NpgsqlDataSource dataSource) : IDraftStore
         return (int)(await select.ExecuteScalarAsync(cancellationToken))!;
     }
 
+    public async ValueTask<IAsyncDisposable> LockConfirmAsync(CancellationToken cancellationToken)
+    {
+        var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        try
+        {
+            await using var take = new NpgsqlCommand("SELECT pg_advisory_lock(hashtextextended('ai.strategy_draft_confirm', 0))", connection);
+            await take.ExecuteNonQueryAsync(cancellationToken);
+            return new ConfirmLock(connection);
+        }
+#pragma warning disable CA1031 // the connection must be given back whatever failed
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
+    }
+
+    private sealed class ConfirmLock(NpgsqlConnection connection) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await using var release = new NpgsqlCommand("SELECT pg_advisory_unlock(hashtextextended('ai.strategy_draft_confirm', 0))", connection);
+                await release.ExecuteNonQueryAsync(CancellationToken.None);
+            }
+            finally
+            {
+                await connection.DisposeAsync();
+            }
+        }
+    }
+
     public async ValueTask<StoredDraftDecision?> DecisionAsync(long draftId, CancellationToken cancellationToken)
     {
-        await using var select = dataSource.CreateCommand("SELECT draft_id, decision, strategy_id, strategy_version, lab_run_id, edited, auto, actor, decided_at FROM ai.strategy_draft_decisions WHERE draft_id = @id");
+        await using var select = dataSource.CreateCommand("SELECT draft_id, decision, strategy_id, strategy_version, lab_run_id, edited, auto, actor, decided_at, run_error FROM ai.strategy_draft_decisions WHERE draft_id = @id");
         select.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, draftId);
         await using var reader = await select.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
             ? new StoredDraftDecision(
                 reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetInt32(3), reader.IsDBNull(4) ? null : reader.GetGuid(4), reader.GetBoolean(5), reader.GetBoolean(6), reader.GetString(7),
-                reader.GetFieldValue<DateTimeOffset>(8))
+                reader.GetFieldValue<DateTimeOffset>(8), reader.IsDBNull(9) ? null : reader.GetString(9))
             : null;
     }
 
@@ -89,8 +123,8 @@ internal sealed class DraftStore(NpgsqlDataSource dataSource) : IDraftStore
     {
         ArgumentNullException.ThrowIfNull(decision);
         await using var insert = dataSource.CreateCommand("""
-            INSERT INTO ai.strategy_draft_decisions (draft_id, decision, strategy_id, strategy_version, lab_run_id, edited, auto, settings_id, snapshot_hash, actor)
-            VALUES (@draft, @decision, @strategy, @version, @run, @edited, @auto, @settings, @hash, @actor)
+            INSERT INTO ai.strategy_draft_decisions (draft_id, decision, strategy_id, strategy_version, lab_run_id, edited, auto, settings_id, snapshot_hash, actor, run_error)
+            VALUES (@draft, @decision, @strategy, @version, @run, @edited, @auto, @settings, @hash, @actor, @runerror)
             ON CONFLICT (draft_id) DO NOTHING
             """);
         var p = insert.Parameters;
@@ -104,6 +138,7 @@ internal sealed class DraftStore(NpgsqlDataSource dataSource) : IDraftStore
         p.AddWithValue("settings", NpgsqlDbType.Bigint, (object?)decision.SettingsId ?? DBNull.Value);
         p.AddWithValue("hash", NpgsqlDbType.Char, (object?)decision.SnapshotHash ?? DBNull.Value);
         p.AddWithValue("actor", NpgsqlDbType.Varchar, decision.Actor);
+        p.AddWithValue("runerror", NpgsqlDbType.Varchar, (object?)decision.RunError ?? DBNull.Value);
         var created = await insert.ExecuteNonQueryAsync(cancellationToken) == 1;
         var stored = await DecisionAsync(decision.DraftId, cancellationToken) ?? throw new InvalidOperationException("The decision was not found after it was stored.");
         return (stored, created);

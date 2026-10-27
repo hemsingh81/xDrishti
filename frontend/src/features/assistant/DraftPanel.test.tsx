@@ -208,6 +208,24 @@ describe('the draft panel', () => {
     expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
   });
 
+  it('says why a requested quick test did not start', async () => {
+    await open(
+      draftBuilder({
+        status: 'confirmed',
+        confirmed: {
+          strategyId: 'DRAFT_X',
+          version: 1,
+          labRunId: null,
+          edited: false,
+          auto: false,
+          runError: 'lab.no_data',
+        },
+      }),
+    );
+
+    expect(screen.getByText(/could not be started \(lab\.no_data\)/)).toBeInTheDocument();
+  });
+
   it('starts a draft from the idea box and refuses an idea that is too short', async () => {
     let sent: unknown = null;
     server.use(

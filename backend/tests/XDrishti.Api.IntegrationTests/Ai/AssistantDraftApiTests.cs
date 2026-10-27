@@ -248,6 +248,37 @@ public sealed class AssistantDraftApiTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task Two_concurrent_confirms_of_one_draft_store_one_version_and_two_drafts_with_one_id_cannot_both_confirm()
+    {
+        await SettingsAsync(enabled: true, allowConfirm: true);
+        var (host, model) = NewHost(enabled: true);
+        using var _ = host;
+        var (client, password) = await SignedInAsync(host);
+        var id = NewId();
+        for (var i = 0; i < 3; i++)
+        {
+            model.Script(new ModelTextPart(Answer(id)), new ModelFinishPart("stop", 100, 50));
+        }
+
+        var one = await StartAsync(client, host);
+        var two = await StartAsync(client, host);
+        var three = await StartAsync(client, host);
+        Task<HttpResponseMessage> Confirm(long draft) => client.PostAsJsonAsync(new Uri($"/api/assistant/strategy-drafts/{draft}/confirm", UriKind.Relative), new { run = false, password }, Ct);
+
+        var same = await Task.WhenAll(Confirm(one), Confirm(one));
+        var other = await Task.WhenAll(Confirm(two), Confirm(three));
+
+        same.ShouldAllBe(r => r.StatusCode == HttpStatusCode.OK);
+        other.Select(r => r.StatusCode).Order().ShouldBe([HttpStatusCode.Conflict, HttpStatusCode.Conflict]);
+        (await CountAsync("lab.strategy_versions", $"strategy_id = '{id}'")).ShouldBe(1);
+        (await CountAsync("ai.strategy_draft_decisions", $"draft_id IN ({one}, {two}, {three})")).ShouldBe(1);
+        foreach (var r in same.Concat(other))
+        {
+            r.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task A_quick_test_that_cannot_start_still_leaves_the_stored_version_and_a_text_the_owner_edited_is_what_is_stored()
     {
         await SettingsAsync(enabled: true, allowConfirm: true);
@@ -265,6 +296,7 @@ public sealed class AssistantDraftApiTests(ApiFactory factory)
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         json.GetProperty("confirmed").GetProperty("edited").GetBoolean().ShouldBeTrue();
         json.GetProperty("confirmed").GetProperty("labRunId").ValueKind.ShouldBe(JsonValueKind.Null);
+        json.GetProperty("confirmed").GetProperty("runError").GetString().ShouldStartWith("lab.");
         (await CountAsync("lab.strategy_versions", $"strategy_id = '{id}' AND note = 'Assistant draft {draftId}; confirmed by owner' AND source_text LIKE '%rr: 3%'")).ShouldBe(1);
     }
 

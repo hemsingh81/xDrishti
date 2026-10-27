@@ -24,6 +24,13 @@ internal sealed class ChangeAssistantSettingsHandler(
         var autoQuick = command.AutoLabQuickTest ?? current.AutoLabQuickTest;
         var proposalAccept = command.AllowProposalAccept ?? current.AllowProposalAccept;
         var autoHypothesis = command.AutoAcceptHypothesis ?? current.AutoAcceptHypothesis;
+        // Until slice 07b and P9-08 exist these switches do nothing; storing true would let the owner believe an auto option is active. Turning them off stays allowed.
+        if ((autoQuick && !current.AutoLabQuickTest) || (proposalAccept && !current.AllowProposalAccept) || (autoHypothesis && !current.AutoAcceptHypothesis))
+        {
+            AssistantLog.Refused(logger, "assistant.setting_not_available");
+            return Result.Failure<AssistantStatusView>(Error.Validation("assistant.setting_not_available", "This switch is not available yet: nothing is built behind it, so it cannot be turned on."));
+        }
+
         var change = AssistantSettingsChange.Create(command.Actor, command.Reason, command.Enabled, command.PortfolioContext, command.MaxToolCalls, draftConfirm, autoQuick, proposalAccept, autoHypothesis);
         if (change.IsFailure)
         {

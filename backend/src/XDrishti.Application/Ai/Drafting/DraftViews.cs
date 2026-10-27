@@ -5,7 +5,7 @@ using XDrishti.Domain.Lab;
 
 namespace XDrishti.Application.Ai.Drafting;
 
-/// <summary>What the owner's confirm made: the stored version, the quick test (or why it did not start) and whether the owner edited the text.</summary>
+/// <summary>What the owner's confirm made: the stored version, the quick test and whether the owner edited the text. <c>RunError</c> is the code of the refusal when a requested quick test could not start (the version is stored anyway).</summary>
 public sealed record DraftConfirmed(string StrategyId, int Version, Guid? LabRunId, bool Edited, bool Auto, string? RunError);
 
 /// <summary>The deterministic summary of the linked quick test (spec P9-07 AC 9): counts and the run's own labels, never a win rate, expectancy or verdict.</summary>
@@ -42,7 +42,7 @@ public sealed record DraftView(
         ArgumentNullException.ThrowIfNull(d);
         var answer = d.Answer;
         var status = decision is null ? d.Status : decision.Decision == "confirmed" ? DraftStatus.Confirmed : DraftStatus.Discarded;
-        var confirmed = decision is { Decision: "confirmed" } c ? new DraftConfirmed(c.StrategyId ?? string.Empty, c.StrategyVersion ?? 0, c.LabRunId, c.Edited, c.Auto, c.LabRunId is null ? "not_started" : null) : null;
+        var confirmed = decision is { Decision: "confirmed" } c ? new DraftConfirmed(c.StrategyId ?? string.Empty, c.StrategyVersion ?? 0, c.LabRunId, c.Edited, c.Auto, c.RunError) : null;
         return new DraftView(
             d.Id, status, d.Idea, answer?.Understood ?? [], answer?.Assumptions ?? [], answer?.NotExpressed ?? [], answer?.Unsupported ?? [], answer?.RequestedTest ?? DraftRequestedTest.None, d.Yaml, d.Problems, d.Findings,
             d.Attempts.Count, d.ModelId, d.PromptVersion, d.FailReason, confirmed, run is null ? null : Summary(run), d.CreatedAt);

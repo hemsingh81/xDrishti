@@ -25,5 +25,7 @@ internal sealed class AiStrategyDraftDecisionRecord
 
     public string Actor { get; set; } = string.Empty;
 
+    public string? RunError { get; set; }
+
     public DateTimeOffset DecidedAt { get; set; }
 }

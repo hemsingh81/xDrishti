@@ -177,8 +177,10 @@ internal sealed class DraftRig
         }
     }
 
-    public sealed class FakeDraftStore : IDraftStore
+    public sealed class FakeDraftStore : IDraftStore, IDisposable
     {
+        public void Dispose() => _lock.Dispose();
+
         public Dictionary<long, StoredDraft> Drafts { get; } = [];
 
         public Dictionary<long, StoredDraftDecision> Decisions { get; } = [];
@@ -201,6 +203,23 @@ internal sealed class DraftRig
 
         public ValueTask<int> CountBetweenAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) => ValueTask.FromResult(TodayCount);
 
+        private readonly SemaphoreSlim _lock = new(1, 1);
+
+        public async ValueTask<IAsyncDisposable> LockConfirmAsync(CancellationToken cancellationToken)
+        {
+            await _lock.WaitAsync(cancellationToken);
+            return new Release(_lock);
+        }
+
+        private sealed class Release(SemaphoreSlim slot) : IAsyncDisposable
+        {
+            public ValueTask DisposeAsync()
+            {
+                slot.Release();
+                return ValueTask.CompletedTask;
+            }
+        }
+
         public ValueTask<StoredDraftDecision?> DecisionAsync(long draftId, CancellationToken cancellationToken) => ValueTask.FromResult(Decisions.GetValueOrDefault(draftId));
 
         public ValueTask<(StoredDraftDecision Decision, bool Created)> InsertDecisionAsync(NewDraftDecision d, CancellationToken cancellationToken)
@@ -210,7 +229,7 @@ internal sealed class DraftRig
                 return ValueTask.FromResult((existing, false));
             }
 
-            var row = new StoredDraftDecision(d.DraftId, d.Decision, d.StrategyId, d.StrategyVersion, d.LabRunId, d.Edited, d.Auto, d.Actor, DateTimeOffset.UnixEpoch);
+            var row = new StoredDraftDecision(d.DraftId, d.Decision, d.StrategyId, d.StrategyVersion, d.LabRunId, d.Edited, d.Auto, d.Actor, DateTimeOffset.UnixEpoch, d.RunError);
             Decisions[d.DraftId] = row;
             return ValueTask.FromResult((row, true));
         }

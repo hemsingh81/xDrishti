@@ -349,8 +349,25 @@ public sealed class DraftHandlerTests
         var result = await rig.Confirmer().HandleAsync(new ConfirmDraftCommand(draft.Id, null, Guid.NewGuid(), null, true, DraftRig.Owner), Ct);
 
         result.Value.Confirmed!.LabRunId.ShouldBeNull();
+        result.Value.Confirmed.RunError.ShouldBe("lab.no_data");
         result.Value.Confirmed.StrategyId.ShouldBe("DRAFT_X");
         rig.Store.Decisions.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Two_concurrent_confirms_create_and_start_once_and_the_second_gets_the_first_result()
+    {
+        var rig = new DraftRig();
+        var draft = rig.Seed();
+        rig.Start.HandleAsync(Arg.Any<StartLabRunCommand>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(StartedRun(Guid.NewGuid()))));
+        var command = new ConfirmDraftCommand(draft.Id, null, Guid.NewGuid(), null, true, DraftRig.Owner);
+
+        var both = await Task.WhenAll(rig.Confirmer().HandleAsync(command, Ct).AsTask(), rig.Confirmer().HandleAsync(command, Ct).AsTask());
+
+        both.ShouldAllBe(r => r.IsSuccess);
+        both[1].Value.Confirmed.ShouldBe(both[0].Value.Confirmed);
+        await rig.Create.Received(1).HandleAsync(Arg.Any<CreateStrategyCommand>(), Arg.Any<CancellationToken>());
+        await rig.Start.Received(1).HandleAsync(Arg.Any<StartLabRunCommand>(), Arg.Any<CancellationToken>());
     }
 
     // discard

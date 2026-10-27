@@ -43,10 +43,10 @@ public sealed record StoredDraft(
     IReadOnlyList<DraftFinding> Findings, string? ModelId, string PromptVersion, string SheetHash, string RequestedBy, DateTimeOffset CreatedAt);
 
 /// <summary>A decision to store.</summary>
-public sealed record NewDraftDecision(long DraftId, string Decision, string? StrategyId, int? StrategyVersion, Guid? LabRunId, bool Edited, bool Auto, long? SettingsId, string? SnapshotHash, string Actor);
+public sealed record NewDraftDecision(long DraftId, string Decision, string? StrategyId, int? StrategyVersion, Guid? LabRunId, bool Edited, bool Auto, long? SettingsId, string? SnapshotHash, string Actor, string? RunError = null);
 
 /// <summary>A stored decision.</summary>
-public sealed record StoredDraftDecision(long DraftId, string Decision, string? StrategyId, int? StrategyVersion, Guid? LabRunId, bool Edited, bool Auto, string Actor, DateTimeOffset DecidedAt);
+public sealed record StoredDraftDecision(long DraftId, string Decision, string? StrategyId, int? StrategyVersion, Guid? LabRunId, bool Edited, bool Auto, string Actor, DateTimeOffset DecidedAt, string? RunError = null);
 
 /// <summary>The draft store (<c>ai.strategy_drafts</c>, <c>ai.strategy_draft_decisions</c>), insert-only.</summary>
 public interface IDraftStore
@@ -63,6 +63,9 @@ public interface IDraftStore
 
     /// <summary>How many drafts were made between the two instants.</summary>
     ValueTask<int> CountBetweenAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken);
+
+    /// <summary>Takes the one lock that serialises every confirm (check, create, start, decision); released when disposed. Two confirms of one draft, or of two drafts with one strategy id, therefore cannot both create or start.</summary>
+    ValueTask<IAsyncDisposable> LockConfirmAsync(CancellationToken cancellationToken);
 
     ValueTask<StoredDraftDecision?> DecisionAsync(long draftId, CancellationToken cancellationToken);
 

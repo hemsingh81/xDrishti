@@ -52,7 +52,7 @@ public sealed class AssistantDraftArchitectureTests
     [Fact]
     public void The_draft_ports_have_no_update_or_delete_and_the_model_port_has_no_tools()
     {
-        typeof(IDraftStore).GetMethods().Select(m => m.Name).Order().ShouldBe(["CountBetweenAsync", "DecisionAsync", "GetAsync", "InsertAsync", "InsertDecisionAsync", "ListAsync", "ReserveIdAsync"]);
+        typeof(IDraftStore).GetMethods().Select(m => m.Name).Order().ShouldBe(["CountBetweenAsync", "DecisionAsync", "GetAsync", "InsertAsync", "InsertDecisionAsync", "ListAsync", "LockConfirmAsync", "ReserveIdAsync"]);
         typeof(IStrategyDrafter).GetMethods().Select(m => m.Name).ShouldBe(["DraftAsync"]);
         typeof(DraftModelRequest).GetProperties().Select(p => p.Name).Order().ShouldBe(["MaxOutputTokens", "Seed", "System", "User"]);
     }

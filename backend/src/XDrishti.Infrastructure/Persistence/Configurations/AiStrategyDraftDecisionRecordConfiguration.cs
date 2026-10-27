@@ -20,6 +20,7 @@ internal sealed class AiStrategyDraftDecisionRecordConfiguration : IEntityTypeCo
         builder.Property(x => x.StrategyId).HasMaxLength(64);
         builder.Property(x => x.SnapshotHash).HasColumnType("character(64)");
         builder.Property(x => x.Actor).HasMaxLength(64).IsRequired();
+        builder.Property(x => x.RunError).HasMaxLength(64);
         builder.Property(x => x.DecidedAt).HasDefaultValueSql("now()");
         builder.HasOne<AiStrategyDraftRecord>().WithMany().HasForeignKey(x => x.DraftId).HasConstraintName("fk_strategy_draft_decisions_strategy_drafts_draft_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => x.DraftId).IsUnique().HasDatabaseName("ux_ai_strategy_draft_decisions_draft_id");

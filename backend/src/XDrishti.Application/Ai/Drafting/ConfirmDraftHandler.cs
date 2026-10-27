@@ -46,6 +46,8 @@ internal sealed class ConfirmDraftHandler(
             return Refuse(DraftErrors.NotFound(command.Id));
         }
 
+        await using var confirmLock = await store.LockConfirmAsync(cancellationToken);
+        draft = await store.GetAsync(command.Id, cancellationToken) ?? draft;
         var earlier = await store.DecisionAsync(draft.Id, cancellationToken);
         if (earlier is not null)
         {
@@ -92,13 +94,15 @@ internal sealed class ConfirmDraftHandler(
         }
 
         Guid? runId = null;
+        string? runError = null;
         if (command.Run)
         {
             var started = await start.HandleAsync(new StartLabRunCommand(created.Value.Id, created.Value.Version, command.BasketId, command.Symbols, "quick", null, null), cancellationToken);
             runId = started.IsSuccess ? started.Value.Run.Id : null;
+            runError = started.IsSuccess ? null : started.Error.Code;
         }
 
-        var written = await store.InsertDecisionAsync(new NewDraftDecision(draft.Id, "confirmed", created.Value.Id, created.Value.Version, runId, edited, false, null, null, command.Actor), CancellationToken.None);
+        var written = await store.InsertDecisionAsync(new NewDraftDecision(draft.Id, "confirmed", created.Value.Id, created.Value.Version, runId, edited, false, null, null, command.Actor, runError), CancellationToken.None);
         DraftLog.Confirmed(logger, draft.Id, created.Value.Id, created.Value.Version, written.Decision.LabRunId, edited);
         return Result.Success(await GetDraftHandler.ViewAsync(draft, store, runs, CancellationToken.None));
     }

@@ -84,6 +84,24 @@ public sealed class AssistantSettingsHandlerTests
         (append.Change.Actor, append.Change.Enabled, append.Change.Reason, append.Expected).ShouldBe((Owner, true, "why", null));
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task The_switches_with_nothing_behind_them_cannot_be_turned_on_but_can_be_turned_off(int which)
+    {
+        var (handler, store) = Build(AssistantSettings.Defaults, new AssistantSettings(8, true, false, 6));
+        var on = new ChangeAssistantSettingsCommand(Owner, "why", true, false, 6, 0, PasswordVerified: true, AutoLabQuickTest: which == 1 ? true : null, AllowProposalAccept: which == 2 ? true : null, AutoAcceptHypothesis: which == 3 ? true : null);
+
+        var refused = await handler.HandleAsync(on, Ct);
+
+        refused.Error.Code.ShouldBe("assistant.setting_not_available");
+        store.Appends.ShouldBeEmpty();
+        var (handler2, store2) = Build(new AssistantSettings(8, true, false, 6, AutoLabQuickTest: true, AllowProposalAccept: true, AutoAcceptHypothesis: true), new AssistantSettings(9, true, false, 6));
+        (await handler2.HandleAsync(new ChangeAssistantSettingsCommand(Owner, "off", true, false, 6, null, PasswordVerified: false, AutoLabQuickTest: false, AllowProposalAccept: false, AutoAcceptHypothesis: false), Ct)).IsSuccess.ShouldBeTrue();
+        store2.Appends.ShouldHaveSingleItem();
+    }
+
     [Fact]
     public async Task Switching_it_off_needs_no_password()
     {
