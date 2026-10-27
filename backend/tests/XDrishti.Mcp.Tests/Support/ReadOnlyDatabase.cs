@@ -50,7 +50,7 @@ public class ReadOnlyDatabase : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         ContainerRuntime.UsePodmanIfNeeded();
-        _container = new PostgreSqlBuilder(Image).WithDatabase(Database).WithUsername("xd_owner").WithPassword(Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16))).Build();
+        _container = new PostgreSqlBuilder(Image).WithDatabase(Database).WithUsername("xd_owner").WithPassword(Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16))).WithMemoryLimit().Build();
         await _container.StartAsync(TestContext.Current.CancellationToken);
         Owner = new NpgsqlConnectionStringBuilder(_container.GetConnectionString()) { Pooling = false }.ConnectionString;
         App = new NpgsqlConnectionStringBuilder(Owner) { Username = "xd_app", Password = AppPassword }.ConnectionString;

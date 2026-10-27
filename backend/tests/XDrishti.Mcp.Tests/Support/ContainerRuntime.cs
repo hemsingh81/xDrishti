@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Testcontainers.PostgreSql;
 
 namespace XDrishti.Mcp.Tests.Support;
 
@@ -19,9 +20,14 @@ internal static class ContainerRuntime
         if (socket is not null)
         {
             Environment.SetEnvironmentVariable("DOCKER_HOST", "unix://" + socket);
+            // Ryuk cannot start under rootless Podman Desktop (its container vanishes at once: 404 on start), so leaks are cleaned by scripts/clean-test-containers.sh.
             Environment.SetEnvironmentVariable("TESTCONTAINERS_RYUK_DISABLED", "true");
         }
     }
+
+    /// <summary>Caps the server at 1.5 GiB (it idles near 200 MB), so a leaked container cannot eat the Podman VM.</summary>
+    public static PostgreSqlBuilder WithMemoryLimit(this PostgreSqlBuilder builder) =>
+        builder.WithCreateParameterModifier(parameters => { parameters.HostConfig ??= new(); parameters.HostConfig.Memory = 1536L * 1024 * 1024; });
 
     private static string? TryPodmanSocket()
     {

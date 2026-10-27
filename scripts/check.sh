@@ -12,7 +12,9 @@ dotnet format XDrishti.slnx --verify-no-changes
 say "Backend: build"
 dotnet build XDrishti.slnx -c Release --nologo -v q
 say "Backend: tests (integration tests use TimescaleDB in Podman)"
+"$ROOT/scripts/clean-test-containers.sh" || true
 dotnet test --solution XDrishti.slnx -c Release --no-build
+"$ROOT/scripts/clean-test-containers.sh" || true
 "$ROOT/scripts/check-proxy.sh"
 
 cd "$ROOT/frontend"

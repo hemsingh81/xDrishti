@@ -88,3 +88,14 @@ Rules for working with agents:
 
 ## Third-party notices
 - **TradingView Lightweight Charts** (`lightweight-charts@5.2.1`, Apache-2.0), used for price charts (ADR 0125). The licence asks for the attribution notice of its NOTICE file and a link to https://www.tradingview.com/ on a page that shows the chart: the replay page footer carries the notice and the link, and the chart's own attribution logo is on. Notice (the letter in "(с)" is the Cyrillic с, U+0441, as the file has it): TradingView Lightweight Charts™ Copyright (с) 2025 TradingView, Inc. https://www.tradingview.com/
+
+## Leaked test containers
+Integration tests start throw-away TimescaleDB containers with Testcontainers (label `org.testcontainers=true`). Under
+rootless Podman Desktop the reaper (Ryuk) cannot start, so it is disabled (`ContainerRuntime`); a test run killed with
+SIGKILL or an IDE stop therefore leaves its containers running. Each one is capped at 1.5 GiB.
+- List: `podman ps -a --filter label=org.testcontainers=true`
+- Clean: `scripts/clean-test-containers.sh` (also run before and after the backend tests by `scripts/check.sh`). It removes
+  only containers with that label that are older than `XD_TEST_CONTAINER_MAX_AGE_MIN` minutes (default 60, well beyond
+  one run, so a gate running in another shell is safe). Set it to `0` to remove all of them now.
+- A full run starts up to four servers (shared API server, research-grants server, two MCP-test servers): the roles are
+  cluster-wide, so those suites cannot share one server.

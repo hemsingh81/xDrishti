@@ -50,6 +50,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             .WithDatabase("xdrishti")
             .WithUsername("xd_owner")
             .WithPassword("integration-tests")
+            .WithMemoryLimit()
             .Build();
     }
 
