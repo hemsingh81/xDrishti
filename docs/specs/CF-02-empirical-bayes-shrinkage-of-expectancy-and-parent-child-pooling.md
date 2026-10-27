@@ -81,3 +81,12 @@ Unit: AC 1 to 8 tables at tolerance 1e-3; property tests (blend in [0, 1]; shrun
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`); migration added
 - [ ] ADR added; doc 09 layer 1 text updated; `scripts/build-docs.sh`
+
+## Review fixes 2026-10-27
+Status stays Draft; size 3.5 -> **4 agent-days** (+0.5 fixture and extra cases). Amends the text above.
+1. **Lower bound is optimistic.** The 5 % quantile uses only the posterior sd; it ignores the uncertainty in tau^2, the parent mean and sigma^2. Added to the honest limits and as a column note ("lower bound ignores uncertainty in the pooling parameters"). It must **not feed `Gate`** until validated (a seeded simulation of coverage, written as a separate acceptance step before `Gate` is offered).
+2. **Floor report.** Every snapshot reports the count and share of cells whose tau^2 is at the floor (`tauFloorCells`, `tauFloorShare`) in the view and the log (counts only).
+3. **DL and leave-one-out consistency.** Decision 4 estimates tau^2 over **all** siblings including cell i, while the parent mean excludes i. Chosen rule: compute tau^2 once per parent group over all siblings (a stated, small inconsistency); the leave-one-out tau^2 variant is a documented alternative, not built. The limit is printed.
+4. **Per-cell sigma^2 pooling.** For 5..30 trades the cell's sigma^2 is shrunk toward the parent's pooled sigma^2 with weight n/(n+30) (`SigmaPoolStrength = 30`), below 5 trades the pooled value alone; above 30 the cell's own value.
+5. **Parent-level switching.** The parent level can change between recomputes as trades cross the 30-trade line; no hysteresis is built, accepted as a limit and shown by `parentLevel` on each row (history of snapshots is insert-only so the switch is visible).
+6. **Regression fixture.** A stored-verdict and snapshot fixture (P6-01 table) is re-run in all three modes; every existing field must be byte-identical in Off and ReportOnly.

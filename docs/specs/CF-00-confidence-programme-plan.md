@@ -41,17 +41,20 @@ Sizes are agent-days, uncalibrated (earlier phases overran; use ×1.3). "Moves" 
 | [CF-06](CF-06-preregistration-trial-ledger-and-locked-holdout-in-the-lab.md) | Pre-registration, trial ledger, locked hold-out | 6 | 3 | CF-04 for a useful hold-out | no | L |
 | [CF-07](CF-07-random-entry-null-placebo-runs-and-plateau-gate.md) | Random-entry null, placebo / mirror runs, plateau gate | 5.5 | 4 | CF-06 (looks are counted) | no | L |
 | [CF-08](CF-08-shadow-paper-trading-of-every-nightly-candidate.md) | Shadow paper trading of every nightly candidate (forward-only) | 6 | 3 | P7 plan, P10-01/04/05; CF-01 later | no (paper only) | M and L (more forward trades) |
-| CF-09..CF-12 | Not seen when this plan was written: per CF-05..CF-08 they include a scorecard (CF-11) and later slices that CF-08 feeds (CF-09, CF-10, CF-12); possibly sequential test / decay, combinatorial purged CV, small-sample model controls | see files | after CF-08 | CF-01..CF-08 | no | H and M |
+| [CF-09](CF-09-sequential-failure-test-for-paper-trading.md) | Sequential failure test for paper trading (boundary flags only) | 3 | 4 | CF-08, CF-01 (placeholder rho 0.3 until then), P10-04 | no | H (early stop on a failing edge; hard-fail input to CF-11) |
+| [CF-10](CF-10-ml-safety-calibration-ladder-and-champion-challenger-rollback.md) | ML safety: calibration, ladder, champion/challenger, rollback (10a to 10d) | 13.5 | 4 | P6-03..13, CF-01, CF-06, CF-08, CF-12 (paired bootstrap) | **yes** (auto rollback writer, `MlMayInfluence` predicate; default OFF, ML stays advisory) | M (a model is trusted only after a locked hold-out) |
+| [CF-11](CF-11-readiness-scorecard-per-strategy-and-system.md) | Readiness scorecard per strategy and system (Gate R / Gate S) | 7 | last | CF-01, 05, 06, 07, 08, 09, 10 (CF-12 optional); missing input = `unavailable` = fail | **yes** (light; can block owner acts once `enforce` is ON) | H and L (one honest readiness answer) |
+| [CF-12](CF-12-decay-monitor-kill-rules-and-is-the-loop-helping.md) | Decay monitor, kill rules, "is the loop helping" (three-arm test, learning curve) | 9 | 4 | CF-08, 05, 09, 10, 01, P6-08 | **yes** (automatic demotion only behind a setting, OFF; re-enable is an owner act) | M and L (stops running a decayed edge) |
 
-CF-05..CF-12 are written by another agent. CF-05..CF-08 were read by title, size and Needs line only (not reviewed); CF-09..CF-12 did not exist when this table was written, so their row is a placeholder. Where the final files differ, the files win and this table is corrected.
+CF-05..CF-12 were written by another agent. Rows CF-05..CF-12 were corrected on 2026-10-27 from the actual files (sizes, Needs, Safety lines); where a file later changes, the file wins.
 
-Sizes of CF-01..CF-04 total **24 agent-days** (4.5 + 3.5 + 6.5 + 9.5). Adding CF-05..CF-08 (23 days) gives about **47 agent-days** before CF-09..CF-12.
+Sizes of CF-01..CF-04 total **24 agent-days** (4.5 + 3.5 + 6.5 + 9.5). Adding CF-05..CF-08 (23 days) gives about 47; CF-09 to CF-12 add 32.5 (3 + 13.5 + 7 + 9); with this plan (0.5) the programme is about **80 agent-days** (uncalibrated; use x1.3).
 
 ### Order and parallelism
 - **Wave 1 (parallel, no shared files):** CF-01 (Domain `Confidence/`, cell stats, gates), CF-04 Part A (data layer; owner decisions first). 
 - **Wave 2:** CF-02 (needs CF-01's `EffectiveSampleSize`), CF-04 Part B (needs the owner's setting switch and the adjustment seam test), CF-05, CF-08 in parallel worktrees.
 - **Wave 3:** CF-03 A (DSR, block bootstrap), then CF-03 B (PBO, needs the per-variant series stored and benefits from CF-06/CF-07 grids), CF-06, CF-07 after CF-06.
-- **Wave 4:** CF-09 to CF-11 as their files say. **Last:** CF-12 (the scorecard-style slice reads CF-01 to CF-08).
+- **Wave 4:** CF-09 (needs CF-08's edge series), CF-12 and CF-10 (CF-10 uses CF-12's paired bootstrap; build that part of CF-12 first or take CF-10a/10b first). **Last:** CF-11 (the scorecard reads CF-01 to CF-10, and `unavailable` counts as fail until a producer exists).
 - Two writers never touch the same file: CF-01, CF-02 and CF-03 all edit `Domain/Learning/CellStatsCalculator.cs` or `Domain/Lab/VerdictEvaluator.cs`; run them in the order CF-01, CF-02, CF-03 or in separate worktrees with a rebase between.
 
 ## What the programme moves in the confidence assessment
@@ -92,3 +95,6 @@ The owner's current reading (from the research notes): **moderate** confidence t
 - [ ] The owner has read CF-00..CF-12 and set each slice Approved or deferred
 - [ ] CF-01 built first and its n_eff visible on the Learning and Lab screens
 - [ ] This plan's table corrected to the final CF-05..CF-12 files
+
+## Review fixes 2026-10-27
+Sizes after review: CF-01 5.5, CF-02 4, CF-03 7, CF-04 10.5 (total 27). CF-01 now also builds the normal-quantile helper that CF-02 and CF-03 need, so CF-01 comes first. CF-04 Part A is a prerequisite of Part B. Status stays Draft.

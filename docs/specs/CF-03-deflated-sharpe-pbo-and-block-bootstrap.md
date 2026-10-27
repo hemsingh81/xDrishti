@@ -88,3 +88,13 @@ Unit (Domain): AC 1 to 4, 7 to 9, 12, 13 hand tables; property tests (DSR monoto
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`); migration added
 - [ ] ADR added; doc 11 §4 and §5 updated (the factor is no longer the only deflation); `scripts/build-docs.sh`
+
+## Review fixes 2026-10-27
+Status stays Draft; size 6.5 -> **7 agent-days** (+0.5 power arm). Amends the text above.
+1. **AC 6 gets a power arm.** The null bound alone is vacuous (a gate that always says no passes it). Add: one variant with true per-trade SR about 0.3 among 15 null variants, T = 100, must pass `DSR >= 0.95` in **at least 50 %** of seeded families; the null arm keeps its at-most-10 % bound. `Gate` is offered only if both arms hold.
+2. **N and stored stats.** DSR's N is the number of variants **with stored stats**; if stored/ledger count is below 0.8 the line reads `unavailable: trial statistics stored for only X of Y variants`.
+3. **T and small n.** T = n_eff (CF-01), and T < 20 is unavailable; this will make DSR unavailable for most thin cells. Stated in the limits. Alternative offered: use raw T with n_eff shown beside (setting `Deflation:TBasis = nEff|raw`, default nEff).
+4. **AC 13 rank convention.** Rank is ascending: rank 1 is the lowest out-of-sample value, rank N the highest; `omega = rank/(N+1)`. The hand case already follows this.
+5. **PBO is diagnostic.** The whole-window PBO never feeds a selection (no variant is chosen by it); it only flags.
+6. **Series size.** 17 variants x ~520 sessions is about 70 KB as numbers; values are rounded to 4 decimals to stay under the 100 KB limit (AC 15 checks both).
+7. **Dependency.** `Phi` and `Phi^-1` come from CF-01's `NormalDistribution`.

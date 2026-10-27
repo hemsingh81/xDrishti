@@ -3,7 +3,7 @@
 - **Status:** Draft (written 2026-10-27; the decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** CF — Confidence programme (row added by CF-00; UNVERIFIED). Extends P6 (validation harness, trainer, registry, lifecycle, drift).
 - **Design refs:** docs/design/09-learning-engine.md §1 to §8, §10 · 16-configuration.md (`drift`, `max_calibration_error_pp`) · docs/research/confidence-learning-and-validation-speed.md §1 · P6-05, P6-06, P6-07, P6-08, P6-09, P6-12, P6-13, P7-00 Q8 · ADRs 0067, 0068, 0070, 0073, 0074, 0077
-- **Needs:** P6-03..P6-13 (built), CF-00, CF-01 (n_eff), CF-06 (the shared locked hold-out), CF-08 (forward scored candidates), CF-12 (the paired bootstrap used by the promotion rule). Feeds CF-11 (calibration sub-score).
+- **Needs:** P6-03..P6-13 (built), CF-00, CF-01 (n_eff), CF-06 (the shared locked hold-out), CF-08 (forward scored candidates). Feeds CF-11 (calibration sub-score).
 - **Size:** about 13.5 agent-days. Recommended build order and split: **10a** calibration and ECE interval 2 d, **10b** ladder, events-per-variable and feature stability 4 d, **10c** paired bootstrap, uniqueness weights, hold-out predicate `MlMayInfluence` 4.5 d, **10d** champion / challenger rules, rollback and regime rule 3 d. Uncalibrated.
 - **Safety:** yes. An automatic rollback writer and a predicate that gates any influence of a model on a decision. Everything is default OFF / manual; no order is ever placed; ML stays **advisory** (`AdvisoryPWin` is "shown beside the cell figure and used for nothing else", P7-00 Q8) unless the predicate holds **and** an owner switch is on.
 
@@ -28,7 +28,7 @@ A model's probability can never quietly start steering decisions: it must be cal
 
 ## Scope
 **In:** Domain `PlattCalibrator`, `CalibrationChoice`, `EceInterval`, `ComplexityLadder`, `EventsPerVariable`, `FeatureStability`, `Psi`, `PairedDayBootstrap`, `UniquenessWeights`, `MlInfluence` (the predicate and reasons), `RollbackPolicy`; Application `EvaluateMlInfluenceHandler`, `IMlInfluenceGate`, `ProposeRollbackHandler`, `ExecuteRollbackHandler` (auto), settings, verbs `xd learn influence|rollback`; extension of the harness report and of the registry / changelog; endpoints below; ADR; docs; `gen-api`.
-**Out:** any consumer that changes ranking, size or approval from a model (a later slice behind the switch); combinatorial purged CV and PBO (CF-03); deflated Sharpe (CF-03); n_eff for strategies (CF-01); the paired comparison itself for arms (CF-12 supplies the bootstrap; CF-10 uses it); the learning curve (CF-12); any order.
+**Out:** any consumer that changes ranking, size or approval from a model (a later slice behind the switch); combinatorial purged CV and PBO (CF-03); deflated Sharpe (CF-03); n_eff for strategies (CF-01); the learning curve and the three-arm test (CF-12); any order.
 
 ## Acceptance criteria
 1. **Calibration choice.** 499 calibration rows give Platt, 500 give isotonic, 0 give the constant base rate (unit). Platt on a constant score with 3 wins in 8: targets `0.8` (wins) and `1/7 = 0.142857` (losses), fitted value `(3 x 0.8 + 5 x 0.142857) / 8 = 0.389286`, while isotonic gives `0.375`; Platt is non-decreasing, deterministic and uses two parameters (unit, 6 places).
@@ -73,3 +73,8 @@ Whether ML.NET already Platt-calibrates the raw score before the isotonic map. P
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`); migration `AddMlSafety` added and tested up and down
 - [ ] Design docs/ADR updated (docs 09, 16); `scripts/build-docs.sh`
+
+## Review fixes 2026-10-27
+1. **Cycle removed.** CF-10c owns `PairedDayBootstrap`; CF-12 is no longer in CF-10's Needs and uses the bootstrap from CF-10c. Build order: 10c, CF-12, 10d. D7's promotion rule reads CF-12's challenger-versus-champion comparison only once CF-12 exists (until then promotion stays manual with the P6-12 counterfactual).
+2. **Step-up, made consistent in D6, D7, D8, AC12:** `ml.influence.enabled` and `ml.auto_promote` need a fresh password; `ml.auto_rollback` needs the owner session and CSRF only (it lowers reliance on ML).
+3. **Promotion never sets `ml.influence.enabled`**, manual or auto.

@@ -77,3 +77,6 @@ Whether `Costing` exposes a ready `chargesR` or only the 16 lines and net R (der
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`); no migration for the result document
 - [ ] Design docs/ADR updated (docs 11, 16); `scripts/build-docs.sh`
+
+## Review fixes 2026-10-27
+1. AC6 addition: evidence that comes only from tier C is a hard fail in CF-11 (D3 of CF-11), and tier C trades are excluded from the "tradable" label; the report prints how many were excluded.

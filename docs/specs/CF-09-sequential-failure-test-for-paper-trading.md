@@ -78,3 +78,6 @@ The design-effect estimator (CF-01). That CF-08 provides the ordering and the da
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`)
 - [ ] Design docs/ADR updated (docs 09, 18); `scripts/build-docs.sh`
+
+## Review fixes 2026-10-27
+1. AC12 honesty text states the cumulative false-failure bound: "at most 5.3 %, then about 0.33 % per later return to the cap" (not a bare 5.3 %).

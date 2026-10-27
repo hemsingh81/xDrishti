@@ -113,3 +113,12 @@ Unit: planner (AC 3), estimator and disk (AC 4, 5), source-aware factors (AC 8),
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`); migrations added
 - [ ] ADR recording the NSE terms decision and the allow-list act (owner's); ADR for the source-aware adjustment; doc 05 §4.2 and §6.1 updated; ISS-19 and ISS-22 text updated when depth is real; `scripts/build-docs.sh`
+
+## Review fixes 2026-10-27
+Status stays Draft; size 9.5 -> **10.5 agent-days** (+1: seam from stored bars, guard change, extra cases). Amends the text above.
+1. **Probe rule (Decision 9 vs Risk 1).** An instrument's pre-seam bars enter simulations only after its **own** probe passed. Default: probe every instrument that has an applied action after its first backfilled date, and a sample (`Probe:Instruments`) of the rest; instruments neither probed nor sampled are `seam_unresolved` and excluded until probed.
+2. **Seam from stored bars.** The seam date per instrument is `min(ts)` of rows with `source = 'csv'` in `market.bars_1m` (not `csv_files.first_bar`, which an undo via `undone_at` can move). The planner and the writer **re-check the seam on every run**. A CSV import that reaches before the seam is refused or flagged (`BarStore` marks a CSV row `kept` against an existing Dhan row, so it would otherwise leave Dhan bars in the CSV span unnoticed).
+3. **Factor by date against the seam.** Adjustment decides by bar date versus the per-instrument seam date (bars before the seam: Dhan rule; at or after: CSV rule). No dependence on `ReadAsync` exposing the source. Added case: a Dhan bar dated **exactly on the ex-date** takes the rule "factor applies to bars strictly before the ex-date", so it gets no factor from that action, and the previous day's bar does (hand case: bonus 1:1 ex 2024-08-01, raw close 2024-07-31 = 400.00 -> 200.00; 2024-08-01 = 205.00 stays).
+4. **Calendar (AC 17).** `trading_days` for the backfilled range is derived from Part A's `daily_eod` (a date with any cash-series rows is a trading day). **Part A is a prerequisite of Part B.**
+5. **Allow-list guard change.** `MasterDataEndpoints.IsAllowed` matches exact paths, so dated bhavcopy paths need a code change (pattern-aware guard) that lands with an **empty entry list**; the owner then adds hosts and patterns as the security act.
+6. **Times are minimums.** The 10.7 and 42.8 minute figures (and 25 minutes for 500 instruments) are "at least": retries, DH-904 back-off and the off-hours window add to them.

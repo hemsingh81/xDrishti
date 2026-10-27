@@ -64,3 +64,8 @@ The walker's change size for the entry override. Whether P3-02e (BUY to SELL mir
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`); no migration beyond CF-06's column
 - [ ] Design docs/ADR updated (docs 11, 16); `scripts/build-docs.sh`
+
+## Review fixes 2026-10-27
+1. Pass rule: pass if and only if `p <= 0.05` (`(count_ge + 1) / (draws + 1)`); the 95th percentile is displayed only and is not a second test.
+2. Random-entry null, placebos and plateau run only inside the clamped development window (CF-06 AC8); no hold-out session is ever read here.
+3. AC9 now matches CF-06 D3, which counts one trial per null row (see CF-06 Review fixes).
