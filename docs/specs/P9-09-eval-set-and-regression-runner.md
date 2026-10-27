@@ -1,6 +1,6 @@
 # P9-09 — Eval set and regression runner (30 data questions, 10 plans, 10 ideas, 200 announcements deferred)
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner approved all P9 plans; model and GPU chosen in ADR 0136). P9-09a built 2026-10-27 (fixture, 30 questions, answer grader, statistics, thresholds, announcements grader, oracle test). Written 2026-10-24 as Draft ( decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P9 — AI assistant and Hermes PoC ("eval set"; exit: "Eval set passes"); slice of [P9-00](P9-00-ai-assistant-plan.md) (written in parallel; UNVERIFIED text). ADR 0005 and the benchmark note call this "the P9-07 eval set": the roadmap numbering now puts it here.
 - **Design refs:** docs/design/14-ai-assistant.md §2 ("final pick by the eval set"), §5 (the table), §6 (Hermes PoC thresholds) · ADR 0005 · docs/research/p0-15-llm-benchmark.md · P9-05, P9-06, P9-07, P9-08 · P8-05 (the oracle for KPIs).
 - **Needs:** P9-01 (`xd-ai.sh`, model alias and mode), P9-02/P9-05 (tools over the two read-only roles), P9-03 (`IAssistantTurnRunner`, `ai.messages` and `ai.tool_calls` audit), P9-06 (`TextGuard`, `NumberTokenizer`, `BriefingFacts`), P9-07 (draft pipeline and sheet), P8-05/P8-06 (KPI engine as second derivation). Used by: P9-10 (the Hermes PoC grades its answers with this runner).

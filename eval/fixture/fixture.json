@@ -1,0 +1,446 @@
+{
+ "version": 1,
+ "note": "Synthetic fixture of the P9-09 eval. Symbols are fake; no real holdings, accounts or prices.",
+ "fixtureDate": "2026-03-03",
+ "instruments": [
+  {
+   "symbol": "EVA",
+   "name": "Eval Alpha A"
+  },
+  {
+   "symbol": "EVB",
+   "name": "Eval Alpha B"
+  },
+  {
+   "symbol": "EVC",
+   "name": "Eval Alpha C"
+  },
+  {
+   "symbol": "EVD",
+   "name": "Eval Beta D"
+  },
+  {
+   "symbol": "EVE",
+   "name": "Eval Beta E"
+  },
+  {
+   "symbol": "EVF",
+   "name": "Eval Beta F"
+  },
+  {
+   "symbol": "EVH1",
+   "name": "Eval Holding One"
+  },
+  {
+   "symbol": "EVH2",
+   "name": "Eval Holding Two"
+  }
+ ],
+ "baskets": [
+  {
+   "name": "EvalAlpha",
+   "symbols": [
+    "EVA",
+    "EVB",
+    "EVC"
+   ]
+  },
+  {
+   "name": "EvalBeta",
+   "symbols": [
+    "EVD",
+    "EVE",
+    "EVF"
+   ]
+  },
+  {
+   "name": "MyLongTerm",
+   "symbols": [
+    "EVH1",
+    "EVH2"
+   ]
+  }
+ ],
+ "runs": [
+  {
+   "key": "EVAL-ORB-15m",
+   "strategy": "ORB",
+   "timeframe": "15m",
+   "style": "intraday",
+   "exit": "FIXED_RR",
+   "universe": "EvalAll",
+   "windowStart": "2026-01-05",
+   "windowEnd": "2026-02-27",
+   "trades": [
+    {
+     "symbol": "EVA",
+     "side": "BUY",
+     "entry": "2026-01-05",
+     "r": 2
+    },
+    {
+     "symbol": "EVA",
+     "side": "BUY",
+     "entry": "2026-01-06",
+     "r": -1
+    },
+    {
+     "symbol": "EVB",
+     "side": "BUY",
+     "entry": "2026-01-07",
+     "r": 1
+    },
+    {
+     "symbol": "EVB",
+     "side": "BUY",
+     "entry": "2026-01-08",
+     "r": -1
+    },
+    {
+     "symbol": "EVC",
+     "side": "BUY",
+     "entry": "2026-01-09",
+     "r": 3
+    },
+    {
+     "symbol": "EVC",
+     "side": "BUY",
+     "entry": "2026-01-12",
+     "r": -1
+    },
+    {
+     "symbol": "EVA",
+     "side": "SELL",
+     "entry": "2026-01-13",
+     "r": -1
+    },
+    {
+     "symbol": "EVA",
+     "side": "SELL",
+     "entry": "2026-01-14",
+     "r": -1
+    },
+    {
+     "symbol": "EVB",
+     "side": "SELL",
+     "entry": "2026-01-15",
+     "r": 1.5
+    },
+    {
+     "symbol": "EVB",
+     "side": "SELL",
+     "entry": "2026-01-16",
+     "r": -1
+    },
+    {
+     "symbol": "EVC",
+     "side": "SELL",
+     "entry": "2026-01-19",
+     "r": 2
+    },
+    {
+     "symbol": "EVC",
+     "side": "SELL",
+     "entry": "2026-01-20",
+     "r": -1
+    },
+    {
+     "symbol": "EVD",
+     "side": "BUY",
+     "entry": "2026-01-21",
+     "r": -1
+    },
+    {
+     "symbol": "EVD",
+     "side": "BUY",
+     "entry": "2026-01-22",
+     "r": -1
+    },
+    {
+     "symbol": "EVE",
+     "side": "BUY",
+     "entry": "2026-01-23",
+     "r": -1
+    },
+    {
+     "symbol": "EVE",
+     "side": "BUY",
+     "entry": "2026-01-26",
+     "r": 2
+    },
+    {
+     "symbol": "EVF",
+     "side": "BUY",
+     "entry": "2026-01-27",
+     "r": -1
+    },
+    {
+     "symbol": "EVF",
+     "side": "BUY",
+     "entry": "2026-01-28",
+     "r": 0.5
+    },
+    {
+     "symbol": "EVD",
+     "side": "SELL",
+     "entry": "2026-01-29",
+     "r": 1
+    },
+    {
+     "symbol": "EVD",
+     "side": "SELL",
+     "entry": "2026-01-30",
+     "r": 1
+    },
+    {
+     "symbol": "EVE",
+     "side": "SELL",
+     "entry": "2026-02-02",
+     "r": -1
+    },
+    {
+     "symbol": "EVE",
+     "side": "SELL",
+     "entry": "2026-02-03",
+     "r": 1
+    },
+    {
+     "symbol": "EVF",
+     "side": "SELL",
+     "entry": "2026-02-04",
+     "r": -1
+    },
+    {
+     "symbol": "EVF",
+     "side": "SELL",
+     "entry": "2026-02-05",
+     "r": 2
+    }
+   ]
+  },
+  {
+   "key": "EVAL-VWAP-15m",
+   "strategy": "VWAP_PULLBACK",
+   "timeframe": "15m",
+   "style": "intraday",
+   "exit": "FIXED_RR",
+   "universe": "EvalAll",
+   "windowStart": "2026-01-05",
+   "windowEnd": "2026-02-27",
+   "trades": [
+    {
+     "symbol": "EVA",
+     "side": "BUY",
+     "entry": "2026-01-05",
+     "r": 1
+    },
+    {
+     "symbol": "EVA",
+     "side": "BUY",
+     "entry": "2026-01-06",
+     "r": 1
+    },
+    {
+     "symbol": "EVA",
+     "side": "BUY",
+     "entry": "2026-01-07",
+     "r": -1
+    },
+    {
+     "symbol": "EVB",
+     "side": "BUY",
+     "entry": "2026-01-08",
+     "r": 2
+    },
+    {
+     "symbol": "EVB",
+     "side": "BUY",
+     "entry": "2026-01-09",
+     "r": -1
+    },
+    {
+     "symbol": "EVB",
+     "side": "BUY",
+     "entry": "2026-01-12",
+     "r": 1
+    },
+    {
+     "symbol": "EVC",
+     "side": "BUY",
+     "entry": "2026-01-13",
+     "r": -1
+    },
+    {
+     "symbol": "EVC",
+     "side": "BUY",
+     "entry": "2026-01-14",
+     "r": 1
+    },
+    {
+     "symbol": "EVD",
+     "side": "BUY",
+     "entry": "2026-01-15",
+     "r": -1
+    },
+    {
+     "symbol": "EVD",
+     "side": "BUY",
+     "entry": "2026-01-16",
+     "r": -1
+    },
+    {
+     "symbol": "EVD",
+     "side": "BUY",
+     "entry": "2026-01-19",
+     "r": 1
+    },
+    {
+     "symbol": "EVE",
+     "side": "BUY",
+     "entry": "2026-01-20",
+     "r": -1
+    },
+    {
+     "symbol": "EVE",
+     "side": "BUY",
+     "entry": "2026-01-21",
+     "r": 2
+    },
+    {
+     "symbol": "EVE",
+     "side": "BUY",
+     "entry": "2026-01-22",
+     "r": -1
+    },
+    {
+     "symbol": "EVF",
+     "side": "BUY",
+     "entry": "2026-01-23",
+     "r": -1
+    },
+    {
+     "symbol": "EVF",
+     "side": "BUY",
+     "entry": "2026-01-26",
+     "r": 0
+    }
+   ]
+  }
+ ],
+ "plan": {
+  "date": "2026-03-03",
+  "paperAccount": "EvalPaper",
+  "primary": [
+   {
+    "rank": 1,
+    "symbol": "EVA",
+    "side": "BUY",
+    "strategy": "ORB",
+    "timeframe": "15m",
+    "cell": "ORB|15m|BUY|INTRADAY|*",
+    "cellTrades": 12,
+    "pWin": 0.52,
+    "conservativeExpectancyR": 0.05,
+    "allocationShares": 200
+   },
+   {
+    "rank": 2,
+    "symbol": "EVD",
+    "side": "SELL",
+    "strategy": "ORB",
+    "timeframe": "15m",
+    "allocationShares": 150
+   },
+   {
+    "rank": 3,
+    "symbol": "EVC",
+    "side": "BUY",
+    "strategy": "VWAP_PULLBACK",
+    "timeframe": "15m",
+    "allocationShares": 100
+   }
+  ],
+  "reserve": [
+   {
+    "symbol": "EVB"
+   }
+  ],
+  "rejected": [
+   {
+    "symbol": "EVE",
+    "reason": "win-rate check"
+   },
+   {
+    "symbol": "EVF",
+    "reason": "sector unavailable"
+   }
+  ]
+ },
+ "portfolio": {
+  "account": "EvalLongTerm",
+  "basket": "MyLongTerm",
+  "holdings": [
+   {
+    "symbol": "EVH1",
+    "shares": 100,
+    "boughtOn": "2025-03-03",
+    "buyPrice": 100.0,
+    "lastPrice": 121.0
+   },
+   {
+    "symbol": "EVH2",
+    "shares": 50,
+    "boughtOn": "2025-09-03",
+    "buyPrice": 200.0,
+    "lastPrice": 180.0
+   }
+  ]
+ },
+ "cellStats": {
+  "cell": "ORB|15m|BUY|INTRADAY|*",
+  "windows": [
+   {
+    "window": "all",
+    "n": 12
+   },
+   {
+    "window": "250d",
+    "n": 12
+   },
+   {
+    "window": "60d",
+    "n": 12
+   }
+  ]
+ },
+ "learning": {
+  "lessons": [
+   {
+    "key": "EVAL-L1",
+    "status": "open"
+   },
+   {
+    "key": "EVAL-L2",
+    "status": "open"
+   },
+   {
+    "key": "EVAL-L3",
+    "status": "closed"
+   }
+  ],
+  "hypotheses": [
+   {
+    "key": "EVAL-H1",
+    "status": "proposed"
+   },
+   {
+    "key": "EVAL-H2",
+    "status": "approved"
+   },
+   {
+    "key": "EVAL-H3",
+    "status": "rejected"
+   }
+  ]
+ }
+}

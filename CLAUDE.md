@@ -7,6 +7,7 @@ the roadmap phases in `docs/design/18-roadmap.md`. Engineering standards: `docs/
 - `backend/` .NET 10 modular monolith (`src/XDrishti.*`, `tests/`) — rules in `backend/CLAUDE.md`.
 - `frontend/` React 19 + TypeScript + Vite + MUI — rules in `frontend/CLAUDE.md`. Match the UX of `docs/prototype/`.
 - `deploy/` Podman Compose stack, Caddy, DB init, `xd-up.sh` — rules in `deploy/CLAUDE.md`.
+- `eval/` the assistant eval: synthetic fixture, question sets, thresholds (ADR 0143); results go to `data/eval/` (git-ignored).
 - `scripts/` developer scripts; `data/` local runtime data (git-ignored).
 - `docs/design/*.md` is the source of truth; `docs/site/` is generated — never edit it by hand.
 - Trading configuration and strategies are **not files in the repo**: they live in the database, versioned, and are

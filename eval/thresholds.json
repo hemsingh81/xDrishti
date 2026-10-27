@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "data": { "of": 30, "pass_min": 27 },
+  "plans": { "of": 10, "raw_pass_min": 8, "repaired_pass_min": 9, "escape_max": 0, "covered_all": true },
+  "ideas": { "of": 10, "first_shot_valid_min": 8, "repaired_valid_min": 9, "intent_min": 0.85, "intent_floor": 0.60, "decline_correct_min": 2 },
+  "events": { "precision_material_min": 0.80, "min_rows": 200 }
+}
