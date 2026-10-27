@@ -233,9 +233,18 @@ internal sealed class DraftRig
 
         private readonly SemaphoreSlim _lock = new(1, 1);
 
+        /// <summary>Runs once the lock is held (a test flips a setting here, as an owner could while a run waits).</summary>
+        public Action? OnLock { get; set; }
+
+        /// <summary>How many decision inserts fail before one succeeds.</summary>
+        public int FailInserts { get; set; }
+
+        public int InsertTries { get; private set; }
+
         public async ValueTask<IAsyncDisposable> LockConfirmAsync(CancellationToken cancellationToken)
         {
             await _lock.WaitAsync(cancellationToken);
+            OnLock?.Invoke();
             return new Release(_lock);
         }
 
@@ -255,6 +264,13 @@ internal sealed class DraftRig
 
         public ValueTask<(StoredDraftDecision Decision, bool Created)> InsertDecisionAsync(NewDraftDecision d, CancellationToken cancellationToken)
         {
+            InsertTries++;
+            if (FailInserts > 0)
+            {
+                FailInserts--;
+                throw new InvalidOperationException("the write failed");
+            }
+
             if (Decisions.TryGetValue(d.DraftId, out var existing))
             {
                 return ValueTask.FromResult((existing, false));

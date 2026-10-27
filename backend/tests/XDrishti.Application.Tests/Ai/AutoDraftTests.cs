@@ -147,6 +147,59 @@ public sealed class AutoDraftTests
     }
 
     [Fact]
+    public async Task Switching_the_option_off_while_a_run_waits_for_the_lock_lets_no_stale_run_through()
+    {
+        var rig = On("MyChoice");
+        var draft = rig.Seed(idea: Named);
+        rig.Store.OnLock = () => rig.Settings = rig.Settings with { AutoLabQuickTest = false };
+
+        (await AskAsync(rig, draft.Id)).ShouldBe(new AutoDraftOutcome(false, "off"));
+        await NothingRanAsync(rig);
+    }
+
+    [Fact]
+    public async Task The_setting_row_recorded_is_the_one_read_under_the_lock()
+    {
+        var rig = On("MyChoice");
+        var draft = rig.Seed(idea: Named);
+        rig.Store.OnLock = () => rig.Settings = rig.Settings with { Id = 2, SnapshotHash = new string('f', 64) };
+
+        (await AskAsync(rig, draft.Id)).Started.ShouldBeTrue();
+        (rig.Store.LastDecision!.SettingsId, rig.Store.LastDecision.SnapshotHash).ShouldBe((2L, new string('f', 64)));
+    }
+
+    [Theory]
+    [InlineData("Buy on NIFTY_BANK when the close is above VWAP with RSI(14).", false)]
+    [InlineData("Buy on NIFTY-50 when the close is above VWAP with RSI(14).", false)]
+    [InlineData("Buy on NIFTY.BANK when the close is above VWAP with RSI(14).", false)]
+    [InlineData("Buy on NIFTY_ when the close is above VWAP with RSI(14).", false)]
+    [InlineData("Buy when the close is above VWAP with RSI(14), on NIFTY.", true)]
+    [InlineData("Buy on (NIFTY) when the close is above VWAP with RSI(14).", true)]
+    [InlineData("Buy on NIFTY, not a second basket, when the close is above VWAP.", true)]
+    [InlineData("Do not use NIFTY when the close is above VWAP with RSI(14).", true)]
+    public void Word_characters_include_underscore_and_hyphen_and_a_dot_before_a_letter(string idea, bool matches)
+    {
+        var found = AutoDraftHandler.BasketsNamedIn(idea, [DraftRig.Basket("NIFTY"), DraftRig.Basket("Other")]);
+
+        (found.Count == 1).ShouldBe(matches);
+    }
+
+    [Fact]
+    public async Task A_failed_decision_write_is_tried_again_and_a_second_failure_is_thrown_after_it_is_logged()
+    {
+        var once = On("MyChoice");
+        once.Store.FailInserts = 1;
+        var twice = On("MyChoice");
+        twice.Store.FailInserts = 2;
+
+        (await AskAsync(once, once.Seed(idea: Named).Id)).Started.ShouldBeTrue();
+        once.Store.InsertTries.ShouldBe(2);
+        await Should.ThrowAsync<InvalidOperationException>(async () => await AskAsync(twice, twice.Seed(idea: Named).Id));
+        twice.Store.InsertTries.ShouldBe(2);
+        twice.Store.Decisions.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task A_taken_id_is_left_for_the_owner()
     {
         var rig = On("MyChoice");

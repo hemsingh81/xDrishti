@@ -29,6 +29,9 @@ internal static partial class DraftLog
     [LoggerMessage(EventId = 6178, Level = LogLevel.Information, Message = "assistant.draft.auto id={Id} started={Started} reason={Reason}")]
     public static partial void Auto(ILogger logger, long id, bool started, string reason);
 
+    [LoggerMessage(EventId = 6179, Level = LogLevel.Error, Message = "assistant.draft.decision_not_written id={Id} strategy={Strategy} version={Version}")]
+    public static partial void DecisionNotWritten(ILogger logger, long id, string strategy, int version);
+
     [LoggerMessage(EventId = 6177, Level = LogLevel.Error, Message = "assistant.draft.job_crashed id={Id}")]
     public static partial void JobCrashed(ILogger logger, long id);
 }

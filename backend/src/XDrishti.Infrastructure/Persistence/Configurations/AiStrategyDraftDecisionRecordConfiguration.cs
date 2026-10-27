@@ -12,7 +12,7 @@ internal sealed class AiStrategyDraftDecisionRecordConfiguration : IEntityTypeCo
         {
             t.HasCheckConstraint("ck_ai_strategy_draft_decisions_decision", "decision IN ('confirmed', 'discarded')");
             t.HasCheckConstraint("ck_ai_strategy_draft_decisions_confirmed", "decision <> 'confirmed' OR (strategy_id IS NOT NULL AND strategy_version IS NOT NULL)");
-            t.HasCheckConstraint("ck_ai_strategy_draft_decisions_auto", "NOT auto OR (decision = 'confirmed' AND settings_id IS NOT NULL AND snapshot_hash IS NOT NULL AND actor = 'system:auto-draft')");
+            t.HasCheckConstraint("ck_ai_strategy_draft_decisions_auto", "(actor = 'system:auto-draft') = auto AND (NOT auto OR (decision = 'confirmed' AND settings_id IS NOT NULL AND snapshot_hash IS NOT NULL))");
         });
         builder.HasKey(x => x.Id).HasName("pk_strategy_draft_decisions");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();

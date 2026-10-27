@@ -53,6 +53,14 @@ internal sealed class AutoDraftHandler(
         }
 
         await using var confirmLock = await store.LockConfirmAsync(cancellationToken);
+
+        // The switch is read again under the lock: an owner who switched the option off while this waited for the lock must not get one stale run, and the setting row recorded below is the one read here.
+        current = await settings.CurrentAsync(cancellationToken);
+        if (!options.Enabled || !current.Enabled || !current.AutoLabQuickTest || current.Id is null || current.SnapshotHash is null)
+        {
+            return Left("off");
+        }
+
         var draft = await store.GetAsync(draftId, cancellationToken);
         if (draft is null || draft.Via != "job" || !OwnerConfirmation.IsOwnerActor(draft.RequestedBy))
         {
@@ -117,9 +125,8 @@ internal sealed class AutoDraftHandler(
         }
 
         var started = await start.HandleAsync(new StartLabRunCommand(created.Value.Id, created.Value.Version, basketId, null, "quick", null, null), cancellationToken);
-        await store.InsertDecisionAsync(
-            new NewDraftDecision(draft.Id, "confirmed", created.Value.Id, created.Value.Version, started.IsSuccess ? started.Value.Run.Id : null, false, true, current.Id, current.SnapshotHash, Actor, started.IsSuccess ? null : started.Error.Code),
-            CancellationToken.None);
+        await DecisionWriter.WriteAsync(
+            store, logger, new NewDraftDecision(draft.Id, "confirmed", created.Value.Id, created.Value.Version, started.IsSuccess ? started.Value.Run.Id : null, false, true, current.Id, current.SnapshotHash, Actor, started.IsSuccess ? null : started.Error.Code));
         return new AutoDraftOutcome(true, started.IsSuccess ? "started" : "run_not_started");
     }
 
@@ -131,9 +138,9 @@ internal sealed class AutoDraftHandler(
         {
             for (var at = idea.IndexOf(basket.Name, StringComparison.Ordinal); at >= 0; at = idea.IndexOf(basket.Name, at + 1, StringComparison.Ordinal))
             {
-                var before = at == 0 || !char.IsLetterOrDigit(idea[at - 1]);
+                var before = at == 0 || !IsWordChar(idea[at - 1]) && idea[at - 1] != '.';
                 var end = at + basket.Name.Length;
-                if (before && (end == idea.Length || !char.IsLetterOrDigit(idea[end])))
+                if (before && (end == idea.Length || !IsWordChar(idea[end]) && !(idea[end] == '.' && end + 1 < idea.Length && char.IsLetterOrDigit(idea[end + 1]))))
                 {
                     found.Add(basket.Id);
                     break;
@@ -143,6 +150,9 @@ internal sealed class AutoDraftHandler(
 
         return found;
     }
+
+    /// <summary>Letters, digits, underscore and hyphen are part of a name (so NIFTY_BANK and NIFTY-50 are not NIFTY); a dot is part of it only before a letter or digit ("NIFTY.BANK"), not at the end of a sentence. A negation ("not NIFTY") still matches: the idea is the owner's own text.</summary>
+    private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c is '_' or '-';
 
     private static AutoDraftOutcome Left(string reason) => new(false, reason);
 }

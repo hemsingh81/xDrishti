@@ -80,6 +80,8 @@ public sealed class AssistantDraftDatabaseTests(ResearchGrantsTests.DedicatedSer
         await store.InsertAsync(Draft(id, "declined", null), Ct);
         (await Should.ThrowAsync<PostgresException>(async () => await store.InsertDecisionAsync(new NewDraftDecision(id, "confirmed", null, null, null, false, false, null, null, "owner:o@example.invalid"), Ct))).SqlState.ShouldBe("23514");
         (await Should.ThrowAsync<PostgresException>(async () => await store.InsertDecisionAsync(new NewDraftDecision(id, "confirmed", "X", 1, null, false, true, null, null, "system:auto-draft"), Ct))).SqlState.ShouldBe("23514");
+        // the reverse case: the auto actor on a decision that is not recorded as auto
+        (await Should.ThrowAsync<PostgresException>(async () => await store.InsertDecisionAsync(new NewDraftDecision(id, "confirmed", "X", 1, null, false, false, null, null, "system:auto-draft"), Ct))).SqlState.ShouldBe("23514");
         (await Should.ThrowAsync<PostgresException>(async () => await store.InsertDecisionAsync(new NewDraftDecision(id + 1000, "discarded", null, null, null, false, false, null, null, "owner:o@example.invalid"), Ct))).SqlState.ShouldBe("23503");
         var before = await store.CountAutoBetweenAsync(DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddDays(1), Ct);
         (await store.InsertDecisionAsync(new NewDraftDecision(id, "confirmed", "X", 1, null, false, true, 1, new string('a', 64), "system:auto-draft", "lab.no_data"), Ct)).Created.ShouldBeTrue();

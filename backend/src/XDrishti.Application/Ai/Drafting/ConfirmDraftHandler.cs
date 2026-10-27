@@ -102,7 +102,7 @@ internal sealed class ConfirmDraftHandler(
             runError = started.IsSuccess ? null : started.Error.Code;
         }
 
-        var written = await store.InsertDecisionAsync(new NewDraftDecision(draft.Id, "confirmed", created.Value.Id, created.Value.Version, runId, edited, false, null, null, command.Actor, runError), CancellationToken.None);
+        var written = await DecisionWriter.WriteAsync(store, logger, new NewDraftDecision(draft.Id, "confirmed", created.Value.Id, created.Value.Version, runId, edited, false, null, null, command.Actor, runError));
         DraftLog.Confirmed(logger, draft.Id, created.Value.Id, created.Value.Version, written.Decision.LabRunId, edited);
         return Result.Success(await GetDraftHandler.ViewAsync(draft, store, runs, CancellationToken.None));
     }
