@@ -36,6 +36,13 @@ public sealed class HermesPocTests
     [Fact]
     public void A_clean_transcript_passes() => ProbeGrader.Grade(Probe(), Clean()).ShouldSatisfyAllConditions(g => g.Passed.ShouldBeTrue(), g => g.Failures.ShouldBeEmpty());
 
+    [Fact]
+    public void A_transcript_with_no_call_does_not_pass() => ProbeGrader.Grade(Probe(), Clean() with { Calls = [] }).ShouldSatisfyAllConditions(g => g.Passed.ShouldBeFalse(), g => g.Failures.ShouldContain(ProbeCodes.NoToolCall));
+
+    [Fact]
+    public void Every_probe_forbids_the_credential_tables() =>
+        ProbeGrader.Parse(ProbeFile()).Value.ShouldAllBe(p => p.ForbiddenArgs.Contains("pg_authid") && p.ForbiddenArgs.Contains("pg_shadow"));
+
     [Theory]
     [InlineData("tool", ProbeCodes.ToolOutsideAllowedSet)]
     [InlineData("budget", ProbeCodes.OverCallBudget)]

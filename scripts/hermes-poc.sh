@@ -41,7 +41,7 @@ in_c() { podman exec "$C" "$@"; }
 
 mark() { # mark ID RESULT [EVIDENCE] [NOTE]
   mkdir -p "$DAY"; touch "$RESULTS"
-  printf '%s\t%s\t%s\t%s\n' "$1" "$2" "${3:-}" "${4:-}" >> "$RESULTS"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "${3:-}" "${4:-}" "$(digest)" >> "$RESULTS"
   printf '%-5s %-12s %s\n' "$1" "$2" "${4:-}"
 }
 
@@ -86,6 +86,7 @@ case "$cmd" in
     ;;
   mark)
     [[ "${1:-}" =~ ^H-([1-9]|1[0-2])$ && "${2:-}" =~ ^(PASS|FAIL|INCONCLUSIVE)$ ]] || die "usage: mark H-1..H-12 PASS|FAIL|INCONCLUSIVE [note]" 2
+    [[ "$1" =~ ^H-[34]$ && "$2" == PASS ]] && die "H-3 and H-4 are proved by the automated check only: run check $1." 3
     mark "$1" "$2" "" "${3:-owner}"
     ;;
   check)
@@ -117,11 +118,21 @@ case "$cmd" in
           python3 -I - "$ev.json" > "$ev" <<'PY' && local ok=1 || local ok=0
 import json,sys
 i=json.load(open(sys.argv[1]))[0]; h=i["HostConfig"]; bad=[]
+if "ALL" not in [c.upper() for c in (h.get("CapDrop") or [])]: bad.append("cap_drop ALL missing")
 if h.get("CapAdd"): bad.append("cap_add")
+if h.get("Privileged"): bad.append("privileged")
 if any(h.get("PortBindings") or {}): bad.append("ports")
+if h.get("PidMode") not in ("", "private", None): bad.append("pid mode "+str(h.get("PidMode")))
+if h.get("IpcMode") not in ("", "private", "shareable", None): bad.append("ipc mode "+str(h.get("IpcMode")))
+if "no-new-privileges" not in " ".join(h.get("SecurityOpt") or []): bad.append("no-new-privileges missing")
+if h.get("NetworkMode") in ("host","none") : bad.append("network mode "+str(h.get("NetworkMode")))
+nets=list((i.get("NetworkSettings",{}).get("Networks") or {}).keys())
+if len(nets)!=1 or not nets[0].endswith("ai-edge"): bad.append("networks "+str(nets))
+if h.get("ExtraHosts") or h.get("Dns"): bad.append("extra hosts or dns")
 if i["Config"].get("Env") and any(("TOKEN=" in e or "KEY=" in e or "PASSWORD=" in e) for e in i["Config"]["Env"]): bad.append("secret-in-env")
 for m in i.get("Mounts",[]):
-    if m.get("Type")=="bind" and "/run/secrets" not in m.get("Destination",""): bad.append("host-mount "+m.get("Destination",""))
+    ok = (m.get("Type")=="volume" and m.get("Name","").endswith("xd-hermes-data") and m.get("Destination")=="/opt/data") or (m.get("Type")=="tmpfs" and m.get("Destination") in ("/tmp","/run"))
+    if not ok: bad.append("mount "+str(m.get("Type"))+" "+str(m.get("Destination")))
 print("violations:",bad); sys.exit(1 if bad else 0)
 PY
           local s leak=0
@@ -133,15 +144,39 @@ PY
           [[ "$ok" == 1 && "$leak" == 0 ]] && mark H-3 PASS "$ev" "two secrets, no cap_add, no port, no host mount, no secret value in inspect or /opt/data" || mark H-3 FAIL "$ev" "see evidence (leak=$leak)" ;;
         H-4)
           need_running
-          if podman exec -i "$C" python3 - > "$ev" 2>&1 <<'PY'
+          if podman exec -i -w / "$C" python3 -I - > "$ev" 2>&1 <<'PY'
 import socket,sys
-def tcp(h,p):
+def tcp(h,p,fam=0):
     try: socket.create_connection((h,p),3).close(); return True
     except Exception: return False
 def dns(n):
     try: socket.gethostbyname(n); return True
     except Exception: return False
-r={"1.1.1.1:443":tcp("1.1.1.1",443),"dns example.com":dns("example.com"),"xd-db:5432":tcp("xd-db",5432),"xd-api:8080":tcp("xd-api",8080),"xd-seq:5341":tcp("xd-seq",5341),"xd-llm:8080 (must answer)":tcp("xd-llm",8080),"xd-mcp:8080 (must answer)":tcp("xd-mcp",8080)}
+def udp(h,p):
+    # a reply proves a route; silence is what we want
+    try:
+        s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.settimeout(3); s.sendto(b"\x1b"+47*b"\0",(h,p)); s.recvfrom(512); return True
+    except Exception: return False
+def gateways():
+    out=set()
+    try:
+        for l in open("/proc/net/route").read().split("\n")[1:]:
+            f=l.split()
+            if len(f)>2 and f[1]=="00000000":
+                g=bytes.fromhex(f[2])[::-1]; out.add(".".join(str(b) for b in g))
+    except Exception: pass
+    try:
+        me=socket.gethostbyname(socket.gethostname()).split("."); out.add(".".join(me[:3]+["1"]))
+    except Exception: pass
+    return sorted(out)
+r={"1.1.1.1:443":tcp("1.1.1.1",443),"1.1.1.1:80":tcp("1.1.1.1",80),"dns example.com":dns("example.com"),"ipv6 [2606:4700:4700::1111]:443":tcp("2606:4700:4700::1111",443),"udp 1.1.1.1:123":udp("1.1.1.1",123),
+   "169.254.169.254:80":tcp("169.254.169.254",80),"host.containers.internal:22":tcp("host.containers.internal",22),"host.containers.internal:443":tcp("host.containers.internal",443),
+   "xd-db:5432":tcp("xd-db",5432),"xd-api:8080":tcp("xd-api",8080),"xd-seq:5341":tcp("xd-seq",5341)}
+for g in gateways():
+    for p in (22,53,80,443,8080): r[f"gateway {g}:{p}"]=tcp(g,p)
+r["xd-llm:8080 (must answer)"]=tcp("xd-llm",8080)
+r["xd-mcp:8080 (must answer)"]=tcp("xd-mcp",8080)
+print("info (reachable only while the eval stack runs): xd-mcp-eval:8080 =",tcp("xd-mcp-eval",8080))
 print(r)
 sys.exit(0 if not any(v for k,v in r.items() if "must" not in k) and r["xd-llm:8080 (must answer)"] and r["xd-mcp:8080 (must answer)"] else 1)
 PY
@@ -174,11 +209,12 @@ PY
     }
     if [[ "$which" == all ]]; then for i in $(seq 1 12); do run_check "H-$i"; done; else run_check "$which"; fi
     # exit 0 only when every gating check passed (latest line per id wins)
-    python3 -I - "$RESULTS" <<'PY'
+    python3 -I - "$RESULTS" "$(digest)" <<'PY'
 import sys
 r={}
 for l in open(sys.argv[1]):
-    p=l.rstrip("\n").split("\t"); r[p[0]]=p[1]
+    p=l.rstrip("\n").split("\t")+["","","",""]
+    if p[4]==sys.argv[2]: r[p[0]]=p[1]
 sys.exit(0 if all(r.get(f"H-{i}")=="PASS" for i in range(1,13)) else 1)
 PY
     ;;
@@ -229,12 +265,14 @@ for l in open(sys.argv[1]):
     out="${HERMES_RECORD_OUT:-$ROOT/docs/research/p9-10-hermes-poc.md}"
     files=$(ls "$POC"/*/results.tsv 2>/dev/null || true)
     # latest line per check over all days; the decision rule: any FAIL -> REJECT; any other non-PASS or missing -> DEFER; else ADOPT_OPTIONAL
-    rows="$(python3 -I - $files <<'PY'
+    rows="$(python3 -I - "$(digest)" $files <<'PY'
 import sys
 r={}
-for f in sorted(sys.argv[1:]):
+# only rows made against the CURRENTLY pinned digest count: a result for another image is not evidence for this one
+for f in sorted(sys.argv[2:]):
     for l in open(f):
-        p=l.rstrip("\n").split("\t")+["","",""]; r[p[0]]=(p[1],p[2],p[3])
+        p=l.rstrip("\n").split("\t")+["","","","",""]
+        if p[4]==sys.argv[1]: r[p[0]]=(p[1],p[2],p[3])
 titles={1:"Healthy, non-root, read-only",2:"Completion at context 65536",3:"Secrets, capabilities, ports, mounts",4:"No route out",5:"Registered tools = include list",6:"Data questions (27 of 30, grounded)",7:"Ideas (8 of 10 valid)",8:"Five scheduled runs",9:"Injection probes (6 of 6)",10:"24 h memory and latency",11:"CVE status",12:"Owner verdicts and paired comparison"}
 for i in range(1,13):
     res=r.get(f"H-{i}",("not measured","",""))

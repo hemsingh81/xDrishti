@@ -23,11 +23,13 @@ public sealed class HermesRecordScriptTests : IDisposable
         throw new FileNotFoundException("scripts/hermes-poc.sh");
     }
 
+    private static string Digest() => System.Text.RegularExpressions.Regex.Match(File.ReadAllText(Path.Combine(Path.GetDirectoryName(Script())!, "..", "deploy", "hermes", "Dockerfile")), "@sha256:([0-9a-f]{64})").Groups[1].Value;
+
     private (int Exit, string Record) Record(IReadOnlyDictionary<int, string> results, params string[] args)
     {
         var day = Path.Combine(_dir, "2026-11-01");
         Directory.CreateDirectory(day);
-        File.WriteAllLines(Path.Combine(day, "results.tsv"), results.Select(r => $"H-{r.Key}\t{r.Value}\t\tnote"));
+        File.WriteAllLines(Path.Combine(day, "results.tsv"), results.Select(r => $"H-{r.Key}\t{r.Value}\t\tnote\t{Digest()}"));
         var output = Path.Combine(_dir, "record.md");
         File.Delete(output);
         var start = new ProcessStartInfo("bash") { RedirectStandardOutput = true, RedirectStandardError = true };
@@ -122,5 +124,45 @@ public sealed class HermesRecordScriptTests : IDisposable
     public void A_signed_verdict_needs_a_named_owner()
     {
         Record(AllPass(), "--verdict", "REJECT").Exit.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Rows_made_against_another_digest_are_ignored_and_a_manual_pass_of_the_automated_checks_is_refused()
+    {
+        var day = Path.Combine(_dir, "2026-11-01");
+        Directory.CreateDirectory(day);
+        File.WriteAllLines(Path.Combine(day, "results.tsv"), Enumerable.Range(1, 12).Select(i => $"H-{i}\tPASS\t\tnote\t{new string('f', 64)}"));
+        var output = Path.Combine(_dir, "stale.md");
+        var start = new ProcessStartInfo("bash") { RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var a in new[] { Script(), "record", "--verdict", "ADOPT_OPTIONAL", "--owner", "Owner" })
+        {
+            start.ArgumentList.Add(a);
+        }
+
+        start.Environment["HERMES_POC_DIR"] = _dir;
+        start.Environment["HERMES_RECORD_OUT"] = output;
+        using (var process = Process.Start(start)!)
+        {
+            process.StandardOutput.ReadToEnd();
+            process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            process.ExitCode.ShouldBe(3);
+        }
+
+        foreach (var id in new[] { "H-3", "H-4" })
+        {
+            var mark = new ProcessStartInfo("bash") { RedirectStandardOutput = true, RedirectStandardError = true };
+            foreach (var a in new[] { Script(), "mark", id, "PASS" })
+            {
+                mark.ArgumentList.Add(a);
+            }
+
+            mark.Environment["HERMES_POC_DIR"] = _dir;
+            using var process = Process.Start(mark)!;
+            process.StandardOutput.ReadToEnd();
+            process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            process.ExitCode.ShouldBe(3, id);
+        }
     }
 }

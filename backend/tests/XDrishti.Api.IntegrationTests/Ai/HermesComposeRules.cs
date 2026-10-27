@@ -14,8 +14,10 @@ internal static partial class HermesComposeRules
     public static readonly string[] All =
     [
         "profile-hermes-only", "no-ports", "network-ai-edge-only", "ai-edge-internal", "ai-edge-members", "read-only-root", "cap-drop-all", "no-cap-add", "no-new-privileges", "tmpfs-tmp-and-run", "one-named-volume", "limits", "healthcheck", "exactly-two-secrets",
-        "no-secret-in-environment", "no-host-mount", "no-messaging-or-dashboard-variable", "not-restarting", "non-root-user", "image-pinned-by-tag-and-digest", "no-installer", "one-mcp-server-read-only-tools", "config-cannot-drift", "entrypoint-keeps-secrets-out-of-data", "profile-never-started-by-scripts",
+        "no-secret-in-environment", "no-host-mount", "no-messaging-or-dashboard-variable", "not-restarting", "non-root-user", "image-pinned-by-tag-and-digest", "no-installer", "one-mcp-server-read-only-tools", "config-cannot-drift", "entrypoint-keeps-secrets-out-of-data", "profile-never-started-by-scripts", "no-escape-hatches",
     ];
+
+    public static readonly string[] EscapeKeys = ["env_file", "network_mode", "pid", "ipc", "extra_hosts", "dns", "sysctls", "volumes_from", "group_add", "userns_mode", "depends_on", "links", "privileged", "devices", "cap_add"];
 
     public static readonly string[] IncludeList =
     [
@@ -48,7 +50,8 @@ internal static partial class HermesComposeRules
         Check("read-only-root", AiComposeRules.Text(service, "read_only") == "true");
         Check("cap-drop-all", AiComposeRules.List(service, "cap_drop") is ["ALL"]);
         Check("no-cap-add", !service.ContainsKey("cap_add"));
-        Check("no-new-privileges", AiComposeRules.List(service, "security_opt").Contains("no-new-privileges:true"));
+        Check("no-new-privileges", AiComposeRules.List(service, "security_opt") is ["no-new-privileges:true"]);
+        Check("no-escape-hatches", !EscapeKeys.Any(service.ContainsKey));
         Check("tmpfs-tmp-and-run", AiComposeRules.List(service, "tmpfs").Order(StringComparer.Ordinal).SequenceEqual(["/run", "/tmp"]));
         Check("one-named-volume", volumes is ["xd-hermes-data:/opt/data"]);
         Check("limits", AiComposeRules.Text(service, "mem_limit").Length > 0 && AiComposeRules.Text(service, "pids_limit") == "256" && AiComposeRules.Text(service, "cpus").Length > 0);
@@ -86,8 +89,9 @@ internal static partial class HermesComposeRules
         bool Mentions(string line) => line.Contains("MCP_TOKEN", StringComparison.Ordinal) || line.Contains("OPENAI_API_KEY", StringComparison.Ordinal);
         Check(
             "entrypoint-keeps-secrets-out-of-data",
-            !code.Any(l => l.Contains("/opt/data", StringComparison.Ordinal) && (Mentions(l) || l.Contains("/run/secrets", StringComparison.Ordinal))) && !code.Any(l => l.Contains("echo", StringComparison.Ordinal) && Mentions(l))
-            && code.Any(l => l.Contains("cp /opt/xd/config.yaml /opt/data/config.yaml", StringComparison.Ordinal)));
+            !code.Any(l => (l.Contains("$DATA", StringComparison.Ordinal) || l.Contains("/opt/data", StringComparison.Ordinal)) && (Mentions(l) || l.Contains("SECRETS", StringComparison.Ordinal) || l.Contains("/run/secrets", StringComparison.Ordinal))) && !code.Any(l => l.Contains("echo", StringComparison.Ordinal) && Mentions(l))
+            && !code.Any(l => l.Contains("MCP_TOKEN", StringComparison.Ordinal) && l.Contains('>'))
+            && code.Any(l => l.Contains("install -m 0600 \"$BAKED/config.yaml\" \"$DATA/config.yaml\"", StringComparison.Ordinal)));
 
         // Nothing but scripts/hermes-poc.sh may start the profile.
         Check("profile-never-started-by-scripts", !files.Scripts.Any(s => s.Value.Split('\n').Where(l => !l.TrimStart().StartsWith('#')).Any(l => StartsProfile().IsMatch(l))));
@@ -103,6 +107,6 @@ internal static partial class HermesComposeRules
     [GeneratedRegex(@"\b(curl|wget|pip3?|apt|apt-get|apk|npm|npx|yarn|uv)\b|git\s+clone|\|\s*(ba)?sh\b|\bADD\s+https?:", RegexOptions.IgnoreCase)]
     private static partial Regex Installer();
 
-    [GeneratedRegex(@"--profile[ =]hermes|COMPOSE_PROFILES[^\n]*hermes|xd-hermes", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"--profile[ =]hermes|COMPOSE_PROFILES[^\n]*hermes|\b(up|start|run|create)\b[^\n]*xd-hermes", RegexOptions.IgnoreCase)]
     private static partial Regex StartsProfile();
 }

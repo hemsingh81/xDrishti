@@ -21,3 +21,9 @@ Doc 14 section 6 wants Hermes Agent evaluated as an optional front-end (schedule
 - **The importer is not wired into the CLI.** `HermesAnswerImporter` (tested) and its Python mirror `scripts/hermes-merge.py` produce answer lines with `tool_results`, which `xd eval grade` now accepts. The `mcp.call` event (6030) does not yet carry the client name, so the call-count cross-check against the `xd-mcp` log is reported as unknown.
 - H-7 (ideas), H-8 (cron), H-10 to H-12 are recorded by the owner with `hermes-poc.sh mark`.
 - Log ids 6196 to 6199 are unused: the new code logs nothing.
+- **Known limits (review of the first commit):**
+  - The agent can edit `/opt/data/config.yaml` while it runs; the baked copy is installed (mode 0600, replacing a read-only copy) only at the next start. At each start the entrypoint also deletes `.env`, `plugins`, `hooks` and `.hooks` from the data volume; skills, memory, sessions and cron are kept because the weekly `review` and the cron check need them.
+  - `xd-hermes` shares `llm_api_key` with `xd-api` and the eval runner: it cannot be revoked alone (the MCP token can). `xd-llm` runs with one slot (`-np 1`), so Hermes can starve the built-in assistant while a scheduled run is in progress.
+  - Two clients with one token value stop `xd-mcp` from starting (`McpOptions` validation); the check covers the eval token too.
+  - A result row carries the pinned digest and `record` ignores rows made against another digest; `mark` cannot record PASS for H-3 or H-4 (automated only).
+  - A probe transcript with no tool call cannot pass.
