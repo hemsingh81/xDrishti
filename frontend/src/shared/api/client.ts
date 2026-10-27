@@ -47,6 +47,7 @@ const passwordCheckPaths = new Set<string>([
   '/api/lessons/{id}/dismiss',
   '/api/hypotheses/{id}/move',
   '/api/changelog/{id}/revert',
+  '/api/assistant/settings',
 ]);
 
 api.use({

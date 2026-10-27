@@ -1,5 +1,6 @@
 import AccountBalanceIcon from '@mui/icons-material/AccountBalanceOutlined';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesomeOutlined';
+import ChatIcon from '@mui/icons-material/ChatOutlined';
 import BarChartIcon from '@mui/icons-material/BarChartOutlined';
 import ChecklistIcon from '@mui/icons-material/ChecklistOutlined';
 import DnsIcon from '@mui/icons-material/DnsOutlined';
@@ -67,6 +68,7 @@ export const navigation: NavSection[] = [
       { path: '/learning', label: 'Learning', icon: PsychologyIcon },
       { path: '/reports', label: 'Reports', icon: BarChartIcon },
       { path: '/lab', label: 'Strategy Lab', icon: ScienceIcon },
+      { path: '/assistant', label: 'Assistant', icon: ChatIcon },
     ],
   },
   {

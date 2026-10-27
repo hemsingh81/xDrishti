@@ -5,6 +5,7 @@ import { findWrites } from './writeScan';
 // read-only, so a new feature that writes fails here until someone adds it to WRITER_FEATURES on purpose.
 const WRITER_FEATURES = new Set([
   'accounts',
+  'assistant',
   'auth',
   'baskets',
   'data',

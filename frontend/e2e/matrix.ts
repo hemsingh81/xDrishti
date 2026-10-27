@@ -13,9 +13,11 @@ import { buildPhase, mountPhase } from '../src/test/phaseFixtures';
 import { mount as mountPlans } from '../src/test/planScreen';
 import { replayServer } from '../src/test/replayFixtures';
 import { runKeyA } from '../src/test/reportFixtures';
-import { problemResponse, server } from '../src/test/server';
+import { server } from '../src/test/server';
+import { noStudies } from './noStudies';
 import { learningEmpty, learningFull, learningThin, records, recordsEmpty } from './learningMounts';
 import { mountTrades, reportBase, reportEmpty } from './reportMounts';
+import { assistantScreen } from './assistantScreen';
 import { auditEntry, mountAudit } from './auditFixtures';
 import type { State } from './checks/types';
 
@@ -41,16 +43,6 @@ const learning = (id: string, tab: string, mounts: Screen['mounts'], review = fa
   mounts,
 });
 
-const noStudies = () => {
-  server.use(
-    http.get('/api/learning/entry-windows', () =>
-      problemResponse({ title: 'None stored.', code: 'learning.entry_windows_not_found' }, 404),
-    ),
-    http.get('/api/learning/meta-policy', () =>
-      problemResponse({ title: 'None stored.', code: 'learning.meta_policy_not_found' }, 404),
-    ),
-  );
-};
 const smartRulesFull = () => {
   learningFull();
   noStudies();
@@ -259,4 +251,5 @@ export const screens: Screen[] = [
       },
     },
   },
+  assistantScreen,
 ];
