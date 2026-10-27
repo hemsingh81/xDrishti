@@ -82,10 +82,10 @@ MCP client, messaging gateways (Telegram, WhatsApp…), works with local OpenAI-
 **Decision:** not part of the core. Build the built-in assistant first. Evaluate Hermes in Phase 9 as an
 **optional front-end** (phone access, scheduled summaries) connected only to `xd-llm` and `xd-mcp`.
 
-**Why cautious:** a third-party review (Sept 2026) cites 44 published CVEs including high-severity
+**Why cautious:** a third-party review (Sept 2026) cites 44 published CVEs (UNVERIFIED: the figure was not reproduced; several 2026 CVE records exist, see P9-10 D9) including high-severity
 remote-code-execution and supply-chain issues, and an audit found unrestricted shell and credential-file
 access in default config; self-written skills/memory can persist errors or injected instructions; it needs
-≥ 32–64K context.
+≥ 64K context (corrected from "32–64K": Hermes rejects smaller windows, P9-10 D6). The PoC bench is built (P9-10, [ADR 0144](../adr/0144-the-hermes-agent-poc-is-a-contained-bench-the-owner-starts-an-isolated-network-two-credentials-a-pinned-image-and-a-default-verdict-of-reject.md)); the verdict is the owner's.
 
 **If adopted, mandatory hardening:** own image from a pinned release (no `curl | bash`); shell, browser,
 web-search, file-system and media tools disabled; only `xd-mcp` registered; no secrets mounted; egress only

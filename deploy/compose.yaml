@@ -293,7 +293,7 @@ services:
     secrets: [llm_api_key]
     volumes:
       - ${XD_MODELS_DIR:-../data/models-llm}:/mnt/models:ro
-    networks: [back]
+    networks: [back, ai-edge] # ai-edge: the Hermes PoC network (P9-10); a member of both, never a router
     mem_limit: 8g # PLACEHOLDER until measured (P9-01 AC 10, UNVERIFIED)
     healthcheck:
       test: [CMD, curl, -fsS, "http://127.0.0.1:8080/health"]
@@ -354,7 +354,9 @@ services:
         target: Database__SqlPassword
       - source: eval_mcp_token
         target: Mcp__Tokens__Eval
-    networks: [back]
+      - source: mcp_token_hermes
+        target: Mcp__Tokens__Hermes
+    networks: [back, ai-edge]
     mem_limit: 512m
     depends_on:
       xd-db: { condition: service_healthy }
@@ -445,7 +447,9 @@ services:
         target: Database__SqlPassword
       - source: mcp_token
         target: Mcp__Tokens__Api
-    networks: [back]
+      - source: mcp_token_hermes
+        target: Mcp__Tokens__Hermes
+    networks: [back, ai-edge]
     mem_limit: 512m
     depends_on:
       xd-migrate: { condition: service_completed_successfully }
@@ -457,16 +461,51 @@ services:
       retries: 3
     <<: *hardening
 
+  # ---- The Hermes Agent PoC (P9-10, ADR 0144). Profile `hermes` = NEVER started by xd-up.sh, xd-down.sh, xd-ai.sh or xd-eval.sh; only the owner's `scripts/hermes-poc.sh up`. Third-party, self-modifying agent: it sits alone on the internal
+  # network `ai-edge` with xd-llm and xd-mcp (no route to the database, the API or the internet), holds exactly two credentials, publishes no port, and writes only to its own volume. Rules: deploy/CLAUDE.md, checked by HermesComposeRulesTests. ----
+  # UNVERIFIED until check H-1 runs: that the image starts read-only, non-root, with every capability dropped and no messaging platform; the healthcheck command.
+  xd-hermes:
+    profiles: [hermes]
+    build:
+      context: ./hermes
+    image: localhost/xdrishti/hermes:${XD_VERSION:-0.1.0}
+    restart: "no"
+    command: [gateway, run] # UNVERIFIED: the scheduler host without a platform
+    user: "10000:10000"
+    read_only: true
+    tmpfs: [/tmp, /run]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g # PLACEHOLDER until H-10
+    pids_limit: 256
+    cpus: 2
+    environment:
+      XD_MCP_URL: ${XD_HERMES_MCP_URL:-http://xd-mcp:8080/mcp}
+    volumes:
+      - xd-hermes-data:/opt/data
+    secrets: [llm_api_key, mcp_token_hermes]
+    networks: [ai-edge]
+    healthcheck:
+      test: [CMD, hermes, --version] # UNVERIFIED: the image's real health command is found in H-1
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
 networks:
   front: {}
   back:
     internal: true
   # Outbound internet for xd-api (Dhan sign-in, ADR 0008, 0009; instrument master files, ADR 0010) and xd-feed (the market-data WebSocket, ADR 0024). Not internal, no published ports, no other member.
   egress: {}
+  # The Hermes PoC network (P9-10): internal (no route out); only xd-hermes, xd-llm, xd-mcp and xd-mcp-eval are members.
+  ai-edge:
+    internal: true
 
 volumes:
   xd-db-data: {}
   xd-seq-data: {}
+  xd-hermes-data: {}
 
 # Secret files are written from the macOS Keychain by deploy/xd-up.sh (never committed, never in images).
 secrets:
@@ -492,3 +531,5 @@ secrets:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/mcp_token
   eval_mcp_token:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/eval_mcp_token
+  mcp_token_hermes:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/mcp_token_hermes

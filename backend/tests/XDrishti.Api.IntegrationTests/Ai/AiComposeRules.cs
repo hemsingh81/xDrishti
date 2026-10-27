@@ -33,7 +33,7 @@ internal static partial class AiComposeRules
 
         Check("profile-ai-only", List(service, "profiles") is ["ai"]);
         Check("no-ports", !service.ContainsKey("ports"));
-        Check("network-back-only", NetworkNames(service) is ["back"]);
+        Check("network-back-only", NetworkNames(service) is ["back", "ai-edge"]);
         var image = Text(service, "image");
         Check("image-tag-and-digest", image.StartsWith("quay.io/ramalama/ramalama:0.25.0@" + Digest, StringComparison.Ordinal));
         Check("cap-drop-all", List(service, "cap_drop") is ["ALL"]);

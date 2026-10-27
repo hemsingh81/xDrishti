@@ -36,16 +36,16 @@ public sealed class McpComposeRulesTests
     {
         { "profile-ai-only", "profiles: [ai]", "profiles: [ai, ops]" },
         { "no-ports", "restart: unless-stopped\n    environment:\n      DOTNET_ENVIRONMENT", "restart: unless-stopped\n    ports: [\"127.0.0.1:8081:8080\"]\n    environment:\n      DOTNET_ENVIRONMENT" },
-        { "network-back-only", "networks: [back]\n    mem_limit: 512m", "networks: [back, egress]\n    mem_limit: 512m" },
+        { "network-back-only", "networks: [back, ai-edge]\n    mem_limit: 512m", "networks: [back, egress]\n    mem_limit: 512m" },
         { "cap-drop-all", "<<: *hardening", "read_only: true\n    security_opt: [no-new-privileges:true]" },
         { "no-new-privileges", "<<: *hardening", "read_only: true\n    cap_drop: [ALL]" },
         { "mem-limit", "mem_limit: 512m", "mem_limit: 4g" },
         { "healthcheck", "    healthcheck:\n      test: [CMD, dotnet, XDrishti.Mcp.dll", "    xhealthcheck:\n      test: [CMD, dotnet, XDrishti.Mcp.dll" },
         { "read-only-root", "<<: *hardening", "cap_drop: [ALL]\n    security_opt: [no-new-privileges:true]" },
-        { "exactly-three-secrets", "      - source: mcp_token\n        target: Mcp__Tokens__Api", "      - source: mcp_token\n        target: Mcp__Tokens__Api\n      - source: db_app_password\n        target: Database__Password" },
+        { "exactly-four-secrets", "      - source: mcp_token\n        target: Mcp__Tokens__Api", "      - source: mcp_token\n        target: Mcp__Tokens__Api\n      - source: db_app_password\n        target: Database__Password" },
         { "no-secret-in-environment", "ASPNETCORE_ENVIRONMENT: Production", "ASPNETCORE_ENVIRONMENT: Production\n      Mcp__Tokens__Api: abcdefghijklmnopqrstuvwxyz0123456789" },
         { "no-application-role", "Username=xd_mcp_sql\n", "Username=xd_app\n" },
-        { "no-volumes", "    networks: [back]\n    mem_limit: 512m", "    volumes: [\"../data:/data\"]\n    networks: [back]\n    mem_limit: 512m" },
+        { "no-volumes", "    networks: [back, ai-edge]\n    mem_limit: 512m", "    volumes: [\"../data:/data\"]\n    networks: [back, ai-edge]\n    mem_limit: 512m" },
         { "migrate-first", "xd-migrate: { condition: service_completed_successfully }\n    healthcheck:\n      test: [CMD, dotnet, XDrishti.Mcp.dll", "xd-migrate: { condition: service_started }\n    healthcheck:\n      test: [CMD, dotnet, XDrishti.Mcp.dll" },
         { "built-from-target-mcp", "target: mcp", "target: api" },
         { "restart-unless-stopped", "restart: unless-stopped\n    environment:\n      DOTNET_ENVIRONMENT", "restart: \"no\"\n    environment:\n      DOTNET_ENVIRONMENT" },
@@ -65,9 +65,10 @@ public sealed class McpComposeRulesTests
     public void The_token_and_the_two_passwords_are_mounted_only_where_the_design_says()
     {
         var services = Compose[..Compose.IndexOf("\nnetworks:\n", StringComparison.Ordinal)];
-        string[] Users(string secret) => [.. services.Split("\n  xd-", StringSplitOptions.None).Where(block => block.Contains($"source: {secret}", StringComparison.Ordinal)).Select(b => b.Split('\n')[0].TrimEnd(':'))];
+        string[] Users(string secret) => [.. services.Split("\n  xd-", StringSplitOptions.None).Where(block => block.Contains($"source: {secret}\n", StringComparison.Ordinal)).Select(b => b.Split('\n')[0].TrimEnd(':'))];
 
         Users("mcp_token").ShouldBe(["api", "mcp"], ignoreOrder: true, customMessage: "the token is read by the tool server and sent by the API");
+        Users("mcp_token_hermes").ShouldBe(["mcp", "mcp-eval"], ignoreOrder: true, customMessage: "Mcp:Tokens:Hermes is accepted by both tool servers; xd-hermes holds it as a plain short-syntax secret (P9-10)");
         Users("db_mcp_read_password").ShouldBe(["migrate", "mcp", "migrate-eval", "mcp-eval"], ignoreOrder: true, customMessage: "migrate sets the login, the tool server uses it, and so do the migration and the tool server of the eval (P9-09)");
         Users("db_mcp_sql_password").ShouldBe(["migrate", "mcp", "migrate-eval", "mcp-eval"], ignoreOrder: true);
         Compose.ShouldContain("target: AiRoles__ReadPassword");

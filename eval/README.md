@@ -27,3 +27,5 @@ Model-free tests (`scripts/check.sh`) cover the graders, statistics, thresholds,
 5. `scripts/xd-eval.sh compare <run>` compares with the accepted baseline (paired, exact sign test; it never blocks by itself), and `scripts/xd-eval.sh accept <run>` makes a gating PASS the baseline (needs `--reason` when a set got worse). `GET /api/assistant/evals/status` and the Assistant status then say whether the accepted run is still current: a new model, runtime, prompt version, set, threshold or fixture makes it stale.
 
 A model that is down is reported as `model_unavailable` and the partial run is never a pass. Answers of another assistant (Hermes, P9-10) are graded from a file with `scripts/xd-eval.sh grade --answers FILE --target hermes`.
+
+`eval/probes/injection.jsonl` (P9-10): the six injection probes of the Hermes PoC, graded by `ProbeGrader` (domain, tested). The fixture variant that carries the hostile text is not built yet, so `xd eval grade` does not grade probes; `xd eval grade` accepts an optional `tool_results` array per answer line.

@@ -53,7 +53,7 @@ internal sealed class GradeEvalAnswersHandler(IEvalFiles files, IConversationRea
                 return Result.Failure<EvalRunView>(EvalErrors.Invalid($"Only data questions are graded from a file; '{given.Set}' '{given.CaseId}' is not one."));
             }
 
-            var results = given.SessionId is { } session ? await ToolResultsAsync(session, cancellationToken) : null;
+            var results = given.ToolResults is { Count: > 0 } supplied ? supplied : given.SessionId is { } session ? await ToolResultsAsync(session, cancellationToken) : null;
             var grade = AnswerGrader.Grade(evalCase, given.Answer, results);
             var flags = new Dictionary<string, bool> { ["hard_fail"] = grade.HardFail };
             rows.Add(new CaseRepeatResult("data", evalCase.Id, given.Repeat, grade.Passed, grade.Grounded, null, flags, EvalText.Key(given.Answer)));
@@ -123,7 +123,9 @@ internal sealed class GradeEvalAnswersHandler(IEvalFiles files, IConversationRea
                     return Result.Failure<List<GivenAnswer>>(EvalErrors.Invalid($"line {number} is not an answer."));
                 }
 
-                list.Add(new GivenAnswer(root.GetProperty("set").GetString() ?? string.Empty, root.GetProperty("case_id").GetString() ?? string.Empty, repeat, answer, session, latency));
+                // Results taken from another assistant's own session store (the Hermes PoC, spec P9-10 AC 9) travel in the line; they are texts, never executed.
+                IReadOnlyList<string>? supplied = root.TryGetProperty("tool_results", out var t) && t.ValueKind == JsonValueKind.Array ? [.. t.EnumerateArray().Select(x => x.ValueKind == JsonValueKind.String ? x.GetString() ?? string.Empty : x.GetRawText())] : null;
+                list.Add(new GivenAnswer(root.GetProperty("set").GetString() ?? string.Empty, root.GetProperty("case_id").GetString() ?? string.Empty, repeat, answer, session, latency, supplied));
             }
             catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException or FormatException)
             {
@@ -134,5 +136,5 @@ internal sealed class GradeEvalAnswersHandler(IEvalFiles files, IConversationRea
         return list.Count == 0 ? Result.Failure<List<GivenAnswer>>(EvalErrors.Invalid("The answers file holds no answer.")) : Result.Success(list);
     }
 
-    private sealed record GivenAnswer(string Set, string CaseId, int Repeat, string Answer, Guid? SessionId, int LatencyMs);
+    private sealed record GivenAnswer(string Set, string CaseId, int Repeat, string Answer, Guid? SessionId, int LatencyMs, IReadOnlyList<string>? ToolResults);
 }

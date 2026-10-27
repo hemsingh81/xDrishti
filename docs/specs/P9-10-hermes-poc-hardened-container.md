@@ -128,3 +128,7 @@ None blocking the build. Owner acts afterwards, each with its default: approve t
 
 ## Review fixes 2026-10-25
 1. Stated that P9-02's event 6030 must include the client name. 2. ADR numbers stay "next free at build time" (0102 on 2026-10-25); the highest existing log id is 4801 and this slice uses 6196 to 6199. 3. Hermes still has no draft or proposal path: `lab_propose_run` is local to `xd-api` and the proposal inbox has no MCP tool, so the new password-and-capability gates of P9-07/P9-08 do not apply to it.
+
+
+## Built 2026-10-27 (ADR 0144)
+Built: Dockerfile (placeholder digest, `pin` writes the real one), config, entrypoint, compose service and `ai-edge`, `xd-up.sh` secret, `scripts/hermes-poc.sh` (+ `hermes-merge.py`), 25 static rules with planted tests, `ProbeGrader`, `HermesAnswerImporter`, `tool_results` in `xd eval grade`, probe file, record renderer and decision rule, docs. Cut: fixture variant `probes` and `grade --set probes` (H-9 INCONCLUSIVE until built), CLI wiring of the importer, the client name in event 6030, automated H-7/H-8/H-10 to H-12 (recorded with `mark`). Nothing was pulled, built or run.

@@ -1,0 +1,23 @@
+# 0144 — The Hermes Agent PoC is a contained bench the owner starts: an isolated network, two credentials, a pinned image and a default verdict of reject
+
+- **Status:** Proposed (written in P9-10 under the owner's delegation; the spec was treated as Approved). **SAFETY decision: a third-party, self-modifying agent in a container.** Becomes Accepted when the owner has read it. The adopt or reject verdict is a separate owner act recorded in `docs/research/p9-10-hermes-poc.md`.
+- **Date:** 2026-10-27.
+- **Relation to other ADRs:** [0005](0005-local-llm-runtime-and-models.md), [0136](0136-the-local-model-server-runs-in-a-container-on-the-gpu-the-pick-is-qwen3-30b-a3b-with-the-thinking-mode-off-gpt-oss-20b-is-the-alternate.md) (`xd-llm`), [0137](0137-the-assistants-tools-run-in-a-separate-read-only-server-under-two-database-roles-that-can-select-only-from-reviewed-views-and-the-switch-lives-in-the-database.md) (`xd-mcp`, a token per client), [0143](0143-the-eval-grades-the-assistant-by-code-on-a-synthetic-fixture-read-only-with-exact-numbers-intervals-and-an-owner-accepted-baseline.md) (`xd eval grade --target hermes`).
+
+## Context
+Doc 14 section 6 wants Hermes Agent evaluated as an optional front-end (scheduled summaries, later a phone). It is a fast-moving third-party project with a record of security advisories and it can write its own skills and memory. The PoC must give evidence without ever giving the agent a route to the owner's data.
+
+## Decision
+1. **Definition only; the owner runs it.** `deploy/hermes/` (Dockerfile, config, entrypoint), the compose service `xd-hermes` (profile `hermes`) and `scripts/hermes-poc.sh`. No script of the stack starts, builds or pulls anything of Hermes (a test greps them). `pin`, `build` and `up` print what they will fetch and ask y/N.
+2. **Pinned by tag and digest, no installer.** The Dockerfile is `FROM docker.io/nousresearch/hermes-agent:0.22.5@sha256:<digest>` plus our config. The digest in the repository is an all-zero placeholder; `build` and `up` refuse it; only `scripts/hermes-poc.sh pin` (owner, y/N) writes the real one. Nothing was fetched while building this slice, so the tag and digest are UNVERIFIED.
+3. **Isolation by network.** A new internal network `ai-edge` holds `xd-hermes`, `xd-llm`, `xd-mcp` and `xd-mcp-eval` and nothing else. The three existing services join it in addition to `back` (the P9-01 and P9-02 network rules are amended to "`back` plus `ai-edge`"); a container is not a router, so Hermes has no path to the database, the API or the internet.
+4. **Two credentials.** `llm_api_key` and `mcp_token_hermes` (`Mcp:Tokens:Hermes`, Keychain `xdrishti/mcp/hermes-token`, revocable alone; `xd-mcp` and `xd-mcp-eval` accept it). Read from `/run/secrets` into the entrypoint's environment, never written to `/opt/data`.
+5. **Hardening.** Non-root 10000, read-only root, tmpfs `/tmp` and `/run`, `cap_drop: [ALL]`, `no-new-privileges`, memory, pids and cpu limits, no published port, one named volume, no host mount, no restart. Config is copied from the baked file at every start: only the `xd` MCP server with the 14 read-only tools, no built-in toolset, memory off, skill writes gated, approvals manual, no messaging.
+6. **Static rules.** 25 named rules in `HermesComposeRulesTests` (a planted violation of each) plus a test that the record script refuses `ADOPT_OPTIONAL` unless all twelve checks passed. Verdict rule: any FAIL gives REJECT, any other gap DEFER, only all-PASS may be adopted; the default is reject.
+
+## Cut or limited
+- **Nothing was run.** No image was pulled or built, no container started; every `hermes ...` command line, the health command, the config key names marked UNVERIFIED, the non-root and `cap_drop: [ALL]` start, and the session export format are unproven until the owner's checks H-1 to H-5.
+- **Fixture variant `probes` not built.** The fixture has no table for hypotheses, alerts or strategy notes; the carriers INJ-01, 02, 04 and 06 need seeder work. `ProbeGrader` and `eval/probes/injection.jsonl` exist and are tested; `xd eval grade --set probes` is not wired, so H-9 stays INCONCLUSIVE until it is.
+- **The importer is not wired into the CLI.** `HermesAnswerImporter` (tested) and its Python mirror `scripts/hermes-merge.py` produce answer lines with `tool_results`, which `xd eval grade` now accepts. The `mcp.call` event (6030) does not yet carry the client name, so the call-count cross-check against the `xd-mcp` log is reported as unknown.
+- H-7 (ideas), H-8 (cron), H-10 to H-12 are recorded by the owner with `hermes-poc.sh mark`.
+- Log ids 6196 to 6199 are unused: the new code logs nothing.

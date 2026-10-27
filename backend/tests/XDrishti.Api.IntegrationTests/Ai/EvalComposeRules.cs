@@ -32,14 +32,14 @@ internal static class EvalComposeRules
 
         Check("profile-eval-only", Services.All(s => AiComposeRules.List(Of(s), "profiles") is ["eval"]));
         Check("no-ports", Services.All(s => !Of(s).ContainsKey("ports") && !Of(s).ContainsKey("expose")));
-        Check("network-back-only", Services.All(s => AiComposeRules.NetworkNames(Of(s)) is ["back"]));
+        Check("network-back-only", Services.All(s => AiComposeRules.NetworkNames(Of(s)) is ["back"] || (s == "xd-mcp-eval" && AiComposeRules.NetworkNames(Of(s)) is ["back", "ai-edge"])));
         Check("hardening", Services.All(s => AiComposeRules.Text(Of(s), "read_only") == "true" && AiComposeRules.List(Of(s), "cap_drop") is ["ALL"] && AiComposeRules.List(Of(s), "security_opt").Contains("no-new-privileges:true")));
 
         var mcp = Of("xd-mcp-eval");
         var read = Env("xd-mcp-eval", "Database__ReadConnectionString");
         var sql = Env("xd-mcp-eval", "Database__SqlConnectionString");
         Check("mcp-eval-database", read.Contains("Database=xdrishti_eval;", StringComparison.Ordinal) && read.EndsWith("Username=xd_mcp_read", StringComparison.Ordinal) && sql.Contains("Database=xdrishti_eval;", StringComparison.Ordinal) && sql.EndsWith("Username=xd_mcp_sql", StringComparison.Ordinal));
-        Check("mcp-eval-secrets", McpComposeRules.Secrets(mcp).Order(StringComparer.Ordinal).SequenceEqual(["db_mcp_read_password", "db_mcp_sql_password", "eval_mcp_token"]) && composeText.Contains("target: Mcp__Tokens__Eval", StringComparison.Ordinal) && !AiComposeRules.EnvironmentLooksSecret(mcp));
+        Check("mcp-eval-secrets", McpComposeRules.Secrets(mcp).Order(StringComparer.Ordinal).SequenceEqual(["db_mcp_read_password", "db_mcp_sql_password", "eval_mcp_token", "mcp_token_hermes"]) && composeText.Contains("target: Mcp__Tokens__Eval", StringComparison.Ordinal) && !AiComposeRules.EnvironmentLooksSecret(mcp));
         Check("mcp-eval-image", AiComposeRules.Text(mcp, "image").StartsWith("localhost/xdrishti/mcp:", StringComparison.Ordinal) && AiComposeRules.Map(mcp, "build").TryGetValue("target", out var target) && target?.ToString() == "mcp" && AiComposeRules.Text(mcp, "mem_limit") == "512m" && mcp.ContainsKey("healthcheck"));
 
         Check(

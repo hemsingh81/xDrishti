@@ -19,3 +19,5 @@
 - Eval (P9-09, ADR 0143): profile `eval` = four services (`xd-migrate-eval`, `xd-mcp-eval`, `xd-eval-seed`, `xd-eval`), never part of `xd-up.sh`, started with `scripts/xd-eval.sh`. None publishes a port; all sit on `back` only
   (no egress); `xd-mcp-eval` reads only the database `xdrishti_eval` as the two read-only roles with its own token (`eval_mcp_token`); only `xd-eval` holds that token, and `xd-api` holds no eval token and no path to
   `xd-mcp-eval`. Checked by `EvalComposeRulesTests`.
+- Hermes PoC (P9-10, ADR 0144): profile `hermes` = `xd-hermes` only, never started by `xd-up.sh`, `xd-down.sh`, `xd-ai.sh` or `xd-eval.sh`; only the owner's `scripts/hermes-poc.sh up`. Network `ai-edge` is `internal` and holds only `xd-hermes`, `xd-llm`, `xd-mcp`, `xd-mcp-eval`
+  (the last three also stay on `back`). Exactly two secrets (`llm_api_key`, `mcp_token_hermes`), no published port, no host mount, image `FROM` pinned by tag AND digest with no installer. Checked by `HermesComposeRulesTests`.

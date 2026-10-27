@@ -238,6 +238,23 @@ public sealed class RunEvalTests
     }
 
     [Fact]
+    public async Task Tool_results_in_the_line_ground_the_answer_without_an_audit_session()
+    {
+        var rig = new EvalRig();
+        var handler = new GradeEvalAnswersHandler(new DiskEvalFiles(), Substitute.For<IConversationReader>(), rig.Store, new EvalRig.FakePrompts(rig), rig.Time, NullLogger<GradeEvalAnswersHandler>.Instance);
+        var lines = """
+            {"set":"data","case_id":"DQ-01","repeat":1,"answer":"ORB 15m has 24 trades.","tool_results":["{\"n\":24}"]}
+            {"set":"data","case_id":"DQ-02","repeat":1,"answer":"ORB 15m has 24 trades.","tool_results":[]}
+            """;
+
+        var run = (await handler.HandleAsync(new GradeEvalAnswersCommand(lines, "hermes", EvalErrors.CliActor), Ct)).Value;
+
+        var cases = rig.Store.Cases[run.Id];
+        cases.Single(c => c.CaseId == "DQ-01").Grounded.ShouldBe(true);
+        cases.Single(c => c.CaseId == "DQ-02").Grounded.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task The_reports_hold_the_rates_with_their_intervals_the_small_sample_sentence_and_the_failed_cases()
     {
         var rig = new EvalRig();

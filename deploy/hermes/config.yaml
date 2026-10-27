@@ -1,0 +1,42 @@
+# Hermes Agent configuration for the P9-10 PoC. Overwritten into /opt/data/config.yaml by entrypoint.sh at EVERY start, so it cannot drift.
+# Key names are from the Hermes docs as read on 2026-10-24 except those marked UNVERIFIED; check H-1 prints the effective config and fails on any key Hermes does not know.
+model:
+  provider: custom
+  model: xd-main
+  base_url: "http://xd-llm:8080/v1"
+  context_length: 65536 # Hermes needs at least 64,000 tokens of context (spec D6)
+
+# UNVERIFIED key names: the auxiliary model block points at the same endpoint (nothing else is reachable anyway).
+auxiliary:
+  provider: custom
+  model: xd-main
+  base_url: "http://xd-llm:8080/v1"
+
+mcp_servers:
+  xd:
+    url: "${XD_MCP_URL}" # http://xd-mcp:8080/mcp, or http://xd-mcp-eval:8080/mcp after `hermes-poc.sh eval-mode on`
+    headers:
+      Authorization: "Bearer ${MCP_TOKEN}"
+    tools:
+      include: [list_tables, describe_table, run_sql, lab_validate, get_report, list_runs, get_plan, get_cell, get_portfolio, get_basket, get_instrument, get_learning, get_system_status, calc]
+      resources: false
+      prompts: false
+    timeout: 30
+
+# Every built-in toolset off (spec D3). UNVERIFIED: no documented key restricts the agent to MCP tools only; check H-5 proves the result and a Hermes that cannot be restricted is rejected for that reason alone.
+toolsets: []
+
+memory:
+  memory_enabled: false
+
+skills:
+  write_approval: true
+  guard_agent_created: true
+
+# UNVERIFIED key name: manual approvals; a headless context denies by default.
+approvals:
+  mode: manual
+
+# Messaging gateways: none configured, allowlists empty (deny all).
+gateway:
+  allowlists: {}

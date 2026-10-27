@@ -141,6 +141,8 @@ write_secret db_mcp_sql_password "xdrishti/db/mcp-sql"
 write_secret mcp_token "xdrishti/mcp/token"
 # The eval's tool token (P9-09, ADR 0143): held by xd-mcp-eval and the one-shot eval runner only, never by xd-api. Created once, never replaced; the eval services are started by the owner (scripts/xd-eval.sh).
 write_secret eval_mcp_token "xdrishti/mcp/eval-token"
+# The Hermes PoC's own tool token (P9-10, ADR 0144): Mcp:Tokens:Hermes of xd-mcp / xd-mcp-eval, held by xd-hermes (profile hermes, never started here). Revoke it alone by rotating the Keychain item and restarting xd-mcp.
+write_secret mcp_token_hermes "xdrishti/mcp/hermes-token"
 
 # Credential-reference files of P1-16 (ADR 0007, replaced by the vault): plain copies of Keychain items that nothing reads any more.
 if [ -e "$XD_SECRETS_DIR/brokers" ] || [ -e "$XD_SECRETS_DIR/brokers.index" ]; then

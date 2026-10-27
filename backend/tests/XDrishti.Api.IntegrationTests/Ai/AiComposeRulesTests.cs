@@ -36,7 +36,7 @@ public sealed class AiComposeRulesTests
     {
         { "profile-ai-only", "profiles: [ai]", "profiles: [ai, ops]" },
         { "no-ports", "restart: \"no\"", "restart: \"no\"\n    ports: [\"127.0.0.1:8080:8080\"]" },
-        { "network-back-only", "networks: [back]\n    mem_limit: 8g", "networks: [back, egress]\n    mem_limit: 8g" },
+        { "network-back-only", "networks: [back, ai-edge] # ai-edge: the Hermes PoC network (P9-10); a member of both, never a router\n    mem_limit: 8g", "networks: [back, egress]\n    mem_limit: 8g" },
         { "image-tag-and-digest", "ramalama:0.25.0@sha256:d60dfda3113e127071d2b2679921c763d0eb7a0733596f68bf93a4ef1ca1216e", "ramalama:latest" },
         { "cap-drop-all", "<<: *hardening", "read_only: true" },
         { "no-new-privileges", "<<: *hardening", "read_only: true\n    cap_drop: [ALL]" },
@@ -73,7 +73,7 @@ public sealed class AiComposeRulesTests
         var services = Compose[..Compose.IndexOf("\nnetworks:\n", StringComparison.Ordinal)];
         var users = services.Split("\n  xd-", StringSplitOptions.None).Where(block => block.Contains("llm_api_key", StringComparison.Ordinal)).Select(b => b.Split('\n')[0].TrimEnd(':')).ToList();
 
-        users.ShouldBe(["api", "llm", "eval"], ignoreOrder: true, customMessage: "only xd-api, xd-llm and the eval runner (which asks the model, P9-09) may use llm_api_key");
+        users.ShouldBe(["api", "llm", "eval", "hermes"], ignoreOrder: true, customMessage: "only xd-api, xd-llm the eval runner (which asks the model, P9-09) and the Hermes PoC (P9-10) may use llm_api_key");
         Compose.ShouldContain("target: Assistant__Llm__ApiKey");
     }
 }
