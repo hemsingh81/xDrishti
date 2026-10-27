@@ -14096,6 +14096,308 @@
         }
       }
     },
+    "/api/assistant/status": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "The assistant's settings in force (off by default), the model server, the tool server (not asked while the assistant is off), whether a turn is running, whether the nightly run blocks it, and the evaluation (not_yet_evaluated until P9-09). Read only",
+        "operationId": "GetAssistantStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantStatusView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/chat": {
+      "post": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "Ask the assistant; the answer is a text/event-stream of turn, status, tool_call, tool_result, token, iteration_discard, ping, done and error events. Refusals come before the stream as problems: 409 assistant.disabled, assistant.busy, assistant.nightly_running; 503 assistant.model_unavailable (with state), assistant.tools_unavailable; 422 assistant.invalid, assistant.too_long; 404 assistant.not_found; 429 auth.rate_limited. Nothing is stored for a refusal",
+        "operationId": "ChatWithAssistant",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseItemOfstring"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/settings": {
+      "put": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "Change the assistant's switches as the owner; appends one audited row and answers the status. Needs a session and the CSRF token. A change that only reduces exposure (assistant off, portfolio context off, a lower budget) needs no password; any change that turns something on or raises it needs the password in the body, checked on EVERY such change (an earlier step-up window does not count). 401 auth.invalid_credentials, 423 auth.locked, 403 assistant.owner_only, 400 assistant.values_invalid or assistant.reason_invalid, 409 assistant.stale, 429 auth.rate_limited",
+        "operationId": "ChangeAssistantSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantStatusView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/conversations": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "The newest stored conversations (limit 1 to 50, default 20). Read only; nothing edits or deletes a conversation",
+        "operationId": "ListAssistantConversations",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationSummary"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/conversations/{id}": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "One conversation: its messages in order, each assistant message with its tool-call summaries, the grounding status and the figures that were not found in the tool results. 404 assistant.not_found",
+        "operationId": "GetAssistantConversation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/tool-calls/{id}": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "One stored tool call with its arguments and the result envelope (up to 64 KB), as the audit keeps it. 404 assistant.not_found",
+        "operationId": "GetAssistantToolCall",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredToolCall"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/plans/{id}/review": {
       "get": {
         "tags": [
@@ -15795,6 +16097,129 @@
           }
         },
         "description": "The body of an approval. Everything is optional; a ticket whose checks all passed needs no body. The actor comes from the signed-in session, never from here."
+      },
+      "AssistantChatRequest": {
+        "required": [
+          "conversationId",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "An existing conversation, or null to start one.",
+            "format": "uuid"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "1 to 2,000 characters, no control character."
+          }
+        },
+        "description": "The body of `POST /api/assistant/chat`: the question and, to continue a conversation, its id."
+      },
+      "AssistantSettingsRequest": {
+        "required": [
+          "enabled",
+          "portfolioContext",
+          "maxToolCalls",
+          "reason",
+          "expectedSettingsId",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "The assistant answers."
+          },
+          "portfolioContext": {
+            "type": "boolean",
+            "description": "The portfolio views show data to the tools."
+          },
+          "maxToolCalls": {
+            "type": "integer",
+            "description": "The budget of tool calls per question, 1 to 12.",
+            "format": "int32"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "expectedSettingsId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The row the form was loaded at (0 when none was stored); a stale form is a 409.",
+            "format": "int64"
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, for a change that raises exposure."
+          }
+        },
+        "description": "The body of `PUT /api/assistant/settings`. The actor is never in it (it comes from the session). Password is the owner's password for THIS change; it is needed when the change turns something on or raises it, and is not needed to switch something off or lower it."
+      },
+      "AssistantStatusView": {
+        "required": [
+          "enabled",
+          "portfolioContext",
+          "maxToolCalls",
+          "settingsId",
+          "llm",
+          "tools",
+          "busy",
+          "nightlyRunning",
+          "evaluation"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "portfolioContext": {
+            "type": "boolean"
+          },
+          "maxToolCalls": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "settingsId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "llm": {
+            "$ref": "#/components/schemas/LlmStatusView"
+          },
+          "tools": {
+            "$ref": "#/components/schemas/ToolsStatusView"
+          },
+          "busy": {
+            "type": "boolean"
+          },
+          "nightlyRunning": {
+            "type": "boolean"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/EvaluationView"
+          }
+        },
+        "description": "What `GET /api/assistant/status` answers (spec P9-03 AC 9). No key, address or path in it."
       },
       "AttentionAction": {
         "required": [
@@ -20295,6 +20720,87 @@
           }
         },
         "description": "One day (or VIX leg) the derivation did not use, with the reason code and the bars it had."
+      },
+      "ConversationDetail": {
+        "required": [
+          "id",
+          "title",
+          "origin",
+          "createdAt",
+          "modelId",
+          "settingsId",
+          "messages"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "modelId": {
+            "type": "string"
+          },
+          "settingsId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageView"
+            }
+          }
+        },
+        "description": "A conversation with its messages in order."
+      },
+      "ConversationSummary": {
+        "required": [
+          "id",
+          "title",
+          "origin",
+          "createdAt",
+          "messageCount",
+          "lastActivityAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "messageCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastActivityAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "A line of the conversation list (newest first)."
       },
       "CorporateActionPage": {
         "required": [
@@ -25115,6 +25621,33 @@
           }
         },
         "description": "The equity curves of a report for a lens, one per group, with the evidence of the report. At most int EquityView.MaxSeries groups are drawn; a lens with more is refused rather than cut silently."
+      },
+      "EvaluationView": {
+        "required": [
+          "state",
+          "at",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The result of the assistant's evaluation (P9-09): `not_yet_evaluated` until that slice writes one."
       },
       "EvidenceView": {
         "required": [
@@ -31377,6 +31910,113 @@
           }
         },
         "description": "Every member of the basket exactly once, in the wanted order."
+      },
+      "MessageView": {
+        "required": [
+          "id",
+          "turnId",
+          "seq",
+          "role",
+          "content",
+          "createdAt",
+          "finishReason",
+          "groundingStatus",
+          "ungrounded",
+          "promptTokens",
+          "completionTokens",
+          "firstTokenMs",
+          "totalMs",
+          "promptHash",
+          "noAnswerStored",
+          "toolCalls"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "turnId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seq": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "role": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "groundingStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ungrounded": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UngroundedSpan"
+            }
+          },
+          "promptTokens": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "completionTokens": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "firstTokenMs": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "totalMs": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "promptHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "noAnswerStored": {
+            "type": "boolean"
+          },
+          "toolCalls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolCallSummary"
+            }
+          }
+        },
+        "description": "A stored message. For an assistant message: the finish reason, the grounding status with the spans, the tokens and times, and its tool calls. For a user message: NoAnswerStored is true when the turn has no assistant message (a crash mid-turn)."
       },
       "MetaFoldView": {
         "required": [
@@ -40622,6 +41262,36 @@
         },
         "description": "A close-to-close move that was far above the median: `movePercent` is signed; `reversed` says the next bar took at least half of it back (a bad tick, not a real move)."
       },
+      "SseItemOfstring": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "eventType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "eventId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reconnectionInterval": {
+            "pattern": "^-?(\\d+\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "StartDataJobRequest": {
         "type": "object",
         "properties": {
@@ -40878,6 +41548,109 @@
           }
         },
         "description": "A strategy family as the library lists it (spec P3-02d, D4): the id, the style copied from its first version, whether it is a built-in, when it was created, its latest version number and how many versions it has."
+      },
+      "StoredToolCall": {
+        "required": [
+          "id",
+          "conversationId",
+          "turnId",
+          "callIndex",
+          "tool",
+          "arguments",
+          "status",
+          "errorCode",
+          "result",
+          "resultBytes",
+          "rows",
+          "truncated",
+          "evidence",
+          "redactions",
+          "injectionFlags",
+          "startedAt",
+          "durationMs"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "turnId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "callIndex": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "status": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            ]
+          },
+          "resultBytes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "evidence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            ]
+          },
+          "redactions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "injectionFlags": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A stored tool call with its envelope (up to 64 KB), as the audit keeps it."
       },
       "StrategyDetail": {
         "required": [
@@ -42003,6 +42776,90 @@
           }
         },
         "description": "One start on the timeline: the India time as `HH:mm` and the instant."
+      },
+      "ToolCallSummary": {
+        "required": [
+          "id",
+          "index",
+          "tool",
+          "arguments",
+          "status",
+          "errorCode",
+          "rows",
+          "truncated",
+          "durationMs",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "index": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "status": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "durationMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "evidence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            ]
+          }
+        },
+        "description": "A tool call as the conversation read shows it under the answer (the stored envelope is read with `GET /api/assistant/tool-calls/{id}`)."
+      },
+      "ToolsStatusView": {
+        "required": [
+          "state",
+          "count",
+          "schemaTokensEstimate"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "schemaTokensEstimate": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The state of the tool server as the status shows it: `ready`, `down` or `disabled` (the assistant is off, or no address and token are configured), how many tools it lists and the estimated tokens of their schemas."
       },
       "TrackResult": {
         "required": [
@@ -43299,6 +44156,28 @@
           }
         },
         "description": "What a transfer did. Only instruments that are members of the source are transferred: the others are `notInSource` (for a repeated move, the ones\nmoved before). `added` became members of the target, `alreadyInTarget` were there already, `removed` left the source (a move only),\n`newlyTracked` of the added ones were not tracked and are now."
+      },
+      "UngroundedSpan": {
+        "required": [
+          "start",
+          "end",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "end": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "description": "A figure of the answer that the tool results do not hold: its place in the text (UTF-16 code units, End exclusive) and the text itself."
       },
       "UnmatchedEntry": {
         "required": [

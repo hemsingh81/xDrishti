@@ -131,7 +131,7 @@ services:
       # (scripts/xd-ai.sh start) and is not part of the stack. xd-llm is on the internal `back` network: no route out.
       Assistant__Llm__Enabled: ${XD_ASSISTANT_LLM:-false}
       Assistant__Llm__BaseUrl: http://xd-llm:8080/v1
-      # The read-only tool server (P9-02, ADR 0137): where the chat endpoint of P9-03 will reach it. Nothing reads these two settings yet.
+      # The read-only tool server (P9-02, ADR 0137): where the chat endpoint of P9-03 reaches it (only while the assistant is switched on by the owner, the model server is ready and a question is asked).
       Assistant__Mcp__Url: http://xd-mcp:8080/mcp
     # The 1-minute CSV files (ADR 0016): read-only, the API never writes there. deploy/xd-up.sh creates the folder when it is missing.
     volumes:
@@ -145,7 +145,7 @@ services:
       # Key of the local model server (xd-llm checks it; the API sends it). Same file as xd-llm's.
       - source: llm_api_key
         target: Assistant__Llm__ApiKey
-      # Bearer token for the tool server (xd-mcp checks it; the API will send it from P9-03). Same file as xd-mcp's.
+      # Bearer token for the tool server (xd-mcp checks it; the API sends it from P9-03). Same file as xd-mcp's.
       - source: mcp_token
         target: Assistant__Mcp__Token
     # egress: outbound only, to Dhan's consent endpoints (auth.dhan.co; ADR 0008, 0009), the read of the account's holdings (GET api.dhan.co/v2/holdings

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Capabilities;
 using XDrishti.Application.Abstractions.Depth;
@@ -690,6 +691,14 @@ public static class DependencyInjection
         services.AddScoped<CapabilityViews>();
         services.AddScoped<IQueryHandler<GetCapabilitiesQuery, CapabilitiesView>, GetCapabilitiesHandler>();
         services.AddScoped<IQueryHandler<GetLlmStatusQuery, LlmStatusView>, GetLlmStatusHandler>(); // the state of the local model server, read only (P9-01)
+        services.AddSingleton<TurnGate>(); // one turn at a time (P9-03)
+        services.AddScoped<IAssistantTurnRunner, AssistantTurnService>(); // the only way to the model for question answering (P9-03, ADR 0138)
+        services.AddScoped<IQueryHandler<GetAssistantStatusQuery, AssistantStatusView>, GetAssistantStatusHandler>();
+        services.AddScoped<IQueryHandler<AssistantSettingsNeedPasswordQuery, bool>, AssistantSettingsNeedPasswordHandler>();
+        services.AddScoped<ICommandHandler<ChangeAssistantSettingsCommand, AssistantStatusView>, ChangeAssistantSettingsHandler>(); // the owner's switch; appends one audited row
+        services.AddScoped<IQueryHandler<ListAssistantConversationsQuery, IReadOnlyList<ConversationSummary>>, ListAssistantConversationsHandler>();
+        services.AddScoped<IQueryHandler<GetAssistantConversationQuery, Result<ConversationDetail>>, GetAssistantConversationHandler>();
+        services.AddScoped<IQueryHandler<GetAssistantToolCallQuery, Result<StoredToolCall>>, GetAssistantToolCallHandler>();
         services.AddScoped<ICommandHandler<ChangeCapabilityCommand, CapabilityChangeOutcome>, ChangeCapabilityHandler>(); // the one writer of the capability log; only the owner's endpoint calls it
         services.AddScoped<IQueryHandler<EvaluatePaperPhaseCheckQuery, Result<PaperPhaseCheckView>>, EvaluatePaperPhaseCheckHandler>(); // the paper phase check: reads only, judges nothing it cannot read (P10-06, ADR 0123)
         services.AddScoped<IQueryHandler<GetBacktestVsPaperQuery, Result<BacktestVsPaperView>>, GetBacktestVsPaperHandler>(); // backtest vs paper, computed on read (P10-04, ADR 0122)

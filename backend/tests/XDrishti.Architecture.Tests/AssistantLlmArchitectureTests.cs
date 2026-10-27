@@ -15,7 +15,7 @@ public sealed class AssistantLlmArchitectureTests
     private static readonly Assembly Infrastructure = typeof(XDrishti.Infrastructure.DependencyInjection).Assembly;
     private static readonly string[] AiNamespaces = ["XDrishti.Application.Ai", "XDrishti.Application.Abstractions.Ai", "XDrishti.Infrastructure.Ai"];
     private static readonly string[] Shipped = ["XDrishti.Domain", "XDrishti.Application", "XDrishti.Infrastructure", "XDrishti.Hosting", "XDrishti.Api", "XDrishti.Worker", "XDrishti.Feed"];
-    private static readonly string[] ClientLibraries = ["OpenAI", "System.ClientModel", "Microsoft.Extensions.AI"];
+    private static readonly string[] ClientLibraries = ["OpenAI", "System.ClientModel", "Microsoft.Extensions.AI", "ModelContextProtocol"];
 
     [Fact]
     public void Application_code_of_other_modules_references_no_assistant_type()
@@ -57,7 +57,7 @@ public sealed class AssistantLlmArchitectureTests
     {
         var api = Assembly.Load(new AssemblyName("XDrishti.Api"));
         var offenders = Types.InAssembly(api).That().HaveDependencyOnAny(AiNamespaces).GetTypes()
-            .Select(t => t.FullName!).Where(n => !n.StartsWith("XDrishti.Api.Endpoints.AssistantEndpoints", StringComparison.Ordinal) && !n.StartsWith("XDrishti.Api.Infrastructure.ApiJsonContext", StringComparison.Ordinal) && !n.StartsWith("XDrishti.Api.Infrastructure.ApiSetup", StringComparison.Ordinal)).ToList();
+            .Select(t => t.FullName!).Where(n => !n.StartsWith("XDrishti.Api.Endpoints.Assistant", StringComparison.Ordinal) && !n.StartsWith("XDrishti.Api.Infrastructure.ApiJsonContext", StringComparison.Ordinal) && !n.StartsWith("XDrishti.Api.Infrastructure.ApiSetup", StringComparison.Ordinal)).ToList();
 
         offenders.ShouldBeEmpty();
     }

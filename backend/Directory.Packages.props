@@ -18,6 +18,7 @@
     <PackageVersion Include="OpenAI" Version="2.14.0" />
   </ItemGroup>
   <ItemGroup Label="Read-only tool server (P9-02, ADR 0137)">
+    <PackageVersion Include="ModelContextProtocol" Version="2.3.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
   </ItemGroup>
   <ItemGroup Label="Spreadsheets (P2-17)">

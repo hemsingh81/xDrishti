@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using XDrishti.Api.Auth;
 using XDrishti.Api.Endpoints;
 using XDrishti.Api.Lab;
+using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Research;
@@ -105,6 +106,21 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ChangeChargeSheetCapabilityRequest))]
 [JsonSerializable(typeof(CapabilitiesView))]
 [JsonSerializable(typeof(LlmStatusView))]
+[JsonSerializable(typeof(AssistantStatusView))]
+[JsonSerializable(typeof(AssistantSettingsRequest))]
+[JsonSerializable(typeof(AssistantChatRequest))]
+[JsonSerializable(typeof(IReadOnlyList<ConversationSummary>))]
+[JsonSerializable(typeof(ConversationDetail))]
+[JsonSerializable(typeof(StoredToolCall))]
+[JsonSerializable(typeof(TurnStarted))]
+[JsonSerializable(typeof(TurnStatus))]
+[JsonSerializable(typeof(TurnToolCall))]
+[JsonSerializable(typeof(TurnToolResult))]
+[JsonSerializable(typeof(TurnToken))]
+[JsonSerializable(typeof(TurnIterationDiscard))]
+[JsonSerializable(typeof(TurnPing))]
+[JsonSerializable(typeof(TurnDone))]
+[JsonSerializable(typeof(TurnError))]
 [JsonSerializable(typeof(CapabilityChangeOutcome))]
 [JsonSerializable(typeof(ChangeCapabilityRequest))]
 [JsonSerializable(typeof(ExperimentPreviewView))]

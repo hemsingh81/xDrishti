@@ -5884,6 +5884,284 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiConversationRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("LlmBuild")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("llm_build");
+
+                    b.Property<string>("ModelId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("model_id");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("origin");
+
+                    b.Property<long?>("SettingsId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("settings_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id")
+                        .HasName("pk_conversations");
+
+                    b.HasIndex("CreatedAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_ai_conversations_created_at");
+
+                    b.HasIndex("SettingsId")
+                        .HasDatabaseName("ix_conversations_settings_id");
+
+                    b.ToTable("conversations", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_conversations_origin", "origin IN ('chat', 'eval', 'job')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiMessageRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<int?>("CompletionTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("completion_tokens");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("FinishReason")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("finish_reason");
+
+                    b.Property<int?>("FirstTokenMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("first_token_ms");
+
+                    b.Property<string>("GroundingStatus")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("grounding_status");
+
+                    b.Property<string>("ModelId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("model_id");
+
+                    b.Property<string>("PromptHash")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("prompt_hash");
+
+                    b.Property<int?>("PromptTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("prompt_tokens");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("role");
+
+                    b.Property<int>("Seq")
+                        .HasColumnType("integer")
+                        .HasColumnName("seq");
+
+                    b.Property<int?>("TotalMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_ms");
+
+                    b.Property<Guid>("TurnId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("turn_id");
+
+                    b.Property<string>("Ungrounded")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("ungrounded");
+
+                    b.HasKey("Id")
+                        .HasName("pk_messages");
+
+                    b.HasIndex("PromptHash")
+                        .HasDatabaseName("ix_messages_prompt_hash");
+
+                    b.HasIndex("TurnId")
+                        .HasDatabaseName("ix_ai_messages_turn_id");
+
+                    b.HasIndex("ConversationId", "Seq")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ai_messages_conversation_id_seq");
+
+                    b.ToTable("messages", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_messages_finish_reason", "finish_reason IS NULL OR finish_reason IN ('stop', 'length', 'tool_limit', 'cancelled', 'error')");
+
+                            t.HasCheckConstraint("ck_ai_messages_grounding_status", "grounding_status IS NULL OR grounding_status IN ('grounded', 'ungrounded', 'no_numbers', 'not_checked')");
+
+                            t.HasCheckConstraint("ck_ai_messages_role", "role IN ('user', 'assistant')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiModelCallRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Caller")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("caller");
+
+                    b.Property<int?>("CompletionTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("completion_tokens");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("error_code");
+
+                    b.Property<string>("FinishReason")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("finish_reason");
+
+                    b.Property<string>("ModelId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("model_id");
+
+                    b.Property<string>("ModelSha256")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("model_sha256");
+
+                    b.Property<string>("PromptHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("prompt_hash");
+
+                    b.Property<int?>("PromptTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("prompt_tokens");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("purpose");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("TotalMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_ms");
+
+                    b.HasKey("Id")
+                        .HasName("pk_model_calls");
+
+                    b.ToTable("model_calls", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_model_calls_purpose", "purpose IN ('briefing', 'draft', 'proposal', 'eval', 'other')");
+
+                            t.HasCheckConstraint("ck_ai_model_calls_status", "status IN ('ok', 'error', 'timeout', 'cancelled')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiPromptRecord", b =>
+                {
+                    b.Property<string>("Hash")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("hash");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("version");
+
+                    b.HasKey("Hash")
+                        .HasName("pk_prompts");
+
+                    b.ToTable("prompts", "ai");
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiSettingRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -5932,6 +6210,100 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("settings", "ai", t =>
                         {
                             t.HasCheckConstraint("ck_ai_settings_shape", "max_tool_calls >= 1 AND max_tool_calls <= 12 AND changed_by LIKE 'owner:%' AND length(btrim(changed_by)) > 6 AND length(btrim(reason)) >= 1 AND length(reason) <= 500");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiToolCallRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Arguments")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("arguments");
+
+                    b.Property<int>("CallIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("call_index");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<int>("DurationMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("error_code");
+
+                    b.Property<string>("Evidence")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("evidence");
+
+                    b.Property<int>("InjectionFlags")
+                        .HasColumnType("integer")
+                        .HasColumnName("injection_flags");
+
+                    b.Property<int>("Redactions")
+                        .HasColumnType("integer")
+                        .HasColumnName("redactions");
+
+                    b.Property<string>("Result")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("result");
+
+                    b.Property<int>("ResultBytes")
+                        .HasColumnType("integer")
+                        .HasColumnName("result_bytes");
+
+                    b.Property<int>("Rows")
+                        .HasColumnType("integer")
+                        .HasColumnName("rows");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("ToolName")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("tool_name");
+
+                    b.Property<bool>("Truncated")
+                        .HasColumnType("boolean")
+                        .HasColumnName("truncated");
+
+                    b.Property<Guid>("TurnId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("turn_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tool_calls");
+
+                    b.HasIndex("ConversationId", "TurnId", "CallIndex")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ai_tool_calls_conversation_id_turn_id_call_index");
+
+                    b.ToTable("tool_calls", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_tool_calls_result_bytes", "result_bytes >= 0 AND result_bytes <= 10485760");
+
+                            t.HasCheckConstraint("ck_ai_tool_calls_status", "status IN ('ok', 'error', 'timeout', 'refused', 'disabled')");
                         });
                 });
 
@@ -9091,6 +9463,41 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_skips_epochs_epoch_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiConversationRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Persistence.AiSettingRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SettingsId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_conversations_settings_settings_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiMessageRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Persistence.AiConversationRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_messages_conversations_conversation_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Persistence.AiPromptRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PromptHash")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_messages_prompts_prompt_hash");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiToolCallRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Persistence.AiConversationRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tool_calls_conversations_conversation_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Planning.ApprovalRecord", b =>

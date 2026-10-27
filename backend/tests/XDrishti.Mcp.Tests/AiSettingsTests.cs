@@ -9,7 +9,7 @@ public sealed class AiSettingsTests(ReadOnlyDatabase db)
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private Task ResetAsync() => ReadOnlyDatabase.ExecuteAsync(db.Owner, "TRUNCATE ai.settings");
+    private Task ResetAsync() => ReadOnlyDatabase.ExecuteAsync(db.Owner, "TRUNCATE ai.settings CASCADE");
 
     private Task SetAsync(bool enabled, bool portfolio, int calls = 6) =>
         ReadOnlyDatabase.ExecuteAsync(db.App, $"INSERT INTO ai.settings (enabled, portfolio_context, max_tool_calls, changed_by, reason) VALUES ({(enabled ? "true" : "false")}, {(portfolio ? "true" : "false")}, {calls}, 'owner:probe@example.test', 'settings test')");
@@ -59,7 +59,7 @@ public sealed class AiSettingsTests(ReadOnlyDatabase db)
         }
         finally
         {
-            await ReadOnlyDatabase.ExecuteAsync(db.Owner, "DELETE FROM portfolio.holdings; TRUNCATE ai.settings");
+            await ReadOnlyDatabase.ExecuteAsync(db.Owner, "DELETE FROM portfolio.holdings; TRUNCATE ai.settings CASCADE");
         }
     }
 
@@ -70,7 +70,7 @@ public sealed class AiSettingsTests(ReadOnlyDatabase db)
         await SetAsync(true, false);
 
         (await ReadOnlyDatabase.SqlStateAsync(db.App, "SELECT count(*) FROM ai.settings")).ShouldBeNull();
-        foreach (var statement in new[] { "UPDATE ai.settings SET enabled = false", "DELETE FROM ai.settings", "TRUNCATE ai.settings", "ALTER TABLE ai.settings ADD COLUMN x integer", "DROP TABLE ai.settings", "CREATE TABLE ai.x (i integer)" })
+        foreach (var statement in new[] { "UPDATE ai.settings SET enabled = false", "DELETE FROM ai.settings", "TRUNCATE ai.settings CASCADE", "ALTER TABLE ai.settings ADD COLUMN x integer", "DROP TABLE ai.settings", "CREATE TABLE ai.x (i integer)" })
         {
             (await ReadOnlyDatabase.SqlStateAsync(db.App, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }

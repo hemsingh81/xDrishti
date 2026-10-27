@@ -207,6 +207,16 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<AiSettingRecord> AiSettings => Set<AiSettingRecord>();
 
+    internal DbSet<AiPromptRecord> AiPrompts => Set<AiPromptRecord>();
+
+    internal DbSet<AiConversationRecord> AiConversations => Set<AiConversationRecord>();
+
+    internal DbSet<AiMessageRecord> AiMessages => Set<AiMessageRecord>();
+
+    internal DbSet<AiToolCallRecord> AiToolCalls => Set<AiToolCallRecord>();
+
+    internal DbSet<AiModelCallRecord> AiModelCalls => Set<AiModelCallRecord>();
+
     internal DbSet<ContextDailyRecord> ContextDaily => Set<ContextDailyRecord>();
 
     internal DbSet<ChargeSheetEventRecord> ChargeSheetEvents => Set<ChargeSheetEventRecord>();

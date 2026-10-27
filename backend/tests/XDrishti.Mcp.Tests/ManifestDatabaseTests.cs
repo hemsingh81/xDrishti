@@ -134,7 +134,7 @@ public sealed class ManifestDatabaseTests(ReadOnlyDatabase db)
     public async Task A_portfolio_view_shows_the_account_label_never_the_account_id_or_the_client_id()
     {
         await ReadOnlyDatabase.ExecuteAsync(db.Owner, """
-            TRUNCATE ai.settings;
+            TRUNCATE ai.settings CASCADE;
             DELETE FROM portfolio.holdings;
             DELETE FROM accounts.broker_accounts WHERE slug = 'label-probe';
             INSERT INTO accounts.broker_accounts (id, slug, name, broker, client_id, color, created_at, updated_at, data_enabled, data_primary, data_standby, live_feed_budget)
@@ -161,7 +161,7 @@ public sealed class ManifestDatabaseTests(ReadOnlyDatabase db)
         }
         finally
         {
-            await ReadOnlyDatabase.ExecuteAsync(db.Owner, "TRUNCATE ai.settings; DELETE FROM portfolio.holdings; DELETE FROM accounts.broker_accounts WHERE slug = 'label-probe'");
+            await ReadOnlyDatabase.ExecuteAsync(db.Owner, "TRUNCATE ai.settings CASCADE; DELETE FROM portfolio.holdings; DELETE FROM accounts.broker_accounts WHERE slug = 'label-probe'");
         }
     }
 }

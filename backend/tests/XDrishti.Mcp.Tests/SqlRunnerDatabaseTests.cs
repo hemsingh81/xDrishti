@@ -87,7 +87,7 @@ public sealed class SqlRunnerDatabaseTests(ReadOnlyDatabase db) : IAsyncLifetime
     [Fact]
     public async Task The_cursor_wrapper_refuses_select_into_and_a_data_modifying_statement_even_when_the_pre_check_is_bypassed()
     {
-        await ReadOnlyDatabase.ExecuteAsync(db.Owner, "TRUNCATE ai.settings");
+        await ReadOnlyDatabase.ExecuteAsync(db.Owner, "TRUNCATE ai.settings CASCADE");
 
         var into = await Runner.RunAsync("select * into temp t from aiv.instruments", 50, FiveSeconds, Ct);
         var modify = await Runner.RunAsync("with x as (insert into ai.settings (enabled, portfolio_context, max_tool_calls, changed_by, reason) values (true, true, 6, 'owner:x@example.test', 'x') returning 1) select * from x", 50, FiveSeconds, Ct);
@@ -100,7 +100,7 @@ public sealed class SqlRunnerDatabaseTests(ReadOnlyDatabase db) : IAsyncLifetime
     [Fact]
     public async Task A_second_statement_smuggled_past_the_pre_check_changes_nothing()
     {
-        await ReadOnlyDatabase.ExecuteAsync(db.Owner, "TRUNCATE ai.settings");
+        await ReadOnlyDatabase.ExecuteAsync(db.Owner, "TRUNCATE ai.settings CASCADE");
 
         foreach (var text in new[]
         {

@@ -1,0 +1,29 @@
+using System.Security.Cryptography;
+using System.Text;
+
+namespace XDrishti.Application.Ai;
+
+/// <summary>One prompt of the assistant: its name, version, text and the SHA-256 (hex) of the text, which is what <c>ai.prompts</c> and every message store.</summary>
+public sealed record PromptVersion(string Name, string Version, string Text, string Sha256);
+
+/// <summary>
+/// The prompts the assistant sends (spec P9-03): a static list of <c>(name, version, sha256)</c>. The chat prompt is the embedded file <c>system.v1.txt</c>; the date and time that are appended at run time are not part of the hash. Later slices (briefing, drafts, proposals, eval) add their own.
+/// </summary>
+public static class PromptRegistry
+{
+    private const string ChatResource = "XDrishti.Application.Ai.Prompts.system.v1.txt";
+
+    /// <summary>The system prompt of a chat turn.</summary>
+    public static PromptVersion Chat { get; } = Load("chat", "v1", ChatResource);
+
+    /// <summary>Every registered prompt.</summary>
+    public static IReadOnlyList<PromptVersion> All { get; } = [Chat];
+
+    private static PromptVersion Load(string name, string version, string resource)
+    {
+        using var stream = typeof(PromptRegistry).Assembly.GetManifestResourceStream(resource) ?? throw new InvalidOperationException($"The prompt {resource} is not embedded.");
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var text = reader.ReadToEnd().ReplaceLineEndings("\n").TrimEnd();
+        return new PromptVersion(name, version, text, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text))));
+    }
+}

@@ -8,6 +8,9 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Ai\Prompts\*.txt" LogicalName="XDrishti.Application.Ai.Prompts.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="XDrishti.Application.Tests" />
     <InternalsVisibleTo Include="XDrishti.Api.IntegrationTests" />
   </ItemGroup>

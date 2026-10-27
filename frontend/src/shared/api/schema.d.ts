@@ -4071,6 +4071,108 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/assistant/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The assistant's settings in force (off by default), the model server, the tool server (not asked while the assistant is off), whether a turn is running, whether the nightly run blocks it, and the evaluation (not_yet_evaluated until P9-09). Read only */
+    get: operations['GetAssistantStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/chat': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Ask the assistant; the answer is a text/event-stream of turn, status, tool_call, tool_result, token, iteration_discard, ping, done and error events. Refusals come before the stream as problems: 409 assistant.disabled, assistant.busy, assistant.nightly_running; 503 assistant.model_unavailable (with state), assistant.tools_unavailable; 422 assistant.invalid, assistant.too_long; 404 assistant.not_found; 429 auth.rate_limited. Nothing is stored for a refusal */
+    post: operations['ChatWithAssistant'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Change the assistant's switches as the owner; appends one audited row and answers the status. Needs a session and the CSRF token. A change that only reduces exposure (assistant off, portfolio context off, a lower budget) needs no password; any change that turns something on or raises it needs the password in the body, checked on EVERY such change (an earlier step-up window does not count). 401 auth.invalid_credentials, 423 auth.locked, 403 assistant.owner_only, 400 assistant.values_invalid or assistant.reason_invalid, 409 assistant.stale, 429 auth.rate_limited */
+    put: operations['ChangeAssistantSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/conversations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The newest stored conversations (limit 1 to 50, default 20). Read only; nothing edits or deletes a conversation */
+    get: operations['ListAssistantConversations'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/conversations/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One conversation: its messages in order, each assistant message with its tool-call summaries, the grounding status and the figures that were not found in the tool results. 404 assistant.not_found */
+    get: operations['GetAssistantConversation'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/tool-calls/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One stored tool call with its arguments and the result envelope (up to 64 KB), as the audit keeps it. 404 assistant.not_found */
+    get: operations['GetAssistantToolCall'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/plans/{id}/review': {
     parameters: {
       query?: never;
@@ -4592,6 +4694,51 @@ export interface components {
       reason: null | string;
       /** @description The checks approved despite, per account. */
       confirmations: null | components['schemas']['CheckConfirmationRequest'][];
+    };
+    /** @description The body of `POST /api/assistant/chat`: the question and, to continue a conversation, its id. */
+    AssistantChatRequest: {
+      /**
+       * Format: uuid
+       * @description An existing conversation, or null to start one.
+       */
+      conversationId: null | string;
+      /** @description 1 to 2,000 characters, no control character. */
+      message: null | string;
+    };
+    /** @description The body of `PUT /api/assistant/settings`. The actor is never in it (it comes from the session). Password is the owner's password for THIS change; it is needed when the change turns something on or raises it, and is not needed to switch something off or lower it. */
+    AssistantSettingsRequest: {
+      /** @description The assistant answers. */
+      enabled: boolean;
+      /** @description The portfolio views show data to the tools. */
+      portfolioContext: boolean;
+      /**
+       * Format: int32
+       * @description The budget of tool calls per question, 1 to 12.
+       */
+      maxToolCalls: number;
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /**
+       * Format: int64
+       * @description The row the form was loaded at (0 when none was stored); a stale form is a 409.
+       */
+      expectedSettingsId: null | number;
+      /** @description The owner's password, for a change that raises exposure. */
+      password: null | string;
+    };
+    /** @description What `GET /api/assistant/status` answers (spec P9-03 AC 9). No key, address or path in it. */
+    AssistantStatusView: {
+      enabled: boolean;
+      portfolioContext: boolean;
+      /** Format: int32 */
+      maxToolCalls: number;
+      /** Format: int64 */
+      settingsId: null | number;
+      llm: components['schemas']['LlmStatusView'];
+      tools: components['schemas']['ToolsStatusView'];
+      busy: boolean;
+      nightlyRunning: boolean;
+      evaluation: components['schemas']['EvaluationView'];
     };
     /**
      * @description What the owner can do about an item (ADR 0027), at most two per item. `Kind``route`: `Target` is an in-app path with its query (`/accounts?account=…&amp;tab=connection`) to navigate to. `Kind``command`: `Target` is an existing
@@ -6303,6 +6450,32 @@ export interface components {
       reason: string;
       /** Format: int32 */
       bars: number;
+    };
+    /** @description A conversation with its messages in order. */
+    ConversationDetail: {
+      /** Format: uuid */
+      id: string;
+      title: string;
+      origin: string;
+      /** Format: date-time */
+      createdAt: string;
+      modelId: string;
+      /** Format: int64 */
+      settingsId: null | number;
+      messages: components['schemas']['MessageView'][];
+    };
+    /** @description A line of the conversation list (newest first). */
+    ConversationSummary: {
+      /** Format: uuid */
+      id: string;
+      title: string;
+      origin: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: int32 */
+      messageCount: number;
+      /** Format: date-time */
+      lastActivityAt: string;
     };
     /** @description A page of corporate actions, newest ex-date first. `pending` is the number of suggestions waiting for a decision over all instruments, whatever the filter. */
     CorporateActionPage: {
@@ -8122,6 +8295,13 @@ export interface components {
       series: components['schemas']['EquitySeriesView'][];
       /** @description The evidence of the report. */
       evidence: components['schemas']['ReportEvidenceView'];
+    };
+    /** @description The result of the assistant's evaluation (P9-09): `not_yet_evaluated` until that slice writes one. */
+    EvaluationView: {
+      state: string;
+      /** Format: date-time */
+      at: null | string;
+      detail: null | string;
     };
     /** @description The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words. */
     EvidenceView: {
@@ -10428,6 +10608,33 @@ export interface components {
     /** @description Every member of the basket exactly once, in the wanted order. */
     MembersOrderInput: {
       instrumentIds: null | string[];
+    };
+    /** @description A stored message. For an assistant message: the finish reason, the grounding status with the spans, the tokens and times, and its tool calls. For a user message: NoAnswerStored is true when the turn has no assistant message (a crash mid-turn). */
+    MessageView: {
+      /** Format: int64 */
+      id: number;
+      /** Format: uuid */
+      turnId: string;
+      /** Format: int32 */
+      seq: number;
+      role: string;
+      content: string;
+      /** Format: date-time */
+      createdAt: string;
+      finishReason: null | string;
+      groundingStatus: null | string;
+      ungrounded: components['schemas']['UngroundedSpan'][];
+      /** Format: int32 */
+      promptTokens: null | number;
+      /** Format: int32 */
+      completionTokens: null | number;
+      /** Format: int32 */
+      firstTokenMs: null | number;
+      /** Format: int32 */
+      totalMs: null | number;
+      promptHash: null | string;
+      noAnswerStored: boolean;
+      toolCalls: components['schemas']['ToolCallSummary'][];
     };
     /** @description One fold of a stored policy evaluation. */
     MetaFoldView: {
@@ -14139,6 +14346,12 @@ export interface components {
       movePercent: number;
       reversed: boolean;
     };
+    SseItemOfstring: {
+      data?: null | string;
+      eventType?: null | string;
+      eventId?: null | string;
+      reconnectionInterval?: null | string;
+    };
     /**
      * @description Starts a data job. `steps`: any of csv · dhan · aggregate · quality (default csv, dhan and aggregate; always run in that order); `forceCsv` loads CSV files again that were loaded already
      *     and have not changed; `refetchGaps` makes the Dhan phase also retry the sessions it gave up on (status `unfillable`); `csvFiles` (at most 214 names from the CSV folder, only with the csv step) loads only
@@ -14219,6 +14432,36 @@ export interface components {
       latestVersion: number;
       /** Format: int32 */
       versionCount: number;
+    };
+    /** @description A stored tool call with its envelope (up to 64 KB), as the audit keeps it. */
+    StoredToolCall: {
+      /** Format: int64 */
+      id: number;
+      /** Format: uuid */
+      conversationId: string;
+      /** Format: uuid */
+      turnId: string;
+      /** Format: int32 */
+      callIndex: number;
+      tool: string;
+      arguments: components['schemas']['JsonElement'];
+      status: string;
+      errorCode: null | string;
+      result: null | components['schemas']['JsonElement'];
+      /** Format: int32 */
+      resultBytes: number;
+      /** Format: int32 */
+      rows: number;
+      truncated: boolean;
+      evidence: null | components['schemas']['JsonElement'];
+      /** Format: int32 */
+      redactions: number;
+      /** Format: int32 */
+      injectionFlags: number;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: int32 */
+      durationMs: number;
     };
     /** @description One family with the list of its versions (spec P5-01): no texts, those are read one version at a time. */
     StrategyDetail: {
@@ -14644,6 +14887,31 @@ export interface components {
       time: string;
       /** Format: date-time */
       at: string;
+    };
+    /** @description A tool call as the conversation read shows it under the answer (the stored envelope is read with `GET /api/assistant/tool-calls/{id}`). */
+    ToolCallSummary: {
+      /** Format: int64 */
+      id: number;
+      /** Format: int32 */
+      index: number;
+      tool: string;
+      arguments: components['schemas']['JsonElement'];
+      status: string;
+      errorCode: null | string;
+      /** Format: int32 */
+      rows: number;
+      truncated: boolean;
+      /** Format: int32 */
+      durationMs: number;
+      evidence: null | components['schemas']['JsonElement'];
+    };
+    /** @description The state of the tool server as the status shows it: `ready`, `down` or `disabled` (the assistant is off, or no address and token are configured), how many tools it lists and the estimated tokens of their schemas. */
+    ToolsStatusView: {
+      state: string;
+      /** Format: int32 */
+      count: number;
+      /** Format: int32 */
+      schemaTokensEstimate: number;
     };
     /**
      * @description What a track call did (all counts are of distinct instruments): `added` never tracked before, `reactivated` tracked again after an
@@ -15106,6 +15374,14 @@ export interface components {
       sourceMemberCount: number;
       /** Format: int32 */
       targetMemberCount: number;
+    };
+    /** @description A figure of the answer that the tool results do not hold: its place in the text (UTF-16 code units, End exclusive) and the text itself. */
+    UngroundedSpan: {
+      /** Format: int32 */
+      start: number;
+      /** Format: int32 */
+      end: number;
+      text: string;
     };
     /** @description An entry that named no instrument. `reason`: `not_found` · `ambiguous` (an ISIN of several instruments) · `invalid` (too long or with control characters). */
     UnmatchedEntry: {
@@ -25185,6 +25461,248 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAssistantStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AssistantStatusView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  ChatWithAssistant: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AssistantChatRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/event-stream': components['schemas']['SseItemOfstring'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ChangeAssistantSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AssistantSettingsRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AssistantStatusView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListAssistantConversations: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConversationSummary'][];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAssistantConversation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConversationDetail'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAssistantToolCall: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StoredToolCall'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

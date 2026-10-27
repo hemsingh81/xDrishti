@@ -418,7 +418,7 @@ Every decision-relevant row carries `as_of` timestamps and the `config_version` 
 | Insights | `GET /api/portfolio/actions?account=&severity=` · `POST /api/portfolio/actions/{key}/{snooze, done}` · `GET/POST/DELETE /api/alerts` · `GET /api/reports/insights` |
 | Risk profiles | `GET/POST/PUT/DELETE /api/risk-profiles` (step-up) |
 | Data | `GET /api/data/quality` · `GET /api/data/coverage` |
-| Assistant | `POST /api/assistant/chat` (streaming) |
+| Assistant | `POST /api/assistant/chat` (streaming, `text/event-stream`; the refusals are problems before the stream) · `GET /api/assistant/status` · `PUT /api/assistant/settings` (owner act; fresh password only to turn on or raise) · `GET /api/assistant/conversations` · `GET /api/assistant/conversations/{id}` · `GET /api/assistant/tool-calls/{id}` · `GET /api/assistant/llm-status` ([ADR 0138](../adr/0138-the-assistant-endpoint-runs-the-tool-loop-in-the-application-streams-events-marks-figures-not-found-in-the-tool-results-and-stores-every-turn-insert-only.md)) |
 | Real-time | SignalR `/hubs/events`: live prices & P&L (active set), alerts, job/import progress, nightly status. **Built in P2-10a ([ADR 0024](../adr/0024-live-feed-xd-feed-and-live-prices.md) §7, [spec](../specs/P2-10a-live-hub-and-live-portfolio-screen.md)):** the hub with server methods `Subscribe(scope)` / `Unsubscribe` and client events `pricesChanged` and `feedStatus`, plus `GET /api/live/status` (see below); Lab run progress is on it since P5-02 (`labRunProgress`, `labRunFinished`); alerts and nightly status use the same hub later |
 
 ## 7. Key flows

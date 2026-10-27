@@ -24,7 +24,7 @@ public sealed class ToolsDatabaseTests(ReadOnlyDatabase db)
 
     private async Task<(TestMcpHost Host, McpClient Client)> StartAsync(bool enabled = true, bool portfolio = false)
     {
-        await ReadOnlyDatabase.ExecuteAsync(db.Owner, "TRUNCATE ai.settings");
+        await ReadOnlyDatabase.ExecuteAsync(db.Owner, "TRUNCATE ai.settings CASCADE");
         if (enabled)
         {
             await ReadOnlyDatabase.ExecuteAsync(db.App, $"INSERT INTO ai.settings (enabled, portfolio_context, max_tool_calls, changed_by, reason) VALUES (true, {(portfolio ? "true" : "false")}, 6, 'owner:probe@example.test', 'tools test')");

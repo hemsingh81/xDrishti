@@ -37,6 +37,9 @@ internal static class ApiSetup
     /// <summary>The most owner decisions on a plan (approve, modify, reject, approve-all, mark seen) per minute and client (P7-10): far above a person, far below a script.</summary>
     public const int PlanDecisionsPerMinute = 120;
 
+    /// <summary>Chat questions per minute per session (spec P9-03).</summary>
+    public const int AssistantChatsPerMinute = 10;
+
     private static readonly string[] TrustedProxyNetworks = ["127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"];
 
     public static IServiceCollection AddApi(this IServiceCollection services)
@@ -269,6 +272,9 @@ internal static class ApiSetup
             o.AddPolicy(SessionAuthentication.PlanDecisionRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = PlanDecisionsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(AssistantEndpoints.ChatRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Request.Cookies[SessionAuthentication.CookieName] is { Length: > 0 } session ? "session:" + session : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = AssistantChatsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             o.OnRejected = async (context, _) =>
             {
                 int? retryAfter = null;

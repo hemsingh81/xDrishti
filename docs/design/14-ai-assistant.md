@@ -37,6 +37,15 @@ Model choice is config; select by our eval set, not leaderboards.
   `aiv` (one SELECT, 200 rows, 5 s, labelled "ad-hoc query, not checked by the report engine"), `lab_validate(yaml)` (stores nothing).
   **Later (P9-05):** `get_report(type, filters)`, `get_plan(date, account)`, `get_cell(key)`, `get_portfolio(group_by, as_of)`,
   `get_basket(name)`, `make_chart(spec)`. `lab_run` is dropped (P9-00 D9): a run is proposed, never started by the model.
+- **The endpoint (P9-03, [ADR 0138](../adr/0138-the-assistant-endpoint-runs-the-tool-loop-in-the-application-streams-events-marks-figures-not-found-in-the-tool-results-and-stores-every-turn-insert-only.md)):**
+  `POST /api/assistant/chat` streams `turn`, `status`, `tool_call`, `tool_result`, `token`, `iteration_discard`, `ping`, `done`, `error`. The loop
+  (up to the owner's budget of 1 to 12 tool calls, default 6; history of the last 6 messages with one line per old call, never old results; 10,000
+  characters of results per turn; 900 answer tokens; 180 s) is the application's, over a model port and the tool-server port. **Off by default**
+  (no `ai.settings` row = `409 assistant.disabled`, nothing called); turning it on or raising a setting is the owner's act with a fresh password in
+  the body, switching off needs none. **Grounding:** every figure of the answer is looked up in the tool results of that turn (and the question and
+  the tool arguments); unmatched figures are marked, not removed, and the message is `ungrounded` (a figure computed by the model itself is
+  unmatched: derived numbers come from `calc`). **Audit:** `ai.prompts`, `ai.conversations`, `ai.messages`, `ai.tool_calls` and `ai.model_calls`
+  are insert-only for the application role; each turn can be replayed from them. One turn at a time; no chat while the nightly run is running.
 - Guardrails: numbers only from tool results; no write tools except `lab_run`; no promotion; no config
   changes (only proposed diffs you apply in the Config screen); prompts and tool calls logged in `ai.*`;
   broker secrets never in context. If the LLM is down, the nightly plan is unaffected.

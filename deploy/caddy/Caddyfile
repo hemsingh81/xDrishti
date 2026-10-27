@@ -8,7 +8,10 @@
 }
 
 :8080 {
-	encode zstd gzip
+	# Compression for everything except the assistant's chat stream (P9-03): a compressor buffers a text/event-stream, and a model that
+	# writes for 20 seconds would then show nothing until the end.
+	@compressible not path /api/assistant/chat
+	encode @compressible zstd gzip
 
 	header {
 		X-Content-Type-Options nosniff
@@ -18,6 +21,21 @@
 		# The app, the API and the guarded docs are one origin: forbid foreign scripts, frames, forms and plugins.
 		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 		-Server
+	}
+
+	# The assistant's chat is a server-sent event stream (P9-03): flushed at once, never compressed (see @compressible above), not buffered,
+	# and the model's first token may take a while, so the connection is not cut early. Must come before the general API block.
+	@chat path /api/assistant/chat
+	handle @chat {
+		header ?Cache-Control "no-store"
+		reverse_proxy xd-api:8080 {
+			health_uri /health/live
+			health_interval 15s
+			flush_interval -1
+			transport http {
+				response_header_timeout 200s
+			}
+		}
 	}
 
 	# API, OpenAPI docs and health → xd-api.

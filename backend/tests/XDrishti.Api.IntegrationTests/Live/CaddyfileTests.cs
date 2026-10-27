@@ -94,6 +94,23 @@ public sealed partial class CaddyfileTests
         Caddyfile.ShouldNotContain("0.0.0.0");
     }
 
+    [Fact]
+    public void The_assistant_chat_stream_is_flushed_at_once_and_is_not_compressed()
+    {
+        // P9-03 AC 14: a text/event-stream is not compressed (a compressor holds it back) and is not buffered; everything else is still compressed. scripts/check-proxy.sh proves it end to end with a 2 s gap.
+        Caddyfile.ShouldContain("@compressible not path /api/assistant/chat");
+        Caddyfile.ShouldContain("encode @compressible zstd gzip");
+        Regex.IsMatch(Caddyfile, @"^\s*encode\s+zstd", RegexOptions.Multiline).ShouldBeFalse("a bare 'encode' would compress the chat stream");
+
+        var handler = Block("handle @chat");
+        handler.ShouldContain("reverse_proxy xd-api:8080");
+        handler.ShouldContain("flush_interval -1");
+        handler.ShouldNotContain("encode");
+        handler.ShouldNotContain("file_server");
+        Caddyfile.ShouldContain("@chat path /api/assistant/chat");
+        Caddyfile.IndexOf("handle @chat", StringComparison.Ordinal).ShouldBeLessThan(Caddyfile.IndexOf("handle @api", StringComparison.Ordinal));
+    }
+
     [GeneratedRegex(@"^\s*@hubs\s+path\s+/hubs/\*\s*$", RegexOptions.Multiline)]
     private static partial Regex HubsMatcher();
 }
