@@ -1,6 +1,6 @@
 import ErrorIcon from '@mui/icons-material/ErrorOutlineOutlined';
 import { Box, Typography } from '@mui/material';
-import { anchorSpans, type Span } from '../lib/markSpans';
+import { checkSpans, type Span } from '../lib/markSpans';
 import { GroundingBanner } from './GroundingBanner';
 import { PlainText } from './PlainText';
 import { ToolCallChips, type ChipCall } from './ToolCallChips';
@@ -27,6 +27,7 @@ export function AssistantMessage({
   streaming = false,
   working = null,
 }: AssistantMessageProps) {
+  const checked = checkSpans(text, grounding?.spans ?? []);
   return (
     <Box
       component="article"
@@ -50,7 +51,7 @@ export function AssistantMessage({
         </Typography>
       )}
       <Box sx={{ opacity: streaming ? 0.8 : 1 }}>
-        <PlainText text={text} spans={anchorSpans(text, grounding?.spans ?? [])} />
+        <PlainText text={text} spans={checked.valid} />
       </Box>
       {notes.map((note) => (
         <Box key={note} sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mt: 0.5, color: 'warning.main' }}>
@@ -60,7 +61,9 @@ export function AssistantMessage({
           </Typography>
         </Box>
       ))}
-      {grounding && <GroundingBanner status={grounding.status} count={grounding.spans.length} />}
+      {grounding && (
+        <GroundingBanner status={grounding.status} count={checked.valid.length} notLocated={checked.dropped} />
+      )}
       <ToolCallChips calls={calls} />
     </Box>
   );

@@ -103,7 +103,7 @@ export function conversationBuilder(over: Partial<ConversationDetail> = {}): Con
         createdAt: '2026-10-27T08:00:04Z',
         finishReason: 'stop',
         groundingStatus: 'ungrounded',
-        ungrounded: [{ start: 62, end: 64, text: '46' }],
+        ungrounded: [{ start: 51, end: 53, text: '46' }],
         promptTokens: 10,
         completionTokens: 20,
         firstTokenMs: 100,

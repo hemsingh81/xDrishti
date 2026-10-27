@@ -34,10 +34,12 @@ export function useChatStream(onDone: (conversationId: string) => void): ChatStr
   const controller = useRef<AbortController | null>(null);
   const queue = useRef<TurnAction[]>([]);
   const frame = useRef<number | null>(null);
+  const alive = useRef(true);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
 
   const flush = useCallback(() => {
+    if (!alive.current) return;
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     frame.current = null;
     const actions = queue.current;
@@ -47,19 +49,21 @@ export function useChatStream(onDone: (conversationId: string) => void): ChatStr
 
   const enqueue = useCallback(
     (action: TurnAction) => {
+      if (!alive.current) return;
       queue.current.push(action);
       frame.current ??= requestAnimationFrame(flush);
     },
     [flush],
   );
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
       controller.current?.abort();
       if (frame.current !== null) cancelAnimationFrame(frame.current);
-    },
-    [],
-  );
+    };
+  }, []);
 
   const send = useCallback(
     async (message: string, conversationId: string | null) => {
@@ -115,7 +119,7 @@ export function useChatStream(onDone: (conversationId: string) => void): ChatStr
       } finally {
         controller.current = null;
       }
-      if (seen.finished && seen.conversation) doneRef.current(seen.conversation);
+      if (alive.current && seen.finished && seen.conversation) doneRef.current(seen.conversation);
       return true;
     },
     [enqueue, flush],

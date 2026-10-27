@@ -51,6 +51,7 @@ export const toolCallQuery = (id: number) =>
 export function useChangeSettings() {
   const client = useQueryClient();
   return useMutation({
+    gcTime: 0,
     mutationFn: async (body: SettingsRequest) => unwrap(await api.PUT('/api/assistant/settings', { body })),
     onSuccess: (status) => {
       client.setQueryData(statusQuery.queryKey, status);

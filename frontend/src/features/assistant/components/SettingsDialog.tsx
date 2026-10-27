@@ -67,6 +67,12 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
     (!raises || password.length > 0) &&
     !change.isPending;
 
+  // Cleared after every try, right or wrong; never kept (the mutation state would hold the variables, password included).
+  const settle = () => {
+    setPassword('');
+    change.reset();
+  };
+
   const save = () => {
     setProblem(null);
     change.mutate(
@@ -81,15 +87,13 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
       },
       {
         onSuccess: () => {
+          settle();
           notify(words.settingsSaved, 'success');
           onClose();
         },
         onError: (error) => {
+          settle();
           setProblem(problemOf(error));
-        },
-        // Cleared after every try, right or wrong; never kept.
-        onSettled: () => {
-          setPassword('');
         },
       },
     );

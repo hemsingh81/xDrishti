@@ -29,5 +29,5 @@ event: token
 data: {"iteration":2,"text":"and about 46 of them won."}
 
 event: done
-data: {"messageId":502,"finishReason":"stop","grounding":{"status":"ungrounded","checked":3,"ungrounded":[{"start":62,"end":64,"text":"46"}]},"usage":{"promptTokens":1840,"completionTokens":38},"firstTokenMs":1210,"totalMs":4380}
+data: {"messageId":502,"finishReason":"stop","grounding":{"status":"ungrounded","checked":3,"ungrounded":[{"start":51,"end":53,"text":"46"}]},"usage":{"promptTokens":1840,"completionTokens":38},"firstTokenMs":1210,"totalMs":4380}
 

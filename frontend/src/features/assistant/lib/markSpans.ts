@@ -29,22 +29,15 @@ export function markSpans(text: string, spans: readonly Span[]): TextPart[] {
 }
 
 /**
- * Checks each span against the answer: the characters at its offsets must be the span's own text. A span that does not match is
- * moved to the nearest place where its text occurs (a drifted offset must not underline the wrong characters); one whose text
- * is nowhere in the answer is dropped (the banner still counts it).
+ * Keeps the spans whose characters at the offsets are the span's own text (offsets are exact UTF-16 indices). A span that does
+ * not match is dropped, never moved: `dropped` counts them so the screen can say how many figures it could not locate.
  */
-export function anchorSpans(answer: string, spans: readonly (Span & { text: string })[]): Span[] {
-  const out: Span[] = [];
-  for (const span of spans) {
-    if (span.text === '' || answer.slice(span.start, span.end) === span.text) {
-      out.push({ start: span.start, end: span.end });
-      continue;
-    }
-    let best = -1;
-    for (let i = answer.indexOf(span.text); i >= 0; i = answer.indexOf(span.text, i + 1)) {
-      if (best < 0 || Math.abs(i - span.start) < Math.abs(best - span.start)) best = i;
-    }
-    if (best >= 0) out.push({ start: best, end: best + span.text.length });
-  }
-  return out;
+export function checkSpans(
+  answer: string,
+  spans: readonly (Span & { text: string })[],
+): { valid: Span[]; dropped: number } {
+  const valid = spans
+    .filter((s) => s.text === '' || answer.slice(s.start, s.end) === s.text)
+    .map((s) => ({ start: s.start, end: s.end }));
+  return { valid, dropped: spans.length - valid.length };
 }

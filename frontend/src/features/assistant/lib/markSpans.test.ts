@@ -1,4 +1,4 @@
-import { anchorSpans, markSpans } from './markSpans';
+import { checkSpans, markSpans } from './markSpans';
 
 describe('markSpans', () => {
   it('counts offsets in UTF-16 code units (an emoji is two)', () => {
@@ -24,11 +24,13 @@ describe('markSpans', () => {
   });
 });
 
-describe('anchorSpans', () => {
+describe('checkSpans', () => {
   const answer = 'about 46 of them won, 46 again';
-  it('keeps a span whose characters match, moves a drifted one to the nearest match, drops one that is nowhere', () => {
-    expect(anchorSpans(answer, [{ start: 6, end: 8, text: '46' }])).toEqual([{ start: 6, end: 8 }]);
-    expect(anchorSpans(answer, [{ start: 20, end: 22, text: '46' }])).toEqual([{ start: 22, end: 24 }]);
-    expect(anchorSpans(answer, [{ start: 0, end: 3, text: '999' }])).toEqual([]);
+  it('keeps a span whose characters match and drops one that does not (never relocates)', () => {
+    expect(checkSpans(answer, [{ start: 6, end: 8, text: '46' }])).toEqual({
+      valid: [{ start: 6, end: 8 }],
+      dropped: 0,
+    });
+    expect(checkSpans(answer, [{ start: 20, end: 22, text: '46' }])).toEqual({ valid: [], dropped: 1 });
   });
 });

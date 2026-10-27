@@ -58,11 +58,18 @@ describe('sseParser', () => {
     expect(JSON.parse(frames[0]?.data ?? '{}')).toEqual({ text: 'café \u{1F600}' });
   });
 
-  it('does not grow without bound on a hostile endless line', () => {
+  it('does not grow without bound on a hostile endless line, and its tail never forms a frame', () => {
     const frames: SseFrame[] = [];
     const p = createSseParser((f) => frames.push(f));
     for (let i = 0; i < 30; i++) p.push('x'.repeat(100_000));
-    p.push('\n\nevent: ok\ndata: 1\n\n');
-    expect(frames.at(-1)).toEqual({ event: 'ok', data: '1' });
+    p.push('\n\nevent: ok\ndata: 2\n\n');
+    expect(frames).toEqual([{ event: 'ok', data: '2' }]);
+  });
+
+  it('does not form a frame from the tail of an overflowed line on the same line', () => {
+    const frames: SseFrame[] = [];
+    const p = createSseParser((f) => frames.push(f));
+    p.push('data: ' + 'y'.repeat(1_100_000) + 'EVIL\n\n');
+    expect(frames).toEqual([]);
   });
 });

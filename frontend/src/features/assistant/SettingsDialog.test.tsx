@@ -11,9 +11,17 @@ pinClock('2026-10-27T09:00:00Z');
 
 const open = () => renderRoutes([{ path: '/assistant', element: <AssistantPage /> }], { initialPath: '/assistant' });
 
+let held: () => string[] = () => [];
+
 async function openDialog() {
   const user = userEvent.setup();
-  open();
+  const { client } = open();
+  // The passwords still held anywhere in the mutation cache.
+  held = () =>
+    client
+      .getMutationCache()
+      .getAll()
+      .map((m) => JSON.stringify(m.state.variables ?? null));
   const settings = await screen.findByRole('button', { name: 'Settings' });
   await waitFor(() => {
     expect(settings).toBeEnabled();
@@ -99,6 +107,7 @@ describe('settings dialog (owner act)', () => {
     expect(await screen.findByText('The password was not accepted. Nothing was changed.')).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Assistant settings' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Your password/)).toHaveValue('');
+    expect(held().join()).not.toContain('wrong-pass');
     expect(bodies[0]).toMatchObject({ password: 'wrong-pass', portfolioContext: true });
     // A wrong password is an answer, not an ended session: the owner is still on the page.
     expect(screen.getByRole('button', { name: 'Settings', hidden: true })).toBeInTheDocument();
@@ -109,6 +118,7 @@ describe('settings dialog (owner act)', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
     expect(bodies[1]).toMatchObject({ password: 'right-pass' });
+    expect(held().join()).not.toContain('right-pass');
   });
 
   it('shows the lock and the retry seconds on 423', async () => {

@@ -29,6 +29,8 @@ export const words = {
   incomplete: 'Incomplete',
   notFromTool: '(not from a tool)',
   checked: 'Checked: every figure was found in the tool results above',
+  someUngrounded: 'Some figures in this answer were not found in any tool result',
+  answerCut: 'The answer was cut because it was too long',
   notChecked: 'Not checked (stopped or failed)',
   adHoc: 'Ad-hoc query, not checked by the report engine',
   chartAsTable: 'Chart shown as a table',

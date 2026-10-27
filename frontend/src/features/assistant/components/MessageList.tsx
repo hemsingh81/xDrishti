@@ -65,6 +65,7 @@ function Live({ live }: { live: LiveTurn }) {
   const notes = [
     ...(turn.stopped ? [words.stopped] : []),
     ...(turn.interrupted ? [words.closedEarly, words.incomplete] : []),
+    ...(turn.truncated ? [words.answerCut] : []),
     ...(turn.error ? [turn.error.message] : []),
   ];
   const grounding = turn.done

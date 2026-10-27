@@ -16,7 +16,8 @@ const maxPending = 1_000_000;
 
 /** A pure, incremental SSE parser: lines (LF, CRLF, CR), `event:`, `data:`, comment lines, an unknown field is ignored. */
 export function createSseParser(onFrame: (frame: SseFrame) => void): SseParser {
-  let buffer = '';
+  let partial = '';
+  let overflowed = false;
   let event = '';
   let data: string[] = [];
   let dataSize = 0;
@@ -47,13 +48,22 @@ export function createSseParser(onFrame: (frame: SseFrame) => void): SseParser {
     return undefined;
   };
 
+  const append = (segment: string) => {
+    if (overflowed) return;
+    partial += segment;
+    if (partial.length > maxPending) {
+      // A hostile endless line: skip everything up to the next line terminator, so its tail never forms a field or a frame.
+      overflowed = true;
+      partial = '';
+    }
+  };
+
   return {
     push(text) {
-      buffer += text;
       let start = 0;
-      for (let i = 0; i < buffer.length; i++) {
-        const c = buffer[i];
-        if (skipLf && i === start) {
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (skipLf) {
           skipLf = false;
           if (c === '\n') {
             start = i + 1;
@@ -61,16 +71,19 @@ export function createSseParser(onFrame: (frame: SseFrame) => void): SseParser {
           }
         }
         if (c === '\n' || c === '\r') {
-          line(buffer.slice(start, i));
+          append(text.slice(start, i));
+          if (!overflowed) line(partial);
+          partial = '';
+          overflowed = false;
           start = i + 1;
           skipLf = c === '\r';
         }
       }
-      buffer = buffer.slice(start);
-      if (buffer.length > maxPending) buffer = '';
+      append(text.slice(start));
     },
     end() {
-      buffer = '';
+      partial = '';
+      overflowed = false;
       event = '';
       data = [];
       dataSize = 0;

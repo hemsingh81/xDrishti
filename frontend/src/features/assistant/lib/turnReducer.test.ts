@@ -31,7 +31,7 @@ describe('turnReducer', () => {
       rows: 1,
       status: 'ok',
     });
-    expect(state.done?.grounding.ungrounded).toEqual([{ start: 62, end: 64, text: '46' }]);
+    expect(state.done?.grounding.ungrounded).toEqual([{ start: 51, end: 53, text: '46' }]);
     expect(state.conversationId).toBe('0198a2c4-7b1e-7c3a-9a41-5f0c6d2e8b10');
   });
 
@@ -85,5 +85,12 @@ describe('turnReducer', () => {
     expect(s.calls).toEqual([]);
     expect(answerOf(s)).toBe('');
     expect(s.done?.grounding).toEqual({ status: 'not_checked', checked: 0, ungrounded: [] });
+  });
+
+  it('caps the answer length and says it was cut', () => {
+    const chunk = { type: 'frame', event: 'token', data: { iteration: 1, text: 'x'.repeat(150_000) } } as const;
+    const s = run([chunk, chunk, chunk]);
+    expect(s.truncated).toBe(true);
+    expect(answerOf(s).length).toBe(150_000);
   });
 });

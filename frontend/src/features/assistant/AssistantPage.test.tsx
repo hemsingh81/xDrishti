@@ -242,6 +242,18 @@ describe('asking', () => {
     expect(calls).toBe(1);
   });
 
+  it('leaving the page mid-turn aborts quietly (nothing is applied after unmount)', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mountChat(() => sseResponse(fixture.slice(0, fixture.indexOf('event: ping')), { hang: true }));
+    const view = open();
+    await ask('q');
+    await screen.findByText(/Expectancy is 0.12R/);
+    view.unmount();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
+  });
+
   it('Esc also stops', async () => {
     mountChat(() => sseResponse(fixture.slice(0, fixture.indexOf('event: ping')), { hang: true }));
     open();
@@ -365,6 +377,18 @@ describe('history', () => {
     const answer = await screen.findByRole('article', { name: 'Assistant answer' });
     expect(within(answer).getByText('46', { selector: 'mark' })).toBeInTheDocument();
     expect(within(answer).queryByText('0.12R', { selector: 'mark' })).not.toBeInTheDocument();
+  });
+
+  it('drops a span whose text is not at its offsets and says how many figures were not located', async () => {
+    const detail = conversationBuilder();
+    const assistant = detail.messages[1];
+    if (!assistant) throw new Error('fixture');
+    assistant.ungrounded = [{ start: 3, end: 5, text: '46' }];
+    mountConversation(detail);
+    open(`/assistant?c=${conversationId}`);
+    const answer = await screen.findByRole('article', { name: 'Assistant answer' });
+    expect(answer.querySelector('mark')).toBeNull();
+    expect(within(answer).getByText('1 figure not located in the text')).toBeInTheDocument();
   });
 
   it('selects from the list, then New conversation clears ?c', async () => {

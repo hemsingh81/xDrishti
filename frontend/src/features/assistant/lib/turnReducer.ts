@@ -37,6 +37,10 @@ export interface TurnState {
   /** The stream closed before `done` (and was not stopped). */
   interrupted: boolean;
   stopped: boolean;
+  /** The answer reached the length cap and the rest was dropped. */
+  truncated: boolean;
+  /** Characters kept in `iterations` (for the cap). */
+  length: number;
 }
 
 export type TurnAction =
@@ -57,7 +61,12 @@ export const idleTurn: TurnState = {
   error: null,
   interrupted: false,
   stopped: false,
+  truncated: false,
+  length: 0,
 };
+
+/** The most answer text kept; the rest is dropped and the answer says so. */
+export const maxAnswer = 200_000;
 
 type Rec = Record<string, unknown>;
 const rec = (v: unknown): Rec => (typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Rec) : {});
@@ -142,13 +151,18 @@ function onFrame(state: TurnState, event: string, raw: unknown): TurnState {
       const iteration = int(d.iteration);
       const text = str(d.text);
       if (iteration === null || text === null) return state;
-      return { ...state, iterations: { ...state.iterations, [iteration]: (state.iterations[iteration] ?? '') + text } };
+      if (state.length + text.length > maxAnswer) return { ...state, truncated: true };
+      return {
+        ...state,
+        length: state.length + text.length,
+        iterations: { ...state.iterations, [iteration]: (state.iterations[iteration] ?? '') + text },
+      };
     }
     case 'iteration_discard': {
       const iteration = int(d.iteration);
       if (iteration === null) return state;
       const rest = Object.fromEntries(Object.entries(state.iterations).filter(([k]) => Number(k) !== iteration));
-      return { ...state, iterations: rest };
+      return { ...state, iterations: rest, length: state.length - (state.iterations[iteration]?.length ?? 0) };
     }
     case 'done':
       return {
