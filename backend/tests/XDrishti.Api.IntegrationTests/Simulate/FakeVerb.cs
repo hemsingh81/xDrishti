@@ -161,6 +161,8 @@ internal sealed class FakeVerb : IDisposable
 
         public bool HoldsOvernight => false;
 
+        public bool ReadsContext => false;
+
         public IReadOnlyList<FieldError> Warnings { get; } = [];
     }
 

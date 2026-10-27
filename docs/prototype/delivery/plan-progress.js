@@ -462,7 +462,7 @@ null,
           ["P3-01e", "Breadth of your tracked shares, point in time, and the market gate input (built 2026-10-27; needs tracked shares and the two indices)", "built", "0134", {"d": 2.5, "s": "P3-01e-breadth-point-in-time"}],
           ["P3-02e", "BUY to SELL mirror: a closed rewrite table on the syntax tree (built 2026-10-25)", "built", "0107", {"d": 3, "s": "P3-02e-buy-to-sell-mirror"}],
           ["P3-02f", "Lag on a feature call and an always-false lint (optional; supersedes an approved restriction, needs your decision and an ADR) (built 2026-10-25)", "built", "0108", {"d": 2, "s": "P3-02f-lag-on-feature-calls-and-always-false-lint"}],
-          ["P3-lift", "Lift simulation.needs_context and needs_expiry_days: the simulator refuses context and expiry-day strategies", "later", "", {"d": 2}],
+          ["P3-lift", "The simulator reads the market context (built 2026-10-27; point-in-time; needs_context lifted; is_expiry_day stays refused with its reason)", "built", "0145", {"d": 2, "s": "P3-lift-simulator-reads-the-market-context"}],
         ],
       },
       {

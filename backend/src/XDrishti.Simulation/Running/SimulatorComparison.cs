@@ -72,10 +72,15 @@ public sealed class SimulatorComparison
 
     /// <summary>Scans the minutes of one instrument once per side and walks every entry candidate under every member. Same arguments and same refusals as <see cref="Simulator.Run"/>.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<ComparisonResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null)
+    public Result<ComparisonResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
+        if (_union.Any(s => s.NeedsContext) && context is null)
+        {
+            return Result.Failure<ComparisonResult>(Simulator.ContextNotGivenError());
+        }
+
         if (Simulator.NotAscending(bars) is { } unordered)
         {
             return Result.Failure<ComparisonResult>(unordered);
@@ -86,7 +91,7 @@ public sealed class SimulatorComparison
         var scans = new List<ScanCounters>(_union.Length);
         for (var s = 0; s < _union.Length; s++)
         {
-            var created = EntryScanner.Create(_union[s], instrument, calendar);
+            var created = EntryScanner.Create(_union[s], instrument, calendar, context);
             if (created.IsFailure)
             {
                 return Result.Failure<ComparisonResult>(created.Error);

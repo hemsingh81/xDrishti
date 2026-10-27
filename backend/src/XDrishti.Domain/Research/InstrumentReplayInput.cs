@@ -1,6 +1,7 @@
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
+using XDrishti.Domain.Market.Context;
 
 namespace XDrishti.Domain.Research;
 
@@ -20,6 +21,8 @@ namespace XDrishti.Domain.Research;
 /// <param name="Tick">The instrument's tick; absent only with a <paramref name="PresetSkip"/> (nothing is scanned then, so no fill needs it): for <see cref="SkipReason.TickSizeInvalid"/> because there is none, for <see cref="SkipReason.CsvAdjustedTwice"/> when the master's tick is refused as well. The record then has no tick.</param>
 /// <param name="PresetSkip">A skip the runner decided (<see cref="SkipReason.CsvAdjustedTwice"/> or <see cref="SkipReason.TickSizeInvalid"/>): the replay classifies the sessions and hashes the bars and does not scan. An empty list gives <c>no_bars</c> whatever it says.</param>
 /// <param name="SkipDetail">A note on the preset skip, kept in the record.</param>
+/// <param name="ContextDays">The stored market-context days (P3-lift, ADR 0145), oldest first, shared by every instrument of a run; given only when the strategy reads the context, otherwise null. A decision reads the latest day strictly before its date.</param>
+/// <param name="ContextNote">Why there are no <paramref name="ContextDays"/> for a strategy that reads the context (<c>no_context</c>); null otherwise.</param>
 /// <param name="Costs">How the trades are sized and charged after the window cut (ADR 0042, D1 and D2); null for a gross replay. The handler of P3-04a passes none: a run through it is gross until P3-03f.</param>
 public sealed record InstrumentReplayInput(
     Guid InstrumentId,
@@ -34,4 +37,6 @@ public sealed record InstrumentReplayInput(
     TickSpec? Tick,
     SkipReason? PresetSkip = null,
     string? SkipDetail = null,
-    CostContext? Costs = null);
+    CostContext? Costs = null,
+    IReadOnlyList<ContextDayRecord>? ContextDays = null,
+    string? ContextNote = null);

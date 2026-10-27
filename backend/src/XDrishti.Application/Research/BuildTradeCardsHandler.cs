@@ -140,7 +140,7 @@ internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQuer
         if (basis is not null)
         {
             // P3-04d: the same input the run had, gross, replayed once with the chosen trades asked for; the answer must be the recorded trades.
-            var input = InstrumentInputReader.Build(record.InstrumentId, instrument, raw, factors, run.AcknowledgeCsvAdjusted, basis.Calendar, basis.CsvThrough, run.Options, run.From, run.To, null);
+            var input = InstrumentInputReader.Build(record.InstrumentId, instrument, raw, factors, run.AcknowledgeCsvAdjusted, basis.Calendar, basis.CsvThrough, run.Options, run.From, run.To, null, basis.ContextDays, basis.ContextDays is { Count: > 0 } ? null : "no_context");
             var requests = trades.Select(t => new ExplainRequest(t.Trade.Key, t.Trade.DecisionEpochSeconds, t.Trade.Side)).ToList();
             var answer = engine.Explain(basis.Strategy, input, requests);
             var mismatch = Verify(record.Symbol, trades, answer);

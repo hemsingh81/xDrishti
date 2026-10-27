@@ -40,6 +40,9 @@ public sealed class PreparedStrategy
     /// <summary>The fill rules every walk of this strategy applies (<see cref="FillRules.Default"/> when <see cref="StrategyPreparation.Prepare"/> was given none).</summary>
     public FillRules Fills => Simulator.Fills;
 
+    /// <summary>The strategy reads the daily market context: the replay needs the stored days and skips with <c>context_unavailable</c> when there are none (P3-lift, ADR 0145).</summary>
+    public bool ReadsContext => Simulator.ReadsContext;
+
     internal Simulator Simulator { get; }
 
     /// <summary>The strategy is a swing one: its positions are held across sessions and a run gates them (a comparison does not, P4-05 D4).</summary>

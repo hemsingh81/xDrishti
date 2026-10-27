@@ -112,6 +112,8 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine
 
         public bool HoldsOvernight => Strategy.HoldsOvernight;
 
+        public bool ReadsContext => Strategy.ReadsContext;
+
         public IReadOnlyList<FieldError> Warnings { get; } = warnings;
     }
 }

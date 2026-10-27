@@ -18,6 +18,9 @@ public interface IPreparedStrategy
     /// <summary>The strategy holds its positions overnight (a swing strategy): a comparison of its candidates is not gated (P4-05, D4).</summary>
     bool HoldsOvernight { get; }
 
+    /// <summary>The strategy reads the daily market context (P3-lift, ADR 0145): a run gives the replay the stored context days, and an instrument is skipped with <c>context_unavailable</c> when there are none.</summary>
+    bool ReadsContext { get; }
+
     /// <summary>The warnings of the compile (path in <see cref="FieldError.Field"/>, code in <see cref="FieldError.Code"/>); counted in the log, not stored in the run record.</summary>
     IReadOnlyList<FieldError> Warnings { get; }
 }

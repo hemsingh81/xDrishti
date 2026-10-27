@@ -151,10 +151,10 @@ public sealed class EntryScanner
     /// <summary>
     /// Makes the scanner of a compiled side for one instrument: its own frame, created from the features of the side with the calendar (a special session then closes its last buckets at its own last minute), and the side
     /// bound to it. The stop the scanner reads is the level feature of <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c>, <c>bar_high</c> and <c>or_opposite</c> on the evaluation timeframe with no buffer; the rest, and an
-    /// evaluation on a week or a month, are refused by name. A 1D evaluation is accepted (ADR 0043): its decision is taken at the step of the 15:29 minute.
+    /// evaluation on a week or a month, are refused by name. A side that reads the market context needs <paramref name="context"/> (P3-lift): the frame is refused without it. A 1D evaluation is accepted (ADR 0043): its decision is taken at the step of the 15:29 minute.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="side"/> is null.</exception>
-    public static Result<EntryScanner> Create(CompiledSide side, InstrumentRef instrument, TradingCalendar? calendar = null)
+    public static Result<EntryScanner> Create(CompiledSide side, InstrumentRef instrument, TradingCalendar? calendar = null, ScanContext? context = null)
     {
         ArgumentNullException.ThrowIfNull(side);
         if (side.EvaluationTimeframe >= Timeframe.W1)
@@ -167,7 +167,7 @@ public sealed class EntryScanner
             return Result.Failure<EntryScanner>(Error.Validation(ScannerCodes.StopUnsupported, problem));
         }
 
-        var created = FeatureFrame.Create(side.Features, new FrameOptions(calendar, Math.Max(side.HistoryDepth, 1)));
+        var created = FeatureFrame.Create(side.Features, new FrameOptions(calendar, Math.Max(side.HistoryDepth, 1), side.NeedsContext ? context?.Context : null));
         if (created.IsFailure)
         {
             return Result.Failure<EntryScanner>(created.Error);

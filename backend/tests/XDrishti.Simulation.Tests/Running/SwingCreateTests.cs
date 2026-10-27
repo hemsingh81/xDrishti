@@ -67,7 +67,6 @@ public sealed class SwingCreateTests
     {
         { "an overlay event_exit", Buy(b => b with { Overlays = [new OverlaySpec(OverlayKind.EventExit, [new ExitParameter("days_before_results", [Quantity.Of(1)])])] }), Timeframe.H1, "simulation.unsupported_exit", "buy.overlays[0]" },
         { "a filter", TestStrategies.Swing1h() with { Filters = ["min_turnover"] }, Timeframe.H1, "simulation.filter_not_available", "filters[0]" },
-        { "a market context", Buy(b => b with { Trigger = TestStrategies.All("close > or_high(60) and vix < 20") }), Timeframe.H1, "simulation.needs_context", "buy" },
         { "an expiry read", Buy(b => b with { Trigger = TestStrategies.All("close > or_high(60) and is_expiry_day == 0") }), Timeframe.H1, "simulation.needs_expiry_days", "buy" },
         { "entry stop_above_high", Buy(b => b with { Entry = new EntrySpec(EntryKind.StopAboveHigh) }), Timeframe.H1, "simulation.unsupported_entry", "buy.entry" },
         { "entry limit_pullback", Buy(b => b with { Entry = new EntrySpec(EntryKind.LimitPullback) }), Timeframe.H1, "simulation.unsupported_entry", "buy.entry" },

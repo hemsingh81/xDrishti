@@ -29,6 +29,9 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
 
     public List<FieldError> Warnings { get; } = [];
 
+    /// <summary>Whether the prepared strategies read the market context (P3-lift).</summary>
+    public bool ReadsContext { get; set; }
+
     /// <summary>The replay to return; null means the default.</summary>
     public Func<InstrumentReplayInput, InstrumentReplay>? Script { get; set; }
 
@@ -42,7 +45,8 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
         return PrepareResult ?? Result.Success<IPreparedStrategy>(new FakePrepared(
             new StrategyRecord(strategyId, parameters, "{}", new string('a', 64), evaluationTimeframe, [Side.Buy, Side.Sell]),
             Warnings,
-            exits));
+            exits,
+            ReadsContext));
     }
 
     /// <summary>What <see cref="PrepareStored"/> was asked, in order: the text, the hash the store held for it and the parameters.</summary>
@@ -57,7 +61,8 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
         return PrepareStoredResult ?? Result.Success<IPreparedStrategy>(new FakePrepared(
             new StrategyRecord(sourceText.Split(' ')[0], parameters, "{}", expectedHash, evaluationTimeframe, [Side.Buy, Side.Sell]),
             Warnings,
-            exits));
+            exits,
+            ReadsContext));
     }
 
     public Result<StrategyDescription> Describe(string sourceText) => throw new NotSupportedException("the handler tests do not describe a text");
@@ -125,7 +130,7 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
             2.0, 0, 100.5, 105.5, EntryFill.AtLimit, false, 1, 0);
     }
 
-    private sealed class FakePrepared(StrategyRecord record, IReadOnlyList<FieldError> warnings, ExitChoice? exits) : IPreparedStrategy
+    private sealed class FakePrepared(StrategyRecord record, IReadOnlyList<FieldError> warnings, ExitChoice? exits, bool readsContext = false) : IPreparedStrategy
     {
         public StrategyRecord Record => record;
 
@@ -134,6 +139,8 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
             : [.. exits.Candidates.Select(c => new CandidateRecord(exits.IdOf(c), c, record with { DefinitionSha256 = CanonicalText.Sha256Hex(record.DefinitionSha256 + exits.IdOf(c)) }, record.DefinitionSha256))];
 
         public bool HoldsOvernight => false;
+
+        public bool ReadsContext => readsContext;
 
         public IReadOnlyList<FieldError> Warnings => warnings;
     }

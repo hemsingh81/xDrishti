@@ -39,7 +39,6 @@ public sealed class SimulatorCreateTests
         { "several rr values", Sell(s => s with { Exits = [Rr(1.5, 2, 3)] }), "simulation.unsupported_exit", "sell.exits", "rr" },
         { "an overlay event_exit", Buy(b => b with { Overlays = [new OverlaySpec(OverlayKind.EventExit, [new ExitParameter("days_before_results", [Quantity.Of(1)])])] }), "simulation.unsupported_exit", "buy.overlays[0]", "event_exit" },
         { "a filter", OrbV1.Create() with { Filters = ["min_turnover"] }, "simulation.filter_not_available", "filters[0]", "min_turnover" },
-        { "a market context", WithTrigger("close > or_high(or_min) and close[1] <= or_high(or_min) and vix < 20"), "simulation.needs_context", "buy", "market context" },
         { "expiry dates", WithTrigger("close > or_high(or_min) and close[1] <= or_high(or_min) and is_expiry_day == 0"), "simulation.needs_expiry_days", "buy", "expiry" },
     };
 

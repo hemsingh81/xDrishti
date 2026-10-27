@@ -16,4 +16,5 @@ public sealed record RunHeader(
     string Fills,
     UniverseRecord Universe,
     TradingCalendar Calendar,
-    CostRecord? Costs = null);
+    CostRecord? Costs = null,
+    string? ContextSha256 = null);

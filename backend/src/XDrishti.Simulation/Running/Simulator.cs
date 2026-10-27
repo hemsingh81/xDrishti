@@ -15,7 +15,7 @@ namespace XDrishti.Simulation.Running;
 /// the <see cref="TradeWalker"/>. The two stages share nothing but the entry candidate, which carries no exit, so the same entries can be replayed under every exit policy (P4).
 /// <para>
 /// <b>What it runs.</b> An intraday strategy, or a swing strategy evaluated inside the session (30m or 1h; ADR 0040), on an evaluation timeframe up to one day, entered at the close of the trigger bar, with a stop that is a level
-/// (<c>or_opposite</c>, <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c> or <c>bar_high</c>, no buffer, read on the evaluation timeframe), exactly one exit candidate (<c>FIXED_RR</c>, <c>PARTIAL_BE</c> or <c>PARTIAL_TRAIL</c> from P4-02, from P4-03 <c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>, or from P4-04 <c>PYRAMID</c>, whose ladders are not candidate lists) with one value in each list, at most the <c>time_stop</c> overlay, no filter, no market context and no expiry dates. A swing side is held up to its
+/// (<c>or_opposite</c>, <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c> or <c>bar_high</c>, no buffer, read on the evaluation timeframe), exactly one exit candidate (<c>FIXED_RR</c>, <c>PARTIAL_BE</c> or <c>PARTIAL_TRAIL</c> from P4-02, from P4-03 <c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>, or from P4-04 <c>PYRAMID</c>, whose ladders are not candidate lists) with one value in each list, at most the <c>time_stop</c> overlay, no filter and no expiry dates. A side may read the daily market context (P3-lift, ADR 0145): <see cref="Run"/> is given a <see cref="ScanContext"/> and every decision reads the latest context day strictly before its date. A swing side is held up to its
 /// <c>max_hold_sessions</c> (the entry session counts as the first) and is gated to one open position per instrument and side (<see cref="PositionGate"/>). <see cref="Create"/> refuses everything else by name (<see cref="SimulatorCodes"/>) with a located problem, rather than
 /// ignoring it: a result must be what it says it is. A side that does not compile makes <see cref="Create"/> return no simulator; a half strategy is never run.
 /// </para>
@@ -49,6 +49,9 @@ public sealed class Simulator
 
     /// <summary>The fill rules every walk of this simulator applies (the default ones when <see cref="Create"/> was given none).</summary>
     public FillRules Fills => _fills;
+
+    /// <summary>Some side reads the daily market context: <see cref="Run"/> needs one (the replay reads the stored days for such a strategy only).</summary>
+    public bool ReadsContext => _sides.Any(s => s.Compiled.NeedsContext);
 
     /// <summary>The sides this simulator runs, Buy first.</summary>
     public IReadOnlyList<Side> Sides => _sides.Select(s => s.Compiled.Side).ToList().AsReadOnly();
@@ -150,11 +153,17 @@ public sealed class Simulator
     /// <param name="tick">The instrument's tick size (<see cref="TickSpec.FromMasterPaise"/>); the price grid of its fills and of its entry limit.</param>
     /// <param name="calendar">The trading calendar, or null for the regular 09:15 to 15:30 session.</param>
     /// <param name="quantity">The full size <c>Q</c> of ADR 0042 for an exact entry and an initial risk, for a <c>PYRAMID</c> to see an add of no whole share (P4-04, D3); null in a gross run, where no add is skipped for its quantity.</param>
+    /// <param name="context">The daily market context the context features read (P3-lift, ADR 0145); required when a side reads it (<see cref="ReadsContext"/>), ignored otherwise.</param>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null)
+    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
+        if (ReadsContext && context is null)
+        {
+            return Result.Failure<SimulationResult>(ContextNotGivenError());
+        }
+
         if (NotAscending(bars) is { } unordered)
         {
             return Result.Failure<SimulationResult>(unordered);
@@ -165,7 +174,7 @@ public sealed class Simulator
         var walk = WalkCounters.Empty;
         foreach (var side in _sides)
         {
-            var created = EntryScanner.Create(side.Compiled, instrument, calendar);
+            var created = EntryScanner.Create(side.Compiled, instrument, calendar, context);
             if (created.IsFailure)
             {
                 return Result.Failure<SimulationResult>(created.Error);
@@ -196,6 +205,9 @@ public sealed class Simulator
         var ordered = outcomes.OrderBy(o => o.Candidate.DecisionEpochSeconds).ThenBy(o => o.Candidate.Side).ToList().AsReadOnly();
         return Result.Success(new SimulationResult(HeaderOf(), ordered, scans.AsReadOnly(), walk));
     }
+
+    /// <summary>The error of a context-reading side run with no context.</summary>
+    internal static Error ContextNotGivenError() => Error.Validation(SimulatorCodes.ContextNotGiven, "The strategy reads the market context and none was given; the replay skips such an instrument with `context_unavailable` before it runs.");
 
     /// <summary>The refusal for minutes that are not strictly ascending, or null.</summary>
     internal static Error? NotAscending(IReadOnlyList<Bar> bars)
@@ -302,14 +314,9 @@ public sealed class Simulator
             problems.Add(Refusal("filters[" + at + "]", SimulatorCodes.FilterNotAvailable, "The filter `" + filter + "` is not evaluated yet (there is no results calendar, P15, and no liquidity data of the universe layer, doc 10 §2); the simulator refuses to run a strategy that names one rather than ignore it."));
         }
 
-        if (side.NeedsContext)
-        {
-            problems.Add(Refusal(name, SimulatorCodes.NeedsContext, "The side reads the market context (the VIX, the index, the regime or breadth); the simulator has no context to give it (reading it is P3-01d)."));
-        }
-
         if (side.NeedsExpiryDays)
         {
-            problems.Add(Refusal(name, SimulatorCodes.NeedsExpiryDays, "The side reads the expiry dates (`is_expiry_day`); the simulator has none to give it (reading them is P3-01d)."));
+            problems.Add(Refusal(name, SimulatorCodes.NeedsExpiryDays, "The side reads the expiry dates (`is_expiry_day`). No expiry calendar is stored and none can be derived from stored data: the instrument master holds no option expiries, there is no options data yet (P14), and NSE has changed the weekday of its weekly and monthly expiries more than once, so a rule would be a guess. Remove `is_expiry_day` or wait for the options data."));
         }
     }
 

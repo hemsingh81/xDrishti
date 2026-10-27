@@ -69,11 +69,11 @@ public sealed class RunRecordSchemaTests
             "RunTrade: Trade, BasketIds",
             "ReplayOptions: MinSessionCompleteness, DiscontinuityThreshold",
             "InstrumentReplay: Record, Trades, OpenAtEnd",
-            "RunHeader: Strategy, EngineVersion, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, Calendar, Costs",
-            "InstrumentReplayInput: InstrumentId, Symbol, RawBars, Factors, CsvAdjustedThrough, Calendar, Options, From, To, Tick, PresetSkip, SkipDetail, Costs",
+            "RunHeader: Strategy, EngineVersion, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, Calendar, Costs, ContextSha256",
+            "InstrumentReplayInput: InstrumentId, Symbol, RawBars, Factors, CsvAdjustedThrough, Calendar, Options, From, To, Tick, PresetSkip, SkipDetail, Costs, ContextDays, ContextNote",
             "CostRecord: SheetId, RatesSha256, SheetJson, Checked, Capital, Profile, MaxCostR",
             "SizingProfile: Name, RiskPerTradePct, MaxCapitalPerTradePct",
-            "SkipReason: InstrumentNotFound, NoBars, CsvAdjustedTwice, TickSizeInvalid, NoRunnableSessions, NoSessionsInWindow, FeaturesNotReady",
+            "SkipReason: InstrumentNotFound, NoBars, CsvAdjustedTwice, TickSizeInvalid, NoRunnableSessions, NoSessionsInWindow, FeaturesNotReady, ContextUnavailable",
             "SessionExclusion: ClosedDay, SpecialSession, ShortSession, MissingSession",
             "UniverseKind: InstrumentList, Basket",
         ]);
@@ -82,7 +82,7 @@ public sealed class RunRecordSchemaTests
     [Fact]
     public void The_stable_codes_of_the_skip_reasons_and_the_session_exclusions_are_the_ones_of_the_spec()
     {
-        Enum.GetValues<SkipReason>().Select(r => r.ToCode()).ShouldBe(["instrument_not_found", "no_bars", "csv_adjusted_twice", "tick_size_invalid", "no_runnable_sessions", "no_sessions_in_window", "features_not_ready"]);
+        Enum.GetValues<SkipReason>().Select(r => r.ToCode()).ShouldBe(["instrument_not_found", "no_bars", "csv_adjusted_twice", "tick_size_invalid", "no_runnable_sessions", "no_sessions_in_window", "features_not_ready", "context_unavailable"]);
         Enum.GetValues<SessionExclusion>().Select(r => r.ToCode()).ShouldBe(["closed_day", "special_session", "short_session", "missing_session"]);
         UniverseLabels.MembersAsOfToday.ShouldBe("members as of today");
         UniverseLabels.InstrumentsAsListed.ShouldBe("instruments as listed");

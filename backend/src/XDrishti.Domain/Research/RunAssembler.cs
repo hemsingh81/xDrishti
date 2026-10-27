@@ -110,6 +110,11 @@ public static class RunAssembler
                 + (instrument.TickSize is { } tick ? CanonicalText.Number(tick) : "-") + "|" + (instrument.TickFromFallback ? "1" : "0"));
         }
 
+        if (header.ContextSha256 is { } context)
+        {
+            Line(text, "context", context);   // only a strategy that reads the market context has this line, so every other key is unchanged (ADR 0145)
+        }
+
         Line(text, "cal", string.Join(',', calendarExceptions.Select(e => Date(e.Date) + ":" + (e.IsHoliday ? "holiday" : CanonicalText.Number(e.FromMinute) + "-" + CanonicalText.Number(e.ToMinute)))));
         return text.ToString();
     }

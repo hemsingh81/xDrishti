@@ -136,9 +136,12 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
         client.DefaultRequestHeaders.Add("Cookie", $"xd.sid={ApiFactory.SessionCookieValue(login)}");
         client.DefaultRequestHeaders.Add("X-CSRF-Token", session.CsrfToken);
 
+        // The sample master holds October 2026 contracts that expire on the 27th: on a later real date this very refresh would retire them (60 added, 51 active), so the refresh runs on a pinned date before that.
+        factory.Clock.Pin(new DateTimeOffset(2026, 10, 1, 4, 0, 0, TimeSpan.Zero));
         using var started = await client.PostAsync("/api/instruments/refresh", Ct);
         started.StatusCode.ShouldBe(HttpStatusCode.Accepted, await started.Content.ReadAsStringAsync(Ct));
         await factory.RefreshJobs.RunPendingAsync(host.Services, Ct);
+        factory.Clock.Pin(DateTimeOffset.UtcNow);
 
         using var statusResponse = await client.GetAsync("/api/instruments/refresh/status", Ct);
         var status = await statusResponse.ReadAsync<RefreshStatusView>(Ct);

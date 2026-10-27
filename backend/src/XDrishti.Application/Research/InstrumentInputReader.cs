@@ -3,6 +3,7 @@ using XDrishti.Application.Market.Actions;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
+using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Research;
@@ -37,7 +38,9 @@ internal sealed class InstrumentInputReader(IBarStore bars, IBarQueries barQueri
         ReplayOptions options,
         DateOnly from,
         DateOnly to,
-        CostContext? costs)
+        CostContext? costs,
+        IReadOnlyList<ContextDayRecord>? contextDays = null,
+        string? contextNote = null)
     {
         var tick = TickSpec.FromMasterPaise(instrument.TickSize);
         var twice = !acknowledgeCsvAdjusted && AdjustsCsvTwice(raw, factors, csvThrough, id);
@@ -61,7 +64,9 @@ internal sealed class InstrumentInputReader(IBarStore bars, IBarQueries barQueri
             tick.IsSuccess ? tick.Value : null,
             preset,
             detail,
-            costs);
+            costs,
+            contextDays,
+            contextNote);
     }
 
     /// <summary>The guard of ADR 0017 §5: an applied action that changes the bars read and falls on or before the date the loaded CSV files reach would adjust their prices a second time.</summary>

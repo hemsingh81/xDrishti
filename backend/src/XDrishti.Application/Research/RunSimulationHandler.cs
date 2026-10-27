@@ -3,6 +3,7 @@ using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
+using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Market.Actions;
@@ -11,6 +12,7 @@ using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
+using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Research;
@@ -33,6 +35,7 @@ internal sealed class RunSimulationHandler(
     ISimulationEngine engine,
     IStrategyStore strategies,
     ICostSheetStore costSheets,
+    IContextDayStore contextDays,
     TimeProvider time,
     ILogger<RunSimulationHandler> logger) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>
 {
@@ -124,12 +127,15 @@ internal sealed class RunSimulationHandler(
         var calendar = await calendars.GetAsync(cancellationToken);
         var csvThrough = targets.Ids.Count == 0 ? new Dictionary<Guid, DateOnly>() : await actions.ListCsvAdjustedThroughAsync(targets.Ids, cancellationToken);
 
+        // P3-lift (ADR 0145): a strategy that reads the market context gets the stored days, read once for the whole run; one that does not reads none and its run key is unchanged.
+        var readsContext = prepared.Value.ReadsContext;
+        var days = readsContext ? await contextDays.ListAsync(cancellationToken) : null;
         if (basisSink is not null)
         {
-            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough);
+            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough, days);
         }
 
-        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext);
+        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext, days);
         var readTime = time.GetElapsedTime(started);
         var replayTime = TimeSpan.Zero;
         var candidates = prepared.Value.Candidates;
@@ -179,7 +185,8 @@ internal sealed class RunSimulationHandler(
                 (fills.Value ?? FillRules.Default).ToCanonicalJson(),
                 universeRecord,
                 calendar,
-                costContext is null ? null : CostRecord.Of(costContext));
+                costContext is null ? null : CostRecord.Of(costContext),
+                days is null ? null : ContextFingerprint.Of(days, request.To));
             firstHeader ??= header;
             runs.Add(RunAssembler.Assemble(header, replays[k]));
         }
@@ -339,7 +346,7 @@ internal sealed class RunSimulationHandler(
 
         var request = context.Request;
         var (raw, factors) = await _reader.ReadAsync(id, request.To, cancellationToken);
-        return InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs);
+        return InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"));
     }
 
     private sealed record Universe(UniverseKind Kind, Guid? BasketId, string? BasketName, string Label, IReadOnlyList<Guid> Ids, IReadOnlyDictionary<Guid, BarsInstrument>? Known);
@@ -350,5 +357,6 @@ internal sealed class RunSimulationHandler(
         IReadOnlyDictionary<Guid, DateOnly> CsvThrough,
         Universe Targets,
         ReplayOptions Options,
-        CostContext? Costs);
+        CostContext? Costs,
+        IReadOnlyList<ContextDayRecord>? ContextDays);
 }
