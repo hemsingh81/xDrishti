@@ -6129,6 +6129,296 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiEvalBaselineRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("AcceptedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("AcceptedBy")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("accepted_by");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_eval_baselines");
+
+                    b.HasIndex("RunId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ai_eval_baselines_run_id");
+
+                    b.ToTable("eval_baselines", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_eval_baselines_actor", "accepted_by = 'cli:xd'");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiEvalCaseRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Answer")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("answer");
+
+                    b.Property<string>("CaseId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("case_id");
+
+                    b.Property<int?>("CompletionTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("completion_tokens");
+
+                    b.Property<string>("DetailJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("detail_json");
+
+                    b.Property<bool?>("Grounded")
+                        .HasColumnType("boolean")
+                        .HasColumnName("grounded");
+
+                    b.Property<int>("LatencyMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("latency_ms");
+
+                    b.Property<bool>("Passed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("passed");
+
+                    b.Property<int?>("PromptTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("prompt_tokens");
+
+                    b.Property<int>("Repeat")
+                        .HasColumnType("integer")
+                        .HasColumnName("repeat");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<decimal?>("Score")
+                        .HasColumnType("numeric(6,4)")
+                        .HasColumnName("score");
+
+                    b.Property<Guid?>("SessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("Set")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("set");
+
+                    b.Property<int>("ToolCalls")
+                        .HasColumnType("integer")
+                        .HasColumnName("tool_calls");
+
+                    b.HasKey("Id")
+                        .HasName("pk_eval_cases");
+
+                    b.HasIndex("RunId", "Set", "CaseId", "Repeat")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ai_eval_cases_run_set_case_repeat");
+
+                    b.ToTable("eval_cases", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_eval_cases_counts", "tool_calls >= 0 AND latency_ms >= 0");
+
+                            t.HasCheckConstraint("ck_ai_eval_cases_repeat", "repeat >= 1");
+
+                            t.HasCheckConstraint("ck_ai_eval_cases_set", "\"set\" IN ('data', 'plans', 'ideas', 'events')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiEvalMarkerRecord", b =>
+                {
+                    b.Property<short>("Id")
+                        .HasColumnType("smallint")
+                        .HasColumnName("id");
+
+                    b.Property<string>("FixtureHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("fixture_hash");
+
+                    b.Property<DateTimeOffset>("SeededAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("seeded_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id")
+                        .HasName("pk_eval_marker");
+
+                    b.ToTable("eval_marker", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_eval_marker_single", "id = 1");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiEvalRunRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("fingerprint");
+
+                    b.Property<DateTimeOffset>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("FixtureHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("fixture_hash");
+
+                    b.Property<bool>("Gating")
+                        .HasColumnType("boolean")
+                        .HasColumnName("gating");
+
+                    b.Property<string>("ModelId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("model_id");
+
+                    b.Property<string>("ModelSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("model_sha256");
+
+                    b.Property<string>("ParamsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("params_json");
+
+                    b.Property<string>("Profile")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("profile");
+
+                    b.Property<string>("PromptVersionsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("prompt_versions_json");
+
+                    b.Property<int>("Repeats")
+                        .HasColumnType("integer")
+                        .HasColumnName("repeats");
+
+                    b.Property<string>("RuntimeDigest")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("runtime_digest");
+
+                    b.PrimitiveCollection<string[]>("Sets")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("sets");
+
+                    b.Property<string>("SetsHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("sets_hash");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("SummaryJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("summary_json");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("target");
+
+                    b.Property<string>("ThresholdsHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("thresholds_hash");
+
+                    b.Property<string>("Verdict")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("verdict");
+
+                    b.HasKey("Id")
+                        .HasName("pk_eval_runs");
+
+                    b.HasIndex("FinishedAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_ai_eval_runs_finished_at");
+
+                    b.HasIndex("Gating")
+                        .HasDatabaseName("ix_ai_eval_runs_gating");
+
+                    b.ToTable("eval_runs", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_eval_runs_gating", "NOT gating OR (repeats >= 2 AND target = 'builtin' AND status = 'completed')");
+
+                            t.HasCheckConstraint("ck_ai_eval_runs_repeats", "repeats BETWEEN 1 AND 5");
+
+                            t.HasCheckConstraint("ck_ai_eval_runs_time", "finished_at >= started_at");
+
+                            t.HasCheckConstraint("ck_ai_eval_runs_verdict", "verdict IN ('PASS', 'FAIL', 'INCOMPLETE')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiMessageRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -10073,6 +10363,26 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SettingsId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_conversations_settings_settings_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiEvalBaselineRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Persistence.AiEvalRunRecord", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_eval_baselines_eval_runs_run_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiEvalCaseRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Persistence.AiEvalRunRecord", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_eval_cases_eval_runs_run_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiMessageRecord", b =>

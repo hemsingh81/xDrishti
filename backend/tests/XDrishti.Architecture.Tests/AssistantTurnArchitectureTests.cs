@@ -42,7 +42,7 @@ public sealed class AssistantTurnArchitectureTests
     {
         var users = Types.InAssembly(Application).That().HaveDependencyOn(typeof(IChatModel).FullName!).GetTypes().Select(t => t.FullName!).Where(n => !n.Contains("+<", StringComparison.Ordinal)).ToList();
 
-        users.ShouldAllBe(n => n.StartsWith("XDrishti.Application.Ai.AssistantTurnService", StringComparison.Ordinal) || n.StartsWith("XDrishti.Application.DependencyInjection", StringComparison.Ordinal));
+        users.ShouldAllBe(n => n.StartsWith("XDrishti.Application.Ai.AssistantTurnService", StringComparison.Ordinal) || n.StartsWith("XDrishti.Application.DependencyInjection", StringComparison.Ordinal) || n.StartsWith("XDrishti.Application.Ai.EvalTurnRunnerFactory", StringComparison.Ordinal)); // the factory only hands the port to the same turn service (the eval turn, P9-09)
         var implementers = Types.InAssembly(Infrastructure).That().ImplementInterface(typeof(IChatModel)).GetTypes().Select(t => t.Namespace).Distinct().ToList();
         implementers.ShouldBe(["XDrishti.Infrastructure.Ai.Assistant"]);
     }

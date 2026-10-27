@@ -142,7 +142,7 @@ public sealed class ToolsDatabaseTests(ReadOnlyDatabase db)
             holdingsRow["classes"]![0]!.GetValue<string>().ShouldBe("C2");
             holdingsRow["approxRows"]!.GetValue<long>().ShouldBe(0);
             holdingsRow["note"]!.GetValue<string>().ShouldBe("portfolio context is off");
-            listed["rows"]!.AsArray().Count.ShouldBe(36);
+            listed["rows"]!.AsArray().Count.ShouldBe(37);
             listed["notes"]![0]!.GetValue<string>().ShouldContain("Portfolio context is off");
         }
     }

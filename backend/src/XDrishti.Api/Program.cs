@@ -68,7 +68,8 @@ if (verb == Verb.Migrate)
     await DatabaseMigrator.MigrateAsync(app.Services);
     await StrategySeeding.SeedAsync(app.Services); // the built-in strategies as stored text (spec P3-02d); idempotent
     await PostMigration.ProvisionReadOnlyRolesAsync(app.Services); // the assistant's read-only roles get a login when both password files exist (spec P9-02); idempotent, otherwise they stay NOLOGIN
-    return await OwnerBootstrap.ProvisionAsync(app.Services);
+    // The migration of the eval's fixture database (P9-09): no owner account is made there (compose sets Migrate__SkipOwner).
+    return app.Configuration.GetValue<bool>("Migrate:SkipOwner") ? 0 : await OwnerBootstrap.ProvisionAsync(app.Services);
 }
 
 // One-shot: `dotnet XDrishti.Api.dll owner-reset` replaces the owner's password from the secrets and ends all sessions.

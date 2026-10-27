@@ -21,6 +21,7 @@ using XDrishti.Application.Ai;
 using XDrishti.Application.Ai.Briefing;
 using XDrishti.Application.Ai.Drafting;
 using XDrishti.Application.Ai.Proposals;
+using XDrishti.Application.Assistant.Evaluation;
 using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
@@ -727,6 +728,18 @@ public static class DependencyInjection
         services.AddSingleton<TurnGate>(); // one turn at a time (P9-03)
         services.AddScoped<IAssistantTurnRunner, AssistantTurnService>(); // the only way to the model for question answering (P9-03, ADR 0138)
         services.AddScoped<IQueryHandler<GetAssistantStatusQuery, AssistantStatusView>, GetAssistantStatusHandler>();
+        services.AddSingleton<IPromptVersions, EvalPromptVersions>(); // the eval (P9-09, ADR 0143): the prompts it stamps, the model it measures, the runners of the plan and idea sets over the P9-06 and P9-07 parts, the one turn runner over the EVAL tool catalog
+        services.AddScoped<IEvalEnvironment, EvalModelEnvironment>();
+        services.AddScoped<PlanTextRunner>();
+        services.AddScoped<IdeaDraftRunner>();
+        services.AddScoped<IEvalAnswerSource>(sp => new EvalTurnAnswerSource(EvalTurnRunnerFactory.Create(sp), sp.GetRequiredService<IConversationReader>()));
+        services.AddScoped<ICommandHandler<RunEvalCommand, EvalRunView>, RunEvalHandler>(); // started by the owner's verb only: never by an endpoint, service or job
+        services.AddScoped<ICommandHandler<GradeEvalAnswersCommand, EvalRunView>, GradeEvalAnswersHandler>();
+        services.AddScoped<ICommandHandler<AcceptEvalCommand, EvalRunView>, AcceptEvalHandler>(); // the baseline: the owner's verb, a gating PASS, no auto option
+        services.AddScoped<IQueryHandler<CompareEvalsQuery, Result<EvalComparisonView>>, CompareEvalsHandler>();
+        services.AddScoped<IQueryHandler<GetEvalQuery, Result<EvalDetailView>>, GetEvalHandler>();
+        services.AddScoped<IQueryHandler<ListEvalsQuery, Result<IReadOnlyList<EvalRunView>>>, ListEvalsHandler>();
+        services.AddScoped<IQueryHandler<GetEvalStatusQuery, EvalStatusView>, GetEvalStatusHandler>();
         services.AddScoped<IQueryHandler<AssistantSettingsNeedPasswordQuery, bool>, AssistantSettingsNeedPasswordHandler>();
         services.AddScoped<ICommandHandler<ChangeAssistantSettingsCommand, AssistantStatusView>, ChangeAssistantSettingsHandler>(); // the owner's switch; appends one audited row
         services.AddScoped<IQueryHandler<ListAssistantConversationsQuery, IReadOnlyList<ConversationSummary>>, ListAssistantConversationsHandler>();

@@ -4122,6 +4122,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/assistant/evals': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The eval runs, newest first (limit 1 to 50, default 20), each with its summary: per set the outcome, the rates with their 95 % intervals and the verdict. Read only. 422 assistant.invalid */
+    get: operations['ListAssistantEvals'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/evals/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Whether the accepted eval run still describes the assistant: the baseline, the current fingerprint, stale and what differs (model, runtime, prompt X, sets, thresholds). No network call. With no accepted run: 'no accepted eval run'. Read only */
+    get: operations['GetAssistantEvalStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/evals/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One eval run with its cases, the prompts and the parameters it measured. Read only. 404 assistant.eval_not_found */
+    get: operations['GetAssistantEval'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/assistant/strategy-drafts': {
     parameters: {
       query?: never;
@@ -4283,7 +4334,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The assistant's settings in force (off by default), the model server, the tool server (not asked while the assistant is off), whether a turn is running, whether the nightly run blocks it, and the evaluation (not_yet_evaluated until P9-09). Read only */
+    /** The assistant's settings in force (off by default), the model server, the tool server (not asked while the assistant is off), whether a turn is running, whether the nightly run blocks it, and the evaluation (not_yet_evaluated, passed or failed: from the accepted eval run, GET /api/assistant/evals/status). Read only */
     get: operations['GetAssistantStatus'];
     put?: never;
     post?: never;
@@ -8652,6 +8703,79 @@ export interface components {
       series: components['schemas']['EquitySeriesView'][];
       /** @description The evidence of the report. */
       evidence: components['schemas']['ReportEvidenceView'];
+    };
+    /** @description One stored case repeat. The answer is fixture data only. */
+    EvalCaseView: {
+      set: string;
+      caseId: string;
+      /** Format: int32 */
+      repeat: number;
+      passed: boolean;
+      grounded: null | boolean;
+      /** Format: double */
+      score: null | number;
+      detail: string;
+      answer: string;
+      /** Format: uuid */
+      sessionId: null | string;
+      /** Format: int32 */
+      toolCalls: number;
+      /** Format: int32 */
+      latencyMs: number;
+      /** Format: int32 */
+      promptTokens: null | number;
+      /** Format: int32 */
+      completionTokens: null | number;
+    };
+    /** @description A run with its cases and the prompts and parameters it measured. */
+    EvalDetailView: {
+      run: components['schemas']['EvalRunView'];
+      cases: components['schemas']['EvalCaseView'][];
+      promptVersions: string;
+      parameters: string;
+    };
+    /** @description A run as the API and the verb show it (spec P9-09 Contract). IsBaseline: the owner accepted it. */
+    EvalRunView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      finishedAt: string;
+      target: string;
+      profile: string;
+      sets: string[];
+      /** Format: int32 */
+      repeats: number;
+      gating: boolean;
+      modelId: string;
+      modelSha256: string;
+      runtimeDigest: string;
+      fingerprint: string;
+      status: string;
+      verdict: string;
+      actor: string;
+      isBaseline: boolean;
+      summary: components['schemas']['RunSummary'];
+    };
+    /**
+     * @description The status of the evaluation (spec AC 10). Stale is true when the current fingerprint differs from the baseline's; Reasons names what differs. State feeds the assistant status:
+     *     `passed` only while a baseline exists and is not stale, `failed` when the newest gating run is not PASS, else `not_yet_evaluated`.
+     */
+    EvalStatusView: {
+      /** Format: uuid */
+      baselineRunId: null | string;
+      baselineFingerprint: null | string;
+      currentFingerprint: string;
+      stale: boolean;
+      reasons: string[];
+      state: string;
+      /** Format: date-time */
+      at: null | string;
+      detail: string;
+      /** Format: uuid */
+      newestGatingRunId: null | string;
+      newestGatingVerdict: null | string;
     };
     /** @description The result of the assistant's evaluation (P9-09): `not_yet_evaluated` until that slice writes one. */
     EvaluationView: {
@@ -13498,6 +13622,18 @@ export interface components {
       /** @description The lower bound of expectancy is above 0: the only reading of "works" the engine allows. */
       lowerBoundPositive: boolean;
     };
+    /** @description A rate with its sample and its Wilson 95 % interval (spec P9-09 AC 9: every rate is printed with its interval). */
+    RateLine: {
+      name: string;
+      /** Format: int32 */
+      k: number;
+      /** Format: int32 */
+      n: number;
+      /** Format: double */
+      low: number;
+      /** Format: double */
+      high: number;
+    };
     /** @description Trades whose favourable excursion reached the level, and their share of the trades with a recorded excursion. */
     ReachedMfeView: {
       /**
@@ -14346,6 +14482,13 @@ export interface components {
        */
       createdAt: string;
     };
+    /** @description The summary of a run: the verdict, the sets, and the sentence about the small sample. A run with one repeat is bool RunSummary.NonGating and can never be accepted. */
+    RunSummary: {
+      verdict: string;
+      nonGating: boolean;
+      sets: components['schemas']['SetSummary'][];
+      smallSampleLine: string;
+    };
     /** @description One run in the "Data used" panel of a report (P8-00 D2): the run key, what it replayed, its window, whether it was costed and the labels a report took from it. */
     RunUsedView: {
       /** @description The stored run key. */
@@ -14657,6 +14800,33 @@ export interface components {
        * @description End of the step-up window (password re-entered); null when the session is not elevated right now.
        */
       elevatedUntil?: null | string;
+    };
+    /** @description The outcome of one set: the state and, for a failure, the thresholds that did not hold, in words. */
+    SetOutcome: {
+      set: string;
+      state: components['schemas']['SetState'];
+      reasons: string[];
+    };
+    /**
+     * @description How one set of the eval ended against its thresholds.
+     * @enum {unknown}
+     */
+    SetState: 'Pass' | 'Fail' | 'NotRun' | 'NotEvaluable';
+    /** @description The summary of one set: its outcome, its rates with intervals, and the repeat figures (`pass@1` and `stability` where they apply). */
+    SetSummary: {
+      set: string;
+      outcome: components['schemas']['SetOutcome'];
+      rates: components['schemas']['RateLine'][];
+      /** Format: int32 */
+      cases: number;
+      /** Format: int32 */
+      repeats: number;
+      /** Format: double */
+      stability: null | number;
+      /** Format: double */
+      intentMean: null | number;
+      /** Format: double */
+      intentLowest: null | number;
     };
     /** @description The sign-flip baseline: lenient (mean R against 0 given the trade sizes), not a re-run with random entries. */
     SignFlipBaselineView: {
@@ -26053,6 +26223,97 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListAssistantEvals: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EvalRunView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAssistantEvalStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EvalStatusView'];
+        };
+      };
+    };
+  };
+  GetAssistantEval: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EvalDetailView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

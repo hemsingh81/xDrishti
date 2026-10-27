@@ -1,6 +1,9 @@
+using System.Text.Json.Serialization;
+
 namespace XDrishti.Domain.Assistant.Evaluation;
 
 /// <summary>How one set of the eval ended against its thresholds.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<SetState>))]
 public enum SetState
 {
     /// <summary>Every threshold of the set holds.</summary>

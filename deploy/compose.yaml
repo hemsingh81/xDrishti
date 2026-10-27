@@ -133,9 +133,12 @@ services:
       Assistant__Llm__BaseUrl: http://xd-llm:8080/v1
       # The read-only tool server (P9-02, ADR 0137): where the chat endpoint of P9-03 reaches it (only while the assistant is switched on by the owner, the model server is ready and a question is asked).
       Assistant__Mcp__Url: http://xd-mcp:8080/mcp
+      # The eval files (P9-09, ADR 0143), read only: the status of the accepted eval run compares their hashes. xd-api holds no eval token and cannot reach the eval's tool server.
+      Eval__Folder: /data/eval-files
     # The 1-minute CSV files (ADR 0016): read-only, the API never writes there. deploy/xd-up.sh creates the folder when it is missing.
     volumes:
       - ${XD_CSV_DIR:-../data/Stocks_CSV}:/data/csv:ro
+      - ../eval:/data/eval-files:ro
     secrets:
       - source: db_app_password
         target: Database__Password
@@ -300,6 +303,123 @@ services:
       retries: 12 # 150 s + 12 x 10 s = 270 s, inside the 330 s that scripts/xd-ai.sh waits
     <<: *hardening
 
+  # ---- The assistant eval (P9-09, ADR 0143). Profile `eval` = never part of `xd-up.sh`; the owner starts it with scripts/xd-eval.sh. Four services, none with a published port, all on the internal `back` network (no route out). ----
+  # The fixture database `xdrishti_eval` is migrated by the same image and seeded from eval/fixture/fixture.json. The eval's tool server reads ONLY that database, as the same two read-only roles of P9-02; its own token is held by the
+  # runner alone (never by xd-api, which keeps no eval token and no path to this server). Rules: deploy/CLAUDE.md, checked by EvalComposeRulesTests (part of scripts/check.sh).
+
+  # One-shot: the migrations of the fixture database (no owner account is created: Migrate__SkipOwner).
+  xd-migrate-eval:
+    profiles: [eval]
+    image: localhost/xdrishti/api:${XD_VERSION:-0.1.0}
+    command: [migrate]
+    restart: "no"
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Production
+      Database__ConnectionString: Host=xd-db;Port=5432;Database=xdrishti_eval;Username=xd_owner
+      Migrate__SkipOwner: "true"
+    secrets:
+      - source: db_owner_password
+        target: Database__Password
+      - source: db_mcp_read_password
+        target: AiRoles__ReadPassword
+      - source: db_mcp_sql_password
+        target: AiRoles__SqlPassword
+    networks: [back]
+    pull_policy: never
+    depends_on:
+      xd-db: { condition: service_healthy }
+    <<: *hardening
+
+  # The assistant's tool server over the FIXTURE database: xd-mcp's image, roles and hardening, another database and its own token (Mcp:Tokens:Eval).
+  xd-mcp-eval:
+    profiles: [eval]
+    image: localhost/xdrishti/mcp:${XD_VERSION:-0.1.0}
+    build:
+      context: ../backend
+      target: mcp
+      args: { VERSION: "${XD_VERSION:-0.1.0}" }
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Production
+      Database__ReadConnectionString: Host=xd-db;Port=5432;Database=xdrishti_eval;Username=xd_mcp_read
+      Database__SqlConnectionString: Host=xd-db;Port=5432;Database=xdrishti_eval;Username=xd_mcp_sql
+      Serilog__WriteTo__1__Name: Seq
+      Serilog__WriteTo__1__Args__serverUrl: http://xd-seq:5341
+    secrets:
+      - source: db_mcp_read_password
+        target: Database__ReadPassword
+      - source: db_mcp_sql_password
+        target: Database__SqlPassword
+      - source: eval_mcp_token
+        target: Mcp__Tokens__Eval
+    networks: [back]
+    mem_limit: 512m
+    depends_on:
+      xd-db: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, dotnet, XDrishti.Mcp.dll, --healthcheck]
+      interval: 15s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+    <<: *hardening
+
+  # One-shot: `xd eval seed` writes the fixture into the empty, migrated xdrishti_eval as the database owner, and refuses any other database or one that holds data.
+  xd-eval-seed:
+    profiles: [eval]
+    image: localhost/xdrishti/api:${XD_VERSION:-0.1.0}
+    command: [xd, eval, seed]
+    restart: "no"
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Production
+      Database__ConnectionString: Host=xd-db;Port=5432;Database=xdrishti_eval;Username=xd_owner
+      Eval__SeedConnection: Host=xd-db;Port=5432;Database=xdrishti_eval;Username=xd_owner
+      Eval__Folder: /data/eval-files
+    secrets:
+      - source: db_owner_password
+        target: Database__Password
+    volumes:
+      - ../eval:/data/eval-files:ro
+    networks: [back]
+    pull_policy: never
+    depends_on:
+      xd-db: { condition: service_healthy }
+    <<: *hardening
+
+  # One-shot, the owner's verb: `xd eval run|grade|compare|accept|show` (scripts/xd-eval.sh). It asks the local model (xd-llm) questions of the fixture, with the tools of xd-mcp-eval, and writes only the assistant's audit rows (origin eval, fixture data) and the eval tables
+  # of the production database as the runtime role. It reads no tool server but the eval's. Never started by a service, a job or an endpoint.
+  xd-eval:
+    profiles: [eval]
+    image: localhost/xdrishti/api:${XD_VERSION:-0.1.0}
+    command: [xd, eval, show]
+    restart: "no"
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Production
+      Database__ConnectionString: Host=xd-db;Port=5432;Database=xdrishti;Username=xd_app
+      Assistant__Llm__Enabled: "true"
+      Assistant__Llm__BaseUrl: http://xd-llm:8080/v1
+      Eval__Mcp__Url: http://xd-mcp-eval:8080/mcp
+      Eval__Folder: /data/eval-files
+    secrets:
+      - source: db_app_password
+        target: Database__Password
+      - source: llm_api_key
+        target: Assistant__Llm__ApiKey
+      - source: eval_mcp_token
+        target: Eval__Mcp__Token
+    volumes:
+      - ../eval:/data/eval-files:ro
+    networks: [back]
+    mem_limit: 1g
+    pull_policy: never
+    depends_on:
+      xd-db: { condition: service_healthy }
+    <<: *hardening
+
   # The assistant's read-only tool server (P9-02, ADR 0137): four read tools over MCP (Streamable HTTP, stateless, bearer token). Profile `ai` = never part of `xd-up.sh`; the owner starts it with scripts/xd-ai.sh. It logs in as the roles xd_mcp_read and
   # xd_mcp_sql, which can SELECT from the reviewed views of schema `aiv` and nothing else; it holds none of the application's credentials. No published port, internal network only; the only secrets are its two passwords and its token.
   # deploy/CLAUDE.md rules for this block are checked by McpComposeRulesTests (part of scripts/check.sh).
@@ -370,3 +490,5 @@ secrets:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/db_mcp_sql_password
   mcp_token:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/mcp_token
+  eval_mcp_token:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/eval_mcp_token

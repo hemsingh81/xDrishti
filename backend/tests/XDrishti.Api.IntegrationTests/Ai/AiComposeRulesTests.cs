@@ -73,7 +73,7 @@ public sealed class AiComposeRulesTests
         var services = Compose[..Compose.IndexOf("\nnetworks:\n", StringComparison.Ordinal)];
         var users = services.Split("\n  xd-", StringSplitOptions.None).Where(block => block.Contains("llm_api_key", StringComparison.Ordinal)).Select(b => b.Split('\n')[0].TrimEnd(':')).ToList();
 
-        users.ShouldBe(["api", "llm"], ignoreOrder: true, customMessage: "only xd-api and xd-llm may use llm_api_key");
+        users.ShouldBe(["api", "llm", "eval"], ignoreOrder: true, customMessage: "only xd-api, xd-llm and the eval runner (which asks the model, P9-09) may use llm_api_key");
         Compose.ShouldContain("target: Assistant__Llm__ApiKey");
     }
 }

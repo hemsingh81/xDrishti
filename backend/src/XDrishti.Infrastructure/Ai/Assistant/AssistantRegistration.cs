@@ -39,6 +39,14 @@ public static class AssistantRegistration
         });
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<TurnOptions>>().Value);
         services.AddSingleton<IToolCatalog, McpToolCatalog>();
+        services.AddOptions<EvalOptions>()
+            .Bind(configuration.GetSection(EvalOptions.SectionName))
+            .Validate(o => o.Mcp.HasValidUrl(), "Eval:Mcp:Url must be an absolute http or https address.")
+            .ValidateOnStart();
+        services.AddSingleton<IEvalToolCatalog, EvalToolCatalog>(); // the eval's own tool client (Eval:Mcp, its own token): the eval turn is built over this one and never over the production catalog (P9-09, ADR 0143)
+        services.AddSingleton<IEvalFiles, EvalFileReader>();
+        services.AddScoped<IEvalFixtureProbe, EvalFixtureProbe>();
+        services.AddScoped<IEvalStore, EvalStore>();
         services.AddSingleton<IChatModel, ChatClientModel>();
         services.AddScoped<IBriefingWriter, BriefingWriter>();
         services.AddScoped<IBriefingStore, BriefingStore>();

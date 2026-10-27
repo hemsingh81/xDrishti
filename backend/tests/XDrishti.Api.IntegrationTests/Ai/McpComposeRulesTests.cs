@@ -68,8 +68,8 @@ public sealed class McpComposeRulesTests
         string[] Users(string secret) => [.. services.Split("\n  xd-", StringSplitOptions.None).Where(block => block.Contains($"source: {secret}", StringComparison.Ordinal)).Select(b => b.Split('\n')[0].TrimEnd(':'))];
 
         Users("mcp_token").ShouldBe(["api", "mcp"], ignoreOrder: true, customMessage: "the token is read by the tool server and sent by the API");
-        Users("db_mcp_read_password").ShouldBe(["migrate", "mcp"], ignoreOrder: true, customMessage: "migrate sets the login, the tool server uses it");
-        Users("db_mcp_sql_password").ShouldBe(["migrate", "mcp"], ignoreOrder: true);
+        Users("db_mcp_read_password").ShouldBe(["migrate", "mcp", "migrate-eval", "mcp-eval"], ignoreOrder: true, customMessage: "migrate sets the login, the tool server uses it, and so do the migration and the tool server of the eval (P9-09)");
+        Users("db_mcp_sql_password").ShouldBe(["migrate", "mcp", "migrate-eval", "mcp-eval"], ignoreOrder: true);
         Compose.ShouldContain("target: AiRoles__ReadPassword");
         Compose.ShouldContain("target: AiRoles__SqlPassword");
         Compose.ShouldContain("target: Assistant__Mcp__Token");

@@ -1,5 +1,6 @@
 using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Assistant.Evaluation;
 
 namespace XDrishti.Application.Ai;
 
@@ -12,7 +13,8 @@ internal sealed class GetAssistantStatusHandler(
     IToolCatalog tools,
     INightlyRunProbe nightly,
     TurnGate gate,
-    TurnOptions options) : IQueryHandler<GetAssistantStatusQuery, AssistantStatusView>
+    TurnOptions options,
+    IQueryHandler<GetEvalStatusQuery, EvalStatusView>? evaluation = null) : IQueryHandler<GetAssistantStatusQuery, AssistantStatusView>
 {
     public async ValueTask<AssistantStatusView> HandleAsync(GetAssistantStatusQuery query, CancellationToken cancellationToken)
     {
@@ -26,6 +28,7 @@ internal sealed class GetAssistantStatusHandler(
         }
 
         var running = await nightly.IsRunningAsync(TimeSpan.FromMinutes(options.NightlyGuardMinutes), cancellationToken);
-        return new AssistantStatusView(settings.Enabled, settings.PortfolioContext, settings.MaxToolCalls, settings.Id, llm, toolsView, gate.Busy, running, new EvaluationView("not_yet_evaluated", null, null), settings.AllowDraftConfirm, settings.AutoLabQuickTest, settings.AllowProposalAccept, settings.AutoAcceptHypothesis);
+        var eval = evaluation is null ? null : await evaluation.HandleAsync(new GetEvalStatusQuery(), cancellationToken);
+        return new AssistantStatusView(settings.Enabled, settings.PortfolioContext, settings.MaxToolCalls, settings.Id, llm, toolsView, gate.Busy, running, eval is null ? new EvaluationView("not_yet_evaluated", null, null) : new EvaluationView(eval.State, eval.At, eval.Detail), settings.AllowDraftConfirm, settings.AutoLabQuickTest, settings.AllowProposalAccept, settings.AutoAcceptHypothesis);
     }
 }

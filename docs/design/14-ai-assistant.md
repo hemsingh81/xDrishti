@@ -72,6 +72,8 @@ Model choice is config; select by our eval set, not leaderboards.
 | Strategy drafting | 10 ideas | Valid DSL; matches intent on review |
 | Event flags | 200 labelled announcements | Precision on "material" ≥ 80% |
 
+The eval runs with `xd eval` ([P9-09](../specs/P9-09-eval-set-and-regression-runner.md), [ADR 0143](../adr/0143-the-eval-grades-the-assistant-by-code-on-a-synthetic-fixture-read-only-with-exact-numbers-intervals-and-an-owner-accepted-baseline.md)): a synthetic fixture database, graders written as code (no model judge), the pass thresholds in `eval/thresholds.json` (data 27 of 30; plans raw 8 and repaired 9 of 10 with no escape; ideas first shot 8 and repaired 9 of 10; events precision 0.80 once 200 labelled rows exist), every rate with its Wilson interval, a paired sign test between two runs, and a baseline only the owner accepts. It is re-run on every model, runtime or prompt change; the accepted run goes stale at once when the fingerprint of the model, runtime, prompts, sets, thresholds or fixture changes.
+
 ## 6. Hermes Agent (Nous Research) — decision
 
 **What it is:** open-source (MIT) always-on agent: persistent memory, self-written skills, built-in cron,

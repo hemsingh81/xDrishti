@@ -582,6 +582,12 @@ internal static class ManifestViews
                 new("detail", ColumnKind.Text, DataClass.U, "", "Detail (untrusted text)."),
                 new("graded_at", ColumnKind.Timestamp, DataClass.C2, "UTC", "Graded."),
             ]),
+        new(
+            "eval_marker", "Marker of the eval fixture database (P9-09): one row there, none in any other database.", "one row", ViewClass.C1, "ai.eval_marker",
+            [
+                new("fixture_hash", ColumnKind.Id, DataClass.C1, "", "SHA-256 of the fixture file the database was seeded from."),
+                new("seeded_at", ColumnKind.Timestamp, DataClass.C1, "UTC", "When it was seeded."),
+            ]),
     ];
 }
 

@@ -229,6 +229,14 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<AssistantProposalDecisionRecord> AssistantProposalDecisions => Set<AssistantProposalDecisionRecord>();
 
+    internal DbSet<AiEvalRunRecord> AiEvalRuns => Set<AiEvalRunRecord>();
+
+    internal DbSet<AiEvalCaseRecord> AiEvalCases => Set<AiEvalCaseRecord>();
+
+    internal DbSet<AiEvalBaselineRecord> AiEvalBaselines => Set<AiEvalBaselineRecord>();
+
+    internal DbSet<AiEvalMarkerRecord> AiEvalMarker => Set<AiEvalMarkerRecord>();
+
     internal DbSet<ContextDailyRecord> ContextDaily => Set<ContextDailyRecord>();
 
     internal DbSet<ChargeSheetEventRecord> ChargeSheetEvents => Set<ChargeSheetEventRecord>();

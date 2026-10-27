@@ -27,7 +27,7 @@ internal sealed class AssistantEndpoints : IEndpointModule
 
         group.MapGet("/status", GetStatusAsync)
             .WithName("GetAssistantStatus")
-            .WithSummary("The assistant's settings in force (off by default), the model server, the tool server (not asked while the assistant is off), whether a turn is running, whether the nightly run blocks it, and the evaluation (not_yet_evaluated until P9-09). Read only")
+            .WithSummary("The assistant's settings in force (off by default), the model server, the tool server (not asked while the assistant is off), whether a turn is running, whether the nightly run blocks it, and the evaluation (not_yet_evaluated, passed or failed: from the accepted eval run, GET /api/assistant/evals/status). Read only")
             .ProducesRejections(conflict: false, notFound: false);
 
         group.MapPost("/chat", ChatAsync)

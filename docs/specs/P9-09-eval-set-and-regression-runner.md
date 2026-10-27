@@ -1,6 +1,6 @@
 # P9-09 — Eval set and regression runner (30 data questions, 10 plans, 10 ideas, 200 announcements deferred)
 
-- **Status:** Approved (owner approved all P9 plans; model and GPU chosen in ADR 0136). P9-09a built 2026-10-27 (fixture, 30 questions, answer grader, statistics, thresholds, announcements grader, oracle test). Written 2026-10-24 as Draft ( decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner approved all P9 plans; model and GPU chosen in ADR 0136). P9-09a and P9-09b built 2026-10-27 (09a: fixture, 30 questions, answer grader, statistics, thresholds, announcements grader, oracle test; 09b: plan and idea sets and graders, runner, store, migration `AddEvalRuns`, read endpoints, verb, isolation, seeder, compose and scripts, tests; the cut candidates `xd eval compare` and the staleness endpoint were kept). Written 2026-10-24 as Draft ( decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P9 — AI assistant and Hermes PoC ("eval set"; exit: "Eval set passes"); slice of [P9-00](P9-00-ai-assistant-plan.md) (written in parallel; UNVERIFIED text). ADR 0005 and the benchmark note call this "the P9-07 eval set": the roadmap numbering now puts it here.
 - **Design refs:** docs/design/14-ai-assistant.md §2 ("final pick by the eval set"), §5 (the table), §6 (Hermes PoC thresholds) · ADR 0005 · docs/research/p0-15-llm-benchmark.md · P9-05, P9-06, P9-07, P9-08 · P8-05 (the oracle for KPIs).
 - **Needs:** P9-01 (`xd-ai.sh`, model alias and mode), P9-02/P9-05 (tools over the two read-only roles), P9-03 (`IAssistantTurnRunner`, `ai.messages` and `ai.tool_calls` audit), P9-06 (`TextGuard`, `NumberTokenizer`, `BriefingFacts`), P9-07 (draft pipeline and sheet), P8-05/P8-06 (KPI engine as second derivation). Used by: P9-10 (the Hermes PoC grades its answers with this runner).
@@ -121,10 +121,10 @@ Unit: `AnswerGrader` tables for every expected kind and the failure codes; numbe
 None. (Accepting a baseline and choosing the model after the runs are the owner's acts; until then no run is accepted and `status` says "no accepted eval run".)
 
 ## Done when
-- [ ] All acceptance criteria have evidence
-- [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] Contract regenerated (`scripts/gen-api.sh`); migration `AddEvalRuns` added with `Down`; compose profile `eval` and `deploy/CLAUDE.md` updated
-- [ ] ADR (next free ADR number at build time); docs 14 §5, ADR 0005 reference, root `CLAUDE.md` layout line and the roadmap row updated; `scripts/build-docs.sh` run
+- [x] All acceptance criteria have evidence (ADR 0143 lists the deviations: DQ-15 asks the unrealised return, DQ-24 and DQ-25 say "by its newest state", the "closed" lesson is a dismissed one)
+- [x] `scripts/check.sh` green; reviewer agent: no blockers/majors
+- [x] Contract regenerated (`scripts/gen-api.sh`); migration `AddEvalRuns` added with `Down`; compose profile `eval` and `deploy/CLAUDE.md` updated
+- [x] ADR 0143 (Proposed); docs 14 §5 and 17, root `CLAUDE.md` layout line updated; the roadmap row and `scripts/build-docs.sh` are left to the owner session
 
 ## Review fixes 2026-10-25 (2)
 1. Safety line made consistent with criterion 13: only `Origin: eval` audit rows of fixture data go to production `ai` tables; enabled switch is a precondition, never set by the runner.

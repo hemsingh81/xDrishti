@@ -13,4 +13,17 @@ Grading is code (no model judge): exact normalised numbers, words, honest-state 
 
 The report engine answers "insufficient" below 30 trades and the fixture groups are smaller, so a correct answer computes the figure from the stored trades; the model-free oracle test runs the engine with small minimums.
 
-Model-free tests (`scripts/check.sh`) cover the graders, statistics, thresholds, the fixture and its oracle. A model run is an owner act and is described in the P9-09b section of this file once the runner exists.
+| `sets/plans.jsonl` | The 10 historical plans of the briefing set: stored `BriefingFacts` and what a good text keeps. |
+| `sets/ideas.jsonl` | The 10 ideas of the drafting set with their assertions (8 drafts, 1 decline, 1 decline or partial). |
+
+Model-free tests (`scripts/check.sh`) cover the graders, statistics, thresholds, the fixture and its oracle, and an end to end run with a scripted model.
+
+## Running it (an owner act; nothing starts it by itself)
+
+1. `deploy/xd-up.sh` once (it writes the eval token from the Keychain item `xdrishti/mcp/eval-token`).
+2. `scripts/xd-eval.sh prepare` creates and seeds the fixture database `xdrishti_eval` (synthetic rows only; `scripts/eval-db.sh reset` recreates it) and starts the eval tool server `xd-mcp-eval`.
+3. `scripts/xd-ai.sh start` starts the model (and `main` thinking off is the profile of the gate), and the assistant's master switch must be ON in the app. The runner never sets it.
+4. `scripts/xd-eval.sh run` (all sets, three repeats; about two hours, UNVERIFIED) prints each set's rates with their 95 % intervals and the verdict, and writes `data/eval/<run>/report.json`, `report.md` and `answers.jsonl`. Exit code 0 only for a gating PASS. `--repeats 1` is a look only: it can never be accepted.
+5. `scripts/xd-eval.sh compare <run>` compares with the accepted baseline (paired, exact sign test; it never blocks by itself), and `scripts/xd-eval.sh accept <run>` makes a gating PASS the baseline (needs `--reason` when a set got worse). `GET /api/assistant/evals/status` and the Assistant status then say whether the accepted run is still current: a new model, runtime, prompt version, set, threshold or fixture makes it stale.
+
+A model that is down is reported as `model_unavailable` and the partial run is never a pass. Answers of another assistant (Hermes, P9-10) are graded from a file with `scripts/xd-eval.sh grade --answers FILE --target hermes`.

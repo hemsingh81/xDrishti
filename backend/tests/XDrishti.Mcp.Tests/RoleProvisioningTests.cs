@@ -128,7 +128,7 @@ public sealed class RoleProvisioningTests(UnprovisionedDatabase db) : IClassFixt
 
             await migrator.MigrateAsync(null, Ct);
 
-            (await ScalarAsync(db.Owner, "SELECT count(*) FROM pg_views WHERE schemaname = 'aiv'")).ShouldBe(36L);
+            (await ScalarAsync(db.Owner, "SELECT count(*) FROM pg_views WHERE schemaname = 'aiv'")).ShouldBe(37L);
 
             // What the migration leaves: both roles exist, without a login or a password.
             (await ScalarAsync(db.Owner, "SELECT count(*) FROM pg_roles WHERE rolname IN ('xd_mcp_read', 'xd_mcp_sql') AND NOT rolcanlogin")).ShouldBe(2L);

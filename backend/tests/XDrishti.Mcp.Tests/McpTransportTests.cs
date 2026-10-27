@@ -220,7 +220,7 @@ public sealed class McpTransportTests
         var json = JsonNode.Parse(Text(result))!;
         json["ok"]!.GetValue<bool>().ShouldBeTrue();
         json["tool"]!.GetValue<string>().ShouldBe("list_tables");
-        json["rows"]!.AsArray().Count.ShouldBe(36);
+        json["rows"]!.AsArray().Count.ShouldBe(37);
         Text(result).Length.ShouldBeLessThanOrEqualTo(6000);
     }
 

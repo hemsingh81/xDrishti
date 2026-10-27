@@ -17,7 +17,7 @@ namespace XDrishti.Api.IntegrationTests.Ai;
 public sealed class AssistantAuditDatabaseTests(ResearchGrantsTests.DedicatedServer server) : IClassFixture<ResearchGrantsTests.DedicatedServer>
 {
     private const string Owner = "owner:owner@example.invalid";
-    private static readonly string[] Tables = ["ai.briefing_attempts", "ai.briefings", "ai.conversations", "ai.messages", "ai.model_calls", "ai.prompts", "ai.settings", "ai.strategy_draft_decisions", "ai.strategy_drafts", "ai.tool_calls"];
+    private static readonly string[] Tables = ["ai.briefing_attempts", "ai.briefings", "ai.conversations", "ai.eval_baselines", "ai.eval_cases", "ai.eval_runs", "ai.messages", "ai.model_calls", "ai.prompts", "ai.settings", "ai.strategy_draft_decisions", "ai.strategy_drafts", "ai.tool_calls"];
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private async Task<bool> HasAsync(string role, string table, string privilege)
@@ -57,7 +57,10 @@ public sealed class AssistantAuditDatabaseTests(ResearchGrantsTests.DedicatedSer
             await using var reader = await tables.ExecuteReaderAsync(Ct);
             while (await reader.ReadAsync(Ct))
             {
-                names.Add("ai." + reader.GetString(0));
+                if (reader.GetString(0) != "eval_marker")
+                {
+                    names.Add("ai." + reader.GetString(0)); // the marker of the eval fixture has no right for the runtime role at all (EvalFixtureDatabaseTests)
+                }
             }
 
             names.Order(StringComparer.Ordinal).ShouldBe(Tables.Order(StringComparer.Ordinal));

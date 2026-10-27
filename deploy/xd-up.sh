@@ -139,6 +139,8 @@ write_secret llm_api_key "xdrishti/llm/api-key"
 write_secret db_mcp_read_password "xdrishti/db/mcp-read"
 write_secret db_mcp_sql_password "xdrishti/db/mcp-sql"
 write_secret mcp_token "xdrishti/mcp/token"
+# The eval's tool token (P9-09, ADR 0143): held by xd-mcp-eval and the one-shot eval runner only, never by xd-api. Created once, never replaced; the eval services are started by the owner (scripts/xd-eval.sh).
+write_secret eval_mcp_token "xdrishti/mcp/eval-token"
 
 # Credential-reference files of P1-16 (ADR 0007, replaced by the vault): plain copies of Keychain items that nothing reads any more.
 if [ -e "$XD_SECRETS_DIR/brokers" ] || [ -e "$XD_SECRETS_DIR/brokers.index" ]; then

@@ -98,7 +98,7 @@ public sealed partial class ResultStoreArchitectureTests
     {
         var writers = SourceFiles().Where(f => WritesResearch().IsMatch(Code(f))).Select(Relative).Order(StringComparer.Ordinal).ToList();
 
-        writers.ShouldBe(["XDrishti.Infrastructure/Learning/CellStatsStore.cs", "XDrishti.Infrastructure/Learning/DigestStore.cs", "XDrishti.Infrastructure/Learning/ExperimentJobStore.cs", "XDrishti.Infrastructure/Learning/ExperimentLedger.cs", "XDrishti.Infrastructure/Learning/HypothesisLogStore.cs", "XDrishti.Infrastructure/Learning/LearningChangelogSql.cs", "XDrishti.Infrastructure/Learning/LearningReportStore.cs", "XDrishti.Infrastructure/Learning/LessonLogStore.cs", "XDrishti.Infrastructure/Learning/ModelRegistry.cs", "XDrishti.Infrastructure/Learning/TradeFeatureStore.cs", "XDrishti.Infrastructure/Learning/TrainingSetStore.cs", "XDrishti.Infrastructure/Research/ExitSelectionStore.cs", "XDrishti.Infrastructure/Research/RunStore.Comparisons.cs", "XDrishti.Infrastructure/Research/RunStore.Legs.cs", "XDrishti.Infrastructure/Research/RunStore.Write.cs"]);
+        writers.ShouldBe(["XDrishti.Infrastructure/Ai/Evaluation/FixtureSeeder.cs", "XDrishti.Infrastructure/Learning/CellStatsStore.cs", "XDrishti.Infrastructure/Learning/DigestStore.cs", "XDrishti.Infrastructure/Learning/ExperimentJobStore.cs", "XDrishti.Infrastructure/Learning/ExperimentLedger.cs", "XDrishti.Infrastructure/Learning/HypothesisLogStore.cs", "XDrishti.Infrastructure/Learning/LearningChangelogSql.cs", "XDrishti.Infrastructure/Learning/LearningReportStore.cs", "XDrishti.Infrastructure/Learning/LessonLogStore.cs", "XDrishti.Infrastructure/Learning/ModelRegistry.cs", "XDrishti.Infrastructure/Learning/TradeFeatureStore.cs", "XDrishti.Infrastructure/Learning/TrainingSetStore.cs", "XDrishti.Infrastructure/Research/ExitSelectionStore.cs", "XDrishti.Infrastructure/Research/RunStore.Comparisons.cs", "XDrishti.Infrastructure/Research/RunStore.Legs.cs", "XDrishti.Infrastructure/Research/RunStore.Write.cs"]);
         WritesResearch().IsMatch("INSERT INTO research.sim_runs (a) VALUES (1)").ShouldBeTrue("the scan does see a write");
         WritesResearch().IsMatch("COPY research.sim_trades (a) FROM STDIN").ShouldBeTrue();
         WritesResearch().IsMatch("DELETE FROM research.sim_runs").ShouldBeTrue();
@@ -110,7 +110,7 @@ public sealed partial class ResultStoreArchitectureTests
     {
         var users = SourceFiles()
             .Where(f => NamesTheTables().IsMatch(Code(f)) && !Relative(f).StartsWith("XDrishti.Infrastructure/Research/", StringComparison.Ordinal) && !Relative(f).StartsWith("XDrishti.Infrastructure/Persistence/", StringComparison.Ordinal)
-                && Relative(f) != "XDrishti.Domain/Assistant/ManifestViews.cs") // the manifest of the read-only views (P9-02): views of schema aiv that carry the names of the tables they project, never the tables
+                && Relative(f) != "XDrishti.Domain/Assistant/ManifestViews.cs" && Relative(f) != "XDrishti.Infrastructure/Ai/Evaluation/FixtureSeeder.cs") // the manifest of the read-only views (P9-02): views of schema aiv that carry the names of the tables they project, never the tables; the eval fixture seeder (P9-09, ADR 0143): the owner login writes the synthetic rows of the fixture database once, refuses any other database and any database that holds data
             .Select(Relative)
             .ToList();
 

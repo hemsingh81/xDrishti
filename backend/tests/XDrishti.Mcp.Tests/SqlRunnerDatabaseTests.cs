@@ -114,7 +114,7 @@ public sealed class SqlRunnerDatabaseTests(ReadOnlyDatabase db) : IAsyncLifetime
         }
 
         (await ReadOnlyDatabase.ScalarAsync(db.Owner, "SELECT count(*) FROM ai.settings")).ShouldBe(0L);
-        (await ReadOnlyDatabase.ScalarAsync(db.Owner, "SELECT count(*) FROM pg_views WHERE schemaname = 'aiv'")).ShouldBe(36L);
+        (await ReadOnlyDatabase.ScalarAsync(db.Owner, "SELECT count(*) FROM pg_views WHERE schemaname = 'aiv'")).ShouldBe(37L);
         (await ReadOnlyDatabase.ScalarAsync(db.Owner, "SELECT count(*) FROM pg_tables WHERE tablename = 'smuggled'")).ShouldBe(0L);
     }
 

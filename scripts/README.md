@@ -21,6 +21,7 @@ Developer helpers (macOS). They use the .NET SDK in `~/.dotnet` and Podman Deskt
 | `llm-bench.sh` | P0-15: benchmark an OpenAI-compatible local LLM server (throughput, first-token time, capability smoke) → `data/llm-bench/`. |
 | `xd-ai.sh` | P9-01, P9-02: start / stop / status / logs of the on-demand assistant services: the local model server `xd-llm` (`start [main\|gptoss\|qwen-instruct]`; `model_missing` when the file is absent; never downloads) and the read-only tool server `xd-mcp` (`start --tools-only` starts it alone; `logs [llm\|mcp]`). |
 | `fetch-model.sh` | P9-01 (ADR 0136): download the pinned `qwen-instruct` model file into `data/models-llm`, asks y/N, resumable, checks size and SHA-256 and refuses a mismatch; `--verify` only checks. Run by the owner. |
+| `xd-eval.sh` / `eval-db.sh` | P9-09 (ADR 0143): the assistant eval, on demand. `eval-db.sh [reset]` creates, migrates and seeds the fixture database `xdrishti_eval` (synthetic data only); `xd-eval.sh prepare` also starts the eval tool server `xd-mcp-eval`; `xd-eval.sh run [--set S] [--repeats N]` runs the eval ONCE (the model must run and the assistant's master switch must be ON; nothing here sets it) and saves the report to `data/eval/<run>/`; `grade`, `compare`, `accept` (the owner's act), `show`, `stop`. |
 | `serve.sh` | Serves the clickable prototype (8766) and the docs site (8765). |
 
 The stack itself starts with `deploy/xd-up.sh` and stops with `deploy/xd-down.sh`.

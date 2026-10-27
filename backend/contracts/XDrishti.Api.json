@@ -14330,6 +14330,124 @@
         }
       }
     },
+    "/api/assistant/evals": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "The eval runs, newest first (limit 1 to 50, default 20), each with its summary: per set the outcome, the rates with their 95 % intervals and the verdict. Read only. 422 assistant.invalid",
+        "operationId": "ListAssistantEvals",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EvalRunView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/evals/status": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "Whether the accepted eval run still describes the assistant: the baseline, the current fingerprint, stale and what differs (model, runtime, prompt X, sets, thresholds). No network call. With no accepted run: 'no accepted eval run'. Read only",
+        "operationId": "GetAssistantEvalStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalStatusView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/evals/{id}": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "One eval run with its cases, the prompts and the parameters it measured. Read only. 404 assistant.eval_not_found",
+        "operationId": "GetAssistantEval",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalDetailView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/assistant/strategy-drafts": {
       "post": {
         "tags": [
@@ -14906,7 +15024,7 @@
         "tags": [
           "Assistant"
         ],
-        "summary": "The assistant's settings in force (off by default), the model server, the tool server (not asked while the assistant is off), whether a turn is running, whether the nightly run blocks it, and the evaluation (not_yet_evaluated until P9-09). Read only",
+        "summary": "The assistant's settings in force (off by default), the model server, the tool server (not asked while the assistant is off), whether a turn is running, whether the nightly run blocks it, and the evaluation (not_yet_evaluated, passed or failed: from the accepted eval run, GET /api/assistant/evals/status). Read only",
         "operationId": "GetAssistantStatus",
         "responses": {
           "200": {
@@ -27021,6 +27139,267 @@
           }
         },
         "description": "The equity curves of a report for a lens, one per group, with the evidence of the report. At most int EquityView.MaxSeries groups are drawn; a lens with more is refused rather than cut silently."
+      },
+      "EvalCaseView": {
+        "required": [
+          "set",
+          "caseId",
+          "repeat",
+          "passed",
+          "grounded",
+          "score",
+          "detail",
+          "answer",
+          "sessionId",
+          "toolCalls",
+          "latencyMs",
+          "promptTokens",
+          "completionTokens"
+        ],
+        "type": "object",
+        "properties": {
+          "set": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string"
+          },
+          "repeat": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "grounded": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "score": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "toolCalls": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "latencyMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "promptTokens": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "completionTokens": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "One stored case repeat. The answer is fixture data only."
+      },
+      "EvalDetailView": {
+        "required": [
+          "run",
+          "cases",
+          "promptVersions",
+          "parameters"
+        ],
+        "type": "object",
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/EvalRunView"
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvalCaseView"
+            }
+          },
+          "promptVersions": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "string"
+          }
+        },
+        "description": "A run with its cases and the prompts and parameters it measured."
+      },
+      "EvalRunView": {
+        "required": [
+          "id",
+          "startedAt",
+          "finishedAt",
+          "target",
+          "profile",
+          "sets",
+          "repeats",
+          "gating",
+          "modelId",
+          "modelSha256",
+          "runtimeDigest",
+          "fingerprint",
+          "status",
+          "verdict",
+          "actor",
+          "isBaseline",
+          "summary"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "target": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "sets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "repeats": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "gating": {
+            "type": "boolean"
+          },
+          "modelId": {
+            "type": "string"
+          },
+          "modelSha256": {
+            "type": "string"
+          },
+          "runtimeDigest": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "isBaseline": {
+            "type": "boolean"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/RunSummary"
+          }
+        },
+        "description": "A run as the API and the verb show it (spec P9-09 Contract). IsBaseline: the owner accepted it."
+      },
+      "EvalStatusView": {
+        "required": [
+          "baselineRunId",
+          "baselineFingerprint",
+          "currentFingerprint",
+          "stale",
+          "reasons",
+          "state",
+          "at",
+          "detail",
+          "newestGatingRunId",
+          "newestGatingVerdict"
+        ],
+        "type": "object",
+        "properties": {
+          "baselineRunId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "baselineFingerprint": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "currentFingerprint": {
+            "type": "string"
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "state": {
+            "type": "string"
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "newestGatingRunId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "newestGatingVerdict": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The status of the evaluation (spec AC 10). Stale is true when the current fingerprint differs from the baseline's; Reasons names what differs. State feeds the assistant status:\n`passed` only while a baseline exists and is not stale, `failed` when the newest gating run is not PASS, else `not_yet_evaluated`."
       },
       "EvaluationView": {
         "required": [
@@ -39417,6 +39796,38 @@
         },
         "description": "A cell with enough sample in its place in the ranking by the credible lower bound of expectancy."
       },
+      "RateLine": {
+        "required": [
+          "name",
+          "k",
+          "n",
+          "low",
+          "high"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "k": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "low": {
+            "type": "number",
+            "format": "double"
+          },
+          "high": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "A rate with its sample and its Wilson 95 % interval (spec P9-09 AC 9: every rate is printed with its interval)."
+      },
       "ReachedMfeView": {
         "required": [
           "atR",
@@ -41781,6 +42192,33 @@
         },
         "description": "A stored run a report may use, with whether the default run set takes it and, if not, why."
       },
+      "RunSummary": {
+        "required": [
+          "verdict",
+          "nonGating",
+          "sets",
+          "smallSampleLine"
+        ],
+        "type": "object",
+        "properties": {
+          "verdict": {
+            "type": "string"
+          },
+          "nonGating": {
+            "type": "boolean"
+          },
+          "sets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SetSummary"
+            }
+          },
+          "smallSampleLine": {
+            "type": "string"
+          }
+        },
+        "description": "The summary of a run: the verdict, the sets, and the sentence about the small sample. A run with one repeat is bool RunSummary.NonGating and can never be accepted."
+      },
       "RunUsedView": {
         "required": [
           "runKey",
@@ -42678,6 +43116,95 @@
           }
         },
         "description": "What the client needs to know about its session."
+      },
+      "SetOutcome": {
+        "required": [
+          "set",
+          "state",
+          "reasons"
+        ],
+        "type": "object",
+        "properties": {
+          "set": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SetState"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The outcome of one set: the state and, for a failure, the thresholds that did not hold, in words."
+      },
+      "SetState": {
+        "enum": [
+          "Pass",
+          "Fail",
+          "NotRun",
+          "NotEvaluable"
+        ],
+        "description": "How one set of the eval ended against its thresholds."
+      },
+      "SetSummary": {
+        "required": [
+          "set",
+          "outcome",
+          "rates",
+          "cases",
+          "repeats",
+          "stability",
+          "intentMean",
+          "intentLowest"
+        ],
+        "type": "object",
+        "properties": {
+          "set": {
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/SetOutcome"
+          },
+          "rates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RateLine"
+            }
+          },
+          "cases": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "repeats": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stability": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "intentMean": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "intentLowest": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "The summary of one set: its outcome, its rates with intervals, and the repeat figures (`pass@1` and `stability` where they apply)."
       },
       "SignFlipBaselineView": {
         "required": [
