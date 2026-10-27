@@ -575,7 +575,7 @@ null,
       {
         id: "P9", t: "AI assistant", state: "planned", note: "Local assistant: off by default, every number checked against tool results, never decides a trade. Delegated to the agent (2026-10-26): model and GPU chosen by the agent, the model download stays yours (a pinned fetch script). P9-01 to P9-03, P9-05, P9-07, P9-08 and P9-10 are SAFETY.",
         slices: [
-          ["P9-01", "xd-llm service, model runtime and LLM client (pinned image, GPU, on demand) (delegated to the agent (model and GPU chosen by the agent; you only run the pinned model fetch script))", "approved", "", {"d": 2, "o": 1, "s": "P9-01-xd-llm-service-and-model-runtime"}],
+          ["P9-01", "xd-llm service, model runtime and LLM client (built 2026-10-27, OFF: model Qwen3-30B-A3B in a container, pinned in ADR 0136; start with scripts/xd-ai.sh, the real-model measurements are still open)", "built", "0136", {"d": 2, "o": 1, "s": "P9-01-xd-llm-service-and-model-runtime"}],
           ["P9-02", "xd-mcp: read-only tool server, two read-only database roles and the aiv views (delegated to the agent (model and GPU chosen by the agent; you only run the pinned model fetch script))", "approved", "", {"d": 3, "o": 1, "s": "P9-02-xd-mcp-read-only-tool-server"}],
           ["P9-03", "Assistant endpoint: streaming chat, tool loop, grounding check and ai audit tables (delegated to the agent (model and GPU chosen by the agent; you only run the pinned model fetch script))", "approved", "", {"d": 3, "o": 1, "s": "P9-03-assistant-endpoint-streaming-and-ai-audit-tables"}],
           ["P9-04", "Assistant chat screen (delegated to the agent (model and GPU chosen by the agent; you only run the pinned model fetch script))", "approved", "", {"d": 3, "s": "P9-04-assistant-chat-ui"}],
@@ -604,7 +604,7 @@ null,
         slices: [
           ["P11-05", "Static IP and SEBI re-check: runbook, questions and the compliance record", "draft", "", {"d": 2, "o": 1, "s": "P11-05-static-ip-and-sebi-recheck-runbook"}],
           ["P11-04", "Scale-up rules and risk ramp: live-ready gate, steps S1/S2/S3, evidence gates, halts", "draft", "", {"d": 5, "o": 1, "s": "P11-04-scale-up-rules-and-risk-ramp"}],
-          ["P11-01", "Manual-live fill capture: trade book and order book read from Dhan (delegated to the agent with the Dhan allow-list slice (read-only GET /v2/orders))", "approved", "", {"d": 3.5, "o": 1, "s": "P11-01-manual-live-fill-capture"}],
+          ["P11-01", "Manual-live fill capture: trade book and order book read from Dhan (waits for P11-04A live allocations; the read-only GET entries are accepted in principle, ADR 0133)", "approved", "", {"d": 3.5, "o": 1, "s": "P11-01-manual-live-fill-capture"}],
           ["P11-02", "Execution feedback: grade on fills, slippage per liquidity bucket, capacity score", "draft", "", {"d": 3.5, "s": "P11-02-execution-feedback-grade-on-fills-slippage-and-capacity"}],
           ["P11-03", "Live versus paper report: paired tickets, slippage distribution, execution gap", "draft", "", {"d": 3, "s": "P11-03-live-vs-paper-slippage-report"}],
           ["P11-06", "The small-live phase check (eight weeks, eight criteria)", "draft", "", {"d": 2, "s": "P11-06-small-live-phase-check"}],
