@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Ai;
 using XDrishti.Application.Ai.Briefing;
+using XDrishti.Application.Ai.Drafting;
 
 namespace XDrishti.Infrastructure.Ai.Assistant;
 
@@ -24,6 +25,8 @@ public static class AssistantRegistration
             .Validate(o => o.HasValidUrl(), "Assistant:Mcp:Url must be an absolute http or https address.")
             .ValidateOnStart();
         services.AddOptions<BriefingOptions>().Bind(configuration.GetSection(BriefingOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<DraftOptions>().Bind(configuration.GetSection(DraftOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<DraftOptions>>().Value);
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton(sp =>
         {
@@ -36,6 +39,10 @@ public static class AssistantRegistration
         services.AddSingleton<IChatModel, ChatClientModel>();
         services.AddScoped<IBriefingWriter, BriefingWriter>();
         services.AddScoped<IBriefingStore, BriefingStore>();
+        services.AddScoped<IStrategyDrafter, StrategyDrafter>();
+        services.AddScoped<IDraftStore, DraftStore>();
+        services.AddSingleton<IDraftSheetSource, DraftSheetBuilder>();
+        services.AddSingleton<IStrategyTextReader, StrategyTextReader>();
         services.AddScoped<IAssistantSettingsStore, AssistantSettingsStore>();
         services.AddScoped<INightlyRunProbe, NightlyRunProbe>();
         services.AddScoped<IModelCallAudit, ModelCallAudit>();

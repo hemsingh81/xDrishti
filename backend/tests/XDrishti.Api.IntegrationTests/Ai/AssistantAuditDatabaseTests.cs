@@ -17,7 +17,7 @@ namespace XDrishti.Api.IntegrationTests.Ai;
 public sealed class AssistantAuditDatabaseTests(ResearchGrantsTests.DedicatedServer server) : IClassFixture<ResearchGrantsTests.DedicatedServer>
 {
     private const string Owner = "owner:owner@example.invalid";
-    private static readonly string[] Tables = ["ai.briefing_attempts", "ai.briefings", "ai.conversations", "ai.messages", "ai.model_calls", "ai.prompts", "ai.settings", "ai.tool_calls"];
+    private static readonly string[] Tables = ["ai.briefing_attempts", "ai.briefings", "ai.conversations", "ai.messages", "ai.model_calls", "ai.prompts", "ai.settings", "ai.strategy_draft_decisions", "ai.strategy_drafts", "ai.tool_calls"];
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private async Task<bool> HasAsync(string role, string table, string privilege)

@@ -12,8 +12,12 @@ public sealed record AssistantSettingsChange
     /// <summary>The longest reason (the column is 500).</summary>
     public const int MaxReasonLength = 500;
 
-    private AssistantSettingsChange(string actor, string reason, bool enabled, bool portfolioContext, int maxToolCalls)
+    private AssistantSettingsChange(string actor, string reason, bool enabled, bool portfolioContext, int maxToolCalls, bool allowDraftConfirm, bool autoLabQuickTest, bool allowProposalAccept, bool autoAcceptHypothesis)
     {
+        AllowDraftConfirm = allowDraftConfirm;
+        AutoLabQuickTest = autoLabQuickTest;
+        AllowProposalAccept = allowProposalAccept;
+        AutoAcceptHypothesis = autoAcceptHypothesis;
         Actor = actor;
         Reason = reason;
         Enabled = enabled;
@@ -36,8 +40,20 @@ public sealed record AssistantSettingsChange
     /// <summary>The new budget of tool calls per turn.</summary>
     public int MaxToolCalls { get; }
 
+    /// <summary>Whether the owner may confirm a strategy draft.</summary>
+    public bool AllowDraftConfirm { get; }
+
+    /// <summary>Whether the dedicated drafting job may queue a quick test of a valid draft on its own.</summary>
+    public bool AutoLabQuickTest { get; }
+
+    /// <summary>Used by P9-08.</summary>
+    public bool AllowProposalAccept { get; }
+
+    /// <summary>Used by P9-08.</summary>
+    public bool AutoAcceptHypothesis { get; }
+
     /// <summary>Makes the change, or says why not: an owner actor, a reason that fits and a budget in range.</summary>
-    public static Result<AssistantSettingsChange> Create(string? actor, string? reason, bool enabled, bool portfolioContext, int maxToolCalls)
+    public static Result<AssistantSettingsChange> Create(string? actor, string? reason, bool enabled, bool portfolioContext, int maxToolCalls, bool allowDraftConfirm = false, bool autoLabQuickTest = false, bool allowProposalAccept = false, bool autoAcceptHypothesis = false)
     {
         if (!OwnerConfirmation.IsOwnerActor(actor) || actor!.Length > 100)
         {
@@ -55,16 +71,17 @@ public sealed record AssistantSettingsChange
             return Result.Failure<AssistantSettingsChange>(Error.Validation("assistant.values_invalid", $"The budget of tool calls is {AssistantSettings.LowestMaxToolCalls} to {AssistantSettings.HighestMaxToolCalls}."));
         }
 
-        return Result.Success(new AssistantSettingsChange(actor, text, enabled, portfolioContext, maxToolCalls));
+        return Result.Success(new AssistantSettingsChange(actor, text, enabled, portfolioContext, maxToolCalls, allowDraftConfirm, autoLabQuickTest, allowProposalAccept, autoAcceptHypothesis));
     }
 
     /// <summary>
     /// Whether a change to these values turns something on or raises something relative to <paramref name="current"/> (the assistant on, the portfolio context on, a larger budget). Such a change needs the owner's password for this change; a change that only lowers or keeps does not.
     /// A pure function of the states (table test), so the endpoint can ask it before it has an actor.
     /// </summary>
-    public static bool RaisesExposure(AssistantSettings current, bool enabled, bool portfolioContext, int maxToolCalls)
+    public static bool RaisesExposure(AssistantSettings current, bool enabled, bool portfolioContext, int maxToolCalls, bool allowDraftConfirm = false, bool autoLabQuickTest = false, bool allowProposalAccept = false, bool autoAcceptHypothesis = false)
     {
         ArgumentNullException.ThrowIfNull(current);
-        return (enabled && !current.Enabled) || (portfolioContext && !current.PortfolioContext) || maxToolCalls > current.MaxToolCalls;
+        return (enabled && !current.Enabled) || (portfolioContext && !current.PortfolioContext) || maxToolCalls > current.MaxToolCalls
+            || (allowDraftConfirm && !current.AllowDraftConfirm) || (autoLabQuickTest && !current.AutoLabQuickTest) || (allowProposalAccept && !current.AllowProposalAccept) || (autoAcceptHypothesis && !current.AutoAcceptHypothesis);
     }
 }

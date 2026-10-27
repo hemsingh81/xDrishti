@@ -19,6 +19,7 @@ using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Ai;
 using XDrishti.Application.Ai.Briefing;
+using XDrishti.Application.Ai.Drafting;
 using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
@@ -578,6 +579,15 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<PreviewBriefingQuery, Result<BriefingView>>, PreviewBriefingHandler>();
         services.AddScoped<IQueryHandler<GetBriefingQuery, Result<BriefingView>>, GetBriefingHandler>();
         services.AddScoped<IQueryHandler<ListBriefingsQuery, Result<IReadOnlyList<BriefingView>>>, ListBriefingsHandler>();
+        services.AddSingleton<DraftJobs>(); // the drafting jobs in progress (P9-07); in memory, a crash loses one
+        services.AddScoped<IQueryHandler<SubmitDraftQuery, DraftEvaluation>, SubmitDraftHandler>(); // the one core of a draft: the Lab validator and the checks C3 to C6; no model, no store
+        services.AddScoped<ICommandHandler<StartDraftCommand, DraftView>, StartDraftHandler>(); // the owner types an idea; takes the model slot and starts the job
+        services.AddScoped<ICommandHandler<DraftStrategyCommand, DraftView>, DraftStrategyHandler>(); // the job: model, repair turns, one insert-only row
+        services.AddScoped<ICommandHandler<ConfirmDraftCommand, DraftView>, ConfirmDraftHandler>(); // the owner's confirm: the only path to a stored version and a quick test (P9-07, ADR 0141)
+        services.AddScoped<ICommandHandler<DiscardDraftCommand, DraftView>, DiscardDraftHandler>();
+        services.AddScoped<IQueryHandler<GetDraftQuery, Result<DraftView>>, GetDraftHandler>();
+        services.AddScoped<IQueryHandler<ListDraftsQuery, Result<IReadOnlyList<DraftView>>>, ListDraftsHandler>();
+        services.AddScoped<IQueryHandler<DraftConfirmAllowedQuery, bool>, DraftConfirmAllowedHandler>();
         services.AddScoped<IQueryHandler<ListDigestsQuery, Result<IReadOnlyList<DigestView>>>, ListDigestsHandler>();
         services.AddScoped<ICommandHandler<StoreCounterfactualCommand, StoredCounterfactual>, StoreCounterfactualHandler>(); // the counterfactual stored once per input hash; the verb's --store (P8-12, ADR 0110)
         services.AddScoped<IQueryHandler<GetCounterfactualQuery, Result<CounterfactualReportView>>, GetCounterfactualHandler>();

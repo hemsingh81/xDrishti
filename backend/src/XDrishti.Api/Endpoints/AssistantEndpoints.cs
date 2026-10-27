@@ -106,7 +106,7 @@ internal sealed class AssistantEndpoints : IEndpointModule
         http.Response.Headers.CacheControl = "no-store";
 
         // Switching something off or lowering it is free (the owner can always switch it off); anything that turns something on or raises it needs the password for this change.
-        var raises = await needsPassword.HandleAsync(new AssistantSettingsNeedPasswordQuery(request.Enabled, request.PortfolioContext, request.MaxToolCalls), cancellationToken);
+        var raises = await needsPassword.HandleAsync(new AssistantSettingsNeedPasswordQuery(request.Enabled, request.PortfolioContext, request.MaxToolCalls, request.AllowDraftConfirm, request.AutoLabQuickTest, request.AllowProposalAccept, request.AutoAcceptHypothesis), cancellationToken);
         var owner = raises ? await OwnerAct.AuthorizeAsync(http, passwordCheck, request.Password, cancellationToken) : OwnerAct.SessionOwner(http);
         if (owner.IsFailure)
         {
@@ -114,7 +114,7 @@ internal sealed class AssistantEndpoints : IEndpointModule
         }
 
         var result = await handler.HandleAsync(
-            new ChangeAssistantSettingsCommand(owner.Value, request.Reason ?? string.Empty, request.Enabled, request.PortfolioContext, request.MaxToolCalls, request.ExpectedSettingsId, PasswordVerified: raises), cancellationToken);
+            new ChangeAssistantSettingsCommand(owner.Value, request.Reason ?? string.Empty, request.Enabled, request.PortfolioContext, request.MaxToolCalls, request.ExpectedSettingsId, PasswordVerified: raises, request.AllowDraftConfirm, request.AutoLabQuickTest, request.AllowProposalAccept, request.AutoAcceptHypothesis), cancellationToken);
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 

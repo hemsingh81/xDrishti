@@ -23,6 +23,10 @@ export function statusBuilder(over: Partial<AssistantStatus> = {}): AssistantSta
     busy: false,
     nightlyRunning: false,
     evaluation: { state: 'not_yet_evaluated', at: null, detail: null },
+    allowDraftConfirm: false,
+    autoLabQuickTest: false,
+    allowProposalAccept: false,
+    autoAcceptHypothesis: false,
     ...over,
   };
 }

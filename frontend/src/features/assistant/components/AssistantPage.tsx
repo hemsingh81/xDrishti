@@ -12,6 +12,7 @@ import { useChatStream } from '../hooks/useChatStream';
 import { gateOf } from '../lib/gate';
 import { words } from '../lib/wording';
 import { Composer } from './Composer';
+import { DraftPanelLazy } from './DraftPanelLazy';
 import { ConversationList } from './ConversationList';
 import { EvaluationLine } from './EvaluationLine';
 import { MessageList } from './MessageList';
@@ -28,6 +29,7 @@ export function AssistantPage() {
   const [draft, setDraft] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [draftsOpen, setDraftsOpen] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const theme = useTheme();
   const wide = useMediaQuery(theme.breakpoints.up('md'));
@@ -118,6 +120,14 @@ export function AssistantPage() {
         >
           Settings
         </Button>
+        <Button
+          aria-expanded={draftsOpen}
+          onClick={() => {
+            setDraftsOpen((open) => !open);
+          }}
+        >
+          Draft a strategy
+        </Button>
       </Stack>
       {status.isPending && <LoadingState label="Loading assistant status…" />}
       {status.isError && <ErrorState error={status.error} />}
@@ -157,6 +167,7 @@ export function AssistantPage() {
           />
         </Box>
       </Box>
+      {draftsOpen && <DraftPanelLazy />}
       <Box role="status" aria-live="polite" sx={visuallyHidden}>
         {announcement}
       </Box>

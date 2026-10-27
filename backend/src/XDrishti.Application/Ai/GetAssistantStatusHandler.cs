@@ -26,6 +26,6 @@ internal sealed class GetAssistantStatusHandler(
         }
 
         var running = await nightly.IsRunningAsync(TimeSpan.FromMinutes(options.NightlyGuardMinutes), cancellationToken);
-        return new AssistantStatusView(settings.Enabled, settings.PortfolioContext, settings.MaxToolCalls, settings.Id, llm, toolsView, gate.Busy, running, new EvaluationView("not_yet_evaluated", null, null));
+        return new AssistantStatusView(settings.Enabled, settings.PortfolioContext, settings.MaxToolCalls, settings.Id, llm, toolsView, gate.Busy, running, new EvaluationView("not_yet_evaluated", null, null), settings.AllowDraftConfirm, settings.AutoLabQuickTest, settings.AllowProposalAccept, settings.AutoAcceptHypothesis);
     }
 }

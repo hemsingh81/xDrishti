@@ -4054,6 +4054,75 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/assistant/strategy-drafts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The newest finished drafts (limit 1 to 50, default 20) with their decisions. Read only. 422 assistant.invalid */
+    get: operations['ListAssistantStrategyDrafts'];
+    put?: never;
+    /** The owner types a trading idea (10 to 2,000 characters); starts the model job and answers 202 with the draft in state drafting (poll GET). Stores nothing as a strategy and runs nothing. 409 assistant.disabled, assistant.limit, assistant.busy; 422 assistant.invalid */
+    post: operations['StartAssistantStrategyDraft'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/strategy-drafts/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One draft: drafting while its job runs, then valid, invalid, declined or failed, and confirmed or discarded after the owner's decision; the linked quick test's deterministic summary once it has a state. Read only. 404 assistant.draft_not_found */
+    get: operations['GetAssistantStrategyDraft'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/strategy-drafts/{id}/confirm': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The owner's confirm: re-validates the text sent, stores it as a normal library version and, when run is true, starts a quick test on the universe the owner picked. Needs a fresh password in the body and the switch allow_draft_confirm. 409 assistant.capability_off, assistant.draft_id_taken, assistant.draft_discarded; 422 assistant.draft_invalid, assistant.invalid, lab.invalid_strategy */
+    post: operations['ConfirmAssistantStrategyDraft'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/strategy-drafts/{id}/discard': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The owner discards a draft (no password: the safe direction). A confirmed draft cannot be discarded. 409 assistant.draft_confirmed */
+    post: operations['DiscardAssistantStrategyDraft'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/assistant/briefings': {
     parameters: {
       query?: never;
@@ -4793,6 +4862,14 @@ export interface components {
       expectedSettingsId: null | number;
       /** @description The owner's password, for a change that raises exposure. */
       password: null | string;
+      /** @description The owner may confirm a strategy draft (P9-07); absent means unchanged. */
+      allowDraftConfirm?: null | boolean;
+      /** @description A valid draft of the dedicated drafting job may be queued for a quick test without a confirm (P9-07 D9); absent means unchanged. */
+      autoLabQuickTest?: null | boolean;
+      /** @description Used by P9-08; absent means unchanged. */
+      allowProposalAccept?: null | boolean;
+      /** @description Used by P9-08; absent means unchanged. */
+      autoAcceptHypothesis?: null | boolean;
     };
     /** @description What `GET /api/assistant/status` answers (spec P9-03 AC 9). No key, address or path in it. */
     AssistantStatusView: {
@@ -4807,6 +4884,14 @@ export interface components {
       busy: boolean;
       nightlyRunning: boolean;
       evaluation: components['schemas']['EvaluationView'];
+      /** @default false */
+      allowDraftConfirm: boolean;
+      /** @default false */
+      autoLabQuickTest: boolean;
+      /** @default false */
+      allowProposalAccept: boolean;
+      /** @default false */
+      autoAcceptHypothesis: boolean;
     };
     /**
      * @description What the owner can do about an item (ADR 0027), at most two per item. `Kind``route`: `Target` is an in-app path with its query (`/accounts?account=…&amp;tab=connection`) to navigate to. `Kind``command`: `Target` is an existing
@@ -6461,6 +6546,18 @@ export interface components {
       /** @description Why, 1 to 500 characters (for example what the sheet was checked against). */
       reason: null | string;
       /** @description The owner's password, re-entered for THIS act and checked on every request. */
+      password: null | string;
+    };
+    /**
+     * @description The body of `POST /api/assistant/strategy-drafts/{id}/confirm` (spec P9-07 AC 7): the owner's edited text (absent: the stored draft's), the universe of the quick test (a basket or symbols; the owner picks), whether to run it, and the owner's password for THIS confirm.
+     *     The actor is never in it.
+     */
+    ConfirmDraftRequest: {
+      text: null | string;
+      /** Format: uuid */
+      basketId: null | string;
+      symbols: null | string[];
+      run: boolean;
       password: null | string;
     };
     /** @description Where to send the owner's browser to sign in at Dhan (same tab): Dhan's consent login page. The sign-in must come back before ExpiresAt. */
@@ -8120,6 +8217,78 @@ export interface components {
       /** Format: double */
       amountToStore: number;
       names: components['schemas']['NameLearning'];
+    };
+    /** @description A value the model chose on its own: the YAML path (such as `exits[0].rr`), the value it wrote and why. */
+    DraftAssumption: {
+      field: string;
+      value: string;
+      why: string;
+    };
+    /** @description What the owner's confirm made: the stored version, the quick test (or why it did not start) and whether the owner edited the text. */
+    DraftConfirmed: {
+      strategyId: string;
+      /** Format: int32 */
+      version: number;
+      /** Format: uuid */
+      labRunId: null | string;
+      edited: boolean;
+      auto: boolean;
+      runError: null | string;
+    };
+    /** @description One thing a check found wrong with a draft: a code and the plain detail (a path or a number; never the idea text). */
+    DraftFinding: {
+      code: string;
+      detail: string;
+    };
+    /** @description Something in the idea the strategy language cannot say today, with the reason; it keeps a number or time of the idea from being dropped silently. */
+    DraftNotExpressed: {
+      what: string;
+      why: string;
+    };
+    /** @description The test the idea asked for, as text only. The owner picks the window and the universe at Confirm. */
+    DraftRequestedTest: {
+      from: null | string;
+      to: null | string;
+      baskets: string[];
+    };
+    /** @description The deterministic summary of the linked quick test (spec P9-07 AC 9): counts and the run's own labels, never a win rate, expectancy or verdict. */
+    DraftRunSummary: {
+      state: string;
+      /** Format: int32 */
+      instrumentsRun: null | number;
+      /** Format: int32 */
+      skipped: null | number;
+      /** Format: int32 */
+      trades: null | number;
+      /** Format: int32 */
+      openAtEnd: null | number;
+      labels: string[];
+      problems: components['schemas']['LabProblem'][];
+      error: null | string;
+    };
+    /** @description A draft as the API serves it (spec P9-07 Contract). */
+    DraftView: {
+      /** Format: int64 */
+      id: number;
+      status: string;
+      idea: string;
+      understood: string[];
+      assumptions: components['schemas']['DraftAssumption'][];
+      notExpressed: components['schemas']['DraftNotExpressed'][];
+      unsupported: string[];
+      requestedTest: components['schemas']['DraftRequestedTest'];
+      yaml: null | string;
+      problems: components['schemas']['StrategyIssue'][];
+      findings: components['schemas']['DraftFinding'][];
+      /** Format: int32 */
+      attempts: number;
+      modelId: null | string;
+      promptVersion: null | string;
+      failReason: null | string;
+      confirmed: null | components['schemas']['DraftConfirmed'];
+      runSummary: null | components['schemas']['DraftRunSummary'];
+      /** Format: date-time */
+      createdAt: null | string;
     };
     /**
      * @description The largest peak-to-trough fall of a NAV series: `Pct` is a percent number (12.5 means it fell 12.5 %) from the peak on `From` to the low on `To`. A series that never falls (flat or rising)
@@ -14478,6 +14647,12 @@ export interface components {
       forceCsv?: null | boolean;
       refetchGaps?: null | boolean;
       csvFiles?: null | string[];
+    };
+    /** @description The body of `POST /api/assistant/strategy-drafts`: the owner's idea in plain text and, optionally, a basket the idea is about. The actor is never in it. */
+    StartDraftRequest: {
+      idea: null | string;
+      /** Format: uuid */
+      basketId: null | string;
     };
     /** @description The body of a replay start. The owner is never part of it: the actor comes from the signed-in session. */
     StartExperimentRequest: {
@@ -25543,6 +25718,230 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListAssistantStrategyDrafts: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  StartAssistantStrategyDraft: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['StartDraftRequest'];
+      };
+    };
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftView'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAssistantStrategyDraft: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ConfirmAssistantStrategyDraft: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ConfirmDraftRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DiscardAssistantStrategyDraft: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DraftView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

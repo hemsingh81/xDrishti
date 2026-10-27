@@ -74,4 +74,26 @@ public sealed class AssistantSettingsChangeTests
         AssistantSettingsChange.RaisesExposure(defaults, true, false, 6).ShouldBeTrue();
         AssistantSettingsChange.RaisesExposure(defaults, false, false, 6).ShouldBeFalse();
     }
+
+    [Fact]
+    public void Turning_a_write_switch_on_raises_exposure_and_turning_it_off_does_not()
+    {
+        var off = AssistantSettings.Defaults with { Enabled = true };
+        var on = off with { AllowDraftConfirm = true, AutoLabQuickTest = true };
+
+        AssistantSettingsChange.RaisesExposure(off, true, false, 6, allowDraftConfirm: true).ShouldBeTrue();
+        AssistantSettingsChange.RaisesExposure(off, true, false, 6, autoLabQuickTest: true).ShouldBeTrue();
+        AssistantSettingsChange.RaisesExposure(off, true, false, 6, allowProposalAccept: true).ShouldBeTrue();
+        AssistantSettingsChange.RaisesExposure(off, true, false, 6, autoAcceptHypothesis: true).ShouldBeTrue();
+        AssistantSettingsChange.RaisesExposure(on, true, false, 6, allowDraftConfirm: true, autoLabQuickTest: true).ShouldBeFalse();
+        AssistantSettingsChange.RaisesExposure(on, true, false, 6).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_write_switches_default_to_off() =>
+        AssistantSettings.Defaults.ShouldSatisfyAllConditions(
+            d => d.AllowDraftConfirm.ShouldBeFalse(),
+            d => d.AutoLabQuickTest.ShouldBeFalse(),
+            d => d.AllowProposalAccept.ShouldBeFalse(),
+            d => d.AutoAcceptHypothesis.ShouldBeFalse());
 }

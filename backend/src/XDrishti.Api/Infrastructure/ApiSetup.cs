@@ -124,6 +124,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, ChargeSheetEndpoints>(); // the owner's confirmation of the charge sheet (P8-23, ADR 0127)
         services.AddSingleton<SwitchOnLimiter>();
         services.AddSingleton<IEndpointModule, CapabilitiesEndpoints>(); // the owner's capability switches of the owner-act slices (P8-18 Part A, ADR 0128)
+        services.AddSingleton<IEndpointModule, AssistantDraftEndpoints>(); // strategy drafting: the owner types an idea, reads the draft, confirms with a fresh password (P9-07)
         services.AddSingleton<IEndpointModule, AssistantBriefingEndpoints>(); // the stored briefing and weekly review texts, read only (P9-06)
         services.AddSingleton<IEndpointModule, AssistantEndpoints>(); // the local model server's state, read only (P9-01)
         services.AddSingleton<IEndpointModule, PlanReviewEndpoints>(); // the owner's approve / modify / reject / approve-all of a plan (P7-10); session + CSRF, manual approval, no order

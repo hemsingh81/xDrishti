@@ -7,7 +7,11 @@ namespace XDrishti.Domain.Assistant;
 /// <param name="Enabled">Whether the assistant answers at all.</param>
 /// <param name="PortfolioContext">Whether the portfolio views show data to the tools (only effective while <paramref name="Enabled"/>).</param>
 /// <param name="MaxToolCalls">The most tool calls of one turn, 1 to 12.</param>
-public sealed record AssistantSettings(long? Id, bool Enabled, bool PortfolioContext, int MaxToolCalls)
+/// <param name="AllowDraftConfirm">Whether the owner may confirm a strategy draft (P9-07); false by default.</param>
+/// <param name="AutoLabQuickTest">Whether a valid draft of the dedicated job may be queued for a quick test without the owner's confirm (P9-07 D9); false by default.</param>
+/// <param name="AllowProposalAccept">Used by P9-08; false by default.</param>
+/// <param name="AutoAcceptHypothesis">Used by P9-08; false by default.</param>
+public sealed record AssistantSettings(long? Id, bool Enabled, bool PortfolioContext, int MaxToolCalls, bool AllowDraftConfirm = false, bool AutoLabQuickTest = false, bool AllowProposalAccept = false, bool AutoAcceptHypothesis = false)
 {
     /// <summary>The design default budget of tool calls per turn.</summary>
     public const int DefaultMaxToolCalls = 6;

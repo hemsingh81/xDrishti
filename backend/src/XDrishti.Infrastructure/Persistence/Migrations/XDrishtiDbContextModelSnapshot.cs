@@ -6355,6 +6355,30 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
 
+                    b.Property<bool>("AllowDraftConfirm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("allow_draft_confirm");
+
+                    b.Property<bool>("AllowProposalAccept")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("allow_proposal_accept");
+
+                    b.Property<bool>("AutoAcceptHypothesis")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("auto_accept_hypothesis");
+
+                    b.Property<bool>("AutoLabQuickTest")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("auto_lab_quick_test");
+
                     b.Property<DateTimeOffset>("ChangedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("changed_at");
@@ -6394,6 +6418,199 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("settings", "ai", t =>
                         {
                             t.HasCheckConstraint("ck_ai_settings_shape", "max_tool_calls >= 1 AND max_tool_calls <= 12 AND changed_by LIKE 'owner:%' AND length(btrim(changed_by)) > 6 AND length(btrim(reason)) >= 1 AND length(reason) <= 500");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiStrategyDraftDecisionRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("actor");
+
+                    b.Property<bool>("Auto")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto");
+
+                    b.Property<DateTimeOffset>("DecidedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("decision");
+
+                    b.Property<long>("DraftId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("draft_id");
+
+                    b.Property<bool>("Edited")
+                        .HasColumnType("boolean")
+                        .HasColumnName("edited");
+
+                    b.Property<Guid?>("LabRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lab_run_id");
+
+                    b.Property<long?>("SettingsId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("settings_id");
+
+                    b.Property<string>("SnapshotHash")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("snapshot_hash");
+
+                    b.Property<string>("StrategyId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<int?>("StrategyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("strategy_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_strategy_draft_decisions");
+
+                    b.HasIndex("DecidedAt")
+                        .HasDatabaseName("ix_ai_strategy_draft_decisions_decided_at");
+
+                    b.HasIndex("DraftId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ai_strategy_draft_decisions_draft_id");
+
+                    b.ToTable("strategy_draft_decisions", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_strategy_draft_decisions_auto", "NOT auto OR (decision = 'confirmed' AND settings_id IS NOT NULL AND snapshot_hash IS NOT NULL AND actor = 'system:auto-draft')");
+
+                            t.HasCheckConstraint("ck_ai_strategy_draft_decisions_confirmed", "decision <> 'confirmed' OR (strategy_id IS NOT NULL AND strategy_version IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_ai_strategy_draft_decisions_decision", "decision IN ('confirmed', 'discarded')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiStrategyDraftRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AnswerJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("answer_json");
+
+                    b.Property<string>("AttemptsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("attempts_json");
+
+                    b.Property<Guid?>("BasketId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("basket_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("FailReason")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("fail_reason");
+
+                    b.Property<string>("FindingsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("findings_json");
+
+                    b.Property<string>("Idea")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("idea");
+
+                    b.Property<string>("ModelId")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("model_id");
+
+                    b.Property<string>("ModelSha256")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("model_sha256");
+
+                    b.Property<string>("ParamsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("params_json");
+
+                    b.Property<string>("ProblemsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("problems_json");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("prompt_version");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("requested_by");
+
+                    b.Property<string>("SheetHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("sheet_hash");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Via")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("via");
+
+                    b.Property<string>("Yaml")
+                        .HasColumnType("text")
+                        .HasColumnName("yaml");
+
+                    b.HasKey("Id")
+                        .HasName("pk_strategy_drafts");
+
+                    b.HasIndex("CreatedAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_ai_strategy_drafts_created_at");
+
+                    b.ToTable("strategy_drafts", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_strategy_drafts_status", "status IN ('valid', 'invalid', 'declined', 'failed')");
+
+                            t.HasCheckConstraint("ck_ai_strategy_drafts_via", "via IN ('job', 'chat_tool')");
+
+                            t.HasCheckConstraint("ck_ai_strategy_drafts_yaml", "status <> 'valid' OR yaml IS NOT NULL");
                         });
                 });
 
@@ -9688,6 +9905,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PromptHash")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_messages_prompts_prompt_hash");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiStrategyDraftDecisionRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Persistence.AiStrategyDraftRecord", null)
+                        .WithMany()
+                        .HasForeignKey("DraftId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_strategy_draft_decisions_strategy_drafts_draft_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiToolCallRecord", b =>

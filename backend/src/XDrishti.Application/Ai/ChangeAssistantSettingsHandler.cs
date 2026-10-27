@@ -19,20 +19,24 @@ internal sealed class ChangeAssistantSettingsHandler(
     public async ValueTask<Result<AssistantStatusView>> HandleAsync(ChangeAssistantSettingsCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        var change = AssistantSettingsChange.Create(command.Actor, command.Reason, command.Enabled, command.PortfolioContext, command.MaxToolCalls);
+        var current = await store.CurrentAsync(cancellationToken);
+        var draftConfirm = command.AllowDraftConfirm ?? current.AllowDraftConfirm;
+        var autoQuick = command.AutoLabQuickTest ?? current.AutoLabQuickTest;
+        var proposalAccept = command.AllowProposalAccept ?? current.AllowProposalAccept;
+        var autoHypothesis = command.AutoAcceptHypothesis ?? current.AutoAcceptHypothesis;
+        var change = AssistantSettingsChange.Create(command.Actor, command.Reason, command.Enabled, command.PortfolioContext, command.MaxToolCalls, draftConfirm, autoQuick, proposalAccept, autoHypothesis);
         if (change.IsFailure)
         {
             AssistantLog.Refused(logger, change.Error.Code);
             return Result.Failure<AssistantStatusView>(change.Error);
         }
 
-        var current = await store.CurrentAsync(cancellationToken);
         if (command.ExpectedSettingsId is { } expected && expected != (current.Id ?? 0))
         {
             return Stale();
         }
 
-        if (AssistantSettingsChange.RaisesExposure(current, command.Enabled, command.PortfolioContext, command.MaxToolCalls) && !command.PasswordVerified)
+        if (AssistantSettingsChange.RaisesExposure(current, command.Enabled, command.PortfolioContext, command.MaxToolCalls, draftConfirm, autoQuick, proposalAccept, autoHypothesis) && !command.PasswordVerified)
         {
             AssistantLog.Refused(logger, AuthErrors.InvalidCredentialsCode);
             return Result.Failure<AssistantStatusView>(AuthErrors.InvalidCredentials);

@@ -37,6 +37,7 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
   const [enabled, setEnabled] = useState(status.enabled);
   const [portfolio, setPortfolio] = useState(status.portfolioContext);
   const [maxCalls, setMaxCalls] = useState(String(status.maxToolCalls));
+  const [draftConfirm, setDraftConfirm] = useState(status.allowDraftConfirm);
   const [reason, setReason] = useState('');
   const [password, setPassword] = useState('');
   const [problem, setProblem] = useState<FormProblem | null>(null);
@@ -51,14 +52,21 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
     setEnabled(status.enabled);
     setPortfolio(status.portfolioContext);
     setMaxCalls(String(status.maxToolCalls));
+    setDraftConfirm(status.allowDraftConfirm);
   }
 
   const calls = Number(maxCalls);
   const callsOk = Number.isInteger(calls) && calls >= 1 && calls <= 12;
   const raises =
-    (enabled && !status.enabled) || (portfolio && !status.portfolioContext) || (callsOk && calls > status.maxToolCalls);
+    (enabled && !status.enabled) ||
+    (portfolio && !status.portfolioContext) ||
+    (callsOk && calls > status.maxToolCalls) ||
+    (draftConfirm && !status.allowDraftConfirm);
   const changed =
-    enabled !== status.enabled || portfolio !== status.portfolioContext || (callsOk && calls !== status.maxToolCalls);
+    enabled !== status.enabled ||
+    portfolio !== status.portfolioContext ||
+    draftConfirm !== status.allowDraftConfirm ||
+    (callsOk && calls !== status.maxToolCalls);
   const ready =
     changed &&
     callsOk &&
@@ -80,6 +88,7 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
         enabled,
         portfolioContext: portfolio,
         maxToolCalls: calls,
+        allowDraftConfirm: draftConfirm,
         reason,
         expectedSettingsId: status.settingsId ?? 0,
         // The password travels only for a change that turns something on or raises it.
@@ -142,6 +151,23 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
                 {words.portfolioOff}
               </Typography>
             )}
+          </div>
+          <div>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={draftConfirm}
+                  onChange={(e) => {
+                    setDraftConfirm(e.target.checked);
+                  }}
+                />
+              }
+              label="Allow confirming strategy drafts"
+            />
+            <Typography variant="body2" color="text.secondary">
+              Off by default. Confirming stores a draft as a library version and can start a quick test; it asks your
+              password every time.
+            </Typography>
           </div>
           <TextField
             label="Maximum tool calls"

@@ -7,4 +7,4 @@ public sealed record ToolsStatusView(string State, int Count, int SchemaTokensEs
 public sealed record EvaluationView(string State, DateTimeOffset? At, string? Detail);
 
 /// <summary>What <c>GET /api/assistant/status</c> answers (spec P9-03 AC 9). No key, address or path in it.</summary>
-public sealed record AssistantStatusView(bool Enabled, bool PortfolioContext, int MaxToolCalls, long? SettingsId, LlmStatusView Llm, ToolsStatusView Tools, bool Busy, bool NightlyRunning, EvaluationView Evaluation);
+public sealed record AssistantStatusView(bool Enabled, bool PortfolioContext, int MaxToolCalls, long? SettingsId, LlmStatusView Llm, ToolsStatusView Tools, bool Busy, bool NightlyRunning, EvaluationView Evaluation, bool AllowDraftConfirm = false, bool AutoLabQuickTest = false, bool AllowProposalAccept = false, bool AutoAcceptHypothesis = false);

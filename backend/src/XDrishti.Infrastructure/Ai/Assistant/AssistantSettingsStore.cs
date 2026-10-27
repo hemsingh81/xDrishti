@@ -13,7 +13,7 @@ internal sealed class AssistantSettingsStore(NpgsqlDataSource dataSource) : IAss
 {
     public async ValueTask<AssistantSettings> CurrentAsync(CancellationToken cancellationToken)
     {
-        await using var select = dataSource.CreateCommand("SELECT id, enabled, portfolio_context, max_tool_calls FROM ai.settings ORDER BY id DESC LIMIT 1");
+        await using var select = dataSource.CreateCommand("SELECT id, enabled, portfolio_context, max_tool_calls, allow_draft_confirm, auto_lab_quick_test, allow_proposal_accept, auto_accept_hypothesis FROM ai.settings ORDER BY id DESC LIMIT 1");
         await using var reader = await select.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken) ? Read(reader) : AssistantSettings.Defaults;
     }
@@ -38,12 +38,16 @@ internal sealed class AssistantSettingsStore(NpgsqlDataSource dataSource) : IAss
         }
 
         await using var insert = new NpgsqlCommand(
-            "INSERT INTO ai.settings (enabled, portfolio_context, max_tool_calls, changed_by, reason) VALUES (@enabled, @portfolio, @max, @actor, @reason) RETURNING id, enabled, portfolio_context, max_tool_calls", connection, transaction);
+            "INSERT INTO ai.settings (enabled, portfolio_context, max_tool_calls, changed_by, reason, allow_draft_confirm, auto_lab_quick_test, allow_proposal_accept, auto_accept_hypothesis) VALUES (@enabled, @portfolio, @max, @actor, @reason, @draft, @auto, @proposal, @hypothesis) RETURNING id, enabled, portfolio_context, max_tool_calls, allow_draft_confirm, auto_lab_quick_test, allow_proposal_accept, auto_accept_hypothesis", connection, transaction);
         insert.Parameters.AddWithValue("enabled", NpgsqlDbType.Boolean, change.Enabled);
         insert.Parameters.AddWithValue("portfolio", NpgsqlDbType.Boolean, change.PortfolioContext);
         insert.Parameters.AddWithValue("max", NpgsqlDbType.Integer, change.MaxToolCalls);
         insert.Parameters.AddWithValue("actor", NpgsqlDbType.Varchar, change.Actor);
         insert.Parameters.AddWithValue("reason", NpgsqlDbType.Varchar, change.Reason);
+        insert.Parameters.AddWithValue("draft", NpgsqlDbType.Boolean, change.AllowDraftConfirm);
+        insert.Parameters.AddWithValue("auto", NpgsqlDbType.Boolean, change.AutoLabQuickTest);
+        insert.Parameters.AddWithValue("proposal", NpgsqlDbType.Boolean, change.AllowProposalAccept);
+        insert.Parameters.AddWithValue("hypothesis", NpgsqlDbType.Boolean, change.AutoAcceptHypothesis);
         AssistantSettings row;
         await using (var reader = await insert.ExecuteReaderAsync(cancellationToken))
         {
@@ -55,5 +59,5 @@ internal sealed class AssistantSettingsStore(NpgsqlDataSource dataSource) : IAss
         return row;
     }
 
-    private static AssistantSettings Read(NpgsqlDataReader reader) => new(reader.GetInt64(0), reader.GetBoolean(1), reader.GetBoolean(2), reader.GetInt32(3));
+    private static AssistantSettings Read(NpgsqlDataReader reader) => new(reader.GetInt64(0), reader.GetBoolean(1), reader.GetBoolean(2), reader.GetInt32(3), reader.GetBoolean(4), reader.GetBoolean(5), reader.GetBoolean(6), reader.GetBoolean(7));
 }

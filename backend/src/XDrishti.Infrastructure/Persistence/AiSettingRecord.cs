@@ -14,6 +14,14 @@ internal sealed class AiSettingRecord
 
     public int MaxToolCalls { get; set; }
 
+    public bool AllowDraftConfirm { get; set; }
+
+    public bool AutoLabQuickTest { get; set; }
+
+    public bool AllowProposalAccept { get; set; }
+
+    public bool AutoAcceptHypothesis { get; set; }
+
     public DateTimeOffset ChangedAt { get; set; }
 
     public string ChangedBy { get; set; } = string.Empty;

@@ -180,13 +180,14 @@ public sealed class AiSettingsTests(ReadOnlyDatabase db)
             }
         }
 
-        columns.Select(c => c.Name).ShouldBe(["enabled", "portfolio_context", "max_tool_calls"], "a new value column needs a line here and in the trigger function");
+        columns.Select(c => c.Name).ToList().ShouldBe(["allow_draft_confirm", "allow_proposal_accept", "auto_accept_hypothesis", "auto_lab_quick_test", "enabled", "max_tool_calls", "portfolio_context"], ignoreOrder: true, customMessage: "a new value column needs a line here and in the trigger function");
         foreach (var (name, type) in columns)
         {
             await ResetAsync();
             string Row(bool flipped, string column) => column == name ? (type == "boolean" ? (flipped ? "false" : "true") : (flipped ? "7" : "6")) : (column == "max_tool_calls" ? "6" : "true");
             type.ShouldBeOneOf("boolean", "integer");
-            var sql = (bool flipped) => $"INSERT INTO ai.settings (enabled, portfolio_context, max_tool_calls, changed_by, reason) VALUES ({Row(flipped, "enabled")}, {Row(flipped, "portfolio_context")}, {Row(flipped, "max_tool_calls")}, 'owner:probe@example.test', 'hash test')";
+            var all = columns.Select(c => c.Name).ToList();
+            var sql = (bool flipped) => $"INSERT INTO ai.settings ({string.Join(", ", all)}, changed_by, reason) VALUES ({string.Join(", ", all.Select(c => Row(flipped, c)))}, 'owner:probe@example.test', 'hash test')";
             await ReadOnlyDatabase.ExecuteAsync(db.App, sql(false));
             await ReadOnlyDatabase.ExecuteAsync(db.App, sql(true));
 

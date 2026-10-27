@@ -50,7 +50,7 @@ Model choice is config; select by our eval set, not leaderboards.
   the tool arguments); unmatched figures are marked, not removed, and the message is `ungrounded` (a figure computed by the model itself is
   unmatched: derived numbers come from `calc`). **Audit:** `ai.prompts`, `ai.conversations`, `ai.messages`, `ai.tool_calls` and `ai.model_calls`
   are insert-only for the application role; each turn can be replayed from them. One turn at a time; no chat while the nightly run is running.
-- Guardrails: numbers only from tool results; no write tools except `lab_run`; no promotion; no config
+- Guardrails: numbers only from tool results; no write tools (a draft is text the model writes for you to read; only your confirm, with the switch on and your password, stores a version or starts a quick test, [ADR 0141](0141-a-strategy-draft-is-text-the-model-wrote-for-the-owner-to-read-the-lab-validator-and-four-checks-decide-if-it-is-offered-and-only-the-owners-confirm-with-a-switch-and-a-fresh-password-stores-a-version-or-starts-a-quick-test.md)); no promotion; no config
   changes (only proposed diffs you apply in the Config screen); prompts and tool calls logged in `ai.*`;
   broker secrets never in context. If the LLM is down, the nightly plan is unaffected.
 
@@ -59,7 +59,7 @@ Model choice is config; select by our eval set, not leaderboards.
 1. **Daily briefing** (≤ 300 words): regime, the tickets with one-line rationale, risks, system changes. Built in P9-06 ([ADR 0140](../adr/0140-the-briefing-text-is-phrased-by-the-model-from-app-built-facts-and-a-deterministic-guard-rejects-any-figure-symbol-or-claim-it-cannot-verify-the-fixed-format-text-is-the-fallback.md)): the app builds the facts, the model only phrases, a deterministic guard rejects any number, symbol or claim not in the facts, and a fixed-format text is stored instead; the weekly review works the same way. Both services start paused and the model is used only when the assistant and `Assistant:Briefing:UseModel` are both on.
 2. **Ask your data**: "Expectancy of 15m SELL setups in high-vol regimes in 2025?" → query + numbers + chart.
    Also portfolio and baskets: "XIRR of MyLongTerm vs Nifty this year?", "Which basket worked best for 15m setups?"
-3. **Strategy drafting**: English idea → DSL YAML → validation → you confirm → Lab run → summary.
+3. **Strategy drafting**: English idea → DSL YAML → validation → you confirm → Lab run → summary. Built in P9-07a ([ADR 0141](0141-a-strategy-draft-is-text-the-model-wrote-for-the-owner-to-read-the-lab-validator-and-four-checks-decide-if-it-is-offered-and-only-the-owners-confirm-with-a-switch-and-a-fresh-password-stores-a-version-or-starts-a-quick-test.md)): the model writes text, the Lab validator and four checks decide whether it is offered, you confirm with a fresh password and the switch on, and a quick test starts on the universe you pick; the chat tool and the auto option are not built.
 4. **Hypothesis proposals** for the learning loop ([doc 09](09-learning-engine.md) §5).
 5. **Event flags** (later): classify announcements for the event-risk filter.
 
