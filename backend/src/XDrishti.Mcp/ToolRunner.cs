@@ -125,25 +125,36 @@ internal sealed class ToolRunner(IAiContext context, IOptions<McpOptions> option
     }
 
     /// <summary>
-    /// Free text inside a tool's data object: a property whose name ends in <c>Text</c> (<c>basisText</c>, <c>nameText</c>) holds text that came from the database and is cleaned and scrubbed like a text cell, and counted. Every other string of the data is written by the system.
+    /// Keys of the <c>data</c> object whose strings are structural (ids, codes, dates, numbers as text, names of dimensions): they are only cut, never scrubbed, so a plan key, a symbol or a decimal result is delivered as stored. Every other string of <c>data</c>, at any depth, is treated as
+    /// text that may have come from the database: cleaned, scrubbed, escaped and counted.
     /// </summary>
-    private static JsonObject? CleanData(JsonObject? data, CleanCounters counters)
+    private static readonly HashSet<string> StructuralKeys = new(StringComparer.Ordinal)
     {
-        if (data is null)
-        {
-            return null;
-        }
+        "state", "kind", "date", "forDate", "planKey", "symbol", "isin", "series", "exchange", "segment", "type", "strategy", "timeframe", "side", "style", "exit", "regime", "metric", "rowDimension", "columnDimension", "groupBy", "valuationDate",
+        "priceAsOfOldest", "priceAsOfNewest", "retiredAt", "firstDailyBar", "lastDailyBar", "result", "operands", "dimensions", "latestQuality", "elapsedMs", "group", "hash", "code",
+    };
 
-        var copy = (JsonObject)data.DeepClone();
-        foreach (var property in copy.ToList())
-        {
-            if (property.Key.EndsWith("Text", StringComparison.Ordinal) && property.Value is JsonValue value && value.TryGetValue<string>(out var text))
-            {
-                copy[property.Key] = (string?)CellCleaner.Clean(text, true, counters);
-            }
-        }
+    private static JsonObject? CleanData(JsonObject? data, CleanCounters counters) => data is null ? null : (JsonObject)CleanNode(data, null, counters)!;
 
-        return copy;
+    private static JsonNode? CleanNode(JsonNode? node, string? key, CleanCounters counters)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                var copy = new JsonObject();
+                foreach (var (name, child) in obj)
+                {
+                    copy[name] = CleanNode(child, name, counters);
+                }
+
+                return copy;
+            case JsonArray array:
+                return new JsonArray([.. array.Select(child => CleanNode(child, key, counters))]);
+            case JsonValue value when value.TryGetValue<string>(out var text):
+                return JsonValue.Create((string?)CellCleaner.Clean(text, key is null || !StructuralKeys.Contains(key), counters));
+            default:
+                return node?.DeepClone();
+        }
     }
 
     /// <summary>A short hash of the arguments for the log line: enough to tell calls apart, nothing to read back.</summary>

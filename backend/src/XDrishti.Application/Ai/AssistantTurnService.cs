@@ -187,6 +187,7 @@ internal sealed class AssistantTurnService(
             messages.Add(new ModelMessage(ModelRole.User, request.Question));
             var resultTexts = new List<string>();
             var resultsByCall = new Dictionary<int, string>();
+            var nonCalcTexts = new List<string>();
             var iterationText = new StringBuilder();
             var finish = "stop";
             int? promptTokens = null;
@@ -264,9 +265,18 @@ internal sealed class AssistantTurnService(
                         var executed = await RunToolAsync(call, budget, results, resultsByCall, started.ConversationId, turnId, Emit, token);
                         calls++;
                         warned |= executed.BudgetRefused;
-                        if (executed.Granted && !string.Equals(call.Name, ChartTool.Name, StringComparison.Ordinal))
+                        if (executed.Granted && string.Equals(call.Name, "calc", StringComparison.Ordinal))
+                        {
+                            // A derived figure counts only when its operands came from other tools' results of this turn (or the question): calc cannot launder an invented number.
+                            if (CalcGrounding.IsGrounded(executed.ModelText, nonCalcTexts, request.Question))
+                            {
+                                resultTexts.Add(executed.ModelText);
+                            }
+                        }
+                        else if (executed.Granted && !string.Equals(call.Name, ChartTool.Name, StringComparison.Ordinal))
                         {
                             resultTexts.Add(executed.ModelText);
+                            nonCalcTexts.Add(executed.ModelText);
                         }
 
                         messages.Add(new ModelMessage(ModelRole.Tool, executed.ModelText, null, call.Id));

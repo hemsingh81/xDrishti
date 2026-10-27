@@ -97,4 +97,12 @@ public sealed class CalcTests
     {
         Calc.Evaluate(new string('(', 30) + "1" + new string(')', 30)).ErrorCode.ShouldBe("calc.rejected");
     }
+
+    [Fact]
+    public void The_result_echoes_the_number_literals_of_the_expression()
+    {
+        Calc.Evaluate("12.5/4+round(2.675, 2)").Operands.ShouldBe(["12.5", "4", "2.675", "2"]);
+        Calc.Evaluate("0.90+0").Operands.ShouldBe(["0.90", "0"]);
+        Calc.Evaluate("1/0").Operands.ShouldBeNull();
+    }
 }

@@ -108,7 +108,7 @@ internal sealed class AssistantRig
 
         public ValueTask<ToolCatalogSnapshot> ListAsync(CancellationToken cancellationToken) =>
             ValueTask.FromResult(State == ToolCatalogState.Ready
-                ? new ToolCatalogSnapshot(ToolCatalogState.Ready, [new ToolDescriptor("get_report", "A report.", """{"type":"object","properties":{"report":{"type":"string"}}}"""), new ToolDescriptor("get_portfolio", "The portfolio.", """{"type":"object"}""")])
+                ? new ToolCatalogSnapshot(ToolCatalogState.Ready, [new ToolDescriptor("get_report", "A report.", """{"type":"object","properties":{"report":{"type":"string"}}}"""), new ToolDescriptor("get_portfolio", "The portfolio.", """{"type":"object"}"""), new ToolDescriptor("calc", "Arithmetic.", """{"type":"object"}""")])
                 : ToolCatalogSnapshot.Unavailable(State));
 
         public ValueTask<ToolInvocation> CallAsync(string name, string argumentsJson, CancellationToken cancellationToken)

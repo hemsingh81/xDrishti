@@ -85,4 +85,17 @@ public sealed class ChartToolTests
         ChartTool.Descriptor.Description.Split(' ').Length.ShouldBeLessThanOrEqualTo(40);
         JsonNode.Parse(ChartTool.Descriptor.InputSchemaJson).ShouldNotBeNull();
     }
+
+    [Theory]
+    [InlineData("Win rate 80%", "ok", "title")]
+    [InlineData("T", "Rate 0.9", "series")]
+    public void A_digit_in_the_title_or_a_label_is_refused_because_it_would_not_come_from_a_tool(string title, string label, string which)
+    {
+        var args = Args($$"""[{"callIndex":1,"column":"n","label":"{{label}}"}]""", title: title);
+
+        var json = ChartTool.Run(args, Results, At, out var reason);
+
+        reason.ShouldBe(which);
+        json.ShouldContain("chart.bad_reference");
+    }
 }

@@ -49,7 +49,7 @@ public static class Calc
                 return Reject(parser.Problem ?? "syntax");
             }
 
-            return new CalcResult(Math.Round(value.Value, places, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture), null, null);
+            return new CalcResult(Math.Round(value.Value, places, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture), null, null, [.. tokens.Where(t => t.Kind == TokenKind.Number).Select(t => t.Number.ToString(CultureInfo.InvariantCulture))]);
         }
         catch (DivideByZeroException)
         {

@@ -24,7 +24,7 @@ internal sealed class CalcTool(ToolRunner runner, ILogger<CalcTool> logger) : Re
 
         return Task.FromResult(new ToolOutcome
         {
-            Data = new JsonObject { ["result"] = result.Text, ["places"] = places },
+            Data = new JsonObject { ["result"] = result.Text, ["places"] = places, ["operands"] = new JsonArray([.. result.Operands!.Select(o => (JsonNode?)o)]) },
             Evidence = new ToolEvidence("exact decimal arithmetic on the numbers in the expression", [], null, null, ["the result is only as good as the numbers you gave it"], []),
         });
     }

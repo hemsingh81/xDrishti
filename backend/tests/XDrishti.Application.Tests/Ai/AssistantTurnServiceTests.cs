@@ -500,4 +500,48 @@ public sealed class AssistantTurnServiceTests
         rig.Store.ToolCalls[2].ErrorCode.ShouldBe("chart.bad_reference");
         events.OfType<TurnToolResult>().Count().ShouldBe(3);
     }
+
+    private static string CalcAnswer(string result, params string[] operands) =>
+        "{\"ok\":true,\"tool\":\"calc\",\"rows\":null,\"data\":{\"result\":\"" + result + "\",\"places\":4,\"operands\":[" + string.Join(",", operands.Select(o => "\"" + o + "\"")) + "]},\"rowCount\":0,\"truncated\":false,\"evidence\":null,\"redactions\":0,\"injectionFlags\":0}";
+
+    private static async Task<IReadOnlyList<string>> UngroundedAsync(string calcResult, string answer, string calcArguments)
+    {
+        var rig = new AssistantRig();
+        rig.Catalog.Respond = (name, _) => name == "calc"
+            ? calcResult
+            : """{"ok":true,"tool":"get_report","rows":[{"a":12.5,"b":4}],"rowCount":1,"truncated":false,"evidence":null,"redactions":0,"injectionFlags":0}""";
+        rig.Model.Script(Call("c1"), Call("c2", "calc", calcArguments), Done("tool_calls"));
+        rig.Model.Script(new ModelTextPart(answer), Done());
+
+        var (result, _) = await RunAsync(rig, Ask("What is it?"));
+
+        return [.. result.Value.Grounding.Ungrounded.Select(u => u.Text)];
+    }
+
+    [Fact]
+    public async Task A_figure_invented_and_passed_through_calc_stays_flagged()
+    {
+        (await UngroundedAsync(CalcAnswer("0.9", "0.9", "0"), "The value is 0.9 R [2].", """{"expression":"0.9+0"}""")).ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_real_derivation_of_two_earlier_results_is_grounded()
+    {
+        (await UngroundedAsync(CalcAnswer("3.125", "12.5", "4"), "The ratio is 3.125 [2].", """{"expression":"12.5/4"}""")).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_calc_of_a_calc_result_does_not_launder()
+    {
+        var rig = new AssistantRig();
+        rig.Catalog.Respond = (name, args) => name != "calc"
+            ? """{"ok":true,"tool":"get_report","rows":[{"a":12.5,"b":4}],"rowCount":1,"truncated":false,"evidence":null,"redactions":0,"injectionFlags":0}"""
+            : args.Contains("12.5", StringComparison.Ordinal) ? CalcAnswer("3.125", "12.5", "4") : CalcAnswer("7.777", "3.125", "2.488");
+        rig.Model.Script(Call("c1"), Call("c2", "calc", """{"expression":"12.5/4"}"""), Call("c3", "calc", """{"expression":"3.125*2.488"}"""), Done("tool_calls"));
+        rig.Model.Script(new ModelTextPart("It is 7.777 [3]."), Done());
+
+        var (result, _) = await RunAsync(rig, Ask("What is it?"));
+
+        result.Value.Grounding.Ungrounded.Select(u => u.Text).ShouldNotBeEmpty();
+    }
 }

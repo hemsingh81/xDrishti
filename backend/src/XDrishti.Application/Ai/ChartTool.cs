@@ -51,9 +51,9 @@ public static class ChartTool
             return Bad(asOf, "kind", "kind is bar, line or scatter", out reason);
         }
 
-        if (string.IsNullOrWhiteSpace(title) || title.Length > MaxTitle || HasMarkup(title))
+        if (string.IsNullOrWhiteSpace(title) || title.Length > MaxTitle || HasMarkup(title) || title.Any(char.IsDigit))
         {
-            return Bad(asOf, "title", $"title is 1 to {MaxTitle} characters without markup", out reason);
+            return Bad(asOf, "title", $"title is 1 to {MaxTitle} characters without markup or digits (a figure in a title would not come from a tool)", out reason);
         }
 
         if (!root.TryGetProperty("x", out var x) || x.ValueKind != JsonValueKind.Object || !TryRef(x, out var xCall, out var xColumn))
@@ -87,9 +87,9 @@ public static class ChartTool
         foreach (var item in y.EnumerateArray())
         {
             index++;
-            if (item.ValueKind != JsonValueKind.Object || !TryRef(item, out var call, out var column) || Text(item, "label") is not { Length: > 0 and <= 40 } label || HasMarkup(label))
+            if (item.ValueKind != JsonValueKind.Object || !TryRef(item, out var call, out var column) || Text(item, "label") is not { Length: > 0 and <= 40 } label || HasMarkup(label) || label.Any(char.IsDigit))
             {
-                return Bad(asOf, "series", $"series {index.ToString(CultureInfo.InvariantCulture)} needs callIndex, column and a label of up to 40 characters without markup", out reason);
+                return Bad(asOf, "series", $"series {index.ToString(CultureInfo.InvariantCulture)} needs callIndex, column and a label of up to 40 characters without markup or digits", out reason);
             }
 
             var rows = RowsOf(results, call, out problem);
