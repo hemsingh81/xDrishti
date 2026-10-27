@@ -95,7 +95,7 @@ rootless Podman Desktop the reaper (Ryuk) cannot start, so it is disabled (`Cont
 SIGKILL or an IDE stop therefore leaves its containers running. Each one is capped at 1.5 GiB.
 - List: `podman ps -a --filter label=org.testcontainers=true`
 - Clean: `scripts/clean-test-containers.sh` (also run before and after the backend tests by `scripts/check.sh`). It removes
-  only containers with that label that are older than `XD_TEST_CONTAINER_MAX_AGE_MIN` minutes (default 60, well beyond
+  only containers with that label that also carry `xdrishti.test=1` (or, for older leaks, whose image contains `timescaledb`) and are older than `XD_TEST_CONTAINER_MAX_AGE_MIN` minutes (default 60, well beyond
   one run, so a gate running in another shell is safe). Set it to `0` to remove all of them now.
 - A full run starts up to four servers (shared API server, research-grants server, two MCP-test servers): the roles are
   cluster-wide, so those suites cannot share one server.

@@ -25,9 +25,9 @@ internal static class ContainerRuntime
         }
     }
 
-    /// <summary>Caps the server at 1.5 GiB (it idles near 200 MB), so a leaked container cannot eat the Podman VM.</summary>
+    /// <summary>Labels the server (xdrishti.test, for scripts/clean-test-containers.sh) and caps it at 1.5 GiB (it idles near 200 MB), so a leaked container cannot eat the Podman VM.</summary>
     public static PostgreSqlBuilder WithMemoryLimit(this PostgreSqlBuilder builder) =>
-        builder.WithCreateParameterModifier(parameters => { parameters.HostConfig ??= new(); parameters.HostConfig.Memory = 1536L * 1024 * 1024; });
+        builder.WithLabel("xdrishti.test", "1").WithCreateParameterModifier(parameters => { parameters.HostConfig ??= new(); parameters.HostConfig.Memory = 1536L * 1024 * 1024; });
 
     private static string? TryPodmanSocket()
     {
