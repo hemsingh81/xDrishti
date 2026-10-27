@@ -10,8 +10,8 @@ public sealed class DataManifestTests
     public void There_are_the_documented_views_each_once()
     {
         DataManifest.Views.Select(v => v.Name).ShouldBeUnique();
-        DataManifest.Views.Count.ShouldBe(35);
-        DataManifest.Views.Where(v => v.Class == ViewClass.C2).Select(v => v.Name).Order().ShouldBe(["fill_grades", "holding_lots", "holdings", "journal_entries", "journal_fills", "plan_item_allocations", "transactions"]);
+        DataManifest.Views.Count.ShouldBe(36);
+        DataManifest.Views.Where(v => v.Class == ViewClass.C2).Select(v => v.Name).Order().ShouldBe(["fill_grades", "holding_groups", "holding_lots", "holdings", "journal_entries", "journal_fills", "plan_item_allocations", "transactions"]);
     }
 
     [Fact]

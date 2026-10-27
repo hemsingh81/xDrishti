@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Domain.Assistant;
@@ -120,7 +121,29 @@ internal sealed class ToolRunner(IAiContext context, IOptions<McpOptions> option
             ];
         }
 
-        return new ToolEnvelope(true, tool, asOf, [.. outcome.Columns.Select(c => c.Name)], rows, outcome.Data, total, truncated, outcome.Evidence, outcome.Notes, null, counters.Redactions, counters.InjectionFlags, outcome.OmitNullCells);
+        return new ToolEnvelope(true, tool, asOf, [.. outcome.Columns.Select(c => c.Name)], rows, CleanData(outcome.Data, counters), total, truncated, outcome.Evidence, outcome.Notes, null, counters.Redactions, counters.InjectionFlags, outcome.OmitNullCells);
+    }
+
+    /// <summary>
+    /// Free text inside a tool's data object: a property whose name ends in <c>Text</c> (<c>basisText</c>, <c>nameText</c>) holds text that came from the database and is cleaned and scrubbed like a text cell, and counted. Every other string of the data is written by the system.
+    /// </summary>
+    private static JsonObject? CleanData(JsonObject? data, CleanCounters counters)
+    {
+        if (data is null)
+        {
+            return null;
+        }
+
+        var copy = (JsonObject)data.DeepClone();
+        foreach (var property in copy.ToList())
+        {
+            if (property.Key.EndsWith("Text", StringComparison.Ordinal) && property.Value is JsonValue value && value.TryGetValue<string>(out var text))
+            {
+                copy[property.Key] = (string?)CellCleaner.Clean(text, true, counters);
+            }
+        }
+
+        return copy;
     }
 
     /// <summary>A short hash of the arguments for the log line: enough to tell calls apart, nothing to read back.</summary>

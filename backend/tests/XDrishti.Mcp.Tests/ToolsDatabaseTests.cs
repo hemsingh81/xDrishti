@@ -142,7 +142,7 @@ public sealed class ToolsDatabaseTests(ReadOnlyDatabase db)
             holdingsRow["classes"]![0]!.GetValue<string>().ShouldBe("C2");
             holdingsRow["approxRows"]!.GetValue<long>().ShouldBe(0);
             holdingsRow["note"]!.GetValue<string>().ShouldBe("portfolio context is off");
-            listed["rows"]!.AsArray().Count.ShouldBe(35);
+            listed["rows"]!.AsArray().Count.ShouldBe(36);
             listed["notes"]![0]!.GetValue<string>().ShouldContain("Portfolio context is off");
         }
     }
@@ -157,7 +157,7 @@ public sealed class ToolsDatabaseTests(ReadOnlyDatabase db)
             var listed = await CallAsync(client, "list_tables", new() { ["prefix"] = "hold" });
             var described = await CallAsync(client, "describe_table", new() { ["name"] = "holdings" });
 
-            listed["rows"]!.AsArray().Select(r => r!["name"]!.GetValue<string>()).ShouldBe(["holdings", "holding_lots"]);
+            listed["rows"]!.AsArray().Select(r => r!["name"]!.GetValue<string>()).ShouldBe(["holdings", "holding_lots", "holding_groups"]);
             listed["rows"]![0]!["note"].ShouldBeNull();
             described["data"]!["limits"]!.AsArray().Select(l => l!.GetValue<string>()).ShouldContain(l => l.Contains("portfolio context is on", StringComparison.Ordinal));
         }

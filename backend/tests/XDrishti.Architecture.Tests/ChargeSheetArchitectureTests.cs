@@ -138,7 +138,7 @@ public sealed partial class ChargeSheetArchitectureTests
     {
         var infrastructure = Names(Types.InAssembly(Infrastructure).That().HaveDependencyOn(typeof(IChargeSheetConfirmationSource).FullName!).GetTypes());
 
-        infrastructure.ShouldBe(["ChargeSheetConfirmationStore", "DependencyInjection", "StoredCostConfirmation"]); // the registration names the port; the two classes are its only users
+        infrastructure.ShouldBe(["AiReadOnlyRegistration", "ChargeSheetConfirmationStore", "DependencyInjection", "NoChargeSheetConfirmation", "StoredCostConfirmation"]); // the registrations name the port; the store and the cost fact read the stored confirmation, the tool server's class is always absent (P9-05) and reads nothing
         Source("XDrishti.Infrastructure", "DependencyInjection.cs").ShouldContain("ServiceDescriptor.Scoped<ICostConfirmationFact, StoredCostConfirmation>()");
         Source("XDrishti.Application", "DependencyInjection.cs").ShouldContain("TryAddSingleton<ICostConfirmationFact, NotConfirmed>()");
         Source("XDrishti.Domain", "Platform", "AppSettingKeys.cs").ShouldNotContain("charge_sheet_confirmation");

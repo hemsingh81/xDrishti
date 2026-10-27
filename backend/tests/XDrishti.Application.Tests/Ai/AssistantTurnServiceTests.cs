@@ -479,4 +479,25 @@ public sealed class AssistantTurnServiceTests
 
         public ValueTask<ToolInvocation> CallAsync(string name, string argumentsJson, CancellationToken cancellationToken) => ValueTask.FromResult(new ToolInvocation(false, true, string.Empty));
     }
+
+    [Fact]
+    public async Task Make_chart_is_offered_runs_locally_on_the_results_of_this_turn_and_is_not_a_source_of_figures()
+    {
+        var rig = new AssistantRig();
+        rig.Catalog.Respond = (name, _) => """{"ok":true,"tool":"get_report","rows":[{"basket":"A","n":40},{"basket":"B","n":55}],"rowCount":2,"truncated":false,"evidence":null,"redactions":0,"injectionFlags":0}""";
+        rig.Model.Script(Call("c1"), Done("tool_calls"));
+        rig.Model.Script(Call("c2", "make_chart", """{"kind":"bar","title":"Trades","x":{"callIndex":1,"column":"basket"},"y":[{"callIndex":1,"column":"n","label":"n"}]}"""), Done("tool_calls"));
+        rig.Model.Script(Call("c3", "make_chart", """{"kind":"bar","title":"Bad","x":{"callIndex":1,"column":"basket"},"y":[{"callIndex":1,"column":"nope","label":"n"}]}"""), Done("tool_calls"));
+        rig.Model.Script(new ModelTextPart("The chart is attached."), Done());
+
+        var (result, events) = await RunAsync(rig);
+
+        result.IsSuccess.ShouldBeTrue();
+        rig.Model.Requests[0].Tools.Select(t => t.Name).ShouldContain("make_chart");
+        rig.Catalog.Calls.Select(c => c.Name).ShouldBe(["get_report"], "make_chart never reaches the tool server");
+        rig.Store.ToolCalls.Select(c => (c.Tool, c.Status)).ShouldBe([("get_report", "ok"), ("make_chart", "ok"), ("make_chart", "error")]);
+        rig.Store.ToolCalls[2].ResultJson!.ShouldContain("chart.bad_reference");
+        rig.Store.ToolCalls[2].ErrorCode.ShouldBe("chart.bad_reference");
+        events.OfType<TurnToolResult>().Count().ShouldBe(3);
+    }
 }

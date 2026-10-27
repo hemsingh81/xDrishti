@@ -11,10 +11,12 @@ namespace XDrishti.Mcp.Tests;
 
 /// <summary>
 /// Spec P9-03 contract tests of the client against the real <c>xd-mcp</c> host on a loopback port: the tool list with the bearer token, a call of <c>lab_validate</c> round trip, a wrong token or a stopped server as a state (never an exception), no address or token configured as disabled,
-/// and the schema budget over the four tools built so far. (The 16-tool golden schema file is P9-05's; the estimate here is UNVERIFIED for 16.)
+/// and the schema budget and golden file over all 16 tools (spec P9-05).
 /// </summary>
 public sealed class McpToolCatalogTests
 {
+    private static readonly JsonSerializerOptions GoldenOptions = new() { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private static McpToolCatalog Catalog(string url, string token) =>
@@ -31,10 +33,29 @@ public sealed class McpToolCatalogTests
         var snapshot = await catalog.ListAsync(Ct);
 
         snapshot.State.ShouldBe(ToolCatalogState.Ready);
-        snapshot.Tools.Select(t => t.Name).Order().ShouldBe(["describe_table", "lab_validate", "list_tables", "run_sql"]);
+        snapshot.Tools.Select(t => t.Name).Order().ShouldBe(["calc", "describe_table", "get_basket", "get_cell", "get_instrument", "get_learning", "get_plan", "get_portfolio", "get_report", "get_system_status", "lab_validate", "list_runs", "list_tables", "run_sql", "search_notes"]);
         snapshot.Tools.ShouldAllBe(t => t.Description.Length > 0 && JsonDocument.Parse(t.InputSchemaJson).RootElement.ValueKind == JsonValueKind.Object);
-        ContextBudget.SchemaTokens(snapshot.Tools).ShouldBeLessThanOrEqualTo(ContextBudget.SchemaTokenLimit / 2);
+
+        // The 16 tools the model sees (these 15 and the local make_chart) fit the schema budget, each description is at most 40 words, and the whole list equals the golden file (spec P9-05 AC 15 and 16).
+        var all = snapshot.Tools.Append(ChartTool.Descriptor).OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
+        all.Count.ShouldBe(16);
+        ContextBudget.SchemaTokens(all).ShouldBeLessThanOrEqualTo(ContextBudget.SchemaTokenLimit);
+        all.ShouldAllBe(t => t.Description.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length <= 40, "descriptions are at most 40 words");
+        var golden = JsonSerializer.Serialize(all.Select(t => new { t.Name, t.Description, Schema = JsonDocument.Parse(t.InputSchemaJson).RootElement }), GoldenOptions).ReplaceLineEndings("\n") + "\n";
+        var path = Path.Combine(Path.GetDirectoryName(ThisFile())!, "Golden", "tool-schemas.json");
+        if (Environment.GetEnvironmentVariable("XD_UPDATE_GOLDEN") == "1")
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await File.WriteAllTextAsync(path, golden, Ct);
+        }
+
+        (await File.ReadAllTextAsync(path, Ct)).ReplaceLineEndings("\n").ShouldBe(golden, "the tool schemas changed: review them, then run once with XD_UPDATE_GOLDEN=1");
+        snapshot.Tools.Single(t => t.Name == "get_report").Description.ShouldContain("gross");
+        snapshot.Tools.Single(t => t.Name == "get_report").Description.ShouldContain("state");
+        snapshot.Tools.Single(t => t.Name == "get_report").Description.ShouldContain("n,");
     }
+
+    private static string ThisFile([System.Runtime.CompilerServices.CallerFilePath] string path = "") => path;
 
     [Fact]
     public async Task A_call_goes_through_and_the_envelope_text_comes_back()

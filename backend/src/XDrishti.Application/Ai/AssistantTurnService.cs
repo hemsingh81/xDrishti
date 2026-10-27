@@ -75,6 +75,9 @@ internal sealed class AssistantTurnService(
             return Refuse(new Error("assistant.tools_unavailable", "The tool server is not reachable.", ErrorKind.Upstream));
         }
 
+        // make_chart is local: it needs this turn's stored results, which the stateless tool server does not hold (spec P9-05).
+        tools = tools with { Tools = [.. tools.Tools, ChartTool.Descriptor] };
+
         if (await nightly.IsRunningAsync(TimeSpan.FromMinutes(options.NightlyGuardMinutes), cancellationToken))
         {
             return Refuse(Error.Conflict("assistant.nightly_running", "The nightly run is in progress; ask again when it has finished."));
@@ -183,6 +186,7 @@ internal sealed class AssistantTurnService(
             messages.AddRange(history);
             messages.Add(new ModelMessage(ModelRole.User, request.Question));
             var resultTexts = new List<string>();
+            var resultsByCall = new Dictionary<int, string>();
             var iterationText = new StringBuilder();
             var finish = "stop";
             int? promptTokens = null;
@@ -257,10 +261,10 @@ internal sealed class AssistantTurnService(
                     messages.Add(new ModelMessage(ModelRole.Assistant, string.Empty, requested));
                     foreach (var call in requested)
                     {
-                        var executed = await RunToolAsync(call, budget, results, started.ConversationId, turnId, Emit, token);
+                        var executed = await RunToolAsync(call, budget, results, resultsByCall, started.ConversationId, turnId, Emit, token);
                         calls++;
                         warned |= executed.BudgetRefused;
-                        if (executed.Granted)
+                        if (executed.Granted && !string.Equals(call.Name, ChartTool.Name, StringComparison.Ordinal))
                         {
                             resultTexts.Add(executed.ModelText);
                         }
@@ -320,7 +324,7 @@ internal sealed class AssistantTurnService(
             return new TurnResult(messageId, answer, wire, calls, usage, finish, firstToken, total);
         }
 
-        private async ValueTask<Executed> RunToolAsync(ModelToolCall call, ToolBudget budget, ToolResultBudget results, Guid conversationId, Guid turnId, Func<TurnEvent, ValueTask> emit, CancellationToken cancellationToken)
+        private async ValueTask<Executed> RunToolAsync(ModelToolCall call, ToolBudget budget, ToolResultBudget results, Dictionary<int, string> resultsByCall, Guid conversationId, Guid turnId, Func<TurnEvent, ValueTask> emit, CancellationToken cancellationToken)
         {
             var granted = budget.TryTake();
             var index = budget.Asked;
@@ -340,6 +344,14 @@ internal sealed class AssistantTurnService(
                 granted = false;
                 text = Failure(call.Name, "tool.unknown", "That tool does not exist.");
             }
+            else if (string.Equals(call.Name, ChartTool.Name, StringComparison.Ordinal))
+            {
+                text = ChartTool.Run(call.ArgumentsJson, resultsByCall, startedAt, out var chartReason);
+                if (chartReason is not null)
+                {
+                    AssistantLog.ChartRejected(owner.Logger, chartReason);
+                }
+            }
             else
             {
                 var outcome = await owner.Catalog.CallAsync(call.Name, call.ArgumentsJson, cancellationToken);
@@ -347,6 +359,11 @@ internal sealed class AssistantTurnService(
             }
 
             var ms = (int)clock.ElapsedMilliseconds;
+            if (granted)
+            {
+                resultsByCall[index] = text;
+            }
+
             var facts = ToolResultReader.Read(text);
             var status = StatusOf(facts, granted);
             var stored = text;

@@ -1,6 +1,6 @@
 # P9-05 — "Ask your data" tools
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-27 (see Build notes; was: Draft written 2026-10-24; decisions below were researched under the owner's delegation; the owner approved all plans)
 - **Phase / roadmap row:** P9 — AI assistant, slice P9-05 of [P9-00](P9-00-ai-assistant-plan.md)
 - **Design refs:** docs/design/14-ai-assistant.md §3 (tool list), §4(2) · 13 §1c to §1e · 06 §4 (lenses, baskets) · P8-00 D1 to D5 · P8-06 (report DTOs and endpoints) · P9-00 D10, D11, D12 and the tool contract · P9-02 (runner, roles, manifest)
 - **Needs:** P9-02 (tool runner, `aiv` views, roles, manifest tests), P9-03 (the turn loop; `make_chart` is registered there), P8-06 (`get_report`, `list_runs`; without it these two answer `tool.unavailable` and the rest ships). P8-05 and P7 are built.
@@ -93,3 +93,7 @@ None. Owner act that changes behaviour: turning the portfolio context on (P9-03 
 4. `search_notes`: no journal source (the journal has no free text); named real owner-typed fields.
 5. `PortfolioFigures` moved to Application (needs `Xirr`), or XIRR is `unavailable`.
 6. Size 3 d -> 5 d with a cut order.
+
+## Build notes 2026-10-27
+Built whole (nothing cut): the 11 tools on `xd-mcp`, `make_chart` in the API, migration `AddAiToolAccess` (with `Down`), ADR 0139 (Proposed), the golden schema file (`backend/tests/XDrishti.Mcp.Tests/Golden/tool-schemas.json`, 16 tools under 2,200 tokens).
+Deviations: `get_portfolio` has no `asOf`; `tracked` is `hasDailyBars`; `search_notes` has no price-alert source and no context-gated source today; `list_runs(sim)` ignores `strategy` and `limit`; a new view `aiv.holding_groups` (with `ai.bucket_labels`) carries the bucket for `groupBy=bucket`; `data` strings whose property name ends in `Text` are cleaned by the runner; the schema omits `minLength` 0 or 1. Not exercised against a database: a report mixing gross and costed runs. Not verified: any real model, `get_report` on a large stored run.

@@ -32,11 +32,15 @@ Model choice is config; select by our eval set, not leaderboards.
 - `xd-api` assistant endpoint uses **Microsoft.Extensions.AI** with tool calling; streams to React.
 - Tools are served by **`xd-mcp`** (ModelContextProtocol C# SDK 2.3.0, Streamable HTTP, stateless, a bearer token per client,
   [ADR 0137](../adr/0137-the-assistants-tools-run-in-a-separate-read-only-server-under-two-database-roles-that-can-select-only-from-reviewed-views-and-the-switch-lives-in-the-database.md)) under **two read-only DB roles** (`xd_mcp_sql` for `run_sql`, `xd_mcp_read` for the typed tools),
-  each able to `SELECT` only from the reviewed views of schema `aiv` (35 views; the portfolio ones are empty until the owner turns the
+  each able to `SELECT` only from the reviewed views of schema `aiv` (36 views; the portfolio ones are empty until the owner turns the
   portfolio context on, in the database itself). **Built (P9-02):** `list_tables`, `describe_table`, `run_sql(sql, maxRows)` over
   `aiv` (one SELECT, 200 rows, 5 s, labelled "ad-hoc query, not checked by the report engine"), `lab_validate(yaml)` (stores nothing).
-  **Later (P9-05):** `get_report(type, filters)`, `get_plan(date, account)`, `get_cell(key)`, `get_portfolio(group_by, as_of)`,
-  `get_basket(name)`, `make_chart(spec)`. `lab_run` is dropped (P9-00 D9): a run is proposed, never started by the model.
+  **Built (P9-05, [ADR 0139](../adr/0139-the-ask-your-data-tools-reuse-the-report-engine-and-read-only-views-the-read-role-gets-column-grants-on-four-report-source-tables-and-calc-and-charts-take-no-number-from-the-model.md)):**
+  `get_report(report, query)` (the report engine's own handlers, gross only, each figure a state), `list_runs(kind)`, `get_plan(date)`,
+  `get_cell(key | strategy, timeframe, side)`, `get_portfolio(groupBy)` (empty until the portfolio context is on), `get_basket(name)`,
+  `get_instrument(symbol, bars)`, `search_notes(query)`, `get_learning(kind)`, `get_system_status()`, `calc(expression)` (exact decimals: the only
+  source of a derived number) and, inside the API, `make_chart(spec)` (columns of earlier results of the turn, never numbers). Sixteen tools in all, under
+  2,200 tokens of schema. `lab_run` is dropped (P9-00 D9): a run is proposed, never started by the model.
 - **The endpoint (P9-03, [ADR 0138](../adr/0138-the-assistant-endpoint-runs-the-tool-loop-in-the-application-streams-events-marks-figures-not-found-in-the-tool-results-and-stores-every-turn-insert-only.md)):**
   `POST /api/assistant/chat` streams `turn`, `status`, `tool_call`, `tool_result`, `token`, `iteration_discard`, `ping`, `done`, `error`. The loop
   (up to the owner's budget of 1 to 12 tool calls, default 6; history of the last 6 messages with one line per old call, never old results; 10,000

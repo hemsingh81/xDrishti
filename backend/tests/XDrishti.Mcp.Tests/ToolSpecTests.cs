@@ -90,4 +90,32 @@ public sealed class ToolSpecTests
         LabValidateTool.Spec.Arguments.Single().Max.ShouldBe(65_536);
         RunSqlTool.Spec.Arguments[0].Max.ShouldBe(4000);
     }
+
+    private static readonly ToolSpec MapSpec = new(
+        "m",
+        "d",
+        new ArgDef("flag", ArgType.Boolean, false, "f"),
+        new ArgDef("query", ArgType.StringMap, false, "q", 0, 5, null, 2, ["a", "b", "c"]));
+
+    private static (ToolArguments? Arguments, string? Problem) CheckMap(string json) =>
+        MapSpec.Validate(JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json)!.Select(p => new KeyValuePair<string, object?>(p.Key, p.Value)));
+
+    [Fact]
+    public void A_map_and_a_boolean_are_typed_and_the_map_keys_counts_and_lengths_are_checked()
+    {
+        var (arguments, problem) = CheckMap("""{"flag":true,"query":{"a":"x","b":"yy"}}""");
+
+        problem.ShouldBeNull();
+        arguments!.Boolean("flag").ShouldBe(true);
+        arguments.Map("query").ShouldBe(new Dictionary<string, string> { ["a"] = "x", ["b"] = "yy" });
+        CheckMap("""{"query":{"z":"x"}}""").Problem!.ShouldContain("unknown key");
+        CheckMap("""{"query":{"a":"x","b":"y","c":"z"}}""").Problem!.ShouldContain("more than 2 keys");
+        CheckMap("""{"query":{"a":"123456"}}""").Problem!.ShouldContain("at most 5 characters");
+        CheckMap("""{"query":{"a":1}}""").Problem!.ShouldContain("must be text");
+        CheckMap("""{"query":[1]}""").Problem!.ShouldContain("'query'");
+        CheckMap("""{"flag":"yes"}""").Problem!.ShouldContain("'flag'");
+        var schema = MapSpec.Schema.GetProperty("properties").GetProperty("query");
+        schema.GetProperty("type").GetString().ShouldBe("object");
+        schema.GetProperty("maxProperties").GetInt32().ShouldBe(2);
+    }
 }

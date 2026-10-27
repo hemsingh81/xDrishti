@@ -90,13 +90,19 @@ public sealed class McpArchitectureTests
     public void Each_tool_takes_only_read_ports_in_its_constructor()
     {
         var tools = Mcp.GetTypes().Where(t => t.IsClass && !t.IsAbstract && t.BaseType?.Name == "ReadOnlyTool").ToList();
-        tools.Select(t => t.Name).Order().ShouldBe(["DescribeTableTool", "LabValidateTool", "ListTablesTool", "RunSqlTool"]);
+        tools.Select(t => t.Name).Order().ShouldBe(["CalcTool", "DescribeTableTool", "GetBasketTool", "GetCellTool", "GetInstrumentTool", "GetLearningTool", "GetPlanTool", "GetPortfolioTool", "GetReportTool", "GetSystemStatusTool", "LabValidateTool", "ListRunsTool", "ListTablesTool", "RunSqlTool", "SearchNotesTool"]);
 
-        var allowed = new[] { "ToolRunner", "IAiCatalog", "IAiSqlRunner", "IAiLabValidator", "IOptions`1" };
+        var allowed = new[] { "ToolRunner", "IAiCatalog", "IAiSqlRunner", "IAiLabValidator", "IAiReportReader", "IAiDataReader", "ILogger`1", "IOptions`1" };
         foreach (var tool in tools)
         {
             var parameters = tool.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Single().GetParameters();
             parameters.Select(p => p.ParameterType.Name).ShouldAllBe(n => allowed.Contains(n), tool.Name);
+        }
+
+        // The two data ports of the typed tools have only read verbs (get, list, search): no member is a write.
+        foreach (var port in new[] { typeof(XDrishti.Application.Abstractions.Ai.IAiReportReader), typeof(XDrishti.Application.Abstractions.Ai.IAiDataReader) })
+        {
+            port.GetMethods().Select(m => m.Name).ShouldAllBe(n => n.StartsWith("Get", StringComparison.Ordinal) || n.StartsWith("List", StringComparison.Ordinal) || n.StartsWith("Search", StringComparison.Ordinal), port.Name);
         }
 
         // The read ports have only read methods: no member of the three ports is a write.

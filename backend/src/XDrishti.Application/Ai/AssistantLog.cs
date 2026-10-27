@@ -22,4 +22,7 @@ internal static partial class AssistantLog
 
     [LoggerMessage(EventId = 6066, Level = LogLevel.Information, Message = "assistant.turn.cancelled {TurnId}")]
     public static partial void Cancelled(ILogger logger, Guid turnId);
+
+    [LoggerMessage(EventId = 6123, Level = LogLevel.Information, Message = "assistant.chart_rejected {Reason}")]
+    public static partial void ChartRejected(ILogger logger, string reason);
 }

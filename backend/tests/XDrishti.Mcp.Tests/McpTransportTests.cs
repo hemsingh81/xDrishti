@@ -170,14 +170,14 @@ public sealed class McpTransportTests
     }
 
     [Fact]
-    public async Task The_tool_list_is_exactly_the_four_tools_with_schemas_that_forbid_extra_properties_and_read_only_annotations()
+    public async Task The_tool_list_is_exactly_the_fifteen_tools_with_schemas_that_forbid_extra_properties_and_read_only_annotations()
     {
         await using var host = await TestMcpHost.StartAsync();
         await using var client = await ConnectAsync(host);
 
         var tools = await client.ListToolsAsync(cancellationToken: Ct);
 
-        tools.Select(t => t.Name).Order().ShouldBe(["describe_table", "lab_validate", "list_tables", "run_sql"]);
+        tools.Select(t => t.Name).Order().ShouldBe(["calc", "describe_table", "get_basket", "get_cell", "get_instrument", "get_learning", "get_plan", "get_portfolio", "get_report", "get_system_status", "lab_validate", "list_runs", "list_tables", "run_sql", "search_notes"]);
         foreach (var tool in tools)
         {
             var schema = tool.ProtocolTool.InputSchema;
@@ -204,7 +204,8 @@ public sealed class McpTransportTests
         foreach (var tool in tools)
         {
             tool.Name.ShouldNotMatch("(?i)(insert|update|delete|write|place|order|set_|create|drop|execute|send|cancel|modify)");
-            tool.Description.ShouldContain("Read-only");
+            tool.Description.ShouldNotMatch("(?i)\\b(insert|update|delete|write|drop|execute|send|cancel|modify|recommend)\\b"); // read-only is the annotation (checked in the test above), not a word every description has to spend tokens on
+            tool.ProtocolTool.Annotations!.ReadOnlyHint.ShouldBe(true, tool.Name);
         }
     }
 
@@ -219,7 +220,7 @@ public sealed class McpTransportTests
         var json = JsonNode.Parse(Text(result))!;
         json["ok"]!.GetValue<bool>().ShouldBeTrue();
         json["tool"]!.GetValue<string>().ShouldBe("list_tables");
-        json["rows"]!.AsArray().Count.ShouldBe(35);
+        json["rows"]!.AsArray().Count.ShouldBe(36);
         Text(result).Length.ShouldBeLessThanOrEqualTo(6000);
     }
 

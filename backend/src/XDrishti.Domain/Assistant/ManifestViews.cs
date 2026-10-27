@@ -526,6 +526,13 @@ internal static class ManifestViews
                 new("voided_at", ColumnKind.Timestamp, DataClass.C2, "UTC", "Voided, if it was."),
             ]),
         new(
+            "holding_groups", "Which bucket each holding is in (portfolio context).", "per holding", ViewClass.C2, "portfolio.holdings",
+            [
+                new("account", ColumnKind.Text, DataClass.U, "", "Account label (untrusted text)."),
+                new("symbol", ColumnKind.Id, DataClass.C2, "", "Trading symbol."),
+                new("bucket", ColumnKind.Text, DataClass.U, "", "Bucket name (untrusted text)."),
+            ]),
+        new(
             "plan_item_allocations", "Quantity per account of a plan item (portfolio context).", "per allocation", ViewClass.C2, "trading.plan_item_allocations",
             [
                 new("plan_key", ColumnKind.Key, DataClass.C2, "", "Plan key."),

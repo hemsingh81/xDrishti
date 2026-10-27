@@ -93,9 +93,52 @@ internal sealed class ToolSpec(string name, string description, params ArgDef[] 
 
                 parsed = number;
                 return null;
+            case ArgType.Boolean:
+                if (element.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                {
+                    return $"Property '{arg.Name}' must be true or false.";
+                }
+
+                parsed = element.GetBoolean();
+                return null;
+            case ArgType.StringMap:
+                return CheckMap(arg, element, out parsed);
             default:
                 return $"Property '{arg.Name}' has an unsupported type.";
         }
+    }
+
+    private static string? CheckMap(ArgDef arg, JsonElement element, out object? parsed)
+    {
+        parsed = null;
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return $"Property '{arg.Name}' must be an object of text values.";
+        }
+
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var member in element.EnumerateObject())
+        {
+            if (map.Count >= arg.MaxItems)
+            {
+                return $"Property '{arg.Name}' has more than {arg.MaxItems} keys.";
+            }
+
+            if (arg.Keys is not null && !arg.Keys.Contains(member.Name, StringComparer.Ordinal))
+            {
+                return $"Property '{arg.Name}' has an unknown key '{Truncate(member.Name)}'; use {string.Join(", ", arg.Keys)}.";
+            }
+
+            if (member.Value.ValueKind != JsonValueKind.String || member.Value.GetString()!.Length > arg.Max)
+            {
+                return $"Property '{arg.Name}' key '{Truncate(member.Name)}' must be text of at most {arg.Max} characters.";
+            }
+
+            map[member.Name] = member.Value.GetString()!;
+        }
+
+        parsed = map;
+        return null;
     }
 
     private static string Truncate(string text) => text.Length <= 40 ? text : text[..40] + "…";
@@ -107,10 +150,24 @@ internal sealed class ToolSpec(string name, string description, params ArgDef[] 
         foreach (var arg in arguments)
         {
             var property = new JsonObject { ["description"] = arg.Description };
-            if (arg.Type == ArgType.String)
+            if (arg.Type == ArgType.Boolean)
+            {
+                property["type"] = "boolean";
+            }
+            else if (arg.Type == ArgType.StringMap)
+            {
+                property["type"] = "object";
+                property["maxProperties"] = arg.MaxItems;
+                property["additionalProperties"] = new JsonObject { ["type"] = "string", ["maxLength"] = arg.Max };
+            }
+            else if (arg.Type == ArgType.String)
             {
                 property["type"] = "string";
-                property["minLength"] = arg.Min;
+                if (arg.Min > 1)
+                {
+                    property["minLength"] = arg.Min; // a minimum of 0 or 1 is left out of the schema the model reads (tokens); Validate still enforces it
+                }
+
                 property["maxLength"] = arg.Max;
                 if (arg.Pattern is not null)
                 {

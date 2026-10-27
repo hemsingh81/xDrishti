@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Text.Json.Nodes;
 
 namespace XDrishti.Domain.Assistant;
 
@@ -34,6 +35,8 @@ public static class CellCleaner
                 return ToolLimits.CutCell(scrubbed);
             case string text:
                 return ToolLimits.CutCell(text);
+            case JsonNode node:
+                return CleanNode(node, isText, counters);
             case IEnumerable items and not string:
                 var list = new List<object?>();
                 foreach (var item in items)
@@ -44,6 +47,28 @@ public static class CellCleaner
                 return list;
             default:
                 return value;
+        }
+    }
+
+    /// <summary>A JSON value inside a cell (a metric, a level set): its strings are treated like cells, its numbers and flags are untouched. The node is copied, never changed.</summary>
+    private static JsonNode? CleanNode(JsonNode node, bool isText, CleanCounters counters)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                var copy = new JsonObject();
+                foreach (var (key, child) in obj)
+                {
+                    copy[key] = child is null ? null : CleanNode(child, isText, counters);
+                }
+
+                return copy;
+            case JsonArray array:
+                return new JsonArray([.. array.Select(child => child is null ? null : CleanNode(child, isText, counters))]);
+            case JsonValue leaf when leaf.TryGetValue<string>(out var text):
+                return JsonValue.Create((string?)Clean(text, isText, counters));
+            default:
+                return node.DeepClone();
         }
     }
 }

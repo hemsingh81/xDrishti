@@ -196,7 +196,7 @@ public sealed class ReadOnlyRolesTests(ReadOnlyDatabase db)
         views.Count.ShouldBe(DataManifest.Views.Count);
         (await HasAsync("has_schema_privilege", "xd_app", "aiv", "USAGE")).ShouldBeFalse();
         (await HasAsync("has_schema_privilege", "xd_app", "aiv", "CREATE")).ShouldBeFalse();
-        foreach (var view in views.Append("ai.account_labels"))
+        foreach (var view in views.Append("ai.account_labels").Append("ai.bucket_labels"))
         {
             foreach (var privilege in new[] { "SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE" })
             {
@@ -217,7 +217,9 @@ public sealed class ReadOnlyRolesTests(ReadOnlyDatabase db)
         {
             foreach (var schema in new[] { "accounts", "auth", "platform", "portfolio", "research", "lab", "market", "trading", "workflow", "paper" })
             {
-                (await HasAsync("has_schema_privilege", role, schema, "USAGE")).ShouldBeFalse($"{role} USAGE on {schema}");
+                // The read role names the four report-source tables of research and lab (column-level grants, migration AddAiToolAccess); the SQL role names nothing.
+                var expected = role == "xd_mcp_read" && schema is "research" or "lab";
+                (await HasAsync("has_schema_privilege", role, schema, "USAGE")).ShouldBe(expected, $"{role} USAGE on {schema}");
             }
 
             (await HasAsync("has_schema_privilege", role, "aiv", "USAGE")).ShouldBeTrue();
