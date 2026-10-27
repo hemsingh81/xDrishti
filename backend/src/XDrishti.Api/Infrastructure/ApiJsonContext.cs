@@ -291,6 +291,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(GapPage))]
 [JsonSerializable(typeof(DataNotices))]
 [JsonSerializable(typeof(ContextCoverageView))]
+[JsonSerializable(typeof(RegimeLabelsView))]
 [JsonSerializable(typeof(ContextBreadthView))]
 [JsonSerializable(typeof(InstrumentBars))]
 [JsonSerializable(typeof(StartQualityRunRequest))]

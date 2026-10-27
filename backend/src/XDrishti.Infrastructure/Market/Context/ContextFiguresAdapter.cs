@@ -23,9 +23,27 @@ internal sealed class ContextFiguresAdapter(IContextDayStore store, ContextFigur
     /// <summary>A context built from <paramref name="Stamp"/>'s days; <paramref name="Context"/> is null when the library refused a row, <paramref name="First"/> the oldest date, <paramref name="Universe"/> the number of shares asked on each day that has a breadth.</summary>
     internal sealed record Built(ContextStamp Stamp, MarketContext? Context, DateOnly? First, IReadOnlyDictionary<DateOnly, int>? Universe = null);
 
-    public async ValueTask<ContextRead> AsOfAsync(DateOnly date, CancellationToken cancellationToken)
+    public async ValueTask<ContextRead> AsOfAsync(DateOnly date, CancellationToken cancellationToken) =>
+        Read(await BuiltAsync(cancellationToken), date);
+
+    public async ValueTask<IReadOnlyDictionary<DateOnly, ContextRead>> AsOfManyAsync(IReadOnlyCollection<DateOnly> dates, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(dates);
         var built = await BuiltAsync(cancellationToken);
+        var answers = new Dictionary<DateOnly, ContextRead>(dates.Count);
+        foreach (var date in dates)
+        {
+            if (!answers.ContainsKey(date))
+            {
+                answers[date] = Read(built, date);
+            }
+        }
+
+        return answers;
+    }
+
+    private static ContextRead Read(Built built, DateOnly date)
+    {
         if (built.Stamp.Count == 0)
         {
             return ContextRead.Not(ContextRead.NoContext);

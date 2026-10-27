@@ -95,7 +95,21 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     {
         await using var command = dataSource.CreateCommand($"""
             SELECT {Columns}, cell_key FROM research.cell_stats
-            WHERE snapshot_key = {Newest} AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
+            WHERE snapshot_key = {Newest} AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
+            ORDER BY cell_key, window_code
+            """);
+        command.Parameters.AddWithValue("strategy", NpgsqlDbType.Text, (object?)strategy ?? DBNull.Value);
+        command.Parameters.AddWithValue("window", NpgsqlDbType.Text, (object?)window ?? DBNull.Value);
+        return await ReadAsync(command, cancellationToken);
+    }
+
+    public async ValueTask<IReadOnlyList<StoredCellStats>> ListRegimeLatestAsync(string? strategy, string? window, CancellationToken cancellationToken)
+    {
+        // P6-02 (ADR 0146): the newest snapshot that holds any regime row; the rows carry their own as-of date and snapshot key, so an older snapshot is visible as older
+        await using var command = dataSource.CreateCommand($"""
+            SELECT {Columns}, cell_key FROM research.cell_stats
+            WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE regime <> '*' ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)
+              AND regime <> '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
         command.Parameters.AddWithValue("strategy", NpgsqlDbType.Text, (object?)strategy ?? DBNull.Value);
@@ -114,7 +128,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
         await using var command = dataSource.CreateCommand($"""
             SELECT {Columns}, cell_key FROM research.cell_stats
             WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE as_of < @before ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)
-              AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
+              AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
         command.Parameters.AddWithValue("before", NpgsqlDbType.Date, before);

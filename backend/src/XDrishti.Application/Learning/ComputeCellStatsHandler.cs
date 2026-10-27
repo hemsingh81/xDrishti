@@ -3,11 +3,13 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Learning;
+using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.Context;
 
 namespace XDrishti.Application.Learning;
 
@@ -16,7 +18,7 @@ namespace XDrishti.Application.Learning;
 /// source), runs the pure <see cref="CellStatsCalculator"/> and appends the snapshot. The same inputs give the same snapshot key and a second run writes nothing. R is net of charges when the run was costed, else from the filled prices; each row says which.
 /// Nothing of a trade is logged.
 /// </summary>
-internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore store, TimeProvider time, ILogger<ComputeCellStatsHandler> logger) : ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>
+internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore store, IContextFigures contextFigures, TimeProvider time, ILogger<ComputeCellStatsHandler> logger) : ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>
 {
     /// <summary>The most runs one snapshot reads.</summary>
     public const int MaxSources = 50;
@@ -43,9 +45,21 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
 
         var ordered = read.Value.Cells;
         var tradeCount = read.Value.Trades.Count;
-        var rows = CellStatsCalculator.Compute(ordered, command.AsOf, command.Options);
+        RegimeCells? regime = null;
+        string? regimeText = null;
+        if (command.ByRegime)
+        {
+            // P6-02 (ADR 0146): the label of each trade is the regime of the day before its entry day, or the reason there is none; the labels used are part of the snapshot key.
+            var labels = await RegimeTags.LabelsAsync(contextFigures, read.Value.Trades.Select(t => t.Trade.TradeDate), cancellationToken);
+            var byCell = read.Value.Trades.ToLookup(t => t.CellKey, StringComparer.Ordinal);   // in the order the trades were read, which is the order of CellInput.Trades
+            var perCell = ordered.Select(c => (IReadOnlyList<RegimeLabel>)[.. byCell[c.Cell.Key].Select(t => labels[t.Trade.TradeDate])]).ToList();
+            regime = RegimeCellBuilder.Build(ordered, perCell);
+            regimeText = RegimeTags.Canonical(labels);
+        }
+
+        var rows = CellStatsCalculator.Compute(ordered, command.AsOf, command.Options, regime?.Cells);
         var sources = string.Join(',', command.Sources.OrderBy(s => s.RunKey, StringComparer.Ordinal).Select(s => $"{s.RunKey}:{s.Style}:{s.Exit}"));
-        var key64 = KeyOf(command.AsOf, command.Options, sources);
+        var key64 = KeyOf(command.AsOf, command.Options, sources, regimeText);
         var snapshot = new CellSnapshotToStore(key64, command.AsOf, command.Options, sources, rows, command.Actor, time.GetUtcNow());
         bool written;
         try
@@ -58,16 +72,17 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
             throw;
         }
 
-        var outcome = new CellStatsOutcome(key64, ordered.Count, rows.Count, tradeCount, !written);
+        var outcome = new CellStatsOutcome(key64, ordered.Count, rows.Count, tradeCount, !written, regime?.Tally, regime?.Cells.Count ?? 0);
         var asOfText = command.AsOf.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
         CellStatsLog.Completed(logger, key64[..12], asOfText, outcome.Cells, outcome.Rows, tradeCount, written ? "stored" : "already stored", elapsedMs);
         return Result.Success(outcome);
     }
 
-    internal static string KeyOf(DateOnly asOf, CellStatsOptions o, string sources)
+    internal static string KeyOf(DateOnly asOf, CellStatsOptions o, string sources, string? regimeLabels = null)
     {
-        var text = string.Create(CultureInfo.InvariantCulture, $"cell-stats/1|{asOf:yyyy-MM-dd}|{o.RecencyHalfLifeDays:R}|{o.PriorStrength:R}|{o.MinTrades}|{o.CredibleLevel:R}|{sources}");
+        // the regime part is appended only when the split was asked for, so the key of every snapshot without it is the key it always had
+        var text = string.Create(CultureInfo.InvariantCulture, $"cell-stats/1|{asOf:yyyy-MM-dd}|{o.RecencyHalfLifeDays:R}|{o.PriorStrength:R}|{o.MinTrades}|{o.CredibleLevel:R}|{sources}") + (regimeLabels is null ? string.Empty : "|regime=" + regimeLabels);
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     }
 

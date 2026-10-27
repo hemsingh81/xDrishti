@@ -39,7 +39,7 @@ internal static class InsightBuilder
         }
 
         insights.Add(Gap(InsightKind.Weekday, "Weekday", Of([ReportDimension.Weekday], "weekday"), string.Empty));
-        insights.Add(Reason(InsightKind.Regime, MetricState.Unavailable, "Regime: unavailable, no market context is stored, so no trade has a regime."));
+        insights.Add(Reason(InsightKind.Regime, MetricState.Unavailable, "Regime: unavailable here, the report engine does not tag trades with a regime yet; see the regime cells."));
         insights.Add(Reason(InsightKind.Calibration, MetricState.NotEvaluable, "Calibration: not evaluable, it needs the predicted win rates of a champion model and a report uses none."));
         return insights.AsReadOnly();
     }

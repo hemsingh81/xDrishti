@@ -62,7 +62,7 @@ public static class ReportErrors
     public static Error DimensionUnavailable(ReportDimension dimension) =>
         Error.Validation("reports.dimension_unavailable", dimension switch
         {
-            ReportDimension.Regime => "Regime is unavailable: no market context is stored, so no trade has a regime.",
+            ReportDimension.Regime => "Regime is not a report dimension yet: the regime of a trade is read for the regime cells (GET /api/cells/regimes) and the Lab by_regime block, not for the report engine.",
             ReportDimension.Account => "Account is unavailable: a simulated trade has no account.",
             _ => $"{dimension} is not unavailable.",
         });

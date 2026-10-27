@@ -18,11 +18,19 @@ public sealed record YearView(int Year, int Trades, double MeanR, double TotalR,
 /// <summary>The sign-flip baseline: lenient (mean R against 0 given the trade sizes), not a re-run with random entries.</summary>
 public sealed record SignFlipBaselineView(string Kind, int Trades, int Draws, string Seed, double ObservedMeanR, double NullMeanP95, double PValue, string Label);
 
-/// <summary>The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why.</summary>
+/// <summary>One regime part of the out-of-sample trades (P6-02): the regime and its basis are one bucket; below 30 trades it is shown but is not evidence.</summary>
+public sealed record RegimeBucketView(string Regime, string Basis, int Trades, double MeanR, double TotalR, bool Enough);
+
+/// <summary>Out-of-sample trades with no regime label, by reason (P6-02).</summary>
+public sealed record RegimeMissingView(string Reason, int Trades);
+
+/// <summary>The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. <c>ByRegime</c> is the one-line text; since P6-02 <c>ByRegimeBuckets</c> and <c>ByRegimeUnavailable</c> carry the numbers (null in a result stored before it).</summary>
 public sealed record RobustnessView(
     SensitivityView Sensitivity,
     MonteCarloView? MonteCarlo,
     IReadOnlyList<YearView> ByYear,
     SignFlipBaselineView? SignFlipBaseline,
     string ByRegime,
-    IReadOnlyList<string> Limits);
+    IReadOnlyList<string> Limits,
+    IReadOnlyList<RegimeBucketView>? ByRegimeBuckets = null,
+    IReadOnlyList<RegimeMissingView>? ByRegimeUnavailable = null);

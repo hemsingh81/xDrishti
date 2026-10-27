@@ -20,3 +20,4 @@ The context exists (P3-01d/e) and cells carry a regime part that was always `*`.
 - A label for a date uses only data before it, so adding days never changes an earlier label (prefix-stable).
 - The names are duplicated in the Domain and pinned by a test against the indicator library.
 - Rejected: `research.trade_regimes` or a stored per-day table (a second source of truth); a basis column (a migration and a seventh key part); regime rows in the same reads as `*` rows (silent duplicates for consumers).
+- Limit: the decision day is the entry date; an order that rested overnight was decided a session earlier, so its label may read one context day later than the decision.

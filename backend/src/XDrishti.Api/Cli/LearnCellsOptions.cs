@@ -6,12 +6,13 @@ using XDrishti.Domain.Learning;
 namespace XDrishti.Api.Cli;
 
 /// <summary>The parsed command line of <c>xd learn cells</c> (spec P6-01). Nothing here reads a file or the database.</summary>
-internal sealed record LearnCellsOptions(DateOnly AsOf, IReadOnlyList<CellSource> Sources, CellStatsOptions Options)
+internal sealed record LearnCellsOptions(DateOnly AsOf, IReadOnlyList<CellSource> Sources, CellStatsOptions Options, bool ByRegime = false)
 {
     public const string Usage = """
         usage:
-          xd learn cells --as-of YYYY-MM-DD --run RUNKEY:STYLE:EXIT [--run ...] [--half-life-days N] [--prior-strength N] [--min-trades N]
+          xd learn cells --as-of YYYY-MM-DD --run RUNKEY:STYLE:EXIT [--run ...] [--half-life-days N] [--prior-strength N] [--min-trades N] [--by-regime]
             RUNKEY is the 64-hex key of a stored run, STYLE is intraday or swing, EXIT labels the exit policy the run used (no '|')
+            --by-regime also splits every cell by the regime of its trades' entry day (read before the day; trades with no regime are counted, not guessed)
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
         """;
@@ -25,10 +26,20 @@ internal sealed record LearnCellsOptions(DateOnly AsOf, IReadOnlyList<CellSource
         var errors = new List<string>();
         var runs = new List<CellSource>();
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        var byRegime = false;
         for (var i = 0; i < args.Count; i++)
         {
             var arg = args[i];
-            if (!Known.Contains(arg, StringComparer.Ordinal))
+            if (arg == "--by-regime")
+            {
+                if (byRegime)
+                {
+                    errors.Add("'--by-regime' is given twice");
+                }
+
+                byRegime = true;
+            }
+            else if (!Known.Contains(arg, StringComparer.Ordinal))
             {
                 errors.Add($"unknown argument '{SimulateOptions.Show(arg)}'");
             }
@@ -74,7 +85,7 @@ internal sealed record LearnCellsOptions(DateOnly AsOf, IReadOnlyList<CellSource
             errors.Add("--min-trades must be a whole number");
         }
 
-        return errors.Count > 0 ? (null, errors) : (new LearnCellsOptions(asOf, runs, new CellStatsOptions(half, strength, min)), errors);
+        return errors.Count > 0 ? (null, errors) : (new LearnCellsOptions(asOf, runs, new CellStatsOptions(half, strength, min), byRegime), errors);
     }
 
     private static double Number(Dictionary<string, string> values, string key, double fallback, List<string> errors)

@@ -48,7 +48,7 @@ public sealed class ContextArchitectureTests
     public void The_handlers_are_internal_and_sealed_the_ports_are_public_interfaces_and_the_adapters_are_internal_sealed()
     {
         ShouldHaveNone(Types.InAssembly(Application).That().ResideInNamespace("XDrishti.Application.Market.Context").And().HaveNameEndingWith("Handler").Should().NotBePublic().And().BeSealed().GetResult());
-        Application.GetTypes().Count(t => t.Namespace == "XDrishti.Application.Market.Context" && t.Name.EndsWith("Handler", StringComparison.Ordinal)).ShouldBe(4, "refresh, coverage, compute breadth, rebuild breadth");
+        Application.GetTypes().Count(t => t.Namespace == "XDrishti.Application.Market.Context" && t.Name.EndsWith("Handler", StringComparison.Ordinal)).ShouldBe(5, "refresh, coverage, compute breadth, rebuild breadth, regime labels");
         foreach (var name in new[] { "IContextBarSource", "IContextDayStore", "IContextFigures", "IContextSettings", "IBreadthSource" })
         {
             var port = Application.GetType("XDrishti.Application.Abstractions.Market.Context." + name).ShouldNotBeNull();

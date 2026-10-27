@@ -511,7 +511,7 @@ null,
           ["P6-17a", "Intraday strategy batch: 8 of 9 as stored YAML (CPR deferred)", "built", "0079"],
           ["P6-17b", "Swing strategy batch: 4 of 6 (RS_ROTATION, BB_SQUEEZE, FAILED_BREAKOUT deferred)", "built", "0081"],
           ["P6-18", "Phase check and learning overview API", "built", "0080"],
-          ["P6-02", "Regime labels and regime cells (needs P3-01d)", "blocked", ""],
+          ["P6-02", "Regime labels per day, regime tags on trades and regime cells (built 2026-10-28; basis never mixed; Reports dimension, training feature and loss tag follow as P6-02b)", "built", "0146", {"d": 2, "s": "P6-02-regime-labels-and-regime-cells"}],
         ],
       },
       {

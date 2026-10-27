@@ -1086,6 +1086,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/data/regimes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The regime label of each session (P6-02): from..to (yyyy-MM-dd, default the 90 days up to the last closed session, at most 400 sessions) the regime read from the context day before the session, its basis (index_and_vix or index_only) or the reason there is none (no_context, before_history, stale, context_invalid, regime_not_ready); the count per regime and basis, the sessions without a label by reason, and the first date any label exists and the first with both parts. 400 data.invalid */
+    get: operations['GetDataRegimes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/data/calendar': {
     parameters: {
       query?: never;
@@ -2784,6 +2801,23 @@ export interface paths {
     };
     /** The cell statistics of the newest snapshot: per cell and window (all, 250d, 60d) the trades, the Beta-shrunk win rate with its credible bounds, recency-weighted expectancy and profit factor, drawdown and MAE/MFE quantiles, each with its basis, knobs and limits. Filter by strategy and window; empty before the first computation. 422 learning.invalid */
     get: operations['ListCells'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cells/regimes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The regime cells (P6-02): the cells of the newest snapshot that was computed with the regime split, per regime part and window, each with its trades, its Beta-shrunk win rate, the enough-evidence flag and the basis of its regime (index_and_vix or index_only; a cell never mixes the two). A regime below the minimum of trades says so. Filter by strategy and window; empty before a computation with --by-regime. 422 learning.invalid */
+    get: operations['ListRegimeCells'];
     put?: never;
     post?: never;
     delete?: never;
@@ -6113,6 +6147,10 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
       limits: string;
+      /** @description The regime name of a regime cell (P6-02), null for a `*` cell. */
+      regimeName?: null | string;
+      /** @description What the regime of the cell was built from: `index_and_vix` or `index_only`, or `all` for a `*` cell. A cell never mixes the two. */
+      regimeBasis?: null | string;
     };
     /** @description One cell (timeframe and side) of a full test: the exit the walk-forward chose and how stable that choice was. */
     CellView: {
@@ -13717,6 +13755,74 @@ export interface components {
       /** Format: int32 */
       totalActive: number;
     };
+    /** @description One regime part of the out-of-sample trades (P6-02): the regime and its basis are one bucket; below 30 trades it is shown but is not evidence. */
+    RegimeBucketView: {
+      regime: string;
+      basis: string;
+      /** Format: int32 */
+      trades: number;
+      /** Format: double */
+      meanR: number;
+      /** Format: double */
+      totalR: number;
+      enough: boolean;
+    };
+    /** @description How many sessions of the range fall in one regime, by basis; a regime with no session shows 0 (nothing is hidden). */
+    RegimeCountView: {
+      regime: string;
+      /** Format: int32 */
+      code: number;
+      /** Format: int32 */
+      indexAndVixDays: number;
+      /** Format: int32 */
+      indexOnlyDays: number;
+    };
+    /** @description The regime label of one session (P6-02): the regime read from the context day before it, or why there is none. */
+    RegimeDayView: {
+      /** Format: date */
+      date: string;
+      regime: null | string;
+      /** Format: int32 */
+      code: null | number;
+      basis: null | string;
+      /** Format: date */
+      contextAsOf: null | string;
+      unavailable: null | string;
+    };
+    /**
+     * @description The regime labels per session (`GET /api/data/regimes`, P6-02, ADR 0146): `Days` for the range asked, the counts per regime and basis and the sessions without a label by reason over the same range, and what the whole stored history makes readable
+     *     (`FirstLabel`, `FirstIndexAndVix`). The label of a session reads only data before it; the index is the regime index of the context (NIFTY 50 by default).
+     */
+    RegimeLabelsView: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      /** Format: int32 */
+      sessions: number;
+      days: components['schemas']['RegimeDayView'][];
+      counts: components['schemas']['RegimeCountView'][];
+      unavailable: components['schemas']['RegimeUnavailableView'][];
+      /** Format: int32 */
+      contextDays: number;
+      /** Format: date */
+      firstLabel: null | string;
+      /** Format: date */
+      firstIndexAndVix: null | string;
+      note: string;
+    };
+    /** @description Out-of-sample trades with no regime label, by reason (P6-02). */
+    RegimeMissingView: {
+      reason: string;
+      /** Format: int32 */
+      trades: number;
+    };
+    /** @description Sessions with no label, by reason. */
+    RegimeUnavailableView: {
+      reason: string;
+      /** Format: int32 */
+      days: number;
+    };
     /** @description The body of `POST /api/assistant/proposals/{id}/reject` (AC 10): an optional reason of at most 300 characters. */
     RejectProposalRequest: {
       reason: null | string;
@@ -14391,7 +14497,7 @@ export interface components {
       weeklyLossR: number;
       weeklyLossAction: string;
     };
-    /** @description The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. */
+    /** @description The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it). */
     RobustnessView: {
       sensitivity: components['schemas']['SensitivityView'];
       monteCarlo: null | components['schemas']['MonteCarloView'];
@@ -14399,6 +14505,8 @@ export interface components {
       signFlipBaseline: null | components['schemas']['SignFlipBaselineView'];
       byRegime: string;
       limits: string[];
+      byRegimeBuckets?: null | components['schemas']['RegimeBucketView'][];
+      byRegimeUnavailable?: null | components['schemas']['RegimeMissingView'][];
     };
     RoleToggleInput: {
       enabled: boolean;
@@ -19039,6 +19147,38 @@ export interface operations {
       };
     };
   };
+  GetDataRegimes: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegimeLabelsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
   GetTradingCalendar: {
     parameters: {
       query?: {
@@ -23081,6 +23221,38 @@ export interface operations {
     };
   };
   ListCells: {
+    parameters: {
+      query?: {
+        strategy?: string;
+        window?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CellStatsView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListRegimeCells: {
     parameters: {
       query?: {
         strategy?: string;

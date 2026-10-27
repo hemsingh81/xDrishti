@@ -12,8 +12,11 @@ public static class CellStatsCalculator
 {
     private static readonly CellWindow[] Windows = [CellWindow.All, CellWindow.Days250, CellWindow.Days60];
 
-    /// <summary>The rows, for every cell and every window, in the order of the input then the windows. The options must be usable (<see cref="CellStatsOptions.Problems"/>).</summary>
-    public static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, DateOnly asOf, CellStatsOptions options)
+    /// <summary>
+    /// The rows, for every cell and every window, in the order of the input then the windows. The options must be usable (<see cref="CellStatsOptions.Problems"/>). With <paramref name="regimeCells"/> (P6-02, ADR 0146) the rows of those cells follow,
+    /// shrunk toward the same strategy rate; the system and strategy rates are taken from <paramref name="cells"/> alone, so a trade is never counted twice and the rows of <paramref name="cells"/> are the same with and without them.
+    /// </summary>
+    public static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, DateOnly asOf, CellStatsOptions options, IReadOnlyList<CellInput>? regimeCells = null)
     {
         ArgumentNullException.ThrowIfNull(cells);
         ArgumentNullException.ThrowIfNull(options);
@@ -48,6 +51,22 @@ public static class CellStatsCalculator
             {
                 var (input, trades) = slices[window][i];
                 rows.Add(Row(input, window, trades, asOf, strategyRates[window][input.Cell.Strategy], options));
+            }
+        }
+
+        if (regimeCells is not null)
+        {
+            foreach (var input in regimeCells)
+            {
+                foreach (var window in Windows)
+                {
+                    if (!strategyRates[window].TryGetValue(input.Cell.Strategy, out var prior))
+                    {
+                        throw new ArgumentException($"The regime cell {input.Cell.Key} has no cell of its strategy among the cells.", nameof(regimeCells));
+                    }
+
+                    rows.Add(Row(input, window, InWindow(input.Trades, asOf, window), asOf, prior, options));
+                }
             }
         }
 

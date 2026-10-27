@@ -3947,6 +3947,53 @@
         }
       }
     },
+    "/api/data/regimes": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The regime label of each session (P6-02): from..to (yyyy-MM-dd, default the 90 days up to the last closed session, at most 400 sessions) the regime read from the context day before the session, its basis (index_and_vix or index_only) or the reason there is none (no_context, before_history, stale, context_invalid, regime_not_ready); the count per regime and basis, the sessions without a label by reason, and the first date any label exists and the first with both parts. 400 data.invalid",
+        "operationId": "GetDataRegimes",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegimeLabelsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data/calendar": {
       "get": {
         "tags": [
@@ -9444,6 +9491,56 @@
         ],
         "summary": "The cell statistics of the newest snapshot: per cell and window (all, 250d, 60d) the trades, the Beta-shrunk win rate with its credible bounds, recency-weighted expectancy and profit factor, drawdown and MAE/MFE quantiles, each with its basis, knobs and limits. Filter by strategy and window; empty before the first computation. 422 learning.invalid",
         "operationId": "ListCells",
+        "parameters": [
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CellStatsView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cells/regimes": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The regime cells (P6-02): the cells of the newest snapshot that was computed with the regime split, per regime part and window, each with its trades, its Beta-shrunk win rate, the enough-evidence flag and the basis of its regime (index_and_vix or index_only; a cell never mixes the two). A regime below the minimum of trades says so. Filter by strategy and window; empty before a computation with --by-regime. 422 learning.invalid",
+        "operationId": "ListRegimeCells",
         "parameters": [
           {
             "name": "strategy",
@@ -20168,6 +20265,20 @@
           },
           "limits": {
             "type": "string"
+          },
+          "regimeName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The regime name of a regime cell (P6-02), null for a `*` cell."
+          },
+          "regimeBasis": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the regime of the cell was built from: `index_and_vix` or `index_only`, or `all` for a `*` cell. A cell never mixes the two."
           }
         },
         "description": "One row of the cell statistics as the API shows it (P6-01), with the facts a reader needs to judge it (spec honest limits: the basis, the knobs, the evidence flag and the limits text)."
@@ -40052,6 +40163,221 @@
         },
         "description": "Where the master list stands: the refresh in progress (if any), the last finished one, the automatic schedule and how many instruments are active."
       },
+      "RegimeBucketView": {
+        "required": [
+          "regime",
+          "basis",
+          "trades",
+          "meanR",
+          "totalR",
+          "enough"
+        ],
+        "type": "object",
+        "properties": {
+          "regime": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "meanR": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalR": {
+            "type": "number",
+            "format": "double"
+          },
+          "enough": {
+            "type": "boolean"
+          }
+        },
+        "description": "One regime part of the out-of-sample trades (P6-02): the regime and its basis are one bucket; below 30 trades it is shown but is not evidence."
+      },
+      "RegimeCountView": {
+        "required": [
+          "regime",
+          "code",
+          "indexAndVixDays",
+          "indexOnlyDays"
+        ],
+        "type": "object",
+        "properties": {
+          "regime": {
+            "type": "string"
+          },
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "indexAndVixDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "indexOnlyDays": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "How many sessions of the range fall in one regime, by basis; a regime with no session shows 0 (nothing is hidden)."
+      },
+      "RegimeDayView": {
+        "required": [
+          "date",
+          "regime",
+          "code",
+          "basis",
+          "contextAsOf",
+          "unavailable"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "regime": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "basis": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "contextAsOf": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "unavailable": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The regime label of one session (P6-02): the regime read from the context day before it, or why there is none."
+      },
+      "RegimeLabelsView": {
+        "required": [
+          "from",
+          "to",
+          "sessions",
+          "days",
+          "counts",
+          "unavailable",
+          "contextDays",
+          "firstLabel",
+          "firstIndexAndVix",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "sessions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegimeDayView"
+            }
+          },
+          "counts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegimeCountView"
+            }
+          },
+          "unavailable": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegimeUnavailableView"
+            }
+          },
+          "contextDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstLabel": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "firstIndexAndVix": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "description": "The regime labels per session (`GET /api/data/regimes`, P6-02, ADR 0146): `Days` for the range asked, the counts per regime and basis and the sessions without a label by reason over the same range, and what the whole stored history makes readable\n(`FirstLabel`, `FirstIndexAndVix`). The label of a session reads only data before it; the index is the regime index of the context (NIFTY 50 by default)."
+      },
+      "RegimeMissingView": {
+        "required": [
+          "reason",
+          "trades"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Out-of-sample trades with no regime label, by reason (P6-02)."
+      },
+      "RegimeUnavailableView": {
+        "required": [
+          "reason",
+          "days"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Sessions with no label, by reason."
+      },
       "RejectProposalRequest": {
         "required": [
           "reason"
@@ -41964,9 +42290,27 @@
             "items": {
               "type": "string"
             }
+          },
+          "byRegimeBuckets": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RegimeBucketView"
+            }
+          },
+          "byRegimeUnavailable": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RegimeMissingView"
+            }
           }
         },
-        "description": "The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why."
+        "description": "The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it)."
       },
       "RoleToggleInput": {
         "required": [

@@ -333,6 +333,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RebuildBreadthCommand, BreadthRebuilt>, RebuildBreadthHandler>();
         services.AddScoped<IContextUpkeep, ContextUpkeep>();
         services.AddScoped<IQueryHandler<GetContextCoverageQuery, ContextCoverageView>, GetContextCoverageHandler>();
+        services.AddScoped<IQueryHandler<GetRegimeLabelsQuery, Result<RegimeLabelsView>>, GetRegimeLabelsHandler>(); // the regime label of each session, read before the day (P6-02, ADR 0146)
         services.AddScoped<IQueryHandler<GetCalendarQuery, Result<CalendarView>>, GetCalendarHandler>();
         services.AddScoped<ICommandHandler<AddCalendarDayCommand, AddedCalendarDay>, AddCalendarDayHandler>();
         services.AddScoped<ICommandHandler<ConfirmCalendarDayCommand, CalendarDayView>, ConfirmCalendarDayHandler>();
@@ -568,6 +569,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetSmartRulesEvidenceQuery, Result<SmartRulesView>>, GetSmartRulesEvidenceHandler>(); // smart-rule evidence from stored plan rows (P8-13, ADR 0111)
         services.AddScoped<IQueryHandler<ListCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListCellsHandler>();
         services.AddScoped<IQueryHandler<GetCellQuery, Result<IReadOnlyList<CellStatsView>>>, GetCellHandler>();
+        services.AddScoped<IQueryHandler<ListRegimeCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListRegimeCellsHandler>(); // the regime cells of the newest snapshot that has them (P6-02, ADR 0146)
         services.AddScoped<IQueryHandler<EvaluateCounterfactualQuery, Result<CounterfactualReport>>, EvaluateCounterfactualHandler>(); // frozen-model counterfactual, evidence only (P6-12, ADR 0077)
         services.AddScoped<IQueryHandler<EvaluateMetaPolicyQuery, Result<MetaPolicyReport>>, EvaluateMetaPolicyHandler>(); // meta-labelling policy of the champion, evidence only (P6-13, ADR 0075)
         services.AddScoped<ICommandHandler<TrainModelCommand, TrainModelOutcome>, TrainModelHandler>(); // train, validate and register a model (P6-07, ADR 0070)

@@ -1,5 +1,6 @@
 using NSubstitute;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Lab;
@@ -7,6 +8,7 @@ using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Lab;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.Context;
 using XDrishti.Domain.Research;
 using XDrishti.Tests.Shared;
 
@@ -34,7 +36,7 @@ public sealed class LabRobustnessTests
         [], new LabVerdictView("FAIL", 1, 1, new EvidenceView(0, null, null, 0, 0, null, 0, "walk_forward"), [], [], [], [], []), 1, 1, 0,
         [.. r.Select((v, i) => new SelectionTrade("c", new DateOnly(2026, 1, 1 + i), new DateOnly(2026, 1, 2 + i), v))]);
 
-    private LabRobustness Service(LabSettings? settings = null)
+    private LabRobustness Service(LabSettings? settings = null, IContextFigures? figures = null)
     {
         _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>()).Returns(ci =>
         {
@@ -44,7 +46,7 @@ public sealed class LabRobustnessTests
                 ? Result.Failure<SimulationRun>(Error.Validation("simulation.unknown_parameter", "no such parameter"))
                 : Result.Success(FabricatedRun.Standard());
         });
-        return new LabRobustness(_simulation, settings ?? LabSettings.Default);
+        return new LabRobustness(_simulation, settings ?? LabSettings.Default, figures);
     }
 
     private static StrategyDescription Described(params (string Name, double Value)[] parameters) =>
@@ -111,6 +113,50 @@ public sealed class LabRobustnessTests
         view.ByYear.Single().Year.ShouldBe(2026);
         view.ByRegime.ShouldStartWith("unavailable");
         view.Limits.ShouldContain(l => l.Contains("sign-flip", StringComparison.Ordinal));
+    }
+
+    private static IContextFigures Figures(Func<DateOnly, ContextRead> script)
+    {
+        var figures = Substitute.For<IContextFigures>();
+        figures.AsOfManyAsync(Arg.Any<IReadOnlyCollection<DateOnly>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => (IReadOnlyDictionary<DateOnly, ContextRead>)ci.Arg<IReadOnlyCollection<DateOnly>>().ToDictionary(d => d, script));
+        return figures;
+    }
+
+    private static ContextRead Regime(DateOnly date, int code, string basis) =>
+        ContextRead.Of(new ContextFigures(date.AddDays(-1), basis, 1, 20, 50, 15, 40, 0, 1, 0, code, null));
+
+    [Fact]
+    public async Task By_regime_splits_the_oos_trades_by_the_regime_before_their_entry_day_keeps_the_bases_apart_and_counts_what_has_none()
+    {
+        // entries on 1 to 6 January with R 1 to 6: the 1st has no history, even days are UP_LOW_VOL from the index and the VIX, odd days RANGE_NORMAL_VOL from the index alone
+        var service = Service(figures: Figures(d => d.Day switch
+        {
+            1 => ContextRead.Not(ContextRead.BeforeHistory),
+            _ when d.Day % 2 == 0 => Regime(d, 1, ContextBasis.IndexAndVix),
+            _ => Regime(d, 5, ContextBasis.IndexOnly),
+        }));
+
+        var view = (await service.RunAsync(Run(), Now, SweepSchedule.None, Template(), Full(1, 2, 3, 4, 5, 6), null, Ct)).Value.View;
+
+        view.ByRegimeBuckets!.Select(b => (b.Regime, b.Basis, b.Trades, b.TotalR, b.Enough)).ShouldBe(
+            [("RANGE_NORMAL_VOL~index_only", ContextBasis.IndexOnly, 2, 8.0, false), ("UP_LOW_VOL", ContextBasis.IndexAndVix, 3, 12.0, false)]);
+        view.ByRegimeUnavailable.ShouldBe([new RegimeMissingView(ContextRead.BeforeHistory, 1)]);
+        view.ByRegime.ShouldContain("UP_LOW_VOL 3 trades, mean 4.00 R (not enough evidence)");
+        view.ByRegime.ShouldContain("unavailable before_history 1");
+    }
+
+    [Fact]
+    public async Task By_regime_with_no_context_says_unavailable_with_the_reason_and_has_no_buckets()
+    {
+        var service = Service(figures: Figures(_ => ContextRead.Not(ContextRead.NoContext)));
+
+        var view = (await service.RunAsync(Run(), Now, SweepSchedule.None, Template(), Full(1, -1, 2), null, Ct)).Value.View;
+
+        view.ByRegime.ShouldBe("unavailable: no out-of-sample trade has a regime (unavailable no_context 3)");
+        view.ByRegimeBuckets.ShouldBeEmpty();
+        view.ByRegimeUnavailable.ShouldBe([new RegimeMissingView(ContextRead.NoContext, 3)]);
+        view.Sensitivity.ShouldNotBeNull();
     }
 
     [Fact]

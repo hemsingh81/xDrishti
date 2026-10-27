@@ -9,4 +9,9 @@ namespace XDrishti.Application.Abstractions.Market.Context;
 public interface IContextFigures
 {
     ValueTask<ContextRead> AsOfAsync(DateOnly date, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The answers of <see cref="AsOfAsync"/> for many dates from one read of the stored days (P6-02): the same answer for each date as asking one at a time, with the stored days checked once. Duplicate dates give one entry.
+    /// </summary>
+    ValueTask<IReadOnlyDictionary<DateOnly, ContextRead>> AsOfManyAsync(IReadOnlyCollection<DateOnly> dates, CancellationToken cancellationToken);
 }

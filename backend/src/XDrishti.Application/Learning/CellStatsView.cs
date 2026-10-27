@@ -44,6 +44,12 @@ public sealed record CellStatsView(
     /// <summary>Printed on every row (doc 09, P6-00 honest limits).</summary>
     public const string LimitsText = "Replayed history with modelled fills, about 2 years, in-sample on the data shown: a description of the past, not a forecast. The prior's parent group includes the cell's own trades. The credible interval treats trades as independent, which overlapping trades are not, so it is too narrow. One run per strategy feeds a snapshot, else signals would be counted twice.";
 
+    /// <summary>The regime name of a regime cell (P6-02), null for a <c>*</c> cell.</summary>
+    public string? RegimeName => Domain.Market.Context.RegimeNames.ParsePart(Regime)?.Name;
+
+    /// <summary>What the regime of the cell was built from: <c>index_and_vix</c> or <c>index_only</c>, or <c>all</c> for a <c>*</c> cell. A cell never mixes the two.</summary>
+    public string RegimeBasis => Domain.Market.Context.RegimeNames.ParsePart(Regime)?.Basis ?? "all";
+
     internal static CellStatsView Of(StoredCellStats s)
     {
         var r = s.Row;

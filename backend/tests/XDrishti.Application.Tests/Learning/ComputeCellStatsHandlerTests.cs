@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Learning;
+using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
 using XDrishti.Domain.Learning;
@@ -25,12 +26,14 @@ public sealed class ComputeCellStatsHandlerTests
 
     private readonly ICellStatsStore _store = Substitute.For<ICellStatsStore>();
 
+    private readonly IContextFigures _figures = Substitute.For<IContextFigures>();
+
     private CellSnapshotToStore? _written;
 
     private ComputeCellStatsHandler Handler()
     {
         _store.StoreAsync(Arg.Do<CellSnapshotToStore>(s => _written = s), Ct).Returns(true);
-        return new ComputeCellStatsHandler(_runs, _store, new FakeTimeProvider(new DateTimeOffset(2026, 3, 11, 0, 0, 0, TimeSpan.Zero)), NullLogger<ComputeCellStatsHandler>.Instance);
+        return new ComputeCellStatsHandler(_runs, _store, _figures, new FakeTimeProvider(new DateTimeOffset(2026, 3, 11, 0, 0, 0, TimeSpan.Zero)), NullLogger<ComputeCellStatsHandler>.Instance);
     }
 
     private static StoredRunHeader Header(string key) =>

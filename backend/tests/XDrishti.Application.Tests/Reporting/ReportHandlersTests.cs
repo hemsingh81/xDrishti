@@ -394,7 +394,7 @@ public sealed class ReportHandlersTests
         var account = await Refused(new GetReportGroupsHandler(world.Loader).HandleAsync(new GetReportGroupsQuery(Q(new ReportQueryInput(Lens: "account"))), Ct));
 
         regime.Code.ShouldBe("reports.dimension_unavailable");
-        regime.Message.ShouldContain("no market context");
+        regime.Message.ShouldContain("not a report dimension yet");
         account.Code.ShouldBe("reports.dimension_unavailable");
     }
 

@@ -21,7 +21,7 @@ public enum InsightKind
     /// <summary>The best and the worst weekday.</summary>
     Weekday,
 
-    /// <summary>The most and least favourable regime: unavailable while no market context is stored.</summary>
+    /// <summary>The most and least favourable regime: unavailable in the report engine (P6-02: the regime cells and the Lab carry it).</summary>
     Regime,
 
     /// <summary>Predicted against actual win rate: not evaluable without a champion model.</summary>

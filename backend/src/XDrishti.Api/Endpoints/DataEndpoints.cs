@@ -61,6 +61,11 @@ internal sealed class DataEndpoints : IEndpointModule
             .WithName("GetDataContext")
             .WithSummary("The coverage of the market context (P3-01d): days stored, first and last date, the first readable date of index_trend, regime and vix_pct, the VIX days and the calendar span of their window, the first date the regime has both parts, how many sessions the newest day is behind (stale when more than one), the skipped days with reasons (first 50 and the total), and the missing prerequisite (index_not_tracked, vix_not_tracked, disabled) with its fix. Read only; derived from 1-minute bars");
 
+        group.MapGet("/regimes", GetRegimeLabelsAsync)
+            .WithName("GetDataRegimes")
+            .WithSummary("The regime label of each session (P6-02): from..to (yyyy-MM-dd, default the 90 days up to the last closed session, at most 400 sessions) the regime read from the context day before the session, its basis (index_and_vix or index_only) or the reason there is none (no_context, before_history, stale, context_invalid, regime_not_ready); the count per regime and basis, the sessions without a label by reason, and the first date any label exists and the first with both parts. 400 data.invalid")
+            .ProducesValidationProblem();
+
         group.MapGet("/calendar", GetCalendarAsync)
             .WithName("GetTradingCalendar")
             .WithSummary("The trading calendar: confirmed holidays and special sessions from..to (yyyy-MM-dd, default today and a year on, at most 3660 days), every proposed day (from the stored bars, also a proposal next to a confirmed day: replaces names that day's kind) and the next holiday")
@@ -123,6 +128,17 @@ internal sealed class DataEndpoints : IEndpointModule
         int? pageSize = null)
     {
         var result = await handler.HandleAsync(new ListBarGapsQuery(new GapRequest(status, instrumentId, page, pageSize)), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<RegimeLabelsView>, ProblemHttpResult>> GetRegimeLabelsAsync(
+        HttpContext http,
+        IQueryHandler<GetRegimeLabelsQuery, Result<RegimeLabelsView>> handler,
+        CancellationToken cancellationToken,
+        string? from = null,
+        string? to = null)
+    {
+        var result = await handler.HandleAsync(new GetRegimeLabelsQuery(from, to), cancellationToken);
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 

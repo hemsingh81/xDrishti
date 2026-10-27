@@ -30,7 +30,7 @@ public enum ReportDimension
     /// <summary>The weekday of the entry.</summary>
     Weekday,
 
-    /// <summary>Market regime: unavailable, no market context is stored.</summary>
+    /// <summary>Market regime: unavailable in the report engine (the regime of a trade is read for the regime cells and the Lab, P6-02).</summary>
     Regime,
 
     /// <summary>Account: unavailable, a simulated trade has no account.</summary>

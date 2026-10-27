@@ -1,10 +1,13 @@
 using System.Globalization;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Learning;
 using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Lab;
+using XDrishti.Domain.Learning;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Lab;
@@ -16,10 +19,10 @@ internal sealed record RobustnessOutcome(RobustnessView View, IReadOnlyList<Ledg
 /// The robustness checks of a <c>robust</c> run (spec P5-05, ADR 0062): a one-at-a-time sensitivity sweep (each point a plain run of the default exit, in-sample), a seeded Monte Carlo and a sign-flip baseline over the out-of-sample trades of the full test,
 /// and the same trades by year. Nothing is written here and the verdict is not touched.
 /// </summary>
-internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<SimulationRun>> simulation, LabSettings settings)
+internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<SimulationRun>> simulation, LabSettings settings, IContextFigures? contextFigures = null)
 {
-    /// <summary>Said in the block: why <c>by_regime</c> has no numbers.</summary>
-    public const string RegimeUnavailable = "unavailable: the market-context job (P3-01d) is not built";
+    /// <summary>Said in the block when there is no source of regime labels at all (P6-02: with one, the text names the reason of each missing label).</summary>
+    public const string RegimeUnavailable = "unavailable: no market-context source is available";
 
     /// <summary>XORed into the seed of the sign-flip baseline so its draws do not repeat those of the Monte Carlo.</summary>
     private const ulong FlipSeedMask = 0xA5A5_5A5A_C3C3_3C3CUL;
@@ -97,14 +100,29 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
             limits.Add("fewer than " + MonteCarlo.MinTrades.ToString(CultureInfo.InvariantCulture) + " out-of-sample trades: no Monte Carlo and no baseline");
         }
 
+        var regime = await RegimeAsync(full, cancellationToken);
         var view = new RobustnessView(
             sensitivity,
             mc is null ? null : new MonteCarloView(mc.Trades, mc.Draws, mc.Seed.ToString(CultureInfo.InvariantCulture), mc.ObservedMeanR, mc.ObservedMaxDrawdownR, mc.MeanP05, mc.MeanP50, mc.MeanP95, mc.DrawdownP50, mc.DrawdownP95, mc.ShareNotPositive),
             [.. YearBreakdown.Of(full.OosTrades).Select(y => new YearView(y.Year, y.Trades, y.MeanR, y.TotalR, y.ProfitFactor, y.Positive))],
             flip is null ? null : new SignFlipBaselineView("sign_flip", flip.Trades, flip.Draws, flip.Seed.ToString(CultureInfo.InvariantCulture), flip.ObservedMeanR, flip.NullMeanP95, flip.PValue, "each trade keeps its size, its sign is a coin flip; not a random-entry run"),
-            RegimeUnavailable,
-            limits);
+            regime?.Text ?? RegimeUnavailable,
+            limits,
+            regime is null ? null : [.. regime.Buckets.Select(b => new RegimeBucketView(b.Part, b.Basis, b.Trades, b.MeanR, b.TotalR, b.Enough))],
+            regime is null ? null : [.. regime.Tally.UnavailableByReason.Select(r => new RegimeMissingView(r.Key, r.Value))]);
         return Result.Success(new RobustnessOutcome(view, rows));
+    }
+
+    /// <summary>The out-of-sample trades split by the regime of their entry day (P6-02, ADR 0146); null when no source of labels is available.</summary>
+    private async ValueTask<RegimeBreakdownResult?> RegimeAsync(FullTestOutcome full, CancellationToken cancellationToken)
+    {
+        if (contextFigures is null)
+        {
+            return null;
+        }
+
+        var labels = await RegimeTags.LabelsAsync(contextFigures, full.OosTrades.Select(t => t.Entry), cancellationToken);
+        return RegimeBreakdown.Of([.. full.OosTrades.Select(t => (labels[t.Entry], t.R))]);
     }
 
     private async ValueTask<SweepResult> PointAsync(SimulationRequest template, ExitChoice exit, SweepPoint point, Dictionary<string, double> parameters, IProgress<int>? progress, int index, int instruments, CancellationToken cancellationToken)

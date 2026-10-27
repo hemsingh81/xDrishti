@@ -36,6 +36,32 @@ public sealed class LearnCellsOptionsTests
         options.Options.MinTrades.ShouldBe(20);
     }
 
+    [Fact]
+    public void The_regime_split_is_a_flag_with_no_value_off_by_default_and_not_given_twice()
+    {
+        var (plain, _) = LearnCellsOptions.Parse(["--as-of", "2026-04-30", "--run", $"{Key}:swing:X"]);
+        var (split, errors) = LearnCellsOptions.Parse(["--as-of", "2026-04-30", "--by-regime", "--run", $"{Key}:swing:X"]);
+        var (twice, twiceErrors) = LearnCellsOptions.Parse(["--as-of", "2026-04-30", "--by-regime", "--by-regime", "--run", $"{Key}:swing:X"]);
+
+        plain!.ByRegime.ShouldBeFalse();
+        errors.ShouldBeEmpty();
+        split!.ByRegime.ShouldBeTrue();
+        twice.ShouldBeNull();
+        twiceErrors.ShouldContain(e => e.Contains("twice", StringComparison.Ordinal));
+        LearnCellsOptions.Usage.ShouldContain("--by-regime");
+    }
+
+    [Fact]
+    public async Task The_verb_with_the_regime_split_prints_how_the_labels_came_out_and_why_some_are_missing()
+    {
+        var tally = new XDrishti.Domain.Learning.RegimeTally(5, 3, 2, new Dictionary<string, int> { ["before_history"] = 4 });
+
+        var (code, output, _) = await RunAsync(Result.Success(new CellStatsOutcome(new string('c', 64), 2, 12, 9, false, tally, 2)), "--as-of", "2026-04-30", "--by-regime", "--run", $"{Key}:swing:X");
+
+        code.ShouldBe(0);
+        output.ShouldContain("regime split: 2 regime cells; 5 of 9 trades have a regime (3 from the index and the VIX, 2 from the index alone); no regime: before_history 4");
+    }
+
     [Theory]
     [InlineData("--run", "k:swing")]
     [InlineData("--as-of", "30/04/2026")]
