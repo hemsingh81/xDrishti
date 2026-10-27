@@ -13,6 +13,7 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Ai;
+using XDrishti.Application.Ai.Briefing;
 using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
@@ -112,6 +113,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(IReadOnlyList<ConversationSummary>))]
 [JsonSerializable(typeof(ConversationDetail))]
 [JsonSerializable(typeof(StoredToolCall))]
+[JsonSerializable(typeof(BriefingView))]
+[JsonSerializable(typeof(IReadOnlyList<BriefingView>))]
 [JsonSerializable(typeof(TurnStarted))]
 [JsonSerializable(typeof(TurnStatus))]
 [JsonSerializable(typeof(TurnToolCall))]

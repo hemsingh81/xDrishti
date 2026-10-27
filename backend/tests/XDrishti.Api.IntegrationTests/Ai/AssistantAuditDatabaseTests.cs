@@ -17,7 +17,7 @@ namespace XDrishti.Api.IntegrationTests.Ai;
 public sealed class AssistantAuditDatabaseTests(ResearchGrantsTests.DedicatedServer server) : IClassFixture<ResearchGrantsTests.DedicatedServer>
 {
     private const string Owner = "owner:owner@example.invalid";
-    private static readonly string[] Tables = ["ai.conversations", "ai.messages", "ai.model_calls", "ai.prompts", "ai.settings", "ai.tool_calls"];
+    private static readonly string[] Tables = ["ai.briefing_attempts", "ai.briefings", "ai.conversations", "ai.messages", "ai.model_calls", "ai.prompts", "ai.settings", "ai.tool_calls"];
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private async Task<bool> HasAsync(string role, string table, string privilege)
@@ -60,7 +60,7 @@ public sealed class AssistantAuditDatabaseTests(ResearchGrantsTests.DedicatedSer
                 names.Add("ai." + reader.GetString(0));
             }
 
-            names.ShouldBe(Tables);
+            names.Order(StringComparer.Ordinal).ShouldBe(Tables.Order(StringComparer.Ordinal));
         }
 
         foreach (var table in Tables)
@@ -109,6 +109,8 @@ public sealed class AssistantAuditDatabaseTests(ResearchGrantsTests.DedicatedSer
             "UPDATE ai.prompts SET text = 'x'", "DELETE FROM ai.prompts",
             "UPDATE ai.tool_calls SET status = 'ok'", "DELETE FROM ai.tool_calls",
             "UPDATE ai.model_calls SET caller = 'x'", "DELETE FROM ai.model_calls",
+            "UPDATE ai.briefings SET text = 'x'", "DELETE FROM ai.briefings",
+            "UPDATE ai.briefing_attempts SET text = 'x'", "DELETE FROM ai.briefing_attempts",
             "TRUNCATE ai.messages CASCADE",
         })
         {

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Ai;
+using XDrishti.Application.Ai.Briefing;
 
 namespace XDrishti.Infrastructure.Ai.Assistant;
 
@@ -22,10 +23,19 @@ public static class AssistantRegistration
             .ValidateDataAnnotations()
             .Validate(o => o.HasValidUrl(), "Assistant:Mcp:Url must be an absolute http or https address.")
             .ValidateOnStart();
+        services.AddOptions<BriefingOptions>().Bind(configuration.GetSection(BriefingOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
         services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton(sp =>
+        {
+            var briefing = sp.GetRequiredService<IOptions<BriefingOptions>>().Value;
+            briefing.ReadyWaitSeconds = configuration.GetValue("Assistant:Llm:ReadyWaitSeconds", briefing.ReadyWaitSeconds); // the wait for a ready model is the model client's own setting (P9-01)
+            return briefing;
+        });
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<TurnOptions>>().Value);
         services.AddSingleton<IToolCatalog, McpToolCatalog>();
         services.AddSingleton<IChatModel, ChatClientModel>();
+        services.AddScoped<IBriefingWriter, BriefingWriter>();
+        services.AddScoped<IBriefingStore, BriefingStore>();
         services.AddScoped<IAssistantSettingsStore, AssistantSettingsStore>();
         services.AddScoped<INightlyRunProbe, NightlyRunProbe>();
         services.AddScoped<IModelCallAudit, ModelCallAudit>();

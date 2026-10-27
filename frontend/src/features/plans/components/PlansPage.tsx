@@ -2,6 +2,7 @@ import ChecklistIcon from '@mui/icons-material/ChecklistOutlined';
 import { Alert, Box, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
+import { BriefingCard } from '@/features/briefing';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
 import { plansQuery } from '../api/planQueries';
 import { DigestList } from './DigestList';
@@ -50,6 +51,7 @@ export function PlansPage() {
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '300px 1fr' }, alignItems: 'start' }}>
           <PlanList plans={list} selectedId={selected.id} />
           <Stack spacing={2}>
+            <BriefingCard kind="daily" subject={selected.forDate} />
             <PlanDetail key={selected.id} planId={selected.id} />
             <Suggestions planId={selected.id} />
             <GradePanel planId={selected.id} />

@@ -1,5 +1,6 @@
 import { Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { BriefingCard } from '@/features/briefing';
 import { ApiError } from '@/shared/api';
 import { NonValue } from '@/shared/analytics';
 import { ErrorState, LoadingState } from '@/shared/ui';
@@ -21,6 +22,7 @@ export function DigestSections({ week }: { week: string }) {
   if (query.isError) return <ErrorState error={query.error} />;
   return (
     <Box sx={{ display: 'grid', gap: 2 }}>
+      <BriefingCard kind="weekly" subject={week} />
       {query.data.sections.map((section) => (
         <DrawerSection key={section.key} title={section.title}>
           <Box component="ul" sx={{ m: 0, pl: 2.5 }}>

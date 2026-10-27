@@ -12,12 +12,16 @@ public sealed record PromptVersion(string Name, string Version, string Text, str
 public static class PromptRegistry
 {
     private const string ChatResource = "XDrishti.Application.Ai.Prompts.system.v1.txt";
+    private const string BriefingResource = "XDrishti.Application.Ai.Prompts.briefing.v1.txt";
 
     /// <summary>The system prompt of a chat turn.</summary>
     public static PromptVersion Chat { get; } = Load("chat", "v1", ChatResource);
 
+    /// <summary>The system prompt of the daily briefing and the weekly review (spec P9-06).</summary>
+    public static PromptVersion Briefing { get; } = Load("briefing", "v1", BriefingResource);
+
     /// <summary>Every registered prompt.</summary>
-    public static IReadOnlyList<PromptVersion> All { get; } = [Chat];
+    public static IReadOnlyList<PromptVersion> All { get; } = [Chat, Briefing];
 
     private static PromptVersion Load(string name, string version, string resource)
     {

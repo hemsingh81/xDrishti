@@ -4054,6 +4054,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/assistant/briefings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The newest stored briefing and weekly review texts (kind daily or weekly, limit 1 to 60, default 14), each with its source (model or deterministic), the reason a model text was not used, the guard's findings per attempt and the records behind the facts. Read only. 422 assistant.invalid */
+    get: operations['ListAssistantBriefings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/briefings/daily': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored briefing of a plan date (date=YYYY-MM-DD; default the newest stored one): the text, source, reason, word count, facts hash, model, attempts with findings and the evidence. Read only. 404 assistant.briefing_not_found; 422 assistant.invalid */
+    get: operations['GetAssistantDailyBriefing'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/briefings/weekly': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored review text of an ISO week (week=YYYY-Www; default this week). Read only. 404 assistant.briefing_not_found; 422 assistant.invalid */
+    get: operations['GetAssistantWeeklyReview'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/briefings/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The fixed-format text of a plan date or week (kind daily or weekly, subject a date or an ISO week, default the newest plan / this week), computed from the stored facts and shown. Writes nothing and never calls the model. 404 assistant.briefing_not_found; 409 assistant.briefing_not_evaluable (a week with no digest); 422 assistant.invalid */
+    get: operations['PreviewAssistantBriefing'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/assistant/llm-status': {
     parameters: {
       query?: never;
@@ -5245,6 +5313,54 @@ export interface components {
       serviceId: string;
       /** @description The warning. */
       text: string;
+    };
+    /** @description One model attempt, as the API shows it. The refused text itself stays in the audit table. */
+    BriefingAttemptView: {
+      /** Format: int32 */
+      n: number;
+      passed: boolean;
+      findings: components['schemas']['BriefingFindingView'][];
+      /** Format: int32 */
+      latencyMs: number;
+    };
+    /** @description The records behind the facts of a briefing. */
+    BriefingEvidenceView: {
+      /** Format: int64 */
+      planId: null | number;
+      /** Format: int64 */
+      digestId: null | number;
+      runKeys: string[];
+    };
+    /** @description One finding of the guard, as the API shows it. */
+    BriefingFindingView: {
+      code: string;
+      token: string;
+      /** Format: int32 */
+      offset: number;
+      words: string;
+    };
+    /** @description A briefing or weekly review text (spec P9-06 Contract). `Id` is null for a preview, which stores nothing. `Source` is `model` or `deterministic`; `Reason` is null for the model. */
+    BriefingView: {
+      /** Format: int64 */
+      id: null | number;
+      kind: string;
+      subject: string;
+      /** Format: int32 */
+      version: number;
+      source: string;
+      reason: null | string;
+      text: string;
+      deterministicText: string;
+      /** Format: int32 */
+      wordCount: number;
+      factsHash: string;
+      modelId: null | string;
+      promptVersion: string;
+      attempts: components['schemas']['BriefingAttemptView'][];
+      evidence: components['schemas']['BriefingEvidenceView'];
+      /** Format: date-time */
+      createdAt: null | string;
+      repeated: boolean;
     };
     /**
      * @description Where one dropped row of a broker read lies, and why it was dropped: the dates of the request that returned it (DateOnly BrokerDroppedRow.WindowFrom, DateOnly BrokerDroppedRow.WindowTo; after a split, the half that was asked), the int BrokerDroppedRow.Page of the answer (0 for the
@@ -25418,6 +25534,195 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListAssistantBriefings: {
+    parameters: {
+      query?: {
+        kind?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BriefingView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAssistantDailyBriefing: {
+    parameters: {
+      query?: {
+        date?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BriefingView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAssistantWeeklyReview: {
+    parameters: {
+      query?: {
+        week?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BriefingView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  PreviewAssistantBriefing: {
+    parameters: {
+      query?: {
+        kind?: string;
+        subject?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BriefingView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

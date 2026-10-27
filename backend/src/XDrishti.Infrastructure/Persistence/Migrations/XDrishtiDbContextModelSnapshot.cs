@@ -5884,6 +5884,190 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiBriefingAttemptRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt");
+
+                    b.Property<long>("BriefingId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("briefing_id");
+
+                    b.Property<int?>("CompletionTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("completion_tokens");
+
+                    b.Property<string>("FindingsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("findings_json");
+
+                    b.Property<int>("LatencyMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("latency_ms");
+
+                    b.Property<long?>("ModelCallId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("model_call_id");
+
+                    b.Property<bool>("Passed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("passed");
+
+                    b.Property<int?>("PromptTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("prompt_tokens");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id")
+                        .HasName("pk_briefing_attempts");
+
+                    b.HasIndex("ModelCallId")
+                        .HasDatabaseName("ix_briefing_attempts_model_call_id");
+
+                    b.HasIndex("BriefingId", "Attempt")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ai_briefing_attempts_briefing_id_attempt");
+
+                    b.ToTable("briefing_attempts", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_briefing_attempts_attempt", "attempt >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiBriefingRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BuiltBy")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("built_by");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("DeterministicText")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("deterministic_text");
+
+                    b.Property<string>("FactsHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("facts_hash");
+
+                    b.Property<string>("FactsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("facts_json");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("ModelId")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("model_id");
+
+                    b.Property<string>("ModelSha256")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("model_sha256");
+
+                    b.Property<string>("ParamsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("params_json");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("prompt_version");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(13)
+                        .HasColumnType("character varying(13)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("subject");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<int>("WordCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("word_count");
+
+                    b.HasKey("Id")
+                        .HasName("pk_briefings");
+
+                    b.HasIndex("CreatedAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_ai_briefings_created_at");
+
+                    b.HasIndex("Kind", "Subject", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ai_briefings_kind_subject_version");
+
+                    b.ToTable("briefings", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_briefings_kind", "kind IN ('daily', 'weekly')");
+
+                            t.HasCheckConstraint("ck_ai_briefings_model_source", "source <> 'model' OR model_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_ai_briefings_reason", "reason IS NULL OR reason IN ('model_off', 'model_unavailable', 'guard_rejected', 'facts_thin')");
+
+                            t.HasCheckConstraint("ck_ai_briefings_reason_iff_deterministic", "(source = 'model') = (reason IS NULL)");
+
+                            t.HasCheckConstraint("ck_ai_briefings_source", "source IN ('model', 'deterministic')");
+
+                            t.HasCheckConstraint("ck_ai_briefings_version", "version >= 1");
+
+                            t.HasCheckConstraint("ck_ai_briefings_weekly_footer", "kind <> 'weekly' OR text LIKE '%Nothing was applied%'");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiConversationRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9463,6 +9647,22 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_skips_epochs_epoch_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiBriefingAttemptRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Persistence.AiBriefingRecord", null)
+                        .WithMany()
+                        .HasForeignKey("BriefingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_briefing_attempts_briefings_briefing_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Persistence.AiModelCallRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ModelCallId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_briefing_attempts_model_calls_model_call_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiConversationRecord", b =>

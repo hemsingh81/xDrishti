@@ -56,7 +56,7 @@ Model choice is config; select by our eval set, not leaderboards.
 
 ## 4. Features
 
-1. **Daily briefing** (≤ 300 words): regime, the tickets with one-line rationale, risks, system changes.
+1. **Daily briefing** (≤ 300 words): regime, the tickets with one-line rationale, risks, system changes. Built in P9-06 ([ADR 0140](../adr/0140-the-briefing-text-is-phrased-by-the-model-from-app-built-facts-and-a-deterministic-guard-rejects-any-figure-symbol-or-claim-it-cannot-verify-the-fixed-format-text-is-the-fallback.md)): the app builds the facts, the model only phrases, a deterministic guard rejects any number, symbol or claim not in the facts, and a fixed-format text is stored instead; the weekly review works the same way. Both services start paused and the model is used only when the assistant and `Assistant:Briefing:UseModel` are both on.
 2. **Ask your data**: "Expectancy of 15m SELL setups in high-vol regimes in 2025?" → query + numbers + chart.
    Also portfolio and baskets: "XIRR of MyLongTerm vs Nifty this year?", "Which basket worked best for 15m setups?"
 3. **Strategy drafting**: English idea → DSL YAML → validation → you confirm → Lab run → summary.
@@ -68,7 +68,7 @@ Model choice is config; select by our eval set, not leaderboards.
 | Task | Test | Pass |
 |------|------|------|
 | Data questions | 30 questions with known answers | ≥ 90% exact numbers |
-| Briefing | 10 historical plans | No numbers absent from input; all tickets covered |
+| Briefing | 10 historical plans | No numbers absent from input; all tickets covered (the guard of P9-06 is the checker; set B measures how many first attempts it accepts) |
 | Strategy drafting | 10 ideas | Valid DSL; matches intent on review |
 | Event flags | 200 labelled announcements | Precision on "material" ≥ 80% |
 

@@ -10,7 +10,9 @@ const sources = import.meta.glob<string>(['./**/*.{ts,tsx}', '!./**/*.test.{ts,t
 });
 
 // P8-18: the one allowed import of another feature: the switch hook, to draw a plain link to the replay screen.
-const allowedImports = /^import \{ useCapability \} from '@\/features\/owner-acts';$/m;
+// P9-06: and the read-only briefing card, to show the week's review text beside the digest.
+const allowedImports =
+  /^import \{ useCapability \} from '@\/features\/owner-acts';$|^import \{ BriefingCard \} from '@\/features\/briefing';$/gm;
 
 /** The text with the one allowed import taken out, then asked for any other feature import. */
 const otherFeatureImports = (text: string): string[] =>

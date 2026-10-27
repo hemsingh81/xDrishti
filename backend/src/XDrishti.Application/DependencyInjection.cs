@@ -18,6 +18,7 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Ai;
+using XDrishti.Application.Ai.Briefing;
 using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
@@ -179,6 +180,8 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, PlanExpiryService>(); // expires the day's armed tickets after the close (P7-11); starts paused
         services.AddSingleton<IScheduledService, PaperCaptureService>(); // paper fills of armed tickets after the end-of-day run (P10-01); starts paused, no order
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
+        services.AddSingleton<IScheduledService, BriefingService>(); // the daily briefing text after the suggestions (P9-06); starts paused, the model is used only under both switches
+        services.AddSingleton<IScheduledService, WeeklyReviewService>(); // the weekly review text after the digest (P9-06); starts paused, applies nothing
         services.AddSingleton<IScheduledService, PaperReviewService>(); // the weekly paper review (P10-03); starts paused, builds and stores one text per week and epoch, applies nothing
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<IScheduledService, DepthRecorderService>(); // the depth recorder (P7-16): shown and edited here, run by xd-feed; starts paused, Run now is refused
@@ -570,6 +573,11 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetLearningPhaseCheckQuery, Result<LearningPhaseCheckView>>, GetLearningPhaseCheckHandler>(); // the same check as a read-only GET, no replay seconds from a client (P8-04, ADR 0103)
         services.AddScoped<ICommandHandler<BuildDigestCommand, DigestView>, BuildDigestHandler>(); // the weekly digest from stored records; its only write is the digest (P7-15, ADR 0094)
         services.AddScoped<IQueryHandler<GetDigestQuery, Result<DigestView>>, GetDigestHandler>();
+        services.AddScoped<IBriefingFactSource, BriefingFactSource>(); // the briefing's facts from the stored plan, digest and report insights (P9-06)
+        services.AddScoped<ICommandHandler<BuildBriefingCommand, BriefingView>, BuildBriefingHandler>(); // the model only phrases; the guard rejects; the only write is the insert-only text (P9-06, ADR 0140)
+        services.AddScoped<IQueryHandler<PreviewBriefingQuery, Result<BriefingView>>, PreviewBriefingHandler>();
+        services.AddScoped<IQueryHandler<GetBriefingQuery, Result<BriefingView>>, GetBriefingHandler>();
+        services.AddScoped<IQueryHandler<ListBriefingsQuery, Result<IReadOnlyList<BriefingView>>>, ListBriefingsHandler>();
         services.AddScoped<IQueryHandler<ListDigestsQuery, Result<IReadOnlyList<DigestView>>>, ListDigestsHandler>();
         services.AddScoped<ICommandHandler<StoreCounterfactualCommand, StoredCounterfactual>, StoreCounterfactualHandler>(); // the counterfactual stored once per input hash; the verb's --store (P8-12, ADR 0110)
         services.AddScoped<IQueryHandler<GetCounterfactualQuery, Result<CounterfactualReportView>>, GetCounterfactualHandler>();

@@ -14065,6 +14065,256 @@
         }
       }
     },
+    "/api/assistant/briefings": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "The newest stored briefing and weekly review texts (kind daily or weekly, limit 1 to 60, default 14), each with its source (model or deterministic), the reason a model text was not used, the guard's findings per attempt and the records behind the facts. Read only. 422 assistant.invalid",
+        "operationId": "ListAssistantBriefings",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 14
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BriefingView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/briefings/daily": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "The stored briefing of a plan date (date=YYYY-MM-DD; default the newest stored one): the text, source, reason, word count, facts hash, model, attempts with findings and the evidence. Read only. 404 assistant.briefing_not_found; 422 assistant.invalid",
+        "operationId": "GetAssistantDailyBriefing",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefingView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/briefings/weekly": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "The stored review text of an ISO week (week=YYYY-Www; default this week). Read only. 404 assistant.briefing_not_found; 422 assistant.invalid",
+        "operationId": "GetAssistantWeeklyReview",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefingView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/briefings/preview": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "The fixed-format text of a plan date or week (kind daily or weekly, subject a date or an ISO week, default the newest plan / this week), computed from the stored facts and shown. Writes nothing and never calls the model. 404 assistant.briefing_not_found; 409 assistant.briefing_not_evaluable (a week with no digest); 422 assistant.invalid",
+        "operationId": "PreviewAssistantBriefing",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "daily"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefingView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/assistant/llm-status": {
       "get": {
         "tags": [
@@ -17755,6 +18005,182 @@
           }
         },
         "description": "A service that would restart the count when it runs."
+      },
+      "BriefingAttemptView": {
+        "required": [
+          "n",
+          "passed",
+          "findings",
+          "latencyMs"
+        ],
+        "type": "object",
+        "properties": {
+          "n": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BriefingFindingView"
+            }
+          },
+          "latencyMs": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One model attempt, as the API shows it. The refused text itself stays in the audit table."
+      },
+      "BriefingEvidenceView": {
+        "required": [
+          "planId",
+          "digestId",
+          "runKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "digestId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "runKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The records behind the facts of a briefing."
+      },
+      "BriefingFindingView": {
+        "required": [
+          "code",
+          "token",
+          "offset",
+          "words"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "words": {
+            "type": "string"
+          }
+        },
+        "description": "One finding of the guard, as the API shows it."
+      },
+      "BriefingView": {
+        "required": [
+          "id",
+          "kind",
+          "subject",
+          "version",
+          "source",
+          "reason",
+          "text",
+          "deterministicText",
+          "wordCount",
+          "factsHash",
+          "modelId",
+          "promptVersion",
+          "attempts",
+          "evidence",
+          "createdAt",
+          "repeated"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "source": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "deterministicText": {
+            "type": "string"
+          },
+          "wordCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "factsHash": {
+            "type": "string"
+          },
+          "modelId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "promptVersion": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BriefingAttemptView"
+            }
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/BriefingEvidenceView"
+          },
+          "createdAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "repeated": {
+            "type": "boolean"
+          }
+        },
+        "description": "A briefing or weekly review text (spec P9-06 Contract). `Id` is null for a preview, which stores nothing. `Source` is `model` or `deterministic`; `Reason` is null for the model."
       },
       "BrokerDroppedRow": {
         "required": [

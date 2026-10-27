@@ -10,6 +10,7 @@
 #   scripts/xd.sh learn experiment --baseline RUNKEY --candidate RUNKEY --knob NAME --kind slippage --from 8 --to 12   (P6-11, ADR 0072: judge a knob change between two stored runs, recorded)
 #   scripts/xd.sh learn phase-check [--replay-seconds X]   (P6-18, ADR 0080: the P6 exit criteria from stored records, MET / NOT MET / NOT EVALUABLE, limits printed)
 #   scripts/xd.sh plan run [--date YYYY-MM-DD] [--dry-run]   (P7-08, ADR 0086: the fail-closed nightly pipeline now; a failing gate publishes nothing and exits 1; --dry-run writes nothing)
+#   scripts/xd.sh assistant briefing [--kind daily|weekly] [--subject S] [--store] [--new-version]   (P9-06, ADR 0140: the briefing or weekly review text; prints the fixed-format text, --store keeps it; the model phrases only under both switches)
 #   scripts/xd.sh plan phase-check [--through YYYY-MM-DD]   (P7-18, ADR 0097: the P7 exit criteria from stored plan runs, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
 #   scripts/xd.sh reports phase-check   (P8-17, ADR 0126: the P8 exit criteria from stored runs, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
 #   scripts/xd.sh charge-sheet show [--sheet ID]   (P8-23, ADR 0127: whether the owner's charge-sheet confirmation stands; read only; confirm and revoke are the owner's act with a fresh password on the Settings screen, the verb refuses them)
