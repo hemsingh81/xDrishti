@@ -19,6 +19,9 @@ internal sealed class DepthRecorder(IServiceScopeFactory scopes, IDepthFeedConne
     /// <summary>Rows unwritten for longer than this are dropped, oldest first.</summary>
     public static readonly TimeSpan MaxUnwritten = TimeSpan.FromSeconds(30);
 
+    /// <summary>The most rows waiting for the database (about 3 minutes of 50 instruments at one a second); more are dropped and counted.</summary>
+    public const int MaxPending = 10_000;
+
     public static readonly TimeSpan BackoffInitial = TimeSpan.FromSeconds(1);
 
     public static readonly TimeSpan BackoffMax = TimeSpan.FromSeconds(30);
@@ -255,6 +258,13 @@ internal sealed class DepthRecorder(IServiceScopeFactory scopes, IDepthFeedConne
 
         lock (_gate)
         {
+            if (_pending.Count >= MaxPending)
+            {
+                // a database that hangs must not grow memory: the new row is dropped and counted (the 30-second rule drops the oldest once writing works again)
+                Interlocked.Increment(ref _dropped);
+                return;
+            }
+
             _pending.Add(snapshot);
         }
 

@@ -18,6 +18,11 @@ public static class ServiceErrors
 
     public static readonly Error AlreadyRunning = Error.Conflict(AlreadyRunningCode, "The service is running already.");
 
+    public const string RunNowUnavailableCode = "services.run_now_unavailable";
+
+    /// <summary>The depth recorder (P7-16) follows its three gates and its window; "Run now" cannot start it.</summary>
+    public static readonly Error RunNowUnavailable = Error.Conflict(RunNowUnavailableCode, "This service cannot be started by hand. It runs only when the deployment flag, your switch and this service are all on, inside its window.");
+
     public static readonly Error ReadOnly = Error.Conflict(ReadOnlyCode, "This service is set elsewhere (under Accounts) and cannot be changed here.");
 
     /// <summary>A refused schedule: one field error per error issue, named with its field; those of another service carry its id as the scope.</summary>

@@ -40,7 +40,8 @@ internal sealed class ChangeDepthRecorderHandler(IDepthSwitchStore store, IAccou
         }
         catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
         {
-            // the row stands; the audit cross-index is a second write
+            // the row stands; the audit cross-index is a second write. Only the type of the failure is logged.
+            DepthLog.AuditFailed(logger, failure.GetType().Name);
         }
 
         return Result.Success(new DepthRecorderSwitched(row.Id, row.Enabled));

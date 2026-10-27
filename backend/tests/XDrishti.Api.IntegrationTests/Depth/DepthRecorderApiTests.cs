@@ -136,7 +136,7 @@ public sealed class DepthRecorderApiTests(ApiFactory factory) : DataTestBase(fac
         service.GetProperty("id").GetString().ShouldBe("depth-recorder");
         service.GetProperty("enabled").GetBoolean().ShouldBeFalse();
         run.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        (await run.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("code").GetString().ShouldBe("services.read_only");
+        (await run.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("code").GetString().ShouldBe("services.run_now_unavailable");
         (await ScalarAsync<long>("SELECT count(*) FROM platform.service_runs WHERE service_id = 'depth-recorder'")).ShouldBe(0);
     }
 }

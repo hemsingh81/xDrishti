@@ -153,6 +153,27 @@ public sealed class DepthRecorderTests
         world.Store.Rows.ShouldHaveSingleItem().BidQty[0].ShouldBe(999);
     }
 
+    [Fact]
+    public async Task A_database_that_hangs_cannot_grow_the_queue_without_limit_the_surplus_is_dropped_and_counted()
+    {
+        var world = new World(settings: DepthSettings.Off with { Enabled = true, Sample = TimeSpan.Zero });
+        var run = world.Start();
+        var connection = await ConnectedAsync(world);
+        connection.Push(Ask());
+        var total = DepthRecorder.MaxPending + 50;
+        for (var i = 0; i < total; i++)
+        {
+            connection.Push(Bid(quantity: (uint)(1000 + i)));
+        }
+
+        await UntilAsync(() => world.Recorder.Stats.Packets == total + 1, "packets not read");
+        await world.Recorder.FlushAsync(Ct);
+        var result = await world.StopAsync(run);
+
+        world.Store.Rows.Count.ShouldBe(DepthRecorder.MaxPending);
+        result.Stats.DroppedRows.ShouldBe(total - DepthRecorder.MaxPending);
+    }
+
     [Theory]
     [InlineData(806, "NotSubscribed")]
     [InlineData(805, "Flapping")]

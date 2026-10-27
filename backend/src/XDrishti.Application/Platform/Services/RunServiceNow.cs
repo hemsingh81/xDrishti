@@ -47,7 +47,7 @@ internal sealed class RunServiceNowHandler(
 
         if (command.ServiceId == XDrishti.Application.Depth.DepthRecorderService.Id)
         {
-            return Result.Failure<ServiceRunView>(ServiceErrors.ReadOnly); // the depth recorder follows its three gates and its window; "Run now" cannot start it (P7-16)
+            return Result.Failure<ServiceRunView>(ServiceErrors.RunNowUnavailable); // the depth recorder follows its three gates and its window; "Run now" cannot start it (P7-16)
         }
 
         if (registry.IsExternal(command.ServiceId))

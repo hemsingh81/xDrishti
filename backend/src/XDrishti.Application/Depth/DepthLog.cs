@@ -77,6 +77,12 @@ internal static partial class DepthLog
     [LoggerMessage(EventId = 5323, Level = LogLevel.Warning, Message = "depth.switch_refused code={Code}")]
     public static partial void SwitchRefused(ILogger logger, string code);
 
+    [LoggerMessage(EventId = 5325, Level = LogLevel.Warning, Message = "depth.gate_read_failed type={ErrorType}: treated as closed, a running session is stopped")]
+    public static partial void GateReadFailed(ILogger logger, string errorType);
+
+    [LoggerMessage(EventId = 5326, Level = LogLevel.Warning, Message = "depth.audit_failed type={ErrorType}: the switch row stands, its audit event was not written")]
+    public static partial void AuditFailed(ILogger logger, string errorType);
+
     [LoggerMessage(EventId = 5324, Level = LogLevel.Warning, Message = "depth.free_space_unreadable: only the size cap is in force")]
     public static partial void FreeSpaceUnreadable(ILogger logger);
 }

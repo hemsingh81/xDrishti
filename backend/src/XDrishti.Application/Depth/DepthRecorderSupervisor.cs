@@ -9,6 +9,7 @@ using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Live;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Domain.Market;
+using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Platform.Services;
 
 namespace XDrishti.Application.Depth;
@@ -136,9 +137,32 @@ internal sealed class DepthRecorderSupervisor(IServiceScopeFactory scopes, IDept
             _recovered = true;
         }
 
-        var switchOn = (await services.GetRequiredService<IDepthSwitchStore>().CurrentAsync(cancellationToken))?.Enabled == true;
-        var service = (await services.GetRequiredService<ServiceSettingsReader>().ReadAsync(DepthRecorderService.Definition, cancellationToken)).Settings;
-        var calendar = await services.GetRequiredService<ITradingCalendar>().GetAsync(cancellationToken);
+        bool switchOn;
+        ServiceSettings service;
+        TradingCalendar calendar;
+        try
+        {
+            switchOn = (await services.GetRequiredService<IDepthSwitchStore>().CurrentAsync(cancellationToken))?.Enabled == true;
+            service = (await services.GetRequiredService<ServiceSettingsReader>().ReadAsync(DepthRecorderService.Definition, cancellationToken)).Settings;
+            calendar = await services.GetRequiredService<ITradingCalendar>().GetAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+        {
+            // A gate that cannot be read is a closed gate: a running session is stopped, nothing new is started. Only the type of the exception is logged.
+            DepthLog.GateReadFailed(logger, ex.GetType().Name);
+            if (_running is { Task.IsCompleted: true })
+            {
+                await EndRunAsync(runs, now, cancellationToken);
+            }
+
+            if (_running is not null)
+            {
+                await StopRunAsync(runs, DepthRecorderService.Paused, DepthEndReasons.Paused, cancellationToken);
+            }
+
+            return DepthStates.Paused;
+        }
+
         var decision = FeedWindow.Decide(service, calendar, now, null);
         var shouldBeUp = switchOn && decision.ShouldBeUp;
 
@@ -188,7 +212,9 @@ internal sealed class DepthRecorderSupervisor(IServiceScopeFactory scopes, IDept
             await runs.CompleteAsync(run.Id, ServiceRunStatus.Failed, InterruptedMessage, now, cancellationToken);
         }
 
-        var days = await store.FindUnfinishedDaysAsync(cancellationToken);
+        // Today's date is skipped: a restart in the middle of the day must not take the day's real end row away (it is written once, the first wins). A day that is never closed is found tomorrow.
+        var today = IndiaTime.Today(now);
+        var days = (await store.FindUnfinishedDaysAsync(cancellationToken)).Where(d => d < today).ToList();
         foreach (var date in days)
         {
             var stored = await SafeStoredBytesAsync(store, cancellationToken);

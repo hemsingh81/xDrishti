@@ -423,6 +423,54 @@ public sealed class DepthSupervisorTests
     }
 
     [Fact]
+    public async Task A_switch_that_cannot_be_read_is_a_closed_gate_and_stops_a_running_session()
+    {
+        var world = new DepthSupervisorWorld();
+        await world.TickAsync();
+        world.Session.Running.ShouldBeTrue();
+
+        world.Switch.Fail = true;
+        world.SetClock(At(12, 9, 21));
+        await Should.NotThrowAsync(world.TickAsync);
+
+        world.Session.Running.ShouldBeFalse();
+        world.Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Succeeded);
+        world.LastState.ShouldBe(DepthStates.Paused);
+        world.Switch.Fail = false;
+        world.SetClock(At(12, 9, 22));
+        await world.TickAsync();
+        world.Session.Starts.ShouldBe(2); // the gate reads again: the recorder is wanted again
+    }
+
+    [Fact]
+    public async Task Service_settings_that_cannot_be_read_are_a_closed_gate_and_stop_a_running_session()
+    {
+        var world = new DepthSupervisorWorld();
+        await world.TickAsync();
+
+        world.Data.OnList = () => throw new InvalidOperationException("the database is away");
+        world.SetClock(At(12, 9, 21));
+        await Should.NotThrowAsync(world.TickAsync);
+
+        world.Session.Running.ShouldBeFalse();
+        world.LastState.ShouldBe(DepthStates.Paused);
+    }
+
+    [Fact]
+    public async Task A_restart_in_the_middle_of_the_day_does_not_close_todays_day_as_crashed_but_earlier_days_still_are()
+    {
+        var world = new DepthSupervisorWorld(8, 0);
+        var yesterday = new DateOnly(2026, 10, 9);
+        world.Store.Sets[yesterday] = [new DepthSetEntry(Guid.NewGuid(), 1, "OLD", "armed", 1)];
+        world.Store.Sets[Today] = [new DepthSetEntry(Guid.NewGuid(), 2, "NEW", "armed", 1)];
+
+        await world.TickAsync();
+
+        world.Store.Sessions.ShouldHaveSingleItem().Date.ShouldBe(yesterday);
+        (await ((IDepthStore)world.Store).RecordSessionAsync(new DepthSessionRecord(Today, At(12, 8, 0), At(12, 15, 31), "window_end", 1, 0, 0, 0, 0, null, null), TestContext.Current.CancellationToken)).ShouldBeTrue("the day's real end row can still be written");
+    }
+
+    [Fact]
     public async Task The_process_stopping_ends_the_session_closes_the_run_and_says_stopped_in_a_last_heartbeat()
     {
         var world = new DepthSupervisorWorld();

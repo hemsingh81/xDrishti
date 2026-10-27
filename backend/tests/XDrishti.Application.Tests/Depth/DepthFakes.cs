@@ -160,7 +160,11 @@ internal sealed class FakeDepthSwitchStore : IDepthSwitchStore
 {
     public List<DepthSwitchRow> Rows { get; } = [];
 
-    public ValueTask<DepthSwitchRow?> CurrentAsync(CancellationToken cancellationToken) => ValueTask.FromResult(Rows.Count > 0 ? Rows[^1] : null);
+    /// <summary>The read fails (a database that is away).</summary>
+    public bool Fail { get; set; }
+
+    public ValueTask<DepthSwitchRow?> CurrentAsync(CancellationToken cancellationToken) =>
+        Fail ? throw new InvalidOperationException("the database is away") : ValueTask.FromResult(Rows.Count > 0 ? Rows[^1] : null);
 
     public ValueTask<IReadOnlyList<DepthSwitchRow>> HistoryAsync(int take, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<DepthSwitchRow>>([.. Enumerable.Reverse(Rows).Take(take)]);

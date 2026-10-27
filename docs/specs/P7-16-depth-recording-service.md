@@ -75,6 +75,10 @@ None for the build. Owner acts, default until done = OFF and nothing connects: (
 - [ ] Migration `AddDepthRecording` with `Down`; allow-list and `PinnedAllowList` in one commit; no new package (UNVERIFIED: pin exact versions if one is needed)
 - [ ] ADR written; docs 20 §B, 16, 17 (disk, backups), 03 §5 updated; `docs/research/dhan-samples/README.md` lists the fixtures as UNVERIFIED; `scripts/build-docs.sh` run
 
+## Build notes 2026-10-27
+- **Free-space limit:** `DriveInfo("/")` inside the `xd-feed` container is a `statvfs` of the container root (the overlay on the VM disk). It is UNVERIFIED that it equals the free space of `xd-db-data`'s filesystem; compare with `podman machine ssh df -h /var` before switching on, and trust the size cap if they differ. See ADR 0135.
+- Deviations and review fixes are listed in ADR 0135.
+
 ## Review fixes 2026-10-25
 - The start switch is now an owner act with a fresh password on every change (stored insert-only switch, `AutonomyEndpoints` / `Elevate: false` pattern), in addition to the deployment flag and the paused service; criterion 6 and Decision 8.
 - Checked and stated: the recording list and the disk guard never touch the trading path (new criterion 10; the set is read-only inputs, not an active-set provider; a failing recorder changes nothing else).

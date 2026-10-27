@@ -109,16 +109,20 @@ public sealed class DepthRecorderSwitchTests
     }
 
     [Fact]
-    public async Task A_failing_audit_write_does_not_undo_the_row()
+    public async Task A_failing_audit_write_does_not_undo_the_row_and_is_logged_by_type_only()
     {
         var store = new FakeDepthSwitchStore();
         var events = new Events();
-        var handler = new ChangeDepthRecorderHandler(store, events, new Unit(fail: true), TimeProvider.System, NullLogger<ChangeDepthRecorderHandler>.Instance);
+        var logger = new XDrishti.Application.Tests.Market.CapturingLogger<ChangeDepthRecorderHandler>();
+        var handler = new ChangeDepthRecorderHandler(store, events, new Unit(fail: true), TimeProvider.System, logger);
 
         var result = await handler.HandleAsync(new ChangeDepthRecorderCommand(Owner, true, "on"), Ct);
 
         result.IsSuccess.ShouldBeTrue();
         store.Rows.Count.ShouldBe(1);
+        var logged = logger.Events.Where(e => e.Event == 5326).ToList().ShouldHaveSingleItem();
+        logged.Message.ShouldContain("InvalidOperationException");
+        logged.Message.ShouldNotContain("audit store away");
     }
 
     // ---- the read ----
