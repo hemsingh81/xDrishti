@@ -152,7 +152,7 @@ public sealed class SqlRunnerDatabaseTests(ReadOnlyDatabase db) : IAsyncLifetime
         ((List<object?>)row[8]!).ShouldBe([1L, 2L, 3L]);
         ((List<object?>)row[9]!).ShouldBe(["a", "b"]);
         ((string)row[10]!).ShouldContain("\"k\"");
-        row[11].ShouldBe("[bytea 1 bytes]");
+        row[11].ShouldBe("[bytea]");
         outcome.Columns[13].Name.ShouldBe("naïve");
     }
 
@@ -181,5 +181,49 @@ public sealed class SqlRunnerDatabaseTests(ReadOnlyDatabase db) : IAsyncLifetime
         }));
 
         await Should.ThrowAsync<AiDatabaseUnavailableException>(() => new AiSqlRunner(wrong).RunAsync("select 1", 50, FiveSeconds, Ct));
+    }
+
+    [Fact]
+    public async Task The_dollar_tag_smuggle_is_stopped_even_without_the_pre_check_and_creates_nothing()
+    {
+        const string Attack = "select 1 as a$x$ ; commit ; set default_transaction_read_only=off ; create temp table t(i int) ; select 1 as b$x$";
+
+        var outcome = await Runner.RunAsync(Attack, 50, FiveSeconds, Ct);
+        var again = await Runner.RunAsync("select 1 as a; commit; set default_transaction_read_only=off; create temp table t(i int); select 1 as b", 50, FiveSeconds, Ct);
+
+        outcome.Status.ShouldNotBe(SqlRunStatus.Ok);
+        again.Status.ShouldNotBe(SqlRunStatus.Ok);
+        (await Runner.RunAsync("select count(*) from pg_class where relname = 't' and relpersistence = 't'", 50, FiveSeconds, Ct)).Rows.Single().ShouldBe([0L]);
+        XDrishti.Domain.Assistant.SqlPreCheck.Check(Attack).Reason.ShouldBe("dollar");
+    }
+
+    [Fact]
+    public async Task A_server_error_never_carries_the_value_of_a_cell()
+    {
+        await ReadOnlyDatabase.ExecuteAsync(db.Owner, "DELETE FROM market.baskets WHERE name = 'echo-probe'; INSERT INTO market.baskets (id, name, colour, purpose, description, position, created_at, revision) VALUES (gen_random_uuid(), 'echo-probe', '#000000', 'trading', 'CELLSECRETVALUE', 97, now(), 1)");
+
+        var outcome = await Runner.RunAsync("select description::int from aiv.baskets where name = 'echo-probe'", 50, FiveSeconds, Ct);
+
+        outcome.Status.ShouldBe(SqlRunStatus.Error);
+        outcome.ErrorText.ShouldBe("22P02");
+        await ReadOnlyDatabase.ExecuteAsync(db.Owner, "DELETE FROM market.baskets WHERE name = 'echo-probe'");
+    }
+
+    [Fact]
+    public async Task A_huge_cell_is_bounded_before_it_is_held()
+    {
+        var before = GC.GetTotalAllocatedBytes(precise: true);
+
+        var outcome = await Runner.RunAsync("select repeat('x', 60000000) as big, 'ok' as small", 50, TimeSpan.FromSeconds(5), Ct);
+
+        var allocated = GC.GetTotalAllocatedBytes(precise: true) - before;
+        outcome.Status.ShouldBeOneOf([SqlRunStatus.Ok, SqlRunStatus.Timeout], outcome.ErrorText);
+        if (outcome.Status == SqlRunStatus.Ok)
+        {
+            ((string)outcome.Rows.Single()[0]!).Length.ShouldBeLessThanOrEqualTo(XDrishti.Domain.Assistant.ToolLimits.MaxCellChars + 1);
+            outcome.Rows.Single()[1].ShouldBe("ok");
+        }
+
+        allocated.ShouldBeLessThan(40_000_000, "a 60 MB cell (120 MB as a string) must not be materialised");
     }
 }

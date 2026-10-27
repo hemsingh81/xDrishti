@@ -18,7 +18,7 @@ internal static partial class ToolLog
     [LoggerMessage(EventId = 6033, Level = LogLevel.Information, Message = "mcp.flags {Tool} redactions={Redactions} injection_flags={InjectionFlags}")]
     public static partial void Flags(this ILogger logger, string tool, int redactions, int injectionFlags);
 
-    [LoggerMessage(EventId = 6034, Level = LogLevel.Warning, Message = "mcp.unauthorized")]
+    [LoggerMessage(EventId = 6034, Level = LogLevel.Debug, Message = "mcp.unauthorized")]
     public static partial void Unauthorized(this ILogger logger);
 
     [LoggerMessage(EventId = 6035, Level = LogLevel.Warning, Message = "mcp.rate_limited {Client}")]

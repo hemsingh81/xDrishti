@@ -236,4 +236,23 @@ public sealed class ReadOnlyRolesTests(ReadOnlyDatabase db)
             (await HasAsync("has_table_privilege", "xd_app", "ai.settings", privilege)).ShouldBeFalse(privilege);
         }
     }
+
+    [Fact]
+    public async Task What_public_holds_is_taken_away_the_roles_cannot_use_public_or_make_temp_tables_or_take_advisory_locks_and_the_runtime_role_still_can()
+    {
+        foreach (var role in Roles)
+        {
+            (await HasAsync("has_schema_privilege", role, "public", "USAGE")).ShouldBeFalse($"{role} USAGE on public");
+            (await HasAsync("has_database_privilege", role, "xdrishti", "TEMPORARY")).ShouldBeFalse($"{role} TEMP");
+            (await HasAsync("has_function_privilege", role, "pg_catalog.pg_advisory_lock(bigint)", "EXECUTE")).ShouldBeFalse($"{role} advisory lock");
+            (await HasAsync("has_function_privilege", role, "pg_catalog.pg_try_advisory_xact_lock(bigint)", "EXECUTE")).ShouldBeFalse($"{role} advisory try lock");
+            (await ReadOnlyDatabase.SqlStateAsync(Login(role), "CREATE TEMP TABLE t (i int)")).ShouldNotBeNull();
+        }
+
+        (await HasAsync("has_function_privilege", "xd_mcp_sql", "pg_catalog.pg_advisory_unlock_all()", "EXECUTE")).ShouldBeTrue("the driver resets a pooled connection with it; it only frees the caller's own locks");
+        (await HasAsync("has_schema_privilege", "xd_app", "public", "USAGE")).ShouldBeTrue();
+        (await HasAsync("has_database_privilege", "xd_app", "xdrishti", "TEMPORARY")).ShouldBeTrue();
+        (await HasAsync("has_function_privilege", "xd_app", "pg_catalog.pg_advisory_xact_lock(bigint)", "EXECUTE")).ShouldBeTrue();
+        (await ReadOnlyDatabase.SqlStateAsync(db.App, "CREATE TEMP TABLE t (i int)")).ShouldBeNull();
+    }
 }

@@ -6,7 +6,7 @@ namespace XDrishti.Domain.Assistant;
 
 /// <summary>
 /// The lexical pre-check of <c>run_sql</c> (spec P9-02 AC 8, P9-00 D10): one statement that starts with <c>select</c> or <c>with</c>, at most 4,000 characters, no comment, ASCII outside quoted text, balanced parentheses and none of the refused keywords. It exists for readable error messages,
-/// NOT for safety: the boundary is the database role (SELECT on the <c>aiv</c> views only), the read-only transaction and the cursor. String literals, quoted identifiers and dollar-quoted text are skipped, so a keyword inside a literal or the identifier <c>settings_id</c> is no match.
+/// NOT for safety: the boundary is the database role (SELECT on the <c>aiv</c> views only), the read-only transaction and the cursor. String literals and quoted identifiers are skipped; dollar quoting is refused (a tag inside a name would hide a semicolon), so a keyword inside a literal or the identifier <c>settings_id</c> is no match.
 /// </summary>
 public static partial class SqlPreCheck
 {
@@ -15,6 +15,9 @@ public static partial class SqlPreCheck
         "into", "copy", "set", "reset", "call", "do", "insert", "update", "delete", "drop", "alter", "create", "truncate", "grant", "revoke", "vacuum", "analyze", "execute", "prepare",
         "declare", "fetch", "move", "close", "discard", "listen", "notify", "lock", "commit", "rollback", "begin", "savepoint", "load", "refresh", "reindex", "cluster",
     };
+
+    /// <summary>Function families no question about the stored data needs: locks, settings, other databases, large objects, server files. (<c>pg_sleep</c> stays: the time limit is tested with it.)</summary>
+    private static readonly string[] RefusedPrefixes = ["pg_advisory", "pg_try_advisory", "set_config", "dblink", "lo_", "pg_read_", "pg_ls_", "pg_stat_file", "pg_terminate", "pg_cancel", "pg_reload", "pg_rotate", "pg_switch", "pg_create_", "pg_drop_", "pg_logical", "pg_replication"];
 
     public static SqlCheck Check(string? sql)
     {
@@ -64,6 +67,12 @@ public static partial class SqlPreCheck
         if (words.Count == 0 || words[0] is not ("select" or "with") || !code.TrimStart().StartsWith(words[0], StringComparison.OrdinalIgnoreCase))
         {
             return Refuse("not_select");
+        }
+
+        var risky = words.FirstOrDefault(w => RefusedPrefixes.Any(p => w.StartsWith(p, StringComparison.Ordinal)));
+        if (risky is not null)
+        {
+            return Refuse(RefusedPrefixes.First(p => risky.StartsWith(p, StringComparison.Ordinal)).TrimEnd('_'));
         }
 
         var refused = words.FirstOrDefault(Refused.Contains);
@@ -121,15 +130,15 @@ public static partial class SqlPreCheck
 
                     code.Append(" x ");
                     break;
-                case '$' when TryDollarTag(sql, i, out var tag):
-                    var close = sql.IndexOf(tag, i + tag.Length, StringComparison.Ordinal);
-                    if (close < 0)
+                case '$':
+                    // No dollar quoting and no dollar inside a name: a tag such as a$x$ would hide semicolons from this scan. Only a positional parameter ($1) is left.
+                    if (i == 0 || IsWordChar(sql[i - 1]) || i + 1 >= sql.Length || !char.IsAsciiDigit(sql[i + 1]))
                     {
-                        return new Lexed(string.Empty, "unterminated");
+                        return new Lexed(string.Empty, "dollar");
                     }
 
-                    i = close + tag.Length;
-                    code.Append(' ');
+                    code.Append(c);
+                    i++;
                     break;
                 case '-' when i + 1 < sql.Length && sql[i + 1] == '-':
                 case '/' when i + 1 < sql.Length && sql[i + 1] == '*':
@@ -178,25 +187,6 @@ public static partial class SqlPreCheck
         }
 
         return -1;
-    }
-
-    /// <summary>A dollar-quote tag ($$ or $name$) that opens at <paramref name="start"/>; a positional parameter such as $1 is not one.</summary>
-    private static bool TryDollarTag(string sql, int start, out string tag)
-    {
-        var i = start + 1;
-        while (i < sql.Length && (char.IsAsciiLetter(sql[i]) || sql[i] == '_'))
-        {
-            i++;
-        }
-
-        if (i < sql.Length && sql[i] == '$')
-        {
-            tag = sql[start..(i + 1)];
-            return true;
-        }
-
-        tag = string.Empty;
-        return false;
     }
 
     [GeneratedRegex(@"[A-Za-z_][A-Za-z0-9_$]*", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]

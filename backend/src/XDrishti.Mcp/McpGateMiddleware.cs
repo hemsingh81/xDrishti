@@ -7,7 +7,7 @@ namespace XDrishti.Mcp;
 
 /// <summary>
 /// Everything that happens to a request for <c>/mcp</c> before the MCP SDK sees it (spec P9-02 AC 11): the bearer token (SHA-256 of both sides compared in constant time, every configured token examined whatever the outcome, no hint whether it was missing or wrong), the 64 KB body cap and
-/// the rate limit per client (fixed one-minute window). Any other path passes through untouched (<c>/health</c> is anonymous and carries no detail). The host-header check is the framework's host filtering (<c>AllowedHosts: xd-mcp</c>).
+/// the rate limit per client (fixed one-minute window). Only <c>/health</c> (anonymous, no detail) passes untouched; every other path is gated. The host-header check is the framework's host filtering (<c>AllowedHosts: xd-mcp</c>).
 /// </summary>
 internal sealed class McpGateMiddleware(RequestDelegate next, IOptions<McpOptions> options, TimeProvider time, ILogger<McpGateMiddleware> logger)
 {
@@ -18,7 +18,8 @@ internal sealed class McpGateMiddleware(RequestDelegate next, IOptions<McpOption
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!context.Request.Path.StartsWithSegments("/mcp", StringComparison.Ordinal))
+        // Closed by default: everything but exactly /health needs the token, whatever the casing, slashes or encoding of the path (routing is case-insensitive, so a rule that names /mcp would miss /MCP).
+        if (string.Equals(context.Request.Path.Value, "/health", StringComparison.OrdinalIgnoreCase))
         {
             await next(context);
             return;

@@ -40,7 +40,7 @@ internal sealed partial class RunSqlTool(ToolRunner runner, IAiSqlRunner sql, IO
             case SqlRunStatus.Timeout:
                 return ToolOutcome.Fail(ToolErrorCodes.SqlTimeout, $"The query took longer than {options.Value.SqlTimeoutSeconds} seconds; filter by date or symbol.");
             case SqlRunStatus.Error:
-                return ToolOutcome.Fail(ToolErrorCodes.SqlError, "The database refused the query: " + outcome.ErrorText);
+                return ToolOutcome.Fail(ToolErrorCodes.SqlError, $"The database refused the query (SQLSTATE {outcome.ErrorText}). Check the view and column names with describe_table and the types in your expressions.");
             case SqlRunStatus.Unavailable:
                 throw new AiDatabaseUnavailableException();
         }

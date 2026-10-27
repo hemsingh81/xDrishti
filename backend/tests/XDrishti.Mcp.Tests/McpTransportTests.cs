@@ -96,6 +96,57 @@ public sealed class McpTransportTests
         response.StatusCode.ShouldBe(HttpStatusCode.RequestEntityTooLarge);
     }
 
+    [Theory]
+    [InlineData("/MCP")]
+    [InlineData("/Mcp")]
+    [InlineData("/mcp/")]
+    [InlineData("//mcp")]
+    [InlineData("/mcp/x")]
+    [InlineData("/%6Dcp")]
+    [InlineData("/%4Dcp")]
+    [InlineData("/mcp%2F")]
+    [InlineData("/nothing")]
+    [InlineData("/HEALTH/")]
+    [InlineData("/")]
+    public async Task Every_path_but_health_needs_the_token_whatever_its_casing_slashes_or_encoding(string path)
+    {
+        await using var host = await TestMcpHost.StartAsync();
+        using var client = host.CreateClient();
+
+        var response = await client.SendAsync(Post("http://xd-mcp" + path, """{"jsonrpc":"2.0","id":1,"method":"tools/list"}""", token: null), Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized, path);
+    }
+
+    [Theory]
+    [InlineData("/MCP")]
+    [InlineData("/Mcp")]
+    public async Task A_differently_cased_path_has_the_body_cap_and_the_rate_limit_too(string path)
+    {
+        await using var host = await TestMcpHost.StartAsync();
+        using var client = host.CreateClient();
+
+        var big = await client.SendAsync(Post("http://xd-mcp" + path, new string(' ', 70_000)), Ct);
+        big.StatusCode.ShouldBe(HttpStatusCode.RequestEntityTooLarge);
+        for (var i = 0; i < 60; i++)
+        {
+            await client.SendAsync(Post("http://xd-mcp" + path, """{"jsonrpc":"2.0","id":1,"method":"tools/list"}"""), Ct);
+        }
+
+        (await client.SendAsync(Post("http://xd-mcp" + path, "{}"), Ct)).StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+    }
+
+    [Theory]
+    [InlineData("/health")]
+    [InlineData("/HEALTH")]
+    public async Task Health_stays_anonymous_in_any_casing(string path)
+    {
+        await using var host = await TestMcpHost.StartAsync();
+        using var client = host.CreateClient();
+
+        (await client.GetAsync("http://xd-mcp" + path, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
     [Fact]
     public async Task More_than_sixty_calls_a_minute_per_token_give_429_and_a_new_minute_starts_again_and_another_token_has_its_own_count()
     {
@@ -285,6 +336,18 @@ public sealed class McpTransportTests
         json["error"]!["code"]!.GetValue<string>().ShouldBe("sql.rejected");
         json["error"]!["message"]!.GetValue<string>().ShouldContain(reason);
         sql.Asked.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_refusal_shows_the_sqlstate_and_a_fixed_text_never_the_server_message()
+    {
+        await using var host = await TestMcpHost.StartAsync(sql: new FakeSql(SqlRunOutcome.Failed(SqlRunStatus.Error, 5, "22P02")));
+        await using var client = await ConnectAsync(host);
+
+        var json = JsonNode.Parse(Text(await client.CallToolAsync("run_sql", new Dictionary<string, object?> { ["sql"] = "select 1" }, cancellationToken: Ct)))!;
+
+        json["error"]!["code"]!.GetValue<string>().ShouldBe("sql.error");
+        json["error"]!["message"]!.GetValue<string>().ShouldContain("SQLSTATE 22P02");
     }
 
     [Theory]

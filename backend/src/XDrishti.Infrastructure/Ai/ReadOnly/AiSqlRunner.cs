@@ -26,7 +26,7 @@ internal sealed class AiSqlRunner(AiDataSources sources) : IAiSqlRunner
             connection = await sources.Sql.OpenConnectionAsync(guard.Token);
             await ExecuteAsync(connection, "BEGIN READ ONLY", guard.Token);
             await ExecuteAsync(connection, string.Create(CultureInfo.InvariantCulture, $"SET LOCAL statement_timeout = {(int)timeout.TotalMilliseconds}"), guard.Token);
-            await ExecuteAsync(connection, "DECLARE xd_c NO SCROLL CURSOR FOR " + statement, guard.Token);
+            await DeclareAsync(connection, statement, guard.Token);
             return await FetchAsync(connection, maxRows, clock, guard.Token);
         }
         catch (PostgresException failure) when (failure.SqlState == PostgresErrorCodes.InsufficientPrivilege)
@@ -43,7 +43,7 @@ internal sealed class AiSqlRunner(AiDataSources sources) : IAiSqlRunner
         }
         catch (PostgresException failure)
         {
-            return SqlRunOutcome.Failed(SqlRunStatus.Error, clock.ElapsedMilliseconds, Short(failure.MessageText));
+            return SqlRunOutcome.Failed(SqlRunStatus.Error, clock.ElapsedMilliseconds, failure.SqlState);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -65,7 +65,7 @@ internal sealed class AiSqlRunner(AiDataSources sources) : IAiSqlRunner
     private static async Task<SqlRunOutcome> FetchAsync(NpgsqlConnection connection, int maxRows, Stopwatch clock, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(string.Create(CultureInfo.InvariantCulture, $"FETCH {maxRows + 1} FROM xd_c"), connection);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        await using var reader = await command.ExecuteReaderAsync(System.Data.CommandBehavior.SequentialAccess, cancellationToken);
         var columns = new List<SqlColumn>(reader.FieldCount);
         for (var i = 0; i < reader.FieldCount; i++)
         {
@@ -85,13 +85,55 @@ internal sealed class AiSqlRunner(AiDataSources sources) : IAiSqlRunner
             var row = new object?[reader.FieldCount];
             for (var i = 0; i < row.Length; i++)
             {
-                row[i] = Normalize(reader, i);
+                row[i] = await ReadCellAsync(reader, i, cancellationToken);
             }
 
             rows.Add(row);
         }
 
         return new SqlRunOutcome(SqlRunStatus.Ok, columns, rows, truncated, clock.ElapsedMilliseconds, null);
+    }
+
+    private static readonly HashSet<string> TextTypes = new(StringComparer.OrdinalIgnoreCase) { "text", "character varying", "varchar", "character", "bpchar", "name", "citext", "json", "jsonb" };
+
+    /// <summary>
+    /// One cell, bounded BEFORE it is held: a text cell is read through a text reader for at most the cell limit plus one character and the rest is skipped by the driver (sequential access), so <c>repeat('x', 900000000)</c> never becomes a string; a bytea cell is
+    /// reported by its kind and not read. Other types are read whole (numbers, times, short arrays).
+    /// </summary>
+    private static async ValueTask<object?> ReadCellAsync(NpgsqlDataReader reader, int ordinal, CancellationToken cancellationToken)
+    {
+        if (await reader.IsDBNullAsync(ordinal, cancellationToken))
+        {
+            return null;
+        }
+
+        var type = reader.GetDataTypeName(ordinal);
+        var bare = System.Text.RegularExpressions.Regex.Replace(type, @"\(.*?\)", string.Empty, System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)).Trim();
+        if (bare.Equals("bytea", StringComparison.OrdinalIgnoreCase))
+        {
+            return "[bytea]";
+        }
+
+        if (!TextTypes.Contains(bare))
+        {
+            return Normalize(reader, ordinal);
+        }
+
+        using var text = reader.GetTextReader(ordinal);
+        var buffer = new char[XDrishti.Domain.Assistant.ToolLimits.MaxCellChars + 1];
+        var total = 0;
+        while (total < buffer.Length)
+        {
+            var read = await text.ReadAsync(buffer.AsMemory(total), cancellationToken);
+            if (read == 0)
+            {
+                break;
+            }
+
+            total += read;
+        }
+
+        return new string(buffer, 0, total);
     }
 
     /// <summary>A value as plain data: numeric as text with its scale kept, times as ISO text (UTC where the type has a zone), arrays as lists, anything unusual as its text.</summary>
@@ -142,6 +184,24 @@ internal sealed class AiSqlRunner(AiDataSources sources) : IAiSqlRunner
         }
 
         return list;
+    }
+
+    /// <summary>
+    /// Declares the cursor, but only after the driver has parsed the text and counted ONE statement: Npgsql splits a text at semicolons into several statements, and a second one would run. Preparing only parses (nothing runs); a count other than one stops the call.
+    /// </summary>
+    private static async Task DeclareAsync(NpgsqlConnection connection, string statement, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("DECLARE xd_c NO SCROLL CURSOR FOR " + statement, connection);
+        await command.PrepareAsync(cancellationToken);
+#pragma warning disable CS0618 // Statements is the only public view of the parsed statements of a command
+        var statements = command.Statements.Count;
+#pragma warning restore CS0618
+        if (statements != 1)
+        {
+            throw new PostgresException("one statement only", "ERROR", "ERROR", PostgresErrorCodes.SyntaxError);
+        }
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task ExecuteAsync(NpgsqlConnection connection, string sql, CancellationToken cancellationToken)
