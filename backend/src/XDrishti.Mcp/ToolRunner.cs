@@ -125,13 +125,13 @@ internal sealed class ToolRunner(IAiContext context, IOptions<McpOptions> option
     }
 
     /// <summary>
-    /// Keys of the <c>data</c> object whose strings are structural (ids, codes, dates, numbers as text, names of dimensions): they are only cut, never scrubbed, so a plan key, a symbol or a decimal result is delivered as stored. Every other string of <c>data</c>, at any depth, is treated as
+    /// Keys of the <c>data</c> object whose strings are true enums, ids, dates, hashes or numbers as text (names that a person or a feed typed, such as a symbol, a strategy or a series, are not on the list and are cleaned): they are only cut, never scrubbed, so a plan key, a symbol or a decimal result is delivered as stored. Every other string of <c>data</c>, at any depth, is treated as
     /// text that may have come from the database: cleaned, scrubbed, escaped and counted.
     /// </summary>
     private static readonly HashSet<string> StructuralKeys = new(StringComparer.Ordinal)
     {
-        "state", "kind", "date", "forDate", "planKey", "symbol", "isin", "series", "exchange", "segment", "type", "strategy", "timeframe", "side", "style", "exit", "regime", "metric", "rowDimension", "columnDimension", "groupBy", "valuationDate",
-        "priceAsOfOldest", "priceAsOfNewest", "retiredAt", "firstDailyBar", "lastDailyBar", "result", "operands", "dimensions", "latestQuality", "elapsedMs", "group", "hash", "code",
+        "state", "kind", "date", "forDate", "planKey", "isin", "exchange", "segment", "type", "timeframe", "side", "metric", "rowDimension", "columnDimension", "groupBy", "valuationDate",
+        "priceAsOfOldest", "priceAsOfNewest", "retiredAt", "firstDailyBar", "lastDailyBar", "result", "operands", "dimensions", "latestQuality", "elapsedMs", "hash", "code",
     };
 
     private static JsonObject? CleanData(JsonObject? data, CleanCounters counters) => data is null ? null : (JsonObject)CleanNode(data, null, counters)!;

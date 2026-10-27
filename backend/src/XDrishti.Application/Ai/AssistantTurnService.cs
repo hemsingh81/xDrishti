@@ -268,9 +268,9 @@ internal sealed class AssistantTurnService(
                         if (executed.Granted && string.Equals(call.Name, "calc", StringComparison.Ordinal))
                         {
                             // A derived figure counts only when its operands came from other tools' results of this turn (or the question): calc cannot launder an invented number.
-                            if (CalcGrounding.IsGrounded(executed.ModelText, nonCalcTexts, request.Question))
+                            if (CalcGrounding.SourceText(executed.ModelText, nonCalcTexts, request.Question) is { } derived)
                             {
-                                resultTexts.Add(executed.ModelText);
+                                resultTexts.Add(derived);
                             }
                         }
                         else if (executed.Granted && !string.Equals(call.Name, ChartTool.Name, StringComparison.Ordinal))

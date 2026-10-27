@@ -43,4 +43,30 @@ public sealed class CalcGroundingTests
     {
         CalcGrounding.IsGrounded(text, [Report], "q").ShouldBeFalse();
     }
+
+    [Fact]
+    public void An_invented_year_like_operand_is_not_grounded_but_one_from_a_result_is()
+    {
+        CalcGrounding.IsGrounded(Calc("975", "1950", "0.5"), [Report], "q").ShouldBeFalse();
+        CalcGrounding.IsGrounded(Calc("975", "1950", "0.5"), ["""{"ok":true,"rows":[{"turnover":1950}]}"""], "q").ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("1000000000000", "100", "100", "100", "1", "1")]
+    [InlineData("2", "1", "0.5")]
+    public void An_expression_of_free_literals_only_is_never_a_source(string result, params string[] operands)
+    {
+        CalcGrounding.IsGrounded(Calc(result, operands), [Report], "q").ShouldBeFalse();
+        CalcGrounding.SourceText(Calc(result, operands), [Report], "q").ShouldBeNull();
+    }
+
+    [Fact]
+    public void An_operand_must_equal_a_source_exactly_and_the_chosen_places_never_become_a_source()
+    {
+        CalcGrounding.IsGrounded(Calc("11", "11"), ["""{"ok":true,"rows":[{"x":10.95}]}"""], "q").ShouldBeFalse();
+        var text = CalcGrounding.SourceText(Calc("3.125", "12.5", "4"), [Report], "q");
+        text.ShouldNotBeNull();
+        text.ShouldNotContain("places");
+        text.ShouldContain("3.125");
+    }
 }

@@ -28,6 +28,8 @@ public static class CellCleaner
         ArgumentNullException.ThrowIfNull(counters);
         switch (value)
         {
+            case string text when isText && IsPlainValue(text):
+                return ToolLimits.CutCell(text);
             case string text when isText:
                 var cleaned = UntrustedText.Clean(text);
                 var scrubbed = OutputScrubber.Scrub(cleaned.Text, out var redactions);
@@ -49,6 +51,16 @@ public static class CellCleaner
                 return value;
         }
     }
+
+    /// <summary>
+    /// A string that is only a decimal number with a decimal point (an amount or a level written as text), a GUID or an ISO date or moment is a value, not prose: the digit-run and long-token redaction would corrupt it and there is nothing in it to flag. A bare long integer is not exempt
+    /// (it looks like an account number).
+    /// </summary>
+    private static bool IsPlainValue(string text) =>
+        text.Length <= 64
+        && ((text.Contains('.', StringComparison.Ordinal) && decimal.TryParse(text, System.Globalization.NumberStyles.AllowLeadingSign | System.Globalization.NumberStyles.AllowDecimalPoint, System.Globalization.CultureInfo.InvariantCulture, out _))
+            || Guid.TryParseExact(text, "D", out _)
+            || (text.Length >= 10 && char.IsAsciiDigit(text[0]) && DateTimeOffset.TryParseExact(text, ["yyyy-MM-dd", "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ssK"], System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _)));
 
     /// <summary>A JSON value inside a cell (a metric, a level set): its strings are treated like cells, its numbers and flags are untouched. The node is copied, never changed.</summary>
     private static JsonNode? CleanNode(JsonNode node, bool isText, CleanCounters counters)
