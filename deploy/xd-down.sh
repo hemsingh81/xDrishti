@@ -3,11 +3,12 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 export PODMAN_COMPOSE_WARNING_LOGS=false
+export XD_MODELS_DIR="${XD_MODELS_DIR:-$HOME/Library/Application Support/xDrishti/models}"
 export XD_SECRETS_DIR="${XD_SECRETS_DIR:-$HOME/Library/Application Support/xDrishti/secrets}"
 if [ "${1:-}" = "--purge" ]; then
   read -r -p "Delete ALL xDrishti data (database, logs)? Type 'delete': " answer
   [ "$answer" = "delete" ] || { echo "Cancelled."; exit 1; }
-  podman compose -f compose.yaml -f compose.dev.yaml --profile ops down --volumes
+  podman compose -f compose.yaml -f compose.dev.yaml --profile ops --profile ai down --volumes
 else
-  podman compose -f compose.yaml -f compose.dev.yaml --profile ops down
+  podman compose -f compose.yaml -f compose.dev.yaml --profile ops --profile ai down
 fi

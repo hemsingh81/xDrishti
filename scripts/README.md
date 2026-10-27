@@ -19,6 +19,8 @@ Developer helpers (macOS). They use the .NET SDK in `~/.dotnet` and Podman Deskt
 | `llm-setup.sh` / `llm-models.sh` | P0-15: install the pinned native llama.cpp and the RamaLama image; download the pinned models (SHA-256 verified, resumable). |
 | `llm-serve.sh` / `llm-wait.sh` / `llm-mem.sh` | P0-15: start/stop a local LLM server (native, CPU or container; all on 127.0.0.1), time its load, sample memory. |
 | `llm-bench.sh` | P0-15: benchmark an OpenAI-compatible local LLM server (throughput, first-token time, capability smoke) → `data/llm-bench/`. |
+| `xd-ai.sh` | P9-01: start / stop / status / logs of the on-demand local model server `xd-llm` (`start [main\|gptoss\|qwen-instruct]`; `model_missing` when the file is absent; never downloads). |
+| `fetch-model.sh` | P9-01 (ADR 0136): download the pinned `qwen-instruct` model file into `data/models-llm`, asks y/N, resumable, checks size and SHA-256 and refuses a mismatch; `--verify` only checks. Run by the owner. |
 | `serve.sh` | Serves the clickable prototype (8766) and the docs site (8765). |
 
 The stack itself starts with `deploy/xd-up.sh` and stops with `deploy/xd-down.sh`.

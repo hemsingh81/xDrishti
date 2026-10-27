@@ -16,6 +16,7 @@ using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
+using XDrishti.Application.Ai;
 using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
@@ -688,6 +689,7 @@ public static class DependencyInjection
         services.AddScoped<IOwnerActRunner, OwnerActRunner>(); // the gate again and the audit row of the web owner acts that existing handlers perform (P8-19, ADR 0130)
         services.AddScoped<CapabilityViews>();
         services.AddScoped<IQueryHandler<GetCapabilitiesQuery, CapabilitiesView>, GetCapabilitiesHandler>();
+        services.AddScoped<IQueryHandler<GetLlmStatusQuery, LlmStatusView>, GetLlmStatusHandler>(); // the state of the local model server, read only (P9-01)
         services.AddScoped<ICommandHandler<ChangeCapabilityCommand, CapabilityChangeOutcome>, ChangeCapabilityHandler>(); // the one writer of the capability log; only the owner's endpoint calls it
         services.AddScoped<IQueryHandler<EvaluatePaperPhaseCheckQuery, Result<PaperPhaseCheckView>>, EvaluatePaperPhaseCheckHandler>(); // the paper phase check: reads only, judges nothing it cannot read (P10-06, ADR 0123)
         services.AddScoped<IQueryHandler<GetBacktestVsPaperQuery, Result<BacktestVsPaperView>>, GetBacktestVsPaperHandler>(); // backtest vs paper, computed on read (P10-04, ADR 0122)

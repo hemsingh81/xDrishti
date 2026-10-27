@@ -14065,6 +14065,37 @@
         }
       }
     },
+    "/api/assistant/llm-status": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "Whether the local model server is ready, loading, down or misconfigured, with the loaded model file (and its SHA-256 when it is a pinned one), the build and how to start it. Read only; cached a few seconds; no key, path or address in the answer",
+        "operationId": "GetLlmStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmStatusView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/plans/{id}/review": {
       "get": {
         "tags": [
@@ -30785,6 +30816,67 @@
         },
         "description": "What a Portfolio screen asks the hub to follow (argument of `Subscribe`, ADR 0024 §7): the prices of the instruments of these holdings are pushed, nothing else.\n`accountId` and `bucketId` are the screen's scope, with the meaning they have for `GET /api/holdings/summary`: without `accountId` every open holding of the accounts that count in totals, with it every open holding of that account\n(any account that is not archived); `bucketId` narrows either to one bucket. This is the set the tiles and the group rows are made of.\n`holdingIds` are the holdings the screen shows (rows of the grid, the open drawer); they are added to the scope's holdings even when the scope would not include them (an account that does not count in totals, a filter applied on the screen only).\nAt most 1000 are read; holdings that are closed or have no instrument are ignored. Leave `accountId`, `bucketId` and `holdingIds` null or empty for all accounts that count in totals.\nThe server turns holdings into instruments; the messages carry instrument ids (as `instrumentId` of the holdings list). A second `Subscribe` replaces the first."
       },
+      "LlmStatusView": {
+        "required": [
+          "state",
+          "model",
+          "modelFile",
+          "modelSha256",
+          "build",
+          "checkedAt",
+          "detail",
+          "startCommand"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "ready, loading, down or misconfigured."
+          },
+          "model": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The alias the server serves (for example xd-main), when it answered."
+          },
+          "modelFile": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Base name of the loaded model file, when the server said."
+          },
+          "modelSha256": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "SHA-256 of that file when it is one of the pinned files; null for an unknown file."
+          },
+          "build": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The server's build number text, when it said."
+          },
+          "checkedAt": {
+            "type": "string",
+            "description": "When the answer was taken (cached for a few seconds).",
+            "format": "date-time"
+          },
+          "detail": {
+            "type": "string",
+            "description": "A fixed sentence."
+          },
+          "startCommand": {
+            "type": "string",
+            "description": "How the owner starts the server."
+          }
+        },
+        "description": "What `GET /api/assistant/llm-status` answers. No key, no path and no address of the server is ever in it."
+      },
       "LoginRequest": {
         "required": [
           "email",
@@ -43710,6 +43802,9 @@
     },
     {
       "name": "Capabilities"
+    },
+    {
+      "name": "Assistant"
     },
     {
       "name": "Plan review"

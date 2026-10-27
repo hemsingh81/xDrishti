@@ -31,6 +31,7 @@ using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Reporting;
 using XDrishti.Infrastructure.Accounts;
+using XDrishti.Infrastructure.Ai.Llm;
 using XDrishti.Infrastructure.Audit;
 using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
@@ -59,6 +60,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddLocalLlm(configuration); // the local model server's status port and chat client; OFF by default, never called at start-up (P9-01)
+
         services.AddOptions<DatabaseOptions>()
             .Bind(configuration.GetSection(DatabaseOptions.SectionName))
             .ValidateDataAnnotations()

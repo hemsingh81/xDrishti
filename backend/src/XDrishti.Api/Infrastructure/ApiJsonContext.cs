@@ -11,6 +11,7 @@ using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
+using XDrishti.Application.Ai;
 using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
@@ -103,6 +104,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(RevokeChargeSheetRequest))]
 [JsonSerializable(typeof(ChangeChargeSheetCapabilityRequest))]
 [JsonSerializable(typeof(CapabilitiesView))]
+[JsonSerializable(typeof(LlmStatusView))]
 [JsonSerializable(typeof(CapabilityChangeOutcome))]
 [JsonSerializable(typeof(ChangeCapabilityRequest))]
 [JsonSerializable(typeof(ExperimentPreviewView))]

@@ -31,3 +31,6 @@ The container is proposed anyway because it keeps `xd-llm` inside the compose st
 - The nightly pipeline must not depend on the LLM; LLM jobs (briefing) run outside the nightly window or when the model is already loaded.
 - If the host memory situation worsens or the eval prefers gpt-oss-20b, the smaller model is a config change, not a redesign.
 - A newer open model can be evaluated with `scripts/llm-bench.sh` without code changes.
+
+## Amendments
+- **2026-10-27 (P9-01, [ADR 0136](0136-the-local-model-server-runs-in-a-container-on-demand-with-the-measured-qwen3-30b-a3b-as-default-two-pinned-alternatives-and-a-status-the-api-reads-over-http-only.md)).** Status of the container choice: built as a compose service `xd-llm` (profile `ai`, on demand), still **Proposed** until the owner confirms. The decision text above is unchanged. Pinned model files (with source revision, size, SHA-256, licence), the image's inside facts and the hardening result are in ADR 0136; a third candidate `qwen-instruct` (Qwen3-30B-A3B-Instruct-2507) is pinned there, not yet measured. "P9-07 eval" reads **P9-09 eval** (P9-07 is the Lab proposal slice). The memory limit, load-time, interference and prompt-cache measurements this ADR demanded of P9-01 were **not taken** in the build (they need the model loaded); they are listed in ADR 0136 item 8 and remain open.

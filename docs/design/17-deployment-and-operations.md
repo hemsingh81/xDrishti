@@ -32,7 +32,7 @@ broker/exchange APIs.
 | `xd-db` | PostgreSQL + TimescaleDB (official image) | core | Named volume; read-only role for tools |
 | `xd-seq` | Seq | ops | Logs |
 | `xd-backup` | restic + pg_dump | ops | Nightly encrypted backup to external SSD |
-| `xd-llm` | llama.cpp server (pinned RamaLama image) | ai | GPU via libkrun (`/dev/dri`); model from the host folder or the volume `xd-models` (decide in P9-01); no published port; on demand |
+| `xd-llm` | llama.cpp server (pinned RamaLama image `0.25.0@sha256:d60dfda3...`, [ADR 0136](../adr/0136-the-local-model-server-runs-in-a-container-on-demand-with-the-measured-qwen3-30b-a3b-as-default-two-pinned-alternatives-and-a-status-the-api-reads-over-http-only.md)) | ai | **Built (P9-01), not started by `xd-up.sh`.** GPU via libkrun (`/dev/dri`, Vulkan Venus), user 1000, `read_only`, `cap_drop: [ALL]`, `no-new-privileges`; no published port; network `back` (internal) only; models mounted read-only from `~/Library/Application Support/xDrishti/models` or `data/models-llm` and loaded with `-m` (never `-hf`); the only secret is its own API key (Keychain `xdrishti/llm/api-key`, file `llm_api_key`, also given to `xd-api` as `Assistant__Llm__ApiKey`); `mem_limit: 8g` is a **placeholder, not measured**; started and stopped by the owner with `scripts/xd-ai.sh start [main\|gptoss\|qwen-instruct]`, `stop`, `status` (`model_missing` when the file is absent); `xd-api` looks at it only while `XD_ASSISTANT_LLM=true` (default false) and shows `GET /api/assistant/llm-status`; static rules in `AiComposeRulesTests` |
 | `xd-mcp` | .NET 10 | ai | Read-only MCP tools |
 | `xd-hermes` | Own image, pinned Hermes Agent | ai (optional) | Only after PoC; hardened (doc 14) |
 | `xd-exec` | .NET 10 | live (later) | Orders; isolated network; only holder of order-capable tokens |
@@ -56,7 +56,7 @@ If you do not do this, nothing is lost: "no phone access" is a valid state.
 | Network | Members |
 |---------|---------|
 | `front` | proxy (the only published port), seq (ops) |
-| `back` (internal) | api, worker, sandbox*, db, llm, mcp, seq, feed, proxy (to reach the api) |
+| `back` (internal) | api, worker, sandbox*, db, llm (on demand, P9-01), mcp, seq, feed, proxy (to reach the api) |
 | `egress` (not internal, nothing published) | **api only** (P1-16c, P1-03) |
 | `exec` (internal) | exec, db (later) |
 | Egress allowed later | worker, feed, exec (broker/exchange hosts only) |
@@ -98,6 +98,7 @@ Nothing else is needed for the master: no published port, no volume (the file is
    `broker_vault_key`, mounted **only into `xd-api`** as `/run/secrets/BrokerVault__Key` (the 256-bit key is derived from it with
    HKDF-SHA256). Back it up with the database. The former `scripts/broker-secrets.sh`, `secrets/brokers.index` and the read-only
    `secrets/brokers` mount are gone (`xd-up.sh` deletes leftover files).
+   The key of the local model server (`xdrishti/llm/api-key`, 32 random characters, created once and never replaced by `xd-up.sh`; file `llm_api_key`) is mounted into `xd-llm` (`--api-key-file`) and `xd-api` (`Assistant__Llm__ApiKey`) only ([ADR 0136](../adr/0136-the-local-model-server-runs-in-a-container-on-demand-with-the-measured-qwen3-30b-a3b-as-default-two-pinned-alternatives-and-a-status-the-api-reads-over-http-only.md)).
 5. Never in images, compose files, environment dumps, logs or LLM context.
 
 ## 5. Operations

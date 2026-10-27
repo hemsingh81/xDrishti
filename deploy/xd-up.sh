@@ -27,6 +27,7 @@ done
 export PODMAN_COMPOSE_WARNING_LOGS=false
 KEYCHAIN_ACCOUNT="xdrishti"
 export XD_SECRETS_DIR="${XD_SECRETS_DIR:-$HOME/Library/Application Support/xDrishti/secrets}"
+export XD_MODELS_DIR="${XD_MODELS_DIR:-$HOME/Library/Application Support/xDrishti/models}"   # read-only model files of the optional `ai` profile (xd-llm)
 export XD_HTTP_PORT="${XD_HTTP_PORT:-8080}" XD_SEQ_PORT="${XD_SEQ_PORT:-5341}" XD_DB_PORT="${XD_DB_PORT:-5433}"
 
 say() { printf '\033[1;34m▸\033[0m %s\n' "$*"; }
@@ -129,6 +130,9 @@ write_vault_key() {
   unset value
 }
 write_vault_key
+
+# Key of the local model server (P9-01): xd-llm checks it, xd-api sends it. Created once, never replaced; the server itself is started by the owner (scripts/xd-ai.sh).
+write_secret llm_api_key "xdrishti/llm/api-key"
 
 # Credential-reference files of P1-16 (ADR 0007, replaced by the vault): plain copies of Keychain items that nothing reads any more.
 if [ -e "$XD_SECRETS_DIR/brokers" ] || [ -e "$XD_SECRETS_DIR/brokers.index" ]; then

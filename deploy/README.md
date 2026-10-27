@@ -20,6 +20,7 @@ deploy/xd-down.sh          # stop (data kept);  --purge deletes all data
 | `xd-owner-reset` | On-demand one-shot (profile `tools`): password reset from the secrets | — |
 | `xd-db` | PostgreSQL 18 + TimescaleDB 2.30 | localhost:5433 (dev override) |
 | `xd-seq` | Log viewer (profile `ops`) | http://localhost:5341 |
+| `xd-llm` | Local model server (profile `ai`, P9-01, ADR 0136): never started by `xd-up.sh`; the owner runs `scripts/xd-ai.sh start`. No published port, network `back` only | — |
 
 ## Signing in
 

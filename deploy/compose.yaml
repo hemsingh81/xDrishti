@@ -122,6 +122,10 @@ services:
       Data__Dhan__InitialDays: ${XD_DATA_DHAN_INITIAL_DAYS:-365}
       Data__Dhan__InitialDaysIndex: ${XD_DATA_DHAN_INITIAL_DAYS_INDEX:-1825}
       Data__Dhan__RequestsPerSecond: ${XD_DATA_DHAN_REQUESTS_PER_SECOND:-4}
+      # Local model server (P9-01, ADR 0005, 0136): the API only LOOKS at xd-llm (GET /health, /v1/models, /props), and only while this deployment flag is true. OFF by default; the model server itself is started by the owner
+      # (scripts/xd-ai.sh start) and is not part of the stack. xd-llm is on the internal `back` network: no route out.
+      Assistant__Llm__Enabled: ${XD_ASSISTANT_LLM:-false}
+      Assistant__Llm__BaseUrl: http://xd-llm:8080/v1
     # The 1-minute CSV files (ADR 0016): read-only, the API never writes there. deploy/xd-up.sh creates the folder when it is missing.
     volumes:
       - ${XD_CSV_DIR:-../data/Stocks_CSV}:/data/csv:ro
@@ -131,6 +135,9 @@ services:
       # Key of the encrypted broker vault (accounts.broker_secrets, ADR 0008). Only the API and the live feed (ADR 0024) get it: the API refuses to start without it.
       - source: broker_vault_key
         target: BrokerVault__Key
+      # Key of the local model server (xd-llm checks it; the API sends it). Same file as xd-llm's.
+      - source: llm_api_key
+        target: Assistant__Llm__ApiKey
     # egress: outbound only, to Dhan's consent endpoints (auth.dhan.co; ADR 0008, 0009), the read of the account's holdings (GET api.dhan.co/v2/holdings
     # with the stored access token; ADR 0012) and the two public instrument-master files (images.dhan.co, nsearchives.nseindia.com; ADR 0010).
     # The API's HTTP clients refuse every other endpoint (allow-lists); nothing is published on this network.
@@ -237,6 +244,52 @@ services:
     networks: [front, back]
     mem_limit: 1g
 
+  # The local model server (P9-01, ADR 0005, 0136): llama.cpp, GPU through libkrun (Vulkan "Venus", /dev/dri). Profile `ai` = never part of `xd-up.sh`; the owner starts and stops it with scripts/xd-ai.sh.
+  # No published port and an internal network (no route out); the model files are mounted read-only and are loaded with -m (never -hf, so it never downloads); the only secret is its own API key.
+  # deploy/CLAUDE.md rules for this block are checked by AiComposeRulesTests (part of scripts/check.sh).
+  xd-llm:
+    profiles: [ai]
+    image: quay.io/ramalama/ramalama:0.25.0@sha256:d60dfda3113e127071d2b2679921c763d0eb7a0733596f68bf93a4ef1ca1216e
+    restart: "no"
+    user: "1000:1000"
+    devices: ["/dev/dri:/dev/dri"]
+    # Defaults keep `compose config` valid when the profile is not used; xd-ai.sh exports the real values. A missing file makes the server stop with an error, never answer.
+    command:
+      - llama-server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - -m
+      - /mnt/models/${XD_LLM_MODEL_FILE:-model_missing.gguf}
+      - --alias
+      - ${XD_LLM_ALIAS:-xd-main}
+      - -c
+      - "${XD_LLM_CTX:-16384}"
+      - -ngl
+      - "999"
+      - -np
+      - "1"
+      - --jinja
+      - --no-webui
+    environment:
+      HOME: /tmp
+      LLAMA_ARG_API_KEY_FILE: /run/secrets/llm_api_key
+      # JSON text exported by xd-ai.sh; the default is a valid JSON value because braces break a ":-" default.
+      LLAMA_ARG_CHAT_TEMPLATE_KWARGS: ${XD_LLM_KWARGS:-null}
+    secrets: [llm_api_key]
+    volumes:
+      - ${XD_MODELS_DIR:-../data/models-llm}:/mnt/models:ro
+    networks: [back]
+    mem_limit: 8g # PLACEHOLDER until measured (P9-01 AC 10, UNVERIFIED)
+    healthcheck:
+      test: [CMD, curl, -fsS, "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 150s
+      retries: 12 # 150 s + 12 x 10 s = 270 s, inside the 330 s that scripts/xd-ai.sh waits
+    <<: *hardening
+
 networks:
   front: {}
   back:
@@ -262,3 +315,5 @@ secrets:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/auth_owner_password
   broker_vault_key:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/broker_vault_key
+  llm_api_key:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/llm_api_key

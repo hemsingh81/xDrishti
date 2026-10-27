@@ -4054,6 +4054,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/assistant/llm-status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Whether the local model server is ready, loading, down or misconfigured, with the loaded model file (and its SHA-256 when it is a pinned one), the build and how to start it. Read only; cached a few seconds; no key, path or address in the answer */
+    get: operations['GetLlmStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/plans/{id}/review': {
     parameters: {
       query?: never;
@@ -10212,6 +10229,28 @@ export interface components {
       /** Format: uuid */
       bucketId: null | string;
       holdingIds: null | string[];
+    };
+    /** @description What `GET /api/assistant/llm-status` answers. No key, no path and no address of the server is ever in it. */
+    LlmStatusView: {
+      /** @description ready, loading, down or misconfigured. */
+      state: string;
+      /** @description The alias the server serves (for example xd-main), when it answered. */
+      model: null | string;
+      /** @description Base name of the loaded model file, when the server said. */
+      modelFile: null | string;
+      /** @description SHA-256 of that file when it is one of the pinned files; null for an unknown file. */
+      modelSha256: null | string;
+      /** @description The server's build number text, when it said. */
+      build: null | string;
+      /**
+       * Format: date-time
+       * @description When the answer was taken (cached for a few seconds).
+       */
+      checkedAt: string;
+      /** @description A fixed sentence. */
+      detail: string;
+      /** @description How the owner starts the server. */
+      startCommand: string;
     };
     /** @description Body of `POST /api/auth/login`. */
     LoginRequest: {
@@ -25117,6 +25156,35 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLlmStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LlmStatusView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
         };
       };
     };
