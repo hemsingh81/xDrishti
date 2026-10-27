@@ -28,6 +28,7 @@ internal sealed class AssistantTurnService(
 {
     public const string ToolLimitSentence = "I used all the tool calls I am allowed for one question and could not finish an answer. Ask a narrower question or raise the budget in the settings.";
     private const int ResultsReserveTokens = 3000;
+    private const int SlotLeaseMarginSeconds = 30;
     private const int MaxStoredResultBytes = 64 * 1024;
     private static readonly TimeSpan India = TimeSpan.FromMinutes(330);
 
@@ -99,7 +100,7 @@ internal sealed class AssistantTurnService(
             var history = request.ConversationId is { } id && options.HistoryMessages > 0
                 ? ContextBudget.History(await conversations.RecentAsync(id, options.HistoryMessages, cancellationToken), Math.Min(ContextBudget.HistoryTokenLimit, room))
                 : [];
-            return Result.Success<ITurnSession>(new Session(this, request, settings, llm, tools, system, history, slot));
+            return Result.Success<ITurnSession>(new Session(this, request, settings, llm, tools, system, history, slot, time.CreateTimer(_ => slot.Dispose(), null, TimeSpan.FromSeconds(options.TurnTimeoutSeconds + SlotLeaseMarginSeconds), Timeout.InfiniteTimeSpan)));
         }
         catch
         {
@@ -115,7 +116,7 @@ internal sealed class AssistantTurnService(
     }
 
     private bool IsValid(TurnRequest request) =>
-        !string.IsNullOrWhiteSpace(request.Question) && request.Question.Length <= options.MaxMessageChars && !request.Question.Contains('\0', StringComparison.Ordinal)
+        !string.IsNullOrWhiteSpace(request.Question) && request.Question.Length <= options.MaxMessageChars && !request.Question.Any(c => char.IsControl(c) && c is not ('\n' or '\r' or '\t'))
         && request.Origin is TurnRequest.Chat or TurnRequest.Eval or TurnRequest.Job && !string.IsNullOrWhiteSpace(request.Actor);
 
     private string SystemText()
@@ -132,10 +133,12 @@ internal sealed class AssistantTurnService(
         ToolCatalogSnapshot tools,
         string system,
         IReadOnlyList<ModelMessage> history,
-        IDisposable slot) : ITurnSession
+        IDisposable slot,
+        ITimer lease) : ITurnSession
     {
         public ValueTask DisposeAsync()
         {
+            lease.Dispose();
             slot.Dispose();
             return ValueTask.CompletedTask;
         }
@@ -179,7 +182,6 @@ internal sealed class AssistantTurnService(
             var messages = new List<ModelMessage> { new(ModelRole.System, system) };
             messages.AddRange(history);
             messages.Add(new ModelMessage(ModelRole.User, request.Question));
-            var arguments = new List<string>();
             var resultTexts = new List<string>();
             var iterationText = new StringBuilder();
             var finish = "stop";
@@ -260,7 +262,6 @@ internal sealed class AssistantTurnService(
                         warned |= executed.BudgetRefused;
                         if (executed.Granted)
                         {
-                            arguments.Add(call.ArgumentsJson);
                             resultTexts.Add(executed.ModelText);
                         }
 
@@ -295,7 +296,7 @@ internal sealed class AssistantTurnService(
 
             var grounding = interrupted
                 ? GroundingResult.NotChecked
-                : GroundingCheck.Check(answer, request.Question, arguments, resultTexts);
+                : GroundingCheck.Check(answer, request.Question, resultTexts);
             var wire = new TurnGrounding(grounding.Status.ToCode(), grounding.Checked, grounding.Ungrounded);
             var spans = JsonSerializer.Serialize(grounding.Ungrounded.Select(s => new { start = s.Start, end = s.End, text = s.Text }));
             var messageId = await owner.Conversations.CompleteTurnAsync(

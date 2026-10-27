@@ -272,8 +272,9 @@ internal static class ApiSetup
             o.AddPolicy(SessionAuthentication.PlanDecisionRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = PlanDecisionsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            // The limiter runs before the session is looked at, so a cookie cannot be trusted as a key: a rotating fake cookie would grow the table and dodge the limit. One owner, one address (the proxy's, with the real one in X-Forwarded-For): the key is the address.
             o.AddPolicy(AssistantEndpoints.ChatRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
-                context.Request.Cookies[SessionAuthentication.CookieName] is { Length: > 0 } session ? "session:" + session : "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
+                "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = AssistantChatsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             o.OnRejected = async (context, _) =>
             {

@@ -27,6 +27,8 @@ internal sealed class AssistantRig
 
     public TurnGate Gate { get; } = new();
 
+    public TimeProvider Time { get; set; } = TimeProvider.System;
+
     public int HealthCalls { get; private set; }
 
     public AssistantTurnService Service()
@@ -34,7 +36,7 @@ internal sealed class AssistantRig
         Catalog.State = Tools;
         var settings = new FakeSettings(this);
         var health = new FakeHealth(this);
-        return new AssistantTurnService(settings, health, Catalog, new FakeNightly(this), Store, Model, Gate, Options, TimeProvider.System, NullLogger<AssistantTurnService>.Instance);
+        return new AssistantTurnService(settings, health, Catalog, new FakeNightly(this), Store, Model, Gate, Options, Time, NullLogger<AssistantTurnService>.Instance);
     }
 
     public sealed class FakeSettings(AssistantRig rig) : IAssistantSettingsStore

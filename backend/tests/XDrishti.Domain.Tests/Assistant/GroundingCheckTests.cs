@@ -8,7 +8,7 @@ public sealed class GroundingCheckTests
     private const string Report = """{"ok":true,"tool":"get_report","asOf":"2026-10-27T09:15:00+05:30","rows":[{"expectancy":0.1187,"n":143,"winRate":0.4126,"lost":-0.3,"net":123456.5,"cap":1200000,"profitFactor":1.84,"drawdown":-12.5}],"evidence":{"basis":"gross","n":143,"dateRange":"2025-01-01..2025-12-31"}}""";
 
     private static GroundingResult Check(string answer, string question = "How is ORB15 doing?", string arguments = """{"report":"summary","query":{"runs":"sim-1"}}""", params string[] results) =>
-        GroundingCheck.Check(answer, question, [arguments], results.Length == 0 ? [Report] : results);
+        GroundingCheck.Check(answer, question, results.Length == 0 ? [Report] : results);
 
     [Fact]
     public void A_rounded_answer_with_every_figure_in_the_result_is_grounded()
@@ -50,10 +50,15 @@ public sealed class GroundingCheckTests
     public void A_year_followed_by_a_count_noun_is_a_figure() => NumberTokenizer.Figures("2025 trades").Count.ShouldBe(1);
 
     [Fact]
-    public void A_figure_in_the_question_or_in_an_argument_passes()
+    public void A_figure_in_the_question_passes_but_one_the_model_echoed_in_its_own_tool_arguments_is_flagged()
     {
         Check("You asked about 77 trades.", question: "Why 77 trades?", results: "{}").Status.ShouldBe(GroundingStatus.Grounded);
-        Check("I used 12 runs.", arguments: """{"limit":12}""", results: "{}").Status.ShouldBe(GroundingStatus.Grounded);
+
+        // The arguments of a call are the model's words: 4217 written there and in the answer is still invented.
+        var result = Check("There were 4217 trades.", arguments: """{"limit":4217}""", results: "{}");
+
+        result.Status.ShouldBe(GroundingStatus.Ungrounded);
+        result.Ungrounded.ShouldHaveSingleItem().Text.ShouldBe("4217");
     }
 
     [Fact]
@@ -105,7 +110,7 @@ public sealed class GroundingCheckTests
     [InlineData("1e-3", 0.001, "0.001", true)]
     [InlineData("1e-3", 0.001, "1e-3", true)]
     public void Rounding_boundaries_are_inclusive_and_exponents_parse(string sourceText, double _, string figure, bool grounded) =>
-        GroundingCheck.Check($"It is {figure}.", "q", ["{}"], [$$"""{"v":{{sourceText}}}"""]).Status.ShouldBe(grounded ? GroundingStatus.Grounded : GroundingStatus.Ungrounded);
+        GroundingCheck.Check($"It is {figure}.", "q", [$$"""{"v":{{sourceText}}}"""]).Status.ShouldBe(grounded ? GroundingStatus.Grounded : GroundingStatus.Ungrounded);
 
     [Fact]
     public void A_number_glued_to_text_is_not_a_figure_and_a_negative_zero_is_zero()
@@ -117,7 +122,7 @@ public sealed class GroundingCheckTests
     [Fact]
     public void An_answer_with_no_tool_result_and_a_figure_not_in_the_question_is_ungrounded()
     {
-        var result = GroundingCheck.Check("Expectancy is 0.12R.", "How is it?", [], []);
+        var result = GroundingCheck.Check("Expectancy is 0.12R.", "How is it?", []);
 
         result.Status.ShouldBe(GroundingStatus.Ungrounded);
     }
@@ -171,6 +176,9 @@ public sealed class GroundingCheckTests
         ("Expectancy 0.12R, profit factor 1.8.", "Expectancy 0.32R, profit factor 1.8."),
         ("Net ₹1.23 L over 143 trades.", "Net ₹1.93 L over 143 trades."),
         ("About 41% won.", "About 61% won."),
+        ("n is 143 over 2 runs.", "n is 143 over 7 runs."),
+        ("12 setups won.", "9 setups won."),
+        ("Loss of 0.3R in 143 cells.", "Loss of 0.3R in 8 cells."),
     ];
 
     [Fact]
@@ -182,7 +190,7 @@ public sealed class GroundingCheckTests
             "Net is Rs 1,23,456.50.", "Cap ₹12 L.", "Cap ₹12L.", "Win rate 41 %.", "Expectancy 0.119.", "Profit factor 1.84 over 143 trades.", "Cap 1200000.", "Drawdown 12.5 % over 143 trades.", "Net 123k.", "Net 123.5k.",
             "No figures here at all.", "Between 2025-01-01 and 2025-12-31 on ORB15.",
         ]).ToList();
-        undoctored.Count.ShouldBe(30);
+        undoctored.Count.ShouldBe(33);
 
         foreach (var answer in undoctored)
         {

@@ -23,13 +23,14 @@ public sealed class AssistantApiTests(ApiFactory factory)
     private const string Owner = "owner:" + ApiFactory.OwnerEmail;
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private sealed record Rig(WebApplicationFactory<Program> Host, ScriptedModel Model, ScriptedTools Tools, ScriptedHealth Health);
+    private sealed record Rig(WebApplicationFactory<Program> Host, ScriptedModel Model, ScriptedTools Tools, ScriptedHealth Health, TaskCompletionSource Stored);
 
     private Rig NewRig(Action<IWebHostBuilder>? configure = null)
     {
         var model = new ScriptedModel();
         var tools = new ScriptedTools();
         var health = new ScriptedHealth();
+        var stored = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var host = factory.WithWebHostBuilder(b =>
         {
             b.ConfigureTestServices(services =>
@@ -37,10 +38,11 @@ public sealed class AssistantApiTests(ApiFactory factory)
                 services.RemoveAll<IChatModel>().AddSingleton<IChatModel>(model);
                 services.RemoveAll<IToolCatalog>().AddSingleton<IToolCatalog>(tools);
                 services.RemoveAll<ILlmHealth>().AddSingleton<ILlmHealth>(health);
+                services.RemoveAll<IConversationStore>().AddScoped<IConversationStore>(sp => new SignallingStore(sp.GetRequiredService<XDrishti.Infrastructure.Ai.Assistant.ConversationStore>(), stored));
             });
             configure?.Invoke(b);
         });
-        return new Rig(host, model, tools, health);
+        return new Rig(host, model, tools, health, stored);
     }
 
     private async Task<HttpClient> SignedInAsync(WebApplicationFactory<Program> host)
@@ -199,17 +201,14 @@ public sealed class AssistantApiTests(ApiFactory factory)
         rig.Model.Script(new ModelTextPart("Let me look."), new ModelToolCallPart(new ModelToolCall("c1", "get_report", """{"report":"summary"}""")), new ModelFinishPart("tool_calls", 50, 5));
         rig.Model.Script(new ModelTextPart("Expectancy is 0.12R "), new ModelTextPart("over 143 trades [1], about 46 won."), new ModelFinishPart("stop", 80, 12));
         var client = await SignedInAsync(host);
-        var started = DateTime.UtcNow;
 
         using var response = await PostChatAsync(client, "How is ORB15 doing?");
-        var headersAfter = DateTime.UtcNow - started;
         var frames = await AllFramesAsync(response);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.ShouldBe("text/event-stream");
         response.Headers.CacheControl!.NoStore.ShouldBeTrue();
         response.Content.Headers.ContentEncoding.ShouldBeSubsetOf(["identity"]); // never gzip, br or zstd: a compressor would hold the stream back
-        headersAfter.ShouldBeLessThan(TimeSpan.FromSeconds(5));
         frames.Select(f => f.Event).ShouldBe(["turn", "status", "token", "iteration_discard", "tool_call", "tool_result", "status", "token", "token", "done"]);
         var turn = frames[0].Data;
         turn.GetProperty("promptHash").GetString()!.Length.ShouldBe(64);
@@ -271,25 +270,34 @@ public sealed class AssistantApiTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task The_stream_sends_a_ping_while_the_model_is_silent()
+    public async Task The_stream_sends_a_ping_while_the_model_is_silent_and_goes_on_when_the_model_answers()
     {
         await ResetAsync();
         await SwitchOnAsync();
         var rig = NewRig(b => b.UseSetting("Assistant:Turn:PingSeconds", "1"));
         using var host = rig.Host;
-        rig.Model.Script(Slow);
+        var release = new TaskCompletionSource();
+        rig.Model.Script(token => Silent(release.Task, token));
         var client = await SignedInAsync(host);
 
         using var response = await PostChatAsync(client, "slow one");
-        var frames = await AllFramesAsync(response);
+        var names = new List<string>();
+        await foreach (var frame in FramesAsync(response))
+        {
+            names.Add(frame.Event);
+            if (frame.Event == "ping")
+            {
+                release.TrySetResult(); // the model stays silent until the stream has shown a ping
+            }
+        }
 
-        frames.Count(f => f.Event == "ping").ShouldBeGreaterThanOrEqualTo(1);
-        frames.Select(f => f.Event).Where(e => e != "ping").ShouldBe(["turn", "status", "token", "done"]);
+        names.ShouldContain("ping");
+        names.Where(e => e != "ping").ShouldBe(["turn", "status", "token", "done"]);
         return;
 
-        static async IAsyncEnumerable<ModelStreamPart> Slow([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken token)
+        static async IAsyncEnumerable<ModelStreamPart> Silent(Task gate, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken token)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(2600), token);
+            await gate.WaitAsync(token);
             yield return new ModelTextPart("Done.");
             yield return new ModelFinishPart("stop", 1, 1);
         }
@@ -321,14 +329,8 @@ public sealed class AssistantApiTests(ApiFactory factory)
             await cancel.CancelAsync();
         }
 
-        long stored = 0;
-        for (var i = 0; i < 100 && stored == 0; i++)
-        {
-            await Task.Delay(100, Ct);
-            stored = await CountAsync("ai.messages", "role = 'assistant' AND finish_reason = 'cancelled' AND grounding_status = 'not_checked' AND content LIKE 'partial%'");
-        }
-
-        stored.ShouldBe(1);
+        await rig.Stored.Task.WaitAsync(Ct); // the turn has inserted its assistant message
+        (await CountAsync("ai.messages", "role = 'assistant' AND finish_reason = 'cancelled' AND grounding_status = 'not_checked' AND content LIKE 'partial%'")).ShouldBe(1);
         using var next = await PostChatAsync(client, "again");
         next.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await AllFramesAsync(next)).Last().Event.ShouldBe("done");
@@ -603,5 +605,24 @@ public sealed class AssistantApiTests(ApiFactory factory)
         chat.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
         (await CodeAsync(chat)).ShouldBe("assistant.model_unavailable");
         (await AuditRowsAsync()).ShouldBe(0);
+    }
+}
+
+/// <summary>The real store, telling a test when an assistant message has been inserted (so that it need not wait on a clock).</summary>
+internal sealed class SignallingStore(IConversationStore inner, TaskCompletionSource stored) : IConversationStore
+{
+    public ValueTask<bool> ExistsAsync(Guid conversationId, CancellationToken cancellationToken) => inner.ExistsAsync(conversationId, cancellationToken);
+
+    public ValueTask<IReadOnlyList<HistoryMessage>> RecentAsync(Guid conversationId, int count, CancellationToken cancellationToken) => inner.RecentAsync(conversationId, count, cancellationToken);
+
+    public ValueTask<StartedTurn> StartTurnAsync(StartTurnRecord record, CancellationToken cancellationToken) => inner.StartTurnAsync(record, cancellationToken);
+
+    public ValueTask<long> RecordToolCallAsync(ToolCallRecord record, CancellationToken cancellationToken) => inner.RecordToolCallAsync(record, cancellationToken);
+
+    public async ValueTask<long> CompleteTurnAsync(AssistantMessageRecord record, CancellationToken cancellationToken)
+    {
+        var id = await inner.CompleteTurnAsync(record, cancellationToken);
+        stored.TrySetResult();
+        return id;
     }
 }

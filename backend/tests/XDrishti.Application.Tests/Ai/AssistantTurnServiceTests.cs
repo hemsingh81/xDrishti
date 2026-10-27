@@ -96,6 +96,8 @@ public sealed class AssistantTurnServiceTests
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("has a nul \0 inside")]
+    [InlineData("bell \u0007 inside")]
+    [InlineData("escape \u001b[31m")]
     public async Task An_empty_or_control_message_is_invalid(string question)
     {
         var rig = new AssistantRig();
@@ -104,6 +106,32 @@ public sealed class AssistantTurnServiceTests
 
         result.Error.Code.ShouldBe("assistant.invalid");
         NothingTouched(rig);
+    }
+
+    [Fact]
+    public async Task Newlines_and_tabs_are_allowed_in_a_message()
+    {
+        var rig = new AssistantRig();
+        rig.Model.Script(new ModelTextPart("ok"), Done());
+
+        (await RunAsync(rig, Ask("two lines\n\twith a tab\r\n"))).Result.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_session_that_is_never_run_or_disposed_gives_the_slot_back_after_the_turn_timeout_and_a_margin()
+    {
+        var rig = new AssistantRig();
+        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        rig.Time = clock;
+        var service = rig.Service();
+        var begun = await service.BeginAsync(Ask(), Ct);
+
+        begun.IsSuccess.ShouldBeTrue();
+        clock.Advance(TimeSpan.FromSeconds(rig.Options.TurnTimeoutSeconds));
+        rig.Gate.Busy.ShouldBeTrue();
+        clock.Advance(TimeSpan.FromSeconds(31));
+        rig.Gate.Busy.ShouldBeFalse();
+        (await service.BeginAsync(Ask(), Ct)).IsSuccess.ShouldBeTrue();
     }
 
     [Fact]
