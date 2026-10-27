@@ -25,5 +25,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="XDrishti.Infrastructure.Tests" />
     <InternalsVisibleTo Include="XDrishti.Api.IntegrationTests" />
+    <InternalsVisibleTo Include="XDrishti.Mcp.Tests" />
   </ItemGroup>
 </Project>

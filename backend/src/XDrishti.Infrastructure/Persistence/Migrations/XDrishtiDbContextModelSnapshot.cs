@@ -17,7 +17,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -5881,6 +5881,57 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("skips", "paper", t =>
                         {
                             t.HasCheckConstraint("ck_skips_shape", "code IN ('not_triggered', 'not_gradable', 'dropped_by_sizing', 'legs_not_supported', 'entered_before_armed', 'modification_unreadable', 'approval_missing') AND length(btrim(detail)) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiSettingRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<string>("ChangedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("changed_by");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<int>("MaxToolCalls")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_tool_calls");
+
+                    b.Property<bool>("PortfolioContext")
+                        .HasColumnType("boolean")
+                        .HasColumnName("portfolio_context");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("SnapshotHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("snapshot_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_settings");
+
+                    b.ToTable("settings", "ai", t =>
+                        {
+                            t.HasCheckConstraint("ck_ai_settings_shape", "max_tool_calls >= 1 AND max_tool_calls <= 12 AND changed_by LIKE 'owner:%' AND length(btrim(changed_by)) > 6 AND length(btrim(reason)) >= 1 AND length(reason) <= 500");
                         });
                 });
 

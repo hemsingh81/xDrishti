@@ -42,7 +42,7 @@ flowchart TB
     API -->|load models| VOL
     API -->|chat| LLM
     LLM -. tool calls via API .-> MCP
-    MCP -->|read-only role| DB
+    MCP -->|two read-only roles · aiv views only| DB
     WORKER -->|REST · EOD & history| BROKERS
     INBOX --> WORKER
     FEED -->|WebSocket · active set| BROKERS
@@ -480,6 +480,6 @@ SignalR → results in `lab` schema → report page. Details: [11-strategy-lab.m
   records the configuring actor for audit.
 - Secrets per container via Podman secrets; only `xd-worker`/`xd-feed` (data/account tokens) and later
   `xd-exec` (order tokens) receive broker secrets.
-- `xd-mcp` and the LLM use a **read-only database role**; no tool can change config, plans or orders.
+- `xd-mcp` uses two **read-only database roles** (`xd_mcp_sql` for ad-hoc queries, `xd_mcp_read` for typed tools; [ADR 0137](../adr/0137-the-assistants-tools-run-in-a-separate-read-only-server-under-two-database-roles-that-can-select-only-from-reviewed-views-and-the-switch-lives-in-the-database.md)): `SELECT` on the reviewed `aiv` views only (no base table, no secret, no account id, no session), a read-only transaction, a statement timeout and a row cap; the model server holds no database login at all. No tool can change config, plans or orders.
 - `xd-sandbox` has no network and a read-only data mount.
 - Audit log for config activations, promotions, approvals and (later) orders.

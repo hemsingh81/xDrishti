@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Tests of the read-only tool server (spec P9-02). Its own project: the host's entry point type is internal here, so it never meets the API's Program in the integration tests. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\XDrishti.Mcp\XDrishti.Mcp.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
+  <Import Project="..\Tests.props" />
+</Project>

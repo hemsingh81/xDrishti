@@ -67,6 +67,7 @@ if (verb == Verb.Migrate)
 {
     await DatabaseMigrator.MigrateAsync(app.Services);
     await StrategySeeding.SeedAsync(app.Services); // the built-in strategies as stored text (spec P3-02d); idempotent
+    await PostMigration.ProvisionReadOnlyRolesAsync(app.Services); // the assistant's read-only roles get a login when both password files exist (spec P9-02); idempotent, otherwise they stay NOLOGIN
     return await OwnerBootstrap.ProvisionAsync(app.Services);
 }
 

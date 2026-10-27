@@ -58,6 +58,11 @@ services:
         target: Auth__Owner__Name
       - source: auth_owner_password
         target: Auth__Owner__Password
+      # The passwords of the assistant's two read-only logins (P9-02, ADR 0137): migrate gives the roles xd_mcp_read and xd_mcp_sql their login from these files; absent or empty = the roles stay NOLOGIN.
+      - source: db_mcp_read_password
+        target: AiRoles__ReadPassword
+      - source: db_mcp_sql_password
+        target: AiRoles__SqlPassword
     networks: [back]
     pull_policy: never # uses the image built for xd-api (compose builds all images before starting)
     depends_on:
@@ -126,6 +131,8 @@ services:
       # (scripts/xd-ai.sh start) and is not part of the stack. xd-llm is on the internal `back` network: no route out.
       Assistant__Llm__Enabled: ${XD_ASSISTANT_LLM:-false}
       Assistant__Llm__BaseUrl: http://xd-llm:8080/v1
+      # The read-only tool server (P9-02, ADR 0137): where the chat endpoint of P9-03 will reach it. Nothing reads these two settings yet.
+      Assistant__Mcp__Url: http://xd-mcp:8080/mcp
     # The 1-minute CSV files (ADR 0016): read-only, the API never writes there. deploy/xd-up.sh creates the folder when it is missing.
     volumes:
       - ${XD_CSV_DIR:-../data/Stocks_CSV}:/data/csv:ro
@@ -138,6 +145,9 @@ services:
       # Key of the local model server (xd-llm checks it; the API sends it). Same file as xd-llm's.
       - source: llm_api_key
         target: Assistant__Llm__ApiKey
+      # Bearer token for the tool server (xd-mcp checks it; the API will send it from P9-03). Same file as xd-mcp's.
+      - source: mcp_token
+        target: Assistant__Mcp__Token
     # egress: outbound only, to Dhan's consent endpoints (auth.dhan.co; ADR 0008, 0009), the read of the account's holdings (GET api.dhan.co/v2/holdings
     # with the stored access token; ADR 0012) and the two public instrument-master files (images.dhan.co, nsearchives.nseindia.com; ADR 0010).
     # The API's HTTP clients refuse every other endpoint (allow-lists); nothing is published on this network.
@@ -290,6 +300,43 @@ services:
       retries: 12 # 150 s + 12 x 10 s = 270 s, inside the 330 s that scripts/xd-ai.sh waits
     <<: *hardening
 
+  # The assistant's read-only tool server (P9-02, ADR 0137): four read tools over MCP (Streamable HTTP, stateless, bearer token). Profile `ai` = never part of `xd-up.sh`; the owner starts it with scripts/xd-ai.sh. It logs in as the roles xd_mcp_read and
+  # xd_mcp_sql, which can SELECT from the reviewed views of schema `aiv` and nothing else; it holds none of the application's credentials. No published port, internal network only; the only secrets are its two passwords and its token.
+  # deploy/CLAUDE.md rules for this block are checked by McpComposeRulesTests (part of scripts/check.sh).
+  xd-mcp:
+    profiles: [ai]
+    image: localhost/xdrishti/mcp:${XD_VERSION:-0.1.0}
+    build:
+      context: ../backend
+      target: mcp
+      args: { VERSION: "${XD_VERSION:-0.1.0}" }
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Production
+      Database__ReadConnectionString: Host=xd-db;Port=5432;Database=xdrishti;Username=xd_mcp_read
+      Database__SqlConnectionString: Host=xd-db;Port=5432;Database=xdrishti;Username=xd_mcp_sql
+      Serilog__WriteTo__1__Name: Seq
+      Serilog__WriteTo__1__Args__serverUrl: http://xd-seq:5341
+    secrets:
+      - source: db_mcp_read_password
+        target: Database__ReadPassword
+      - source: db_mcp_sql_password
+        target: Database__SqlPassword
+      - source: mcp_token
+        target: Mcp__Tokens__Api
+    networks: [back]
+    mem_limit: 512m
+    depends_on:
+      xd-migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: [CMD, dotnet, XDrishti.Mcp.dll, --healthcheck]
+      interval: 15s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+    <<: *hardening
+
 networks:
   front: {}
   back:
@@ -317,3 +364,9 @@ secrets:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/broker_vault_key
   llm_api_key:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/llm_api_key
+  db_mcp_read_password:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/db_mcp_read_password
+  db_mcp_sql_password:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/db_mcp_sql_password
+  mcp_token:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/mcp_token

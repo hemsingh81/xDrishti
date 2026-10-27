@@ -50,7 +50,7 @@ internal static partial class AiComposeRules
         return found;
     }
 
-    private static bool EnvironmentLooksSecret(Dictionary<string, object> service)
+    internal static bool EnvironmentLooksSecret(Dictionary<string, object> service)
     {
         // Only file paths and settings are allowed in the environment: a key, token or password by name, or a long random-looking value, is a secret in the wrong place.
         foreach (var (name, value) in Map(service, "environment"))
@@ -69,22 +69,22 @@ internal static partial class AiComposeRules
     [GeneratedRegex("^[A-Za-z0-9+=_-]{24,}$")]
     private static partial Regex RandomLooking();
 
-    private static Dictionary<string, object> Parse(string text)
+    internal static Dictionary<string, object> Parse(string text)
     {
         using var reader = new StringReader(text);
         var parsed = new DeserializerBuilder().Build().Deserialize<Dictionary<object, object>>(new MergingParser(new Parser(reader)));
         return Convert(parsed);
     }
 
-    private static Dictionary<string, object> Convert(Dictionary<object, object> source) =>
+    internal static Dictionary<string, object> Convert(Dictionary<object, object> source) =>
         source.ToDictionary(p => p.Key.ToString()!, p => p.Value is Dictionary<object, object> d ? (object)Convert(d) : p.Value, StringComparer.Ordinal);
 
-    private static Dictionary<string, object> Map(Dictionary<string, object> parent, string key) => parent.TryGetValue(key, out var v) && v is Dictionary<string, object> d ? d : [];
+    internal static Dictionary<string, object> Map(Dictionary<string, object> parent, string key) => parent.TryGetValue(key, out var v) && v is Dictionary<string, object> d ? d : [];
 
-    private static string Text(Dictionary<string, object> parent, string key) => parent.TryGetValue(key, out var v) ? v?.ToString() ?? string.Empty : string.Empty;
+    internal static string Text(Dictionary<string, object> parent, string key) => parent.TryGetValue(key, out var v) ? v?.ToString() ?? string.Empty : string.Empty;
 
-    private static List<string> List(Dictionary<string, object> parent, string key) => parent.TryGetValue(key, out var v) && v is List<object> l ? [.. l.Select(x => x?.ToString() ?? string.Empty)] : [];
+    internal static List<string> List(Dictionary<string, object> parent, string key) => parent.TryGetValue(key, out var v) && v is List<object> l ? [.. l.Select(x => x?.ToString() ?? string.Empty)] : [];
 
-    private static List<string> NetworkNames(Dictionary<string, object> service) =>
+    internal static List<string> NetworkNames(Dictionary<string, object> service) =>
         service.TryGetValue("networks", out var v) ? v switch { List<object> l => [.. l.Select(x => x.ToString()!)], Dictionary<string, object> d => [.. d.Keys], _ => [] } : [];
 }

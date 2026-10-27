@@ -27,4 +27,7 @@ public static class Schemas
 
     /// <summary>The paper record (spec P10-01, ADR 0116): epochs, entries, exits, skips and capture runs, all insert-only for the runtime role.</summary>
     public const string Paper = "paper";
+
+    /// <summary>The assistant's switches (spec P9-02, ADR 0137): <c>settings</c>, insert-only for the runtime role. The views the model reads are in schema <c>aiv</c>, which no EF entity maps.</summary>
+    public const string Ai = "ai";
 }

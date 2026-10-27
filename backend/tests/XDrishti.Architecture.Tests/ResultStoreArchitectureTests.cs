@@ -109,7 +109,8 @@ public sealed partial class ResultStoreArchitectureTests
     public void No_module_outside_the_research_adapter_the_mapping_and_the_migrations_names_the_research_tables()
     {
         var users = SourceFiles()
-            .Where(f => NamesTheTables().IsMatch(Code(f)) && !Relative(f).StartsWith("XDrishti.Infrastructure/Research/", StringComparison.Ordinal) && !Relative(f).StartsWith("XDrishti.Infrastructure/Persistence/", StringComparison.Ordinal))
+            .Where(f => NamesTheTables().IsMatch(Code(f)) && !Relative(f).StartsWith("XDrishti.Infrastructure/Research/", StringComparison.Ordinal) && !Relative(f).StartsWith("XDrishti.Infrastructure/Persistence/", StringComparison.Ordinal)
+                && Relative(f) != "XDrishti.Domain/Assistant/ManifestViews.cs") // the manifest of the read-only views (P9-02): views of schema aiv that carry the names of the tables they project, never the tables
             .Select(Relative)
             .ToList();
 

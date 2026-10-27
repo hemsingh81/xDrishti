@@ -205,6 +205,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<FillGradeRecord> FillGrades => Set<FillGradeRecord>();
     internal DbSet<AutonomySettingRecord> AutonomySettings => Set<AutonomySettingRecord>();
 
+    internal DbSet<AiSettingRecord> AiSettings => Set<AiSettingRecord>();
+
     internal DbSet<ContextDailyRecord> ContextDaily => Set<ContextDailyRecord>();
 
     internal DbSet<ChargeSheetEventRecord> ChargeSheetEvents => Set<ChargeSheetEventRecord>();

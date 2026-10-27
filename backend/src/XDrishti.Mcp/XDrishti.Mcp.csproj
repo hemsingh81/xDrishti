@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- The read-only tool server (xd-mcp, spec P9-02, ADR 0137): four read tools over MCP (Streamable HTTP, stateless, bearer token) under database roles that cannot write.
+       Thin: the host, the token and rate checks and the tool runner. It references no command handler, no DbContext and no store outside Infrastructure/Ai/ReadOnly (architecture test). -->
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.Infrastructure\XDrishti.Infrastructure.csproj" />
+    <ProjectReference Include="..\XDrishti.Hosting\XDrishti.Hosting.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="XDrishti.Mcp.Tests" />
+  </ItemGroup>
+</Project>

@@ -134,6 +134,12 @@ write_vault_key
 # Key of the local model server (P9-01): xd-llm checks it, xd-api sends it. Created once, never replaced; the server itself is started by the owner (scripts/xd-ai.sh).
 write_secret llm_api_key "xdrishti/llm/api-key"
 
+# The assistant's tool server (P9-02, ADR 0137): the passwords of its two read-only database logins and its bearer token. Created once, never replaced. xd-migrate sets the logins from the two password files; xd-mcp (profile ai, started by
+# scripts/xd-ai.sh) and the API (token only) read them. To rotate one: change the Keychain item, run this script (migrate sets the password again) and restart xd-mcp.
+write_secret db_mcp_read_password "xdrishti/db/mcp-read"
+write_secret db_mcp_sql_password "xdrishti/db/mcp-sql"
+write_secret mcp_token "xdrishti/mcp/token"
+
 # Credential-reference files of P1-16 (ADR 0007, replaced by the vault): plain copies of Keychain items that nothing reads any more.
 if [ -e "$XD_SECRETS_DIR/brokers" ] || [ -e "$XD_SECRETS_DIR/brokers.index" ]; then
   rm -rf "$XD_SECRETS_DIR/brokers" "$XD_SECRETS_DIR/brokers.index"
@@ -145,7 +151,7 @@ files=(-f compose.yaml); [ "$DEV" = 1 ] && files+=(-f compose.dev.yaml)
 if [ "$BUILD" = 1 ]; then
   # One image at a time: the api and worker images share the .NET build stage, built once and reused from cache.
   say "Building images (first run takes a few minutes)…"
-  podman compose "${files[@]}" --profile ops --parallel 1 build
+  podman compose "${files[@]}" --profile ops --profile ai --parallel 1 build   # the profile ai only for its image: xd-mcp is built here, started by scripts/xd-ai.sh
 fi
 say "Starting containers and waiting until healthy…"
 podman compose "${files[@]}" --profile ops up -d --wait --wait-timeout 300

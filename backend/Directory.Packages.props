@@ -17,6 +17,9 @@
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.11.0" />
     <PackageVersion Include="OpenAI" Version="2.14.0" />
   </ItemGroup>
+  <ItemGroup Label="Read-only tool server (P9-02, ADR 0137)">
+    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
+  </ItemGroup>
   <ItemGroup Label="Spreadsheets (P2-17)">
     <PackageVersion Include="ExcelDataReader" Version="3.7.0" />
   </ItemGroup>

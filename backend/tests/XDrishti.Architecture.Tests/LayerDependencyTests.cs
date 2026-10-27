@@ -17,18 +17,18 @@ public sealed class LayerDependencyTests
     [Fact]
     public void Domain_depends_on_nothing_else() =>
         AssertNoDependency(Domain,
-            "XDrishti.Application", "XDrishti.Infrastructure", "XDrishti.Hosting", "XDrishti.Api", "XDrishti.Worker", "XDrishti.Feed",
+            "XDrishti.Application", "XDrishti.Infrastructure", "XDrishti.Hosting", "XDrishti.Api", "XDrishti.Worker", "XDrishti.Feed", "XDrishti.Mcp",
             "Microsoft.EntityFrameworkCore", "Npgsql", "Microsoft.AspNetCore", "Microsoft.Extensions", "Serilog");
 
     [Fact]
     public void Application_does_not_depend_on_infrastructure_or_frameworks() =>
         AssertNoDependency(Application,
-            "XDrishti.Infrastructure", "XDrishti.Hosting", "XDrishti.Api", "XDrishti.Worker", "XDrishti.Feed",
+            "XDrishti.Infrastructure", "XDrishti.Hosting", "XDrishti.Api", "XDrishti.Worker", "XDrishti.Feed", "XDrishti.Mcp",
             "Microsoft.EntityFrameworkCore", "Npgsql", "Microsoft.AspNetCore", "Serilog");
 
     [Fact]
     public void Infrastructure_does_not_depend_on_hosts() =>
-        AssertNoDependency(Infrastructure, "XDrishti.Hosting", "XDrishti.Api", "XDrishti.Worker", "XDrishti.Feed", "Microsoft.AspNetCore");
+        AssertNoDependency(Infrastructure, "XDrishti.Hosting", "XDrishti.Api", "XDrishti.Worker", "XDrishti.Feed", "XDrishti.Mcp", "Microsoft.AspNetCore");
 
     [Fact]
     public void Use_case_handlers_are_sealed_and_not_public()

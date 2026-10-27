@@ -30,10 +30,13 @@ Model choice is config; select by our eval set, not leaderboards.
 ## 3. Integration (.NET)
 
 - `xd-api` assistant endpoint uses **Microsoft.Extensions.AI** with tool calling; streams to React.
-- Tools are served by **`xd-mcp`** (ModelContextProtocol C# SDK) over a **read-only DB role**:
-  `list_tables`, `describe_table`, `run_sql(read_only, row limit)`, `get_report(type, filters)`,
-  `get_plan(date, account)`, `get_cell(key)`, `get_portfolio(group_by, as_of)`, `get_basket(name)`,
-  `make_chart(spec)`, `lab_validate(yaml)`, `lab_run(yaml)`.
+- Tools are served by **`xd-mcp`** (ModelContextProtocol C# SDK 2.3.0, Streamable HTTP, stateless, a bearer token per client,
+  [ADR 0137](../adr/0137-the-assistants-tools-run-in-a-separate-read-only-server-under-two-database-roles-that-can-select-only-from-reviewed-views-and-the-switch-lives-in-the-database.md)) under **two read-only DB roles** (`xd_mcp_sql` for `run_sql`, `xd_mcp_read` for the typed tools),
+  each able to `SELECT` only from the reviewed views of schema `aiv` (35 views; the portfolio ones are empty until the owner turns the
+  portfolio context on, in the database itself). **Built (P9-02):** `list_tables`, `describe_table`, `run_sql(sql, maxRows)` over
+  `aiv` (one SELECT, 200 rows, 5 s, labelled "ad-hoc query, not checked by the report engine"), `lab_validate(yaml)` (stores nothing).
+  **Later (P9-05):** `get_report(type, filters)`, `get_plan(date, account)`, `get_cell(key)`, `get_portfolio(group_by, as_of)`,
+  `get_basket(name)`, `make_chart(spec)`. `lab_run` is dropped (P9-00 D9): a run is proposed, never started by the model.
 - Guardrails: numbers only from tool results; no write tools except `lab_run`; no promotion; no config
   changes (only proposed diffs you apply in the Config screen); prompts and tool calls logged in `ai.*`;
   broker secrets never in context. If the LLM is down, the nightly plan is unaffected.

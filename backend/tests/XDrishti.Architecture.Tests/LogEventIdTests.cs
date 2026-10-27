@@ -9,7 +9,7 @@ namespace XDrishti.Architecture.Tests;
 /// </summary>
 public sealed class LogEventIdTests
 {
-    private static readonly string[] Shipped = ["XDrishti.Domain", "XDrishti.Application", "XDrishti.Infrastructure", "XDrishti.Hosting", "XDrishti.Api", "XDrishti.Worker", "XDrishti.Feed"];
+    private static readonly string[] Shipped = ["XDrishti.Domain", "XDrishti.Application", "XDrishti.Infrastructure", "XDrishti.Hosting", "XDrishti.Api", "XDrishti.Worker", "XDrishti.Feed", "XDrishti.Mcp"];
 
     private static List<(int Id, string Method)> EventIds() =>
         [.. Shipped

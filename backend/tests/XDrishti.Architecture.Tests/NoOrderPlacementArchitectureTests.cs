@@ -13,7 +13,7 @@ public sealed class NoOrderPlacementArchitectureTests
 {
     private static readonly string[] Forbidden = ["placeorder", "submitorder", "modifyorder", "cancelorder", "placetrade", "submittrade", "canceltrade", "orderrequest", "neworder"];
 
-    private static readonly string[] Shipped = ["XDrishti.Domain", "XDrishti.Application", "XDrishti.Infrastructure", "XDrishti.Hosting", "XDrishti.Api", "XDrishti.Worker", "XDrishti.Feed"];
+    private static readonly string[] Shipped = ["XDrishti.Domain", "XDrishti.Application", "XDrishti.Infrastructure", "XDrishti.Hosting", "XDrishti.Api", "XDrishti.Worker", "XDrishti.Feed", "XDrishti.Mcp"];
 
     private const BindingFlags AllMembers = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
 
