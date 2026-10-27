@@ -87,7 +87,7 @@ backtest / Strategy Lab / nightly scan / grading. Modules can be split into serv
         VOL[(&quot;models volume&lt;br/&gt;ML.NET models · LLM weights&quot;)]
         SEQ[&quot;xd-seq · Seq&lt;br/&gt;logs&quot;]
         BAK[&quot;xd-backup · restic&quot;]
-        FEED[&quot;xd-feed · .NET&lt;br/&gt;live feed for active set&lt;br/&gt;(later: depth recorder)&quot;]
+        FEED[&quot;xd-feed · .NET&lt;br/&gt;live feed for active set&lt;br/&gt;+ depth recorder (P7-16, off)&quot;]
         EXEC[&quot;xd-exec · .NET (later)&lt;br/&gt;orders · kill switch&quot;]
     end
 
@@ -103,7 +103,7 @@ backtest / Strategy Lab / nightly scan / grading. Modules can be split into serv
     API --&gt;|load models| VOL
     API --&gt;|chat| LLM
     LLM -. tool calls via API .-&gt; MCP
-    MCP --&gt;|read-only role| DB
+    MCP --&gt;|two read-only roles · aiv views only| DB
     WORKER --&gt;|REST · EOD &amp; history| BROKERS
     INBOX --&gt; WORKER
     FEED --&gt;|WebSocket · active set| BROKERS
@@ -561,7 +561,7 @@ walk-forward learning, the nightly scanner and the outcome grader.</p>
 │   │   ├── XDrishti.Worker/         # host: Hangfire server, scheduled services
 │   │   ├── XDrishti.Mcp/            # host: MCP read-only tool server
 │   │   ├── XDrishti.Cli/            # `xd` command-line tool
-│   │   ├── XDrishti.Feed/           # host: market-hours live feed for the active set (later: depth recorder)
+│   │   ├── XDrishti.Feed/           # host: market-hours live feed for the active set and the depth recorder (P7-16, off by default)
 │   │   └── XDrishti.Execution/      # host (later): order service
 │   └── tests/                       # Domain/Application unit, Architecture (layer rules), Api.IntegrationTests (Testcontainers)
 ├── frontend/                        # React 19 + TypeScript + Vite + MUI; Dockerfile builds xd-proxy (Caddy + app)
@@ -792,7 +792,7 @@ returns every indicator to its first state. <strong>The per-session rule (<a hre
 </thead>
 <tbody><tr>
 <td><code>market</code></td>
-<td><code>instruments</code>, <code>instrument_broker_ids</code>, <code>master_refreshes</code>, <code>bars_1m</code> (hypertable, source csv/dhan), <code>bars_1m_live</code>, <code>bars_1d</code>, continuous aggregates <code>bars_5m…bars_1h</code>, <code>context_daily</code>, <code>calendar</code>, <code>corporate_actions</code>, (later) <code>ticks</code>, <code>depth</code></td>
+<td><code>instruments</code>, <code>instrument_broker_ids</code>, <code>master_refreshes</code>, <code>bars_1m</code> (hypertable, source csv/dhan), <code>bars_1m_live</code>, <code>bars_1d</code>, continuous aggregates <code>bars_5m…bars_1h</code>, <code>context_daily</code>, <code>calendar</code>, <code>corporate_actions</code>, <code>depth_snapshots</code> (hypertable, 20-level book, P7-16, <a href="../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.html">ADR 0135</a>), <code>depth_session_instruments</code>, <code>depth_sessions</code>, <code>depth_recorder_switch</code> (all insert-only), (later) <code>ticks</code></td>
 </tr>
 <tr>
 <td><code>catalog</code></td>
@@ -936,7 +936,7 @@ returns every indicator to its first state. <strong>The per-session rule (<a hre
 </tr>
 <tr>
 <td>Assistant</td>
-<td><code>POST /api/assistant/chat</code> (streaming)</td>
+<td><code>POST /api/assistant/chat</code> (streaming, <code>text/event-stream</code>; the refusals are problems before the stream) · <code>GET /api/assistant/status</code> · <code>PUT /api/assistant/settings</code> (owner act; fresh password only to turn on or raise) · <code>GET /api/assistant/conversations</code> · <code>GET /api/assistant/conversations/{id}</code> · <code>GET /api/assistant/tool-calls/{id}</code> · <code>GET /api/assistant/llm-status</code> (<a href="../adr/0138-the-assistant-endpoint-runs-the-tool-loop-in-the-application-streams-events-marks-figures-not-found-in-the-tool-results-and-stores-every-turn-insert-only.html">ADR 0138</a>)</td>
 </tr>
 <tr>
 <td>Real-time</td>
@@ -1012,7 +1012,7 @@ for sensitive actions; HTTPS via Caddy on LAN; optional WireGuard for remote acc
 records the configuring actor for audit.</li>
 <li>Secrets per container via Podman secrets; only <code>xd-worker</code>/<code>xd-feed</code> (data/account tokens) and later
 <code>xd-exec</code> (order tokens) receive broker secrets.</li>
-<li><code>xd-mcp</code> and the LLM use a <strong>read-only database role</strong>; no tool can change config, plans or orders.</li>
+<li><code>xd-mcp</code> uses two <strong>read-only database roles</strong> (<code>xd_mcp_sql</code> for ad-hoc queries, <code>xd_mcp_read</code> for typed tools; <a href="../adr/0137-the-assistants-tools-run-in-a-separate-read-only-server-under-two-database-roles-that-can-select-only-from-reviewed-views-and-the-switch-lives-in-the-database.html">ADR 0137</a>): <code>SELECT</code> on the reviewed <code>aiv</code> views only (no base table, no secret, no account id, no session), a read-only transaction, a statement timeout and a row cap; the model server holds no database login at all. No tool can change config, plans or orders.</li>
 <li><code>xd-sandbox</code> has no network and a read-only data mount.</li>
 <li>Audit log for config activations, promotions, approvals and (later) orders.</li>
 </ul>
@@ -1022,7 +1022,7 @@ records the configuring actor for audit.</li>
     <a class="prev" href="02-requirements.html"><small>← Previous  [</small>02 · Requirements</a>
     <a class="next" href="04-accounts-access-and-operations.html"><small>Next  ] →</small>04 · Accounts, access &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-26 20:03</footer>
+  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-27 03:12</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-architecture-at-a-glance" class="d2">1. Architecture at a glance</a>
 <a href="#2-technology-decisions" class="d2">2. Technology decisions</a>

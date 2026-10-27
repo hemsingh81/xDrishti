@@ -64,6 +64,9 @@ public interface IDraftStore
     /// <summary>How many drafts were made between the two instants.</summary>
     ValueTask<int> CountBetweenAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken);
 
+    /// <summary>How many auto decisions (<c>auto = true</c>) were made between the two instants, counted from the decision rows.</summary>
+    ValueTask<int> CountAutoBetweenAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken);
+
     /// <summary>Takes the one lock that serialises every confirm (check, create, start, decision); released when disposed. Two confirms of one draft, or of two drafts with one strategy id, therefore cannot both create or start.</summary>
     ValueTask<IAsyncDisposable> LockConfirmAsync(CancellationToken cancellationToken);
 

@@ -5,12 +5,15 @@ using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Ai;
 using XDrishti.Application.Ai.Drafting;
 using XDrishti.Application.Lab;
+using XDrishti.Application.Market.Baskets;
 using XDrishti.Domain.Assistant;
+using XDrishti.Domain.Assistant.Drafting;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
@@ -28,7 +31,7 @@ internal sealed class DraftRig
 
     public const string Tree = """{"id":"DRAFT_X","params":{"rr":"2"},"exits":[{"policy":"FIXED_RR","rr":"2"}]}""";
 
-    public AssistantSettings Settings { get; set; } = new(1, true, false, 6, AllowDraftConfirm: true);
+    public AssistantSettings Settings { get; set; } = new(1, true, false, 6, AllowDraftConfirm: true, SnapshotHash: new string('e', 64));
 
     public DraftOptions Options { get; } = new() { Enabled = true, MaxPerDay = 3 };
 
@@ -43,6 +46,8 @@ internal sealed class DraftRig
     public List<ModelCallRecord> Audit { get; } = [];
 
     public Queue<Func<DraftModelAnswer>> Answers { get; } = new();
+
+    public FakeAuto Auto { get; } = new();
 
     public int ModelCalls { get; private set; }
 
@@ -88,7 +93,7 @@ internal sealed class DraftRig
             Audit.Add(call.Arg<ModelCallRecord>());
             return ValueTask.CompletedTask;
         });
-        return new DraftStrategyHandler(Store, new FakeSheet(), new FakeDrafter(this), Submit(), health, audit, Options, NullLogger<DraftStrategyHandler>.Instance);
+        return new DraftStrategyHandler(Store, new FakeSheet(), new FakeDrafter(this), Submit(), health, audit, Auto, Options, NullLogger<DraftStrategyHandler>.Instance);
     }
 
     /// <summary>Jobs whose scope hands out <paramref name="job"/> as the handler of the drafting job.</summary>
@@ -105,6 +110,13 @@ internal sealed class DraftRig
 
     public StartDraftHandler Starter(DraftJobs? jobs = null) => new(SettingsStore(), Store, jobs ?? JobsRunning(), Gate, Options, Time, NullLogger<StartDraftHandler>.Instance);
 
+    public IBasketQueries Baskets { get; } = Substitute.For<IBasketQueries>();
+
+    public AutoDraftHandler AutoHandler() => new(Store, SettingsStore(), Baskets, Checker, Strategies, Create, Start, Options, Time, NullLogger<AutoDraftHandler>.Instance);
+
+    public static BasketView Basket(string name, Guid? id = null, bool archived = false) =>
+        new(id ?? Guid.NewGuid(), name, "#fff", "trading", null, 0, 3, DateTimeOffset.UnixEpoch, archived ? DateTimeOffset.UnixEpoch : null, "manual", false, null, null);
+
     public ConfirmDraftHandler Confirmer() => new(Store, SettingsStore(), Checker, Strategies, Create, Start, Runs, NullLogger<ConfirmDraftHandler>.Instance);
 
     public DiscardDraftHandler Discarder() => new(Store, Runs, NullLogger<DiscardDraftHandler>.Instance);
@@ -116,10 +128,10 @@ internal sealed class DraftRig
         return store;
     }
 
-    public StoredDraft Seed(string status = "valid", string? yaml = Yaml, string via = "job")
+    public StoredDraft Seed(string status = "valid", string? yaml = Yaml, string via = "job", string idea = Idea, string requestedBy = Owner, IReadOnlyList<DraftFinding>? findings = null)
     {
         var id = Store.NextId++;
-        var draft = new StoredDraft(id, Idea, status, null, via, null, yaml, null, [], [], [], "m", "draft.v1", new string('c', 64), Owner, DateTimeOffset.UnixEpoch);
+        var draft = new StoredDraft(id, idea, status, null, via, null, yaml, null, [], [], findings ?? [], "m", "draft.v1", new string('c', 64), requestedBy, DateTimeOffset.UnixEpoch);
         Store.Drafts[id] = draft;
         return draft;
     }
@@ -165,6 +177,18 @@ internal sealed class DraftRig
         }
     }
 
+    /// <summary>The auto option as a recording fake (the command type is internal, so NSubstitute cannot proxy it).</summary>
+    public sealed class FakeAuto : ICommandHandler<AutoDraftCommand, AutoDraftOutcome>
+    {
+        public List<long> Asked { get; } = [];
+
+        public ValueTask<Result<AutoDraftOutcome>> HandleAsync(AutoDraftCommand command, CancellationToken cancellationToken)
+        {
+            Asked.Add(command.DraftId);
+            return ValueTask.FromResult(Result.Success(new AutoDraftOutcome(false, "off")));
+        }
+    }
+
     /// <summary>The drafting job as a recording fake (the command type is internal, so NSubstitute cannot proxy it).</summary>
     public sealed class RecordingJob : ICommandHandler<DraftStrategyCommand, DraftView>
     {
@@ -186,6 +210,10 @@ internal sealed class DraftRig
         public Dictionary<long, StoredDraftDecision> Decisions { get; } = [];
 
         public long NextId { get; set; } = 1;
+
+        public DateTimeOffset Now { get; set; } = DateTimeOffset.UnixEpoch;
+
+        public NewDraftDecision? LastDecision { get; private set; }
 
         public int TodayCount { get; set; }
 
@@ -220,6 +248,9 @@ internal sealed class DraftRig
             }
         }
 
+        public ValueTask<int> CountAutoBetweenAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(Decisions.Values.Count(d => d.Auto && d.DecidedAt >= from && d.DecidedAt < to));
+
         public ValueTask<StoredDraftDecision?> DecisionAsync(long draftId, CancellationToken cancellationToken) => ValueTask.FromResult(Decisions.GetValueOrDefault(draftId));
 
         public ValueTask<(StoredDraftDecision Decision, bool Created)> InsertDecisionAsync(NewDraftDecision d, CancellationToken cancellationToken)
@@ -229,7 +260,8 @@ internal sealed class DraftRig
                 return ValueTask.FromResult((existing, false));
             }
 
-            var row = new StoredDraftDecision(d.DraftId, d.Decision, d.StrategyId, d.StrategyVersion, d.LabRunId, d.Edited, d.Auto, d.Actor, DateTimeOffset.UnixEpoch, d.RunError);
+            var row = new StoredDraftDecision(d.DraftId, d.Decision, d.StrategyId, d.StrategyVersion, d.LabRunId, d.Edited, d.Auto, d.Actor, Now, d.RunError);
+            LastDecision = d;
             Decisions[d.DraftId] = row;
             return ValueTask.FromResult((row, true));
         }

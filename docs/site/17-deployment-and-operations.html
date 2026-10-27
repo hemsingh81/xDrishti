@@ -126,7 +126,7 @@ power, wired network, small UPS recommended.</li>
 <td><code>xd-feed</code></td>
 <td>.NET 10</td>
 <td>core</td>
-<td>Market hours: Dhan WebSocket for the active set (<strong>built</strong>, P2-10, <a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a>): live prices written into the holdings and <code>market.live_quotes</code>, price alerts on every flush, heartbeat in <code>platform.service_heartbeats</code>; the vault key and the app DB password as secret files, networks <code>back</code> + <code>egress</code>, 256 MB, health check = heartbeat &lt; 60 s old. The quote poll of holdings stays in <code>xd-api</code> (service <code>holdings-quotes</code>); live bars and depth recording come later</td>
+<td>Market hours: Dhan WebSocket for the active set (<strong>built</strong>, P2-10, <a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a>): live prices written into the holdings and <code>market.live_quotes</code>, price alerts on every flush, heartbeat in <code>platform.service_heartbeats</code>; the vault key and the app DB password as secret files, networks <code>back</code> + <code>egress</code>, 256 MB, health check = heartbeat &lt; 60 s old. The quote poll of holdings stays in <code>xd-api</code> (service <code>holdings-quotes</code>); live bars come later. <strong>Depth recorder (P7-16, <a href="../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.html">ADR 0135</a>):</strong> a second loop of this process (own heartbeat row <code>xd-depth</code>), off by default (<code>XD_DEPTH_ENABLED</code>, the owner&#39;s switch, the paused service <code>depth-recorder</code>); it grows <code>market.depth_snapshots</code> by about 0.77 GB a day raw (about 38 GB a year compressed, estimate) inside the VM disk (120 GiB): check <code>podman machine ssh df -h /var</code> shows at least 60 GiB free before switching it on; the disk guard stops it at 40 GB stored or under 20 GB free and deletes nothing; <code>xd-backup</code> must exclude this table&#39;s data</td>
 </tr>
 <tr>
 <td><code>xd-sandbox</code></td>
@@ -154,15 +154,15 @@ power, wired network, small UPS recommended.</li>
 </tr>
 <tr>
 <td><code>xd-llm</code></td>
-<td>llama.cpp server (pinned RamaLama image)</td>
+<td>llama.cpp server (pinned RamaLama image <code>0.25.0@sha256:d60dfda3...</code>, <a href="../adr/0136-the-local-model-server-runs-in-a-container-on-demand-with-the-measured-qwen3-30b-a3b-as-default-two-pinned-alternatives-and-a-status-the-api-reads-over-http-only.html">ADR 0136</a>)</td>
 <td>ai</td>
-<td>GPU via libkrun (<code>/dev/dri</code>); model from the host folder or the volume <code>xd-models</code> (decide in P9-01); no published port; on demand</td>
+<td><strong>Built (P9-01), not started by <code>xd-up.sh</code>.</strong> GPU via libkrun (<code>/dev/dri</code>, Vulkan Venus), user 1000, <code>read_only</code>, <code>cap_drop: [ALL]</code>, <code>no-new-privileges</code>; no published port; network <code>back</code> (internal) only; models mounted read-only from <code>~/Library/Application Support/xDrishti/models</code> or <code>data/models-llm</code> and loaded with <code>-m</code> (never <code>-hf</code>); the only secret is its own API key (Keychain <code>xdrishti/llm/api-key</code>, file <code>llm_api_key</code>, also given to <code>xd-api</code> as <code>Assistant__Llm__ApiKey</code>); <code>mem_limit: 8g</code> is a <strong>placeholder, not measured</strong>; started and stopped by the owner with <code>scripts/xd-ai.sh start [main|gptoss|qwen-instruct]</code>, <code>stop</code>, <code>status</code> (<code>model_missing</code> when the file is absent); <code>xd-api</code> looks at it only while <code>XD_ASSISTANT_LLM=true</code> (default false) and shows <code>GET /api/assistant/llm-status</code>; static rules in <code>AiComposeRulesTests</code></td>
 </tr>
 <tr>
 <td><code>xd-mcp</code></td>
-<td>.NET 10</td>
+<td>.NET 10 (<code>aspnet</code> chiseled, image target <code>mcp</code>)</td>
 <td>ai</td>
-<td>Read-only MCP tools</td>
+<td><strong>Built (P9-02, <a href="../adr/0137-the-assistants-tools-run-in-a-separate-read-only-server-under-two-database-roles-that-can-select-only-from-reviewed-views-and-the-switch-lives-in-the-database.html">ADR 0137</a>), not started by <code>xd-up.sh</code>.</strong> The assistant&#39;s read-only tool server: MCP over Streamable HTTP (stateless, <code>POST /mcp</code>, bearer token per client), four tools (<code>list_tables</code>, <code>describe_table</code>, <code>run_sql</code>, <code>lab_validate</code>); <code>/health</code> is anonymous. Logs in as <code>xd_mcp_read</code> and <code>xd_mcp_sql</code> (the roles of migration <code>AddAiReadAccess</code>: <code>SELECT</code> on schema <code>aiv</code> only; their passwords are set by <code>xd-api migrate</code> from the files below). <code>read_only</code>, <code>cap_drop: [ALL]</code>, <code>no-new-privileges</code>, 512 MB, no published port, network <code>back</code> only, no volume; exactly three secrets: <code>db_mcp_read_password</code> and <code>db_mcp_sql_password</code> (Keychain <code>xdrishti/db/mcp-read</code>, <code>xdrishti/db/mcp-sql</code>) and <code>mcp_token</code> (<code>xdrishti/mcp/token</code>, also given to <code>xd-api</code> as <code>Assistant__Mcp__Token</code>; <code>xd-migrate</code> gets the two passwords as <code>AiRoles__*</code>). Started and stopped with <code>scripts/xd-ai.sh start [--tools-only]</code> / <code>stop</code>; the image is built by <code>xd-up.sh</code> (profile <code>ai</code> only for the build).</td>
 </tr>
 <tr>
 <td><code>xd-hermes</code></td>
@@ -202,7 +202,7 @@ power, wired network, small UPS recommended.</li>
 </tr>
 <tr>
 <td><code>back</code> (internal)</td>
-<td>api, worker, sandbox*, db, llm, mcp, seq, feed, proxy (to reach the api)</td>
+<td>api, worker, sandbox*, db, llm (on demand, P9-01), mcp (on demand, P9-02), seq, feed, proxy (to reach the api)</td>
 </tr>
 <tr>
 <td><code>egress</code> (not internal, nothing published)</td>
@@ -298,7 +298,9 @@ encrypted with AES-256-GCM (account id + secret name as associated data, key ver
 be read stops the start instead of being replaced, because another key makes every stored secret unreadable — and writes the secret file
 <code>broker_vault_key</code>, mounted <strong>only into <code>xd-api</code></strong> as <code>/run/secrets/BrokerVault__Key</code> (the 256-bit key is derived from it with
 HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secrets.sh</code>, <code>secrets/brokers.index</code> and the read-only
-<code>secrets/brokers</code> mount are gone (<code>xd-up.sh</code> deletes leftover files).</li>
+<code>secrets/brokers</code> mount are gone (<code>xd-up.sh</code> deletes leftover files).
+The three secrets of the tool server (<code>xdrishti/db/mcp-read</code>, <code>xdrishti/db/mcp-sql</code>, <code>xdrishti/mcp/token</code>; 32 random characters each, created once and never replaced by <code>xd-up.sh</code>; files <code>db_mcp_read_password</code>, <code>db_mcp_sql_password</code>, <code>mcp_token</code>) go to <code>xd-mcp</code>; <code>xd-migrate</code> also reads the two passwords (it gives the read-only roles their login, <a href="../adr/0137-the-assistants-tools-run-in-a-separate-read-only-server-under-two-database-roles-that-can-select-only-from-reviewed-views-and-the-switch-lives-in-the-database.html">ADR 0137</a>) and <code>xd-api</code> the token only. Without the password files the roles stay <code>NOLOGIN</code> and migrate still succeeds.
+The key of the local model server (<code>xdrishti/llm/api-key</code>, 32 random characters, created once and never replaced by <code>xd-up.sh</code>; file <code>llm_api_key</code>) is mounted into <code>xd-llm</code> (<code>--api-key-file</code>) and <code>xd-api</code> (<code>Assistant__Llm__ApiKey</code>) only (<a href="../adr/0136-the-local-model-server-runs-in-a-container-on-demand-with-the-measured-qwen3-30b-a3b-as-default-two-pinned-alternatives-and-a-status-the-api-reads-over-http-only.html">ADR 0136</a>).</li>
 <li>Never in images, compose files, environment dumps, logs or LLM context.</li>
 </ol>
 <h2 id="5-operations">5. Operations<a class="hash" href="#5-operations" aria-label="Link to this section">#</a></h2>
@@ -429,7 +431,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-26 20:03</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-27 03:12</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>

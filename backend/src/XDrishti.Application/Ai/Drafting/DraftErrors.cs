@@ -17,6 +17,9 @@ public static class DraftErrors
     public const string DiscardedCode = "assistant.draft_discarded";
     public const string ConfirmedCode = "assistant.draft_confirmed";
 
+    /// <summary>The owner's own verb on the machine (<c>xd assistant draft</c>): it may ask for a draft, which is text only; a draft it asks for is never an auto candidate.</summary>
+    public const string CliActor = "cli:xd";
+
     public const int MinIdea = 10;
     public const int MaxIdea = 2000;
 

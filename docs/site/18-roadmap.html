@@ -501,8 +501,8 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Context data job</strong>, off the exit path: none of the three first strategies reads a context name. A 0.5-day probe first, run early so that a surprise comes early: can INDIA VIX and NIFTY 50 1-minute histories be had through the allow-listed <code>/v2/charts/intraday</code> (the only chart endpoint on the allow-list; a daily endpoint would be the owner&#39;s security decision), and how far back? Then <code>market.context_daily</code> (<a href="05-data-and-brokers.html">doc 05</a> §9) with raw point-in-time inputs only (index high, low, close, VIX close), a reader that builds the <code>MarketContext</code>, and the age of the last day with an attention item when it is stale (ADR 0033 known risk). Regime is computed on read. Before P5 (<code>by_regime</code> in the Lab robustness block) and P6 (regime cells). Breadth and <code>sector_rs(n)</code> split to P3-01e.</td>
 <td>free capacity</td>
 <td>3.5 d</td>
-<td>Later</td>
-<td>Spec to be drafted · <a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a></td>
+<td><strong>Built 2026-10-27</strong> (all but the live probe: an owner-environment step, <a href="../research/p3-01d-context-probe.html">note</a>, outcome pending); needs the owner to track NIFTY 50 and INDIA VIX</td>
+<td><a href="../specs/P3-01d-context-data-job-index-and-vix.html">spec</a> · <a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a> (Amendment 2026-10-27 settles the six deviations)</td>
 <td>A <code>MarketContext</code> built from the table equals one built from the same <code>ContextDay</code> records (all ten context values at every date of a fixture); restating a stored close does not change earlier days; a partial day is never written; a stale context raises the attention item; coverage is reported (regime needs 265 context days, <code>vix_pct</code> 252 VIX days, so for CSVs that start on 2024-04-01 the index series must start about March 2023); the probe result is written down</td>
 </tr>
 <tr>
@@ -1383,8 +1383,8 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Breadth</strong> (percent of tracked stocks above their 20-day average) computed point-in-time from <code>market.bars_agg</code> 1D and stored in <code>market.context_daily</code>; labelled as the breadth of the owner&#39;s tracked set. <code>sector_rs(n)</code> stays unplanned until a strategy needs it (<code>RS_ROTATION</code>). Before P7 (market gate).</td>
 <td>free capacity</td>
 <td>2 d</td>
-<td>Later</td>
-<td>Spec to be drafted</td>
+<td><strong>Built 2026-10-27</strong></td>
+<td><a href="../specs/P3-01e-breadth-point-in-time.html">spec</a> · <a href="../adr/0134-breadth-of-the-owners-tracked-shares-is-set-once-per-day-from-closes-up-to-that-day-and-the-market-gate-reads-it-in-fractions.html">ADR 0134</a></td>
 <td>Breadth of a fixture universe equals a hand computation on three dates; the value of date D uses closes up to D only (truncation test); an instrument without a bar on D is excluded and counted</td>
 </tr>
 <tr>
@@ -1704,7 +1704,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-26 20:03</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-27 03:12</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

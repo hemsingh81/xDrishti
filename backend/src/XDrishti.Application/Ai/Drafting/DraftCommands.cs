@@ -11,6 +11,12 @@ internal sealed record DraftStrategyCommand(long Id, string Idea, Guid? BasketId
 /// <summary>The owner's confirm (spec P9-07 AC 7): store the text as a normal library version and, when asked, start a quick test. <paramref name="Text"/> is the owner's edited text, or null for the stored draft's.</summary>
 public sealed record ConfirmDraftCommand(long Id, string? Text, Guid? BasketId, IReadOnlyList<string>? Symbols, bool Run, string Actor) : ICommand;
 
+/// <summary>The auto option (spec P9-07 D9): asks whether the just-stored draft may be confirmed for a quick test without the owner. Made only by the drafting job, never from a body or a model argument.</summary>
+internal sealed record AutoDraftCommand(long DraftId) : ICommand;
+
+/// <summary>What the auto option did: <paramref name="Started"/> when it confirmed the draft, else the one-word reason it left the draft for the owner.</summary>
+internal sealed record AutoDraftOutcome(bool Started, string Reason);
+
 /// <summary>The owner discards a draft: a decision row, nothing stored as a strategy.</summary>
 public sealed record DiscardDraftCommand(long Id, string Actor) : ICommand;
 

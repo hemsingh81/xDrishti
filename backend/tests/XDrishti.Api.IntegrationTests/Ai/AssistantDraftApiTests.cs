@@ -114,8 +114,19 @@ public sealed class AssistantDraftApiTests(ApiFactory factory)
 
     private Task<int> ExecuteAsync(string sql) => factory.WithDbAsync(async db => await db.Database.ExecuteSqlRawAsync(sql, Ct));
 
-    private Task<int> SettingsAsync(bool enabled, bool allowConfirm) =>
-        ExecuteAsync($"DELETE FROM ai.settings; INSERT INTO ai.settings (enabled, portfolio_context, max_tool_calls, changed_by, reason, allow_draft_confirm) VALUES ({(enabled ? "true" : "false")}, false, 6, '{Owner}', 'test setup', {(allowConfirm ? "true" : "false")})");
+    private Task<int> SettingsAsync(bool enabled, bool allowConfirm, bool autoQuick = false) =>
+        ExecuteAsync($"DELETE FROM ai.settings; INSERT INTO ai.settings (enabled, portfolio_context, max_tool_calls, changed_by, reason, allow_draft_confirm, auto_lab_quick_test) VALUES ({(enabled ? "true" : "false")}, false, 6, '{Owner}', 'test setup', {(allowConfirm ? "true" : "false")}, {(autoQuick ? "true" : "false")})");
+
+    private static string BasketName() => "Bk" + new string([.. Guid.NewGuid().ToByteArray().Take(10).Select(b => (char)('a' + (b % 26)))]);
+
+    private static async Task<long> StartNamingAsync(HttpClient client, WebApplicationFactory<Program> host, string idea)
+    {
+        using var response = await client.PostAsJsonAsync(new Uri("/api/assistant/strategy-drafts", UriKind.Relative), new { idea }, Ct);
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        var id = (await response.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetInt64();
+        await host.Services.GetRequiredService<DraftJobs>().WhenIdleAsync();
+        return id;
+    }
 
 #pragma warning disable EF1002 // the table names and conditions are the constants of these tests
     private async Task<long> CountAsync(string table, string where = "true") =>
@@ -351,6 +362,87 @@ public sealed class AssistantDraftApiTests(ApiFactory factory)
         (await DraftAsync(client, draftId)).GetProperty("status").GetString().ShouldBe("discarded");
         using var missing = await client.GetAsync(new Uri("/api/assistant/strategy-drafts/999999999", UriKind.Relative), Ct);
         missing.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Enabling_the_auto_quick_test_needs_the_password_the_other_inert_switches_stay_refused_and_turning_it_off_is_free()
+    {
+        await SettingsAsync(enabled: true, allowConfirm: false);
+        var (host, _) = NewHost(enabled: true);
+        using var _ = host;
+        var (client, password) = await SignedInAsync(host);
+        var settings = new Uri("/api/assistant/settings", UriKind.Relative);
+        async Task<long> CurrentIdAsync() => (await client.GetFromJsonAsync<JsonElement>(new Uri("/api/assistant/status", UriKind.Relative), Ct)).GetProperty("settingsId").GetInt64();
+        object Body(long expected, string? pw, bool? auto = null, bool? proposal = null, bool? hypothesis = null) =>
+            new { enabled = true, portfolioContext = false, maxToolCalls = 6, reason = "auto test", expectedSettingsId = expected, password = pw, autoLabQuickTest = auto, allowProposalAccept = proposal, autoAcceptHypothesis = hypothesis };
+        var rows = await CountAsync("ai.settings");
+
+        using var noPassword = await client.PutAsJsonAsync(settings, Body(await CurrentIdAsync(), null, auto: true), Ct);
+        using var wrong = await client.PutAsJsonAsync(settings, Body(await CurrentIdAsync(), "wrong-on-purpose", auto: true), Ct);
+        (await CountAsync("ai.settings")).ShouldBe(rows);
+        using var proposalOn = await client.PutAsJsonAsync(settings, Body(await CurrentIdAsync(), password, proposal: true), Ct);
+        using var hypothesisOn = await client.PutAsJsonAsync(settings, Body(await CurrentIdAsync(), password, hypothesis: true), Ct);
+        using var on = await client.PutAsJsonAsync(settings, Body(await CurrentIdAsync(), password, auto: true), Ct);
+        var onStatus = await on.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        using var off = await client.PutAsJsonAsync(settings, Body(onStatus.GetProperty("settingsId").GetInt64(), null, auto: false), Ct);
+
+        noPassword.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        wrong.StatusCode.ShouldNotBe(HttpStatusCode.OK);
+        proposalOn.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await proposalOn.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("code").GetString().ShouldBe("assistant.setting_not_available");
+        hypothesisOn.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        on.StatusCode.ShouldBe(HttpStatusCode.OK);
+        onStatus.GetProperty("autoLabQuickTest").GetBoolean().ShouldBeTrue();
+        off.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await off.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("autoLabQuickTest").GetBoolean().ShouldBeFalse();
+        (await CountAsync("ai.settings", $"changed_by = '{Owner}' AND auto_lab_quick_test AND length(snapshot_hash) = 64")).ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task With_the_auto_option_on_a_clean_draft_naming_one_basket_is_stored_and_started_as_auto_and_the_next_one_waits_for_the_owner()
+    {
+        await SettingsAsync(enabled: true, allowConfirm: false, autoQuick: true);
+        var (host, model) = NewHost(enabled: true);
+        using var _ = host;
+        var (client, _) = await SignedInAsync(host);
+        var name = BasketName();
+        using var basket = await client.PostAsJsonAsync(new Uri("/api/baskets", UriKind.Relative), new { name, colour = (string?)null, purpose = (string?)null, description = (string?)null }, Ct);
+        basket.StatusCode.ShouldBeOneOf(HttpStatusCode.OK, HttpStatusCode.Created);
+        var first = NewId();
+        var second = NewId();
+        model.Script(new ModelTextPart(Answer(first)), new ModelFinishPart("stop", 100, 50));
+        model.Script(new ModelTextPart(Answer(second)), new ModelFinishPart("stop", 100, 50));
+
+        var one = await StartNamingAsync(client, host, $"{Idea} Test it on {name}.");
+        var two = await StartNamingAsync(client, host, $"{Idea} Test it on {name}.");
+
+        var auto = await DraftAsync(client, one);
+        auto.GetProperty("status").GetString().ShouldBe("confirmed");
+        auto.GetProperty("confirmed").GetProperty("auto").GetBoolean().ShouldBeTrue();
+        (await CountAsync("lab.strategy_versions", $"strategy_id = '{first}' AND note LIKE '%auto-confirmed%'")).ShouldBe(1);
+        (await CountAsync("ai.strategy_draft_decisions", $"draft_id = {one} AND auto AND actor = 'system:auto-draft' AND settings_id IS NOT NULL AND length(snapshot_hash) = 64")).ShouldBe(1);
+        (await CountAsync("lab.lab_runs", $"strategy_id = '{first}' AND method <> 'quick'")).ShouldBe(0);
+        (await DraftAsync(client, two)).GetProperty("status").GetString().ShouldBe("valid");
+        (await CountAsync("lab.strategy_versions", $"strategy_id = '{second}'")).ShouldBe(0);
+        (await CountAsync("ai.strategy_draft_decisions", $"draft_id = {two}")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task With_the_auto_option_off_nothing_is_stored_even_for_a_clean_draft_naming_a_basket()
+    {
+        await SettingsAsync(enabled: true, allowConfirm: false);
+        var (host, model) = NewHost(enabled: true);
+        using var _ = host;
+        var (client, _) = await SignedInAsync(host);
+        var name = BasketName();
+        using var basket = await client.PostAsJsonAsync(new Uri("/api/baskets", UriKind.Relative), new { name, colour = (string?)null, purpose = (string?)null, description = (string?)null }, Ct);
+        var id = NewId();
+        model.Script(new ModelTextPart(Answer(id)), new ModelFinishPart("stop", 100, 50));
+
+        var draft = await StartNamingAsync(client, host, $"{Idea} Test it on {name}.");
+
+        (await DraftAsync(client, draft)).GetProperty("status").GetString().ShouldBe("valid");
+        (await CountAsync("lab.strategy_versions", $"strategy_id = '{id}'")).ShouldBe(0);
     }
 
     [Fact]

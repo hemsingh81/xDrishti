@@ -19,6 +19,7 @@ internal sealed class DraftStrategyHandler(
     IQueryHandler<SubmitDraftQuery, DraftEvaluation> submit,
     ILlmHealth health,
     IModelCallAudit audit,
+    ICommandHandler<AutoDraftCommand, AutoDraftOutcome> auto,
     DraftOptions options,
     ILogger<DraftStrategyHandler> logger) : ICommandHandler<DraftStrategyCommand, DraftView>
 {
@@ -48,6 +49,12 @@ internal sealed class DraftStrategyHandler(
             "draft." + PromptRegistry.Draft.Version, sheet.Hash, ParamsJson(), command.Actor);
         await store.InsertAsync(draft, CancellationToken.None);
         DraftLog.Finished(logger, command.Id, outcome.Status, outcome.Reason, outcome.Attempts.Count);
+        if (outcome.Status == DraftStatus.Valid)
+        {
+            // Off unless the owner switched it on; every condition it needs is checked there, and a draft that fails one stays for the owner.
+            await auto.HandleAsync(new AutoDraftCommand(command.Id), CancellationToken.None);
+        }
+
         var stored = await store.GetAsync(command.Id, CancellationToken.None);
         return stored is null ? Result.Failure<DraftView>(DraftErrors.NotFound(command.Id)) : Result.Success(DraftView.Of(stored, null, null));
     }

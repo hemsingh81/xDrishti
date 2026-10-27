@@ -57,7 +57,7 @@ public sealed class AssistantLlmArchitectureTests
     {
         var api = Assembly.Load(new AssemblyName("XDrishti.Api"));
         var offenders = Types.InAssembly(api).That().HaveDependencyOnAny(AiNamespaces).GetTypes()
-            .Select(t => t.FullName!).Where(n => !n.StartsWith("XDrishti.Api.Endpoints.Assistant", StringComparison.Ordinal) && !n.StartsWith("XDrishti.Api.Cli.AssistantBriefing", StringComparison.Ordinal) && !n.StartsWith("XDrishti.Api.Infrastructure.ApiJsonContext", StringComparison.Ordinal) && !n.StartsWith("XDrishti.Api.Infrastructure.ApiSetup", StringComparison.Ordinal)).ToList();
+            .Select(t => t.FullName!).Where(n => !n.StartsWith("XDrishti.Api.Endpoints.Assistant", StringComparison.Ordinal) && !n.StartsWith("XDrishti.Api.Cli.AssistantBriefing", StringComparison.Ordinal) && !n.StartsWith("XDrishti.Api.Cli.AssistantDraft", StringComparison.Ordinal) && !n.StartsWith("XDrishti.Api.Infrastructure.ApiJsonContext", StringComparison.Ordinal) && !n.StartsWith("XDrishti.Api.Infrastructure.ApiSetup", StringComparison.Ordinal)).ToList();
 
         offenders.ShouldBeEmpty();
     }

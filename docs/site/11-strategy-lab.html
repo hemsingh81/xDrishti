@@ -169,7 +169,7 @@ test:
 </tr>
 <tr>
 <td>Context</td>
-<td><code>regime()</code>, <code>index.trend</code>, <code>vix_pct</code>, <code>sector_rs(n)</code>, <code>day_of_week</code>, <code>is_expiry_day</code> — all exist now except <code>sector_rs(n)</code> (not planned until a strategy needs it, see P3-01e); breadth exists as a plain field</td>
+<td><code>regime()</code>, <code>index.trend</code>, <code>vix_pct</code>, <code>sector_rs(n)</code>, <code>day_of_week</code>, <code>is_expiry_day</code> — all exist now except <code>sector_rs(n)</code> (not planned until a strategy needs it, see P3-01e); breadth is computed by the data job (P3-01e)</td>
 </tr>
 <tr>
 <td>Stops</td>
@@ -274,7 +274,7 @@ frames; every day&#39;s values are computed from that day and earlier days only.
 </tr>
 <tr>
 <td><code>vix_pct</code></td>
-<td>the same percentile rank of the VIX close over the last 252 days that have a VIX. <em>Pending owner confirmation, ADR 0033 Amendments 1 and 2</em></td>
+<td>the same percentile rank of the VIX close over the last 252 days that have a VIX. <em>Confirmed 2026-10-27, ADR 0033 Amendments 1 and 2</em></td>
 <td align="right">252</td>
 </tr>
 <tr>
@@ -284,7 +284,7 @@ frames; every day&#39;s values are computed from that day and earlier days only.
 </tr>
 <tr>
 <td><code>regime_trend</code>, <code>regime_vol</code></td>
-<td>the trend (+1 / 0 / −1, as <code>index_trend</code>) and the volatility class: 0 LOW, 1 NORMAL, 2 HIGH from the mean of <code>vix_pct</code> and <code>index_vol_pct</code> (below 100/3 LOW, from 200/3 HIGH; the index percentile alone when <code>vix_pct</code> is not ready). <em>Pending owner confirmation, ADR 0033 Amendments 1 and 2 (the fallback), and 13 (the exact thirds; the owner&#39;s wording was 33.3 and 66.7)</em></td>
+<td>the trend (+1 / 0 / −1, as <code>index_trend</code>) and the volatility class: 0 LOW, 1 NORMAL, 2 HIGH from the mean of <code>vix_pct</code> and <code>index_vol_pct</code> (below 100/3 LOW, from 200/3 HIGH; the index percentile alone when <code>vix_pct</code> is not ready). <em>Confirmed 2026-10-27, ADR 0033 Amendments 1, 2 (the fallback) and 13 (the exact thirds; the owner&#39;s wording was 33.3 and 66.7)</em></td>
 <td align="right">55, 265</td>
 </tr>
 <tr>
@@ -294,9 +294,9 @@ frames; every day&#39;s values are computed from that day and earlier days only.
 </tr>
 </tbody></table>
 <p>A value that is not ready is <code>NaN</code> (a condition on it is <em>unknown</em>, which a decision treats as false: see <em>The rules language as built</em>). That includes the VIX values (<code>vix</code>, <code>vix_pct</code>, <code>vix_chg</code>) on the date that reads a context day without a VIX — nothing is filled from another day, and <code>regime</code> keeps
-working from the index alone —, <code>vix_chg</code> also on the date after that, and <code>breadth</code> when its day has none. The warm-up of the context is counted in <strong>days of the context, not bars</strong>, so a test or a simulation needs more than a year of daily index and VIX data before its first date. <strong>Past the last day of the context</strong> a frame keeps that day&#39;s values and stays ready (it does not say how old they are; <em>pending owner confirmation, ADR 0033 Amendment 14</em>): the caller extends the context as the days pass and checks its age — the data job (P3-01d) and the market gate (P7) must make a stale context visible (<a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>, known risk). The history of these features (<code>At</code>) has
+working from the index alone —, <code>vix_chg</code> also on the date after that, and <code>breadth</code> when its day has none. The warm-up of the context is counted in <strong>days of the context, not bars</strong>, so a test or a simulation needs more than a year of daily index and VIX data before its first date. <strong>Past the last day of the context</strong> a frame reads nothing once the date is more than <code>ContextOptions.MaxAgeDays</code> (default 7 calendar days) after the last day: the ten context features are not ready (a false condition), so a stale regime never reads as current; at exactly 7 days they are still ready. The caller extends the context as the days pass; the context data job (P3-01d) writes each closed session and the data notices say <code>data_context_stale</code> when it falls more than a session behind (<a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>, Amendment 14 settled 2026-10-27). Every figure of the regime carries its basis (<code>index_and_vix</code> when the VIX percentile was ready, <code>index_only</code> otherwise); a regime cell must not mix the two without saying so. The history of these features (<code>At</code>) has
 one entry per date.</p>
-<p><strong>Not yet built.</strong> <code>sector_rs(n)</code> and the <strong>computation of breadth</strong>, both cross-sectional (they need the daily series of many instruments). The computation of breadth is P3-01e (point-in-time, from the tracked stocks&#39; daily bars, stored in <code>market.context_daily</code>); <code>sector_rs(n)</code> is not planned until a strategy needs it; the index and VIX series are written by the <strong>context data job (P3-01d)</strong> into
+<p><strong>Breadth is built (P3-01e); <code>sector_rs(n)</code> is not.</strong> Breadth is the percent of the owner&#39;s tracked shares (ETFs out) whose close is strictly above the mean of their closes on the last 20 sessions, computed point-in-time from the stored <code>1D</code> rows up to that day (raw closes, a complete bar on each session, a share with a corporate-action ex-date in the window leaves the vote, a thin sample under 50 voters or half the shares with a bar is <code>insufficient</code>, not a number) and set once per context day in the breadth columns of <code>market.context_daily</code> (<a href="05-data-and-brokers.html">doc 05</a> §9, <a href="../adr/0134-breadth-of-the-owners-tracked-shares-is-set-once-per-day-from-closes-up-to-that-day-and-the-market-gate-reads-it-in-fractions.html">ADR 0134</a>); it is labelled as the breadth of the owner&#39;s own tracked set, never of the market. <code>sector_rs(n)</code> (cross-sectional, needs a sector map and a rank) is not planned until a strategy needs it; the index and VIX series are written by the <strong>context data job (P3-01d)</strong> into
 <code>market.context_daily</code> (<a href="05-data-and-brokers.html">doc 05</a> §9). All of it comes after the P3 exit check, and until it exists the caller supplies the <code>ContextDay</code> records; intraday index features (the index against its own VWAP, its move since the open) and more indices
 (Bank Nifty, sector indices) in the regime are not planned for now. The strategy around the language is split: the typed strategy model and the compile of its sections are built (P3-02b, <em>The strategy model as built</em>); the YAML sections, the JSON Schema and the hash are P3-02c, storage in <code>lab.strategies</code> is P3-02d and the BUY → SELL mirror is built (P3-02e). Reading the context from the database is part of P3-01d (it owns the table and the reader that builds the <code>MarketContext</code>; the simulator only uses it), and reading bars from the database is P3-04 (P3-03 runs on the bars it is given).</p>
 <p><strong>How the closed-bar rule is kept.</strong> A feature on a higher timeframe (<code>tf(&quot;1h&quot;).ema(50)</code>) is computed over bars that a <code>TimeframeBuilder</code> emits only once their last minute has arrived, so at 10:30 it reflects the 09:15 hour
@@ -759,7 +759,7 @@ folder); any version can be downloaded as a file and re-imported (<a href="../ad
     <a class="prev" href="10-trade-selection.html"><small>← Previous  [</small>10 · Trade selection</a>
     <a class="next" href="12-portfolio-monitoring.html"><small>Next  ] →</small>12 · Portfolio monitoring</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/11-strategy-lab.md</code> · 2026-10-26 20:03</footer>
+  <footer class="foot">Generated from <code>docs/11-strategy-lab.md</code> · 2026-10-27 03:12</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-ways-to-submit" class="d2">1. Ways to submit</a>
 <a href="#2-rules-language-dsl" class="d2">2. Rules language (DSL)</a>

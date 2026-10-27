@@ -24,7 +24,7 @@ internal sealed class StartDraftHandler(
     public async ValueTask<Result<DraftView>> HandleAsync(StartDraftCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        if (!OwnerConfirmation.IsOwnerActor(command.Actor))
+        if (!OwnerConfirmation.IsOwnerActor(command.Actor) && command.Actor != DraftErrors.CliActor)
         {
             return Refuse(DraftErrors.OwnerOnly());
         }

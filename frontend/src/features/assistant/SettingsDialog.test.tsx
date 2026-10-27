@@ -82,6 +82,24 @@ describe('settings dialog (owner act)', () => {
     expect(screen.queryByLabelText(/Your password/)).not.toBeInTheDocument();
   });
 
+  it('the auto quick test switch is off by default, needs the password to turn on, and sends the flag', async () => {
+    mountPut(() => HttpResponse.json(statusBuilder({ autoLabQuickTest: true, settingsId: 8 })));
+    const user = await openDialog();
+    const auto = screen.getByRole('switch', { name: 'Auto quick test of valid drafts' });
+    expect(auto).not.toBeChecked();
+    await user.click(auto);
+    await user.type(screen.getByLabelText(/Reason/), 'try the auto option');
+    const save = screen.getByRole('button', { name: 'Save' });
+    expect(save).toBeDisabled();
+    await user.type(screen.getByLabelText(/Your password/), 'right-pass');
+    await user.click(save);
+    await waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]).toMatchObject({ autoLabQuickTest: true, password: 'right-pass' });
+    expect(held().join()).not.toContain('right-pass');
+  });
+
   it('shows what portfolio data off means', async () => {
     await openDialog();
     expect(screen.getByText("Off: portfolio questions answer 'not available'")).toBeInTheDocument();

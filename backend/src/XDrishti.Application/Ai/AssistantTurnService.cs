@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Ai;
+using XDrishti.Application.Ai.Drafting;
 using XDrishti.Domain.Assistant;
 using XDrishti.Domain.Assistant.Grounding;
 using XDrishti.Domain.Common;
@@ -24,6 +25,7 @@ internal sealed class AssistantTurnService(
     TurnGate gate,
     TurnOptions options,
     TimeProvider time,
+    DraftProposalTool proposals,
     ILogger<AssistantTurnService> logger) : IAssistantTurnRunner
 {
     public const string ToolLimitSentence = "I used all the tool calls I am allowed for one question and could not finish an answer. Ask a narrower question or raise the budget in the settings.";
@@ -43,6 +45,8 @@ internal sealed class AssistantTurnService(
     private TimeProvider Time => time;
 
     private IToolCatalog Catalog => toolCatalog;
+
+    private DraftProposalTool Proposals => proposals;
 
     public async ValueTask<Result<ITurnSession>> BeginAsync(TurnRequest request, CancellationToken cancellationToken)
     {
@@ -77,6 +81,12 @@ internal sealed class AssistantTurnService(
 
         // make_chart is local: it needs this turn's stored results, which the stateless tool server does not hold (spec P9-05).
         tools = tools with { Tools = [.. tools.Tools, ChartTool.Descriptor] };
+
+        // lab_propose_run is local too (the tool server has no write code): offered only in the owner's own chat turn while drafting is on; it stores a draft, never a strategy or a run (spec P9-07).
+        if (proposals.OfferedTo(request, settings))
+        {
+            tools = tools with { Tools = [.. tools.Tools, DraftProposalTool.Descriptor] };
+        }
 
         if (await nightly.IsRunningAsync(TimeSpan.FromMinutes(options.NightlyGuardMinutes), cancellationToken))
         {
@@ -273,7 +283,7 @@ internal sealed class AssistantTurnService(
                                 resultTexts.Add(derived);
                             }
                         }
-                        else if (executed.Granted && !string.Equals(call.Name, ChartTool.Name, StringComparison.Ordinal))
+                        else if (executed.Granted && !string.Equals(call.Name, ChartTool.Name, StringComparison.Ordinal) && !string.Equals(call.Name, DraftProposalTool.Name, StringComparison.Ordinal))
                         {
                             resultTexts.Add(executed.ModelText);
                             nonCalcTexts.Add(executed.ModelText);
@@ -353,6 +363,10 @@ internal sealed class AssistantTurnService(
             {
                 granted = false;
                 text = Failure(call.Name, "tool.unknown", "That tool does not exist.");
+            }
+            else if (string.Equals(call.Name, DraftProposalTool.Name, StringComparison.Ordinal))
+            {
+                text = await owner.Proposals.RunAsync(call.ArgumentsJson, request, cancellationToken);
             }
             else if (string.Equals(call.Name, ChartTool.Name, StringComparison.Ordinal))
             {

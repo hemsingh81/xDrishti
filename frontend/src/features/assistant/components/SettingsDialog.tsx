@@ -5,6 +5,7 @@ import { AppDialog, AppDialogBody, AppDialogFooter, AppDialogHeader } from '@/sh
 import { useToast } from '@/shared/ui/toastContext';
 import { useChangeSettings, type AssistantStatus } from '../api/assistantApi';
 import { words } from '../lib/wording';
+import { DraftSwitches } from './DraftSwitches';
 
 const maxReason = 500;
 
@@ -38,6 +39,7 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
   const [portfolio, setPortfolio] = useState(status.portfolioContext);
   const [maxCalls, setMaxCalls] = useState(String(status.maxToolCalls));
   const [draftConfirm, setDraftConfirm] = useState(status.allowDraftConfirm);
+  const [autoQuick, setAutoQuick] = useState(status.autoLabQuickTest);
   const [reason, setReason] = useState('');
   const [password, setPassword] = useState('');
   const [problem, setProblem] = useState<FormProblem | null>(null);
@@ -53,6 +55,7 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
     setPortfolio(status.portfolioContext);
     setMaxCalls(String(status.maxToolCalls));
     setDraftConfirm(status.allowDraftConfirm);
+    setAutoQuick(status.autoLabQuickTest);
   }
 
   const calls = Number(maxCalls);
@@ -61,11 +64,13 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
     (enabled && !status.enabled) ||
     (portfolio && !status.portfolioContext) ||
     (callsOk && calls > status.maxToolCalls) ||
-    (draftConfirm && !status.allowDraftConfirm);
+    (draftConfirm && !status.allowDraftConfirm) ||
+    (autoQuick && !status.autoLabQuickTest);
   const changed =
     enabled !== status.enabled ||
     portfolio !== status.portfolioContext ||
     draftConfirm !== status.allowDraftConfirm ||
+    autoQuick !== status.autoLabQuickTest ||
     (callsOk && calls !== status.maxToolCalls);
   const ready =
     changed &&
@@ -89,6 +94,7 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
         portfolioContext: portfolio,
         maxToolCalls: calls,
         allowDraftConfirm: draftConfirm,
+        autoLabQuickTest: autoQuick,
         reason,
         expectedSettingsId: status.settingsId ?? 0,
         // The password travels only for a change that turns something on or raises it.
@@ -152,23 +158,12 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
               </Typography>
             )}
           </div>
-          <div>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={draftConfirm}
-                  onChange={(e) => {
-                    setDraftConfirm(e.target.checked);
-                  }}
-                />
-              }
-              label="Allow confirming strategy drafts"
-            />
-            <Typography variant="body2" color="text.secondary">
-              Off by default. Confirming stores a draft as a library version and can start a quick test; it asks your
-              password every time.
-            </Typography>
-          </div>
+          <DraftSwitches
+            draftConfirm={draftConfirm}
+            onDraftConfirm={setDraftConfirm}
+            autoQuick={autoQuick}
+            onAutoQuick={setAutoQuick}
+          />
           <TextField
             label="Maximum tool calls"
             type="number"

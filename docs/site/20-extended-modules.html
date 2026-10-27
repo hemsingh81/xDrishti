@@ -128,7 +128,8 @@ max drawdown, daily loss, feed loss or a button.</li>
 <h2 id="b-tick-order-book-data">B. Tick &amp; order-book data<a class="hash" href="#b-tick-order-book-data" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>Dhan live feed + <strong>20-level depth</strong> (up to 50 instruments/connection) and <strong>200-level depth</strong> (NSE equity
-&amp; derivatives) over WebSocket (binary). No historical depth from brokers ⇒ record our own.</li>
+&amp; derivatives) over WebSocket (binary). No historical depth from brokers ⇒ record our own.
+<strong>Built in P7-16 (<a href="../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.html">ADR 0135</a>):</strong> the 20-level book of up to 50 shares, about once a second, in <code>market.depth_snapshots</code>; off by default behind three gates; nothing reads it until P13.</li>
 <li>Extends the v1 <code>xd-feed</code> (which already streams the active set): adds 20-level depth subscriptions for a
 configured recording list; writes to Timescale hypertables (compressed); ~50–100 GB/year.</li>
 <li><strong>Start recording in P7</strong> so ≥ 6 months exist by P13.</li>
@@ -164,7 +165,7 @@ features measured like any other, never trade decisions.</li>
     <a class="prev" href="19-risks-and-compliance.html"><small>← Previous  [</small>19 · Risks &amp; compliance</a>
     <a class="next" href="21-glossary.html"><small>Next  ] →</small>21 · Glossary</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/20-extended-modules.md</code> · 2026-10-26 20:03</footer>
+  <footer class="foot">Generated from <code>docs/20-extended-modules.md</code> · 2026-10-27 03:12</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#a-automated-order-placement" class="d2">A. Automated order placement</a>
 <a href="#b-tick-order-book-data" class="d2">B. Tick &amp;amp; order-book data</a>

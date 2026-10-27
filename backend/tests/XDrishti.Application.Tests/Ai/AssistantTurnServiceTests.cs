@@ -1,5 +1,6 @@
 using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Ai;
+using XDrishti.Application.Ai.Drafting;
 using XDrishti.Domain.Common;
 
 namespace XDrishti.Application.Tests.Ai;
@@ -463,13 +464,44 @@ public sealed class AssistantTurnServiceTests
         rig.Model.Script(new ModelTextPart("The tools are down."), Done());
         var unreachable = new UnreachableCatalog();
         var service = new AssistantTurnService(
-            new AssistantRig.FakeSettings(rig), new AssistantRig.FakeHealth(rig), unreachable, new AssistantRig.FakeNightly(rig), rig.Store, rig.Model, rig.Gate, rig.Options, TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger<AssistantTurnService>.Instance);
+            new AssistantRig.FakeSettings(rig), new AssistantRig.FakeHealth(rig), unreachable, new AssistantRig.FakeNightly(rig), rig.Store, rig.Model, rig.Gate, rig.Options, TimeProvider.System, rig.Proposals, Microsoft.Extensions.Logging.Abstractions.NullLogger<AssistantTurnService>.Instance);
 
         var result = await service.RunAsync(Ask(), _ => ValueTask.CompletedTask, Ct);
 
         result.IsSuccess.ShouldBeTrue();
         rig.Store.ToolCalls.Single().Status.ShouldBe("error");
         rig.Store.ToolCalls.Single().ErrorCode.ShouldBe("tool.unavailable");
+    }
+
+    [Fact]
+    public async Task The_drafting_tool_is_offered_only_while_drafting_is_on_and_a_call_stores_a_chat_tool_draft_from_the_owners_message()
+    {
+        var draft = new DraftRig();
+        var rig = new AssistantRig();
+        rig.Proposals = new DraftProposalTool(draft.Submit(), draft.Store, new FakeSheetSource(), draft.Options, TimeProvider.System);
+        rig.Model.Script(Call("c1", DraftProposalTool.Name, DraftRig.Json()), Done("tool_calls"));
+        rig.Model.Script(new ModelTextPart("Drafted."), Done());
+
+        var result = await RunAsync(rig, Ask(DraftRig.Idea));
+
+        result.Result.IsSuccess.ShouldBeTrue();
+        rig.Model.Requests[0].Tools.ShouldContain(t => t.Name == DraftProposalTool.Name);
+        rig.Store.ToolCalls.Single().Status.ShouldBe("ok");
+        var stored = draft.Store.Drafts.Values.Single();
+        (stored.Via, stored.Idea).ShouldBe(("chat_tool", DraftRig.Idea));
+        draft.Strategies_AreUntouched();
+
+        var off = new AssistantRig();
+        off.Model.Script(new ModelTextPart("No tools."), Done());
+        (await RunAsync(off, Ask(DraftRig.Idea))).Result.IsSuccess.ShouldBeTrue();
+        off.Model.Requests[0].Tools.ShouldNotContain(t => t.Name == DraftProposalTool.Name);
+    }
+
+    private sealed class FakeSheetSource : IDraftSheetSource
+    {
+        public string Sheet => "S";
+
+        public string Hash => new('d', 64);
     }
 
     private sealed class UnreachableCatalog : IToolCatalog

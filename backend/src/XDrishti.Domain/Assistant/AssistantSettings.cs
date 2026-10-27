@@ -11,7 +11,8 @@ namespace XDrishti.Domain.Assistant;
 /// <param name="AutoLabQuickTest">Whether a valid draft of the dedicated job may be queued for a quick test without the owner's confirm (P9-07 D9); false by default.</param>
 /// <param name="AllowProposalAccept">Used by P9-08; false by default.</param>
 /// <param name="AutoAcceptHypothesis">Used by P9-08; false by default.</param>
-public sealed record AssistantSettings(long? Id, bool Enabled, bool PortfolioContext, int MaxToolCalls, bool AllowDraftConfirm = false, bool AutoLabQuickTest = false, bool AllowProposalAccept = false, bool AutoAcceptHypothesis = false)
+/// <param name="SnapshotHash">The hash the database stamped on the row (the auto decision of P9-07 records it); null when no row.</param>
+public sealed record AssistantSettings(long? Id, bool Enabled, bool PortfolioContext, int MaxToolCalls, bool AllowDraftConfirm = false, bool AutoLabQuickTest = false, bool AllowProposalAccept = false, bool AutoAcceptHypothesis = false, string? SnapshotHash = null)
 {
     /// <summary>The design default budget of tool calls per turn.</summary>
     public const int DefaultMaxToolCalls = 6;

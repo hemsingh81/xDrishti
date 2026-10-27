@@ -107,6 +107,14 @@ internal sealed class DraftStore(NpgsqlDataSource dataSource) : IDraftStore
         }
     }
 
+    public async ValueTask<int> CountAutoBetweenAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        await using var select = dataSource.CreateCommand("SELECT count(*)::int FROM ai.strategy_draft_decisions WHERE auto AND decided_at >= @from AND decided_at < @to");
+        select.Parameters.AddWithValue("from", NpgsqlDbType.TimestampTz, from.ToUniversalTime());
+        select.Parameters.AddWithValue("to", NpgsqlDbType.TimestampTz, to.ToUniversalTime());
+        return (int)(await select.ExecuteScalarAsync(cancellationToken))!;
+    }
+
     public async ValueTask<StoredDraftDecision?> DecisionAsync(long draftId, CancellationToken cancellationToken)
     {
         await using var select = dataSource.CreateCommand("SELECT draft_id, decision, strategy_id, strategy_version, lab_run_id, edited, auto, actor, decided_at, run_error FROM ai.strategy_draft_decisions WHERE draft_id = @id");

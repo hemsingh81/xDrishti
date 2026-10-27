@@ -85,7 +85,6 @@ public sealed class AssistantSettingsHandlerTests
     }
 
     [Theory]
-    [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
     public async Task The_switches_with_nothing_behind_them_cannot_be_turned_on_but_can_be_turned_off(int which)
@@ -100,6 +99,21 @@ public sealed class AssistantSettingsHandlerTests
         var (handler2, store2) = Build(new AssistantSettings(8, true, false, 6, AutoLabQuickTest: true, AllowProposalAccept: true, AutoAcceptHypothesis: true), new AssistantSettings(9, true, false, 6));
         (await handler2.HandleAsync(new ChangeAssistantSettingsCommand(Owner, "off", true, false, 6, null, PasswordVerified: false, AutoLabQuickTest: false, AllowProposalAccept: false, AutoAcceptHypothesis: false), Ct)).IsSuccess.ShouldBeTrue();
         store2.Appends.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task The_auto_quick_test_switch_can_be_turned_on_only_with_a_verified_password_and_off_without()
+    {
+        var (handler, store) = Build(AssistantSettings.Defaults, new AssistantSettings(8, true, false, 6, AutoLabQuickTest: true));
+        var on = new ChangeAssistantSettingsCommand(Owner, "why", false, false, 6, 0, PasswordVerified: false, AutoLabQuickTest: true);
+
+        (await handler.HandleAsync(on, Ct)).Error.Code.ShouldBe("auth.invalid_credentials");
+        store.Appends.ShouldBeEmpty();
+        (await handler.HandleAsync(on with { PasswordVerified = true }, Ct)).IsSuccess.ShouldBeTrue();
+        store.Appends.ShouldHaveSingleItem().Change.AutoLabQuickTest.ShouldBeTrue();
+        var (off, offStore) = Build(new AssistantSettings(8, true, false, 6, AutoLabQuickTest: true), new AssistantSettings(9, true, false, 6));
+        (await off.HandleAsync(new ChangeAssistantSettingsCommand(Owner, "off", true, false, 6, null, PasswordVerified: false, AutoLabQuickTest: false), Ct)).IsSuccess.ShouldBeTrue();
+        offStore.Appends.ShouldHaveSingleItem().Change.AutoLabQuickTest.ShouldBeFalse();
     }
 
     [Fact]

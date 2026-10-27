@@ -579,11 +579,13 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<PreviewBriefingQuery, Result<BriefingView>>, PreviewBriefingHandler>();
         services.AddScoped<IQueryHandler<GetBriefingQuery, Result<BriefingView>>, GetBriefingHandler>();
         services.AddScoped<IQueryHandler<ListBriefingsQuery, Result<IReadOnlyList<BriefingView>>>, ListBriefingsHandler>();
+        services.AddScoped<DraftProposalTool>(); // lab_propose_run: a proposal tool, draft rows only (P9-07b)
         services.AddSingleton<DraftJobs>(); // the drafting jobs in progress (P9-07); in memory, a crash loses one
         services.AddScoped<IQueryHandler<SubmitDraftQuery, DraftEvaluation>, SubmitDraftHandler>(); // the one core of a draft: the Lab validator and the checks C3 to C6; no model, no store
         services.AddScoped<ICommandHandler<StartDraftCommand, DraftView>, StartDraftHandler>(); // the owner types an idea; takes the model slot and starts the job
         services.AddScoped<ICommandHandler<DraftStrategyCommand, DraftView>, DraftStrategyHandler>(); // the job: model, repair turns, one insert-only row
         services.AddScoped<ICommandHandler<ConfirmDraftCommand, DraftView>, ConfirmDraftHandler>(); // the owner's confirm: the only path to a stored version and a quick test (P9-07, ADR 0141)
+        services.AddScoped<ICommandHandler<AutoDraftCommand, AutoDraftOutcome>, AutoDraftHandler>(); // the auto option: OFF by default, quick test only, 1 per hour and 3 per day, recorded as auto (P9-07b)
         services.AddScoped<ICommandHandler<DiscardDraftCommand, DraftView>, DiscardDraftHandler>();
         services.AddScoped<IQueryHandler<GetDraftQuery, Result<DraftView>>, GetDraftHandler>();
         services.AddScoped<IQueryHandler<ListDraftsQuery, Result<IReadOnlyList<DraftView>>>, ListDraftsHandler>();

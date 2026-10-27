@@ -23,8 +23,21 @@ public sealed class AssistantDraftArchitectureTests
         {
             var users = Types.InAssembly(Application).That().ResideInNamespace(Drafting).And().HaveDependencyOn(command.FullName!).GetTypes().Select(t => t.Name).Where(n => !n.StartsWith('<')).Distinct().Order().ToList();
 
-            users.ShouldBe(["ConfirmDraftHandler"], command.Name);
+            users.ShouldBe(["AutoDraftHandler", "ConfirmDraftHandler"], command.Name);
         }
+    }
+
+    [Fact]
+    public void The_chat_tool_reaches_only_the_core_and_the_draft_store_never_the_library_the_lab_or_the_auto_option()
+    {
+        var result = Types.InAssembly(Application).That().HaveName("DraftProposalTool")
+            .ShouldNot().HaveDependencyOnAny(
+                typeof(CreateStrategyCommand).FullName!, typeof(StartLabRunCommand).FullName!, "XDrishti.Application.Abstractions.Research.IStrategyStore", "XDrishti.Application.Abstractions.Lab.ILabRunStore", "XDrishti.Application.Abstractions.Lab.IStrategyChecker",
+                "XDrishti.Application.Ai.Drafting.ConfirmDraftHandler", "XDrishti.Application.Ai.Drafting.AutoDraftHandler", "XDrishti.Application.Ai.Drafting.AutoDraftCommand", "XDrishti.Application.Ai.Drafting.ConfirmDraftCommand", "XDrishti.Application.Abstractions.Market")
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
+        Types.InAssembly(Application).That().HaveName("DraftProposalTool").GetTypes().Single().GetConstructors().Single().GetParameters().Select(p => p.ParameterType.Name).Order().ShouldBe(["DraftOptions", "IDraftSheetSource", "IDraftStore", "IQueryHandler`2", "TimeProvider"]);
     }
 
     [Fact]
@@ -52,7 +65,7 @@ public sealed class AssistantDraftArchitectureTests
     [Fact]
     public void The_draft_ports_have_no_update_or_delete_and_the_model_port_has_no_tools()
     {
-        typeof(IDraftStore).GetMethods().Select(m => m.Name).Order().ShouldBe(["CountBetweenAsync", "DecisionAsync", "GetAsync", "InsertAsync", "InsertDecisionAsync", "ListAsync", "LockConfirmAsync", "ReserveIdAsync"]);
+        typeof(IDraftStore).GetMethods().Select(m => m.Name).Order().ShouldBe(["CountAutoBetweenAsync", "CountBetweenAsync", "DecisionAsync", "GetAsync", "InsertAsync", "InsertDecisionAsync", "ListAsync", "LockConfirmAsync", "ReserveIdAsync"]);
         typeof(IStrategyDrafter).GetMethods().Select(m => m.Name).ShouldBe(["DraftAsync"]);
         typeof(DraftModelRequest).GetProperties().Select(p => p.Name).Order().ShouldBe(["MaxOutputTokens", "Seed", "System", "User"]);
     }

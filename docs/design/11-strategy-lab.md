@@ -9,7 +9,7 @@ changes, no restart.
 |---------|-----|
 | **Rules editor** | React page with Monaco YAML editor, live JSON-Schema validation and autocomplete |
 | **Form builder** | Pick indicators, conditions, stops, exits from menus → generates the same YAML |
-| **Plain English** | Describe the idea to the assistant → it drafts YAML → **you confirm** |
+| **Plain English** | Describe the idea to the assistant (the Assistant screen, a chat message, or `xd assistant draft`) → it drafts YAML → the Lab validator and four checks decide whether it is offered → **you confirm** (the switch and your password) → a quick test (built P9-07, [ADR 0141](../adr/0141-a-strategy-draft-is-text-the-model-wrote-for-the-owner-to-read-the-lab-validator-and-four-checks-decide-if-it-is-offered-and-only-the-owners-confirm-with-a-switch-and-a-fresh-password-stores-a-version-or-starts-a-quick-test.md)). Drafts are text only; an optional auto quick test (off by default, your act with your password) covers only a clean draft of an idea you typed that names one of your baskets exactly |
 | **Upload / CLI** | Upload a strategy file in the Lab, or run `xd strategy test file.yaml` (built P5-07, [ADR 0061](../adr/0061-the-xd-cli-is-a-verb-of-the-api-host-behind-a-thin-script.md): `scripts/xd.sh`, a verb of the Api host) — the file is imported into the database |
 | **C# plugin** (advanced) | Implement `IStrategy` for logic the DSL can't express; compiled and run in `xd-sandbox` (no network, resource limits) |
 

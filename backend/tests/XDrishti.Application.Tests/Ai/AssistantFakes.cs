@@ -1,7 +1,9 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging.Abstractions;
 using XDrishti.Application.Abstractions.Ai;
+using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Ai;
+using XDrishti.Application.Ai.Drafting;
 using XDrishti.Domain.Assistant;
 
 namespace XDrishti.Application.Tests.Ai;
@@ -31,12 +33,18 @@ internal sealed class AssistantRig
 
     public int HealthCalls { get; private set; }
 
+    /// <summary>The drafting tool: off (the default options) unless a test sets it, so a plain turn never offers it.</summary>
+    public DraftProposalTool Proposals { get; set; } = NewProposals(new DraftOptions());
+
+    public static DraftProposalTool NewProposals(DraftOptions options) =>
+        new(NSubstitute.Substitute.For<IQueryHandler<SubmitDraftQuery, DraftEvaluation>>(), NSubstitute.Substitute.For<IDraftStore>(), NSubstitute.Substitute.For<IDraftSheetSource>(), options, TimeProvider.System);
+
     public AssistantTurnService Service()
     {
         Catalog.State = Tools;
         var settings = new FakeSettings(this);
         var health = new FakeHealth(this);
-        return new AssistantTurnService(settings, health, Catalog, new FakeNightly(this), Store, Model, Gate, Options, Time, NullLogger<AssistantTurnService>.Instance);
+        return new AssistantTurnService(settings, health, Catalog, new FakeNightly(this), Store, Model, Gate, Options, Time, Proposals, NullLogger<AssistantTurnService>.Instance);
     }
 
     public sealed class FakeSettings(AssistantRig rig) : IAssistantSettingsStore
