@@ -43,7 +43,7 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             }
         }
 
-        names.ShouldBe(["trading.fill_grades", "trading.grades", "trading.journal_entries", "trading.journal_fills", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "trading.ticket_alerts", "trading.ticket_notice_acks", "trading.ticket_prompts", "workflow.approvals", "workflow.autonomy_settings", "workflow.charge_sheet_events", "workflow.suggestion_seen", "workflow.suggestions"]);
+        names.ShouldBe(["trading.fill_grades", "trading.grades", "trading.journal_entries", "trading.journal_fills", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "trading.ticket_alerts", "trading.ticket_notice_acks", "trading.ticket_prompts", "workflow.approvals", "workflow.assistant_proposal_decisions", "workflow.assistant_proposals", "workflow.autonomy_settings", "workflow.charge_sheet_events", "workflow.suggestion_seen", "workflow.suggestions"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })

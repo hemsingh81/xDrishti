@@ -20,6 +20,7 @@ using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Ai;
 using XDrishti.Application.Ai.Briefing;
 using XDrishti.Application.Ai.Drafting;
+using XDrishti.Application.Ai.Proposals;
 using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
@@ -183,6 +184,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, BriefingService>(); // the daily briefing text after the suggestions (P9-06); starts paused, the model is used only under both switches
         services.AddSingleton<IScheduledService, WeeklyReviewService>(); // the weekly review text after the digest (P9-06); starts paused, applies nothing
+        services.AddSingleton<IScheduledService, ProposalService>(); // hypothesis and basket proposals after the digest (P9-08); starts paused, off unless Assistant:Proposals:Enabled and the master switch are on
         services.AddSingleton<IScheduledService, PaperReviewService>(); // the weekly paper review (P10-03); starts paused, builds and stores one text per week and epoch, applies nothing
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<IScheduledService, DepthRecorderService>(); // the depth recorder (P7-16): shown and edited here, run by xd-feed; starts paused, Run now is refused
@@ -590,6 +592,17 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetDraftQuery, Result<DraftView>>, GetDraftHandler>();
         services.AddScoped<IQueryHandler<ListDraftsQuery, Result<IReadOnlyList<DraftView>>>, ListDraftsHandler>();
         services.AddScoped<IQueryHandler<DraftConfirmAllowedQuery, bool>, DraftConfirmAllowedHandler>();
+        services.AddScoped<IProposalFacts, ProposalFacts>(); // what the engine knows, read through the screens' own stores and handlers (P9-08)
+        services.AddScoped<ProposalPackBuilder>();
+        services.AddScoped<ProposalEvaluator>(); // re-reads every reference and runs every rule: one code for a new proposal, a stale accept and the auto option
+        services.AddScoped<ProposalApplier>(); // the only code that writes a hypothesis or changes a basket for a proposal; never tracks, backfills, arms or orders
+        services.AddScoped<ICommandHandler<GenerateProposalsCommand, ProposalRunView>, GenerateProposalsHandler>(); // the model proposes: the only write is an inbox row (P9-08, ADR 0142)
+        services.AddScoped<ICommandHandler<AcceptProposalCommand, ProposalView>, AcceptProposalHandler>(); // the owner accepts: capability, fresh password, checks again, then the one decision
+        services.AddScoped<ICommandHandler<RejectProposalCommand, ProposalView>, RejectProposalHandler>();
+        services.AddScoped<ICommandHandler<AutoAcceptProposalsCommand, AutoAcceptOutcome>, AutoAcceptProposalsHandler>(); // the auto option: OFF by default, hypotheses only, 3 per day, recorded as auto (P9-08)
+        services.AddScoped<IQueryHandler<GetProposalQuery, Result<ProposalView>>, GetProposalHandler>();
+        services.AddScoped<IQueryHandler<ListProposalsQuery, Result<IReadOnlyList<ProposalView>>>, ListProposalsHandler>();
+        services.AddScoped<IQueryHandler<ProposalAcceptAllowedQuery, bool>, ProposalAcceptAllowedHandler>();
         services.AddScoped<IQueryHandler<ListDigestsQuery, Result<IReadOnlyList<DigestView>>>, ListDigestsHandler>();
         services.AddScoped<ICommandHandler<StoreCounterfactualCommand, StoredCounterfactual>, StoreCounterfactualHandler>(); // the counterfactual stored once per input hash; the verb's --store (P8-12, ADR 0110)
         services.AddScoped<IQueryHandler<GetCounterfactualQuery, Result<CounterfactualReportView>>, GetCounterfactualHandler>();

@@ -43,7 +43,7 @@ export const navigation: NavSection[] = [
     title: 'Decisions',
     items: [
       { path: '/plans', label: 'Plan review', icon: ChecklistIcon },
-      { path: '/suggestions', label: 'Suggestions', icon: AutoAwesomeIcon, phase: 'P9' },
+      { path: '/suggestions', label: 'Suggestions', icon: AutoAwesomeIcon },
     ],
   },
   {

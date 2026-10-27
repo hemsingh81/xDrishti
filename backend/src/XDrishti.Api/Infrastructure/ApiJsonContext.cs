@@ -15,6 +15,7 @@ using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Ai;
 using XDrishti.Application.Ai.Briefing;
 using XDrishti.Application.Ai.Drafting;
+using XDrishti.Application.Ai.Proposals;
 using XDrishti.Application.Audit;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
@@ -118,6 +119,10 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ConfirmDraftRequest))]
 [JsonSerializable(typeof(DraftView))]
 [JsonSerializable(typeof(IReadOnlyList<DraftView>))]
+[JsonSerializable(typeof(AcceptProposalRequest))]
+[JsonSerializable(typeof(RejectProposalRequest))]
+[JsonSerializable(typeof(ProposalView))]
+[JsonSerializable(typeof(IReadOnlyList<ProposalView>))]
 [JsonSerializable(typeof(BriefingView))]
 [JsonSerializable(typeof(IReadOnlyList<BriefingView>))]
 [JsonSerializable(typeof(TurnStarted))]

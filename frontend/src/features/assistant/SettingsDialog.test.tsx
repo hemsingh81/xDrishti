@@ -100,6 +100,28 @@ describe('settings dialog (owner act)', () => {
     expect(held().join()).not.toContain('right-pass');
   });
 
+  it('the two suggestion switches are off by default, need the password to turn on and send their flags', async () => {
+    mountPut(() =>
+      HttpResponse.json(statusBuilder({ allowProposalAccept: true, autoAcceptHypothesis: true, settingsId: 8 })),
+    );
+    const user = await openDialog();
+    const accept = screen.getByRole('switch', { name: 'Allow accepting suggestions' });
+    const auto = screen.getByRole('switch', { name: 'Auto-accept hypothesis suggestions' });
+    expect(accept).not.toBeChecked();
+    expect(auto).not.toBeChecked();
+    await user.click(accept);
+    await user.click(auto);
+    await user.type(screen.getByLabelText(/Reason/), 'try the suggestions');
+    const save = screen.getByRole('button', { name: 'Save' });
+    expect(save).toBeDisabled();
+    await user.type(screen.getByLabelText(/Your password/), 'right-pass');
+    await user.click(save);
+    await waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]).toMatchObject({ allowProposalAccept: true, autoAcceptHypothesis: true, password: 'right-pass' });
+  });
+
   it('shows what portfolio data off means', async () => {
     await openDialog();
     expect(screen.getByText("Off: portfolio questions answer 'not available'")).toBeInTheDocument();

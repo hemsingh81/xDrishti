@@ -4054,6 +4054,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/assistant/proposals': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The assistant's proposals, newest first (limit 1 to 100, default 50), optionally of one state (pending, accepted, rejected, expired) and kind (hypothesis, basket_add, basket_remove). A pending proposal past its expiry is shown as expired. Read only. 422 assistant.invalid */
+    get: operations['ListAssistantProposals'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/proposals/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One proposal with its evidence, the engine's checks and its decision. Read only. 404 assistant.proposal_not_found */
+    get: operations['GetAssistantProposal'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/proposals/{id}/accept': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The owner's accept: runs every engine check again, then writes a proposed hypothesis or changes a basket (never tracks an instrument, starts a backfill, approves or runs anything, or places an order). Needs a fresh password in the body and the switch allow_proposal_accept. A second accept returns the first result. 409 assistant.capability_off, assistant.proposal_closed, assistant.proposal_stale, hypotheses.open_limit */
+    post: operations['AcceptAssistantProposal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/assistant/proposals/{id}/reject': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The owner rejects a proposal (no password: the safe direction); the same idea is not proposed again for 30 days. A second reject returns the first result. 409 assistant.proposal_closed; 422 assistant.invalid */
+    post: operations['RejectAssistantProposal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/assistant/strategy-drafts': {
     parameters: {
       query?: never;
@@ -4433,6 +4501,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** @description The body of `POST /api/assistant/proposals/{id}/accept` (spec P9-08 AC 9): the owner's password for THIS accept. The actor is never in it. */
+    AcceptProposalRequest: {
+      password: null | string;
+    };
     /** @description Accepting a suggested dividend: optionally the holding it is for (one of the account's; none: unallocated) and a note. The amount and the date are the ledger entry's. */
     AcceptSuggestionInput: {
       /** Format: uuid */
@@ -8224,7 +8296,7 @@ export interface components {
       value: string;
       why: string;
     };
-    /** @description What the owner's confirm made: the stored version, the quick test (or why it did not start) and whether the owner edited the text. */
+    /** @description What the owner's confirm made: the stored version, the quick test and whether the owner edited the text. `RunError` is the code of the refusal when a requested quick test could not start (the version is stored anyway). */
     DraftConfirmed: {
       strategyId: string;
       /** Format: int32 */
@@ -8587,6 +8659,14 @@ export interface components {
       /** Format: date-time */
       at: null | string;
       detail: null | string;
+    };
+    /** @description One figure of the evidence, built by the engine (P8-00 D1). Value is empty unless State is `value`: a figure that is insufficient or unavailable shows a word and no digit. */
+    EvidenceFigure: {
+      label: string;
+      value: string;
+      state: string;
+      /** Format: int32 */
+      n: null | number;
     };
     /** @description The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words. */
     EvidenceView: {
@@ -13038,6 +13118,69 @@ export interface components {
       /** Format: int32 */
       snoozesLeft: number;
     };
+    /** @description One engine check of a proposal: a stable id, whether it passed, and the detail in words. */
+    ProposalCheck: {
+      code: string;
+      ok: boolean;
+      detail: string;
+    };
+    /** @description The decision on a proposal. Auto is true for the auto option: such a decision is never an owner approval. */
+    ProposalDecisionView: {
+      state: string;
+      actor: string;
+      auto: boolean;
+      reason: null | string;
+      resultRef: null | string;
+      /** Format: date-time */
+      decidedAt: string;
+    };
+    /** @description The evidence of a proposal (AC 3): basis, population run keys, date range, n, figures with states and the honest limits. Built by the engine from the references, never from the model's text. */
+    ProposalEvidence: {
+      basis: string;
+      population: string[];
+      dateRange: null | string;
+      /** Format: int32 */
+      n: number;
+      figures: components['schemas']['EvidenceFigure'][];
+      limits: string[];
+    };
+    /** @description The knob of a hypothesis proposal. */
+    ProposalKnobView: {
+      name: string;
+      kind: string;
+      baselineValue: string;
+      candidateValue: string;
+    };
+    /** @description The payload as the API shows it: the fields of the kind are set, the others are null. */
+    ProposalPayloadView: {
+      baselineRunKey: null | string;
+      cellKey: null | string;
+      knob: null | components['schemas']['ProposalKnobView'];
+      /** Format: uuid */
+      basketId: null | string;
+      symbol: null | string;
+    };
+    /** @description One proposal as the API shows it (spec P9-08 Contract). The text fields are text: a screen renders them as text. */
+    ProposalView: {
+      /** Format: int64 */
+      id: number;
+      kind: string;
+      subject: string;
+      state: string;
+      reason: string;
+      payload: components['schemas']['ProposalPayloadView'];
+      evidence: components['schemas']['ProposalEvidence'];
+      checks: components['schemas']['ProposalCheck'][];
+      effect: string;
+      notes: string[];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      expiresAt: string;
+      createdBy: string;
+      modelId: null | string;
+      decision: null | components['schemas']['ProposalDecisionView'];
+    };
     /** @description A bucket stored and recomputed side by side; `fields` name what differs (open, high, low, close, volume, bars) or `missing` / `unexpected`; `stored` or `recomputed` is null when there is none. */
     QualityBucketRow: {
       timeframe: string;
@@ -13437,6 +13580,10 @@ export interface components {
       autoRefresh: components['schemas']['AutoRefreshView'];
       /** Format: int32 */
       totalActive: number;
+    };
+    /** @description The body of `POST /api/assistant/proposals/{id}/reject` (AC 10): an optional reason of at most 300 characters. */
+    RejectProposalRequest: {
+      reason: null | string;
     };
     /** @description The body of a rejection. */
     RejectTicketRequest: {
@@ -25709,6 +25856,194 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListAssistantProposals: {
+    parameters: {
+      query?: {
+        state?: string;
+        kind?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAssistantProposal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  AcceptAssistantProposal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AcceptProposalRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RejectAssistantProposal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RejectProposalRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

@@ -11,6 +11,7 @@
 #   scripts/xd.sh learn phase-check [--replay-seconds X]   (P6-18, ADR 0080: the P6 exit criteria from stored records, MET / NOT MET / NOT EVALUABLE, limits printed)
 #   scripts/xd.sh plan run [--date YYYY-MM-DD] [--dry-run]   (P7-08, ADR 0086: the fail-closed nightly pipeline now; a failing gate publishes nothing and exits 1; --dry-run writes nothing)
 #   scripts/xd.sh assistant draft "<idea>" [--show]   (P9-07b: asks the model for a strategy DRAFT, text only; confirming is the owner's act on the Assistant screen)
+#   scripts/xd.sh assistant propose [--kind K] [--cell KEY] [--dry-run]   (P9-08: asks the model for up to three hypothesis or basket proposals; the engine checks them; proposals only, the owner decides on the Suggestions screen)
 #   scripts/xd.sh assistant briefing [--kind daily|weekly] [--subject S] [--store] [--new-version]   (P9-06, ADR 0140: the briefing or weekly review text; prints the fixed-format text, --store keeps it; the model phrases only under both switches)
 #   scripts/xd.sh plan phase-check [--through YYYY-MM-DD]   (P7-18, ADR 0097: the P7 exit criteria from stored plan runs, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
 #   scripts/xd.sh reports phase-check   (P8-17, ADR 0126: the P8 exit criteria from stored runs, MET / NOT MET / NOT EVALUABLE, limits printed; read only)

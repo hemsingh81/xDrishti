@@ -14,6 +14,7 @@ public static class PromptRegistry
     private const string ChatResource = "XDrishti.Application.Ai.Prompts.system.v1.txt";
     private const string BriefingResource = "XDrishti.Application.Ai.Prompts.briefing.v1.txt";
     private const string DraftResource = "XDrishti.Application.Ai.Prompts.draft.v1.txt";
+    private const string ProposalResource = "XDrishti.Application.Ai.Prompts.proposal.v1.txt";
 
     /// <summary>The system prompt of a chat turn.</summary>
     public static PromptVersion Chat { get; } = Load("chat", "v1", ChatResource);
@@ -24,8 +25,11 @@ public static class PromptRegistry
     /// <summary>The system prompt of a strategy draft (spec P9-07); the generated language sheet is added to it at run time and its hash is stored with every draft.</summary>
     public static PromptVersion Draft { get; } = Load("draft", "v1", DraftResource);
 
+    /// <summary>The system prompt of hypothesis and basket proposals (spec P9-08): the pack is added to the user message at run time.</summary>
+    public static PromptVersion Proposal { get; } = Load("proposal", "v1", ProposalResource);
+
     /// <summary>Every registered prompt.</summary>
-    public static IReadOnlyList<PromptVersion> All { get; } = [Chat, Briefing, Draft];
+    public static IReadOnlyList<PromptVersion> All { get; } = [Chat, Briefing, Draft, Proposal];
 
     private static PromptVersion Load(string name, string version, string resource)
     {

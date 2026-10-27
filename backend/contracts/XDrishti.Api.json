@@ -14065,6 +14065,271 @@
         }
       }
     },
+    "/api/assistant/proposals": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "The assistant's proposals, newest first (limit 1 to 100, default 50), optionally of one state (pending, accepted, rejected, expired) and kind (hypothesis, basket_add, basket_remove). A pending proposal past its expiry is shown as expired. Read only. 422 assistant.invalid",
+        "operationId": "ListAssistantProposals",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProposalView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/proposals/{id}": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "One proposal with its evidence, the engine's checks and its decision. Read only. 404 assistant.proposal_not_found",
+        "operationId": "GetAssistantProposal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/proposals/{id}/accept": {
+      "post": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "The owner's accept: runs every engine check again, then writes a proposed hypothesis or changes a basket (never tracks an instrument, starts a backfill, approves or runs anything, or places an order). Needs a fresh password in the body and the switch allow_proposal_accept. A second accept returns the first result. 409 assistant.capability_off, assistant.proposal_closed, assistant.proposal_stale, hypotheses.open_limit",
+        "operationId": "AcceptAssistantProposal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptProposalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/proposals/{id}/reject": {
+      "post": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "The owner rejects a proposal (no password: the safe direction); the same idea is not proposed again for 30 days. A second reject returns the first result. 409 assistant.proposal_closed; 422 assistant.invalid",
+        "operationId": "RejectAssistantProposal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectProposalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/assistant/strategy-drafts": {
       "post": {
         "tags": [
@@ -15405,6 +15670,21 @@
   },
   "components": {
     "schemas": {
+      "AcceptProposalRequest": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The body of `POST /api/assistant/proposals/{id}/accept` (spec P9-08 AC 9): the owner's password for THIS accept. The actor is never in it."
+      },
       "AcceptSuggestionInput": {
         "required": [
           "holdingId",
@@ -25801,7 +26081,7 @@
             ]
           }
         },
-        "description": "What the owner's confirm made: the stored version, the quick test (or why it did not start) and whether the owner edited the text."
+        "description": "What the owner's confirm made: the stored version, the quick test and whether the owner edited the text. `RunError` is the code of the refusal when a requested quick test could not start (the version is stored anyway)."
       },
       "DraftFinding": {
         "required": [
@@ -26768,6 +27048,34 @@
           }
         },
         "description": "The result of the assistant's evaluation (P9-09): `not_yet_evaluated` until that slice writes one."
+      },
+      "EvidenceFigure": {
+        "required": [
+          "label",
+          "value",
+          "state",
+          "n"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "n": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "One figure of the evidence, built by the engine (P8-00 D1). Value is empty unless State is `value`: a figure that is insufficient or unavailable shows a word and no digit."
       },
       "EvidenceView": {
         "required": [
@@ -37929,6 +38237,269 @@
         },
         "description": "One post-trade prompt with its derived status (open, matched, expired_no_fill, ambiguous) and, when matched, how (journal or trade_on_record). `sameTradeItems` names the other tickets of an ambiguous prompt."
       },
+      "ProposalCheck": {
+        "required": [
+          "code",
+          "ok",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "description": "One engine check of a proposal: a stable id, whether it passed, and the detail in words."
+      },
+      "ProposalDecisionView": {
+        "required": [
+          "state",
+          "actor",
+          "auto",
+          "reason",
+          "resultRef",
+          "decidedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "auto": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "resultRef": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "The decision on a proposal. Auto is true for the auto option: such a decision is never an owner approval."
+      },
+      "ProposalEvidence": {
+        "required": [
+          "basis",
+          "population",
+          "dateRange",
+          "n",
+          "figures",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string"
+          },
+          "population": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dateRange": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "figures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvidenceFigure"
+            }
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The evidence of a proposal (AC 3): basis, population run keys, date range, n, figures with states and the honest limits. Built by the engine from the references, never from the model's text."
+      },
+      "ProposalKnobView": {
+        "required": [
+          "name",
+          "kind",
+          "baselineValue",
+          "candidateValue"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "baselineValue": {
+            "type": "string"
+          },
+          "candidateValue": {
+            "type": "string"
+          }
+        },
+        "description": "The knob of a hypothesis proposal."
+      },
+      "ProposalPayloadView": {
+        "required": [
+          "baselineRunKey",
+          "cellKey",
+          "knob",
+          "basketId",
+          "symbol"
+        ],
+        "type": "object",
+        "properties": {
+          "baselineRunKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cellKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "knob": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ProposalKnobView"
+              }
+            ]
+          },
+          "basketId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The payload as the API shows it: the fields of the kind are set, the others are null."
+      },
+      "ProposalView": {
+        "required": [
+          "id",
+          "kind",
+          "subject",
+          "state",
+          "reason",
+          "payload",
+          "evidence",
+          "checks",
+          "effect",
+          "notes",
+          "createdAt",
+          "expiresAt",
+          "createdBy",
+          "modelId",
+          "decision"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ProposalPayloadView"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/ProposalEvidence"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposalCheck"
+            }
+          },
+          "effect": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "modelId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "decision": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ProposalDecisionView"
+              }
+            ]
+          }
+        },
+        "description": "One proposal as the API shows it (spec P9-08 Contract). The text fields are text: a screen renders them as text."
+      },
       "QualityBucketRow": {
         "required": [
           "timeframe",
@@ -39069,6 +39640,21 @@
           }
         },
         "description": "Where the master list stands: the refresh in progress (if any), the last finished one, the automatic schedule and how many instruments are active."
+      },
+      "RejectProposalRequest": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The body of `POST /api/assistant/proposals/{id}/reject` (AC 10): an optional reason of at most 300 characters."
       },
       "RejectTicketRequest": {
         "required": [

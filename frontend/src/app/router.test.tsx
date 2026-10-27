@@ -34,11 +34,13 @@ describe('app routes', () => {
     expect(await within(drawer).findByRole('link', { name: 'Accounts, 1 needs reconnecting' })).toBeVisible();
   });
 
-  it('shows the roadmap phase for screens that are not built yet', async () => {
+  it('opens the Suggestions screen (no longer a placeholder)', async () => {
+    server.use(http.get('/api/assistant/proposals', () => HttpResponse.json([])));
     renderRoutes(routes, { initialPath: '/suggestions' });
 
-    const note = await screen.findByText(/This screen is planned for roadmap phase/);
-    expect(within(note).getByText('P9')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Suggestions' })).toBeInTheDocument();
+    expect(await screen.findByText('No suggestions')).toBeInTheDocument();
+    expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
   });
 
   it('opens the Learning screen (no longer a placeholder) and marks it in the navigation', async () => {

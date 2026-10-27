@@ -18,6 +18,7 @@ const WRITER_FEATURES = new Set([
   'quality',
   'services',
   'settings',
+  'suggestions',
 ]);
 
 const sources = import.meta.glob<string>(

@@ -6,6 +6,7 @@ using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Ai;
 using XDrishti.Application.Ai.Briefing;
 using XDrishti.Application.Ai.Drafting;
+using XDrishti.Application.Ai.Proposals;
 
 namespace XDrishti.Infrastructure.Ai.Assistant;
 
@@ -27,6 +28,8 @@ public static class AssistantRegistration
         services.AddOptions<BriefingOptions>().Bind(configuration.GetSection(BriefingOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
         services.AddOptions<DraftOptions>().Bind(configuration.GetSection(DraftOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<DraftOptions>>().Value);
+        services.AddOptions<ProposalOptions>().Bind(configuration.GetSection(ProposalOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<ProposalOptions>>().Value);
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton(sp =>
         {
@@ -41,6 +44,11 @@ public static class AssistantRegistration
         services.AddScoped<IBriefingStore, BriefingStore>();
         services.AddScoped<IStrategyDrafter, StrategyDrafter>();
         services.AddScoped<IDraftStore, DraftStore>();
+        services.AddScoped<IProposalModel, ProposalModel>();
+        services.AddScoped<ProposalStore>();
+        services.AddScoped<IProposalInbox>(sp => sp.GetRequiredService<ProposalStore>()); // the model's only write: an insert-only inbox row (P9-08)
+        services.AddScoped<IProposalReader>(sp => sp.GetRequiredService<ProposalStore>());
+        services.AddScoped<IProposalDecisions>(sp => sp.GetRequiredService<ProposalStore>()); // used by the accept, reject and auto handlers only
         services.AddSingleton<IDraftSheetSource, DraftSheetBuilder>();
         services.AddSingleton<IStrategyTextReader, StrategyTextReader>();
         services.AddScoped<IAssistantSettingsStore, AssistantSettingsStore>();

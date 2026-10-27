@@ -52,7 +52,7 @@ internal sealed class ProposeHypothesisHandler(IRunStore runs, IHypothesisLog lo
 
         var now = time.GetUtcNow();
         var row = new NewHypothesisRow(
-            null, HypothesisState.Proposed.Code(), null, command.Source.ToString().ToLowerInvariant(), command.CellKey, command.Knob.Name, command.Knob.Kind.ToString(), command.Knob.BaselineValue, command.Knob.CandidateValue,
+            null, HypothesisState.Proposed.Code(), null, command.Source == HypothesisSource.Assistant ? "model" : command.Source.ToString().ToLowerInvariant(), command.CellKey, command.Knob.Name, command.Knob.Kind.ToString(), command.Knob.BaselineValue, command.Knob.CandidateValue,
             command.Rationale, command.BaselineRunKey, null, null, "proposed", command.Actor, now);
         var appended = await log.ProposeAsync(row, HypothesisLifecycle.DefaultMaxOpen, cancellationToken);
         if (appended.Status != HypothesisAppendStatus.Created)

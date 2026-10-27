@@ -159,6 +159,11 @@ internal static class XdCommand
             return await AssistantDraftCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "assistant" && args[1] == "propose")
+        {
+            return await AssistantProposeCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "plan" && args[1] == "grade")
         {
             return await PlanGradeCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);

@@ -365,7 +365,7 @@ public sealed class AssistantDraftApiTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task Enabling_the_auto_quick_test_needs_the_password_the_other_inert_switches_stay_refused_and_turning_it_off_is_free()
+    public async Task Enabling_the_auto_quick_test_and_the_two_proposal_switches_needs_the_password_and_turning_them_off_is_free()
     {
         await SettingsAsync(enabled: true, allowConfirm: false);
         var (host, _) = NewHost(enabled: true);
@@ -384,17 +384,22 @@ public sealed class AssistantDraftApiTests(ApiFactory factory)
         using var hypothesisOn = await client.PutAsJsonAsync(settings, Body(await CurrentIdAsync(), password, hypothesis: true), Ct);
         using var on = await client.PutAsJsonAsync(settings, Body(await CurrentIdAsync(), password, auto: true), Ct);
         var onStatus = await on.Content.ReadFromJsonAsync<JsonElement>(Ct);
-        using var off = await client.PutAsJsonAsync(settings, Body(onStatus.GetProperty("settingsId").GetInt64(), null, auto: false), Ct);
+        using var off = await client.PutAsJsonAsync(settings, Body(onStatus.GetProperty("settingsId").GetInt64(), null, auto: false, proposal: false, hypothesis: false), Ct);
 
         noPassword.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         wrong.StatusCode.ShouldNotBe(HttpStatusCode.OK);
-        proposalOn.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await proposalOn.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("code").GetString().ShouldBe("assistant.setting_not_available");
-        hypothesisOn.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        proposalOn.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await proposalOn.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("allowProposalAccept").GetBoolean().ShouldBeTrue();
+        hypothesisOn.StatusCode.ShouldBe(HttpStatusCode.OK);
         on.StatusCode.ShouldBe(HttpStatusCode.OK);
         onStatus.GetProperty("autoLabQuickTest").GetBoolean().ShouldBeTrue();
+        onStatus.GetProperty("allowProposalAccept").GetBoolean().ShouldBeTrue();
+        onStatus.GetProperty("autoAcceptHypothesis").GetBoolean().ShouldBeTrue();
         off.StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await off.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("autoLabQuickTest").GetBoolean().ShouldBeFalse();
+        var offStatus = await off.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        offStatus.GetProperty("autoLabQuickTest").GetBoolean().ShouldBeFalse();
+        offStatus.GetProperty("allowProposalAccept").GetBoolean().ShouldBeFalse();
+        offStatus.GetProperty("autoAcceptHypothesis").GetBoolean().ShouldBeFalse();
         (await CountAsync("ai.settings", $"changed_by = '{Owner}' AND auto_lab_quick_test AND length(snapshot_hash) = 64")).ShouldBeGreaterThan(0);
     }
 

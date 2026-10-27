@@ -1,6 +1,6 @@
 # P9-08 — Hypothesis and suggestion proposals (the model proposes, the engine checks, the owner decides)
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-27 (hypothesis, basket_add, basket_remove; next_day_focus, insight references and the new-trades/drift triggers cut, see ADR 0142); earlier: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P9 — AI assistant and Hermes PoC ("hypothesis proposals", doc 14 §4 feature 4 and the suggestions row of §1); slice of [P9-00](P9-00-ai-assistant-plan.md) (written in parallel; UNVERIFIED text).
 - **Design refs:** docs/design/14-ai-assistant.md §1 (rows "Propose hypotheses", "Suggest instruments / basket changes / next-day focus"), §3 · docs/design/09-learning-engine.md §5 (hypothesis loop), §6 (guards) · docs/design/04-accounts-access-and-operations.md §4.1, §4.3 (suggestions inbox) · P6-10 / ADR 0076 (hypotheses) · P7-09 / ADR 0092 (plan suggestions) · ADR 0072 (trials) · P8-00 D1, D3.
 - **Needs:** P9-07 (its migration `AddAiWriteSwitches` adds the `ai.settings` columns used here), P9-01 (`IChatClient`), P9-03 (schema `ai`, settings endpoint, call audit), P9-06 (`TextGuard`), P6-10 (built), P8-06 (reports reads; optional, kinds that need it say `unavailable`). Used by: P9-09 (the proposal checks are part of set B's harness tests).

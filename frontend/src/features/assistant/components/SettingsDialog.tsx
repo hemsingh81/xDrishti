@@ -6,6 +6,7 @@ import { useToast } from '@/shared/ui/toastContext';
 import { useChangeSettings, type AssistantStatus } from '../api/assistantApi';
 import { words } from '../lib/wording';
 import { DraftSwitches } from './DraftSwitches';
+import { ProposalSwitches } from './ProposalSwitches';
 
 const maxReason = 500;
 
@@ -40,6 +41,8 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
   const [maxCalls, setMaxCalls] = useState(String(status.maxToolCalls));
   const [draftConfirm, setDraftConfirm] = useState(status.allowDraftConfirm);
   const [autoQuick, setAutoQuick] = useState(status.autoLabQuickTest);
+  const [proposalAccept, setProposalAccept] = useState(status.allowProposalAccept);
+  const [autoHypothesis, setAutoHypothesis] = useState(status.autoAcceptHypothesis);
   const [reason, setReason] = useState('');
   const [password, setPassword] = useState('');
   const [problem, setProblem] = useState<FormProblem | null>(null);
@@ -56,6 +59,8 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
     setMaxCalls(String(status.maxToolCalls));
     setDraftConfirm(status.allowDraftConfirm);
     setAutoQuick(status.autoLabQuickTest);
+    setProposalAccept(status.allowProposalAccept);
+    setAutoHypothesis(status.autoAcceptHypothesis);
   }
 
   const calls = Number(maxCalls);
@@ -65,12 +70,16 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
     (portfolio && !status.portfolioContext) ||
     (callsOk && calls > status.maxToolCalls) ||
     (draftConfirm && !status.allowDraftConfirm) ||
-    (autoQuick && !status.autoLabQuickTest);
+    (autoQuick && !status.autoLabQuickTest) ||
+    (proposalAccept && !status.allowProposalAccept) ||
+    (autoHypothesis && !status.autoAcceptHypothesis);
   const changed =
     enabled !== status.enabled ||
     portfolio !== status.portfolioContext ||
     draftConfirm !== status.allowDraftConfirm ||
     autoQuick !== status.autoLabQuickTest ||
+    proposalAccept !== status.allowProposalAccept ||
+    autoHypothesis !== status.autoAcceptHypothesis ||
     (callsOk && calls !== status.maxToolCalls);
   const ready =
     changed &&
@@ -95,6 +104,8 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
         maxToolCalls: calls,
         allowDraftConfirm: draftConfirm,
         autoLabQuickTest: autoQuick,
+        allowProposalAccept: proposalAccept,
+        autoAcceptHypothesis: autoHypothesis,
         reason,
         expectedSettingsId: status.settingsId ?? 0,
         // The password travels only for a change that turns something on or raises it.
@@ -163,6 +174,12 @@ function SettingsForm({ status, onClose }: { status: AssistantStatus; onClose: (
             onDraftConfirm={setDraftConfirm}
             autoQuick={autoQuick}
             onAutoQuick={setAutoQuick}
+          />
+          <ProposalSwitches
+            accept={proposalAccept}
+            onAccept={setProposalAccept}
+            auto={autoHypothesis}
+            onAuto={setAutoHypothesis}
           />
           <TextField
             label="Maximum tool calls"

@@ -84,6 +84,8 @@ Built (P6-11, [ADR 0072](../adr/0072-experiments-same-entries-purged-folds-an-ho
 
 ## 5. Hypothesis loop (one variable at a time)
 
+> As built (P9-08, [ADR 0142](../adr/0142-a-proposal-is-a-row-the-model-wrote-in-an-inbox-after-the-engine-re-read-its-evidence-and-checked-every-rule-and-only-the-owners-accept-with-a-switch-and-a-fresh-password-writes-a-proposed-hypothesis-or-changes-a-basket.md)): the local model may propose a hypothesis (stored source `model`) into the Suggestions inbox; the engine re-reads the evidence and checks the bounds; only the owner's accept writes it, still `proposed`.
+
 ```mermaid
 flowchart LR
     T["Trigger<br/>weekly · ≥30 new trades in a cell · drift alarm"] --> R["Reflect<br/>LLM reads reports via read-only tools"]

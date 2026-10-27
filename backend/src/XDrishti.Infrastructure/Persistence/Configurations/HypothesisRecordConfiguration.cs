@@ -17,7 +17,7 @@ internal sealed class HypothesisRecordConfiguration : IEntityTypeConfiguration<H
         builder.ToTable("hypotheses", Schemas.Research, t =>
         {
             t.HasCheckConstraint("ck_hypotheses_state", $"state IN ({States}) AND (from_state IS NULL OR from_state IN ({States})) AND (state = 'proposed') = (from_state IS NULL) AND (state = 'proposed') = (hypothesis_id IS NULL) AND state IS DISTINCT FROM from_state");
-            t.HasCheckConstraint("ck_hypotheses_shape", "source IN ('owner', 'grid') AND knob_kind IN ('Parameter', 'Exit', 'Slippage') AND baseline_run_key ~ '^[0-9a-f]{64}$' AND (candidate_run_key IS NULL OR (candidate_run_key ~ '^[0-9a-f]{64}$' AND candidate_run_key <> baseline_run_key))");
+            t.HasCheckConstraint("ck_hypotheses_shape", "source IN ('owner', 'grid', 'model') AND knob_kind IN ('Parameter', 'Exit', 'Slippage') AND baseline_run_key ~ '^[0-9a-f]{64}$' AND (candidate_run_key IS NULL OR (candidate_run_key ~ '^[0-9a-f]{64}$' AND candidate_run_key <> baseline_run_key))");
             t.HasCheckConstraint("ck_hypotheses_links", "(state NOT IN ('running', 'judged', 'accepted') OR candidate_run_key IS NOT NULL) AND (state NOT IN ('judged', 'accepted') OR experiment_id IS NOT NULL)");
         });
         builder.HasKey(x => x.Id).HasName("pk_hypotheses");

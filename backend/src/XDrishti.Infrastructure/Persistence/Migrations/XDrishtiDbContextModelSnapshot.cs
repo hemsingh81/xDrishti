@@ -3840,7 +3840,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_hypotheses_links", "(state NOT IN ('running', 'judged', 'accepted') OR candidate_run_key IS NOT NULL) AND (state NOT IN ('judged', 'accepted') OR experiment_id IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_hypotheses_shape", "source IN ('owner', 'grid') AND knob_kind IN ('Parameter', 'Exit', 'Slippage') AND baseline_run_key ~ '^[0-9a-f]{64}$' AND (candidate_run_key IS NULL OR (candidate_run_key ~ '^[0-9a-f]{64}$' AND candidate_run_key <> baseline_run_key))");
+                            t.HasCheckConstraint("ck_hypotheses_shape", "source IN ('owner', 'grid', 'model') AND knob_kind IN ('Parameter', 'Exit', 'Slippage') AND baseline_run_key ~ '^[0-9a-f]{64}$' AND (candidate_run_key IS NULL OR (candidate_run_key ~ '^[0-9a-f]{64}$' AND candidate_run_key <> baseline_run_key))");
 
                             t.HasCheckConstraint("ck_hypotheses_state", "state IN ('proposed', 'approved', 'running', 'judged', 'accepted', 'rejected', 'expired') AND (from_state IS NULL OR from_state IN ('proposed', 'approved', 'running', 'judged', 'accepted', 'rejected', 'expired')) AND (state = 'proposed') = (from_state IS NULL) AND (state = 'proposed') = (hypothesis_id IS NULL) AND state IS DISTINCT FROM from_state");
                         });
@@ -6710,6 +6710,185 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_ai_tool_calls_result_bytes", "result_bytes >= 0 AND result_bytes <= 10485760");
 
                             t.HasCheckConstraint("ck_ai_tool_calls_status", "status IN ('ok', 'error', 'timeout', 'refused', 'disabled')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AssistantProposalDecisionRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("actor");
+
+                    b.Property<bool>("Auto")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto");
+
+                    b.Property<DateTimeOffset>("DecidedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("decision");
+
+                    b.Property<long>("ProposalId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("proposal_id");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("ResultRef")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("result_ref");
+
+                    b.Property<long?>("SettingsId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("settings_id");
+
+                    b.Property<string>("SnapshotHash")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("snapshot_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_assistant_proposal_decisions");
+
+                    b.HasIndex("DecidedAt")
+                        .HasDatabaseName("ix_assistant_proposal_decisions_decided_at");
+
+                    b.HasIndex("ProposalId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_assistant_proposal_decisions_proposal_id");
+
+                    b.ToTable("assistant_proposal_decisions", "workflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_assistant_proposal_decisions_auto", "(actor = 'system:auto-accept') = auto AND (NOT auto OR (decision = 'accepted' AND settings_id IS NOT NULL AND snapshot_hash IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_assistant_proposal_decisions_decision", "decision IN ('accepted', 'rejected')");
+
+                            t.HasCheckConstraint("ck_assistant_proposal_decisions_result", "decision <> 'accepted' OR result_ref IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AssistantProposalRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ChecksJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("checks_json");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateOnly>("CreatedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("created_on");
+
+                    b.Property<string>("DedupeKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("dedupe_key");
+
+                    b.Property<string>("EvidenceJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("evidence_json");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("ModelId")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("model_id");
+
+                    b.Property<string>("ModelSha256")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("model_sha256");
+
+                    b.Property<string>("PackHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("pack_hash");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("prompt_version");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("subject");
+
+                    b.HasKey("Id")
+                        .HasName("pk_assistant_proposals");
+
+                    b.HasIndex("CreatedAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_assistant_proposals_created_at");
+
+                    b.HasIndex("DedupeKey", "CreatedOn")
+                        .IsUnique()
+                        .HasDatabaseName("ux_assistant_proposals_dedupe_key_created_on");
+
+                    b.ToTable("assistant_proposals", "workflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_assistant_proposals_kind", "kind IN ('hypothesis', 'basket_add', 'basket_remove')");
+
+                            t.HasCheckConstraint("ck_assistant_proposals_shape", "length(dedupe_key) = 64 AND length(btrim(reason)) > 0 AND length(btrim(subject)) > 0 AND jsonb_typeof(payload) = 'object' AND expires_at > created_at");
                         });
                 });
 
@@ -9930,6 +10109,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_tool_calls_conversations_conversation_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AssistantProposalDecisionRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Persistence.AssistantProposalRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ProposalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_assistant_proposal_decisions_assistant_proposals_proposal_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Planning.ApprovalRecord", b =>
