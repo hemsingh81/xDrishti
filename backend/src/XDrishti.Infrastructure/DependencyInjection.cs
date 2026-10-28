@@ -204,6 +204,12 @@ public static class DependencyInjection
         services.AddOptions<LiveProtectOptions>().Bind(configuration.GetSection(LiveProtectOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
         services.AddSingleton<ILiveCaptureSettings, ConfiguredLiveCaptureSettings>();
         services.AddScoped<ILiveCaptureStore, LiveCaptureStore>(); // the live capture record: five insert-only tables (P11-01)
+        services.AddOptions<LiveBucketOptions>().Bind(configuration.GetSection(LiveBucketOptions.SectionName)).Validate(LiveBucketOptions.IsValid, LiveBucketOptions.InvalidMessage).ValidateOnStart(); // the liquidity bucket edges (P11-02)
+        services.AddOptions<LiveEstimatesOptions>().Bind(configuration.GetSection(LiveEstimatesOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the weekly estimates; Enabled seeds the service OFF
+        services.AddOptions<LiveCapacityOptions>().Bind(configuration.GetSection(LiveCapacityOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
+        services.AddSingleton<ILiveEstimateSettings, ConfiguredLiveEstimateSettings>();
+        services.AddScoped<ILiveExecutionStore, LiveExecutionStore>(); // the execution feedback: four insert-only tables (P11-02)
+        services.AddScoped<ILiveExecutionMarket, LiveExecutionMarket>(); // tick, turnover and 1-minute bars of the stored market data
         services.AddScoped<IBrokerTradeBook, DhanTradeBookClient>(); // GET /v2/trades, the day's trade book: read only (P11-01, ADR 0149)
         services.AddScoped<IBrokerOrderBook, DhanOrderBookClient>(); // GET /v2/orders, the day's order book: read only, never an order action (P11-01, ADR 0149)
         services.AddScoped<IComplianceStore, ComplianceStore>(); // the compliance record of the live phase, insert-only (P11-05)

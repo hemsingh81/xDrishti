@@ -16,7 +16,7 @@ internal static class LiveCaptureCommand
     public const string Usage = """
         usage:
           xd live capture [--account ID] [--date YYYY-MM-DD]
-            one read-only poll of today's trade book (and order book when Live:Capture:OrderBook:Enabled is on), then the settle of the date (default today)
+            one read-only poll of today's trade book (and order book when Live:Capture:OrderBook:Enabled is on), then the settle of the date (default today) and the measuring of its executions against the plan (P11-02)
           xd live outcomes [--account ID] [--date YYYY-MM-DD]
             prints the stored outcome of every approved live ticket of the date (default today); nothing is read from Dhan
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
@@ -58,7 +58,15 @@ internal static class LiveCaptureCommand
                 }
 
                 await console.Out.WriteLineAsync("settle: " + SimulateOptions.Show(settle.Value.Summary));
-                return poll.Value.Failed > 0 || settle.Value.Failed > 0 ? XdCommand.Failed : XdCommand.Done;
+                var measured = await scope.ServiceProvider.GetRequiredService<ICommandHandler<ComputeLiveExecutionsCommand, LiveExecutionsOutcome>>().HandleAsync(new ComputeLiveExecutionsCommand(date, account), cancellationToken);
+                if (measured.IsFailure)
+                {
+                    await console.Error.WriteLineAsync(SimulateOptions.Show(measured.Error.Code + ": " + measured.Error.Message));
+                    return XdCommand.Refused;
+                }
+
+                await console.Out.WriteLineAsync("executions: " + SimulateOptions.Show(measured.Value.Summary));
+                return poll.Value.Failed > 0 || settle.Value.Failed > 0 || measured.Value.Failed > 0 ? XdCommand.Failed : XdCommand.Done;
             }
 
             var day = date ?? DateOnly.FromDateTime(DateTime.UtcNow.AddMinutes(330));

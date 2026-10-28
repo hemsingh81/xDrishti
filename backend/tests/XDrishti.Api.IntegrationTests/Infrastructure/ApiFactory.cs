@@ -242,6 +242,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM workflow.suggestion_seen;
                 DELETE FROM workflow.suggestions;
                 DELETE FROM trading.plan_item_allocations;
+                DELETE FROM trading.capacity_scores;
+                DELETE FROM trading.slippage_estimates;
+                DELETE FROM trading.live_order_classes;
+                DELETE FROM trading.live_executions;
                 DELETE FROM trading.live_ticket_outcomes;
                 DELETE FROM trading.live_fill_charges;
                 DELETE FROM trading.live_fills;
@@ -398,6 +402,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM workflow.suggestion_seen;
                 DELETE FROM workflow.suggestions;
                 DELETE FROM trading.plan_item_allocations;
+                DELETE FROM trading.capacity_scores;
+                DELETE FROM trading.slippage_estimates;
+                DELETE FROM trading.live_order_classes;
+                DELETE FROM trading.live_executions;
                 DELETE FROM trading.live_ticket_outcomes;
                 DELETE FROM trading.live_fill_charges;
                 DELETE FROM trading.live_fills;

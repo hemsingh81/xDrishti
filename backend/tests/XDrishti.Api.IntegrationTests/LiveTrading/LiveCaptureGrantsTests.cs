@@ -5,15 +5,15 @@ using XDrishti.Infrastructure.Persistence;
 namespace XDrishti.Api.IntegrationTests.LiveTrading;
 
 /// <summary>
-/// P11-01 criterion 11 (grants): the runtime role xd_app (no such role in the test databases, so the test creates it with the production default privileges in a scratch database and runs the real migrations there) can insert and select the five
-/// live-capture tables and cannot update, delete or truncate them; the migration has a working Down.
+/// P11-01 criterion 11 (grants): the runtime role xd_app (no such role in the test databases, so the test creates it with the production default privileges in a scratch database and runs the real migrations there) can insert and select the nine
+/// live-capture and execution-feedback tables (P11-01, P11-02) and cannot update, delete or truncate them; the migration has a working Down.
 /// </summary>
 [Collection(ApiTestSuite.Name)]
 public sealed class LiveCaptureGrantsTests(ApiFactory factory)
 {
     private const string ScratchDatabase = "xd_live_capture_grants_probe";
 
-    private static readonly string[] Tables = ["live_capture_runs", "live_fills", "live_fill_charges", "live_orders", "live_ticket_outcomes"];
+    private static readonly string[] Tables = ["live_capture_runs", "live_fills", "live_fill_charges", "live_orders", "live_ticket_outcomes", "live_executions", "live_order_classes", "slippage_estimates", "capacity_scores"];
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -42,7 +42,7 @@ public sealed class LiveCaptureGrantsTests(ApiFactory factory)
 
             await ExecuteAsync(connection, "SET ROLE xd_app");
             await ExecuteAsync(connection, "RESET ROLE");
-            await ExecuteAsync(connection, "DROP TABLE trading.live_ticket_outcomes, trading.live_fill_charges, trading.live_orders, trading.live_fills, trading.live_capture_runs"); // what Down does
+            await ExecuteAsync(connection, "DROP TABLE trading.capacity_scores, trading.slippage_estimates, trading.live_order_classes, trading.live_executions, trading.live_ticket_outcomes, trading.live_fill_charges, trading.live_orders, trading.live_fills, trading.live_capture_runs"); // what Down does
         }
         finally
         {

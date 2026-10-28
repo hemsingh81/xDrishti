@@ -59,6 +59,26 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
             .WithSummary("The stored outcomes of live tickets (filled, partial, over_allocation, not_triggered, missed_no_order, missed_unfilled, rejected, missed_unknown, unknown), newest session first. accountId optional; from and to default to the last 30 days (range at most 92 days); page from 1, size 1 to 200. Read only. 422 live.invalid")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
+        group.MapGet("/executions", ListExecutionsAsync)
+            .WithName("ListLiveExecutions")
+            .WithSummary("The live entries measured against what the plan promised, newest session first: bucket, reference kind, fill VWAP and quantity, and the slippage in rupees, ticks, basis points and R split into the delay before the order and the execution itself (positive is worse for you; a figure with no input is 'unavailable', never 0). accountId optional; from and to default to the last 30 days (range at most 92 days); page from 1, size 1 to 200. Read only. 422 live.invalid")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapGet("/slippage", GetSlippageAsync)
+            .WithName("GetLiveSlippage")
+            .WithSummary("The stored slippage estimates of a week (a Monday; default the newest stored): one row per liquidity bucket, side, style and reference kind with its n; a row under the minimum n is 'insufficient' and has no mean. 'empty' when nothing is stored. Nothing is applied from them. Read only. 422 live.invalid")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapGet("/capacity", GetCapacityAsync)
+            .WithName("GetLiveCapacity")
+            .WithSummary("The stored capacity scores of a week: the share of entry orders filled in full for the account and for each liquidity bucket, with a credible interval, 'insufficient' below the minimum counted orders. Display only. Read only. 422 live.invalid")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapGet("/waterfall", GetWaterfallAsync)
+            .WithName("GetLiveWaterfall")
+            .WithSummary("The waterfall of one round trip by the id of its execution: plan result, entry slippage, exit difference, actual gross, and charges and actual net only when every fill's charges are recorded. 'unavailable' with the reason when the position did not close in the session or the plan was not graded. Read only. 404 live.not_found")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapGet("/settings", GetSettingsAsync)
             .WithName("GetLiveSettings")
             .WithSummary("The live switches (live.auto_approve_tickets, live.auto_ramp_up), both OFF when nothing is stored, with their history. No setting lets this system place an order");
@@ -84,6 +104,34 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
         IQueryHandler<LiveOutcomesQuery, Result<LiveOutcomesPage>> handler, HttpContext http, Guid? accountId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken, int page = 1, int size = 50)
     {
         var result = await handler.HandleAsync(new LiveOutcomesQuery(accountId, from, to, page, size), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<LiveExecutionsPage>, ProblemHttpResult>> ListExecutionsAsync(
+        IQueryHandler<LiveExecutionsQuery, Result<LiveExecutionsPage>> handler, HttpContext http, Guid? accountId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken, int page = 1, int size = 50)
+    {
+        var result = await handler.HandleAsync(new LiveExecutionsQuery(accountId, from, to, page, size), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<LiveSlippageView>, ProblemHttpResult>> GetSlippageAsync(
+        IQueryHandler<LiveSlippageQuery, Result<LiveSlippageView>> handler, HttpContext http, DateOnly? weekStart, CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new LiveSlippageQuery(weekStart), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<LiveCapacityView>, ProblemHttpResult>> GetCapacityAsync(
+        IQueryHandler<LiveCapacityQuery, Result<LiveCapacityView>> handler, HttpContext http, DateOnly? weekStart, CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new LiveCapacityQuery(weekStart), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<LiveWaterfallView>, ProblemHttpResult>> GetWaterfallAsync(
+        IQueryHandler<LiveWaterfallQuery, Result<LiveWaterfallView>> handler, HttpContext http, long entryId, CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new LiveWaterfallQuery(entryId), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 

@@ -106,6 +106,13 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<LiveOutcomesQuery, Result<LiveOutcomesPage>>, ListLiveOutcomesHandler>(); // the outcomes of live tickets: read only
         services.AddSingleton<IScheduledService, LiveCaptureService>(); // polls the trade book and order book during the session (P11-01); starts paused, read only, no order
         services.AddSingleton<IScheduledService, LiveSettleService>(); // the evening settle of the live sessions (P11-01); starts paused, read only, no order
+        services.AddScoped<ICommandHandler<ComputeLiveExecutionsCommand, LiveExecutionsOutcome>, ComputeLiveExecutionsHandler>(); // each entry against its reference, each entry order classified (P11-02, ADR 0150); stored data only
+        services.AddScoped<ICommandHandler<ComputeLiveEstimatesCommand, LiveEstimatesOutcome>, ComputeLiveEstimatesHandler>(); // the weekly slippage per bucket and capacity score, insert-only, applied nowhere
+        services.AddScoped<IQueryHandler<LiveExecutionsQuery, Result<LiveExecutionsPage>>, GetLiveExecutionsHandler>();
+        services.AddScoped<IQueryHandler<LiveSlippageQuery, Result<LiveSlippageView>>, GetLiveSlippageHandler>();
+        services.AddScoped<IQueryHandler<LiveCapacityQuery, Result<LiveCapacityView>>, GetLiveCapacityHandler>();
+        services.AddScoped<IQueryHandler<LiveWaterfallQuery, Result<LiveWaterfallView>>, GetLiveWaterfallHandler>();
+        services.AddSingleton<IScheduledService, LiveEstimatesService>(); // the weekly estimates (P11-02); starts paused, reads stored rows, places no order
         services.AddScoped<ICommandHandler<RecordComplianceCommand, ComplianceRecordView>, RecordComplianceHandler>(); // and write, insert-only, behind a fresh password and the live-writes gate in the endpoint
         services.AddScoped<ICommandHandler<ChangeDepthRecorderCommand, DepthRecorderSwitched>, ChangeDepthRecorderHandler>(); // and change, insert-only, behind a fresh password in the endpoint
 

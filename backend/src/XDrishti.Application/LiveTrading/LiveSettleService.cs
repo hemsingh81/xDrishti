@@ -9,7 +9,7 @@ namespace XDrishti.Application.LiveTrading;
 
 /// <summary>
 /// The evening settle of the live sessions as a service (<see cref="Id"/>, spec P11-01, ADR 0149): after the history read, it stores the charges of the day's delivery fills, matches the fills to the approved tickets and writes the one outcome of each ticket,
-/// final. Sessions whose plan grade is not stored yet are tried again by the next run (the last seven days are looked at). It starts <b>paused</b> and reads Dhan's history only (GET); it places no order.
+/// final, then (P11-02) measures each entry against its reference and classifies each entry order for the capacity score. Sessions whose plan grade is not stored yet are tried again by the next run (the last seven days are looked at). It starts <b>paused</b> and reads Dhan's history only (GET); it places no order.
 /// </summary>
 public sealed class LiveSettleService(IServiceScopeFactory scopes, ILiveCaptureSettings settings) : IScheduledService
 {
@@ -47,6 +47,10 @@ public sealed class LiveSettleService(IServiceScopeFactory scopes, ILiveCaptureS
             return ServiceOutcome.Failed(result.Error.Message);
         }
 
-        return result.Value.Failed > 0 ? ServiceOutcome.Failed(result.Value.Summary) : result.Value.Sessions == 0 ? ServiceOutcome.Skipped("No live session to settle") : ServiceOutcome.Succeeded(result.Value.Summary);
+        // The step after the settle (spec P11-02): measure what the owner did against the plan. It reads stored data and writes insert-only rows; a failure of it is reported but never undoes the outcomes.
+        var measured = await scope.ServiceProvider.GetRequiredService<ICommandHandler<ComputeLiveExecutionsCommand, LiveExecutionsOutcome>>().HandleAsync(new ComputeLiveExecutionsCommand(null, null), cancellationToken);
+        var summary = measured.IsSuccess ? result.Value.Summary + "; " + measured.Value.Summary : result.Value.Summary + "; execution step failed";
+        var stepFailed = measured.IsFailure || measured.Value.Failed > 0;
+        return result.Value.Failed > 0 || stepFailed ? ServiceOutcome.Failed(summary) : result.Value.Sessions == 0 && !(measured.IsSuccess && measured.Value.Sessions > 0) ? ServiceOutcome.Skipped("No live session to settle") : ServiceOutcome.Succeeded(summary);
     }
 }

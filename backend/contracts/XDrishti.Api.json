@@ -14235,6 +14235,205 @@
         }
       }
     },
+    "/api/live-trading/executions": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The live entries measured against what the plan promised, newest session first: bucket, reference kind, fill VWAP and quantity, and the slippage in rupees, ticks, basis points and R split into the delay before the order and the execution itself (positive is worse for you; a figure with no input is 'unavailable', never 0). accountId optional; from and to default to the last 30 days (range at most 92 days); page from 1, size 1 to 200. Read only. 422 live.invalid",
+        "operationId": "ListLiveExecutions",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveExecutionsPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live-trading/slippage": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The stored slippage estimates of a week (a Monday; default the newest stored): one row per liquidity bucket, side, style and reference kind with its n; a row under the minimum n is 'insufficient' and has no mean. 'empty' when nothing is stored. Nothing is applied from them. Read only. 422 live.invalid",
+        "operationId": "GetLiveSlippage",
+        "parameters": [
+          {
+            "name": "weekStart",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveSlippageView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live-trading/capacity": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The stored capacity scores of a week: the share of entry orders filled in full for the account and for each liquidity bucket, with a credible interval, 'insufficient' below the minimum counted orders. Display only. Read only. 422 live.invalid",
+        "operationId": "GetLiveCapacity",
+        "parameters": [
+          {
+            "name": "weekStart",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveCapacityView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live-trading/waterfall": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The waterfall of one round trip by the id of its execution: plan result, entry slippage, exit difference, actual gross, and charges and actual net only when every fill's charges are recorded. 'unavailable' with the reason when the position did not close in the session or the plan was not graded. Read only. 404 live.not_found",
+        "operationId": "GetLiveWaterfall",
+        "parameters": [
+          {
+            "name": "entryId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveWaterfallView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/live-trading/settings": {
       "get": {
         "tags": [
@@ -33860,6 +34059,104 @@
         },
         "description": "The body of a lesson link: the fix to link is a hypothesis or an experiment."
       },
+      "LiveCapacityRowView": {
+        "required": [
+          "scope",
+          "key",
+          "nOrders",
+          "nFull",
+          "nPartial",
+          "nRejected",
+          "nQueueMiss",
+          "nPriceMiss",
+          "nUnclassified",
+          "score",
+          "lo",
+          "hi",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "nOrders": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nFull": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nPartial": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nRejected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nQueueMiss": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nPriceMiss": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nUnclassified": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "score": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "lo": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "hi": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "description": "One capacity row: the share of orders filled in full for a scope (the account, or a bucket) with the counts by class."
+      },
+      "LiveCapacityView": {
+        "required": [
+          "weekStart",
+          "state",
+          "rows",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "weekStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "state": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveCapacityRowView"
+            }
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/LiveExecutionEvidenceView"
+          }
+        },
+        "description": "The capacity snapshot of one week."
+      },
       "LiveCaptureEvidenceView": {
         "required": [
           "orderEvidence",
@@ -34102,6 +34399,225 @@
           }
         },
         "description": "The capture of one session: its health, the runs, one row per approved ticket, the fills no ticket owns and the owner's own trades, and what the evidence is."
+      },
+      "LiveExecutionEvidenceView": {
+        "required": [
+          "basis",
+          "n",
+          "firstDate",
+          "lastDate",
+          "referenceKinds",
+          "bucketEdgesCr",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "lastDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "referenceKinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bucketEdgesCr": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "What stands behind a figure of the execution feedback: the basis, how many entries, over which sessions, against which references, with which bucket edges, and the stated limits. No figure is given without its n."
+      },
+      "LiveExecutionView": {
+        "required": [
+          "id",
+          "accountId",
+          "itemId",
+          "date",
+          "symbol",
+          "side",
+          "style",
+          "product",
+          "bucket",
+          "referenceKind",
+          "fillQty",
+          "fillVwap",
+          "referencePrice",
+          "arrivalPrice",
+          "participationPct",
+          "entryDelaySeconds",
+          "totalRupees",
+          "delayRupees",
+          "executionRupees",
+          "totalTicks",
+          "totalBps",
+          "totalR",
+          "delayR",
+          "executionR",
+          "waterfallAvailable"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "product": {
+            "type": "string"
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "referenceKind": {
+            "type": "string"
+          },
+          "fillQty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fillVwap": {
+            "type": "number",
+            "format": "double"
+          },
+          "referencePrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "arrivalPrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "participationPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "entryDelaySeconds": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "totalRupees": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "delayRupees": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "executionRupees": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "totalTicks": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "totalBps": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "totalR": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "delayR": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "executionR": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "waterfallAvailable": {
+            "type": "boolean"
+          }
+        },
+        "description": "One live entry against its reference. Positive slippage is worse for the owner. Every figure is a state and a number only for a value (no reference, no order evidence or no stop gives `unavailable`, never 0); delay plus execution equals the total.\nbool LiveExecutionView.WaterfallAvailable says whether the round trip closed in the session with a graded plan, so the waterfall can be read."
+      },
+      "LiveExecutionsPage": {
+        "required": [
+          "items",
+          "page",
+          "size",
+          "total",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveExecutionView"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/LiveExecutionEvidenceView"
+          }
+        },
+        "description": "A page of executions with the evidence."
       },
       "LiveFeedStatus": {
         "required": [
@@ -34363,6 +34879,182 @@
           }
         },
         "description": "The live switches in force. `id` is null while nothing is stored (both OFF)."
+      },
+      "LiveSlippageRowView": {
+        "required": [
+          "bucket",
+          "side",
+          "style",
+          "referenceKind",
+          "n",
+          "mean",
+          "meanLo",
+          "meanHi",
+          "median",
+          "medianLo",
+          "medianHi",
+          "meanTicks",
+          "meanR",
+          "state",
+          "proposal"
+        ],
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "referenceKind": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "mean": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "meanLo": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "meanHi": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "median": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "medianLo": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "medianHi": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "meanTicks": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "meanR": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "state": {
+            "type": "string"
+          },
+          "proposal": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One slippage row: a bucket, side, style and reference kind with its n; the mean and median (in basis points) with their intervals are states, a number only for a value. string? LiveSlippageRowView.Proposal is a sentence nothing reads automatically."
+      },
+      "LiveSlippageView": {
+        "required": [
+          "weekStart",
+          "state",
+          "rows",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "weekStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "state": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveSlippageRowView"
+            }
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/LiveExecutionEvidenceView"
+          }
+        },
+        "description": "The slippage snapshot of one week. string LiveSlippageView.State is `empty` when nothing is stored for the week."
+      },
+      "LiveWaterfallRowView": {
+        "required": [
+          "label",
+          "op",
+          "r",
+          "rupees"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "op": {
+            "type": "string"
+          },
+          "r": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "rupees": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "One line of the waterfall: string LiveWaterfallRowView.Op is start, minus or total; MetricView LiveWaterfallRowView.R is unavailable when the plan has no stop (the rupees are then the result)."
+      },
+      "LiveWaterfallView": {
+        "required": [
+          "entryId",
+          "symbol",
+          "date",
+          "state",
+          "basis",
+          "balanced",
+          "rows",
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "entryId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "state": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string"
+          },
+          "balanced": {
+            "type": "boolean"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveWaterfallRowView"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The waterfall of one round trip (plan result, entry slippage, exit difference, actual gross, charges, actual net). string LiveWaterfallView.State is `value` or `unavailable` (the position did not close in the session, or the plan was not graded); then there are no rows\nand IReadOnlyList&lt;string&gt; LiveWaterfallView.Notes says why."
       },
       "LlmStatusView": {
         "required": [

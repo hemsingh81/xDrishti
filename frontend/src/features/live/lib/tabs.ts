@@ -13,6 +13,11 @@ const entries: readonly { id: string; label: string; Component: ComponentType }[
     Component: lazy(() => import('../components/CaptureTab').then((m) => ({ default: m.CaptureTab }))),
   },
   {
+    id: 'execution',
+    label: 'Execution',
+    Component: lazy(() => import('../components/ExecutionTab').then((m) => ({ default: m.ExecutionTab }))),
+  },
+  {
     id: 'ramp',
     label: 'Ramp',
     Component: lazy(() => import('../components/RampTab').then((m) => ({ default: m.RampTab }))),

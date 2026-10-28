@@ -1,6 +1,6 @@
 # P11-02 — Execution feedback: grade on fills, slippage per liquidity bucket and the capacity score
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-28 on the owner's instruction (ADR 0150; see "Amendments at build"). Draft decisions below were researched under the owner's delegation. Not committed or deployed by the builder; the weekly service and every switch stay OFF.
 - **Phase / roadmap row:** P11 — Small live capital, slice P11-02 of [P11-00](P11-00-small-live-plan.md). Row: "execution feedback (grade on fills, slippage per liquidity bucket, capacity score)".
 - **Design refs:** docs/design/09-learning-engine.md §9 (waterfall; slippage per liquidity bucket re-estimated weekly; partial fills / rejections lower the capacity score), §12 (rule 3: judged after the expected live gap) · 08-exits-and-risk.md §8 (slippage model) · 13 §2 (R32) · 16 (`execution_feedback`: `min_turnover_cr` 50, `reestimate: weekly`) · 19 §4 · ADR 0038 (fill realism), 0042 (costs), 0064 (Beta shrinkage), 0090, 0093, 0099
 - **Needs:** P11-01 (fills, orders, outcomes, journal entries), P7-13 (plan grades), P6-01 (`BetaShrinkage`, `BetaDistribution`), P8-05 (`Metric`, `MetricState`, `EvidenceBlock`). **Size:** 3.5 agent-days. **Safety:** no — it reads stored records, writes insert-only estimates and changes no trading behaviour, setting or model.
@@ -79,3 +79,13 @@ None. (The weekly service is switched on by the owner; default paused. Edges are
 ## Review fixes 2026-10-25 (2)
 - Waterfall: plan R is gross; the charges row is live charges minus plan charges (0 in the fixture).
 - t table: 2.000 for df 60 to 119, 1.96 from df 120 (t(60) = 2.000, not 1.96).
+
+## Amendments at build (2026-10-28, ADR 0150)
+1. **The observation unit is an entry outcome** (`live_ticket_outcomes`), not a journal entry: P11-01 did not journal live fills (that is P11-01b). `live_executions.outcome_id` replaces `journal_entry_id`; the journal-based fill grade waits for P11-01b. `grades.entry_at` is **not** added (the entry time comes from the fills and orders).
+2. **Waterfall columns on the execution row** (`plan_entry`, `plan_exit`, `plan_stop`, `plan_charges_r`, `exit_vwap`, `exit_qty`, `live_charges`): the waterfall is a pure function of the stored row. It exists only for a graded plan whose position was closed in the session by exit fills of the same quantity; net only when every fill of the trip has a recorded charge (intraday fills have none, so those trips are gross). The waterfall rows carry an `op` (start / minus / total) and the losses are positive amounts, as in the criterion.
+3. **A fourth insert-only table `live_order_classes`** holds the class of each entry order (written by the same step), so the weekly job reads no bars. **The cell scope of capacity is not built** (the live rows carry no cell key); account and bucket only.
+4. **Turnover** is not stored on plan items, so it is the 20-session mean of close x volume of the daily bars before the day, in crore; bucket edges allow 3 to 6 values (up to L7).
+5. **Estimates pool all live accounts**, so `accountId` is dropped from `GET /slippage` and `GET /capacity`; `weekStart` must be a Monday. `entry_delay_seconds` is the wait from the first entry order's creation to the first entry fill. The t table gains df 5 to 8.
+6. **Where it runs:** the measuring step is the second half of the `live-settle` service run (and of `xd live capture`); `live-estimates` is a separate service, Saturday 10:00, registered paused; `Live:Estimates:Enabled` (OFF) seeds it. `Live:Buckets:EdgesCr` is optional (unset = the default edges).
+7. **UI:** Execution tab on `/live` (lazy): slippage table, capacity table, measured entries with a waterfall that opens per row, and the evidence block; read only.
+8. **Not done:** the doc 09 §9 sentence about selection preferring fillable tickets stays a hypothesis (display only, D6); real Dhan answers were never seen, so every figure is tested on hand-worked data.

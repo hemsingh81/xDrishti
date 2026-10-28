@@ -4088,6 +4088,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/live-trading/executions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The live entries measured against what the plan promised, newest session first: bucket, reference kind, fill VWAP and quantity, and the slippage in rupees, ticks, basis points and R split into the delay before the order and the execution itself (positive is worse for you; a figure with no input is 'unavailable', never 0). accountId optional; from and to default to the last 30 days (range at most 92 days); page from 1, size 1 to 200. Read only. 422 live.invalid */
+    get: operations['ListLiveExecutions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live-trading/slippage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored slippage estimates of a week (a Monday; default the newest stored): one row per liquidity bucket, side, style and reference kind with its n; a row under the minimum n is 'insufficient' and has no mean. 'empty' when nothing is stored. Nothing is applied from them. Read only. 422 live.invalid */
+    get: operations['GetLiveSlippage'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live-trading/capacity': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored capacity scores of a week: the share of entry orders filled in full for the account and for each liquidity bucket, with a credible interval, 'insufficient' below the minimum counted orders. Display only. Read only. 422 live.invalid */
+    get: operations['GetLiveCapacity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live-trading/waterfall': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The waterfall of one round trip by the id of its execution: plan result, entry slippage, exit difference, actual gross, and charges and actual net only when every fill's charges are recorded. 'unavailable' with the reason when the position did not close in the session or the plan was not graded. Read only. 404 live.not_found */
+    get: operations['GetLiveWaterfall'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/live-trading/settings': {
     parameters: {
       query?: never;
@@ -11067,6 +11135,37 @@ export interface components {
       /** @description The owner's password, typed again for THIS act. */
       password: null | string;
     };
+    /** @description One capacity row: the share of orders filled in full for a scope (the account, or a bucket) with the counts by class. */
+    LiveCapacityRowView: {
+      scope: string;
+      key: string;
+      /** Format: int32 */
+      nOrders: number;
+      /** Format: int32 */
+      nFull: number;
+      /** Format: int32 */
+      nPartial: number;
+      /** Format: int32 */
+      nRejected: number;
+      /** Format: int32 */
+      nQueueMiss: number;
+      /** Format: int32 */
+      nPriceMiss: number;
+      /** Format: int32 */
+      nUnclassified: number;
+      score: components['schemas']['MetricView'];
+      lo: components['schemas']['MetricView'];
+      hi: components['schemas']['MetricView'];
+      state: string;
+    };
+    /** @description The capacity snapshot of one week. */
+    LiveCapacityView: {
+      /** Format: date */
+      weekStart: null | string;
+      state: string;
+      rows: components['schemas']['LiveCapacityRowView'][];
+      evidence: components['schemas']['LiveExecutionEvidenceView'];
+    };
     /** @description What the capture rests on, with its stated limits. */
     LiveCaptureEvidenceView: {
       orderEvidence: string;
@@ -11137,6 +11236,71 @@ export interface components {
       unmatched: components['schemas']['LiveCaptureFillView'][];
       discretionary: components['schemas']['LiveCaptureFillView'][];
       evidence: components['schemas']['LiveCaptureEvidenceView'];
+    };
+    /** @description What stands behind a figure of the execution feedback: the basis, how many entries, over which sessions, against which references, with which bucket edges, and the stated limits. No figure is given without its n. */
+    LiveExecutionEvidenceView: {
+      basis: string;
+      /** Format: int32 */
+      n: number;
+      /** Format: date */
+      firstDate: null | string;
+      /** Format: date */
+      lastDate: null | string;
+      referenceKinds: string[];
+      bucketEdgesCr: number[];
+      limits: string[];
+    };
+    /**
+     * @description One live entry against its reference. Positive slippage is worse for the owner. Every figure is a state and a number only for a value (no reference, no order evidence or no stop gives `unavailable`, never 0); delay plus execution equals the total.
+     *     bool LiveExecutionView.WaterfallAvailable says whether the round trip closed in the session with a graded plan, so the waterfall can be read.
+     */
+    LiveExecutionView: {
+      /** Format: int64 */
+      id: number;
+      /** Format: uuid */
+      accountId: string;
+      /** Format: int64 */
+      itemId: number;
+      /** Format: date */
+      date: string;
+      symbol: string;
+      side: string;
+      style: string;
+      product: string;
+      bucket: string;
+      referenceKind: string;
+      /** Format: int64 */
+      fillQty: number;
+      /** Format: double */
+      fillVwap: number;
+      /** Format: double */
+      referencePrice: null | number;
+      /** Format: double */
+      arrivalPrice: null | number;
+      /** Format: double */
+      participationPct: null | number;
+      /** Format: int32 */
+      entryDelaySeconds: null | number;
+      totalRupees: components['schemas']['MetricView'];
+      delayRupees: components['schemas']['MetricView'];
+      executionRupees: components['schemas']['MetricView'];
+      totalTicks: components['schemas']['MetricView'];
+      totalBps: components['schemas']['MetricView'];
+      totalR: components['schemas']['MetricView'];
+      delayR: components['schemas']['MetricView'];
+      executionR: components['schemas']['MetricView'];
+      waterfallAvailable: boolean;
+    };
+    /** @description A page of executions with the evidence. */
+    LiveExecutionsPage: {
+      items: components['schemas']['LiveExecutionView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      size: number;
+      /** Format: int32 */
+      total: number;
+      evidence: components['schemas']['LiveExecutionEvidenceView'];
     };
     /**
      * @description The state of the live feed as the screen needs it: hub event `feedStatus` (pushed on connect, on a change of `state` or `subscribed`, and every 15 seconds) and the body of `GET /api/live/status` (the fallback when the hub is not connected).
@@ -11231,6 +11395,57 @@ export interface components {
       notice: string;
       /** @description Newest first. */
       history: components['schemas']['LiveSettingsChangeView'][];
+    };
+    /** @description One slippage row: a bucket, side, style and reference kind with its n; the mean and median (in basis points) with their intervals are states, a number only for a value. string? LiveSlippageRowView.Proposal is a sentence nothing reads automatically. */
+    LiveSlippageRowView: {
+      bucket: string;
+      side: string;
+      style: string;
+      referenceKind: string;
+      /** Format: int32 */
+      n: number;
+      mean: components['schemas']['MetricView'];
+      meanLo: components['schemas']['MetricView'];
+      meanHi: components['schemas']['MetricView'];
+      median: components['schemas']['MetricView'];
+      medianLo: components['schemas']['MetricView'];
+      medianHi: components['schemas']['MetricView'];
+      meanTicks: components['schemas']['MetricView'];
+      meanR: components['schemas']['MetricView'];
+      state: string;
+      proposal: null | string;
+    };
+    /** @description The slippage snapshot of one week. string LiveSlippageView.State is `empty` when nothing is stored for the week. */
+    LiveSlippageView: {
+      /** Format: date */
+      weekStart: null | string;
+      state: string;
+      rows: components['schemas']['LiveSlippageRowView'][];
+      evidence: components['schemas']['LiveExecutionEvidenceView'];
+    };
+    /** @description One line of the waterfall: string LiveWaterfallRowView.Op is start, minus or total; MetricView LiveWaterfallRowView.R is unavailable when the plan has no stop (the rupees are then the result). */
+    LiveWaterfallRowView: {
+      label: string;
+      op: string;
+      r: components['schemas']['MetricView'];
+      /** Format: double */
+      rupees: number;
+    };
+    /**
+     * @description The waterfall of one round trip (plan result, entry slippage, exit difference, actual gross, charges, actual net). string LiveWaterfallView.State is `value` or `unavailable` (the position did not close in the session, or the plan was not graded); then there are no rows
+     *     and IReadOnlyList&lt;string&gt; LiveWaterfallView.Notes says why.
+     */
+    LiveWaterfallView: {
+      /** Format: int64 */
+      entryId: number;
+      symbol: string;
+      /** Format: date */
+      date: string;
+      state: string;
+      basis: string;
+      balanced: boolean;
+      rows: components['schemas']['LiveWaterfallRowView'][];
+      notes: string[];
     };
     /** @description What `GET /api/assistant/llm-status` answers. No key, no path and no address of the server is ever in it. */
     LlmStatusView: {
@@ -26661,6 +26876,134 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListLiveExecutions: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        from?: string;
+        to?: string;
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveExecutionsPage'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLiveSlippage: {
+    parameters: {
+      query?: {
+        weekStart?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveSlippageView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLiveCapacity: {
+    parameters: {
+      query?: {
+        weekStart?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveCapacityView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLiveWaterfall: {
+    parameters: {
+      query: {
+        entryId: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveWaterfallView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

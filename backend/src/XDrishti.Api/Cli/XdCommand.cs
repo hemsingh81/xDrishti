@@ -134,6 +134,11 @@ internal static class XdCommand
             return await LiveCaptureCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "live" && args[1] is "estimates" or "waterfall")
+        {
+            return await LiveEstimatesCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "charge-sheet")
         {
             return await ChargeSheetCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);

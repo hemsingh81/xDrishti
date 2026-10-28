@@ -126,6 +126,8 @@ services:
       # The live capture (P11-01, ADR 0149): read-only GETs of the day's trade book and order book. Both OFF by default. The first seeds the live-capture and live-settle services (paused when false); the second decides whether the order book is read at all.
       Live__Capture__Enabled: ${XD_LIVE_CAPTURE_ENABLED:-false}
       Live__Capture__OrderBook__Enabled: ${XD_LIVE_CAPTURE_ORDER_BOOK:-false}
+      # The execution feedback (P11-02, ADR 0150): the weekly live-estimates service (slippage per liquidity bucket, capacity score) reads stored rows only and applies nothing. OFF by default: it only seeds the service paused or running at its first start.
+      Live__Estimates__Enabled: ${XD_LIVE_ESTIMATES_ENABLED:-false}
       # Market data (ADR 0016): the folder with the <SYMBOL>_1m.csv[.gz] files, mounted read-only below. Dhan Data API fetch: first fetch goes this many days
       # back, at most this many requests per second.
       Data__CsvFolder: /data/csv
