@@ -251,6 +251,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM trading.live_fills;
                 DELETE FROM trading.live_orders;
                 DELETE FROM trading.live_capture_runs;
+                DELETE FROM trading.live_halts;
                 DELETE FROM trading.ramp_events;
                 DELETE FROM trading.live_settings;
                 DELETE FROM trading.plan_runs;
@@ -411,6 +412,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM trading.live_fills;
                 DELETE FROM trading.live_orders;
                 DELETE FROM trading.live_capture_runs;
+                DELETE FROM trading.live_halts;
                 DELETE FROM trading.ramp_events;
                 DELETE FROM trading.live_settings;
                 DELETE FROM trading.plan_runs;

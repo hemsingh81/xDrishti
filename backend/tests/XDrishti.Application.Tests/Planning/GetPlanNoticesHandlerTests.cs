@@ -40,7 +40,7 @@ public sealed class GetPlanNoticesHandlerTests
     private static PlanEventRow Approval(long item, DateTimeOffset? at = null) =>
         new(item, item, "proposed", "approved", "owner:me", "ok", 1, at ?? new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
 
-    private GetPlanNoticesHandler Handler() => new(_plans, _journal, _tickets, _compliance, _time);
+    private GetPlanNoticesHandler Handler() => new(_plans, _journal, _tickets, _compliance, Substitute.For<XDrishti.Application.Abstractions.Messaging.IQueryHandler<XDrishti.Application.LiveTrading.GetLiveNoticesQuery, IReadOnlyList<XDrishti.Application.LiveTrading.LiveNoticeView>>>(), _time);
 
     private static PlanRow Row(long id, DateOnly? date = null, int version = 1, PlanState state = PlanState.Published) =>
         new(id, new NewPlan("k" + id, date ?? Session, Cutoff, version, Hash, "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, []), state, 1, 0, 0);

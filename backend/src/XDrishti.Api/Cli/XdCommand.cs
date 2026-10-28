@@ -129,6 +129,11 @@ internal static class XdCommand
             return await LiveComplianceCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "live" && args[1] == "ramp")
+        {
+            return await LiveRampCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "live" && args[1] is "capture" or "outcomes")
         {
             return await LiveCaptureCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);

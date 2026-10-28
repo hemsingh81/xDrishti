@@ -53,6 +53,18 @@ public sealed class LiveCaptureService(IServiceScopeFactory scopes, ILiveCapture
             return ServiceOutcome.Skipped(outcome.Summary);
         }
 
+        // After each poll (spec P11-04): the loss limits of the day and the week, from the fills just stored. It writes a halt row and nothing else; a failure of it never fails the poll.
+        try
+        {
+            await scope.ServiceProvider.GetRequiredService<ICommandHandler<EvaluateRampCommand, RampEvaluationOutcome>>().HandleAsync(new EvaluateRampCommand(null, HaltsOnly: true), cancellationToken);
+        }
+#pragma warning disable CA1031 // The halt check is a second step of the poll: the poll itself has succeeded.
+        catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
+#pragma warning restore CA1031
+        {
+            RampLog.EvaluationFailed(scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LiveCaptureService>>(), failure.GetType().Name);
+        }
+
         return outcome.Summary.Contains(OutcomeCodes.RunTokenExpired, StringComparison.Ordinal) || outcome.Summary.Contains(OutcomeCodes.RunRejected, StringComparison.Ordinal)
             ? ServiceOutcome.Failed(outcome.Summary)
             : ServiceOutcome.Succeeded(outcome.Summary);

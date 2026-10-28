@@ -227,6 +227,6 @@ internal sealed class SettleLiveSessionHandler(
         var matched = delivery.Count(f => byId.ContainsKey(f.BrokerTradeId));
         var missing = delivery.Count - matched;
         LiveCaptureLog.HistoryAgreement(logger, matched, missing, written);
-        return (written, OutcomeCodes.RunOk, missing == 0 ? "history agrees with the trade book" : $"history misses {missing} of {delivery.Count} delivery fills of the trade book");
+        return (written, missing == 0 ? OutcomeCodes.RunOk : OutcomeCodes.RunPartial, missing == 0 ? "history agrees with the trade book" : $"history misses {missing} of {delivery.Count} delivery fills of the trade book");
     }
 }

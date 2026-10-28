@@ -17,6 +17,7 @@ internal sealed class SetRampStepHandler(
     IAccountStore accounts,
     IRampStore ramp,
     GetRampHandler view,
+    RampAssessor assessor,
     ILiveWritesGate gate,
     IAccountEventLog events,
     IAccountUnitOfWork unitOfWork,
@@ -43,7 +44,15 @@ internal sealed class SetRampStepHandler(
         }
 
         var current = await ramp.CurrentAsync(command.AccountId, cancellationToken);
-        var made = RampEvent.OwnerSetStep(command.AccountId, current, command.ToStep, command.Actor, command.Reason);
+
+        // A raise is judged on the evidence read now: the frozen gate text rides on the event. A lowering or the first step needs none.
+        GateSnapshot? gates = null;
+        if (current is not null && command.ToStep == current.Step + 1)
+        {
+            gates = (await assessor.AssessAsync(account, cancellationToken))?.Snapshot;
+        }
+
+        var made = RampEvent.OwnerSetStep(command.AccountId, current, command.ToStep, command.Actor, command.Reason, gates);
         if (made.IsFailure)
         {
             return Refuse(made.Error);
@@ -58,7 +67,7 @@ internal sealed class SetRampStepHandler(
         RampLog.StepSet(logger, stored.Id, stored.FromStep, stored.ToStep);
         try
         {
-            events.Record(AccountEvent.Record(AccountEventType.RampStepSet, command.AccountId, string.Create(CultureInfo.InvariantCulture, $"event={stored.Id} from={(stored.FromStep is { } f ? f.ToString(CultureInfo.InvariantCulture) : "none")} to={stored.ToStep}"), command.Actor, clock.GetUtcNow()));
+            events.Record(AccountEvent.Record(AccountEventType.RampStepSet, command.AccountId, string.Create(CultureInfo.InvariantCulture, $"event={stored.Id} kind={stored.Kind} from={(stored.FromStep is { } f ? f.ToString(CultureInfo.InvariantCulture) : "none")} to={stored.ToStep}{(stored.GateHash is { } h ? " gates=" + h[..12] : string.Empty)}"), command.Actor, clock.GetUtcNow()));
             await unitOfWork.TrySaveChangesAsync(CancellationToken.None);
         }
         catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
@@ -66,7 +75,7 @@ internal sealed class SetRampStepHandler(
             RampLog.AuditFailed(logger, failure.GetType().Name);
         }
 
-        return Result.Success(await view.ViewAsync(account.Trading.RiskProfileId, account.Trading.OverrideRiskPerTradePct, command.AccountId, cancellationToken));
+        return Result.Success(await view.ViewAsync(account, cancellationToken));
     }
 
     private Result<RampView> Refuse(Error error)

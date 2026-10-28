@@ -115,6 +115,10 @@ internal sealed class FakeLiveMarket : ILiveExecutionMarket
     public ValueTask<decimal?> MinuteOpenAsync(string symbol, DateTimeOffset at, CancellationToken cancellationToken) => ValueTask.FromResult(Open);
 
     public ValueTask<(decimal? Low, decimal? High)> MinuteExtremesAsync(string symbol, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) => ValueTask.FromResult(Extremes);
+
+    public Dictionary<string, decimal> Last { get; } = [];
+
+    public ValueTask<decimal?> LastPriceAsync(string symbol, DateOnly date, DateTimeOffset notAfter, CancellationToken cancellationToken) => ValueTask.FromResult(Last.TryGetValue(symbol, out var p) ? (decimal?)p : null);
 }
 
 /// <summary>The estimate settings of the spec's defaults.</summary>

@@ -5,17 +5,18 @@ import { accountsQuery } from '@/features/accounts';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { liveSettingsQuery } from '../api/rampQueries';
 import { gatesSentence, noOrderSentence } from '../lib/rampLabels';
-import { RampAccount } from './RampAccount';
+import { RampAccount, type RampAct } from './RampAccount';
 import { RampSwitches } from './RampSwitches';
 
 // The dialogs hold the writes of this tab, so they load only when the owner opens one.
 const RampDialog = lazy(() => import('./RampDialog').then((m) => ({ default: m.RampDialog })));
+const RampActDialog = lazy(() => import('./RampActDialog').then((m) => ({ default: m.RampActDialog })));
 const LiveSettingsDialog = lazy(() => import('./LiveSettingsDialog').then((m) => ({ default: m.LiveSettingsDialog })));
 
-type Open = { kind: 'step'; step: number | null } | { kind: 'switches' } | null;
+type Open = RampAct | { kind: 'switches' } | null;
 
 /**
- * The Ramp tab of the Live screen (spec P11-04): the step of a live account, the risk it gives and its history, and the two live switches (both OFF). It reads
+ * The Ramp tab of the Live screen (spec P11-04): the step of a live account, the risk it gives, the evidence gates, today's loss, the halts and the history, and the two live switches (both OFF). It reads
  * only; the owner's moves are made in the dialogs, with the password typed again. Nothing here calls a broker.
  */
 export function RampTab() {
@@ -56,12 +57,7 @@ export function RampTab() {
               </MenuItem>
             ))}
           </TextField>
-          <RampAccount
-            accountId={account.id}
-            onSetStep={(step) => {
-              setOpen({ kind: 'step', step });
-            }}
-          />
+          <RampAccount accountId={account.id} onAct={setOpen} />
         </>
       ) : (
         <Typography>No account has the Trading role on, so there is no ramp to show.</Typography>
@@ -77,7 +73,16 @@ export function RampTab() {
       />
       <Suspense fallback={null}>
         {open?.kind === 'step' && account && (
-          <RampDialog accountId={account.id} accountName={account.name} step={open.step} onClose={close} />
+          <RampDialog
+            accountId={account.id}
+            accountName={account.name}
+            step={open.step}
+            raiseTo={open.raise && open.step !== null && open.step < 3 ? open.step + 1 : null}
+            onClose={close}
+          />
+        )}
+        {(open?.kind === 'clear-hold' || open?.kind === 'exit-confirmed') && account && (
+          <RampActDialog accountId={account.id} accountName={account.name} act={open.kind} onClose={close} />
         )}
         {open?.kind === 'switches' && <LiveSettingsDialog current={settings.data} onClose={close} />}
       </Suspense>

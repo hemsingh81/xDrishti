@@ -12,7 +12,7 @@ namespace XDrishti.Application.Planning;
 /// The plan notices of the bell (P8-15, ADR 0101), derived on read like the data and service notices (ADR 0018 §7, ADR 0030): the newest version of each of the last three sessions' plans with the state of their tickets, the newest recorded attempt of the nightly pipeline
 /// and the stored fills of approved tickets, handed to the pure <see cref="PlanNoticeRules"/>. It calls read members of the plan and journal ports only; nothing is stored, no ticket moves and no order exists anywhere.
 /// </summary>
-internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore journal, ITicketNoticeSource ticketNotices, IComplianceStore compliance, TimeProvider clock) : IQueryHandler<GetPlanNoticesQuery, PlanNotices>
+internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore journal, ITicketNoticeSource ticketNotices, IComplianceStore compliance, IQueryHandler<GetLiveNoticesQuery, IReadOnlyList<LiveNoticeView>> liveNotices, TimeProvider clock) : IQueryHandler<GetPlanNoticesQuery, PlanNotices>
 {
     /// <summary>The notices cover the last this many India days: today and the days before it, so three means today, yesterday and the day before. A plan or a failed run of an earlier session is not mentioned any more.</summary>
     public const int RecentDays = 3;
@@ -59,8 +59,24 @@ internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore jour
             unmatched.GetValueOrDefault(p.Row.Id).Would,
             unmatched.GetValueOrDefault(p.Row.Id).Ambiguous)).ToList();
         var own = PlanNoticeRules.Derive(now, facts, latestRun);
-        List<PlanNotice> carried = [.. await ticketNotices.ListAsync(now, cancellationToken), .. ComplianceRules.Notices(await compliance.LatestPerKindAsync(cancellationToken), today)];
+        List<PlanNotice> carried = [.. await ticketNotices.ListAsync(now, cancellationToken), .. ComplianceRules.Notices(await compliance.LatestPerKindAsync(cancellationToken), today), .. await LiveAsync(cancellationToken)];
         return new PlanNotices(carried.Count == 0 ? own : Merge(own, carried));
+    }
+
+    /// <summary>The halts, holds, gaps and earned steps of the live record (P11-04): derived on read; the compliance notice is already carried above. A failure here never takes the bell down.</summary>
+    private async Task<IReadOnlyList<PlanNotice>> LiveAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return [.. (await liveNotices.HandleAsync(new GetLiveNoticesQuery(), cancellationToken)).Where(n => n.Kind != ComplianceRules.OverdueKind).Select(n => new PlanNotice(n.Id, n.Kind, n.Severity, n.Text, n.Route, null, null))];
+        }
+#pragma warning disable CA1031 // The live notices are secondary: the plan notices must still be shown.
+        catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
+#pragma warning restore CA1031
+        {
+            _ = failure;
+            return [];
+        }
     }
 
     /// <summary>

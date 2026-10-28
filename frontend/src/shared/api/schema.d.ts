@@ -4027,7 +4027,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The ramp of a live account: step (null = none, so no live allocation), the scale and the live risk it gives, hold, the history. gatesBuilt is false until P11-04b: no gate is listed and the step cannot be raised. 404 live.account_not_found */
+    /** The ramp of a live account: step (null = none, so no live allocation), the scale and the live risk it gives, hold, the evidence gates G1 to G7 (state, number, threshold, n; only pass counts), the breach rules, today's loss, the halts and the history. 404 live.account_not_found */
     get: operations['GetLiveRamp'];
     put?: never;
     post?: never;
@@ -4048,6 +4048,74 @@ export interface paths {
     put?: never;
     /** Set the ramp step as the owner: S1 first, or lower. Insert-only and audited. Needs a session, the CSRF token, the deployment gate Live:Writes:Enabled (off by default) and the password in the body, checked on EVERY move. A raise is 409 live.gates_not_met until the evidence gates exist; 409 live.step_not_adjacent, 409 live.stale, 403 live.capability_off, 401 auth.invalid_credentials, 423 auth.locked, 422 live.invalid, 429 auth.rate_limited. Nothing here places an order */
     post: operations['SetLiveRampStep'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live-trading/ramp/clear-hold': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Clear a hold of the ramp as the owner. Refused with 409 live.hold_condition_active while a breach condition still holds on the evidence read now (event breaches need the cooldown sessions without a new one). Insert-only and audited. Same gates as the step: session, CSRF, Live:Writes:Enabled and the password in the body, checked on this call. */
+    post: operations['ClearLiveRampHold'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live-trading/ramp/exit-confirmed': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Record as the owner that the small-live exit report was read and is met, the key to S3. Refused with 409 live.exit_not_checked unless that report says MET right now; the report (P11-06) is not built yet, so it is always refused for now. Same gates as the step. */
+    post: operations['ConfirmLiveRampExit'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live-trading/halts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The halts of the live accounts (daily and weekly loss limits reached), newest first: the period, the limit, what was measured under which state (value, realised_only, unavailable) and what the halt does. A halt is advice: you place every order. accountId optional; from and to default to the last 30 days, at most 92. */
+    get: operations['ListLiveHalts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live-trading/notices': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The derived notices of the live record: a halt in force, a hold, a capture gap, a step the evidence has earned, a compliance re-check overdue. Words and a route only; nothing to run. */
+    get: operations['ListLiveNotices'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -5728,6 +5796,12 @@ export interface components {
       /** @description The warning. */
       text: string;
     };
+    /** @description One breach rule that fires now (B1 to B7) or still holds a hold. */
+    BreachView: {
+      code: string;
+      action: string;
+      reason: string;
+    };
     /** @description One model attempt, as the API shows it. The refused text itself stays in the audit table. */
     BriefingAttemptView: {
       /** Format: int32 */
@@ -6393,7 +6467,7 @@ export interface components {
     ChangeLiveSettingsRequest: {
       /** @description live.auto_approve_tickets. */
       autoApproveTickets: boolean;
-      /** @description live.auto_ramp_up (takes effect with the evidence gates of P11-04b). */
+      /** @description live.auto_ramp_up (lets the evaluator raise S1 to S2 by rule when every gate passes; never above S2). */
       autoRampUp: boolean;
       /** @description 1 to 500 characters. */
       reason: null | string;
@@ -11315,6 +11389,56 @@ export interface components {
       /** Format: date-time */
       lastTickAt: null | string;
     };
+    /** @description A halt as the screen reads it: the period, the limit, what was measured under which state, and what it does (it is advice: the owner places every order). */
+    LiveHaltView: {
+      /** Format: int64 */
+      id: number;
+      /** Format: uuid */
+      accountId: string;
+      kind: string;
+      /** Format: date */
+      periodStart: string;
+      /** Format: double */
+      limitR: number;
+      /** Format: double */
+      limitPct: number;
+      /** Format: double */
+      measuredR: null | number;
+      /** Format: double */
+      measuredPct: null | number;
+      measureState: string;
+      action: string;
+      /** Format: date-time */
+      openedAt: string;
+    };
+    /** @description The loss of the last measured session: the state (value, realised_only, unavailable), the figures and what is left out. */
+    LiveLossView: {
+      /** Format: date */
+      date: string;
+      health: string;
+      state: string;
+      /** Format: double */
+      netRupees: null | number;
+      /** Format: double */
+      lossR: null | number;
+      /** Format: double */
+      limitR: null | number;
+      /** Format: double */
+      oneRupees: null | number;
+      /** Format: int64 */
+      carriedQty: number;
+      /** Format: int32 */
+      openUnmarked: number;
+      note: string;
+    };
+    /** @description A notice of the live record, derived on read: the words, the route and nothing to run. */
+    LiveNoticeView: {
+      id: string;
+      kind: string;
+      severity: string;
+      text: string;
+      route: string;
+    };
     /** @description One stored outcome (final). */
     LiveOutcomeView: {
       /** Format: int64 */
@@ -14158,6 +14282,18 @@ export interface components {
       /** @description True when the 200 newest accepted hypotheses were read and there may be more. */
       truncated: boolean;
     };
+    /** @description The body of clearing a hold or recording the exit confirmation (spec P11-04): the account, a reason and the owner's password for THIS act. */
+    RampActRequest: {
+      /**
+       * Format: uuid
+       * @description The account.
+       */
+      accountId: string;
+      /** @description 1 to 300 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS act (checked on every request; no step-up window is used). */
+      password: null | string;
+    };
     /** @description One event of the ramp history. */
     RampEventView: {
       /**
@@ -14186,12 +14322,24 @@ export interface components {
        * @description When.
        */
       createdAt: string;
-      /** @description The hash of the frozen gate snapshot (P11-04b); null before. */
+      /** @description The hash of the frozen gate snapshot of a raise on evidence; null for the other kinds. */
       gateHash: null | string;
     };
+    /** @description One evidence gate as the screen reads it. `number` is null when the state says it could not be measured. */
+    RampGateView: {
+      code: string;
+      state: string;
+      /** Format: double */
+      number: null | number;
+      /** Format: double */
+      threshold: null | number;
+      /** Format: int32 */
+      n: null | number;
+      reason: string;
+    };
     /**
-     * @description An account on the ramp. `step` is null while no step is set (no live allocation). `scaleEffective` is the factor of the step; the live risk is the intended risk times it. `gatesBuilt` is false until P11-04b: `gates` is then empty and
-     *     `eligible` is false, so the step cannot be raised.
+     * @description An account on the ramp. `step` is null while no step is set (no live allocation). `scaleEffective` is the factor of the step; the live risk is the intended risk times it. `eligible` is true only when G1 to G6 all pass; an unreadable gate
+     *     is never a pass.
      */
     RampView: {
       /**
@@ -14218,9 +14366,9 @@ export interface components {
        * @description The step a raise would reach; null at S3 or with no step.
        */
       nextStep: null | number;
-      /** @description All evidence gates pass; false while the gates are not built. */
+      /** @description All evidence gates G1 to G6 pass. */
       eligible: boolean;
-      /** @description Whether the evidence gates exist. */
+      /** @description Always true since P11-04b. */
       gatesBuilt: boolean;
       /**
        * Format: double
@@ -14238,6 +14386,26 @@ export interface components {
       history: components['schemas']['RampEventView'][];
       /** @description No setting lets this system place an order. */
       notice: string;
+      /** @description G1 to G7 of the current step, each with its state, number, threshold and n; empty with no step. G7 is information. */
+      gates: components['schemas']['RampGateView'][];
+      /** @description The breach rules that fire on the evidence now. */
+      breaches: components['schemas']['BreachView'][];
+      /** @description What still holds a hold (a clear is refused while any is listed). */
+      holdConditions: components['schemas']['BreachView'][];
+      loss: null | components['schemas']['LiveLossView'];
+      /** @description The halts of the last 30 days, newest first. */
+      halts: components['schemas']['LiveHaltView'][];
+      /** @description The reference kind G3 was measured on. */
+      slippageKind: null | string;
+      /** @description `live.auto_ramp_up` in force (S1 to S2 by rule when every gate passes). */
+      autoRampUp: boolean;
+      /** @description The owner has recorded the exit confirmation S3 needs. */
+      exitConfirmed: boolean;
+      /**
+       * Format: int32
+       * @description Completed sessions at this step.
+       */
+      sessions: number;
     };
     /** @description A cell with enough sample in its place in the ranking by the credible lower bound of expectancy. */
     RankedCellView: {
@@ -15554,7 +15722,7 @@ export interface components {
       accountId: string;
       /**
        * Format: int32
-       * @description 1 (the first step) or a lower step than now. A raise is refused until the evidence gates exist (409 live.gates_not_met).
+       * @description 1 (the first step) or a lower step than now. A raise by one step is refused with 409 live.gates_not_met unless every evidence gate passes (an unreadable gate is not a pass).
        */
       toStep: number;
       /** @description 1 to 300 characters. */
@@ -26804,6 +26972,179 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ClearLiveRampHold: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RampActRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RampView'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ConfirmLiveRampExit: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RampActRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RampView'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListLiveHalts: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveHaltView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListLiveNotices: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveNoticeView'][];
         };
       };
     };

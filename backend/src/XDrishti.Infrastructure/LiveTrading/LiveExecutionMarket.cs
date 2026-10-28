@@ -75,4 +75,17 @@ internal sealed class LiveExecutionMarket(NpgsqlDataSource dataSource) : ILiveEx
 
         return (reader.IsDBNull(0) ? null : Convert.ToDecimal(reader.GetValue(0), System.Globalization.CultureInfo.InvariantCulture), reader.IsDBNull(1) ? null : Convert.ToDecimal(reader.GetValue(1), System.Globalization.CultureInfo.InvariantCulture));
     }
+
+    public async ValueTask<decimal?> LastPriceAsync(string symbol, DateOnly date, DateTimeOffset notAfter, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("""
+            SELECT b.close FROM market.bars_1m b JOIN market.instruments i ON i.id = b.instrument_id
+            WHERE i.canonical_symbol = @symbol AND b.ts >= @from AND b.ts <= @to ORDER BY b.ts DESC LIMIT 1
+            """);
+        command.Parameters.AddWithValue("symbol", Canonical(symbol));
+        command.Parameters.Add(new NpgsqlParameter("from", NpgsqlDbType.TimestampTz) { Value = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).UtcDateTime });
+        command.Parameters.Add(new NpgsqlParameter("to", NpgsqlDbType.TimestampTz) { Value = notAfter.UtcDateTime });
+        var close = await command.ExecuteScalarAsync(cancellationToken);
+        return close is null or DBNull ? null : Convert.ToDecimal(close, System.Globalization.CultureInfo.InvariantCulture);
+    }
 }

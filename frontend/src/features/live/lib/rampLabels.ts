@@ -15,7 +15,44 @@ export const noOrderSentence =
   'No setting lets this system place, change or cancel an order: you place every order yourself.';
 
 export const gatesSentence =
-  'The evidence gates are built in the next slice (P11-04b). Until they exist none can pass, so the step cannot be raised here; you can set S1 and lower the step.';
+  'The step goes up only when every evidence gate G1 to G6 passes; a gate that cannot be read never passes. The system lowers or holds the step by itself when the evidence turns. Gates at this size are a safety brake on gross problems, not proof of an edge.';
+
+export const gateNames: Record<string, string> = {
+  G1_sessions: 'G1 Sessions at this step',
+  G2_volume: 'G2 Graded round trips',
+  G3_slippage: 'G3 Slippage against the plan',
+  G4_discipline: 'G4 Discipline',
+  G5_containment: 'G5 Containment',
+  G6_capture: 'G6 Capture',
+  G7_cost_drag: 'G7 Cost drag (information)',
+};
+
+/** State word and a symbol: the state is never carried by colour alone. */
+export const gateStates: Record<string, { word: string; icon: string }> = {
+  pass: { word: 'Pass', icon: '✔' },
+  fail: { word: 'Fail', icon: '✖' },
+  insufficient: { word: 'Not enough evidence', icon: '…' },
+  unavailable: { word: 'Cannot be read', icon: '?' },
+  not_evaluable: { word: 'Cannot be evaluated', icon: '?' },
+  info: { word: 'Information', icon: 'i' },
+};
+
+export const measureStates: Record<string, string> = {
+  value: 'measured',
+  realised_only: 'realised only, open positions not marked',
+  unavailable: 'unavailable',
+};
+
+export const haltActions: Record<string, string> = {
+  stop_new: 'no new entries',
+  halve: 'size halves next week',
+  alert_only: 'alert only',
+};
+
+/** A number with the given decimals, or a word when it is not known (never a made-up digit). */
+export function num(value: number | null | undefined, digits = 3): string {
+  return typeof value === 'number' ? value.toFixed(digits) : 'not known';
+}
 
 /** A percent with 3 decimals, or a word when the value is not known (never a made-up digit). */
 export function pct(value: number | null | undefined): string {

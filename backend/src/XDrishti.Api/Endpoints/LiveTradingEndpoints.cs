@@ -36,7 +36,7 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
 
         group.MapGet("/ramp", GetRampAsync)
             .WithName("GetLiveRamp")
-            .WithSummary("The ramp of a live account: step (null = none, so no live allocation), the scale and the live risk it gives, hold, the history. gatesBuilt is false until P11-04b: no gate is listed and the step cannot be raised. 404 live.account_not_found")
+            .WithSummary("The ramp of a live account: step (null = none, so no live allocation), the scale and the live risk it gives, hold, the evidence gates G1 to G7 (state, number, threshold, n; only pass counts), the breach rules, today's loss, the halts and the history. 404 live.account_not_found")
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapPost("/ramp/steps", SetRampStepAsync)
@@ -47,6 +47,33 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapPost("/ramp/clear-hold", ClearHoldAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy)
+            .WithName("ClearLiveRampHold")
+            .WithSummary("Clear a hold of the ramp as the owner. Refused with 409 live.hold_condition_active while a breach condition still holds on the evidence read now (event breaches need the cooldown sessions without a new one). Insert-only and audited. Same gates as the step: session, CSRF, Live:Writes:Enabled and the password in the body, checked on this call.")
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapPost("/ramp/exit-confirmed", ConfirmExitAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy)
+            .WithName("ConfirmLiveRampExit")
+            .WithSummary("Record as the owner that the small-live exit report was read and is met, the key to S3. Refused with 409 live.exit_not_checked unless that report says MET right now; the report (P11-06) is not built yet, so it is always refused for now. Same gates as the step.")
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapGet("/halts", GetHaltsAsync)
+            .WithName("ListLiveHalts")
+            .WithSummary("The halts of the live accounts (daily and weekly loss limits reached), newest first: the period, the limit, what was measured under which state (value, realised_only, unavailable) and what the halt does. A halt is advice: you place every order. accountId optional; from and to default to the last 30 days, at most 92.")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapGet("/notices", GetNoticesAsync)
+            .WithName("ListLiveNotices")
+            .WithSummary("The derived notices of the live record: a halt in force, a hold, a capture gap, a step the evidence has earned, a compliance re-check overdue. Words and a route only; nothing to run.");
 
         group.MapGet("/accounts/{accountId:guid}/capture", GetCaptureAsync)
             .WithName("GetLiveCapture")
@@ -164,6 +191,44 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
         var result = await handler.HandleAsync(new SetRampStepCommand(owner.Value, request.AccountId, request.ToStep, request.Reason), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
+
+    private static async Task<Results<Ok<RampView>, ProblemHttpResult>> ClearHoldAsync(
+        RampActRequest request, HttpContext http, ILiveWritesGate gate, ICommandHandler<StepUpCommand, StepUpResult> passwordCheck, ICommandHandler<ClearHoldCommand, RampView> handler, CancellationToken cancellationToken) =>
+        await OwnerRampActAsync(request, http, gate, passwordCheck, owner => handler.HandleAsync(new ClearHoldCommand(owner, request.AccountId, request.Reason), cancellationToken), cancellationToken);
+
+    private static async Task<Results<Ok<RampView>, ProblemHttpResult>> ConfirmExitAsync(
+        RampActRequest request, HttpContext http, ILiveWritesGate gate, ICommandHandler<StepUpCommand, StepUpResult> passwordCheck, ICommandHandler<ConfirmExitCommand, RampView> handler, CancellationToken cancellationToken) =>
+        await OwnerRampActAsync(request, http, gate, passwordCheck, owner => handler.HandleAsync(new ConfirmExitCommand(owner, request.AccountId, request.Reason), cancellationToken), cancellationToken);
+
+    /// <summary>The order of every owner write: the capability gate first (a switched-off save neither counts toward the sign-in lockout nor says anything about the password), then the fresh password for THIS act, then the owner from the session.</summary>
+    private static async Task<Results<Ok<RampView>, ProblemHttpResult>> OwnerRampActAsync(
+        RampActRequest request, HttpContext http, ILiveWritesGate gate, ICommandHandler<StepUpCommand, StepUpResult> passwordCheck, Func<string, ValueTask<Result<RampView>>> act, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        if (!gate.Enabled)
+        {
+            return Problem(Error.Forbidden(LiveErrors.CapabilityOff, "The live writes are switched off in this deployment (Live__Writes__Enabled is false)."), http);
+        }
+
+        var owner = await OwnerAct.AuthorizeAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await act(owner.Value);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<LiveHaltView>>, ProblemHttpResult>> GetHaltsAsync(
+        IQueryHandler<GetLiveHaltsQuery, Result<IReadOnlyList<LiveHaltView>>> handler, HttpContext http, Guid? accountId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetLiveHaltsQuery(accountId, from, to), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<IReadOnlyList<LiveNoticeView>>> GetNoticesAsync(IQueryHandler<GetLiveNoticesQuery, IReadOnlyList<LiveNoticeView>> handler, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await handler.HandleAsync(new GetLiveNoticesQuery(), cancellationToken));
 
     private static async Task<Ok<LiveSettingsView>> GetSettingsAsync(IQueryHandler<GetLiveSettingsQuery, LiveSettingsView> handler, CancellationToken cancellationToken) =>
         TypedResults.Ok(await handler.HandleAsync(new GetLiveSettingsQuery(), cancellationToken));

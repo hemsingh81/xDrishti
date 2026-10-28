@@ -3,7 +3,7 @@ using XDrishti.Domain.LiveTrading;
 namespace XDrishti.Application.Abstractions.LiveTrading;
 
 /// <summary>A stored ramp event (spec P11-04).</summary>
-public sealed record StoredRampEvent(long Id, Guid AccountId, string Kind, int? FromStep, int ToStep, bool Hold, string Actor, string Reason, string? GateHash, DateTimeOffset CreatedAt);
+public sealed record StoredRampEvent(long Id, Guid AccountId, string Kind, int? FromStep, int ToStep, bool Hold, string Actor, string Reason, string? GateHash, DateTimeOffset CreatedAt, string? GateSnapshot = null);
 
 /// <summary>
 /// The ramp of a live account (<c>trading.ramp_events</c>, spec P11-04, ADR 0148): insert-only; the state is the newest row of the account, and an account with none has no step and so no live allocation. The table refuses a move its rules do not allow.

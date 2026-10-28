@@ -13,7 +13,7 @@ public sealed class LiveCaptureGrantsTests(ApiFactory factory)
 {
     private const string ScratchDatabase = "xd_live_capture_grants_probe";
 
-    private static readonly string[] Tables = ["live_capture_runs", "live_fills", "live_fill_charges", "live_orders", "live_ticket_outcomes", "live_executions", "live_order_classes", "slippage_estimates", "capacity_scores"];
+    private static readonly string[] Tables = ["live_capture_runs", "live_fills", "live_fill_charges", "live_orders", "live_ticket_outcomes", "live_executions", "live_order_classes", "slippage_estimates", "capacity_scores", "live_halts"];
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 

@@ -94,6 +94,16 @@ public static class DependencyInjection
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)
         services.AddScoped<IQueryHandler<GetRampQuery, Result<RampView>>>(sp => sp.GetRequiredService<GetRampHandler>());
         services.AddScoped<ICommandHandler<SetRampStepCommand, RampView>, SetRampStepHandler>();
+        services.AddScoped<RampAssessor>(); // the evidence of the step, the gates and the breach rules, read from the stored live record (P11-04b, ADR 0151)
+        services.AddScoped<LiveLossReader>();
+        services.AddScoped<OwnerRampActs>();
+        services.AddScoped<ICommandHandler<ClearHoldCommand, RampView>>(sp => sp.GetRequiredService<OwnerRampActs>());
+        services.AddScoped<ICommandHandler<ConfirmExitCommand, RampView>>(sp => sp.GetRequiredService<OwnerRampActs>());
+        services.AddScoped<ICommandHandler<EvaluateRampCommand, RampEvaluationOutcome>, EvaluateRampHandler>(); // holds, step-downs, halts and the automatic step-up (OFF by default); writes rows only, no order
+        services.AddScoped<IQueryHandler<GetLiveHaltsQuery, Result<IReadOnlyList<LiveHaltView>>>, GetLiveHaltsHandler>();
+        services.AddScoped<IQueryHandler<GetLiveNoticesQuery, IReadOnlyList<LiveNoticeView>>, LiveNotices>();
+        services.AddScoped<ILiveReadyFactsSource, LiveReadyFactsSource>();
+        services.AddSingleton<ILiveExitReport, NoExitReport>(); // P11-06 is not built: the exit report can never say MET, so S3 stays closed
         services.AddScoped<IQueryHandler<GetLiveSettingsQuery, LiveSettingsView>, GetLiveSettingsHandler>();
         services.AddScoped<ICommandHandler<ChangeLiveSettingsCommand, LiveSettingsView>, ChangeLiveSettingsHandler>();
         services.AddScoped<ILiveReadinessSource, LiveReadinessSource>();

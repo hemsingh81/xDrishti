@@ -198,6 +198,7 @@ public static class DependencyInjection
         services.AddOptions<LiveRampOptions>().Bind(configuration.GetSection(LiveRampOptions.SectionName)).Validate(LiveRampOptions.IsValid, LiveRampOptions.InvalidMessage).ValidateOnStart(); // the ramp factors, owner-fixed (P11-04)
         services.AddSingleton<ILiveRampSettings, ConfiguredLiveRampSettings>();
         services.AddScoped<IRampStore, RampStore>(); // insert-only ramp events (P11-04)
+        services.AddScoped<ILiveHaltStore, LiveHaltStore>(); // insert-only halts of the live accounts (P11-04b, ADR 0151)
         services.AddScoped<ILiveSettingsStore, LiveSettingsStore>(); // insert-only live switches, default OFF (P11-04)
         services.AddOptions<LiveCaptureOptions>().Bind(configuration.GetSection(LiveCaptureOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the live capture switches, all OFF (P11-01)
         services.AddOptions<LiveMatchOptions>().Bind(configuration.GetSection(LiveMatchOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();

@@ -7,22 +7,25 @@ import { rampKey } from '../api/rampQueries';
 import { stepNames, writeProblem } from '../lib/rampLabels';
 
 /**
- * A write of the live feature (spec P11-04): sets the ramp step of one account (S1 first, or lower). The password is typed again for THIS move and lives in the
+ * A write of the live feature (spec P11-04): sets the ramp step of one account (S1 first, lower, or one up when every evidence gate passes). The password is typed again for THIS move and lives in the
  * variables of the call only; the field is cleared after every try. Nothing here calls a broker or places an order.
  */
 export function RampDialog({
   accountId,
   accountName,
   step,
+  raiseTo,
   onClose,
 }: {
   accountId: string;
   accountName: string;
   step: number | null;
+  /** The step a raise would reach; null for the first step or a lowering. */
+  raiseTo: number | null;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const options = step === null ? [1] : [1, 2, 3].filter((s) => s < step);
+  const options = step === null ? [1] : raiseTo === null ? [1, 2, 3].filter((s) => s < step) : [raiseTo];
   const [toStep, setToStep] = useState(options[0] ?? 1);
   const [reason, setReason] = useState('');
   const [password, setPassword] = useState('');
@@ -71,7 +74,13 @@ export function RampDialog({
         void submit();
       }}
     >
-      <AppDialogHeader>{step === null ? 'Set the first ramp step' : 'Lower the ramp step'}</AppDialogHeader>
+      <AppDialogHeader>
+        {step === null
+          ? 'Set the first ramp step'
+          : raiseTo === null
+            ? 'Lower the ramp step'
+            : `Raise the ramp step to S${String(raiseTo)}`}
+      </AppDialogHeader>
       <AppDialogBody>
         {saved ? (
           <Alert severity="success">Saved. It takes effect on the next plan; open tickets are untouched.</Alert>

@@ -13992,7 +13992,7 @@
         "tags": [
           "Live trading"
         ],
-        "summary": "The ramp of a live account: step (null = none, so no live allocation), the scale and the live risk it gives, hold, the history. gatesBuilt is false until P11-04b: no gate is listed and the step cannot be raised. 404 live.account_not_found",
+        "summary": "The ramp of a live account: step (null = none, so no live allocation), the scale and the live risk it gives, hold, the evidence gates G1 to G7 (state, number, threshold, n; only pass counts), the breach rules, today's loss, the halts and the history. 404 live.account_not_found",
         "operationId": "GetLiveRamp",
         "parameters": [
           {
@@ -14093,6 +14093,232 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live-trading/ramp/clear-hold": {
+      "post": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "Clear a hold of the ramp as the owner. Refused with 409 live.hold_condition_active while a breach condition still holds on the evidence read now (event breaches need the cooldown sessions without a new one). Insert-only and audited. Same gates as the step: session, CSRF, Live:Writes:Enabled and the password in the body, checked on this call.",
+        "operationId": "ClearLiveRampHold",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RampActRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RampView"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live-trading/ramp/exit-confirmed": {
+      "post": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "Record as the owner that the small-live exit report was read and is met, the key to S3. Refused with 409 live.exit_not_checked unless that report says MET right now; the report (P11-06) is not built yet, so it is always refused for now. Same gates as the step.",
+        "operationId": "ConfirmLiveRampExit",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RampActRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RampView"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live-trading/halts": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The halts of the live accounts (daily and weekly loss limits reached), newest first: the period, the limit, what was measured under which state (value, realised_only, unavailable) and what the halt does. A halt is advice: you place every order. accountId optional; from and to default to the last 30 days, at most 92.",
+        "operationId": "ListLiveHalts",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LiveHaltView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live-trading/notices": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The derived notices of the live record: a halt in force, a hold, a capture gap, a step the evidence has earned, a compliance re-check overdue. Words and a route only; nothing to run.",
+        "operationId": "ListLiveNotices",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LiveNoticeView"
+                  }
                 }
               }
             }
@@ -19480,6 +19706,26 @@
         },
         "description": "A service that would restart the count when it runs."
       },
+      "BreachView": {
+        "required": [
+          "code",
+          "action",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "One breach rule that fires now (B1 to B7) or still holds a hold."
+      },
       "BriefingAttemptView": {
         "required": [
           "n",
@@ -21130,7 +21376,7 @@
           },
           "autoRampUp": {
             "type": "boolean",
-            "description": "live.auto_ramp_up (takes effect with the evidence gates of P11-04b)."
+            "description": "live.auto_ramp_up (lets the evaluator raise S1 to S2 by rule when every gate passes; never above S2)."
           },
           "reason": {
             "type": [
@@ -34644,6 +34890,167 @@
         },
         "description": "The state of the live feed as the screen needs it: hub event `feedStatus` (pushed on connect, on a change of `state` or `subscribed`, and every 15 seconds) and the body of `GET /api/live/status` (the fallback when the hub is not connected).\n`state` is the feed's own word: `connected` (streaming), `idle` (connected, nothing to follow), `connecting`, `reconnecting`, `closed` (outside its window), `paused` (the owner paused the service), `no_token`, `token_refused`,\n`flapping`; or `not_running` when the feed reports nothing (never started, stopped, crashed: no heartbeat in the last 60 seconds). `subscribed` is the number of instruments the feed follows (0 unless it reports); `lastTickAt` the exchange\ntime of its latest tick of any instrument (UTC), null when none yet."
       },
+      "LiveHaltView": {
+        "required": [
+          "id",
+          "accountId",
+          "kind",
+          "periodStart",
+          "limitR",
+          "limitPct",
+          "measuredR",
+          "measuredPct",
+          "measureState",
+          "action",
+          "openedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "limitR": {
+            "type": "number",
+            "format": "double"
+          },
+          "limitPct": {
+            "type": "number",
+            "format": "double"
+          },
+          "measuredR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "measuredPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "measureState": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "A halt as the screen reads it: the period, the limit, what was measured under which state, and what it does (it is advice: the owner places every order)."
+      },
+      "LiveLossView": {
+        "required": [
+          "date",
+          "health",
+          "state",
+          "netRupees",
+          "lossR",
+          "limitR",
+          "oneRupees",
+          "carriedQty",
+          "openUnmarked",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "health": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "netRupees": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "lossR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "limitR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "oneRupees": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "carriedQty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "openUnmarked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "description": "The loss of the last measured session: the state (value, realised_only, unavailable), the figures and what is left out."
+      },
+      "LiveNoticeView": {
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "text",
+          "route"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string"
+          }
+        },
+        "description": "A notice of the live record, derived on read: the words, the route and nothing to run."
+      },
       "LiveOutcomeView": {
         "required": [
           "itemId",
@@ -41672,6 +42079,36 @@
         },
         "description": "The queue of accepted hypotheses that no change names."
       },
+      "RampActRequest": {
+        "required": [
+          "accountId",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "The account.",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "1 to 300 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS act (checked on every request; no step-up window is used)."
+          }
+        },
+        "description": "The body of clearing a hold or recording the exit confirmation (spec P11-04): the account, a reason and the owner's password for THIS act."
+      },
       "RampEventView": {
         "required": [
           "id",
@@ -41725,10 +42162,54 @@
               "null",
               "string"
             ],
-            "description": "The hash of the frozen gate snapshot (P11-04b); null before."
+            "description": "The hash of the frozen gate snapshot of a raise on evidence; null for the other kinds."
           }
         },
         "description": "One event of the ramp history."
+      },
+      "RampGateView": {
+        "required": [
+          "code",
+          "state",
+          "number",
+          "threshold",
+          "n",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "number": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "threshold": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "n": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "One evidence gate as the screen reads it. `number` is null when the state says it could not be measured."
       },
       "RampView": {
         "required": [
@@ -41744,7 +42225,16 @@
           "liveRiskPct",
           "writesEnabled",
           "history",
-          "notice"
+          "notice",
+          "gates",
+          "breaches",
+          "holdConditions",
+          "loss",
+          "halts",
+          "slippageKind",
+          "autoRampUp",
+          "exitConfirmed",
+          "sessions"
         ],
         "type": "object",
         "properties": {
@@ -41790,11 +42280,11 @@
           },
           "eligible": {
             "type": "boolean",
-            "description": "All evidence gates pass; false while the gates are not built."
+            "description": "All evidence gates G1 to G6 pass."
           },
           "gatesBuilt": {
             "type": "boolean",
-            "description": "Whether the evidence gates exist."
+            "description": "Always true since P11-04b."
           },
           "intendedRiskPct": {
             "type": [
@@ -41826,9 +42316,68 @@
           "notice": {
             "type": "string",
             "description": "No setting lets this system place an order."
+          },
+          "gates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RampGateView"
+            },
+            "description": "G1 to G7 of the current step, each with its state, number, threshold and n; empty with no step. G7 is information."
+          },
+          "breaches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BreachView"
+            },
+            "description": "The breach rules that fire on the evidence now."
+          },
+          "holdConditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BreachView"
+            },
+            "description": "What still holds a hold (a clear is refused while any is listed)."
+          },
+          "loss": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The loss of today as measured now; null with no step or no capital.",
+                "$ref": "#/components/schemas/LiveLossView"
+              }
+            ]
+          },
+          "halts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveHaltView"
+            },
+            "description": "The halts of the last 30 days, newest first."
+          },
+          "slippageKind": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The reference kind G3 was measured on."
+          },
+          "autoRampUp": {
+            "type": "boolean",
+            "description": "`live.auto_ramp_up` in force (S1 to S2 by rule when every gate passes)."
+          },
+          "exitConfirmed": {
+            "type": "boolean",
+            "description": "The owner has recorded the exit confirmation S3 needs."
+          },
+          "sessions": {
+            "type": "integer",
+            "description": "Completed sessions at this step.",
+            "format": "int32"
           }
         },
-        "description": "An account on the ramp. `step` is null while no step is set (no live allocation). `scaleEffective` is the factor of the step; the live risk is the intended risk times it. `gatesBuilt` is false until P11-04b: `gates` is then empty and\n`eligible` is false, so the step cannot be raised."
+        "description": "An account on the ramp. `step` is null while no step is set (no live allocation). `scaleEffective` is the factor of the step; the live risk is the intended risk times it. `eligible` is true only when G1 to G6 all pass; an unreadable gate\nis never a pass."
       },
       "RankedCellView": {
         "required": [
@@ -45552,7 +46101,7 @@
           },
           "toStep": {
             "type": "integer",
-            "description": "1 (the first step) or a lower step than now. A raise is refused until the evidence gates exist (409 live.gates_not_met).",
+            "description": "1 (the first step) or a lower step than now. A raise by one step is refused with 409 live.gates_not_met unless every evidence gate passes (an unreadable gate is not a pass).",
             "format": "int32"
           },
           "reason": {

@@ -50,6 +50,7 @@ internal sealed record XdOptions(
           xd live outcomes [--account ID] [--date YYYY-MM-DD]
           xd live estimates [--week YYYY-MM-DD]
           xd live waterfall --entry ID
+          xd live ramp show [--account ID]
           xd lab runs [--strategy ID] [--state queued|running|succeeded|failed|cancelled|interrupted] [--limit 1..200]
         exit codes: 0 done (a full test: verdict PASS), 1 refused (located problems on stderr), 2 wrong command line, 3 failure or timeout, 4 full test finished with verdict MARGINAL or FAIL, 130 cancelled
 

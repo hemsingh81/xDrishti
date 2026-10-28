@@ -97,8 +97,8 @@ public sealed class ComplianceArchitectureTests
     {
         var endpoints = Source("XDrishti.Api/Endpoints/LiveTradingEndpoints.cs");
 
-        // three owner writes in this module: the compliance record (P11-05), the ramp step and the live switches (P11-04), each behind the same gate and fresh password
-        Regex.Count(endpoints, @"\.Map(Post|Put|Delete|Patch)\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBe(3);
+        // five owner writes in this module: the compliance record (P11-05), the ramp step and the live switches (P11-04a), clear-hold and exit-confirmed (P11-04b), each behind the same gate and fresh password
+        Regex.Count(endpoints, @"\.Map(Post|Put|Delete|Patch)\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBe(5);
         Regex.Count(endpoints, @"\.MapPost\(""/compliance""", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBe(1);
         endpoints.ShouldContain("RequireRateLimiting(");
         var gate = endpoints.IndexOf("gate.Enabled", StringComparison.Ordinal);

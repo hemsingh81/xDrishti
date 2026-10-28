@@ -49,8 +49,11 @@ public sealed class LiveSettleService(IServiceScopeFactory scopes, ILiveCaptureS
 
         // The step after the settle (spec P11-02): measure what the owner did against the plan. It reads stored data and writes insert-only rows; a failure of it is reported but never undoes the outcomes.
         var measured = await scope.ServiceProvider.GetRequiredService<ICommandHandler<ComputeLiveExecutionsCommand, LiveExecutionsOutcome>>().HandleAsync(new ComputeLiveExecutionsCommand(null, null), cancellationToken);
-        var summary = measured.IsSuccess ? result.Value.Summary + "; " + measured.Value.Summary : result.Value.Summary + "; execution step failed";
-        var stepFailed = measured.IsFailure || measured.Value.Failed > 0;
+        // The ramp after the measure (spec P11-04): holds, step-downs, halts and, only with live.auto_ramp_up ON, the automatic step-up. Rows by rule:ramp; a failure of it is reported but never undoes the outcomes.
+        var evaluated = await scope.ServiceProvider.GetRequiredService<ICommandHandler<EvaluateRampCommand, RampEvaluationOutcome>>().HandleAsync(new EvaluateRampCommand(null, HaltsOnly: false), cancellationToken);
+        var ramp = evaluated.IsSuccess ? "; " + evaluated.Value.Summary : "; ramp evaluation failed";
+        var summary = (measured.IsSuccess ? result.Value.Summary + "; " + measured.Value.Summary : result.Value.Summary + "; execution step failed") + ramp;
+        var stepFailed = measured.IsFailure || measured.Value.Failed > 0 || evaluated.IsFailure || evaluated.Value.Failed > 0;
         return result.Value.Failed > 0 || stepFailed ? ServiceOutcome.Failed(summary) : result.Value.Sessions == 0 && !(measured.IsSuccess && measured.Value.Sessions > 0) ? ServiceOutcome.Skipped("No live session to settle") : ServiceOutcome.Succeeded(summary);
     }
 }

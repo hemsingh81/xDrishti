@@ -17,4 +17,7 @@ public interface ILiveExecutionMarket
 
     /// <summary>The lowest low and the highest high of the 1-minute bars from the minute containing <paramref name="from"/> to the minute containing <paramref name="to"/>; both null without a bar.</summary>
     ValueTask<(decimal? Low, decimal? High)> MinuteExtremesAsync(string symbol, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken);
+
+    /// <summary>The close of the newest 1-minute bar of the India date that is not after the instant; null when the date has no bar by then (the loss measure then leaves that lot unmarked, never at cost).</summary>
+    ValueTask<decimal?> LastPriceAsync(string symbol, DateOnly date, DateTimeOffset notAfter, CancellationToken cancellationToken);
 }

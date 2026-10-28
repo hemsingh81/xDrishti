@@ -31,7 +31,8 @@ internal sealed class StoredPlanContextSource(
     IPaperBookReader paperBook,
     IContextFigures contextFigures,
     IRampStore ramp,
-    ILiveRampSettings rampSettings) : IPlanContextSource
+    ILiveRampSettings rampSettings,
+    ILiveReadyFactsSource liveFacts) : IPlanContextSource
 {
     /// <summary>Calendar days of daily bars read before the close of the session (about 60 sessions plus slack).</summary>
     public const int ReturnLookbackDays = 120;
@@ -61,7 +62,21 @@ internal sealed class StoredPlanContextSource(
         if (contextAccounts.Any(a => a.Mode == TradingMode.ManualLive))
         {
             var steps = await ramp.CurrentAllAsync(cancellationToken);
-            contextAccounts = [.. contextAccounts.Select(a => a.Mode == TradingMode.ManualLive ? WithRamp(a, steps.GetValueOrDefault(a.AccountId), rampSettings.StepFactors) : a)];
+            var withRamp = new List<ContextAccount>(contextAccounts.Count);
+            foreach (var a in contextAccounts)
+            {
+                if (a.Mode != TradingMode.ManualLive)
+                {
+                    withRamp.Add(a);
+                    continue;
+                }
+
+                var state = steps.GetValueOrDefault(a.AccountId);
+                var standing = await liveFacts.ForAsync(a.AccountId, request.ForDate, state is not null, cancellationToken);
+                withRamp.Add(WithRamp(a, state, rampSettings.StepFactors, standing));
+            }
+
+            contextAccounts = withRamp;
         }
 
         var ids = request.Instruments.Where(i => i.Id is not null).Select(i => i.Id!.Value).Distinct().ToList();
@@ -115,8 +130,17 @@ internal sealed class StoredPlanContextSource(
             ? account with { Equity = b.Equity, OpenRiskPct = b.OpenRiskPct, FundsAvailable = b.FundsAvailable, DailyLossPct = b.DailyLossPct, HeldSymbols = b.HeldSymbols }
             : account;
 
-    internal static ContextAccount WithRamp(ContextAccount account, RampState? state, IReadOnlyList<double> factors) =>
-        account with { RampScale = RampPolicy.Scale(state, factors), RampEventId = state?.EventId, LiveReady = new LiveReadyFacts(state is not null, null, null, null) };
+    /// <summary>The scale is the step's factor times the standing's (1, 0.5 after a weekly halve, 0 under a stop); the facts of the live-ready gate come from the standing. With no standing they stay unknown, which is not a pass.</summary>
+    internal static ContextAccount WithRamp(ContextAccount account, RampState? state, IReadOnlyList<double> factors, LiveStanding? standing = null)
+    {
+        var scale = RampPolicy.Scale(state, factors);
+        if (scale is { } sc && standing is { } st)
+        {
+            scale = st.ScaleFactor <= 0 ? null : sc * st.ScaleFactor;
+        }
+
+        return account with { RampScale = scale, RampEventId = state?.EventId, LiveReady = standing?.Facts ?? new LiveReadyFacts(state is not null, null, null, null) };
+    }
 
     internal static ContextAccount ToAccount(BrokerAccount account, List<HoldingData> open, Dictionary<Guid, RiskProfile> profiles, bool bookAssumedEmpty)
     {

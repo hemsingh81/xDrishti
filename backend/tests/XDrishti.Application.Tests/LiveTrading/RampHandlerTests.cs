@@ -1,9 +1,13 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 using XDrishti.Application.Abstractions.LiveTrading;
+using XDrishti.Application.Abstractions.Market.Calendar;
+using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.LiveTrading;
 using XDrishti.Application.Tests.Accounts;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.LiveTrading;
+using XDrishti.Domain.Market.Calendar;
 
 namespace XDrishti.Application.Tests.LiveTrading;
 
@@ -58,6 +62,8 @@ public sealed class RampHandlerTests
     private sealed class Factors : ILiveRampSettings
     {
         public IReadOnlyList<double> StepFactors => RampPolicy.DefaultFactors;
+
+        public RampThresholds Thresholds => RampThresholds.Defaults;
     }
 
     private sealed class Switches : ILiveSettingsStore
@@ -86,8 +92,16 @@ public sealed class RampHandlerTests
     private readonly AccountsFixture _fx = new();
     private readonly Ramp _ramp = new();
 
-    private SetRampStepHandler Setter(bool gate = true) =>
-        new(_fx.Data, _ramp, new GetRampHandler(_fx.Data, _fx.Data, _ramp, new Factors(), new Gate(gate)), new Gate(gate), _fx.Data, _fx.Data, _fx.Clock, NullLogger<SetRampStepHandler>.Instance);
+    private SetRampStepHandler Setter(bool gate = true)
+    {
+        var calendar = Substitute.For<ITradingCalendar>();
+        calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new TradingCalendar());
+        var store = new InMemoryLiveStore();
+        var assessor = new RampAssessor(_ramp, store, new InMemoryExecutionStore(), new InMemoryHaltStore(), new LiveTicketSource(Substitute.For<IPlanStore>()), calendar, _fx.Data, new Factors(), _fx.Clock);
+        var loss = new LiveLossReader(store, new FakeLiveMarket(), _fx.Clock);
+        var view = new GetRampHandler(_fx.Data, _fx.Data, _ramp, new Factors(), new Gate(gate), assessor, loss, new InMemoryHaltStore(), new Switches(), _fx.Clock);
+        return new(_fx.Data, _ramp, view, assessor, new Gate(gate), _fx.Data, _fx.Data, _fx.Clock, NullLogger<SetRampStepHandler>.Instance);
+    }
 
     private async Task<BrokerAccount> TradingAccountAsync() =>
         await _fx.CreatedAsync(Inputs.Account(trading: Inputs.Trading(_fx.Standard.Id), roles: Inputs.Roles(true, false)));
@@ -104,12 +118,12 @@ public sealed class RampHandlerTests
         result.Value.ScaleEffective.ShouldBe(0.25);
         result.Value.IntendedRiskPct.ShouldNotBeNull();
         result.Value.LiveRiskPct.ShouldBe(result.Value.IntendedRiskPct * 0.25);
-        result.Value.GatesBuilt.ShouldBeFalse();
+        result.Value.GatesBuilt.ShouldBeTrue();
         result.Value.Eligible.ShouldBeFalse();
         result.Value.NextStep.ShouldBe(2);
         _ramp.Rows.Single().Actor.ShouldBe(Owner);
         var audit = _fx.Data.Events.Single(e => e.Event == AccountEventType.RampStepSet);
-        audit.Detail.ShouldBe("event=1 from=none to=1");
+        audit.Detail.ShouldBe("event=1 kind=set_step from=none to=1");
         audit.Detail!.ShouldNotContain("first step");
     }
 

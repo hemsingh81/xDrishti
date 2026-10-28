@@ -91,7 +91,8 @@ public sealed class RampApiTests(ApiFactory factory) : DataTestBase(factory)
         var settings = await Client.GetFromJsonAsync<JsonElement>(Settings, Ct);
 
         ramp.GetProperty("step").ValueKind.ShouldBe(JsonValueKind.Null);
-        ramp.GetProperty("gatesBuilt").GetBoolean().ShouldBeFalse();
+        ramp.GetProperty("gatesBuilt").GetBoolean().ShouldBeTrue();
+        ramp.GetProperty("gates").GetArrayLength().ShouldBe(0);
         ramp.GetProperty("eligible").GetBoolean().ShouldBeFalse();
         settings.GetProperty("id").ValueKind.ShouldBe(JsonValueKind.Null);
         settings.GetProperty("autoApproveTickets").GetBoolean().ShouldBeFalse();
@@ -122,7 +123,79 @@ public sealed class RampApiTests(ApiFactory factory) : DataTestBase(factory)
         skip.Json.GetProperty("code").GetString().ShouldBe("live.step_not_adjacent");
         (await ScalarAsync<long>("SELECT count(*) FROM trading.ramp_events")).ShouldBe(1);
         (await ScalarAsync<string>("SELECT actor FROM trading.ramp_events")).ShouldStartWith("owner:");
-        (await ScalarAsync<string>("SELECT detail FROM accounts.account_events WHERE event = 'RampStepSet'")).ShouldBe("event=" + await ScalarAsync<long>("SELECT id FROM trading.ramp_events") + " from=none to=1");
+        (await ScalarAsync<string>("SELECT detail FROM accounts.account_events WHERE event = 'RampStepSet'")).ShouldBe("event=" + await ScalarAsync<long>("SELECT id FROM trading.ramp_events") + " kind=set_step from=none to=1");
+    }
+
+    private static readonly Uri ClearHold = new("/api/live-trading/ramp/clear-hold", UriKind.Relative);
+
+    private static readonly Uri ExitConfirmed = new("/api/live-trading/ramp/exit-confirmed", UriKind.Relative);
+
+    [Fact]
+    public async Task The_gates_of_a_stepped_account_are_listed_and_a_raise_names_the_failing_ones()
+    {
+        await StepAsync(1, Factory.OwnerPassword);
+        var ramp = await Client.GetFromJsonAsync<JsonElement>(new Uri($"/api/live-trading/ramp?accountId={AccountId}", UriKind.Relative), Ct);
+
+        var codes = ramp.GetProperty("gates").EnumerateArray().Select(g => g.GetProperty("code").GetString()).ToList();
+        codes.ShouldBe(["G1_sessions", "G2_volume", "G3_slippage", "G4_discipline", "G5_containment", "G6_capture", "G7_cost_drag"]);
+        ramp.GetProperty("eligible").GetBoolean().ShouldBeFalse();
+        ramp.GetProperty("gates").EnumerateArray().Where(g => g.GetProperty("code").GetString() != "G7_cost_drag").ShouldAllBe(g => g.GetProperty("state").GetString() != "pass");
+        var raise = await StepAsync(2, Factory.OwnerPassword, "up");
+        raise.Json.GetProperty("code").GetString().ShouldBe("live.gates_not_met");
+        raise.Json.GetProperty("title").GetString()!.ShouldContain("G2_volume insufficient");
+    }
+
+    [Fact]
+    public async Task Clearing_a_hold_and_confirming_the_exit_are_owner_acts_behind_the_gate_and_a_fresh_password()
+    {
+        await StepAsync(1, Factory.OwnerPassword);
+        Configuration["Live:Writes:Enabled"] = null;
+        var closed = await SendAsync(HttpMethod.Post, ClearHold, new { accountId = AccountId, reason = "x", password = Factory.OwnerPassword });
+        Configuration["Live:Writes:Enabled"] = "true";
+        var noPassword = await SendAsync(HttpMethod.Post, ClearHold, new { accountId = AccountId, reason = "x", password = (string?)null });
+        var noHold = await SendAsync(HttpMethod.Post, ClearHold, new { accountId = AccountId, reason = "x", password = Factory.OwnerPassword });
+        var exit = await SendAsync(HttpMethod.Post, ExitConfirmed, new { accountId = AccountId, reason = "read the report", password = Factory.OwnerPassword });
+
+        closed.Json.GetProperty("code").GetString().ShouldBe("live.capability_off");
+        noPassword.Status.ShouldBe(HttpStatusCode.Unauthorized);
+        noHold.Status.ShouldBe(HttpStatusCode.Conflict);
+        noHold.Json.GetProperty("code").GetString().ShouldBe("live.no_hold");
+        exit.Status.ShouldBe(HttpStatusCode.Conflict);
+        exit.Json.GetProperty("code").GetString().ShouldBe("live.exit_not_checked"); // the P11-06 report is not built: never a pass
+        (await ScalarAsync<long>("SELECT count(*) FROM trading.ramp_events")).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_rule_hold_is_cleared_by_the_owner_only_when_no_breach_condition_remains()
+    {
+        await StepAsync(1, Factory.OwnerPassword);
+        (await SqlStateAsync(InsertEvent, ("a", AccountId), ("kind", "hold"), ("from", 1), ("to", 1), ("hold", true), ("actor", "rule:ramp"))).ShouldBeNull();
+
+        var cleared = await SendAsync(HttpMethod.Post, ClearHold, new { accountId = AccountId, reason = "reviewed the record", password = Factory.OwnerPassword });
+
+        cleared.Status.ShouldBe(HttpStatusCode.OK);
+        cleared.Json.GetProperty("hold").GetBoolean().ShouldBeFalse();
+        (await ScalarAsync<string>("SELECT kind FROM trading.ramp_events ORDER BY id DESC LIMIT 1")).ShouldBe("clear_hold");
+    }
+
+    [Fact]
+    public async Task The_halts_and_notices_read_empty_on_an_empty_database_and_the_halt_table_refuses_what_it_should()
+    {
+        var halts = await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/live-trading/halts", UriKind.Relative), Ct);
+        var notices = await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/live-trading/notices", UriKind.Relative), Ct);
+        halts.GetArrayLength().ShouldBe(0);
+        notices.GetArrayLength().ShouldBe(0);
+        using var bad = await Client.GetAsync(new Uri("/api/live-trading/halts?from=2026-01-01&to=2026-12-31", UriKind.Relative), Ct);
+        bad.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+
+        const string Insert = "INSERT INTO trading.live_halts (account_id, kind, event, period_start, limit_r, limit_pct, measured_r, measure_state, action) VALUES (@a, @kind, 'opened', '2026-11-03', 2, 1.5, @r, @state, @action)";
+        (await SqlStateAsync(Insert, ("a", AccountId), ("kind", "daily"), ("r", 2.2), ("state", "value"), ("action", "stop_new"))).ShouldBeNull();
+        (await SqlStateAsync(Insert, ("a", AccountId), ("kind", "daily"), ("r", 2.3), ("state", "value"), ("action", "stop_new"))).ShouldBe("23505"); // one halt per account, kind and period
+        (await SqlStateAsync(Insert.Replace("2026-11-03", "2026-11-04", StringComparison.Ordinal), ("a", AccountId), ("kind", "daily"), ("r", 2.2), ("state", "unavailable"), ("action", "stop_new"))).ShouldBe("23514"); // a missing loss is never a halt
+        (await SqlStateAsync(Insert.Replace("2026-11-03", "2026-11-05", StringComparison.Ordinal), ("a", AccountId), ("kind", "daily"), ("r", 2.2), ("state", "value"), ("action", "halve"))).ShouldBe("23514"); // a daily halt only stops new entries
+        (await SqlStateAsync(Insert.Replace("2026-11-03", "2026-11-02", StringComparison.Ordinal), ("a", AccountId), ("kind", "weekly"), ("r", 5.6), ("state", "value"), ("action", "halve"))).ShouldBeNull();
+        var listed = await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/live-trading/halts?from=2026-10-01&to=2026-11-30", UriKind.Relative), Ct);
+        listed.GetArrayLength().ShouldBe(2);
     }
 
     [Fact]

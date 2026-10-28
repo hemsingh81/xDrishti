@@ -7,7 +7,7 @@ namespace XDrishti.Application.LiveTrading;
 public sealed record GetRampQuery(Guid AccountId) : IQuery<Result<RampView>>;
 
 /// <summary>
-/// The owner sets the ramp step of an account (spec P11-04): the first step (S1) or a lower one. Raising needs the evidence gates (P11-04b) and is refused until they exist. The actor is <c>owner:...</c> from the signed-in identity after a fresh password
+/// The owner sets the ramp step of an account (spec P11-04): the first step (S1), a lower one, or one up when every evidence gate passes (409 live.gates_not_met otherwise). The actor is <c>owner:...</c> from the signed-in identity after a fresh password
 /// (the endpoint), never from a body.
 /// </summary>
 public sealed record SetRampStepCommand(string Actor, Guid AccountId, int ToStep, string? Reason) : ICommand;
@@ -20,12 +20,12 @@ public sealed record SetRampStepCommand(string Actor, Guid AccountId, int ToStep
 /// <param name="Actor">owner:... or rule:ramp.</param>
 /// <param name="Reason">Why.</param>
 /// <param name="CreatedAt">When.</param>
-/// <param name="GateHash">The hash of the frozen gate snapshot (P11-04b); null before.</param>
+/// <param name="GateHash">The hash of the frozen gate snapshot of a raise on evidence; null for the other kinds.</param>
 public sealed record RampEventView(long Id, string Kind, int? FromStep, int ToStep, string Actor, string Reason, DateTimeOffset CreatedAt, string? GateHash);
 
 /// <summary>
-/// An account on the ramp. <c>step</c> is null while no step is set (no live allocation). <c>scaleEffective</c> is the factor of the step; the live risk is the intended risk times it. <c>gatesBuilt</c> is false until P11-04b: <c>gates</c> is then empty and
-/// <c>eligible</c> is false, so the step cannot be raised.
+/// An account on the ramp. <c>step</c> is null while no step is set (no live allocation). <c>scaleEffective</c> is the factor of the step; the live risk is the intended risk times it. <c>eligible</c> is true only when G1 to G6 all pass; an unreadable gate
+/// is never a pass.
 /// </summary>
 /// <param name="AccountId">The account.</param>
 /// <param name="Step">1 to 3, or null.</param>
@@ -33,14 +33,45 @@ public sealed record RampEventView(long Id, string Kind, int? FromStep, int ToSt
 /// <param name="Hold">Raising is blocked.</param>
 /// <param name="HoldReason">Why, or null.</param>
 /// <param name="NextStep">The step a raise would reach; null at S3 or with no step.</param>
-/// <param name="Eligible">All evidence gates pass; false while the gates are not built.</param>
-/// <param name="GatesBuilt">Whether the evidence gates exist.</param>
+/// <param name="Eligible">All evidence gates G1 to G6 pass.</param>
+/// <param name="GatesBuilt">Always true since P11-04b.</param>
 /// <param name="IntendedRiskPct">The risk per trade of the profile (with the account's override), percent of capital; null when not known.</param>
 /// <param name="LiveRiskPct">The intended risk times the scale.</param>
 /// <param name="WritesEnabled">Whether the web may write the ramp now (<c>Live:Writes:Enabled</c>).</param>
 /// <param name="History">Newest first.</param>
 /// <param name="Notice">No setting lets this system place an order.</param>
-public sealed record RampView(Guid AccountId, int? Step, double? ScaleEffective, bool Hold, string? HoldReason, int? NextStep, bool Eligible, bool GatesBuilt, double? IntendedRiskPct, double? LiveRiskPct, bool WritesEnabled, IReadOnlyList<RampEventView> History, string Notice);
+/// <param name="Gates">G1 to G7 of the current step, each with its state, number, threshold and n; empty with no step. G7 is information.</param>
+/// <param name="Breaches">The breach rules that fire on the evidence now.</param>
+/// <param name="HoldConditions">What still holds a hold (a clear is refused while any is listed).</param>
+/// <param name="Loss">The loss of today as measured now; null with no step or no capital.</param>
+/// <param name="Halts">The halts of the last 30 days, newest first.</param>
+/// <param name="SlippageKind">The reference kind G3 was measured on.</param>
+/// <param name="AutoRampUp"><c>live.auto_ramp_up</c> in force (S1 to S2 by rule when every gate passes).</param>
+/// <param name="ExitConfirmed">The owner has recorded the exit confirmation S3 needs.</param>
+/// <param name="Sessions">Completed sessions at this step.</param>
+public sealed record RampView(
+    Guid AccountId,
+    int? Step,
+    double? ScaleEffective,
+    bool Hold,
+    string? HoldReason,
+    int? NextStep,
+    bool Eligible,
+    bool GatesBuilt,
+    double? IntendedRiskPct,
+    double? LiveRiskPct,
+    bool WritesEnabled,
+    IReadOnlyList<RampEventView> History,
+    string Notice,
+    IReadOnlyList<RampGateView> Gates,
+    IReadOnlyList<BreachView> Breaches,
+    IReadOnlyList<BreachView> HoldConditions,
+    LiveLossView? Loss,
+    IReadOnlyList<LiveHaltView> Halts,
+    string? SlippageKind,
+    bool AutoRampUp,
+    bool ExitConfirmed,
+    int Sessions);
 
 /// <summary>Reads the live switches and their history. Read only.</summary>
 public sealed record GetLiveSettingsQuery : IQuery<LiveSettingsView>;
