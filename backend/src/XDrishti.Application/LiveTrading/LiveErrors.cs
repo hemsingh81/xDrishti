@@ -7,4 +7,6 @@ public static class LiveErrors
     public const string CapabilityOff = "live.capability_off";
     public const string Stale = "live.stale";
     public const string AccountNotFound = "live.account_not_found";
+    public const string NotFound = "live.not_found";
+    public const string Invalid = "live.invalid";
 }

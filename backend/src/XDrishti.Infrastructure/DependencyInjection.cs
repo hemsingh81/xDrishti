@@ -199,6 +199,13 @@ public static class DependencyInjection
         services.AddSingleton<ILiveRampSettings, ConfiguredLiveRampSettings>();
         services.AddScoped<IRampStore, RampStore>(); // insert-only ramp events (P11-04)
         services.AddScoped<ILiveSettingsStore, LiveSettingsStore>(); // insert-only live switches, default OFF (P11-04)
+        services.AddOptions<LiveCaptureOptions>().Bind(configuration.GetSection(LiveCaptureOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the live capture switches, all OFF (P11-01)
+        services.AddOptions<LiveMatchOptions>().Bind(configuration.GetSection(LiveMatchOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
+        services.AddOptions<LiveProtectOptions>().Bind(configuration.GetSection(LiveProtectOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
+        services.AddSingleton<ILiveCaptureSettings, ConfiguredLiveCaptureSettings>();
+        services.AddScoped<ILiveCaptureStore, LiveCaptureStore>(); // the live capture record: five insert-only tables (P11-01)
+        services.AddScoped<IBrokerTradeBook, DhanTradeBookClient>(); // GET /v2/trades, the day's trade book: read only (P11-01, ADR 0149)
+        services.AddScoped<IBrokerOrderBook, DhanOrderBookClient>(); // GET /v2/orders, the day's order book: read only, never an order action (P11-01, ADR 0149)
         services.AddScoped<IComplianceStore, ComplianceStore>(); // the compliance record of the live phase, insert-only (P11-05)
         services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)

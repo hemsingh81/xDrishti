@@ -123,6 +123,9 @@ services:
       Planning__TicketAlerts__Enabled: ${XD_TICKET_ALERTS:-false}
       # The live writes of the web (P11-00, P11-05, ADR 0147): OFF by default. While false, the compliance record (POST /api/live-trading/compliance) is refused with 403 live.capability_off; it also needs the owner's fresh password.
       Live__Writes__Enabled: ${XD_LIVE_WRITES_ENABLED:-false}
+      # The live capture (P11-01, ADR 0149): read-only GETs of the day's trade book and order book. Both OFF by default. The first seeds the live-capture and live-settle services (paused when false); the second decides whether the order book is read at all.
+      Live__Capture__Enabled: ${XD_LIVE_CAPTURE_ENABLED:-false}
+      Live__Capture__OrderBook__Enabled: ${XD_LIVE_CAPTURE_ORDER_BOOK:-false}
       # Market data (ADR 0016): the folder with the <SYMBOL>_1m.csv[.gz] files, mounted read-only below. Dhan Data API fetch: first fetch goes this many days
       # back, at most this many requests per second.
       Data__CsvFolder: /data/csv

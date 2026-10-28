@@ -2,8 +2,8 @@ namespace XDrishti.Infrastructure.Brokers;
 
 /// <summary>
 /// The only broker endpoints xDrishti calls (ADR 0008, 0009, 0012, 0016, 0025): Dhan's consent-flow authentication, the read of the account's holdings
-/// (<c>GET /v2/holdings</c>, no query), the trade history (<c>GET /v2/trades/{from}/{to}/{page}</c>, dates in the path, no query) and the ledger (<c>GET /v2/ledger?from-date=…&amp;to-date=…</c>, exactly those two query keys), the 1-minute chart data of the Data API (<c>POST /v2/charts/intraday</c>, no query) and the market quote of the holdings
-/// (<c>POST /v2/marketfeed/quote</c>, no query; ADR 0019) — never orders, positions or funds, and no other market-feed path (<c>ltp</c>, <c>ohlc</c>). Enforced for every request of the broker HTTP clients by <see cref="BrokerEndpointGuard"/>. The two login pages are opened by the owner's
+/// (<c>GET /v2/holdings</c>, no query), the day's trade book and order book (<c>GET /v2/trades</c> and <c>GET /v2/orders</c>, no query, no id; ADR 0149), the trade history (<c>GET /v2/trades/{from}/{to}/{page}</c>, dates in the path, no query) and the ledger (<c>GET /v2/ledger?from-date=…&amp;to-date=…</c>, exactly those two query keys), the 1-minute chart data of the Data API (<c>POST /v2/charts/intraday</c>, no query) and the market quote of the holdings
+/// (<c>POST /v2/marketfeed/quote</c>, no query; ADR 0019) — never an order action, positions or funds, and no other market-feed path (<c>ltp</c>, <c>ohlc</c>). Enforced for every request of the broker HTTP clients by <see cref="BrokerEndpointGuard"/>. The two login pages are opened by the owner's
 /// browser, never by the server.
 /// </summary>
 internal static class BrokerEndpoints
@@ -20,6 +20,15 @@ internal static class BrokerEndpoints
 
     /// <summary>The account's ledger between two dates (ADR 0025; header <c>access-token</c>): <c>/v2/ledger</c> with exactly the query keys <see cref="LedgerFromKey"/> and <see cref="LedgerToKey"/>. Read-only; built by <see cref="BuildLedgerUri"/>.</summary>
     public static readonly Uri DhanLedgerBase = new("https://api.dhan.co/v2/ledger");
+
+    /// <summary>
+    /// The day's trade book (ADR 0149; header <c>access-token</c>): <c>GET /v2/trades</c> with no path beyond it and no query - the exact path of <see cref="DhanTradeHistoryBase"/> itself, which the history shape only allows with dates and a page after it.
+    /// Read only. Opened by the commit of P11-01, the owner's security act.
+    /// </summary>
+    public static readonly Uri DhanTradeBook = DhanTradeHistoryBase;
+
+    /// <summary>The day's order book (ADR 0149; header <c>access-token</c>): <c>GET /v2/orders</c>, no id, no query. Read only: what the owner placed and what became of it. Every other orders path and method (place, modify, cancel, super, forever) stays refused.</summary>
+    public static readonly Uri DhanOrderBook = new("https://api.dhan.co/v2/orders");
 
     public const string LedgerFromKey = "from-date";
 
@@ -63,6 +72,8 @@ internal static class BrokerEndpoints
         (HttpMethod.Post, DhanGenerateConsent, "client_id"),
         (HttpMethod.Post, DhanConsumeConsent, "tokenId"),
         (HttpMethod.Get, DhanHoldings, null),
+        (HttpMethod.Get, DhanTradeBook, null),
+        (HttpMethod.Get, DhanOrderBook, null),
         (HttpMethod.Post, DhanIntradayChart, null),
         (HttpMethod.Post, DhanMarketQuote, null),
     ];

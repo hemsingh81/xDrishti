@@ -209,7 +209,7 @@ public sealed class DhanTradesClientTests : IDisposable
         await Should.ThrowAsync<BrokerEndpointNotAllowedException>(() => client.GetAsync(new Uri("https://api.dhan.co/v2/trades/2026-09-01/2026-09-30"), Ct)); // no page
         await Should.ThrowAsync<BrokerEndpointNotAllowedException>(() => client.GetAsync(new Uri("https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0?x=1"), Ct));
         await Should.ThrowAsync<BrokerEndpointNotAllowedException>(() => client.GetAsync(new Uri("https://api.dhan.co/v2/trades/2026-13-01/2026-09-30/0"), Ct));
-        await Should.ThrowAsync<BrokerEndpointNotAllowedException>(() => client.GetAsync(new Uri("https://api.dhan.co/v2/orders"), Ct));
+        await Should.ThrowAsync<BrokerEndpointNotAllowedException>(() => client.GetAsync(new Uri("https://api.dhan.co/v2/orders/1"), Ct));
         using var post = new HttpRequestMessage(HttpMethod.Post, new Uri("https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0")) { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
         await Should.ThrowAsync<BrokerEndpointNotAllowedException>(() => client.SendAsync(post, Ct));
 

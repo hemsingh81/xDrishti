@@ -98,6 +98,14 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ChangeLiveSettingsCommand, LiveSettingsView>, ChangeLiveSettingsHandler>();
         services.AddScoped<ILiveReadinessSource, LiveReadinessSource>();
         services.AddScoped<IQueryHandler<GetComplianceQuery, Result<ComplianceView>>, GetComplianceHandler>(); // the compliance record of the live phase (P11-05): read
+        services.AddScoped<ILiveAccountAccess, LiveAccountAccess>(); // the usable token of a live account (P11-01)
+        services.AddScoped<LiveTicketSource>(); // the approved live tickets of a session (P11-01)
+        services.AddScoped<ICommandHandler<CaptureLiveSessionCommand, LiveCaptureOutcome>, CaptureLiveSessionHandler>(); // one read-only poll of the day's trade book and order book, insert-only (P11-01, ADR 0149)
+        services.AddScoped<ICommandHandler<SettleLiveSessionCommand, LiveSettleOutcome>, SettleLiveSessionHandler>(); // charges, matching and the one outcome of each live ticket (P11-01)
+        services.AddScoped<IQueryHandler<LiveCaptureQuery, Result<LiveCaptureView>>, GetLiveCaptureHandler>(); // the capture of one session: read only
+        services.AddScoped<IQueryHandler<LiveOutcomesQuery, Result<LiveOutcomesPage>>, ListLiveOutcomesHandler>(); // the outcomes of live tickets: read only
+        services.AddSingleton<IScheduledService, LiveCaptureService>(); // polls the trade book and order book during the session (P11-01); starts paused, read only, no order
+        services.AddSingleton<IScheduledService, LiveSettleService>(); // the evening settle of the live sessions (P11-01); starts paused, read only, no order
         services.AddScoped<ICommandHandler<RecordComplianceCommand, ComplianceRecordView>, RecordComplianceHandler>(); // and write, insert-only, behind a fresh password and the live-writes gate in the endpoint
         services.AddScoped<ICommandHandler<ChangeDepthRecorderCommand, DepthRecorderSwitched>, ChangeDepthRecorderHandler>(); // and change, insert-only, behind a fresh password in the endpoint
 

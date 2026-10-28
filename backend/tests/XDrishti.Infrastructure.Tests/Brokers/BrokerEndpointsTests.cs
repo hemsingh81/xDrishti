@@ -18,17 +18,32 @@ public sealed class BrokerEndpointsTests
     [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0")] // the trade history, a page at a time (ADR 0025)
     [InlineData("GET", "https://API.DHAN.CO/v2/trades/2026-09-01/2026-09-01/12")]
     [InlineData("GET", "https://api.dhan.co/v2/trades/2024-02-29/2026-09-30/10000")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades")] // the day's trade book (ADR 0149)
+    [InlineData("GET", "https://API.DHAN.CO/v2/orders")] // the day's order book (ADR 0149)
     [InlineData("GET", "https://api.dhan.co/v2/ledger?from-date=2026-09-01&to-date=2026-09-30")] // the ledger of a period
     [InlineData("GET", "https://api.dhan.co/v2/ledger?to-date=2026-09-30&from-date=2026-09-01")]
     public void The_documented_endpoints_are_allowed(string method, string url) =>
         BrokerEndpoints.IsAllowed(new HttpMethod(method), new Uri(url)).ShouldBeTrue();
 
     [Theory]
-    [InlineData("GET", "https://api.dhan.co/v2/orders")] // orders
-    [InlineData("POST", "https://api.dhan.co/v2/orders")]
+    [InlineData("POST", "https://api.dhan.co/v2/orders")] // an order write
+    [InlineData("PUT", "https://api.dhan.co/v2/orders")]
+    [InlineData("DELETE", "https://api.dhan.co/v2/orders")]
+    [InlineData("GET", "https://api.dhan.co/v2/orders/1")] // the order book takes no id (ADR 0149)
+    [InlineData("GET", "https://api.dhan.co/v2/orders/")]
+    [InlineData("GET", "https://api.dhan.co/v2/orders?x=1")] // and no query
+    [InlineData("GET", "https://api.dhan.co/v2/orders?")]
+    [InlineData("GET", "https://api.dhan.co/v2/orders#x")]
+    [InlineData("GET", "https://api.dhan.co/v2/super/orders")]
+    [InlineData("GET", "https://api.dhan.co/v2/forever/orders")]
+    [InlineData("GET", "http://api.dhan.co/v2/orders")]
+    [InlineData("GET", "https://api.dhan.co:8443/v2/orders")]
+    [InlineData("POST", "https://api.dhan.co/v2/trades")] // the trade book is a GET only
+    [InlineData("DELETE", "https://api.dhan.co/v2/trades")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades?x=1")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades?")]
     [InlineData("POST", "https://api.dhan.co/v2/super/orders")]
     [InlineData("POST", "https://api.dhan.co/v2/marketfeed/ltp")]
-    [InlineData("GET", "https://api.dhan.co/v2/trades")]
     [InlineData("GET", "https://api.dhan.co/v2/trades/")] // the history needs two dates and a page
     [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01")]
     [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30")]
@@ -45,7 +60,7 @@ public sealed class BrokerEndpointsTests
     [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0?")]
     [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0#x")]
     [InlineData("GET", "https://api.dhan.co/v2/Trades/2026-09-01/2026-09-30/0")]
-    [InlineData("GET", "https://api.dhan.co/v2/trades/../orders")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/../positions")]
     [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0/../../../orders")]
     [InlineData("POST", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0")] // read only
     [InlineData("DELETE", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0")]

@@ -28,10 +28,22 @@ public sealed class BrokerAllowListTests
     [InlineData("POST", "https://api.dhan.co/v2/charts/intraday")]
     [InlineData("POST", "https://api.dhan.co/v2/marketfeed/quote")]
     [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades")]
+    [InlineData("GET", "https://api.dhan.co/v2/orders")]
     [InlineData("GET", "https://api.dhan.co/v2/ledger?from-date=2026-09-01&to-date=2026-09-30")]
     public void The_declared_data_endpoints_are_allowed(string method, string url)
     {
         new BrokerAllowList().Allows(method, url).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void The_probe_set_of_P11_01_is_in_the_phase_check_and_refused()
+    {
+        PlanPhaseCheck.RefusedProbes.ShouldContain(("GET", "https://api.dhan.co/v2/orders/1"));
+        PlanPhaseCheck.RefusedProbes.ShouldContain(("GET", "https://api.dhan.co/v2/orders?x=1"));
+        PlanPhaseCheck.RefusedProbes.ShouldContain(("POST", "https://api.dhan.co/v2/trades"));
+        PlanPhaseCheck.RefusedProbes.ShouldContain(("POST", "https://api.dhan.co/v2/orders"));
+        PlanPhaseCheck.RefusedProbes.ShouldNotContain(("GET", "https://api.dhan.co/v2/orders"));
     }
 
     [Theory]

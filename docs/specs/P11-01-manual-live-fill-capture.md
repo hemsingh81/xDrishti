@@ -1,6 +1,6 @@
 # P11-01 — Manual-live fill capture: the owner's trades and orders read from Dhan, matched to approved tickets, one outcome per ticket
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-28 on the owner's instruction (ADR 0149; see "Amendments at build"). Draft decisions below were researched under the owner's delegation. Not committed or deployed by the builder; services and the order book stay OFF.
 - **Phase / roadmap row:** P11 — Small live capital, slice P11-01 of [P11-00](P11-00-small-live-plan.md)
 - **Design refs:** docs/design/05-data-and-brokers.md §8, §8.3 · 09-learning-engine.md §3 (step 2), §9 · 12-portfolio-monitoring.md (auto-journal, discretionary tag) · 19-risks-and-compliance.md §4 · ADR 0025 (trade history sync; amendment c skips intraday), 0083 (no order by name), 0090, 0093 (journal), 0097 (allow-list pin and refused probes)
 - **Needs:** P11-04A (live allocations exist), P7-13, P7-14, P2-13/P2-16. **Size:** 3.5 agent-days (the largest P11 slice; if it overruns, split the order-book half off as P11-01b). **Safety:** **yes** — two new broker reads (the day's trade book and order book: GET, no body, read only) and a change of the pinned allow-list; the system still places, modifies and cancels nothing. The Approved status on this spec is the owner's consent to the pin change.
@@ -83,3 +83,14 @@ Capture one real order book and trade book answer, scrubbed (owner act; the buil
 - Fixture: stop created 09:44:02 is 152 s after the last fill at 09:41:30 (was 172 s); test plan updated.
 - `JournalFill`/`JournalFillRecord` get `LiveFillId`; the sentence that `TransactionId` carries `live_fills.id` is deleted (it contradicts nullable `transaction_id` + `live_fill_id` and the FK on `transaction_id`).
 - `live_orders` unique key: known limit stated (a price-modified order is not a new revision).
+
+## Amendments at build (2026-10-28, ADR 0149)
+1. **`journal_fills` unchanged; live fills are not journaled here.** The `live_fill_id` change (and acceptance criterion 11's journal clause, the double-journal guard and the grader read of live fills) moves to **P11-01b**. The matching and the outcomes do not depend on it; no fill is journaled twice because `JournalPlansHandler` is untouched.
+2. **Charges** come from the existing history mapper (delivery trades only); intraday fills have no charges row (`unavailable`). The history agreement is reported in the settle summary and log, not stored. A mapper entry that keeps intraday is deferred to P11-02.
+3. **No `IHaltSource`** (P11-04b adds it with the halts). The settle does not call grading for today (the use case refuses it); it grades a finished session and reads stored grades.
+4. **Columns added** to `live_ticket_outcomes`: `protection` and `reject_text`. Poll run words: `ok` = both books read, `partial` = trade book only; order evidence = at least one `ok` poll that day.
+5. **Outcome rules fixed:** `partial` = below the allocation with an entry order that never filled in full; `size_below_allocation` only when no order explains it; `rejected` = every entry order rejected; `missed_unfilled` = an entry order exists and never filled; plan entry and stop = the ticket's levels, else the stored grade's; after five trading sessions a ticket with no stored grade is `unknown`; a ticket with no fill whose grade cannot be computed is `unknown`.
+6. **Services:** `live-capture` is an Interval service (every `PollSeconds` rounded up to whole minutes, 09:10 to 15:40), `live-settle` follows `portfolio-broker-history` and looks at the last seven days; both start paused (`Live:Capture:Enabled` seeds them). A manual poll (`xd live capture`) may run outside the window; the scheduled one never does.
+7. **API:** query parameters of `/outcomes` default to the last 30 days; `GET /capture` defaults to today. The CLI is `xd live capture` / `xd live outcomes`.
+8. **Samples:** the mappers are tested against made-up samples shaped like Dhan's documentation. The owner's real, scrubbed answer is still an open act; it replaces them.
+9. **Allow-list:** the pin gains `GET api.dhan.co/v2/trades` and `GET api.dhan.co/v2/orders`; the probes change as in ADR 0149 (`GET /v2/orders` leaves; `GET /v2/orders/1`, `GET /v2/orders?x=1`, `POST /v2/trades` join).

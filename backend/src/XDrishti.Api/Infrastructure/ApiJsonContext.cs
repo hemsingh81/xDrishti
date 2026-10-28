@@ -106,6 +106,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ComplianceRecordView))]
 [JsonSerializable(typeof(RecordComplianceRequest))]
 [JsonSerializable(typeof(RampView))]
+[JsonSerializable(typeof(LiveCaptureView))]
+[JsonSerializable(typeof(LiveOutcomesPage))]
 [JsonSerializable(typeof(RampEventView))]
 [JsonSerializable(typeof(SetRampStepRequest))]
 [JsonSerializable(typeof(LiveSettingsView))]

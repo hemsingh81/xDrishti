@@ -4054,6 +4054,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/live-trading/accounts/{accountId}/capture': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The capture of one session of a manual-live account (date defaults to today, never the future): health (healthy, gap, not_run), the runs, one row per approved ticket (figures captured so far; the outcome once the settle has written it, null before), the fills no ticket owns and the owner's own trades, and the evidence. Every order-dependent field is 'unavailable' when the session has no order evidence, never a number. Read only. 404 live.not_found, 422 live.invalid */
+    get: operations['GetLiveCapture'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live-trading/outcomes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored outcomes of live tickets (filled, partial, over_allocation, not_triggered, missed_no_order, missed_unfilled, rejected, missed_unknown, unknown), newest session first. accountId optional; from and to default to the last 30 days (range at most 92 days); page from 1, size 1 to 200. Read only. 422 live.invalid */
+    get: operations['ListLiveOutcomes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/live-trading/settings': {
     parameters: {
       query?: never;
@@ -11033,6 +11067,77 @@ export interface components {
       /** @description The owner's password, typed again for THIS act. */
       password: null | string;
     };
+    /** @description What the capture rests on, with its stated limits. */
+    LiveCaptureEvidenceView: {
+      orderEvidence: string;
+      /** Format: int32 */
+      pollRuns: number;
+      /** Format: int32 */
+      fills: number;
+      /** Format: int32 */
+      orders: number;
+      orderBookEnabled: boolean;
+      limits: string[];
+    };
+    /** @description A fill no ticket owns (unmatched, with the reason) or the owner's own trade. */
+    LiveCaptureFillView: {
+      symbol: string;
+      side: string;
+      product: string;
+      /** Format: int64 */
+      qty: number;
+      /** Format: double */
+      price: number;
+      time: null | string;
+      reason: string;
+    };
+    /** @description One run of a poll or the settle. */
+    LiveCaptureRunView: {
+      kind: string;
+      /** Format: date-time */
+      startedAt: string;
+      outcome: string;
+      /** Format: int32 */
+      fillsNew: number;
+      /** Format: int32 */
+      ordersNew: number;
+    };
+    /**
+     * @description One approved ticket. string? LiveCaptureTicketView.Outcome is null while the settle has not written it (the figures beside it are what is captured so far); long? LiveCaptureTicketView.OrderedQty and string LiveCaptureTicketView.Protection are the words `unavailable` / null when there is no order
+     *     evidence; double? LiveCaptureTicketView.MissedR only for the two missed outcomes; string? LiveCaptureTicketView.RejectText is the broker's own text, data to be shown as text.
+     */
+    LiveCaptureTicketView: {
+      /** Format: int64 */
+      itemId: number;
+      symbol: string;
+      side: string;
+      /** Format: int64 */
+      allocatedQty: number;
+      /** Format: int64 */
+      orderedQty: null | number;
+      /** Format: int64 */
+      filledQty: number;
+      /** Format: double */
+      avgEntry: null | number;
+      outcome: null | string;
+      flags: string[];
+      /** Format: double */
+      missedR: null | number;
+      orderEvidence: string;
+      protection: string;
+      rejectText: null | string;
+    };
+    /** @description The capture of one session: its health, the runs, one row per approved ticket, the fills no ticket owns and the owner's own trades, and what the evidence is. */
+    LiveCaptureView: {
+      /** Format: date */
+      date: string;
+      health: string;
+      runs: components['schemas']['LiveCaptureRunView'][];
+      tickets: components['schemas']['LiveCaptureTicketView'][];
+      unmatched: components['schemas']['LiveCaptureFillView'][];
+      discretionary: components['schemas']['LiveCaptureFillView'][];
+      evidence: components['schemas']['LiveCaptureEvidenceView'];
+    };
     /**
      * @description The state of the live feed as the screen needs it: hub event `feedStatus` (pushed on connect, on a change of `state` or `subscribed`, and every 15 seconds) and the body of `GET /api/live/status` (the fallback when the hub is not connected).
      *     `state` is the feed's own word: `connected` (streaming), `idle` (connected, nothing to follow), `connecting`, `reconnecting`, `closed` (outside its window), `paused` (the owner paused the service), `no_token`, `token_refused`,
@@ -11045,6 +11150,43 @@ export interface components {
       subscribed: number;
       /** Format: date-time */
       lastTickAt: null | string;
+    };
+    /** @description One stored outcome (final). */
+    LiveOutcomeView: {
+      /** Format: int64 */
+      itemId: number;
+      /** Format: uuid */
+      accountId: string;
+      /** Format: date */
+      date: string;
+      outcome: string;
+      /** Format: int64 */
+      allocatedQty: number;
+      /** Format: int64 */
+      orderedQty: null | number;
+      /** Format: int64 */
+      entryQty: number;
+      /** Format: date-time */
+      firstEntryAt: null | string;
+      flags: string[];
+      /** Format: double */
+      missedR: null | number;
+      planGradeStatus: string;
+      orderEvidence: string;
+      protection: string;
+      rejectText: null | string;
+      /** Format: date-time */
+      writtenAt: string;
+    };
+    /** @description A page of outcomes. */
+    LiveOutcomesPage: {
+      items: components['schemas']['LiveOutcomeView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      size: number;
+      /** Format: int32 */
+      total: number;
     };
     /**
      * @description What a Portfolio screen asks the hub to follow (argument of `Subscribe`, ADR 0024 §7): the prices of the instruments of these holdings are pushed, nothing else.
@@ -26438,6 +26580,83 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLiveCapture: {
+    parameters: {
+      query?: {
+        date?: string;
+      };
+      header?: never;
+      path: {
+        accountId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveCaptureView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListLiveOutcomes: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        from?: string;
+        to?: string;
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveOutcomesPage'];
         };
       };
       /** @description Unprocessable Entity */

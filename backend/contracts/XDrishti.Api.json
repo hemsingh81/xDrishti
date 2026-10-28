@@ -14100,6 +14100,141 @@
         }
       }
     },
+    "/api/live-trading/accounts/{accountId}/capture": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The capture of one session of a manual-live account (date defaults to today, never the future): health (healthy, gap, not_run), the runs, one row per approved ticket (figures captured so far; the outcome once the settle has written it, null before), the fills no ticket owns and the owner's own trades, and the evidence. Every order-dependent field is 'unavailable' when the session has no order evidence, never a number. Read only. 404 live.not_found, 422 live.invalid",
+        "operationId": "GetLiveCapture",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveCaptureView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live-trading/outcomes": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The stored outcomes of live tickets (filled, partial, over_allocation, not_triggered, missed_no_order, missed_unfilled, rejected, missed_unknown, unknown), newest session first. accountId optional; from and to default to the last 30 days (range at most 92 days); page from 1, size 1 to 200. Read only. 422 live.invalid",
+        "operationId": "ListLiveOutcomes",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveOutcomesPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/live-trading/settings": {
       "get": {
         "tags": [
@@ -33725,6 +33860,249 @@
         },
         "description": "The body of a lesson link: the fix to link is a hypothesis or an experiment."
       },
+      "LiveCaptureEvidenceView": {
+        "required": [
+          "orderEvidence",
+          "pollRuns",
+          "fills",
+          "orders",
+          "orderBookEnabled",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "orderEvidence": {
+            "type": "string"
+          },
+          "pollRuns": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fills": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "orders": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "orderBookEnabled": {
+            "type": "boolean"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "What the capture rests on, with its stated limits."
+      },
+      "LiveCaptureFillView": {
+        "required": [
+          "symbol",
+          "side",
+          "product",
+          "qty",
+          "price",
+          "time",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "product": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "time": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "A fill no ticket owns (unmatched, with the reason) or the owner's own trade."
+      },
+      "LiveCaptureRunView": {
+        "required": [
+          "kind",
+          "startedAt",
+          "outcome",
+          "fillsNew",
+          "ordersNew"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "fillsNew": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ordersNew": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One run of a poll or the settle."
+      },
+      "LiveCaptureTicketView": {
+        "required": [
+          "itemId",
+          "symbol",
+          "side",
+          "allocatedQty",
+          "orderedQty",
+          "filledQty",
+          "avgEntry",
+          "outcome",
+          "flags",
+          "missedR",
+          "orderEvidence",
+          "protection",
+          "rejectText"
+        ],
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "allocatedQty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderedQty": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "filledQty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "avgEntry": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "outcome": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missedR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "orderEvidence": {
+            "type": "string"
+          },
+          "protection": {
+            "type": "string"
+          },
+          "rejectText": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One approved ticket. string? LiveCaptureTicketView.Outcome is null while the settle has not written it (the figures beside it are what is captured so far); long? LiveCaptureTicketView.OrderedQty and string LiveCaptureTicketView.Protection are the words `unavailable` / null when there is no order\nevidence; double? LiveCaptureTicketView.MissedR only for the two missed outcomes; string? LiveCaptureTicketView.RejectText is the broker's own text, data to be shown as text."
+      },
+      "LiveCaptureView": {
+        "required": [
+          "date",
+          "health",
+          "runs",
+          "tickets",
+          "unmatched",
+          "discretionary",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "health": {
+            "type": "string"
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveCaptureRunView"
+            }
+          },
+          "tickets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveCaptureTicketView"
+            }
+          },
+          "unmatched": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveCaptureFillView"
+            }
+          },
+          "discretionary": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveCaptureFillView"
+            }
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/LiveCaptureEvidenceView"
+          }
+        },
+        "description": "The capture of one session: its health, the runs, one row per approved ticket, the fills no ticket owns and the owner's own trades, and what the evidence is."
+      },
       "LiveFeedStatus": {
         "required": [
           "state",
@@ -33749,6 +34127,128 @@
           }
         },
         "description": "The state of the live feed as the screen needs it: hub event `feedStatus` (pushed on connect, on a change of `state` or `subscribed`, and every 15 seconds) and the body of `GET /api/live/status` (the fallback when the hub is not connected).\n`state` is the feed's own word: `connected` (streaming), `idle` (connected, nothing to follow), `connecting`, `reconnecting`, `closed` (outside its window), `paused` (the owner paused the service), `no_token`, `token_refused`,\n`flapping`; or `not_running` when the feed reports nothing (never started, stopped, crashed: no heartbeat in the last 60 seconds). `subscribed` is the number of instruments the feed follows (0 unless it reports); `lastTickAt` the exchange\ntime of its latest tick of any instrument (UTC), null when none yet."
+      },
+      "LiveOutcomeView": {
+        "required": [
+          "itemId",
+          "accountId",
+          "date",
+          "outcome",
+          "allocatedQty",
+          "orderedQty",
+          "entryQty",
+          "firstEntryAt",
+          "flags",
+          "missedR",
+          "planGradeStatus",
+          "orderEvidence",
+          "protection",
+          "rejectText",
+          "writtenAt"
+        ],
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "allocatedQty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "orderedQty": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "entryQty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "firstEntryAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missedR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "planGradeStatus": {
+            "type": "string"
+          },
+          "orderEvidence": {
+            "type": "string"
+          },
+          "protection": {
+            "type": "string"
+          },
+          "rejectText": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "writtenAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "One stored outcome (final)."
+      },
+      "LiveOutcomesPage": {
+        "required": [
+          "items",
+          "page",
+          "size",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveOutcomeView"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A page of outcomes."
       },
       "LiveScope": {
         "required": [

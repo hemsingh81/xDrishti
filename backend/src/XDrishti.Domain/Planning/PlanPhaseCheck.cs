@@ -39,11 +39,13 @@ public static class PlanPhaseCheck
         NightlyGateIds.Calendar, NightlyGateIds.Eod, NightlyGateIds.PortfolioSync, NightlyGateIds.FreshData, NightlyGateIds.Quality, NightlyGateIds.SelectionInputs,
     ];
 
-    /// <summary>The broker allow-list as pinned when the slice was built (ADR 0097): read-only data endpoints and the consent flow, no order, position or fund endpoint. A change is an owner-approved item and must change this list in the same commit.</summary>
+    /// <summary>The broker allow-list as pinned when the slice was built (ADR 0097): read-only data endpoints (P11-01 added the two reads of the day's trade book and order book, ADR 0149) and the consent flow, no order write, position or fund endpoint. A change is an owner-approved item and must change this list in the same commit.</summary>
     public static readonly IReadOnlyList<string> PinnedAllowList =
     [
         "GET api.dhan.co/v2/holdings",
         "GET api.dhan.co/v2/ledger?from-date&to-date",
+        "GET api.dhan.co/v2/orders",
+        "GET api.dhan.co/v2/trades",
         "GET api.dhan.co/v2/trades/{from}/{to}/{page}",
         "POST api.dhan.co/v2/charts/intraday",
         "POST api.dhan.co/v2/marketfeed/quote",
@@ -57,7 +59,9 @@ public static class PlanPhaseCheck
     public static readonly IReadOnlyList<(string Method, string Url)> RefusedProbes =
     [
         ("POST", "https://api.dhan.co/v2/orders"),
-        ("GET", "https://api.dhan.co/v2/orders"),
+        ("GET", "https://api.dhan.co/v2/orders/1"),
+        ("GET", "https://api.dhan.co/v2/orders?x=1"),
+        ("POST", "https://api.dhan.co/v2/trades"),
         ("PUT", "https://api.dhan.co/v2/orders/1"),
         ("DELETE", "https://api.dhan.co/v2/orders/1"),
         ("POST", "https://api.dhan.co/v2/super/orders"),

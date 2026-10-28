@@ -47,6 +47,7 @@ writes it as the secret file `broker_vault_key`, mounted **into `xd-api` only** 
   The automatic holdings refresh (each account chooses *Off* (default), *Every N minutes during market hours* or *Daily at HH:MM IST* in the app) is evaluated once a minute unless `XD_PORTFOLIO_AUTO_REFRESH` is `false`.
   Price-crossing alerts and post-trade prompts (P7-20) are off unless `XD_TICKET_ALERTS=true`; the one variable feeds both `xd-api` and `xd-feed` (the feed's observer and the API's bell and service must agree). Alerts only: no order is placed.
   The compliance record of the live phase (P11-05) can be written from the Live screen only when `XD_LIVE_WRITES_ENABLED=true` (feeds `Live__Writes__Enabled` of `xd-api`; default off); every save also needs your password typed again.
+  The live capture (P11-01) reads, with GET only, the day's trade book and order book at Dhan and places, changes and cancels nothing. Both switches are off: `XD_LIVE_CAPTURE_ENABLED=true` seeds the `live-capture` and `live-settle` services (first start only; afterwards switch them in the Services screen), `XD_LIVE_CAPTURE_ORDER_BOOK=true` lets them read the order book (without it every order-dependent figure reads unavailable).
 - The credential references of ADR 0007 (`scripts/broker-secrets.sh`, `secrets/brokers/`, `brokers.index`) are gone; `xd-up.sh` deletes leftover files.
   Old Keychain items `xdrishti/broker/<ref>/…` are no longer read and can be removed in Keychain Access.
 

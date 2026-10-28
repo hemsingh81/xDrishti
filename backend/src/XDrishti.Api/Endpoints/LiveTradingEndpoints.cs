@@ -48,6 +48,17 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
+        group.MapGet("/accounts/{accountId:guid}/capture", GetCaptureAsync)
+            .WithName("GetLiveCapture")
+            .WithSummary("The capture of one session of a manual-live account (date defaults to today, never the future): health (healthy, gap, not_run), the runs, one row per approved ticket (figures captured so far; the outcome once the settle has written it, null before), the fills no ticket owns and the owner's own trades, and the evidence. Every order-dependent field is 'unavailable' when the session has no order evidence, never a number. Read only. 404 live.not_found, 422 live.invalid")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapGet("/outcomes", ListOutcomesAsync)
+            .WithName("ListLiveOutcomes")
+            .WithSummary("The stored outcomes of live tickets (filled, partial, over_allocation, not_triggered, missed_no_order, missed_unfilled, rejected, missed_unknown, unknown), newest session first. accountId optional; from and to default to the last 30 days (range at most 92 days); page from 1, size 1 to 200. Read only. 422 live.invalid")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
         group.MapGet("/settings", GetSettingsAsync)
             .WithName("GetLiveSettings")
             .WithSummary("The live switches (live.auto_approve_tickets, live.auto_ramp_up), both OFF when nothing is stored, with their history. No setting lets this system place an order");
@@ -60,6 +71,20 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status401Unauthorized);
+    }
+
+    private static async Task<Results<Ok<LiveCaptureView>, ProblemHttpResult>> GetCaptureAsync(
+        IQueryHandler<LiveCaptureQuery, Result<LiveCaptureView>> handler, HttpContext http, Guid accountId, DateOnly? date, CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new LiveCaptureQuery(accountId, date), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<LiveOutcomesPage>, ProblemHttpResult>> ListOutcomesAsync(
+        IQueryHandler<LiveOutcomesQuery, Result<LiveOutcomesPage>> handler, HttpContext http, Guid? accountId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken, int page = 1, int size = 50)
+    {
+        var result = await handler.HandleAsync(new LiveOutcomesQuery(accountId, from, to, page, size), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<RampView>, ProblemHttpResult>> GetRampAsync(IQueryHandler<GetRampQuery, Result<RampView>> handler, HttpContext http, Guid accountId, CancellationToken cancellationToken)

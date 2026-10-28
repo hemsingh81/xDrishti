@@ -1,0 +1,14 @@
+[
+  {"dhanClientId":"1000000001","orderId":"2611030001","exchangeOrderId":"26110300001","exchangeTradeId":"T-0001","transactionType":"BUY","exchangeSegment":"NSE_EQ","productType":"CNC","orderType":"LIMIT","tradingSymbol":"RELIANCE","customSymbol":"Example Reliance","securityId":"2885","tradedQuantity":25,"tradedPrice":1250.40,"createTime":"2026-11-03 09:41:10","updateTime":"2026-11-03 09:41:10","exchangeTime":"2026-11-03 09:41:10","isin":"INE002A01018"},
+  {"dhanClientId":"1000000001","orderId":"2611030001","exchangeOrderId":"26110300001","exchangeTradeId":"T-0002","transactionType":"BUY","exchangeSegment":"NSE_EQ","productType":"CNC","orderType":"LIMIT","tradingSymbol":"RELIANCE","securityId":"2885","tradedQuantity":"15","tradedPrice":"1,250.60","createTime":"2026-11-03 09:41:30","updateTime":"NA","exchangeTime":"2026-11-03T09:41:30"},
+  {"dhanClientId":"1000000001","orderId":"2611030009","exchangeTradeId":"T-0003","transactionType":"SELL","exchangeSegment":"NSE_EQ","productType":"INTRADAY","tradingSymbol":"SBIN","securityId":"3045","tradedQuantity":100,"tradedPrice":801.5,"exchangeTime":"2026-11-03 11:05:00"},
+  {"orderId":"2611030010","exchangeTradeId":"T-0004","transactionType":"BUY","exchangeSegment":"NSE_FNO","productType":"MARGIN","tradingSymbol":"NIFTY-Nov2026-24000-CE","securityId":"1","tradedQuantity":50,"tradedPrice":120,"exchangeTime":"2026-11-03 10:00:00"},
+  {"orderId":"2611030011","exchangeTradeId":"T-0005","transactionType":"BUY","exchangeSegment":"BSE_EQ","productType":"CNC","tradingSymbol":"TCS","securityId":"11536","tradedQuantity":5,"tradedPrice":3400,"exchangeTime":"2026-11-03 10:01:00"},
+  {"orderId":"2611030012","transactionType":"BUY","exchangeSegment":"NSE_EQ","productType":"CNC","tradingSymbol":"INFY","tradedQuantity":5,"tradedPrice":1500,"exchangeTime":"2026-11-03 10:02:00"},
+  {"orderId":"2611030013","exchangeTradeId":"T-0007","transactionType":"HOLD","exchangeSegment":"NSE_EQ","productType":"CNC","tradingSymbol":"INFY","tradedQuantity":5,"tradedPrice":1500,"exchangeTime":"2026-11-03 10:02:00"},
+  {"orderId":"2611030014","exchangeTradeId":"T-0008","transactionType":"BUY","exchangeSegment":"NSE_EQ","productType":"CNC","tradingSymbol":"INFY","tradedQuantity":2.5,"tradedPrice":1500,"exchangeTime":"2026-11-03 10:02:00"},
+  {"orderId":"2611030015","exchangeTradeId":"T-0009","transactionType":"BUY","exchangeSegment":"NSE_EQ","productType":"CNC","tradingSymbol":"INFY","tradedQuantity":5,"tradedPrice":0,"exchangeTime":"2026-11-03 10:02:00"},
+  {"orderId":"2611030016","exchangeTradeId":"T-0010","transactionType":"BUY","exchangeSegment":"NSE_EQ","productType":"CNC","tradingSymbol":"INFY","tradedQuantity":5,"tradedPrice":1500,"exchangeTime":"NA"},
+  {"orderId":"2611030017","exchangeTradeId":"T-0011","transactionType":"BUY","exchangeSegment":"NSE_EQ","productType":"CNC","tradedQuantity":5,"tradedPrice":1500,"exchangeTime":"2026-11-03 10:02:00"},
+  "not a row"
+]

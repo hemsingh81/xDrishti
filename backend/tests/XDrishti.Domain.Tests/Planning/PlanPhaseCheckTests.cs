@@ -351,7 +351,9 @@ public sealed class PlanPhaseCheckTests
     [Fact]
     public void The_pinned_allow_list_has_no_order_position_or_fund_endpoint()
     {
-        PlanPhaseCheck.PinnedAllowList.ShouldNotContain(e => e.Contains("order", StringComparison.OrdinalIgnoreCase) || e.Contains("position", StringComparison.OrdinalIgnoreCase) || e.Contains("fund", StringComparison.OrdinalIgnoreCase));
+        // The one entry that names an order is the read-only GET of the day's order book (P11-01, ADR 0149): no write, no id, no query.
+        PlanPhaseCheck.PinnedAllowList.Where(e => e.Contains("order", StringComparison.OrdinalIgnoreCase)).ShouldBe(["GET api.dhan.co/v2/orders"]);
+        PlanPhaseCheck.PinnedAllowList.ShouldNotContain(e => e.Contains("position", StringComparison.OrdinalIgnoreCase) || e.Contains("fund", StringComparison.OrdinalIgnoreCase));
         PlanPhaseCheck.RefusedProbes.Count.ShouldBeGreaterThan(5);
     }
 
