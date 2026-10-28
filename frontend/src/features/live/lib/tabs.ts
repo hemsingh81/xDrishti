@@ -27,6 +27,11 @@ const entries: readonly { id: string; label: string; Component: ComponentType }[
     label: 'Ramp',
     Component: lazy(() => import('../components/RampTab').then((m) => ({ default: m.RampTab }))),
   },
+  {
+    id: 'phase-check',
+    label: 'Phase check',
+    Component: lazy(() => import('../components/PhaseCheckTab').then((m) => ({ default: m.PhaseCheckTab }))),
+  },
 ];
 
 export type TabId = string;

@@ -50,6 +50,11 @@ public sealed class RampEvaluationTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    private sealed class Unmet : ILiveExitReport
+    {
+        public ValueTask<LiveExitCheck> CheckAsync(CancellationToken cancellationToken) => ValueTask.FromResult(new LiveExitCheck(false, "the phase check is not MET."));
+    }
+
     private sealed class Gate(bool on) : ILiveWritesGate
     {
         public bool Enabled { get; } = on;
@@ -99,7 +104,7 @@ public sealed class RampEvaluationTests
         new(_fx.Data, _fx.Data, _ramp, new Settings(), new Gate(true), Assessor(), new LiveLossReader(_capture, _market, _fx.Clock), _halts, _switches, _fx.Clock);
 
     private OwnerRampActs Acts(bool gate = true) =>
-        new(_fx.Data, _ramp, Viewer(), Assessor(), new NoExitReport(), new Gate(gate), _fx.Data, _fx.Data, _fx.Clock, NullLogger<OwnerRampActs>.Instance);
+        new(_fx.Data, _ramp, Viewer(), Assessor(), new Unmet(), new Gate(gate), _fx.Data, _fx.Data, _fx.Clock, NullLogger<OwnerRampActs>.Instance);
 
     private static NewCaptureRun Poll(Guid account, DateOnly date, int hour, int minute) =>
         new(account, OutcomeCodes.KindPoll, date, At(date, hour, minute), At(date, hour, minute), OutcomeCodes.RunOk, 0, 0, 0, 0);

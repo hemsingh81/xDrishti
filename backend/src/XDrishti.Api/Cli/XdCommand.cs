@@ -149,6 +149,11 @@ internal static class XdCommand
             return await LiveReportCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "live" && args[1] == "phase-check")
+        {
+            return await LivePhaseCheckCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "charge-sheet")
         {
             return await ChargeSheetCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);

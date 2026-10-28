@@ -11,14 +11,14 @@ public sealed class RampRulesArchitectureTests
     private static readonly string[] PureFiles =
     [
         "XDrishti.Domain/LiveTrading/RampGates.cs", "XDrishti.Domain/LiveTrading/RampGate.cs", "XDrishti.Domain/LiveTrading/RampEvidence.cs", "XDrishti.Domain/LiveTrading/RampThresholds.cs",
-        "XDrishti.Domain/LiveTrading/OneSidedT.cs", "XDrishti.Domain/LiveTrading/BreachRules.cs", "XDrishti.Domain/LiveTrading/DayLoss.cs", "XDrishti.Domain/LiveTrading/HaltRules.cs", "XDrishti.Domain/LiveTrading/GateSnapshot.cs",
+        "XDrishti.Domain/LiveTrading/OneSidedT.cs", "XDrishti.Domain/LiveTrading/PhaseCheck/LivePhaseCheck.cs", "XDrishti.Domain/LiveTrading/PhaseCheck/LivePhaseText.cs", "XDrishti.Domain/LiveTrading/BreachRules.cs", "XDrishti.Domain/LiveTrading/DayLoss.cs", "XDrishti.Domain/LiveTrading/HaltRules.cs", "XDrishti.Domain/LiveTrading/GateSnapshot.cs",
     ];
 
     private static readonly string[] CodeFiles =
     [
         .. PureFiles,
         "XDrishti.Application/LiveTrading/RampAssessor.cs", "XDrishti.Application/LiveTrading/LiveLossReader.cs", "XDrishti.Application/LiveTrading/EvaluateRampHandler.cs", "XDrishti.Application/LiveTrading/OwnerRampActs.cs",
-        "XDrishti.Application/LiveTrading/LiveReadyFactsSource.cs", "XDrishti.Application/LiveTrading/LiveNotices.cs", "XDrishti.Application/LiveTrading/GetLiveHaltsHandler.cs", "XDrishti.Application/LiveTrading/NoExitReport.cs",
+        "XDrishti.Application/LiveTrading/LiveReadyFactsSource.cs", "XDrishti.Application/LiveTrading/LiveNotices.cs", "XDrishti.Application/LiveTrading/GetLiveHaltsHandler.cs", "XDrishti.Application/LiveTrading/PhaseCheckExitReport.cs", "XDrishti.Application/LiveTrading/EvaluateLivePhaseCheckHandler.cs", "XDrishti.Api/Cli/LivePhaseCheckCommand.cs",
         "XDrishti.Infrastructure/LiveTrading/LiveHaltStore.cs", "XDrishti.Api/Cli/LiveRampCommand.cs",
     ];
 

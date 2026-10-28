@@ -4080,7 +4080,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Record as the owner that the small-live exit report was read and is met, the key to S3. Refused with 409 live.exit_not_checked unless that report says MET right now; the report (P11-06) is not built yet, so it is always refused for now. Same gates as the step. */
+    /** Record as the owner that the small-live exit report was read and is met, the key to S3. Refused with 409 live.exit_not_checked unless that report says MET right now; the report is the small-live phase check (GET /phase-check, P11-06), read now, and anything it cannot read or judge is not a MET. Same gates as the step. */
     post: operations['ConfirmLiveRampExit'];
     delete?: never;
     options?: never;
@@ -4233,6 +4233,23 @@ export interface paths {
     };
     /** The same tickets on the live account and one paper account: the shortfall in R on the plan's risk per share (positive is live worse) with its n, mean, 95 % interval and the non-inferiority verdict (within, not_within, inconclusive, or insufficient under the minimum pairs), the tickets that could not be paired with their reason, the live slippage histogram of one reference kind and the cumulative R over the paired set. basis gross (default) or net; net only when both sides have charges for every pair, else gross is returned and says so. Computed on read; read only. 404 live.not_found, 422 live.invalid, 422 live.paper_account_required */
     get: operations['GetLiveVsPaper'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live-trading/phase-check': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The small-live phase check recomputed from the stored records: MET, NOT MET or NOT EVALUABLE for criteria C1 to C8 and the integrity line, the week lines, what is printed and not judged, the blockers (with whose act) and the limits. Read only; it never moves a ramp step (exit_confirmed is the owner's act). accountId defaults to the one live account, through to the last closed session; 404 live.not_found without a live account, 422 live.invalid for a date after the last closed session or before the first live session. */
+    get: operations['GetLivePhaseCheck'];
     put?: never;
     post?: never;
     delete?: never;
@@ -11360,6 +11377,14 @@ export interface components {
       discretionary: components['schemas']['LiveCaptureFillView'][];
       evidence: components['schemas']['LiveCaptureEvidenceView'];
     };
+    /** @description One criterion with its call, the numbers behind it and the caveat a MET rests on (null when none). */
+    LiveCriterion: {
+      code: string;
+      name: string;
+      verdict: string;
+      detail: string;
+      caveat?: null | string;
+    };
     /** @description One cumulative-R line over the paired set; `unavailable` (no points) when an input is missing for any pair. */
     LiveEquityLineView: {
       state: string;
@@ -11620,6 +11645,37 @@ export interface components {
       /** Format: double */
       exitDiffR: number;
     };
+    /** @description The report and its deterministic text. string LivePhaseCheckView.State is `value`, or `empty` when there is no live session yet. */
+    LivePhaseCheckView: {
+      state: string;
+      report: components['schemas']['LivePhaseReport'];
+      text: string;
+    };
+    /** @description The phase check: the call, the criteria, the weeks, what is printed, what blocks and the limits. Recomputed on every read; nothing is stored. */
+    LivePhaseReport: {
+      /** Format: date */
+      through: string;
+      /** Format: date */
+      windowStart: null | string;
+      /** Format: int32 */
+      elapsedDays: number;
+      /** Format: int32 */
+      sessions: number;
+      exitVerdict: string;
+      exitCriterion: string;
+      criteria: components['schemas']['LiveCriterion'][];
+      weeks: components['schemas']['LiveWeekLine'][];
+      printed: components['schemas']['LivePrintedLine'][];
+      setup: components['schemas']['LiveSetupItem'][];
+      blockers: string[];
+      recommendation: string;
+      limits: string[];
+    };
+    /** @description A label and a value as printed; a value that does not exist reads as words, never a digit. */
+    LivePrintedLine: {
+      label: string;
+      value: string;
+    };
     /** @description What stands behind every figure of the report: the basis, how many, which sessions, which reference kind, which paper account and epoch, the pair rule, the exclusion counts and the stated limits. No figure is shown without it. */
     LiveReportEvidenceView: {
       basis: string;
@@ -11681,6 +11737,14 @@ export interface components {
       notice: string;
       /** @description Newest first. */
       history: components['schemas']['LiveSettingsChangeView'][];
+    };
+    /** @description A service or switch of the setup and whether it is on; Blocks is true when the phase cannot be evidenced while it is off (the auto switches do not block: they default OFF by design). */
+    LiveSetupItem: {
+      name: string;
+      on: boolean;
+      kind: string;
+      /** @default true */
+      blocks: boolean;
     };
     /** @description One slippage row: a bucket, side, style and reference kind with its n; the mean and median (in basis points) with their intervals are states, a number only for a value. string? LiveSlippageRowView.Proposal is a sentence nothing reads automatically. */
     LiveSlippageRowView: {
@@ -11768,6 +11832,34 @@ export interface components {
       balanced: boolean;
       rows: components['schemas']['LiveWaterfallRowView'][];
       notes: string[];
+    };
+    /** @description One ISO week of the window. */
+    LiveWeekLine: {
+      /** Format: date */
+      weekStart: string;
+      /** Format: int32 */
+      sessions: number;
+      /** Format: int32 */
+      tickets: number;
+      outcomes: {
+        [key: string]: number;
+      };
+      /** Format: int32 */
+      roundTrips: number;
+      /** Format: int32 */
+      cumulativeRoundTrips: number;
+      /** Format: int32 */
+      step: number;
+      /** Format: double */
+      scale: null | number;
+      /** Format: int32 */
+      captureComplete: number;
+      /** Format: int32 */
+      halts: number;
+      /** Format: int32 */
+      holds: number;
+      /** Format: int32 */
+      breaches: number;
     };
     /** @description What `GET /api/assistant/llm-status` answers. No key, no path and no address of the server is ever in it. */
     LlmStatusView: {
@@ -27577,6 +27669,47 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['LiveVsPaperView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLivePhaseCheck: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        through?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LivePhaseCheckView'];
         };
       };
       /** @description Not Found */

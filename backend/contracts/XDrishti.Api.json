@@ -14176,7 +14176,7 @@
         "tags": [
           "Live trading"
         ],
-        "summary": "Record as the owner that the small-live exit report was read and is met, the key to S3. Refused with 409 live.exit_not_checked unless that report says MET right now; the report (P11-06) is not built yet, so it is always refused for now. Same gates as the step.",
+        "summary": "Record as the owner that the small-live exit report was read and is met, the key to S3. Refused with 409 live.exit_not_checked unless that report says MET right now; the report is the small-live phase check (GET /phase-check, P11-06), read now, and anything it cannot read or judge is not a MET. Same gates as the step.",
         "operationId": "ConfirmLiveRampExit",
         "requestBody": {
           "content": {
@@ -14741,6 +14741,65 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LiveVsPaperView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live-trading/phase-check": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The small-live phase check recomputed from the stored records: MET, NOT MET or NOT EVALUABLE for criteria C1 to C8 and the integrity line, the week lines, what is printed and not judged, the blockers (with whose act) and the limits. Read only; it never moves a ramp step (exit_confirmed is the owner's act). accountId defaults to the one live account, through to the last closed session; 404 live.not_found without a live account, 422 live.invalid for a date after the last closed session or before the first live session.",
+        "operationId": "GetLivePhaseCheck",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "through",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LivePhaseCheckView"
                 }
               }
             }
@@ -34884,6 +34943,36 @@
         },
         "description": "The capture of one session: its health, the runs, one row per approved ticket, the fills no ticket owns and the owner's own trades, and what the evidence is."
       },
+      "LiveCriterion": {
+        "required": [
+          "code",
+          "name",
+          "verdict",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "caveat": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One criterion with its call, the numbers behind it and the caveat a MET rests on (null when none)."
+      },
       "LiveEquityLineView": {
         "required": [
           "state",
@@ -35709,6 +35798,127 @@
         },
         "description": "One pair of the same ticket: the live and the paper R and the shortfall split into entry and exit."
       },
+      "LivePhaseCheckView": {
+        "required": [
+          "state",
+          "report",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "report": {
+            "$ref": "#/components/schemas/LivePhaseReport"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "description": "The report and its deterministic text. string LivePhaseCheckView.State is `value`, or `empty` when there is no live session yet."
+      },
+      "LivePhaseReport": {
+        "required": [
+          "through",
+          "windowStart",
+          "elapsedDays",
+          "sessions",
+          "exitVerdict",
+          "exitCriterion",
+          "criteria",
+          "weeks",
+          "printed",
+          "setup",
+          "blockers",
+          "recommendation",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "through": {
+            "type": "string",
+            "format": "date"
+          },
+          "windowStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "elapsedDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sessions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "exitVerdict": {
+            "type": "string"
+          },
+          "exitCriterion": {
+            "type": "string"
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveCriterion"
+            }
+          },
+          "weeks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveWeekLine"
+            }
+          },
+          "printed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LivePrintedLine"
+            }
+          },
+          "setup": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveSetupItem"
+            }
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recommendation": {
+            "type": "string"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The phase check: the call, the criteria, the weeks, what is printed, what blocks and the limits. Recomputed on every read; nothing is stored."
+      },
+      "LivePrintedLine": {
+        "required": [
+          "label",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "description": "A label and a value as printed; a value that does not exist reads as words, never a digit."
+      },
       "LiveReportEvidenceView": {
         "required": [
           "basis",
@@ -35896,6 +36106,30 @@
           }
         },
         "description": "The live switches in force. `id` is null while nothing is stored (both OFF)."
+      },
+      "LiveSetupItem": {
+        "required": [
+          "name",
+          "on",
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "on": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "blocks": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "description": "A service or switch of the setup and whether it is on; Blocks is true when the phase cannot be evidenced while it is off (the auto switches do not block: they default OFF by design)."
       },
       "LiveSlippageRowView": {
         "required": [
@@ -36196,6 +36430,80 @@
           }
         },
         "description": "The waterfall of one round trip (plan result, entry slippage, exit difference, actual gross, charges, actual net). string LiveWaterfallView.State is `value` or `unavailable` (the position did not close in the session, or the plan was not graded); then there are no rows\nand IReadOnlyList&lt;string&gt; LiveWaterfallView.Notes says why."
+      },
+      "LiveWeekLine": {
+        "required": [
+          "weekStart",
+          "sessions",
+          "tickets",
+          "outcomes",
+          "roundTrips",
+          "cumulativeRoundTrips",
+          "step",
+          "scale",
+          "captureComplete",
+          "halts",
+          "holds",
+          "breaches"
+        ],
+        "type": "object",
+        "properties": {
+          "weekStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "sessions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tickets": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "outcomes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "roundTrips": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cumulativeRoundTrips": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "step": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scale": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "captureComplete": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "halts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "holds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "breaches": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One ISO week of the window."
       },
       "LlmStatusView": {
         "required": [

@@ -60,7 +60,7 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
         group.MapPost("/ramp/exit-confirmed", ConfirmExitAsync)
             .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy)
             .WithName("ConfirmLiveRampExit")
-            .WithSummary("Record as the owner that the small-live exit report was read and is met, the key to S3. Refused with 409 live.exit_not_checked unless that report says MET right now; the report (P11-06) is not built yet, so it is always refused for now. Same gates as the step.")
+            .WithSummary("Record as the owner that the small-live exit report was read and is met, the key to S3. Refused with 409 live.exit_not_checked unless that report says MET right now; the report is the small-live phase check (GET /phase-check, P11-06), read now, and anything it cannot read or judge is not a MET. Same gates as the step.")
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -109,6 +109,12 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
         group.MapGet("/reports/live-vs-paper", GetLiveVsPaperAsync)
             .WithName("GetLiveVsPaper")
             .WithSummary("The same tickets on the live account and one paper account: the shortfall in R on the plan's risk per share (positive is live worse) with its n, mean, 95 % interval and the non-inferiority verdict (within, not_within, inconclusive, or insufficient under the minimum pairs), the tickets that could not be paired with their reason, the live slippage histogram of one reference kind and the cumulative R over the paired set. basis gross (default) or net; net only when both sides have charges for every pair, else gross is returned and says so. Computed on read; read only. 404 live.not_found, 422 live.invalid, 422 live.paper_account_required")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapGet("/phase-check", GetPhaseCheckAsync)
+            .WithName("GetLivePhaseCheck")
+            .WithSummary("The small-live phase check recomputed from the stored records: MET, NOT MET or NOT EVALUABLE for criteria C1 to C8 and the integrity line, the week lines, what is printed and not judged, the blockers (with whose act) and the limits. Read only; it never moves a ramp step (exit_confirmed is the owner's act). accountId defaults to the one live account, through to the last closed session; 404 live.not_found without a live account, 422 live.invalid for a date after the last closed session or before the first live session.")
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
@@ -178,6 +184,13 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
         IQueryHandler<LiveVsPaperQuery, Result<LiveVsPaperView>> handler, HttpContext http, Guid accountId, Guid? paperAccountId, DateOnly? from, DateOnly? to, string? basis, string? referenceKind, CancellationToken cancellationToken, int page = 1, int size = 200)
     {
         var result = await handler.HandleAsync(new LiveVsPaperQuery(accountId, paperAccountId, from, to, basis, referenceKind, page, size), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<LivePhaseCheckView>, ProblemHttpResult>> GetPhaseCheckAsync(
+        IQueryHandler<LivePhaseCheckQuery, Result<LivePhaseCheckView>> handler, HttpContext http, Guid? accountId, DateOnly? through, CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new LivePhaseCheckQuery(accountId, through), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 

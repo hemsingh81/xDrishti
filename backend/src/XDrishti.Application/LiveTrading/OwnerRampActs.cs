@@ -12,7 +12,7 @@ namespace XDrishti.Application.LiveTrading;
 /// <summary>
 /// The owner's two other ramp acts (spec P11-04, ADR 0151): clearing a hold and recording the exit confirmation. Both ask the live-writes gate again, need an owner actor and a reason, append one insert-only event and one audit event with the numbers (never the
 /// reason text). The endpoint is responsible for the session and the fresh password. A hold is cleared only when no breach condition still holds on the evidence read now; the exit confirmation is recorded only when the P11-06 report is MET right now (the
-/// owner reads it, the system does not decide; the report is not built yet, so it is refused). Nothing here calls a broker or places an order.
+/// owner reads it, the system does not decide; the report is the P11-06 phase check, read now; anything it cannot read or judge refuses). Nothing here calls a broker or places an order.
 /// </summary>
 internal sealed class OwnerRampActs(
     IAccountStore accounts,

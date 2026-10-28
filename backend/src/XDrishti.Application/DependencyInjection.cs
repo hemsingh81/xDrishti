@@ -103,7 +103,8 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetLiveHaltsQuery, Result<IReadOnlyList<LiveHaltView>>>, GetLiveHaltsHandler>();
         services.AddScoped<IQueryHandler<GetLiveNoticesQuery, IReadOnlyList<LiveNoticeView>>, LiveNotices>();
         services.AddScoped<ILiveReadyFactsSource, LiveReadyFactsSource>();
-        services.AddSingleton<ILiveExitReport, NoExitReport>(); // P11-06 is not built: the exit report can never say MET, so S3 stays closed
+        services.AddScoped<IQueryHandler<LivePhaseCheckQuery, Result<LivePhaseCheckView>>, EvaluateLivePhaseCheckHandler>(); // the small-live phase check (P11-06, ADR 0153): reads stored records, writes nothing
+        services.AddScoped<ILiveExitReport, PhaseCheckExitReport>(); // exit_confirmed reads the phase check now; MET only on the whole report, anything unreadable is not met
         services.AddScoped<IQueryHandler<GetLiveSettingsQuery, LiveSettingsView>, GetLiveSettingsHandler>();
         services.AddScoped<ICommandHandler<ChangeLiveSettingsCommand, LiveSettingsView>, ChangeLiveSettingsHandler>();
         services.AddScoped<ILiveReadinessSource, LiveReadinessSource>();

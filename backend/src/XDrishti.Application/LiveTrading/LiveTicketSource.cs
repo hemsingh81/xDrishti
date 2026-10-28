@@ -44,4 +44,19 @@ internal sealed class LiveTicketSource(IPlanStore plans)
 
         return tickets;
     }
+
+    /// <summary>The live allocations of the date's newest plan, every non-rejected item (approved or not): the risk scale each was cut by and the ramp event it carries. Reads only (spec P11-06, C2).</summary>
+    public async ValueTask<IReadOnlyList<(double Scale, long RampEventId)>> ScalesForDateAsync(DateOnly date, Guid accountId, CancellationToken cancellationToken)
+    {
+        var plan = (await plans.ListAsync(date, null, 30, cancellationToken)).Where(r => r.Plan.ForDate == date).OrderByDescending(r => r.Plan.Version).ThenByDescending(r => r.Id).FirstOrDefault();
+        if (plan is null)
+        {
+            return [];
+        }
+
+        return [.. (await plans.ItemsAsync(plan.Id, cancellationToken)).Where(i => i.Item.Group != TicketGroup.Rejected)
+            .SelectMany(i => i.Item.Allocations)
+            .Where(a => a.Mode == ManualLiveMode && a.AccountId == accountId && a.RiskScale is not null && a.RampEventId is not null)
+            .Select(a => (a.RiskScale!.Value, a.RampEventId!.Value))];
+    }
 }

@@ -77,3 +77,13 @@ None for the build. For the owner (wall-clock): run the eight weeks; keep `live-
 - C2: 'at least 50 % of sessions at S1 or S2' was always true under the band; replaced by 'no session above the step factor in force that session'.
 - 'Eight criteria' now reads 'eight criteria and integrity line I'.
 - Test plan: C2 rows added (0.5 / 0.51, 19 / 20 sessions, 0.125).
+
+## Amendments at build 2026-10-29 (ADR 0153)
+- **Exit report.** `NoExitReport` is deleted; `PhaseCheckExitReport` runs the handler for the one live account and says Met only on overall MET. No live account, several, a refused check, NOT MET, NOT EVALUABLE or a malformed window are not met. S3 is therefore reachable only by a genuine MET plus the owner's `exit_confirmed` act.
+- **Window and sessions** are read from `ramp_events` (first `set_step`), the executions and the captured fills; at most 150 sessions are scanned.
+- **C2** uses the allocation's own `ramp_event_id` for the step in force and the configured step factor; a scale below 0.125 or an unknown factor is NOT EVALUABLE; above the factor or 0.5 is NOT MET.
+- **C6** "last 20 sessions" means 0 to 19 sessions ago. **C7** weeks that are due are the 4 ISO weeks before the week of `through` (the estimates run on Saturday).
+- **I** disagreement = a session whose latest settle run is not `ok`; the allow-list line compares the pinned list and the refused probes (P7-18 port); a fill journaled twice = a repeated broker trade id in a session.
+- **Setup blockers** list the services and capture switches that are off; the two auto switches are shown but never block (OFF by design).
+- **Printed, not judged:** missed-trigger cost in plan R is shown for `missed_no_order` and `missed_unfilled`; `rejected` and `missed_unknown` show counts and "not measured". Elapsed days count inclusively.
+- **Not built:** no stored record; the endpoint takes `accountId`/`through` only; the tab has no account picker (the one live account).
