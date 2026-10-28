@@ -52,8 +52,12 @@ public sealed class RampGatesTests
     [Theory]
     [InlineData(9, 1.833)]
     [InlineData(19, 1.729)]
-    [InlineData(25, 1.699)]
-    [InlineData(100, 1.645)]
+    [InlineData(25, 1.711)] // row 24 (true 1.708), not the higher row 29
+    [InlineData(10, 1.833)] // the row at or below, never the next higher (true 1.812)
+    [InlineData(15, 1.761)]
+    [InlineData(60, 1.671)]
+    [InlineData(100, 1.671)]
+    [InlineData(120, 1.645)]
     public void The_one_sided_quantile_follows_the_spec_table(int df, double expected) => OneSidedT.Quantile95(df).ShouldBe(expected);
 
     [Fact]

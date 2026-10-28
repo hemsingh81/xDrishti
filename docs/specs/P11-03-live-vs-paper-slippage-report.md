@@ -73,3 +73,13 @@ None. (Which paper account to pair with is `Live:Report:PaperAccountId`; with on
 - AC8 identity: `missed_unknown` gets its own row; `unknown` and `live_open` tickets are excluded from the plan sum with a count and a list.
 - AC4: 'different_quantity_basis is NOT a reason' moved out of the reason list into a parenthetical.
 - Histogram contract: query parameter `referenceKind` added.
+
+## Amendments at build (2026-10-29, ADR 0152)
+1. **Built as written, read only, no table:** the two GETs, `xd live report`, the lazy Live vs paper tab. The three `Live:Report` options are thresholds, not switches (nothing to default OFF); no owner write.
+2. **`live_uncertain` is not built** (live fills are not journaled until P11-01b). The pair rho is the execution's stored `risk_per_share`; a pair with no plan prices only loses the plan-price line.
+3. **Net rule:** net requested but not every pair has charges on both sides gives the whole report as gross, with the charges part `unavailable` (never per-pair mixing).
+4. **Execution gap:** plan R for a missed ticket (including `rejected`, which carries no `missed_r`) is the plan grade's R; a group whose trips lack recorded charges is gross as a whole; `unknown`, open and ungraded tickets are left out and listed; the total is built from the same tickets.
+5. **API additions:** `paperAccountId`, `page`, `size` on live-vs-paper; 422 `live.paper_account_required`; a paper store that cannot be read gives state `unavailable`.
+6. **UI:** pairs in a plain table (page of at most 200), histogram as a one-stack category chart, basis and group-by selectors (`?by=` in the URL).
+7. **Not done:** doc 13 R14 and R32 catalogue entries stay shells (a one-line link follow-up in P8); the integration tests do not seed paper entries (they need a plan allocation chain), so the pairing is tested on fakes and the paper SQL against the empty real schema.
+

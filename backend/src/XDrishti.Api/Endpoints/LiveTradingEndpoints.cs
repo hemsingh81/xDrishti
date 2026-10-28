@@ -106,6 +106,18 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
             .WithSummary("The waterfall of one round trip by the id of its execution: plan result, entry slippage, exit difference, actual gross, and charges and actual net only when every fill's charges are recorded. 'unavailable' with the reason when the position did not close in the session or the plan was not graded. Read only. 404 live.not_found")
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/reports/live-vs-paper", GetLiveVsPaperAsync)
+            .WithName("GetLiveVsPaper")
+            .WithSummary("The same tickets on the live account and one paper account: the shortfall in R on the plan's risk per share (positive is live worse) with its n, mean, 95 % interval and the non-inferiority verdict (within, not_within, inconclusive, or insufficient under the minimum pairs), the tickets that could not be paired with their reason, the live slippage histogram of one reference kind and the cumulative R over the paired set. basis gross (default) or net; net only when both sides have charges for every pair, else gross is returned and says so. Computed on read; read only. 404 live.not_found, 422 live.invalid, 422 live.paper_account_required")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapGet("/reports/execution-gap", GetExecutionGapAsync)
+            .WithName("GetLiveExecutionGap")
+            .WithSummary("Plan R to actual R by strategy or month: plan R, missed triggers, missed (cause unknown), entry slippage, exit difference, charges, result, with the tickets left out listed. A figure with no input is 'unavailable', not 0. Computed on read; read only. 404 live.not_found, 422 live.invalid")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
         group.MapGet("/settings", GetSettingsAsync)
             .WithName("GetLiveSettings")
             .WithSummary("The live switches (live.auto_approve_tickets, live.auto_ramp_up), both OFF when nothing is stored, with their history. No setting lets this system place an order");
@@ -159,6 +171,20 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
         IQueryHandler<LiveWaterfallQuery, Result<LiveWaterfallView>> handler, HttpContext http, long entryId, CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(new LiveWaterfallQuery(entryId), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<LiveVsPaperView>, ProblemHttpResult>> GetLiveVsPaperAsync(
+        IQueryHandler<LiveVsPaperQuery, Result<LiveVsPaperView>> handler, HttpContext http, Guid accountId, Guid? paperAccountId, DateOnly? from, DateOnly? to, string? basis, string? referenceKind, CancellationToken cancellationToken, int page = 1, int size = 200)
+    {
+        var result = await handler.HandleAsync(new LiveVsPaperQuery(accountId, paperAccountId, from, to, basis, referenceKind, page, size), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<ExecutionGapView>, ProblemHttpResult>> GetExecutionGapAsync(
+        IQueryHandler<ExecutionGapQuery, Result<ExecutionGapView>> handler, HttpContext http, Guid accountId, DateOnly? from, DateOnly? to, string? groupBy, CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ExecutionGapQuery(accountId, from, to, groupBy), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
@@ -298,7 +324,7 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
 
     /// <summary>A refused input of the record is 422, as in the Lab and the owner moves; every other failure is the shared mapping.</summary>
     private static ProblemHttpResult Problem(Error error, HttpContext http) =>
-        error.Code == ComplianceRecord.InvalidCode
+        error.Code is ComplianceRecord.InvalidCode or LiveReportRules.PaperAccountRequired
             ? TypedResults.Problem(ProblemResults.Create(StatusCodes.Status422UnprocessableEntity, error.Message, error.Code))
             : ProblemResults.From(error, http);
 }

@@ -209,6 +209,9 @@ public static class DependencyInjection
         services.AddOptions<LiveEstimatesOptions>().Bind(configuration.GetSection(LiveEstimatesOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the weekly estimates; Enabled seeds the service OFF
         services.AddOptions<LiveCapacityOptions>().Bind(configuration.GetSection(LiveCapacityOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
         services.AddSingleton<ILiveEstimateSettings, ConfiguredLiveEstimateSettings>();
+        services.AddOptions<LiveReportOptions>().Bind(configuration.GetSection(LiveReportOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the live-versus-paper thresholds (P11-03)
+        services.AddSingleton<ILiveReportSettings, ConfiguredLiveReportSettings>();
+        services.AddScoped<IPaperTradeSource, PaperTradeSource>(); // the paper side of the live-versus-paper report: select only (P11-03)
         services.AddScoped<ILiveExecutionStore, LiveExecutionStore>(); // the execution feedback: four insert-only tables (P11-02)
         services.AddScoped<ILiveExecutionMarket, LiveExecutionMarket>(); // tick, turnover and 1-minute bars of the stored market data
         services.AddScoped<IBrokerTradeBook, DhanTradeBookClient>(); // GET /v2/trades, the day's trade book: read only (P11-01, ADR 0149)

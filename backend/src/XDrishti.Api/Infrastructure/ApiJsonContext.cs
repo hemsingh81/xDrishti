@@ -112,6 +112,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(LiveSlippageView))]
 [JsonSerializable(typeof(LiveCapacityView))]
 [JsonSerializable(typeof(LiveWaterfallView))]
+[JsonSerializable(typeof(LiveVsPaperView))]
+[JsonSerializable(typeof(ExecutionGapView))]
 [JsonSerializable(typeof(RampEventView))]
 [JsonSerializable(typeof(SetRampStepRequest))]
 [JsonSerializable(typeof(RampActRequest))]

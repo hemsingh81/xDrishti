@@ -14660,6 +14660,189 @@
         }
       }
     },
+    "/api/live-trading/reports/live-vs-paper": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The same tickets on the live account and one paper account: the shortfall in R on the plan's risk per share (positive is live worse) with its n, mean, 95 % interval and the non-inferiority verdict (within, not_within, inconclusive, or insufficient under the minimum pairs), the tickets that could not be paired with their reason, the live slippage histogram of one reference kind and the cumulative R over the paired set. basis gross (default) or net; net only when both sides have charges for every pair, else gross is returned and says so. Computed on read; read only. 404 live.not_found, 422 live.invalid, 422 live.paper_account_required",
+        "operationId": "GetLiveVsPaper",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "paperAccountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "referenceKind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveVsPaperView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live-trading/reports/execution-gap": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "Plan R to actual R by strategy or month: plan R, missed triggers, missed (cause unknown), entry slippage, exit difference, charges, result, with the tickets left out listed. A figure with no input is 'unavailable', not 0. Computed on read; read only. 404 live.not_found, 422 live.invalid",
+        "operationId": "GetLiveExecutionGap",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "groupBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionGapView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/live-trading/settings": {
       "get": {
         "tags": [
@@ -28721,6 +28904,61 @@
         },
         "description": "The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words."
       },
+      "ExclusionCountView": {
+        "required": [
+          "reason",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "How many tickets were left out of the report for one reason."
+      },
+      "ExecutionGapView": {
+        "required": [
+          "state",
+          "groupBy",
+          "groups",
+          "total",
+          "excluded",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "groupBy": {
+            "type": "string"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveGapGroupView"
+            }
+          },
+          "total": {
+            "$ref": "#/components/schemas/LiveGapGroupView"
+          },
+          "excluded": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveGapExcludedView"
+            }
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/LiveReportEvidenceView"
+          }
+        },
+        "description": "The execution gap by group, a total that is built from the same tickets, and the evidence."
+      },
       "ExecutionRowView": {
         "required": [
           "id",
@@ -34646,6 +34884,105 @@
         },
         "description": "The capture of one session: its health, the runs, one row per approved ticket, the fills no ticket owns and the owner's own trades, and what the evidence is."
       },
+      "LiveEquityLineView": {
+        "required": [
+          "state",
+          "reason",
+          "points"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveEquityPointView"
+            }
+          }
+        },
+        "description": "One cumulative-R line over the paired set; `unavailable` (no points) when an input is missing for any pair."
+      },
+      "LiveEquityPointView": {
+        "required": [
+          "date",
+          "value",
+          "n"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "value": {
+            "type": "number",
+            "format": "double"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A point of a cumulative line: the day, the cumulative R and how many pairs are in it."
+      },
+      "LiveEquityView": {
+        "required": [
+          "planPrices",
+          "paper",
+          "live"
+        ],
+        "type": "object",
+        "properties": {
+          "planPrices": {
+            "$ref": "#/components/schemas/LiveEquityLineView"
+          },
+          "paper": {
+            "$ref": "#/components/schemas/LiveEquityLineView"
+          },
+          "live": {
+            "$ref": "#/components/schemas/LiveEquityLineView"
+          }
+        },
+        "description": "The three lines over the paired set only, in session order: on plan prices, paper, live."
+      },
+      "LiveExcludedView": {
+        "required": [
+          "planItemId",
+          "symbol",
+          "date",
+          "reason",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "planItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "description": "A ticket that could not be paired, with exactly one reason and what is known about the other side."
+      },
       "LiveExecutionEvidenceView": {
         "required": [
           "basis",
@@ -34890,6 +35227,97 @@
         },
         "description": "The state of the live feed as the screen needs it: hub event `feedStatus` (pushed on connect, on a change of `state` or `subscribed`, and every 15 seconds) and the body of `GET /api/live/status` (the fallback when the hub is not connected).\n`state` is the feed's own word: `connected` (streaming), `idle` (connected, nothing to follow), `connecting`, `reconnecting`, `closed` (outside its window), `paused` (the owner paused the service), `no_token`, `token_refused`,\n`flapping`; or `not_running` when the feed reports nothing (never started, stopped, crashed: no heartbeat in the last 60 seconds). `subscribed` is the number of instruments the feed follows (0 unless it reports); `lastTickAt` the exchange\ntime of its latest tick of any instrument (UTC), null when none yet."
       },
+      "LiveGapExcludedView": {
+        "required": [
+          "planItemId",
+          "symbol",
+          "date",
+          "group",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "planItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "group": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "A ticket left out of the gap with the reason."
+      },
+      "LiveGapGroupView": {
+        "required": [
+          "key",
+          "n",
+          "state",
+          "basis",
+          "balanced",
+          "excluded",
+          "rows",
+          "perTicketMean"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string"
+          },
+          "balanced": {
+            "type": "boolean"
+          },
+          "excluded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveGapRowView"
+            }
+          },
+          "perTicketMean": {
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "One group of the execution gap with its rows (plan R, missed, missed unknown, entry, exit, charges, result, overrides), the per-ticket mean of the result and the tickets left out."
+      },
+      "LiveGapRowView": {
+        "required": [
+          "label",
+          "r"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "r": {
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "One row of a gap group: a label and a figure that is a value only when its input exists."
+      },
       "LiveHaltView": {
         "required": [
           "id",
@@ -34955,6 +35383,63 @@
           }
         },
         "description": "A halt as the screen reads it: the period, the limit, what was measured under which state, and what it does (it is advice: the owner places every order)."
+      },
+      "LiveHistogramBinView": {
+        "required": [
+          "lo",
+          "hi",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "lo": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "hi": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One bin of the slippage histogram in basis points; a null edge is open."
+      },
+      "LiveHistogramView": {
+        "required": [
+          "kind",
+          "n",
+          "state",
+          "bins"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "type": "string"
+          },
+          "bins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveHistogramBinView"
+            }
+          }
+        },
+        "description": "The histogram of live total entry slippage of one reference kind. string LiveHistogramView.State is `value`, `insufficient` (under 10 observations, no bins) or `empty`."
       },
       "LiveLossView": {
         "required": [
@@ -35173,6 +35658,131 @@
         },
         "description": "A page of outcomes."
       },
+      "LivePairView": {
+        "required": [
+          "planItemId",
+          "symbol",
+          "side",
+          "date",
+          "liveR",
+          "paperR",
+          "shortfallR",
+          "entryDiffR",
+          "exitDiffR"
+        ],
+        "type": "object",
+        "properties": {
+          "planItemId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "liveR": {
+            "type": "number",
+            "format": "double"
+          },
+          "paperR": {
+            "type": "number",
+            "format": "double"
+          },
+          "shortfallR": {
+            "type": "number",
+            "format": "double"
+          },
+          "entryDiffR": {
+            "type": "number",
+            "format": "double"
+          },
+          "exitDiffR": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "One pair of the same ticket: the live and the paper R and the shortfall split into entry and exit."
+      },
+      "LiveReportEvidenceView": {
+        "required": [
+          "basis",
+          "n",
+          "firstDate",
+          "lastDate",
+          "referenceKinds",
+          "paperAccountId",
+          "paperEpochId",
+          "pairRule",
+          "exclusions",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "lastDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "referenceKinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "paperAccountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "paperEpochId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "pairRule": {
+            "type": "string"
+          },
+          "exclusions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExclusionCountView"
+            }
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "What stands behind every figure of the report: the basis, how many, which sessions, which reference kind, which paper account and epoch, the pair rule, the exclusion counts and the stated limits. No figure is shown without it."
+      },
       "LiveScope": {
         "required": [
           "accountId",
@@ -35389,6 +35999,130 @@
           }
         },
         "description": "The slippage snapshot of one week. string LiveSlippageView.State is `empty` when nothing is stored for the week."
+      },
+      "LiveVsPaperSummaryView": {
+        "required": [
+          "nPairs",
+          "mean",
+          "sd",
+          "se",
+          "lo95",
+          "hi95",
+          "upperOneSided95",
+          "lowerOneSided95",
+          "entryDiffMean",
+          "exitDiffMean",
+          "chargesDiffMean",
+          "verdict",
+          "threshold",
+          "minPairs"
+        ],
+        "type": "object",
+        "properties": {
+          "nPairs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "mean": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "sd": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "se": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "lo95": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "hi95": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "upperOneSided95": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "lowerOneSided95": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "entryDiffMean": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "exitDiffMean": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "chargesDiffMean": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "threshold": {
+            "type": "number",
+            "format": "double"
+          },
+          "minPairs": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The statistics of the paired shortfalls (R on the plan's risk per share; positive is live worse). Every figure is a state and a number only for a value; under the minimum pairs it is `insufficient` and says so."
+      },
+      "LiveVsPaperView": {
+        "required": [
+          "state",
+          "summary",
+          "pairs",
+          "pairsTotal",
+          "page",
+          "size",
+          "excluded",
+          "histogram",
+          "equity",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/LiveVsPaperSummaryView"
+          },
+          "pairs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LivePairView"
+            }
+          },
+          "pairsTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "excluded": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveExcludedView"
+            }
+          },
+          "histogram": {
+            "$ref": "#/components/schemas/LiveHistogramView"
+          },
+          "equity": {
+            "$ref": "#/components/schemas/LiveEquityView"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/LiveReportEvidenceView"
+          }
+        },
+        "description": "The report: string LiveVsPaperView.State is `value`, `empty` (no live round trip yet) or `unavailable` (the paper record could not be read)."
       },
       "LiveWaterfallRowView": {
         "required": [

@@ -18,6 +18,11 @@ const entries: readonly { id: string; label: string; Component: ComponentType }[
     Component: lazy(() => import('../components/ExecutionTab').then((m) => ({ default: m.ExecutionTab }))),
   },
   {
+    id: 'vs-paper',
+    label: 'Live vs paper',
+    Component: lazy(() => import('../components/LiveVsPaperTab').then((m) => ({ default: m.LiveVsPaperTab }))),
+  },
+  {
     id: 'ramp',
     label: 'Ramp',
     Component: lazy(() => import('../components/RampTab').then((m) => ({ default: m.RampTab }))),

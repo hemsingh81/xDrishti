@@ -4224,6 +4224,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/live-trading/reports/live-vs-paper': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The same tickets on the live account and one paper account: the shortfall in R on the plan's risk per share (positive is live worse) with its n, mean, 95 % interval and the non-inferiority verdict (within, not_within, inconclusive, or insufficient under the minimum pairs), the tickets that could not be paired with their reason, the live slippage histogram of one reference kind and the cumulative R over the paired set. basis gross (default) or net; net only when both sides have charges for every pair, else gross is returned and says so. Computed on read; read only. 404 live.not_found, 422 live.invalid, 422 live.paper_account_required */
+    get: operations['GetLiveVsPaper'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live-trading/reports/execution-gap': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Plan R to actual R by strategy or month: plan R, missed triggers, missed (cause unknown), entry slippage, exit difference, charges, result, with the tickets left out listed. A figure with no input is 'unavailable', not 0. Computed on read; read only. 404 live.not_found, 422 live.invalid */
+    get: operations['GetLiveExecutionGap'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/live-trading/settings': {
     parameters: {
       query?: never;
@@ -9148,6 +9182,21 @@ export interface components {
       calibrationErrorPp: number;
       method: string;
     };
+    /** @description How many tickets were left out of the report for one reason. */
+    ExclusionCountView: {
+      reason: string;
+      /** Format: int32 */
+      count: number;
+    };
+    /** @description The execution gap by group, a total that is built from the same tickets, and the evidence. */
+    ExecutionGapView: {
+      state: string;
+      groupBy: string;
+      groups: components['schemas']['LiveGapGroupView'][];
+      total: components['schemas']['LiveGapGroupView'];
+      excluded: components['schemas']['LiveGapExcludedView'][];
+      evidence: components['schemas']['LiveReportEvidenceView'];
+    };
     /** @description One row of the paper execution waterfall on the wire. */
     ExecutionRowView: {
       /** @description plan, slippage, charges, net, missed_triggers or real_slippage. */
@@ -11311,6 +11360,37 @@ export interface components {
       discretionary: components['schemas']['LiveCaptureFillView'][];
       evidence: components['schemas']['LiveCaptureEvidenceView'];
     };
+    /** @description One cumulative-R line over the paired set; `unavailable` (no points) when an input is missing for any pair. */
+    LiveEquityLineView: {
+      state: string;
+      reason: null | string;
+      points: components['schemas']['LiveEquityPointView'][];
+    };
+    /** @description A point of a cumulative line: the day, the cumulative R and how many pairs are in it. */
+    LiveEquityPointView: {
+      /** Format: date */
+      date: string;
+      /** Format: double */
+      value: number;
+      /** Format: int32 */
+      n: number;
+    };
+    /** @description The three lines over the paired set only, in session order: on plan prices, paper, live. */
+    LiveEquityView: {
+      planPrices: components['schemas']['LiveEquityLineView'];
+      paper: components['schemas']['LiveEquityLineView'];
+      live: components['schemas']['LiveEquityLineView'];
+    };
+    /** @description A ticket that could not be paired, with exactly one reason and what is known about the other side. */
+    LiveExcludedView: {
+      /** Format: int64 */
+      planItemId: number;
+      symbol: string;
+      /** Format: date */
+      date: string;
+      reason: string;
+      detail: string;
+    };
     /** @description What stands behind a figure of the execution feedback: the basis, how many entries, over which sessions, against which references, with which bucket edges, and the stated limits. No figure is given without its n. */
     LiveExecutionEvidenceView: {
       basis: string;
@@ -11389,6 +11469,34 @@ export interface components {
       /** Format: date-time */
       lastTickAt: null | string;
     };
+    /** @description A ticket left out of the gap with the reason. */
+    LiveGapExcludedView: {
+      /** Format: int64 */
+      planItemId: number;
+      symbol: string;
+      /** Format: date */
+      date: string;
+      group: string;
+      reason: string;
+    };
+    /** @description One group of the execution gap with its rows (plan R, missed, missed unknown, entry, exit, charges, result, overrides), the per-ticket mean of the result and the tickets left out. */
+    LiveGapGroupView: {
+      key: string;
+      /** Format: int32 */
+      n: number;
+      state: string;
+      basis: string;
+      balanced: boolean;
+      /** Format: int32 */
+      excluded: number;
+      rows: components['schemas']['LiveGapRowView'][];
+      perTicketMean: components['schemas']['MetricView'];
+    };
+    /** @description One row of a gap group: a label and a figure that is a value only when its input exists. */
+    LiveGapRowView: {
+      label: string;
+      r: components['schemas']['MetricView'];
+    };
     /** @description A halt as the screen reads it: the period, the limit, what was measured under which state, and what it does (it is advice: the owner places every order). */
     LiveHaltView: {
       /** Format: int64 */
@@ -11410,6 +11518,23 @@ export interface components {
       action: string;
       /** Format: date-time */
       openedAt: string;
+    };
+    /** @description One bin of the slippage histogram in basis points; a null edge is open. */
+    LiveHistogramBinView: {
+      /** Format: double */
+      lo: null | number;
+      /** Format: double */
+      hi: null | number;
+      /** Format: int32 */
+      count: number;
+    };
+    /** @description The histogram of live total entry slippage of one reference kind. string LiveHistogramView.State is `value`, `insufficient` (under 10 observations, no bins) or `empty`. */
+    LiveHistogramView: {
+      kind: string;
+      /** Format: int32 */
+      n: number;
+      state: string;
+      bins: components['schemas']['LiveHistogramBinView'][];
     };
     /** @description The loss of the last measured session: the state (value, realised_only, unavailable), the figures and what is left out. */
     LiveLossView: {
@@ -11475,6 +11600,43 @@ export interface components {
       size: number;
       /** Format: int32 */
       total: number;
+    };
+    /** @description One pair of the same ticket: the live and the paper R and the shortfall split into entry and exit. */
+    LivePairView: {
+      /** Format: int64 */
+      planItemId: number;
+      symbol: string;
+      side: string;
+      /** Format: date */
+      date: string;
+      /** Format: double */
+      liveR: number;
+      /** Format: double */
+      paperR: number;
+      /** Format: double */
+      shortfallR: number;
+      /** Format: double */
+      entryDiffR: number;
+      /** Format: double */
+      exitDiffR: number;
+    };
+    /** @description What stands behind every figure of the report: the basis, how many, which sessions, which reference kind, which paper account and epoch, the pair rule, the exclusion counts and the stated limits. No figure is shown without it. */
+    LiveReportEvidenceView: {
+      basis: string;
+      /** Format: int32 */
+      n: number;
+      /** Format: date */
+      firstDate: null | string;
+      /** Format: date */
+      lastDate: null | string;
+      referenceKinds: string[];
+      /** Format: uuid */
+      paperAccountId: null | string;
+      /** Format: int64 */
+      paperEpochId: null | number;
+      pairRule: string;
+      exclusions: components['schemas']['ExclusionCountView'][];
+      limits: string[];
     };
     /**
      * @description What a Portfolio screen asks the hub to follow (argument of `Subscribe`, ADR 0024 §7): the prices of the instruments of these holdings are pushed, nothing else.
@@ -11546,6 +11708,42 @@ export interface components {
       state: string;
       rows: components['schemas']['LiveSlippageRowView'][];
       evidence: components['schemas']['LiveExecutionEvidenceView'];
+    };
+    /** @description The statistics of the paired shortfalls (R on the plan's risk per share; positive is live worse). Every figure is a state and a number only for a value; under the minimum pairs it is `insufficient` and says so. */
+    LiveVsPaperSummaryView: {
+      /** Format: int32 */
+      nPairs: number;
+      mean: components['schemas']['MetricView'];
+      sd: components['schemas']['MetricView'];
+      se: components['schemas']['MetricView'];
+      lo95: components['schemas']['MetricView'];
+      hi95: components['schemas']['MetricView'];
+      upperOneSided95: components['schemas']['MetricView'];
+      lowerOneSided95: components['schemas']['MetricView'];
+      entryDiffMean: components['schemas']['MetricView'];
+      exitDiffMean: components['schemas']['MetricView'];
+      chargesDiffMean: components['schemas']['MetricView'];
+      verdict: string;
+      /** Format: double */
+      threshold: number;
+      /** Format: int32 */
+      minPairs: number;
+    };
+    /** @description The report: string LiveVsPaperView.State is `value`, `empty` (no live round trip yet) or `unavailable` (the paper record could not be read). */
+    LiveVsPaperView: {
+      state: string;
+      summary: components['schemas']['LiveVsPaperSummaryView'];
+      pairs: components['schemas']['LivePairView'][];
+      /** Format: int32 */
+      pairsTotal: number;
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      size: number;
+      excluded: components['schemas']['LiveExcludedView'][];
+      histogram: components['schemas']['LiveHistogramView'];
+      equity: components['schemas']['LiveEquityView'];
+      evidence: components['schemas']['LiveReportEvidenceView'];
     };
     /** @description One line of the waterfall: string LiveWaterfallRowView.Op is start, minus or total; MetricView LiveWaterfallRowView.R is unavailable when the plan has no stop (the rupees are then the result). */
     LiveWaterfallRowView: {
@@ -27345,6 +27543,96 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLiveVsPaper: {
+    parameters: {
+      query: {
+        accountId: string;
+        paperAccountId?: string;
+        from?: string;
+        to?: string;
+        basis?: string;
+        referenceKind?: string;
+        page?: number;
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveVsPaperView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLiveExecutionGap: {
+    parameters: {
+      query: {
+        accountId: string;
+        from?: string;
+        to?: string;
+        groupBy?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionGapView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };

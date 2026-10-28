@@ -122,6 +122,9 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<LiveSlippageQuery, Result<LiveSlippageView>>, GetLiveSlippageHandler>();
         services.AddScoped<IQueryHandler<LiveCapacityQuery, Result<LiveCapacityView>>, GetLiveCapacityHandler>();
         services.AddScoped<IQueryHandler<LiveWaterfallQuery, Result<LiveWaterfallView>>, GetLiveWaterfallHandler>();
+        services.AddScoped<ILivePairSource, LivePairSource>(); // the live side of the live-versus-paper report: stored rows (P11-03, ADR 0152)
+        services.AddScoped<IQueryHandler<LiveVsPaperQuery, Result<LiveVsPaperView>>, GetLiveVsPaperHandler>(); // paired shortfall, verdict, histogram, overlay: computed on read, read only
+        services.AddScoped<IQueryHandler<ExecutionGapQuery, Result<ExecutionGapView>>, GetExecutionGapHandler>(); // plan R to actual R by strategy or month: computed on read, read only
         services.AddSingleton<IScheduledService, LiveEstimatesService>(); // the weekly estimates (P11-02); starts paused, reads stored rows, places no order
         services.AddScoped<ICommandHandler<RecordComplianceCommand, ComplianceRecordView>, RecordComplianceHandler>(); // and write, insert-only, behind a fresh password and the live-writes gate in the endpoint
         services.AddScoped<ICommandHandler<ChangeDepthRecorderCommand, DepthRecorderSwitched>, ChangeDepthRecorderHandler>(); // and change, insert-only, behind a fresh password in the endpoint

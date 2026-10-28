@@ -28,3 +28,6 @@
 - The 1 R of the daily and weekly halts uses the step scale only; the weekly-halve factor is not applied to it. So after a halve the halt limits are still measured in the full step's R, not the halved size.
 - `LiveNotices` assesses every live account on each bell read (up to 120 sessions of indexed reads each); not timed. Upgrade to a short cache if the bell gets slow.
 - Rejected: invalidating shared tickets on a halt; a hard block of fills (impossible: the owner places every order); a profit gate; closing halts by a second row; a system-only S3.
+
+## Note 2026-10-29 (append-only, from P11-03 review)
+`OneSidedT.Quantile95` used to take the next higher table row for a df between rows (df 10 gave 1.761, true 1.812), which made the G3 one-sided bound too narrow. It now takes the largest row at or below the df (df 19 is still 1.729, df 10 is 1.833, df 100 is 1.671, 1.645 from df 120): the bound is wider, so G3 is stricter. See ADR 0152.

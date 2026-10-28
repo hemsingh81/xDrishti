@@ -1,9 +1,9 @@
 namespace XDrishti.Domain.LiveTrading;
 
-/// <summary>The one-sided 95 % Student t quantile of the spec's table (P11-04 G3): df 9 1.833, 14 1.761, 19 1.729, 24 1.711, 29 1.699, 39 1.685, 59 1.671, larger 1.645. A df between table rows takes the larger quantile (the wider bound).</summary>
+/// <summary>The one-sided 95 % Student t quantile of the spec's table (P11-04 G3): df 9 1.833, 14 1.761, 19 1.729, 24 1.711, 29 1.699, 39 1.685, 59 1.671, larger 1.645. A df between table rows takes the quantile of the largest row at or below it (the larger t, the wider bound); 1.645 only from df 120. (Corrected in P11-03, ADR 0152: it used to take the next higher row, a narrower, anti-conservative bound.)</summary>
 public static class OneSidedT
 {
-    private static readonly (int Df, double T)[] Table = [(5, 2.015), (6, 1.943), (7, 1.895), (8, 1.860), (9, 1.833), (14, 1.761), (19, 1.729), (24, 1.711), (29, 1.699), (39, 1.685), (59, 1.671)];
+    private static readonly (int Df, double T)[] Table = [(5, 2.015), (6, 1.943), (7, 1.895), (8, 1.860), (9, 1.833), (14, 1.761), (19, 1.729), (24, 1.711), (29, 1.699), (39, 1.685), (59, 1.671), (60, 1.671), (120, 1.645)];
 
     public static double Quantile95(int df)
     {
@@ -12,15 +12,16 @@ public static class OneSidedT
             throw new ArgumentOutOfRangeException(nameof(df), "At least 6 observations are needed.");
         }
 
+        var result = Table[0].T;
         foreach (var (rowDf, t) in Table)
         {
-            if (df <= rowDf)
+            if (rowDf <= df)
             {
-                return t;
+                result = t;
             }
         }
 
-        return 1.645;
+        return result;
     }
 
     /// <summary>Mean, sample standard deviation and the one-sided 95 % lower and upper bounds of the mean; null under 6 values or with a value that is not finite.</summary>

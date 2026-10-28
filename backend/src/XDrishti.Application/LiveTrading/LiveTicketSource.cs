@@ -38,7 +38,7 @@ internal sealed class LiveTicketSource(IPlanStore plans)
             {
                 var levels = item.Item.Levels;
                 var journal = new JournalTicket(item.Id, plan.Id, item.Item.Rank, allocation.AccountId, TradeRules.NormaliseSymbol(item.Item.Symbol), side, date, approvedAt[item.Id]);
-                tickets.Add(new LiveTicket(journal, new TicketPlan(side, allocation.Quantity, levels?.EntryRef, levels?.Stop), plan.Id));
+                tickets.Add(new LiveTicket(journal, new TicketPlan(side, allocation.Quantity, levels?.EntryRef, levels?.Stop), plan.Id, item.Item.StrategyId));
             }
         }
 
