@@ -148,7 +148,7 @@ internal sealed class CapturePaperFillsHandler(
                 }
 
                 TicketReplay? replay = null;
-                foreach (var allocation in item.Item.Allocations.OrderBy(a => a.AccountId))
+                foreach (var allocation in item.Item.Allocations.Where(a => a.Mode == "paper").OrderBy(a => a.AccountId)) // a manual-live allocation (P11-04) is never a paper fill
                 {
                     seen++;
                     var pair = stored.GetValueOrDefault((item.Id, allocation.AccountId));

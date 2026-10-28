@@ -54,8 +54,10 @@ public sealed record NewPlanItem(int Rank, TicketGroup Group, string Symbol, str
 /// <param name="PWinLower">The lower bound of the shrunk cell estimate of the win rate (P7-12: the only P(win) the auto-approval rule reads); null when not known.</param>
 public sealed record PlanEvidence(string CellKey, int Trades, string DataRange, string PWinBasis, double? PWin, double? ConservativeExpectancyR, IReadOnlyList<string> Unavailable, string? AdvisoryNote, double? PWinLower = null);
 
-/// <summary>Size for one Trading account. Only paper-mode allocations are accepted until the owner decides otherwise (P7-00 question 2).</summary>
+/// <summary>Size for one Trading account: paper, or manual live with its ramp scale (P11-04). The database repeats both rules.</summary>
 /// <param name="AccountId">The broker account.</param>
 /// <param name="Mode">The account's trading mode, "paper".</param>
 /// <param name="Quantity">Shares or lots, above zero.</param>
-public sealed record NewAllocation(Guid AccountId, string Mode, int Quantity);
+/// <param name="RiskScale">For a manual-live row, the ramp scale the size was cut by (above 0, at most 1; spec P11-04); null for paper.</param>
+/// <param name="RampEventId">For a manual-live row, the ramp event that scale comes from; null for paper.</param>
+public sealed record NewAllocation(Guid AccountId, string Mode, int Quantity, double? RiskScale = null, long? RampEventId = null);

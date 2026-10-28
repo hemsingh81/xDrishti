@@ -76,15 +76,16 @@ internal sealed class PlanItemRecordConfiguration : IEntityTypeConfiguration<Pla
     }
 }
 
-/// <summary><c>trading.plan_item_allocations</c>: size per Trading account. Paper mode only until the owner decides otherwise (P7-00 question 2): a later migration relaxes the check.</summary>
+/// <summary><c>trading.plan_item_allocations</c>: size per Trading account. Paper, or manual live with its ramp scale and ramp event (P11-04, ADR 0148); P12-07 extends the later modes and must keep both requirements.</summary>
 internal sealed class PlanItemAllocationRecordConfiguration : IEntityTypeConfiguration<PlanItemAllocationRecord>
 {
     public void Configure(EntityTypeBuilder<PlanItemAllocationRecord> builder)
     {
-        builder.ToTable("plan_item_allocations", Schemas.Trading, t => t.HasCheckConstraint("ck_plan_item_allocations_shape", "quantity > 0 AND mode = 'paper'"));
+        builder.ToTable("plan_item_allocations", Schemas.Trading, t => t.HasCheckConstraint("ck_plan_item_allocations_shape", "quantity > 0 AND (mode = 'paper' OR (mode = 'manual_live' AND risk_scale > 0 AND risk_scale <= 1 AND ramp_event_id IS NOT NULL))"));
         builder.HasKey(x => x.Id).HasName("pk_plan_item_allocations");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.Property(x => x.Mode).HasMaxLength(16).IsRequired();
+        builder.Property(x => x.RiskScale).HasPrecision(5, 4);
         builder.HasOne<PlanItemRecord>().WithMany().HasForeignKey(x => x.ItemId).HasConstraintName("fk_plan_item_allocations_plan_items_item_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<BrokerAccount>().WithMany().HasForeignKey(x => x.AccountId).HasConstraintName("fk_plan_item_allocations_broker_accounts_account_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.ItemId, x.AccountId }).IsUnique().HasDatabaseName("uq_plan_item_allocations_item_account");

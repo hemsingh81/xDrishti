@@ -1,5 +1,6 @@
 using System.Globalization;
 using XDrishti.Domain.Checklist;
+using XDrishti.Domain.LiveTrading;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Selection;
 
@@ -14,7 +15,7 @@ namespace XDrishti.Domain.Autonomy;
 public static class AutoApprovalPolicy
 {
     /// <summary>Decides on a primary ticket.</summary>
-    public static AutoApprovalDecision Decide(AutoApprovalTicket ticket, IReadOnlyList<ChecklistResult> checklists, AutonomySettings settings, AutoApprovalContext context)
+    public static AutoApprovalDecision Decide(AutoApprovalTicket ticket, IReadOnlyList<ChecklistResult> checklists, AutonomySettings settings, AutoApprovalContext context, LiveSettings? live = null)
     {
         ArgumentNullException.ThrowIfNull(ticket);
         ArgumentNullException.ThrowIfNull(checklists);
@@ -26,18 +27,20 @@ public static class AutoApprovalPolicy
             return Decline(settings, [new(AutoDeclineCodes.SettingOff, "automatic approval is switched off: the owner approves by hand")]);
         }
 
-        var reasons = Reasons(ticket, checklists, settings, context, TicketGroup.Primary, checkTiming: true);
+        var reasons = Reasons(ticket, checklists, settings, context, TicketGroup.Primary, checkTiming: true, live);
         if (reasons.Count > 0)
         {
             return Decline(settings, reasons);
         }
 
-        var summary = string.Create(CultureInfo.InvariantCulture, $"{AutoApprovalWording.Marker}: P(win) lower bound {ticket.PWinLower:0.###} is at least {settings.MinPWin:0.###}; all {ChecklistCodes.All.Count} checks passed on {ticket.AccountIds.Count} account(s); settings {settings.Id}, {AutoApprovalWording.PolicyVersion}");
-        return new AutoApprovalDecision(true, [], summary, settings);
+        var isLive = ticket.LiveAccountIds is { Count: > 0 };
+
+        var summary = string.Create(CultureInfo.InvariantCulture, $"{AutoApprovalWording.Marker}: P(win) lower bound {ticket.PWinLower:0.###} is at least {settings.MinPWin:0.###}; all {ChecklistCodes.All.Count} checks passed on {ticket.AccountIds.Count} account(s); settings {settings.Id}{(isLive ? $", live settings {live!.Id}" : string.Empty)}, {AutoApprovalWording.PolicyVersion}");
+        return new AutoApprovalDecision(true, [], summary, settings, isLive ? live : null);
     }
 
     /// <summary>The reasons a ticket does not qualify, whatever the switch; empty when it qualifies. Shared with <see cref="ReservePromotion"/>, which adds no weaker test.</summary>
-    internal static List<AutoDecline> Reasons(AutoApprovalTicket ticket, IReadOnlyList<ChecklistResult> checklists, AutonomySettings settings, AutoApprovalContext context, TicketGroup group, bool checkTiming)
+    internal static List<AutoDecline> Reasons(AutoApprovalTicket ticket, IReadOnlyList<ChecklistResult> checklists, AutonomySettings settings, AutoApprovalContext context, TicketGroup group, bool checkTiming, LiveSettings? live = null)
     {
         var reasons = new List<AutoDecline>();
         if (settings.Id is null || string.IsNullOrEmpty(settings.Hash))
@@ -77,6 +80,11 @@ public static class AutoApprovalPolicy
             reasons.Add(new(AutoDeclineCodes.InputsUnavailable, "the ticket lists inputs that were unavailable: " + string.Join(", ", ticket.UnavailableInputs)));
         }
 
+        if (ticket.LiveAccountIds is { Count: > 0 } && live is not { CanAutoApprove: true })
+        {
+            reasons.Add(new(AutoDeclineCodes.AutoLiveOff, "the ticket has a live allocation and live automatic approval is switched off (or has no stored row): the owner approves by hand"));
+        }
+
         AddChecklistReasons(reasons, ticket, checklists);
 
         if (context.AutoApprovedToday >= settings.MaxAutoPerDay)
@@ -98,7 +106,7 @@ public static class AutoApprovalPolicy
         foreach (var account in ticket.AccountIds.Distinct(StringComparer.Ordinal))
         {
             var mine = checklists.Where(c => c.AccountId == account && string.Equals(c.Symbol, ticket.Symbol, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (mine.Count != 1 || !mine[0].Checks.Select(c => c.Code).SequenceEqual(ChecklistCodes.All))
+            if (mine.Count != 1 || !mine[0].Checks.Select(c => c.Code).SequenceEqual(ticket.LiveAccountIds?.Contains(account, StringComparer.Ordinal) == true ? ChecklistCodes.LiveAll : ChecklistCodes.All))
             {
                 reasons.Add(new(AutoDeclineCodes.ChecklistMissing, $"no complete checklist for account {account}"));
                 continue;

@@ -1,4 +1,5 @@
 using XDrishti.Domain.Accounts;
+using XDrishti.Domain.Checklist;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Selection;
 using XDrishti.Domain.Selection.SmartRules;
@@ -18,7 +19,7 @@ public sealed record InstrumentFacts(string? Sector, IReadOnlyList<string>? Bask
 
 /// <summary>A Trading-role account as the plan needs it (the limits already include the profile and the account's overrides). A null number is "not known".</summary>
 /// <param name="AccountId">The broker account.</param>
-/// <param name="Mode">Paper or manual live. Only paper receives anything.</param>
+/// <param name="Mode">Paper or manual live. A manual-live account is sized in its own pool with the ramp scale (P11-04).</param>
 /// <param name="Equity">Capital the percentages apply to, in rupees.</param>
 /// <param name="RiskPerTradePct">Risk of one trade, percent of equity.</param>
 /// <param name="MaxCapitalPerTradePct">Most capital in one trade, percent of equity.</param>
@@ -29,6 +30,9 @@ public sealed record InstrumentFacts(string? Sector, IReadOnlyList<string>? Bask
 /// <param name="DailyLossLimitPct">Daily loss limit, percent.</param>
 /// <param name="DailyLossPct">Loss so far today as a positive percent; null when not known.</param>
 /// <param name="HeldSymbols">Symbols the account holds; null when not known.</param>
+/// <param name="RampScale">For a manual-live account, the scale of its ramp step; null when it has no step (then nothing is allocated to it).</param>
+/// <param name="RampEventId">The ramp event the scale comes from.</param>
+/// <param name="LiveReady">For a manual-live account, the facts of its live-ready gate; null when no source gives them (the gate is then unavailable).</param>
 public sealed record ContextAccount(
     Guid AccountId,
     TradingMode Mode,
@@ -41,7 +45,10 @@ public sealed record ContextAccount(
     int? MaxPerSector,
     double? DailyLossLimitPct,
     double? DailyLossPct,
-    IReadOnlySet<string>? HeldSymbols);
+    IReadOnlySet<string>? HeldSymbols,
+    double? RampScale = null,
+    long? RampEventId = null,
+    LiveReadyFacts? LiveReady = null);
 
 /// <summary>What the builder asks for: facts as of the close of <see cref="Session"/> for these instruments.</summary>
 /// <param name="Session">The last closed session; nothing after its close may be read.</param>

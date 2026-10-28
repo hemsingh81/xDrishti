@@ -888,7 +888,7 @@
         "tags": [
           "Accounts"
         ],
-        "summary": "Replace the trading configuration (mode, risk profile, capital, styles, instruments, overrides); needs step-up",
+        "summary": "Replace the trading configuration (mode, risk profile, capital, styles, instruments, overrides); needs step-up. Switching from paper to manual_live runs the live-ready gate: 422 accounts.live_not_ready lists every failing item (the soft items need liveConfirmReason). Switching back to paper is never judged",
         "operationId": "UpdateAccountTrading",
         "parameters": [
           {
@@ -13987,6 +13987,209 @@
         }
       }
     },
+    "/api/live-trading/ramp": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The ramp of a live account: step (null = none, so no live allocation), the scale and the live risk it gives, hold, the history. gatesBuilt is false until P11-04b: no gate is listed and the step cannot be raised. 404 live.account_not_found",
+        "operationId": "GetLiveRamp",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RampView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live-trading/ramp/steps": {
+      "post": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "Set the ramp step as the owner: S1 first, or lower. Insert-only and audited. Needs a session, the CSRF token, the deployment gate Live:Writes:Enabled (off by default) and the password in the body, checked on EVERY move. A raise is 409 live.gates_not_met until the evidence gates exist; 409 live.step_not_adjacent, 409 live.stale, 403 live.capability_off, 401 auth.invalid_credentials, 423 auth.locked, 422 live.invalid, 429 auth.rate_limited. Nothing here places an order",
+        "operationId": "SetLiveRampStep",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetRampStepRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RampView"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/live-trading/settings": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The live switches (live.auto_approve_tickets, live.auto_ramp_up), both OFF when nothing is stored, with their history. No setting lets this system place an order",
+        "operationId": "GetLiveSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveSettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "Change the live switches as the owner; appends an audited row (the database stamps the hash). Same gates as the ramp step: session, CSRF, Live:Writes:Enabled and the password on every change. 409 live.stale, 403 live.capability_off, 401 auth.invalid_credentials, 423 auth.locked, 422 live.invalid, 429 auth.rate_limited",
+        "operationId": "ChangeLiveSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeLiveSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveSettingsView"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/charge-sheet/confirmation": {
       "get": {
         "tags": [
@@ -20576,6 +20779,49 @@
           }
         },
         "description": "The body of the switch that allows confirming (off until the owner switches it on)."
+      },
+      "ChangeLiveSettingsRequest": {
+        "required": [
+          "autoApproveTickets",
+          "autoRampUp",
+          "reason",
+          "expectedSettingsId",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "autoApproveTickets": {
+            "type": "boolean",
+            "description": "live.auto_approve_tickets."
+          },
+          "autoRampUp": {
+            "type": "boolean",
+            "description": "live.auto_ramp_up (takes effect with the evidence gates of P11-04b)."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "1 to 500 characters."
+          },
+          "expectedSettingsId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The row the form was loaded at, 0 for none; a different row now is a 409.",
+            "format": "int64"
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS change."
+          }
+        },
+        "description": "The body of a change of the live switches (spec P11-04). Both default OFF."
       },
       "ChangePasswordRequest": {
         "required": [
@@ -33539,6 +33785,85 @@
         },
         "description": "What a Portfolio screen asks the hub to follow (argument of `Subscribe`, ADR 0024 §7): the prices of the instruments of these holdings are pushed, nothing else.\n`accountId` and `bucketId` are the screen's scope, with the meaning they have for `GET /api/holdings/summary`: without `accountId` every open holding of the accounts that count in totals, with it every open holding of that account\n(any account that is not archived); `bucketId` narrows either to one bucket. This is the set the tiles and the group rows are made of.\n`holdingIds` are the holdings the screen shows (rows of the grid, the open drawer); they are added to the scope's holdings even when the scope would not include them (an account that does not count in totals, a filter applied on the screen only).\nAt most 1000 are read; holdings that are closed or have no instrument are ignored. Leave `accountId`, `bucketId` and `holdingIds` null or empty for all accounts that count in totals.\nThe server turns holdings into instruments; the messages carry instrument ids (as `instrumentId` of the holdings list). A second `Subscribe` replaces the first."
       },
+      "LiveSettingsChangeView": {
+        "required": [
+          "id",
+          "autoApproveTickets",
+          "autoRampUp",
+          "actor",
+          "reason",
+          "changedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "autoApproveTickets": {
+            "type": "boolean"
+          },
+          "autoRampUp": {
+            "type": "boolean"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "One change of the switches."
+      },
+      "LiveSettingsView": {
+        "required": [
+          "id",
+          "autoApproveTickets",
+          "autoRampUp",
+          "writesEnabled",
+          "notice",
+          "history"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The row in force.",
+            "format": "int64"
+          },
+          "autoApproveTickets": {
+            "type": "boolean",
+            "description": "`live.auto_approve_tickets`: a ticket with a live allocation may be approved by rule (also needs `autonomy.auto_approve_tickets`)."
+          },
+          "autoRampUp": {
+            "type": "boolean",
+            "description": "`live.auto_ramp_up`: the evaluator may raise S1 to S2 by rule (P11-04b; no effect before)."
+          },
+          "writesEnabled": {
+            "type": "boolean",
+            "description": "Whether the web may write now."
+          },
+          "notice": {
+            "type": "string",
+            "description": "No setting lets this system place an order."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveSettingsChangeView"
+            },
+            "description": "Newest first."
+          }
+        },
+        "description": "The live switches in force. `id` is null while nothing is stored (both OFF)."
+      },
       "LlmStatusView": {
         "required": [
           "state",
@@ -40155,6 +40480,164 @@
         },
         "description": "The queue of accepted hypotheses that no change names."
       },
+      "RampEventView": {
+        "required": [
+          "id",
+          "kind",
+          "fromStep",
+          "toStep",
+          "actor",
+          "reason",
+          "createdAt",
+          "gateHash"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The event id (allocations carry it).",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "description": "set_step, auto_step_up, hold, clear_hold, step_down or exit_confirmed."
+          },
+          "fromStep": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The step before; null for the first.",
+            "format": "int32"
+          },
+          "toStep": {
+            "type": "integer",
+            "description": "The step after.",
+            "format": "int32"
+          },
+          "actor": {
+            "type": "string",
+            "description": "owner:... or rule:ramp."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          },
+          "gateHash": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The hash of the frozen gate snapshot (P11-04b); null before."
+          }
+        },
+        "description": "One event of the ramp history."
+      },
+      "RampView": {
+        "required": [
+          "accountId",
+          "step",
+          "scaleEffective",
+          "hold",
+          "holdReason",
+          "nextStep",
+          "eligible",
+          "gatesBuilt",
+          "intendedRiskPct",
+          "liveRiskPct",
+          "writesEnabled",
+          "history",
+          "notice"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "The account.",
+            "format": "uuid"
+          },
+          "step": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "1 to 3, or null.",
+            "format": "int32"
+          },
+          "scaleEffective": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The factor in force; null with no step.",
+            "format": "double"
+          },
+          "hold": {
+            "type": "boolean",
+            "description": "Raising is blocked."
+          },
+          "holdReason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, or null."
+          },
+          "nextStep": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The step a raise would reach; null at S3 or with no step.",
+            "format": "int32"
+          },
+          "eligible": {
+            "type": "boolean",
+            "description": "All evidence gates pass; false while the gates are not built."
+          },
+          "gatesBuilt": {
+            "type": "boolean",
+            "description": "Whether the evidence gates exist."
+          },
+          "intendedRiskPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The risk per trade of the profile (with the account's override), percent of capital; null when not known.",
+            "format": "double"
+          },
+          "liveRiskPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The intended risk times the scale.",
+            "format": "double"
+          },
+          "writesEnabled": {
+            "type": "boolean",
+            "description": "Whether the web may write the ramp now (`Live:Writes:Enabled`)."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RampEventView"
+            },
+            "description": "Newest first."
+          },
+          "notice": {
+            "type": "string",
+            "description": "No setting lets this system place an order."
+          }
+        },
+        "description": "An account on the ramp. `step` is null while no step is set (no live allocation). `scaleEffective` is the factor of the step; the live risk is the intended risk times it. `gatesBuilt` is false until P11-04b: `gates` is then empty and\n`eligible` is false, so the step cannot be raised."
+      },
       "RankedCellView": {
         "required": [
           "rank",
@@ -43861,6 +44344,42 @@
         },
         "description": "The outcome of one set: the state and, for a failure, the thresholds that did not hold, in words."
       },
+      "SetRampStepRequest": {
+        "required": [
+          "accountId",
+          "toStep",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "The account.",
+            "format": "uuid"
+          },
+          "toStep": {
+            "type": "integer",
+            "description": "1 (the first step) or a lower step than now. A raise is refused until the evidence gates exist (409 live.gates_not_met).",
+            "format": "int32"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "1 to 300 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS move (checked on every request; no step-up window is used)."
+          }
+        },
+        "description": "The body of a ramp step move (spec P11-04). The owner is never part of it: the actor comes from the signed-in session."
+      },
       "SetState": {
         "enum": [
           "Pass",
@@ -46961,9 +47480,15 @@
                 "$ref": "#/components/schemas/AccountOverrides"
               }
             ]
+          },
+          "liveConfirmReason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "The complete trading configuration (a replacement, not a patch); whether the role is on is changed with the roles. Mode is \"paper\" (default) or \"manual_live\"; CapitalSource is \"fixed\" (default) or \"broker_funds\"; Styles holds \"intraday\" and/or \"swing\"; allowed instruments: intraday EQ_MIS and FUT, swing buy EQ_CNC and FUT, swing sell FUT."
+        "description": "The complete trading configuration (a replacement, not a patch); whether the role is on is changed with the roles. Mode is \"paper\" (default) or \"manual_live\"; CapitalSource is \"fixed\" (default) or \"broker_funds\"; Styles holds \"intraday\" and/or \"swing\"; allowed instruments: intraday EQ_MIS and FUT, swing buy EQ_CNC and FUT, swing sell FUT. Switching from paper to manual_live runs the live-ready gate (422 accounts.live_not_ready lists the failing items); the soft items need LiveConfirmReason, a typed reason of 1 to 300 characters recorded in the audit text."
       },
       "TradingRoleView": {
         "required": [

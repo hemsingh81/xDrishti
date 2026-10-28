@@ -286,7 +286,7 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Replace the trading configuration (mode, risk profile, capital, styles, instruments, overrides); needs step-up */
+    /** Replace the trading configuration (mode, risk profile, capital, styles, instruments, overrides); needs step-up. Switching from paper to manual_live runs the live-ready gate: 422 accounts.live_not_ready lists every failing item (the soft items need liveConfirmReason). Switching back to paper is never judged */
     put: operations['UpdateAccountTrading'];
     post?: never;
     delete?: never;
@@ -4020,6 +4020,58 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/live-trading/ramp': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The ramp of a live account: step (null = none, so no live allocation), the scale and the live risk it gives, hold, the history. gatesBuilt is false until P11-04b: no gate is listed and the step cannot be raised. 404 live.account_not_found */
+    get: operations['GetLiveRamp'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live-trading/ramp/steps': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Set the ramp step as the owner: S1 first, or lower. Insert-only and audited. Needs a session, the CSRF token, the deployment gate Live:Writes:Enabled (off by default) and the password in the body, checked on EVERY move. A raise is 409 live.gates_not_met until the evidence gates exist; 409 live.step_not_adjacent, 409 live.stale, 403 live.capability_off, 401 auth.invalid_credentials, 423 auth.locked, 422 live.invalid, 429 auth.rate_limited. Nothing here places an order */
+    post: operations['SetLiveRampStep'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live-trading/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The live switches (live.auto_approve_tickets, live.auto_ramp_up), both OFF when nothing is stored, with their history. No setting lets this system place an order */
+    get: operations['GetLiveSettings'];
+    /** Change the live switches as the owner; appends an audited row (the database stamps the hash). Same gates as the ramp step: session, CSRF, Live:Writes:Enabled and the password on every change. 409 live.stale, 403 live.capability_off, 401 auth.invalid_credentials, 423 auth.locked, 422 live.invalid, 429 auth.rate_limited */
+    put: operations['ChangeLiveSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/charge-sheet/confirmation': {
     parameters: {
       query?: never;
@@ -6233,6 +6285,22 @@ export interface components {
       /** @description Why, 1 to 500 characters. */
       reason: null | string;
       /** @description The owner's password, re-entered for THIS act. */
+      password: null | string;
+    };
+    /** @description The body of a change of the live switches (spec P11-04). Both default OFF. */
+    ChangeLiveSettingsRequest: {
+      /** @description live.auto_approve_tickets. */
+      autoApproveTickets: boolean;
+      /** @description live.auto_ramp_up (takes effect with the evidence gates of P11-04b). */
+      autoRampUp: boolean;
+      /** @description 1 to 500 characters. */
+      reason: null | string;
+      /**
+       * Format: int64
+       * @description The row the form was loaded at, 0 for none; a different row now is a 409.
+       */
+      expectedSettingsId: null | number;
+      /** @description The owner's password, re-entered for THIS change. */
       password: null | string;
     };
     /** @description Body of `POST /api/auth/change-password`. */
@@ -10993,6 +11061,35 @@ export interface components {
       bucketId: null | string;
       holdingIds: null | string[];
     };
+    /** @description One change of the switches. */
+    LiveSettingsChangeView: {
+      /** Format: int64 */
+      id: number;
+      autoApproveTickets: boolean;
+      autoRampUp: boolean;
+      actor: string;
+      reason: string;
+      /** Format: date-time */
+      changedAt: string;
+    };
+    /** @description The live switches in force. `id` is null while nothing is stored (both OFF). */
+    LiveSettingsView: {
+      /**
+       * Format: int64
+       * @description The row in force.
+       */
+      id: null | number;
+      /** @description `live.auto_approve_tickets`: a ticket with a live allocation may be approved by rule (also needs `autonomy.auto_approve_tickets`). */
+      autoApproveTickets: boolean;
+      /** @description `live.auto_ramp_up`: the evaluator may raise S1 to S2 by rule (P11-04b; no effect before). */
+      autoRampUp: boolean;
+      /** @description Whether the web may write now. */
+      writesEnabled: boolean;
+      /** @description No setting lets this system place an order. */
+      notice: string;
+      /** @description Newest first. */
+      history: components['schemas']['LiveSettingsChangeView'][];
+    };
     /** @description What `GET /api/assistant/llm-status` answers. No key, no path and no address of the server is ever in it. */
     LlmStatusView: {
       /** @description ready, loading, down or misconfigured. */
@@ -13704,6 +13801,87 @@ export interface components {
       /** @description True when the 200 newest accepted hypotheses were read and there may be more. */
       truncated: boolean;
     };
+    /** @description One event of the ramp history. */
+    RampEventView: {
+      /**
+       * Format: int64
+       * @description The event id (allocations carry it).
+       */
+      id: number;
+      /** @description set_step, auto_step_up, hold, clear_hold, step_down or exit_confirmed. */
+      kind: string;
+      /**
+       * Format: int32
+       * @description The step before; null for the first.
+       */
+      fromStep: null | number;
+      /**
+       * Format: int32
+       * @description The step after.
+       */
+      toStep: number;
+      /** @description owner:... or rule:ramp. */
+      actor: string;
+      /** @description Why. */
+      reason: string;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      createdAt: string;
+      /** @description The hash of the frozen gate snapshot (P11-04b); null before. */
+      gateHash: null | string;
+    };
+    /**
+     * @description An account on the ramp. `step` is null while no step is set (no live allocation). `scaleEffective` is the factor of the step; the live risk is the intended risk times it. `gatesBuilt` is false until P11-04b: `gates` is then empty and
+     *     `eligible` is false, so the step cannot be raised.
+     */
+    RampView: {
+      /**
+       * Format: uuid
+       * @description The account.
+       */
+      accountId: string;
+      /**
+       * Format: int32
+       * @description 1 to 3, or null.
+       */
+      step: null | number;
+      /**
+       * Format: double
+       * @description The factor in force; null with no step.
+       */
+      scaleEffective: null | number;
+      /** @description Raising is blocked. */
+      hold: boolean;
+      /** @description Why, or null. */
+      holdReason: null | string;
+      /**
+       * Format: int32
+       * @description The step a raise would reach; null at S3 or with no step.
+       */
+      nextStep: null | number;
+      /** @description All evidence gates pass; false while the gates are not built. */
+      eligible: boolean;
+      /** @description Whether the evidence gates exist. */
+      gatesBuilt: boolean;
+      /**
+       * Format: double
+       * @description The risk per trade of the profile (with the account's override), percent of capital; null when not known.
+       */
+      intendedRiskPct: null | number;
+      /**
+       * Format: double
+       * @description The intended risk times the scale.
+       */
+      liveRiskPct: null | number;
+      /** @description Whether the web may write the ramp now (`Live:Writes:Enabled`). */
+      writesEnabled: boolean;
+      /** @description Newest first. */
+      history: components['schemas']['RampEventView'][];
+      /** @description No setting lets this system place an order. */
+      notice: string;
+    };
     /** @description A cell with enough sample in its place in the ranking by the credible lower bound of expectancy. */
     RankedCellView: {
       /**
@@ -15010,6 +15188,23 @@ export interface components {
       state: components['schemas']['SetState'];
       reasons: string[];
     };
+    /** @description The body of a ramp step move (spec P11-04). The owner is never part of it: the actor comes from the signed-in session. */
+    SetRampStepRequest: {
+      /**
+       * Format: uuid
+       * @description The account.
+       */
+      accountId: string;
+      /**
+       * Format: int32
+       * @description 1 (the first step) or a lower step than now. A raise is refused until the evidence gates exist (409 live.gates_not_met).
+       */
+      toStep: number;
+      /** @description 1 to 300 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS move (checked on every request; no step-up window is used). */
+      password: null | string;
+    };
     /**
      * @description How one set of the eval ended against its thresholds.
      * @enum {unknown}
@@ -16121,7 +16316,7 @@ export interface components {
       /** @description The evidence of the report. */
       evidence: components['schemas']['ReportEvidenceView'];
     };
-    /** @description The complete trading configuration (a replacement, not a patch); whether the role is on is changed with the roles. Mode is "paper" (default) or "manual_live"; CapitalSource is "fixed" (default) or "broker_funds"; Styles holds "intraday" and/or "swing"; allowed instruments: intraday EQ_MIS and FUT, swing buy EQ_CNC and FUT, swing sell FUT. */
+    /** @description The complete trading configuration (a replacement, not a patch); whether the role is on is changed with the roles. Mode is "paper" (default) or "manual_live"; CapitalSource is "fixed" (default) or "broker_funds"; Styles holds "intraday" and/or "swing"; allowed instruments: intraday EQ_MIS and FUT, swing buy EQ_CNC and FUT, swing sell FUT. Switching from paper to manual_live runs the live-ready gate (422 accounts.live_not_ready lists the failing items); the soft items need LiveConfirmReason, a typed reason of 1 to 300 characters recorded in the audit text. */
     TradingInput: {
       mode: null | string;
       /** Format: uuid */
@@ -16132,6 +16327,7 @@ export interface components {
       styles: null | string[];
       instruments: null | components['schemas']['InstrumentsInput'];
       overrides: null | components['schemas']['AccountOverrides'];
+      liveConfirmReason?: null | string;
     };
     /** @description Trading role. Mode is "paper" or "manual_live"; Profile is the name of the risk profile (null when none is chosen). */
     TradingRoleView: {
@@ -26146,6 +26342,177 @@ export interface operations {
       };
       /** @description Forbidden */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLiveRamp: {
+    parameters: {
+      query: {
+        accountId: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RampView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SetLiveRampStep: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetRampStepRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RampView'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLiveSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveSettingsView'];
+        };
+      };
+    };
+  };
+  ChangeLiveSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangeLiveSettingsRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveSettingsView'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

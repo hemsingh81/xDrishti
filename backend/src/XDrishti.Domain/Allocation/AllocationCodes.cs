@@ -12,6 +12,9 @@ public static class AllocationCodes
     /// <summary>The account is not in paper mode: excluded, never allocated (owner Q2, 2026-10-23).</summary>
     public const string NotPaper = "account_not_paper";
 
+    /// <summary>The account is not a manual-live account: it is not in the live pool (spec P11-04).</summary>
+    public const string NotLive = "account_not_live";
+
     /// <summary>The same account id was supplied more than once: every copy is excluded.</summary>
     public const string DuplicateAccount = "duplicate_account";
 

@@ -25,7 +25,7 @@ internal sealed class StoredChecklistSource : IChecklistSource
         var results = new List<ChecklistResult>(item.Item.Allocations.Count);
         foreach (var allocation in item.Item.Allocations)
         {
-            var result = StoredChecklist.Build(allocation.AccountId.ToString("D", CultureInfo.InvariantCulture), item.Item.Symbol, string.Equals(allocation.Mode, "paper", StringComparison.Ordinal), stored);
+            var result = StoredChecklist.Build(allocation.AccountId.ToString("D", CultureInfo.InvariantCulture), item.Item.Symbol, string.Equals(allocation.Mode, "paper", StringComparison.Ordinal), stored, liveMode: string.Equals(allocation.Mode, "manual_live", StringComparison.Ordinal));
             if (result is null)
             {
                 return ValueTask.FromResult<IReadOnlyList<ChecklistResult>>([]);

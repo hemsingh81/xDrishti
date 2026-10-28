@@ -103,17 +103,45 @@ public sealed class AccountCommandsTests
     {
         var account = await _fx.CreatedAsync();
         var input = new TradingInput(
-            "manual_live", _fx.Standard.Id, "fixed", 750_000m, [AccountCodes.Intraday, AccountCodes.Swing],
+            "paper", _fx.Standard.Id, "fixed", 750_000m, [AccountCodes.Intraday, AccountCodes.Swing],
             new InstrumentsInput(["EQ_MIS"], ["EQ_CNC", "FUT"], ["FUT"]), new AccountOverrides(0.25m, null, 3, null));
 
         var result = await _fx.UpdateTrading().HandleAsync(new UpdateTradingCommand(account.Id, input, AccountsFixture.Actor), CancellationToken.None);
 
         var trading = result.Value.Trading;
-        trading.Mode.ShouldBe("manual_live");
+        trading.Mode.ShouldBe("paper");
         trading.Styles.ShouldBe(["intraday", "swing"]);
         trading.Instruments.SwingBuy.ShouldBe(["EQ_CNC", "FUT"]);
         trading.Overrides.ShouldBe(new AccountOverrides(0.25m, null, 3, null));
-        EventsOf(account, AccountEventType.TradingUpdated).Single().Detail.ShouldBe("Trading (role off): mode manual_live, profile Standard, capital fixed 750000, styles intraday+swing, with overrides");
+        EventsOf(account, AccountEventType.TradingUpdated).Single().Detail.ShouldBe("Trading (role off): mode paper, profile Standard, capital fixed 750000, styles intraday+swing, with overrides");
+    }
+
+    [Fact]
+    public async Task The_switch_to_manual_live_is_refused_with_every_failing_item_until_the_gate_passes()
+    {
+        var account = await _fx.CreatedAsync();
+        var input = Inputs.Trading(_fx.Standard.Id, "manual_live");
+
+        var result = await _fx.UpdateTrading().HandleAsync(new UpdateTradingCommand(account.Id, input, AccountsFixture.Actor), CancellationToken.None);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("accounts.live_not_ready");
+        var items = result.Error.Fields!.Select(f => f.Message).ToList();
+        items.ShouldContain(m => m.StartsWith("trading_role:", StringComparison.Ordinal));
+        items.ShouldContain(m => m.StartsWith("ramp_step:", StringComparison.Ordinal));
+        items.ShouldContain(m => m.StartsWith("live_capture:", StringComparison.Ordinal) && m.Contains("not registered", StringComparison.Ordinal));
+        items.ShouldContain(m => m.StartsWith("paper_phase_met:", StringComparison.Ordinal) && m.Contains("liveConfirmReason", StringComparison.Ordinal));
+        (await _fx.Data.FindReadOnlyAsync(account.Id, CancellationToken.None))!.Trading.Mode.ShouldBe(TradingMode.Paper);
+    }
+
+    [Fact]
+    public async Task Switching_back_to_paper_is_never_judged()
+    {
+        var account = await _fx.CreatedAsync();
+
+        var result = await _fx.UpdateTrading().HandleAsync(new UpdateTradingCommand(account.Id, Inputs.Trading(_fx.Standard.Id, "paper"), AccountsFixture.Actor), CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
     }
 
     [Fact]

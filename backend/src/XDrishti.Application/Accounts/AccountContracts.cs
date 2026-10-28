@@ -127,7 +127,7 @@ public sealed record RolesInput(DataRoleInput? Data, RoleToggleInput? Trading, R
 
 public sealed record InstrumentsInput(IReadOnlyList<string>? Intraday, IReadOnlyList<string>? SwingBuy, IReadOnlyList<string>? SwingSell);
 
-/// <summary>The complete trading configuration (a replacement, not a patch); whether the role is on is changed with the roles. Mode is "paper" (default) or "manual_live"; CapitalSource is "fixed" (default) or "broker_funds"; Styles holds "intraday" and/or "swing"; allowed instruments: intraday EQ_MIS and FUT, swing buy EQ_CNC and FUT, swing sell FUT.</summary>
+/// <summary>The complete trading configuration (a replacement, not a patch); whether the role is on is changed with the roles. Mode is "paper" (default) or "manual_live"; CapitalSource is "fixed" (default) or "broker_funds"; Styles holds "intraday" and/or "swing"; allowed instruments: intraday EQ_MIS and FUT, swing buy EQ_CNC and FUT, swing sell FUT. Switching from paper to manual_live runs the live-ready gate (422 accounts.live_not_ready lists the failing items); the soft items need LiveConfirmReason, a typed reason of 1 to 300 characters recorded in the audit text.</summary>
 public sealed record TradingInput(
     string? Mode,
     Guid? RiskProfileId,
@@ -135,7 +135,8 @@ public sealed record TradingInput(
     decimal? CapitalAmount,
     IReadOnlyList<string>? Styles,
     InstrumentsInput? Instruments,
-    AccountOverrides? Overrides);
+    AccountOverrides? Overrides,
+    string? LiveConfirmReason = null);
 
 /// <summary>
 /// The portfolio configuration to change. <b>Every field that is left out (null) keeps the account's current value</b>, on update. DefaultBucket: the name of

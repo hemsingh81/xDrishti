@@ -39,6 +39,9 @@ public static class AutoDeclineCodes
     /// <summary>A check did not pass (prefix; the check code follows after a colon).</summary>
     public const string CheckFailed = "check_failed";
 
+    /// <summary>The ticket has a live allocation and <c>live.auto_approve_tickets</c> is OFF or has no stored row (spec P11-04): the owner approves by hand.</summary>
+    public const string AutoLiveOff = "auto_live_off";
+
     /// <summary>The daily cap is reached.</summary>
     public const string CapReached = "cap_reached";
 }

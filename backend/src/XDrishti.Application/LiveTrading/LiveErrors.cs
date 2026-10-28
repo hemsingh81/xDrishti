@@ -5,4 +5,6 @@ public static class LiveErrors
 {
     public const string OwnerOnly = "live.owner_only";
     public const string CapabilityOff = "live.capability_off";
+    public const string Stale = "live.stale";
+    public const string AccountNotFound = "live.account_not_found";
 }

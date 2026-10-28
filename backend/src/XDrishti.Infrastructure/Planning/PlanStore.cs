@@ -371,8 +371,8 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
         try
         {
             await using var insertApproval = new NpgsqlCommand("""
-                INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, cutoff, decided_at, settings_id, settings_hash, policy_version)
-                VALUES (@plan, @item, 'auto', 'approve', @actor, @reason, @cutoff, clock_timestamp(), @sid, @shash, @policy) RETURNING id
+                INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, cutoff, decided_at, settings_id, settings_hash, policy_version, live_settings_id, live_settings_hash)
+                VALUES (@plan, @item, 'auto', 'approve', @actor, @reason, @cutoff, clock_timestamp(), @sid, @shash, @policy, @lsid, @lshash) RETURNING id
                 """, connection, transaction);
             var p = insertApproval.Parameters;
             p.AddWithValue("plan", NpgsqlDbType.Bigint, planId);
@@ -383,6 +383,8 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
             p.AddWithValue("sid", NpgsqlDbType.Bigint, move.SettingsId);
             p.AddWithValue("shash", NpgsqlDbType.Varchar, move.SettingsHash);
             p.AddWithValue("policy", NpgsqlDbType.Varchar, move.PolicyVersion);
+            p.Add(new NpgsqlParameter("lsid", NpgsqlDbType.Bigint) { Value = move.LiveSettingsId is { } lsid ? lsid : DBNull.Value });
+            p.Add(new NpgsqlParameter("lshash", NpgsqlDbType.Varchar) { Value = (object?)move.LiveSettingsHash ?? DBNull.Value });
             approvalId = (long)(await insertApproval.ExecuteScalarAsync(cancellationToken))!;
         }
         catch (PostgresException failure) when (failure.SqlState == PostgresErrorCodes.CheckViolation)
@@ -585,11 +587,13 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
 
         foreach (var allocation in item.Allocations)
         {
-            await using var insertAllocation = new NpgsqlCommand("INSERT INTO trading.plan_item_allocations (item_id, account_id, mode, quantity) VALUES (@item, @account, @mode, @qty)", connection, transaction);
+            await using var insertAllocation = new NpgsqlCommand("INSERT INTO trading.plan_item_allocations (item_id, account_id, mode, quantity, risk_scale, ramp_event_id) VALUES (@item, @account, @mode, @qty, @scale, @ramp)", connection, transaction);
             insertAllocation.Parameters.AddWithValue("item", NpgsqlDbType.Bigint, itemId);
             insertAllocation.Parameters.AddWithValue("account", NpgsqlDbType.Uuid, allocation.AccountId);
             insertAllocation.Parameters.AddWithValue("mode", NpgsqlDbType.Varchar, allocation.Mode);
             insertAllocation.Parameters.AddWithValue("qty", NpgsqlDbType.Integer, allocation.Quantity);
+            insertAllocation.Parameters.Add(new NpgsqlParameter("scale", NpgsqlDbType.Numeric) { Value = allocation.RiskScale is { } scale ? (decimal)Math.Round(scale, 4) : DBNull.Value });
+            insertAllocation.Parameters.Add(new NpgsqlParameter("ramp", NpgsqlDbType.Bigint) { Value = allocation.RampEventId is { } ramp ? ramp : DBNull.Value });
             await insertAllocation.ExecuteNonQueryAsync(cancellationToken);
         }
     }
@@ -615,7 +619,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
             return rows;
         }
 
-        await using var allocations = dataSource.CreateCommand("SELECT item_id, account_id, mode, quantity FROM trading.plan_item_allocations WHERE item_id = ANY(@ids) ORDER BY id");
+        await using var allocations = dataSource.CreateCommand("SELECT item_id, account_id, mode, quantity, risk_scale, ramp_event_id FROM trading.plan_item_allocations WHERE item_id = ANY(@ids) ORDER BY id");
         allocations.Parameters.AddWithValue("ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint, rows.Select(r => r.Id).ToArray());
         var byItem = new Dictionary<long, List<NewAllocation>>();
         await using (var reader = await allocations.ExecuteReaderAsync(cancellationToken))
@@ -628,7 +632,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
                     byItem[id] = list = [];
                 }
 
-                list.Add(new NewAllocation(reader.GetGuid(1), reader.GetString(2), reader.GetInt32(3)));
+                list.Add(new NewAllocation(reader.GetGuid(1), reader.GetString(2), reader.GetInt32(3), reader.IsDBNull(4) ? null : (double)reader.GetDecimal(4), reader.IsDBNull(5) ? null : reader.GetInt64(5)));
             }
         }
 

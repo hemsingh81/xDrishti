@@ -111,7 +111,7 @@ public sealed class AutoApprovalDatabaseTests(ApiFactory factory) : DataTestBase
         return await SqlStateAsync(
             InsertAuto,
             ("item", item), ("kind", kind), ("decision", decision), ("actor", actor),
-            ("sid", (object?)(sid ?? s.Id) ?? DBNull.Value), ("sh", (object?)(hash ?? s.Hash) ?? DBNull.Value), ("pv", "auto-approval/1"), ("mods", (object?)mods ?? DBNull.Value));
+            ("sid", (object?)(sid ?? s.Id) ?? DBNull.Value), ("sh", (object?)(hash ?? s.Hash) ?? DBNull.Value), ("pv", "auto-approval/2"), ("mods", (object?)mods ?? DBNull.Value));
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public sealed class AutoApprovalDatabaseTests(ApiFactory factory) : DataTestBase
             reader.GetString(1).ShouldBe("rule:autonomy");
             reader.GetInt64(2).ShouldBe(settings.Id!.Value);
             reader.GetString(3).ShouldBe(settings.Hash);
-            reader.GetString(4).ShouldBe("auto-approval/1");
+            reader.GetString(4).ShouldBe("auto-approval/2");
             reader.GetString(5).ShouldBe("approve");
             reader.GetString(6).ShouldStartWith(AutoApprovalWording.Marker);
         }

@@ -1,15 +1,19 @@
+using XDrishti.Domain.LiveTrading;
+
 namespace XDrishti.Domain.Autonomy;
 
 /// <summary>What the auto-approval rule decided (spec P7-12): approve, or decline (leave the ticket for the owner, who keeps the normal manual path). The settings snapshot and the policy version are recorded either way.</summary>
 public sealed record AutoApprovalDecision
 {
-    internal AutoApprovalDecision(bool approved, IReadOnlyList<AutoDecline> reasons, string summary, AutonomySettings settings)
+    internal AutoApprovalDecision(bool approved, IReadOnlyList<AutoDecline> reasons, string summary, AutonomySettings settings, LiveSettings? live = null)
     {
         Approved = approved;
         Reasons = reasons;
         Summary = summary;
         SettingsId = settings.Id;
         SettingsHash = settings.Hash;
+        LiveSettingsId = live?.Id;
+        LiveSettingsHash = live?.Hash;
     }
 
     /// <summary>True to approve by rule; false to decline.</summary>
@@ -26,6 +30,12 @@ public sealed record AutoApprovalDecision
 
     /// <summary>The hash of that row.</summary>
     public string? SettingsHash { get; }
+
+    /// <summary>The live settings row an approval of a ticket with a live allocation rests on (spec P11-04); null for a paper ticket.</summary>
+    public long? LiveSettingsId { get; }
+
+    /// <summary>The hash of that row.</summary>
+    public string? LiveSettingsHash { get; }
 
     /// <summary>The version of the rule.</summary>
     public string PolicyVersion { get; } = AutoApprovalWording.PolicyVersion;

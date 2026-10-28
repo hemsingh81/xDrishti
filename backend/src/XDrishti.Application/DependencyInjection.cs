@@ -7,6 +7,7 @@ using XDrishti.Application.Abstractions.Depth;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
+using XDrishti.Application.Abstractions.LiveTrading;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Paper;
@@ -90,6 +91,12 @@ public static class DependencyInjection
         services.AddScoped<IFeedHeartbeats, FeedHeartbeats>();
         services.AddScoped<IDepthHeartbeats, DepthHeartbeats>(); // the depth recorder's own row xd-depth (P7-16)
         services.AddScoped<IQueryHandler<GetDepthRecorderQuery, DepthRecorderView>, GetDepthRecorderHandler>(); // the owner's depth switch (P7-16): read
+        services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)
+        services.AddScoped<IQueryHandler<GetRampQuery, Result<RampView>>>(sp => sp.GetRequiredService<GetRampHandler>());
+        services.AddScoped<ICommandHandler<SetRampStepCommand, RampView>, SetRampStepHandler>();
+        services.AddScoped<IQueryHandler<GetLiveSettingsQuery, LiveSettingsView>, GetLiveSettingsHandler>();
+        services.AddScoped<ICommandHandler<ChangeLiveSettingsCommand, LiveSettingsView>, ChangeLiveSettingsHandler>();
+        services.AddScoped<ILiveReadinessSource, LiveReadinessSource>();
         services.AddScoped<IQueryHandler<GetComplianceQuery, Result<ComplianceView>>, GetComplianceHandler>(); // the compliance record of the live phase (P11-05): read
         services.AddScoped<ICommandHandler<RecordComplianceCommand, ComplianceRecordView>, RecordComplianceHandler>(); // and write, insert-only, behind a fresh password and the live-writes gate in the endpoint
         services.AddScoped<ICommandHandler<ChangeDepthRecorderCommand, DepthRecorderSwitched>, ChangeDepthRecorderHandler>(); // and change, insert-only, behind a fresh password in the endpoint

@@ -20,16 +20,16 @@ public static class PreTradeChecklist
         ArgumentNullException.ThrowIfNull(limits);
         ArgumentNullException.ThrowIfNull(policy);
 
-        var paper = account.IsTrading && account.Mode == TradingMode.Paper;
-        if (!paper)
+        var live = account.Mode == TradingMode.ManualLive;
+        if (!account.IsTrading || !(live || account.Mode == TradingMode.Paper))
         {
-            var why = !account.IsTrading ? "the account does not have the Trading role" : "the account is not in paper mode";
-            return new ChecklistResult(account.AccountId, ticket.Symbol, [new ChecklistCheck(ChecklistCodes.AccountPaper, FilterOutcome.Fail, CheckPolicy.BlockWithConfirm, null, null, "refused: " + why + "; only paper-mode Trading accounts receive tickets")]);
+            var why = !account.IsTrading ? "the account does not have the Trading role" : "the account is not in paper or manual-live mode";
+            return new ChecklistResult(account.AccountId, ticket.Symbol, [new ChecklistCheck(ChecklistCodes.AccountPaper, FilterOutcome.Fail, CheckPolicy.BlockWithConfirm, null, null, "refused: " + why + "; only Trading accounts in paper or manual-live mode receive tickets")]);
         }
 
         var checks = new List<ChecklistCheck>
         {
-            new(ChecklistCodes.AccountPaper, FilterOutcome.Pass, CheckPolicy.BlockWithConfirm, null, null, "paper-mode Trading account"),
+            live ? LiveReady(account.LiveReady) : new(ChecklistCodes.AccountPaper, FilterOutcome.Pass, CheckPolicy.BlockWithConfirm, null, null, "paper-mode Trading account"),
             RiskProfile(ticket, account, policy),
             Capital(ticket, account, policy),
             Exposure(ticket, account, policy),
@@ -64,6 +64,47 @@ public static class PreTradeChecklist
 
     private static ChecklistCheck Judge(string code, ChecklistPolicy p, bool pass, double value, double limit, string detail) =>
         new(code, pass ? FilterOutcome.Pass : FilterOutcome.Fail, p.Of(code), value, limit, detail);
+
+    // The gate of a live account (spec P11-04): any failing fact fails it, any unknown fact makes it unavailable; both refuse the ticket and neither can be confirmed.
+    private static ChecklistCheck LiveReady(LiveReadyFacts? f)
+    {
+        const string code = ChecklistCodes.AccountLiveReady;
+        if (f is null)
+        {
+            return new(code, FilterOutcome.Unavailable, CheckPolicy.BlockWithConfirm, null, null, "unavailable: nothing reports the halt, capture and loss state of the live account");
+        }
+
+        var failed = new List<string>();
+        var unknown = new List<string>();
+        if (!f.StepSet)
+        {
+            failed.Add("no ramp step is set");
+        }
+
+        Fact(f.NoOpenHalt, "a halt is open", "halts are not known", failed, unknown);
+        Fact(f.CaptureHealthy, "the last session's capture has a gap", "the capture state is not known", failed, unknown);
+        Fact(f.LossMeasurable, "the loss of the day cannot be measured", "the loss of the day is not known", failed, unknown);
+        if (failed.Count > 0)
+        {
+            return new(code, FilterOutcome.Fail, CheckPolicy.BlockWithConfirm, null, null, "refused: " + string.Join("; ", failed));
+        }
+
+        return unknown.Count > 0
+            ? new(code, FilterOutcome.Unavailable, CheckPolicy.BlockWithConfirm, null, null, "unavailable: " + string.Join("; ", unknown))
+            : new(code, FilterOutcome.Pass, CheckPolicy.BlockWithConfirm, null, null, "live account ready: a step is set, no halt, capture whole, loss measurable");
+    }
+
+    private static void Fact(bool? fact, string bad, string unknownText, List<string> failed, List<string> unknown)
+    {
+        if (fact is null)
+        {
+            unknown.Add(unknownText);
+        }
+        else if (!fact.Value)
+        {
+            failed.Add(bad);
+        }
+    }
 
     private static ChecklistCheck RiskProfile(ChecklistTicket t, ChecklistAccount a, ChecklistPolicy p)
     {

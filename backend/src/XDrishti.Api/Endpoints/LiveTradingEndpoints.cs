@@ -33,6 +33,90 @@ internal sealed class LiveTradingEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapGet("/ramp", GetRampAsync)
+            .WithName("GetLiveRamp")
+            .WithSummary("The ramp of a live account: step (null = none, so no live allocation), the scale and the live risk it gives, hold, the history. gatesBuilt is false until P11-04b: no gate is listed and the step cannot be raised. 404 live.account_not_found")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/ramp/steps", SetRampStepAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy)
+            .WithName("SetLiveRampStep")
+            .WithSummary("Set the ramp step as the owner: S1 first, or lower. Insert-only and audited. Needs a session, the CSRF token, the deployment gate Live:Writes:Enabled (off by default) and the password in the body, checked on EVERY move. A raise is 409 live.gates_not_met until the evidence gates exist; 409 live.step_not_adjacent, 409 live.stale, 403 live.capability_off, 401 auth.invalid_credentials, 423 auth.locked, 422 live.invalid, 429 auth.rate_limited. Nothing here places an order")
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapGet("/settings", GetSettingsAsync)
+            .WithName("GetLiveSettings")
+            .WithSummary("The live switches (live.auto_approve_tickets, live.auto_ramp_up), both OFF when nothing is stored, with their history. No setting lets this system place an order");
+
+        group.MapPut("/settings", ChangeSettingsAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy)
+            .WithName("ChangeLiveSettings")
+            .WithSummary("Change the live switches as the owner; appends an audited row (the database stamps the hash). Same gates as the ramp step: session, CSRF, Live:Writes:Enabled and the password on every change. 409 live.stale, 403 live.capability_off, 401 auth.invalid_credentials, 423 auth.locked, 422 live.invalid, 429 auth.rate_limited")
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+    }
+
+    private static async Task<Results<Ok<RampView>, ProblemHttpResult>> GetRampAsync(IQueryHandler<GetRampQuery, Result<RampView>> handler, HttpContext http, Guid accountId, CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetRampQuery(accountId), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<RampView>, ProblemHttpResult>> SetRampStepAsync(
+        SetRampStepRequest request,
+        HttpContext http,
+        ILiveWritesGate gate,
+        ICommandHandler<StepUpCommand, StepUpResult> passwordCheck,
+        ICommandHandler<SetRampStepCommand, RampView> handler,
+        CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        if (!gate.Enabled)
+        {
+            return Problem(Error.Forbidden(LiveErrors.CapabilityOff, "The live writes are switched off in this deployment (Live__Writes__Enabled is false)."), http);
+        }
+
+        var owner = await OwnerAct.AuthorizeAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new SetRampStepCommand(owner.Value, request.AccountId, request.ToStep, request.Reason), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<LiveSettingsView>> GetSettingsAsync(IQueryHandler<GetLiveSettingsQuery, LiveSettingsView> handler, CancellationToken cancellationToken) =>
+        TypedResults.Ok(await handler.HandleAsync(new GetLiveSettingsQuery(), cancellationToken));
+
+    private static async Task<Results<Ok<LiveSettingsView>, ProblemHttpResult>> ChangeSettingsAsync(
+        ChangeLiveSettingsRequest request,
+        HttpContext http,
+        ILiveWritesGate gate,
+        ICommandHandler<StepUpCommand, StepUpResult> passwordCheck,
+        ICommandHandler<ChangeLiveSettingsCommand, LiveSettingsView> handler,
+        CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        if (!gate.Enabled)
+        {
+            return Problem(Error.Forbidden(LiveErrors.CapabilityOff, "The live writes are switched off in this deployment (Live__Writes__Enabled is false)."), http);
+        }
+
+        var owner = await OwnerAct.AuthorizeAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new ChangeLiveSettingsCommand(owner.Value, request.Reason, request.AutoApproveTickets, request.AutoRampUp, request.ExpectedSettingsId), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<ComplianceView>, ProblemHttpResult>> GetAsync(

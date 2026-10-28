@@ -4,7 +4,7 @@ using XDrishti.Domain.Accounts;
 namespace XDrishti.Domain.Allocation;
 
 /// <summary>
-/// Splits one ticket's quantity across paper-mode Trading accounts by each account's own limits (spec P7-07, ADR 0089). Pure and deterministic: the same inputs in any order give the same decisions.
+/// Splits one ticket's quantity across the Trading accounts of one pool (paper by default; manual-live with <see cref="PoolMode.Live"/>, spec P11-04) by each account's own limits (spec P7-07, ADR 0089). Pure and deterministic: the same inputs in any order give the same decisions.
 /// Only a paper-mode account with the Trading role can receive a quantity; any other is excluded with a code. An input that is missing or unusable gives nothing, never a guess.
 /// Capacity of an account is the least of: equity x risk % / stop distance, equity x capital % / entry, funds / entry, and the open-risk headroom / stop distance, rounded down to whole lots.
 /// </summary>
@@ -12,8 +12,8 @@ public static class PerAccountAllocator
 {
     private const double Tolerance = 1e-9;
 
-    /// <summary>Allocates. Every supplied account appears once in the result, ordered by account id.</summary>
-    public static AllocationResult Allocate(AllocationTicket ticket, IReadOnlyList<AllocationAccount> accounts)
+    /// <summary>Allocates. Every supplied account appears once in the result, ordered by account id. <paramref name="pool"/> says which accounts the split is for; the default is the paper pool of P7, whose output is unchanged.</summary>
+    public static AllocationResult Allocate(AllocationTicket ticket, IReadOnlyList<AllocationAccount> accounts, PoolMode pool = PoolMode.Paper)
     {
         ArgumentNullException.ThrowIfNull(ticket);
         ArgumentNullException.ThrowIfNull(accounts);
@@ -33,15 +33,19 @@ public static class PerAccountAllocator
             {
                 decisions.Add(None(account, AllocationCodes.NotTrading, null, null, "the account has no Trading role"));
             }
-            else if (account.Mode != TradingMode.Paper)
+            else if (pool == PoolMode.Paper && account.Mode != TradingMode.Paper)
             {
                 decisions.Add(None(account, AllocationCodes.NotPaper, null, null, $"mode is {account.Mode}; only paper accounts receive tickets"));
+            }
+            else if (pool == PoolMode.Live && account.Mode != TradingMode.ManualLive)
+            {
+                decisions.Add(None(account, AllocationCodes.NotLive, null, null, $"mode is {account.Mode}; only manual-live accounts are in the live pool"));
             }
             else if (ticketProblem is not null)
             {
                 decisions.Add(None(account, AllocationCodes.UnavailableTicket, null, null, ticketProblem));
             }
-            else if (AccountProblem(account) is { } accountProblem)
+            else if (AccountProblem(account, pool) is { } accountProblem)
             {
                 decisions.Add(None(account, AllocationCodes.UnavailableAccount, null, null, accountProblem));
             }
@@ -126,7 +130,7 @@ public static class PerAccountAllocator
             }
 
             var riskPct = quantity * c.Distance / c.Equity * 100;
-            result.Add(new AccountAllocation(c.Account.AccountId, c.Account.Mode, quantity, AllocationCodes.Allocated, c.Binding, capacity, riskPct, $"{quantity} of {capacity} shares allowed ({c.Binding}), risk {Fmt(riskPct)}% of equity"));
+            result.Add(new AccountAllocation(c.Account.AccountId, c.Account.Mode, quantity, AllocationCodes.Allocated, c.Binding, capacity, riskPct, $"{quantity} of {capacity} shares allowed ({c.Binding}), risk {Fmt(riskPct)}% of equity", c.Account.RampScale, c.Account.RampEventId));
         }
 
         return result;
@@ -181,9 +185,14 @@ public static class PerAccountAllocator
         return t.Quantity is not { } quantity || quantity < lot ? "quantity is missing or below one lot" : null;
     }
 
-    private static string? AccountProblem(AllocationAccount a)
+    private static string? AccountProblem(AllocationAccount a, PoolMode pool)
     {
         var missing = new List<string>();
+        if (pool == PoolMode.Live && (a.RampScale is not { } scale || !double.IsFinite(scale) || scale <= 0 || scale > 1 || a.RampEventId is null))
+        {
+            missing.Add("ramp step");
+        }
+
         Positive(a.Equity, "equity", missing);
         Positive(a.RiskPerTradePct, "risk per trade", missing);
         Positive(a.MaxCapitalPerTradePct, "capital per trade", missing);

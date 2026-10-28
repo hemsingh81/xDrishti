@@ -87,3 +87,13 @@ Pure owner acts. (1) Set the first step (S1) before switching the account to `ma
 3. `trading.live_halts` is read by P12-03 `no_halt` as an extra source (P12 is being updated to say so).
 4. Options: `Live:*` is a shared section (feed `LiveOptions`, `LiveManualRunOptions`); P11 options use their own sub-section classes (see Settings).
 5. Log ids 5130 to 5139; highest existing was 4801; next ADR number is "next free at build time" (0102 when checked).
+
+## Amendments at build, 04A (2026-10-28, ADR 0148)
+1. **Built in 04A:** tables `ramp_events` (guard trigger) and `live_settings` (stamp trigger), the allocation columns, the replaced shape check and a ceiling trigger, `workflow.approvals.live_settings_id/hash` with `approvals_live_auto_guard`; migration `AddRampEventsAndLiveSettings`. Domain: `RampSteps`, `RampPolicy`, `RampState`, `RampEvent`, `LiveSettings`, `LiveReadiness`, `PoolMode`, `account_live_ready`, `LiveReadyFacts`. Endpoints: `GET /api/live-trading/ramp?accountId=`, `POST /ramp/steps`, `GET` and `PUT /settings` (gate, fresh password, rate limit, audit). Tab **Ramp** (lazy, two lazy dialogs). Not built (04B): gates G1 to G7, breach rules, halts, `live_halts`, the evaluator, `clear_hold`, `exit_confirmed`, notices, `LiveTile`, `xd live ramp show`.
+2. **Gap filled:** criterion 3 needs a step before the switch, so the owner's `set_step` (S1, or lower) is an endpoint in 04A. A raise is refused with 409 `live.gates_not_met` while the gates do not exist; `RampView.gatesBuilt` is false and `gates` is not listed.
+3. **Gap filled:** `StepFactors` may be lower than the ceilings (0.25, 0.5, 1.0), never higher; the table checks the ceiling. `RampPolicy.Scale` ignores a hold (it blocks raising only); the weekly halve and halt are 04B.
+4. **Gap filled:** the live-ready checklist gate reads facts with no source yet as `unavailable` (never a pass), so no live ticket is approvable before P11-01 and 04B. The step is the only fact with a source in 04A.
+5. **Gap filled:** a live account's checklist limits (per-trade and total risk) are scaled like its allocation limits; paper readers (fill capture, weekly review) skip live rows; reserve promotion never promotes a live ticket; `AutoApprovalWording.PolicyVersion` is `auto-approval/2`.
+6. **Gap filled:** `UpdateTradingCommand` input gains `liveConfirmReason`; 422 `accounts.live_not_ready` carries one field message per failing item (`code: detail`). Services are checked by id (`live-capture`, `live-settle`); until P11-01 registers them they read "not registered".
+7. **Log ids:** 5130 (step set), 5131 (refused), 5132 (switches changed), 5133 (audit event not written), 5134 (not ready).
+

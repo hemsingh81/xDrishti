@@ -13,6 +13,8 @@ namespace XDrishti.Domain.Allocation;
 /// <param name="OpenRiskPct">Open risk now, percent of equity (0 when none).</param>
 /// <param name="FundsAvailable">Money the account can use, in rupees.</param>
 /// <param name="HoldsSymbol">Whether the account already holds the symbol.</param>
+/// <param name="RampScale">For a manual-live account, the scale of the ramp step (0 to 1) the three limits above were already multiplied by; null when the account has no step. Paper accounts leave it null.</param>
+/// <param name="RampEventId">The ramp event the scale comes from; stored with the allocation.</param>
 public sealed record AllocationAccount(
     Guid AccountId,
     TradingMode Mode,
@@ -23,4 +25,6 @@ public sealed record AllocationAccount(
     double? MaxTotalRiskPct,
     double? OpenRiskPct,
     double? FundsAvailable,
-    bool? HoldsSymbol);
+    bool? HoldsSymbol,
+    double? RampScale = null,
+    long? RampEventId = null);

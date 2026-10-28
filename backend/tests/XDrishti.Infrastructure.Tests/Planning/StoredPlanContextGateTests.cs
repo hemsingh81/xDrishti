@@ -43,7 +43,7 @@ public sealed class StoredPlanContextGateTests
             asked?.Add(call.Arg<DateOnly>());
             return ValueTask.FromResult(read);
         });
-        return new StoredPlanContextSource(accounts, profiles, holdings, Substitute.For<IHoldingClassifications>(), Substitute.For<IBarQueries>(), new Settings(), Substitute.For<IPaperBookReader>(), figures);
+        return new StoredPlanContextSource(accounts, profiles, holdings, Substitute.For<IHoldingClassifications>(), Substitute.For<IBarQueries>(), new Settings(), Substitute.For<IPaperBookReader>(), figures, Substitute.For<XDrishti.Application.Abstractions.LiveTrading.IRampStore>(), Substitute.For<XDrishti.Application.Abstractions.LiveTrading.ILiveRampSettings>());
     }
 
     private static ContextRead Of(double? vix, double? breadth, int? universe = 214) =>

@@ -60,5 +60,5 @@ public sealed record ChecklistResult
         return new ChecklistReview(AccountId, Symbol, reviewed, used ? confirmation : null);
     }
 
-    private static bool IsRefusal(ChecklistCheck c) => c.Code == ChecklistCodes.AccountPaper && c.Outcome != FilterOutcome.Pass;
+    private static bool IsRefusal(ChecklistCheck c) => (c.Code is ChecklistCodes.AccountPaper or ChecklistCodes.AccountLiveReady) && c.Outcome != FilterOutcome.Pass;
 }

@@ -154,7 +154,7 @@ public sealed class SelectionPlanBuilderTests
     }
 
     [Fact]
-    public async Task An_item_without_levels_hashes_exactly_as_before_the_slice()
+    public async Task An_item_without_levels_hashes_exactly_as_before_the_slice() // re-pinned in P11-04: the book's live account now reports a missing ramp step instead of the old paper-gate refusal
     {
         var without = Candidate("AAA", "S1");
         without = without with { Draft = without.Draft with { IndicativeEntry = null } };
@@ -162,7 +162,7 @@ public sealed class SelectionPlanBuilderTests
         var plan = await Builder([without], Loose).BuildAsync(Request, CancellationToken.None);
 
         Assert.Null(plan.Value.Items[0].Levels);
-        Assert.Equal("d245739cc3443f27671d1a028abf21d50039d298248cec1433bd8c76693cd7ae", plan.Value.InputHash);
+        Assert.Equal("1976d81135cff29c88e92495b836b1550a92b5c4ea31115416e00efc11a28443", plan.Value.InputHash);
     }
 
     [Fact]

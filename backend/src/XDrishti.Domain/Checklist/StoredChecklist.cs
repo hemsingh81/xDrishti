@@ -18,10 +18,11 @@ public static class StoredChecklist
     /// <param name="symbol">The ticket's instrument.</param>
     /// <param name="paperMode">Whether the allocation is to a paper-mode account.</param>
     /// <param name="standings">The stored list that may hold <c>checklist:...</c> entries; other entries are ignored.</param>
-    public static ChecklistResult? Build(string accountId, string symbol, bool paperMode, IEnumerable<string> standings)
+    /// <param name="liveMode">Whether the allocation is to a manual-live account: its first check is the live-ready gate, read from the standings like the others (spec P11-04).</param>
+    public static ChecklistResult? Build(string accountId, string symbol, bool paperMode, IEnumerable<string> standings, bool liveMode = false)
     {
         ArgumentNullException.ThrowIfNull(standings);
-        if (!paperMode)
+        if (!paperMode && !liveMode)
         {
             return new ChecklistResult(accountId, symbol, [new ChecklistCheck(ChecklistCodes.AccountPaper, FilterOutcome.Fail, CheckPolicy.BlockWithConfirm, null, null, "refused: the allocation is not to a paper-mode account; only paper-mode Trading accounts receive tickets")]);
         }
@@ -30,7 +31,7 @@ public static class StoredChecklist
         foreach (var standing in standings.Where(s => s.StartsWith(Prefix, StringComparison.Ordinal)))
         {
             var parts = standing[Prefix.Length..].Split(':');
-            if (parts.Length != 2 || !ChecklistCodes.All.Contains(parts[0], StringComparer.Ordinal))
+            if (parts.Length != 2 || !(ChecklistCodes.All.Contains(parts[0], StringComparer.Ordinal) || parts[0] == ChecklistCodes.AccountLiveReady))
             {
                 return null;
             }
@@ -49,7 +50,7 @@ public static class StoredChecklist
             }
 
             // The account gate of the whole plan concerns accounts other than this one (a live account in the book); this account's gate was judged above.
-            if (parts[0] != ChecklistCodes.AccountPaper)
+            if (parts[0] != ChecklistCodes.AccountPaper && (liveMode || parts[0] != ChecklistCodes.AccountLiveReady))
             {
                 outcomes[parts[0]] = outcomes.TryGetValue(parts[0], out var seen) && seen == FilterOutcome.Unavailable ? FilterOutcome.Unavailable : outcome;
             }
@@ -57,7 +58,7 @@ public static class StoredChecklist
 
         var policy = ChecklistPolicy.Default;
         var checks = new List<ChecklistCheck>(ChecklistCodes.All.Count);
-        foreach (var code in ChecklistCodes.All)
+        foreach (var code in liveMode ? ChecklistCodes.LiveAll : ChecklistCodes.All)
         {
             if (code == ChecklistCodes.AccountPaper)
             {

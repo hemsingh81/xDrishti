@@ -25,7 +25,7 @@ public sealed record ChecklistReview
 
     /// <summary>Whether the ticket may be approved: every expected check is present exactly once in the fixed order (the account gate first), none is refused and none still needs confirmation. An empty or partial list never approves.</summary>
     public bool CanApprove =>
-        Checks.Select(c => c.Check.Code).SequenceEqual(ChecklistCodes.All)
+        ChecklistCodes.IsComplete(Checks.Select(c => c.Check.Code))
         && Checks.All(c => c.Standing is not (CheckStanding.Refused or CheckStanding.NeedsConfirmation));
 
     /// <summary>The codes approved despite, in check order.</summary>

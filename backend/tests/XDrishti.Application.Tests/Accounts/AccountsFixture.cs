@@ -86,7 +86,15 @@ internal sealed class AccountsFixture
 
     public MakePrimaryDataHandler MakePrimary() => new(Data, Data, Data, Views, Clock, NullLogger<MakePrimaryDataHandler>.Instance);
 
-    public UpdateTradingHandler UpdateTrading() => new(Data, Data, Data, Data, Views, Clock, NullLogger<UpdateTradingHandler>.Instance);
+    /// <summary>What the live-ready gate reads outside the account; by default nothing is ready (no step, services not registered).</summary>
+    public XDrishti.Application.Abstractions.LiveTrading.LiveSourceFacts LiveFacts { get; set; } = new(false, XDrishti.Domain.LiveTrading.LiveServiceState.NotRegistered, XDrishti.Domain.LiveTrading.LiveServiceState.NotRegistered, null, null);
+
+    public UpdateTradingHandler UpdateTrading() => new(Data, Data, Connections, new FakeReadiness(this), Data, Data, Views, Clock, NullLogger<UpdateTradingHandler>.Instance);
+
+    private sealed class FakeReadiness(AccountsFixture fixture) : XDrishti.Application.Abstractions.LiveTrading.ILiveReadinessSource
+    {
+        public ValueTask<XDrishti.Application.Abstractions.LiveTrading.LiveSourceFacts> ReadAsync(Guid accountId, CancellationToken cancellationToken) => ValueTask.FromResult(fixture.LiveFacts);
+    }
 
     public UpdatePortfolioHandler UpdatePortfolio() => new(Data, DefaultBuckets, Fetcher, Importer, PortfolioData, Data, Data, Views, Clock, NullLogger<UpdatePortfolioHandler>.Instance);
 

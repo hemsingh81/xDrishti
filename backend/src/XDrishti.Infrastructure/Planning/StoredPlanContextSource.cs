@@ -1,11 +1,14 @@
 using XDrishti.Application.Abstractions.Accounts;
+using XDrishti.Application.Abstractions.LiveTrading;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Domain.Accounts;
+using XDrishti.Domain.Checklist;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.LiveTrading;
 using XDrishti.Domain.Paper;
 using XDrishti.Domain.Selection.SmartRules;
 
@@ -26,7 +29,9 @@ internal sealed class StoredPlanContextSource(
     IBarQueries bars,
     IOpenBookSettings openBook,
     IPaperBookReader paperBook,
-    IContextFigures contextFigures) : IPlanContextSource
+    IContextFigures contextFigures,
+    IRampStore ramp,
+    ILiveRampSettings rampSettings) : IPlanContextSource
 {
     /// <summary>Calendar days of daily bars read before the close of the session (about 60 sessions plus slack).</summary>
     public const int ReturnLookbackDays = 120;
@@ -50,6 +55,13 @@ internal sealed class StoredPlanContextSource(
         if (paper is PaperBook ledger)
         {
             contextAccounts = [.. contextAccounts.Select(a => WithLedger(a, ledger))];
+        }
+
+        // A manual-live account is sized only from its ramp step (spec P11-04): its scale and ramp event ride on the context; with no step it has none and gets nothing. The halt, capture and loss facts of its live-ready gate have no source yet (P11-01, P11-04b): they stay unknown, which is not a pass.
+        if (contextAccounts.Any(a => a.Mode == TradingMode.ManualLive))
+        {
+            var steps = await ramp.CurrentAllAsync(cancellationToken);
+            contextAccounts = [.. contextAccounts.Select(a => a.Mode == TradingMode.ManualLive ? WithRamp(a, steps.GetValueOrDefault(a.AccountId), rampSettings.StepFactors) : a)];
         }
 
         var ids = request.Instruments.Where(i => i.Id is not null).Select(i => i.Id!.Value).Distinct().ToList();
@@ -102,6 +114,9 @@ internal sealed class StoredPlanContextSource(
         book.Accounts.FirstOrDefault(b => b.AccountId == account.AccountId) is { } b && account.Mode == TradingMode.Paper
             ? account with { Equity = b.Equity, OpenRiskPct = b.OpenRiskPct, FundsAvailable = b.FundsAvailable, DailyLossPct = b.DailyLossPct, HeldSymbols = b.HeldSymbols }
             : account;
+
+    internal static ContextAccount WithRamp(ContextAccount account, RampState? state, IReadOnlyList<double> factors) =>
+        account with { RampScale = RampPolicy.Scale(state, factors), RampEventId = state?.EventId, LiveReady = new LiveReadyFacts(state is not null, null, null, null) };
 
     internal static ContextAccount ToAccount(BrokerAccount account, List<HoldingData> open, Dictionary<Guid, RiskProfile> profiles, bool bookAssumedEmpty)
     {

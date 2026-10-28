@@ -93,6 +93,9 @@ public sealed class TradingSettings
         return Result.Success();
     }
 
+    /// <summary>Whether a configuration is complete: profile, capital, at least one style and instruments for every chosen style (the test of an enabled role).</summary>
+    public static bool IsComplete(TradingSpec spec) => !Validate(spec, requireComplete: true).HasErrors;
+
     /// <summary>Why the role cannot be switched on yet (field errors named like the API: <c>roles.trading</c>, <c>trading.riskProfileId</c>, …); empty when it can.</summary>
     internal FieldErrors CheckCanEnable()
     {

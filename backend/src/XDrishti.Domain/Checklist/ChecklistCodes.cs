@@ -6,6 +6,9 @@ public static class ChecklistCodes
     /// <summary>The account is a Trading account in paper mode. Anything else is refused outright.</summary>
     public const string AccountPaper = "account_paper";
 
+    /// <summary>The account is a live account that may receive a ticket now (spec P11-04, ADR 0148): a ramp step is set, no halt is open, the last session's capture has no gap and the loss of the day can be measured. It takes the place of <see cref="AccountPaper"/> for a manual-live account and is never confirmable.</summary>
+    public const string AccountLiveReady = "account_live_ready";
+
     /// <summary>Risk of the ticket against the account's per-trade limit.</summary>
     public const string RiskProfile = "risk_profile";
 
@@ -52,6 +55,12 @@ public static class ChecklistCodes
         SectorExposure, ResultsWithinDays, FnoBan, Surveillance, PriceBand, Liquidity, Correlation,
     ];
 
-    /// <summary>Whether the code is one the owner can approve despite (every check but the account gate).</summary>
-    public static bool IsConfirmable(string code) => code != AccountPaper && All.Contains(code);
+    /// <summary>The checks of a ticket for a live account: the same list with the live-ready gate first in place of <see cref="AccountPaper"/>.</summary>
+    public static readonly IReadOnlyList<string> LiveAll = [AccountLiveReady, .. All.Skip(1)];
+
+    /// <summary>Whether the codes are exactly the full list, in order, for a paper account or for a live account.</summary>
+    public static bool IsComplete(IEnumerable<string> codes) => codes.SequenceEqual(All) || codes.SequenceEqual(LiveAll);
+
+    /// <summary>Whether the code is one the owner can approve despite (every check but the two account gates).</summary>
+    public static bool IsConfirmable(string code) => code != AccountPaper && code != AccountLiveReady && All.Contains(code);
 }

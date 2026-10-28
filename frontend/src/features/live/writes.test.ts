@@ -16,12 +16,20 @@ describe('the live feature writes in one file only', () => {
     expect(files.length).toBeGreaterThan(6);
   });
 
-  it('has the record write in the dialog and nowhere else', () => {
+  it('has the three owner writes in their dialogs and nowhere else', () => {
     const writers = files.filter(([, text]) => findWrites(text).length > 0).map(([name]) => name);
-    expect(writers).toEqual(['./components/ComplianceDialog.tsx']);
+    expect(writers).toEqual([
+      './components/ComplianceDialog.tsx',
+      './components/LiveSettingsDialog.tsx',
+      './components/RampDialog.tsx',
+    ]);
     const dialog = sources['./components/ComplianceDialog.tsx'] ?? '';
     expect(dialog).toMatch(/api\.POST\(\s*'\/api\/live-trading\/compliance'/);
     expect(dialog.match(/api\.(POST|PUT|PATCH|DELETE)\(/g)).toHaveLength(1);
+    expect(sources['./components/RampDialog.tsx'] ?? '').toMatch(/api\.POST\(\s*'\/api\/live-trading\/ramp\/steps'/);
+    expect(sources['./components/LiveSettingsDialog.tsx'] ?? '').toMatch(
+      /api\.PUT\(\s*'\/api\/live-trading\/settings'/,
+    );
   });
 
   it.each(files)('%s names no broker, no order route and no external fetch', (_name, text) => {
@@ -32,5 +40,9 @@ describe('the live feature writes in one file only', () => {
     const tab = sources['./components/ComplianceTab.tsx'] ?? '';
     expect(tab).toMatch(/lazy\(\(\) => import\('\.\/ComplianceDialog'\)/);
     expect(tab).not.toMatch(/useMutation|api\.(POST|PUT)/);
+    const ramp = sources['./components/RampTab.tsx'] ?? '';
+    expect(ramp).toMatch(/lazy\(\(\) => import\('\.\/RampDialog'\)/);
+    expect(ramp).toMatch(/lazy\(\(\) => import\('\.\/LiveSettingsDialog'\)/);
+    expect(ramp).not.toMatch(/useMutation|api\.(POST|PUT)/);
   });
 });

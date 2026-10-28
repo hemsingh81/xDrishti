@@ -46,7 +46,7 @@ public sealed class StoredPlanContextPaperBookTests
         holdings.ListAsync(Arg.Any<HoldingFilter>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<HoldingData>>([]));
         var reader = Substitute.For<IPaperBookReader>();
         reader.ReadAsync(Arg.Any<DateOnly>(), Arg.Any<IReadOnlyList<PaperAccountInput>>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(read?.Invoke(account.Id) ?? new PaperBookUnavailable("x")));
-        return (new StoredPlanContextSource(accounts, profiles, holdings, Substitute.For<IHoldingClassifications>(), Substitute.For<IBarQueries>(), new Settings(assumedEmpty, usePaper), reader, NoContext()), reader, account.Id);
+        return (new StoredPlanContextSource(accounts, profiles, holdings, Substitute.For<IHoldingClassifications>(), Substitute.For<IBarQueries>(), new Settings(assumedEmpty, usePaper), reader, NoContext(), Substitute.For<XDrishti.Application.Abstractions.LiveTrading.IRampStore>(), Substitute.For<XDrishti.Application.Abstractions.LiveTrading.ILiveRampSettings>()), reader, account.Id);
     }
 
     private static IContextFigures NoContext()

@@ -69,13 +69,37 @@ public sealed class WiredPlanEndToEndTests
     }
 
     [Fact]
+    public async Task A_live_account_at_s1_is_sized_in_its_own_pool_at_a_quarter_of_the_risk_and_the_paper_rows_are_unchanged()
+    {
+        var live = WiredPlanFixture.LiveAccount() with { RampScale = 0.25, RampEventId = 9, LiveReady = new LiveReadyFacts(true, null, null, null) };
+
+        var plan = await BuildAsync(context: WiredPlanFixture.Context(accounts: [WiredPlanFixture.PaperAccount(), live]));
+
+        // AAA: risk 1e6 x 0.125 % / 2 = 625, capital 1e6 x 5 % / 100 = 500 (binds); BBB: risk 1e6 x 0.125 % / 10 = 125 (binds); each scaled limit is a quarter of the paper limit
+        plan.Items[0].Allocations.ShouldBe([new NewAllocation(WiredPlanFixture.Paper, "paper", 2000), new NewAllocation(WiredPlanFixture.Live, "manual_live", 500, 0.25, 9)], ignoreOrder: true);
+        plan.Items[1].Allocations.ShouldBe([new NewAllocation(WiredPlanFixture.Paper, "paper", 500), new NewAllocation(WiredPlanFixture.Live, "manual_live", 125, 0.25, 9)], ignoreOrder: true);
+        plan.Items[0].Evidence.Unavailable.ShouldContain("checklist:" + ChecklistCodes.AccountLiveReady + ":unavailable");
+    }
+
+    [Fact]
+    public async Task A_live_account_without_a_step_gets_no_row_and_its_gate_fails()
+    {
+        var live = WiredPlanFixture.LiveAccount() with { LiveReady = new LiveReadyFacts(false, null, null, null) };
+
+        var plan = await BuildAsync(context: WiredPlanFixture.Context(accounts: [WiredPlanFixture.PaperAccount(), live]));
+
+        plan.Items.SelectMany(i => i.Allocations).ShouldAllBe(a => a.Mode == "paper");
+        plan.Items[0].Evidence.Unavailable.ShouldContain("checklist:" + ChecklistCodes.AccountLiveReady + ":fail");
+    }
+
+    [Fact]
     public async Task The_checklist_standings_never_pass_an_input_that_has_no_source()
     {
         var plan = await BuildAsync();
 
         var aaa = plan.Items[0].Evidence.Unavailable;
-        aaa.ShouldContain("allocation:" + "account_not_paper");
-        aaa.ShouldContain("checklist:" + ChecklistCodes.AccountPaper + ":fail");
+        aaa.ShouldContain("allocation:" + "unavailable_account"); // the live account of the book has no ramp step (P11-04): it is sized in its own pool and gets nothing
+        aaa.ShouldContain("checklist:" + ChecklistCodes.AccountLiveReady + ":unavailable"); // no source reports the live account's halt, capture and loss
         foreach (var code in new[] { ChecklistCodes.DataQuality, ChecklistCodes.ResultsWithinDays, ChecklistCodes.FnoBan, ChecklistCodes.Surveillance, ChecklistCodes.PriceBand, ChecklistCodes.Liquidity, ChecklistCodes.Correlation })
         {
             aaa.ShouldContain("checklist:" + code + ":unavailable");

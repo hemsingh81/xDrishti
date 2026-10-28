@@ -40,7 +40,7 @@ public sealed class AutoApprovalPolicyTests
         d.Summary.ShouldStartWith(AutoApprovalWording.Marker);
         d.SettingsId.ShouldBe(7);
         d.SettingsHash.ShouldBe(On.Hash);
-        d.PolicyVersion.ShouldBe("auto-approval/1");
+        d.PolicyVersion.ShouldBe("auto-approval/2");
     }
 
     [Fact]

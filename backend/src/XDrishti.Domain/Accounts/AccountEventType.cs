@@ -86,4 +86,6 @@ public enum AccountEventType
     ReportExported,
     DepthRecorderSwitched,
     ComplianceRecorded,
+    RampStepSet,
+    LiveSettingsChanged,
 }

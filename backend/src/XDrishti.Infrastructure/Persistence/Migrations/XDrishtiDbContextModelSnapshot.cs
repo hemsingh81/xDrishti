@@ -7759,6 +7759,15 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("quantity");
 
+                    b.Property<long?>("RampEventId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ramp_event_id");
+
+                    b.Property<decimal?>("RiskScale")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("risk_scale");
+
                     b.HasKey("Id")
                         .HasName("pk_plan_item_allocations");
 
@@ -7771,7 +7780,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("plan_item_allocations", "trading", t =>
                         {
-                            t.HasCheckConstraint("ck_plan_item_allocations_shape", "quantity > 0 AND mode = 'paper'");
+                            t.HasCheckConstraint("ck_plan_item_allocations_shape", "quantity > 0 AND (mode = 'paper' OR (mode = 'manual_live' AND risk_scale > 0 AND risk_scale <= 1 AND ramp_event_id IS NOT NULL))");
                         });
                 });
 

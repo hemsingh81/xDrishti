@@ -11,7 +11,9 @@ namespace XDrishti.Domain.Allocation;
 /// <param name="Capacity">Most shares the account's own limits allow, rounded down to a lot; null when it was not computed.</param>
 /// <param name="RiskPct">Risk of the allocated quantity, percent of equity; 0 when none.</param>
 /// <param name="Message">One line with the numbers.</param>
-public sealed record AccountAllocation(Guid AccountId, TradingMode Mode, int Quantity, string Code, string? Binding, int? Capacity, double RiskPct, string Message)
+/// <param name="RiskScale">The ramp scale the sizing used (live pool only).</param>
+/// <param name="RampEventId">The ramp event the scale comes from (live pool only).</param>
+public sealed record AccountAllocation(Guid AccountId, TradingMode Mode, int Quantity, string Code, string? Binding, int? Capacity, double RiskPct, string Message, double? RiskScale = null, long? RampEventId = null)
 {
     /// <summary>Whether a quantity was allocated.</summary>
     public bool IsAllocated => Quantity > 0;

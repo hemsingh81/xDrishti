@@ -244,14 +244,38 @@ public sealed class PreTradeChecklistTests
     }
 
     [Fact]
-    public void An_account_in_manual_live_mode_is_refused_with_one_check_and_nothing_else()
+    public void A_live_account_is_judged_with_the_live_ready_gate_first_in_place_of_the_paper_gate()
     {
-        var r = Run(a: Account(mode: TradingMode.ManualLive));
+        var r = Run(a: Account(mode: TradingMode.ManualLive) with { LiveReady = new LiveReadyFacts(true, true, true, true) });
 
+        r.Checks.Select(c => c.Code).ShouldBe(ChecklistCodes.LiveAll);
+        r.Checks[0].Outcome.ShouldBe(FilterOutcome.Pass);
+        r.Refused.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(false, true, true, true, FilterOutcome.Fail)]
+    [InlineData(true, false, true, true, FilterOutcome.Fail)]
+    [InlineData(true, true, false, true, FilterOutcome.Fail)]
+    [InlineData(true, true, true, false, FilterOutcome.Fail)]
+    [InlineData(true, null, true, true, FilterOutcome.Unavailable)]
+    [InlineData(true, true, null, true, FilterOutcome.Unavailable)]
+    [InlineData(true, true, true, null, FilterOutcome.Unavailable)]
+    public void The_live_ready_gate_fails_or_is_unavailable_never_a_pass_and_cannot_be_confirmed(bool step, bool? noHalt, bool? capture, bool? loss, FilterOutcome expected)
+    {
+        var r = Run(a: Account(mode: TradingMode.ManualLive) with { LiveReady = new LiveReadyFacts(step, noHalt, capture, loss) });
+
+        r.Checks[0].Code.ShouldBe(ChecklistCodes.AccountLiveReady);
+        r.Checks[0].Outcome.ShouldBe(expected);
         r.Refused.ShouldBeTrue();
-        r.Checks.Count.ShouldBe(1);
-        r.Checks[0].Code.ShouldBe(ChecklistCodes.AccountPaper);
-        r.Review().CanApprove.ShouldBeFalse();
+        r.Review(Confirm(ChecklistCodes.RiskProfile)).CanApprove.ShouldBeFalse();
+        ChecklistCodes.IsConfirmable(ChecklistCodes.AccountLiveReady).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_live_account_with_no_source_for_its_gate_is_unavailable()
+    {
+        Run(a: Account(mode: TradingMode.ManualLive)).Checks[0].Outcome.ShouldBe(FilterOutcome.Unavailable);
     }
 
     [Fact]
@@ -265,7 +289,7 @@ public sealed class PreTradeChecklistTests
     {
         var confirm = Confirm(ChecklistCodes.RiskProfile);
 
-        var review = Run(a: Account(mode: TradingMode.ManualLive)).Review(confirm);
+        var review = Run(a: Account(trading: false)).Review(confirm);
 
         review.CanApprove.ShouldBeFalse();
         review.Checks.Single().Standing.ShouldBe(CheckStanding.Refused);

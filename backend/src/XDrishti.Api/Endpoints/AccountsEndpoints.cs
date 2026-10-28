@@ -60,7 +60,7 @@ internal sealed class AccountsEndpoints : IEndpointModule
         group.MapPut("/{id:guid}/trading", UpdateTradingAsync)
             .RequireStepUp()
             .WithName("UpdateAccountTrading")
-            .WithSummary("Replace the trading configuration (mode, risk profile, capital, styles, instruments, overrides); needs step-up")
+            .WithSummary("Replace the trading configuration (mode, risk profile, capital, styles, instruments, overrides); needs step-up. Switching from paper to manual_live runs the live-ready gate: 422 accounts.live_not_ready lists every failing item (the soft items need liveConfirmReason). Switching back to paper is never judged")
             .ProducesRejections(conflict: true);
 
         group.MapPut("/{id:guid}/portfolio", UpdatePortfolioAsync)

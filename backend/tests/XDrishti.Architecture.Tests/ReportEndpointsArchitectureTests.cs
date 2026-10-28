@@ -62,7 +62,7 @@ public sealed partial class ReportEndpointsArchitectureTests
     {
         var readers = Types.InAssembly(Application).That().HaveDependencyOn(ConfirmationSource).GetTypes().Select(t => t.Name).Where(n => !n.StartsWith('<')).Distinct().Order(StringComparer.Ordinal).ToList();
 
-        readers.ShouldBe(["GetTradeReplayHandler", "ListReportRunsHandler", "ReportLoader", "RunCostBasis", "StoreCounterfactualHandler", "StoreEntryWindowsHandler", "StoreMetaPolicyHandler"]); // the store handlers state the basis of a stored study through RunCostBasis (P8-12, P8-13b); none writes a confirmation; P8-11: the trade replay reads it to show net figures only for a confirmed sheet
+        readers.ShouldBe(["GetTradeReplayHandler", "ListReportRunsHandler", "LiveReadinessSource", "ReportLoader", "RunCostBasis", "StoreCounterfactualHandler", "StoreEntryWindowsHandler", "StoreMetaPolicyHandler"]); // the store handlers state the basis of a stored study through RunCostBasis (P8-12, P8-13b); none writes a confirmation; P8-11: the trade replay reads it to show net figures only for a confirmed sheet; P11-04: the live-ready gate asks only whether one exists (a soft item)
         Types.InAssembly(Api).That().HaveDependencyOn(ConfirmationSource).GetTypes().ShouldBeEmpty();
         Types.InAssembly(Api).That().HaveDependencyOn(typeof(XDrishti.Domain.Reporting.ChargeSheetConfirmation).FullName!).GetTypes().ShouldBeEmpty();
         Types.InAssembly(typeof(ConfirmationReaderSentinel).Assembly).That().HaveDependencyOn(ConfirmationSource).GetTypes().Select(t => t.Name).ShouldContain(nameof(ConfirmationReaderSentinel));

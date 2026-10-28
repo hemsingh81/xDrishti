@@ -1,5 +1,6 @@
 using System.Globalization;
 using XDrishti.Application.Abstractions.Planning;
+using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Allocation;
 using XDrishti.Domain.Checklist;
 using XDrishti.Domain.Planning;
@@ -51,9 +52,14 @@ internal static class PlanWiring
 
         var symbol = candidate.Symbol;
         var facts = context.Instruments.TryGetValue(symbol.ToUpperInvariant(), out var f) ? f : null;
-        var accounts = context.Accounts.Select(a => ToAllocationAccount(a, symbol, riskMultiplier, addedRisk, addedCost)).ToList();
         var ticket = new AllocationTicket(symbol, candidate.Side, draft.IndicativeEntry, draft.StopLevel, Pool(draft), 1);
-        var result = PerAccountAllocator.Allocate(ticket, accounts);
+
+        // Two pools (spec P11-04): the paper accounts share the ticket's pool as before (output unchanged for a paper-only book); the manual-live accounts are sized separately, each cut by its ramp scale.
+        var paper = PerAccountAllocator.Allocate(ticket, [.. context.Accounts.Where(a => a.Mode != TradingMode.ManualLive).Select(a => ToAllocationAccount(a, symbol, riskMultiplier, addedRisk, addedCost))]);
+        var live = context.Accounts.Where(a => a.Mode == TradingMode.ManualLive).ToList();
+        var result = live.Count == 0
+            ? paper
+            : new AllocationResult([.. paper.Decisions, .. PerAccountAllocator.Allocate(ticket, [.. live.Select(a => ToAllocationAccount(a, symbol, riskMultiplier, addedRisk, addedCost))], PoolMode.Live).Decisions], paper.TicketQuantity);
         var standings = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var d in result.Decisions.Where(d => !d.IsAllocated))
         {
@@ -93,17 +99,22 @@ internal static class PlanWiring
         return shares < 1 ? null : (int)Math.Min(shares, int.MaxValue / 2);
     }
 
+    // A manual-live account's three limits are multiplied by its ramp scale (spec P11-04); a paper account's are not. With no scale the allocator refuses the live account (no step).
+    private static double? Scaled(double? value, ContextAccount a) => a.Mode == TradingMode.ManualLive && a.RampScale is { } scale && value is { } v ? v * scale : value;
+
     private static AllocationAccount ToAllocationAccount(ContextAccount a, string symbol, double riskMultiplier, Dictionary<Guid, double> addedRisk, Dictionary<Guid, double> addedCost) => new(
         a.AccountId,
         a.Mode,
         true,
         a.Equity,
-        a.RiskPerTradePct * riskMultiplier,
-        a.MaxCapitalPerTradePct,
-        a.MaxTotalRiskPct,
+        Scaled(a.RiskPerTradePct * riskMultiplier, a),
+        Scaled(a.MaxCapitalPerTradePct, a),
+        Scaled(a.MaxTotalRiskPct, a),
         a.OpenRiskPct + addedRisk.GetValueOrDefault(a.AccountId),
         a.FundsAvailable is { } funds ? Math.Max(0, funds - addedCost.GetValueOrDefault(a.AccountId)) : null,
-        a.HeldSymbols?.Contains(symbol.ToUpperInvariant()));
+        a.HeldSymbols?.Contains(symbol.ToUpperInvariant()),
+        a.Mode == TradingMode.ManualLive ? a.RampScale : null,
+        a.Mode == TradingMode.ManualLive ? a.RampEventId : null);
 
     private static ChecklistAccount ToChecklistAccount(ContextAccount a, InstrumentFacts? facts, PlanContext context, Dictionary<Guid, double> addedRisk, Dictionary<Guid, double> addedCost)
     {
@@ -117,14 +128,15 @@ internal static class PlanWiring
             a.AccountId.ToString("D", CultureInfo.InvariantCulture),
             a.Mode,
             true,
-            a.RiskPerTradePct,
-            a.MaxTotalRiskPct,
+            Scaled(a.RiskPerTradePct, a),
+            Scaled(a.MaxTotalRiskPct, a),
             a.MaxPerSector,
             a.DailyLossLimitPct,
             a.FundsAvailable is { } funds ? Math.Max(0, funds - addedCost.GetValueOrDefault(a.AccountId)) : null,
             a.OpenRiskPct + addedRisk.GetValueOrDefault(a.AccountId),
             sectorPositions,
-            a.DailyLossPct);
+            a.DailyLossPct,
+            a.Mode == TradingMode.ManualLive ? a.LiveReady : null);
     }
 
     // Everything without a data source is null (unavailable): validation status, results dates, ban list, surveillance, price band, average volume, correlation with the book. The two that come from stored records are the holdings and the open book.

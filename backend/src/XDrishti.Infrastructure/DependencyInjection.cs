@@ -195,6 +195,10 @@ public static class DependencyInjection
         services.AddScoped<IInstrumentSecurities, InstrumentSecurities>(); // shares by canonical symbol with their Dhan NSE equity id (P7-11)
         services.AddScoped<IPreOpenSource, PreOpenSource>(); // the pre-open price, previous close and ATR: the existing read-only quote and stored day bars (P7-11)
         services.AddSingleton<ILiveWritesGate, ConfigurationLiveWritesGate>(); // Live:Writes:Enabled, default OFF (P11-00, P11-05)
+        services.AddOptions<LiveRampOptions>().Bind(configuration.GetSection(LiveRampOptions.SectionName)).Validate(LiveRampOptions.IsValid, LiveRampOptions.InvalidMessage).ValidateOnStart(); // the ramp factors, owner-fixed (P11-04)
+        services.AddSingleton<ILiveRampSettings, ConfiguredLiveRampSettings>();
+        services.AddScoped<IRampStore, RampStore>(); // insert-only ramp events (P11-04)
+        services.AddScoped<ILiveSettingsStore, LiveSettingsStore>(); // insert-only live switches, default OFF (P11-04)
         services.AddScoped<IComplianceStore, ComplianceStore>(); // the compliance record of the live phase, insert-only (P11-05)
         services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)

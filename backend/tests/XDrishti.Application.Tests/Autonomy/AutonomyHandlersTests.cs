@@ -2,11 +2,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Autonomy;
+using XDrishti.Application.Abstractions.LiveTrading;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Autonomy;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Autonomy;
 using XDrishti.Domain.Checklist;
+using XDrishti.Domain.LiveTrading;
 using XDrishti.Domain.Planning;
 
 namespace XDrishti.Application.Tests.Autonomy;
@@ -46,7 +48,7 @@ public sealed class AutonomyHandlersTests
             ChecklistLimits.Default,
             ChecklistPolicy.Default);
 
-    private AutoApprovePlanHandler Pass() => new(_settings, _plans, _auto, _checklists, _time, NullLogger<AutoApprovePlanHandler>.Instance);
+    private AutoApprovePlanHandler Pass() => new(_settings, _plans, _auto, _checklists, new LiveOff(), _time, NullLogger<AutoApprovePlanHandler>.Instance);
 
     private void Arrange(AutonomySettings settings, params PlanItemRow[] items)
     {
@@ -84,14 +86,14 @@ public sealed class AutonomyHandlersTests
         var result = await Pass().HandleAsync(new AutoApprovePlanCommand(1), Ct);
 
         result.Value.Approved.ShouldBe(1);
-        await _auto.Received(1).AutoApproveAsync(Arg.Is<AutoApproveMove>(m => m.ItemId == 5 && m.SettingsId == 7 && m.SettingsHash == On.Hash && m.PolicyVersion == "auto-approval/1" && m.Reason.StartsWith(AutoApprovalWording.Marker, StringComparison.Ordinal)), Ct);
+        await _auto.Received(1).AutoApproveAsync(Arg.Is<AutoApproveMove>(m => m.ItemId == 5 && m.SettingsId == 7 && m.SettingsHash == On.Hash && m.PolicyVersion == "auto-approval/2" && m.Reason.StartsWith(AutoApprovalWording.Marker, StringComparison.Ordinal)), Ct);
     }
 
     [Fact]
     public async Task With_no_stored_checklist_nothing_is_ever_approved()
     {
         Arrange(On, Item(5));
-        var none = new AutoApprovePlanHandler(_settings, _plans, _auto, new StoredChecklistSource(), _time, NullLogger<AutoApprovePlanHandler>.Instance);
+        var none = new AutoApprovePlanHandler(_settings, _plans, _auto, new StoredChecklistSource(), new LiveOff(), _time, NullLogger<AutoApprovePlanHandler>.Instance);
 
         var result = await none.HandleAsync(new AutoApprovePlanCommand(1), Ct);
 
@@ -261,5 +263,15 @@ public sealed class AutonomyHandlersTests
         view.PromoteFromReserve.ShouldBeFalse();
         view.Id.ShouldBeNull();
         view.History.ShouldBeEmpty();
+    }
+
+    /// <summary>The live switches stored: none, so both OFF (the default).</summary>
+    private sealed class LiveOff : ILiveSettingsStore
+    {
+        public ValueTask<LiveSettings> CurrentAsync(CancellationToken cancellationToken) => ValueTask.FromResult(LiveSettings.Defaults);
+
+        public ValueTask<IReadOnlyList<StoredLiveSettings>> HistoryAsync(int limit, CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<StoredLiveSettings>>([]);
+
+        public ValueTask<StoredLiveSettings?> AppendAsync(string actor, bool autoApproveTickets, bool autoRampUp, string reason, long? expectedCurrentId, CancellationToken cancellationToken) => ValueTask.FromResult<StoredLiveSettings?>(null);
     }
 }

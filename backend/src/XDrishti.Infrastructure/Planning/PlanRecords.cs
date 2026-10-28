@@ -102,6 +102,12 @@ internal sealed class PlanItemAllocationRecord
     public string Mode { get; set; } = string.Empty;
 
     public int Quantity { get; set; }
+
+    /// <summary>The ramp scale of a manual-live row (P11-04); null for paper.</summary>
+    public decimal? RiskScale { get; set; }
+
+    /// <summary>The ramp event of a manual-live row; the foreign key and the step ceiling are in the migration (raw SQL).</summary>
+    public long? RampEventId { get; set; }
 }
 
 /// <summary>A row of <c>trading.plan_events</c>: one state change of a plan (<see cref="ItemId"/> null) or of an item. Insert-only.</summary>

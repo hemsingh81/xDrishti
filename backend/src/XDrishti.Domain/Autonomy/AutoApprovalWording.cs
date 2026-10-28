@@ -10,7 +10,7 @@ public static class AutoApprovalWording
     public const string Kind = "auto";
 
     /// <summary>The version of the rule; stored with every auto approval. Change it when the rule changes.</summary>
-    public const string PolicyVersion = "auto-approval/1";
+    public const string PolicyVersion = "auto-approval/2";
 
     /// <summary>The start of every auto-approval reason, notification and Decisions line.</summary>
     public const string Marker = "auto-approved by rule, no order exists";

@@ -41,7 +41,7 @@ internal sealed class PaperReviewSource(IPlanStore plans, IGradeStore grades, IJ
         var modify = approvals.Where(a => a.ItemId == item.Id && a.Decision == ApprovalDecision.Modify.Code()).MaxBy(a => a.Id);
         var parsed = modify is null ? null : TicketModification.Parse(modify.Modifications);
         IReadOnlyList<QuantityChange> changes = parsed is { IsSuccess: true } ? parsed.Value : [];
-        var allocations = item.Item.Allocations.OrderBy(a => a.AccountId)
+        var allocations = item.Item.Allocations.Where(a => a.Mode == "paper").OrderBy(a => a.AccountId)
             .Select(a => new ReviewAllocation(a.AccountId, a.Quantity, changes.FirstOrDefault(c => c.AccountId == a.AccountId) is { } c && c.Quantity >= 1 && c.Quantity < a.Quantity ? c.Quantity : a.Quantity))
             .ToList();
         return new ReviewTicket(item.PlanId, item.Id, session, item.Item.Group, item.Item.Symbol, item.Item.Side, item.State, approve?.Kind, approve?.ConfirmReason is not null, grade, allocations);

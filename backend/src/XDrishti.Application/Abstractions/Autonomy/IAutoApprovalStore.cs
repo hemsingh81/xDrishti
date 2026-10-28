@@ -22,4 +22,6 @@ public interface IAutoApprovalStore
 /// <param name="SettingsHash">Its hash.</param>
 /// <param name="PolicyVersion">The version of the rule.</param>
 /// <param name="Reason">The sentence stored (starts with the auto-approved marker).</param>
-public sealed record AutoApproveMove(long ItemId, long SettingsId, string SettingsHash, string PolicyVersion, string Reason);
+/// <param name="LiveSettingsId">For a ticket with a live allocation, the live settings row the decision also rests on (spec P11-04); null for a paper ticket. The database refuses a live ticket without it.</param>
+/// <param name="LiveSettingsHash">Its hash.</param>
+public sealed record AutoApproveMove(long ItemId, long SettingsId, string SettingsHash, string PolicyVersion, string Reason, long? LiveSettingsId = null, string? LiveSettingsHash = null);

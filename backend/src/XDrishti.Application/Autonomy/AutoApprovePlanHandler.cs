@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Autonomy;
+using XDrishti.Application.Abstractions.LiveTrading;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Planning;
@@ -19,6 +20,7 @@ internal sealed class AutoApprovePlanHandler(
     IPlanStore plans,
     IAutoApprovalStore autoStore,
     IChecklistSource checklists,
+    ILiveSettingsStore liveSettingsStore,
     TimeProvider time,
     ILogger<AutoApprovePlanHandler> logger) : ICommandHandler<AutoApprovePlanCommand, AutoApprovalOutcome>
 {
@@ -46,21 +48,22 @@ internal sealed class AutoApprovePlanHandler(
 
         var items = await plans.ItemsAsync(command.PlanId, cancellationToken);
         var today = await autoStore.CountAutoApprovalsAsync(plan.Plan.ForDate, cancellationToken);
+        var liveSettings = await liveSettingsStore.CurrentAsync(cancellationToken); // read once: a ticket with a live allocation also needs live.auto_approve_tickets ON in a stored row (spec P11-04)
         var approved = 0;
         var declined = new List<AutoDeclinedTicket>();
         foreach (var item in items.Where(i => i.Item.Group == TicketGroup.Primary && i.State == TicketState.Proposed).OrderBy(i => i.Item.Rank))
         {
             var evidence = item.Item.Evidence;
-            var ticket = new AutoApprovalTicket(item.Id, item.Item.Symbol, item.Item.Group, item.State, evidence.PWinLower, evidence.Unavailable, [.. item.Item.Allocations.Select(a => a.AccountId.ToString())]);
+            var ticket = new AutoApprovalTicket(item.Id, item.Item.Symbol, item.Item.Group, item.State, evidence.PWinLower, evidence.Unavailable, [.. item.Item.Allocations.Select(a => a.AccountId.ToString())], [.. item.Item.Allocations.Where(a => a.Mode != "paper").Select(a => a.AccountId.ToString())]);
             var results = await checklists.ForTicketAsync(item, cancellationToken);
-            var decision = AutoApprovalPolicy.Decide(ticket, results, settings, new AutoApprovalContext(now, plan.Plan.ReviewCutoff, today));
+            var decision = AutoApprovalPolicy.Decide(ticket, results, settings, new AutoApprovalContext(now, plan.Plan.ReviewCutoff, today), liveSettings);
             if (!decision.Approved)
             {
                 declined.Add(new AutoDeclinedTicket(item.Id, [.. decision.Reasons.Select(r => r.Code)]));
                 continue;
             }
 
-            var status = await autoStore.AutoApproveAsync(new AutoApproveMove(item.Id, settingsId, settingsHash, decision.PolicyVersion, decision.Summary), cancellationToken);
+            var status = await autoStore.AutoApproveAsync(new AutoApproveMove(item.Id, settingsId, settingsHash, decision.PolicyVersion, decision.Summary, decision.LiveSettingsId, decision.LiveSettingsHash), cancellationToken);
             if (status == MoveStatus.Created)
             {
                 approved++;
