@@ -121,6 +121,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointCatalogue, EndpointCatalogue>(); // the route table for the phase check's read-only criterion
         services.AddSingleton<IEndpointModule, AutonomyEndpoints>();
         services.AddSingleton<IEndpointModule, DepthEndpoints>(); // the owner's depth-recorder switch (P7-16): fresh password per change, insert-only; no depth data is readable
+        services.AddSingleton<IEndpointModule, LiveTradingEndpoints>(); // the compliance record of the small live phase (P11-05): fresh password, gate Live:Writes:Enabled (OFF), insert-only; no broker call
         services.AddSingleton<IEndpointModule, ChargeSheetEndpoints>(); // the owner's confirmation of the charge sheet (P8-23, ADR 0127)
         services.AddSingleton<SwitchOnLimiter>();
         services.AddSingleton<IEndpointModule, CapabilitiesEndpoints>(); // the owner's capability switches of the owner-act slices (P8-18 Part A, ADR 0128)

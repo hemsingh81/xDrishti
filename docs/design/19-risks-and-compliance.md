@@ -72,6 +72,7 @@
   **≤ 10 orders/second per exchange** are tagged with the broker's generic algo ID; above that, exchange
   approval is needed. v1 places no orders; Phase 12 caps at 2 orders/s. Re-check circulars before Phase 12.
   Static-IP decision (Q6, 2026-10-09): not needed until Phase 12; ask the ISP and re-check circulars at the P11 exit.
+  **Update (2026-10-28, P11-05, [ADR 0147](../adr/0147-the-compliance-record-is-one-insert-only-owner-written-store-for-the-static-ip-sebi-and-dhan-read-policy-enquiry.md)):** the enquiry starts at the beginning of P11, not at its exit (an ISP lead time and Dhan's 7-day lock on a set IP would otherwise sit on P12's path); the deadline stays the P11 exit. The runbook with the questions for Dhan and the ISP is [`docs/research/p11-static-ip-and-sebi-runbook.md`](../research/p11-static-ip-and-sebi-runbook.md); the owner's answers are written as dated, insert-only records (static IP, SEBI re-check, Dhan's IP rule for reads) in the Compliance tab of the Live screen, which the P11 phase check reads. **No record has been written yet**, so the decision is still the one above and the facts of the runbook stay `UNVERIFIED` until the circular texts are read and Dhan answers. Re-check every 90 days while P12 is planned or live.
 - Data APIs used within the broker's terms.
 - Forex/CFD trading via offshore platforms (e.g. MT5 brokers) is not part of this system.
 

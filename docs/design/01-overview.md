@@ -97,7 +97,7 @@ entered **in the application** (ADR 0002), never in the repository.
 | Q3 | Initial baskets and their purpose | Working names as configured in [doc 16](16-configuration.md): **Best stocks** (intraday + swing), **MyChoice** (intraday), **MyLongTerm** (swing, BUY only); baskets are created in the app | Decided in P1-15 (baskets are app data, not a blocker) |
 | Q4 | Several accounts: replicate or distribute | **Replicate** (default; `allocation.mode` stays configurable) | Decided |
 | Q5 | Portfolio history depth | Start with the **Dhan trade-history window**; import older lots from CSV / contract notes later (P2-03) | Decided |
-| Q6 | ISP static IP | **Later** — needed only before automated orders (P12); revisit at the P11 exit | Decided |
+| Q6 | ISP static IP | **Later** — needed only before automated orders (P12); revisit at the P11 exit. The enquiry starts with P11 (2026-10-28, P11-05: [runbook](../research/p11-static-ip-and-sebi-runbook.md), dated records in the app); nothing is bought or set until the owner decides | Decided |
 | Q7 | Repository hosting | **Local-only** git; no remote or CI dependence for now; back the code up ([doc 17](17-deployment-and-operations.md) §1) | Decided |
 | Q8 | Podman machine size | **Keep 10 CPUs / 24 GB / 120 GB** — verified by the xd-llm benchmark (P0-15, [ADR 0005](../adr/0005-local-llm-runtime-and-models.md)); revisit before tick data (P13) | Decided, verified |
 

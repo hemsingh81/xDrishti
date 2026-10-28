@@ -5,6 +5,7 @@ import BarChartIcon from '@mui/icons-material/BarChartOutlined';
 import ChecklistIcon from '@mui/icons-material/ChecklistOutlined';
 import DnsIcon from '@mui/icons-material/DnsOutlined';
 import FactCheckIcon from '@mui/icons-material/FactCheckOutlined';
+import GavelIcon from '@mui/icons-material/GavelOutlined';
 import HistoryIcon from '@mui/icons-material/HistoryOutlined';
 import ListAltIcon from '@mui/icons-material/ListAltOutlined';
 import MonitorHeartIcon from '@mui/icons-material/MonitorHeartOutlined';
@@ -51,6 +52,7 @@ export const navigation: NavSection[] = [
     items: [
       { path: '/portfolio', label: 'Portfolio', icon: PieChartIcon },
       { path: '/paper', label: 'Paper trading', icon: AccountBalanceIcon },
+      { path: '/live', label: 'Live trading', icon: GavelIcon },
     ],
   },
   {

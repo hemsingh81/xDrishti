@@ -26,7 +26,8 @@ export type NotificationKind =
   | 'plan_tickets_invalidated'
   | 'plan_fills_unmatched'
   | 'ticket_level_crossed'
-  | 'post_trade_prompt';
+  | 'post_trade_prompt'
+  | 'compliance_recheck_overdue';
 export type NotificationSeverity = 'error' | 'warn' | 'info';
 
 /**

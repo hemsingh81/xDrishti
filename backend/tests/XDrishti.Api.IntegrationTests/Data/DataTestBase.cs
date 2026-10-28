@@ -40,7 +40,7 @@ public abstract class DataTestBase(ApiFactory factory) : IAsyncLifetime
         Owner = await Factory.SignInAsync(Ct);
     }
 
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
         await Factory.ResetClockAsync();
         GC.SuppressFinalize(this);

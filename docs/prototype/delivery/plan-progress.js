@@ -434,7 +434,7 @@ null,
 "P10-05": ["done", "2026-10-26", "Config change governance (ADR 0119)."],
 "P10-06": ["done", "2026-10-26", "Paper phase check (reads NOT EVALUABLE or NOT MET until real evidence; MET also needs your charge-sheet confirmation) (ADR 0123)."],
 "P11-01": ["ready", null, "Delegated to the agent on 2026-10-26 with the Dhan allow-list slice (read-only GET /v2/orders); stays OFF until you allow it."],
-"P11-05": ["ready", null, "Start first: the ISP lead time and Dhan's reply time are outside your control."],
+"P11-05": ["ready", null, "Built 2026-10-28 (runbook in docs/research, Compliance tab, xd live compliance show). Start the enquiry first: the ISP lead time and Dhan's reply time are outside your control."],
 "P11-O1": ["ready", null, "Send the Dhan and ISP questions now (runbook sections 3 and 4)."]
 },
     phases: [
@@ -602,7 +602,7 @@ null,
       {
         id: "P11", t: "Small live", state: "planned", note: "Manual live at 25-50% of intended risk; no order code. The static-IP and SEBI enquiry (P11-05) starts first because of ISP lead time. Exit needs at least 8 weeks of live sessions.",
         slices: [
-          ["P11-05", "Static IP and SEBI re-check: runbook, questions and the compliance record", "draft", "", {"d": 2, "o": 1, "s": "P11-05-static-ip-and-sebi-recheck-runbook"}],
+          ["P11-05", "Static IP and SEBI re-check: runbook, questions and the compliance record (built 2026-10-28; the Compliance tab of Live writes only with XD_LIVE_WRITES_ENABLED=true and your password; no record written yet)", "built", "0147", {"d": 2, "o": 1, "s": "P11-05-static-ip-and-sebi-recheck-runbook"}],
           ["P11-04", "Scale-up rules and risk ramp: live-ready gate, steps S1/S2/S3, evidence gates, halts", "draft", "", {"d": 5, "o": 1, "s": "P11-04-scale-up-rules-and-risk-ramp"}],
           ["P11-01", "Manual-live fill capture: trade book and order book read from Dhan (waits for P11-04A live allocations; the read-only GET entries are accepted in principle, ADR 0133)", "approved", "", {"d": 3.5, "o": 1, "s": "P11-01-manual-live-fill-capture"}],
           ["P11-02", "Execution feedback: grade on fills, slippage per liquidity bucket, capacity score", "draft", "", {"d": 3.5, "s": "P11-02-execution-feedback-grade-on-fills-slippage-and-capacity"}],

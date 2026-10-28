@@ -121,6 +121,8 @@ services:
       Portfolio__Heal__AttentionRetentionDays: ${XD_PORTFOLIO_HEAL_ATTENTION_DAYS:-30}
       # Price-crossing alerts and post-trade prompts (P7-20, ADR 0115): alerts only, no order. OFF by default. xd-api (notice source, plan-screen read, the post-trade-prompts service) and xd-feed (the observer) must have the SAME value: set XD_TICKET_ALERTS once.
       Planning__TicketAlerts__Enabled: ${XD_TICKET_ALERTS:-false}
+      # The live writes of the web (P11-00, P11-05, ADR 0147): OFF by default. While false, the compliance record (POST /api/live-trading/compliance) is refused with 403 live.capability_off; it also needs the owner's fresh password.
+      Live__Writes__Enabled: ${XD_LIVE_WRITES_ENABLED:-false}
       # Market data (ADR 0016): the folder with the <SYMBOL>_1m.csv[.gz] files, mounted read-only below. Dhan Data API fetch: first fetch goes this many days
       # back, at most this many requests per second.
       Data__CsvFolder: /data/csv

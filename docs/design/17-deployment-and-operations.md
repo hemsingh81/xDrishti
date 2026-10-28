@@ -137,5 +137,5 @@ Nothing else is needed for the master: no published port, no volume (the file is
 | Dhan Data API (one account) | ≈ ₹590/month incl. GST |
 | NSE files (optional reconciliation) | ₹0 |
 | External SSD + UPS (one-time, recommended) | ≈ ₹10–18k |
-| ISP static IP | Only when automated orders are enabled (P12); decision Q6: later, revisit at the P11 exit |
+| ISP static IP | Only when automated orders are enabled (P12); decision Q6: later, revisit at the P11 exit. The enquiry (ISP lead time, Dhan's 7-day IP lock) runs from the start of P11: [runbook](../research/p11-static-ip-and-sebi-runbook.md), record in the app (P11-05); a static IP is outbound only, no port is opened |
 | Cloud | ₹0 — none used |

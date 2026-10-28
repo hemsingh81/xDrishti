@@ -15,6 +15,7 @@ using XDrishti.Application.Abstractions.Depth;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
+using XDrishti.Application.Abstractions.LiveTrading;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
@@ -40,6 +41,7 @@ using XDrishti.Infrastructure.Capabilities;
 using XDrishti.Infrastructure.Depth;
 using XDrishti.Infrastructure.Lab;
 using XDrishti.Infrastructure.Learning;
+using XDrishti.Infrastructure.LiveTrading;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Actions;
 using XDrishti.Infrastructure.Market.Bars;
@@ -192,6 +194,8 @@ public static class DependencyInjection
         services.AddScoped<IArmedTicketReader>(sp => (PlanStore)sp.GetRequiredService<IPlanStore>()); // P7-11: the armed tickets of a session, read only (the feed's active-set provider and the expiry job)
         services.AddScoped<IInstrumentSecurities, InstrumentSecurities>(); // shares by canonical symbol with their Dhan NSE equity id (P7-11)
         services.AddScoped<IPreOpenSource, PreOpenSource>(); // the pre-open price, previous close and ATR: the existing read-only quote and stored day bars (P7-11)
+        services.AddSingleton<ILiveWritesGate, ConfigurationLiveWritesGate>(); // Live:Writes:Enabled, default OFF (P11-00, P11-05)
+        services.AddScoped<IComplianceStore, ComplianceStore>(); // the compliance record of the live phase, insert-only (P11-05)
         services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IBrokerAllowList, BrokerAllowList>(); // the broker allow-list read only, for the P7 phase check (P7-18, ADR 0097)

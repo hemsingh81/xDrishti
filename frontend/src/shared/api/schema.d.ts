@@ -4002,6 +4002,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/live-trading/compliance': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The compliance records, newest first (kind filters; limit 1 to 200, default 50), with the newest record of each kind (null = nothing recorded for that kind, which is empty and not 'no change') and whether the web may write now. The overdue flag is set on the newest record of a kind whose review date has passed. 422 live.invalid */
+    get: operations['GetLiveCompliance'];
+    put?: never;
+    /** Write one compliance record as the owner; insert-only and audited (kind, outcome, decided date; never the text). Needs a session, the CSRF token, the deployment gate Live:Writes:Enabled (off by default) and the password in the body, checked on EVERY save (an earlier step-up window does not count and is not used up). The record is your note of what you were told: nothing is checked at Dhan or the ISP. 403 live.capability_off, 401 auth.invalid_credentials, 423 auth.locked, 403 live.owner_only, 422 live.invalid (a field that looks like an IP address, client id or token, or a rule of the record), 429 auth.rate_limited */
+    post: operations['RecordLiveCompliance'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/charge-sheet/confirmation': {
     parameters: {
       query?: never;
@@ -6636,6 +6654,44 @@ export interface components {
       /** Format: int32 */
       unfillableMinutes: number;
       sessions: components['schemas']['SessionCompleteness'][];
+    };
+    /** @description The newest record of each kind; null = nothing recorded for that kind (empty, not "no change"). */
+    ComplianceLatest: {
+      static_ip: null | components['schemas']['ComplianceRecordView'];
+      sebi_recheck: null | components['schemas']['ComplianceRecordView'];
+      dhan_ip_read_policy: null | components['schemas']['ComplianceRecordView'];
+    };
+    /** @description One stored record as the API shows it. */
+    ComplianceRecordView: {
+      /** Format: int64 */
+      id: number;
+      kind: string;
+      outcome: string;
+      /** Format: date */
+      decidedOn: string;
+      summary: string;
+      sources: string[];
+      staticIpState: null | string;
+      isp: null | string;
+      /** Format: double */
+      monthlyCost: null | number;
+      ipVersion: null | string;
+      /** Format: date */
+      whitelistedAt: null | string;
+      /** Format: date */
+      lockEndsOn: null | string;
+      /** Format: date */
+      nextReviewOn: string;
+      overdue: boolean;
+      actor: string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @description The list (newest first), the latest per kind and whether the web may write now (the capability gate Live:Writes:Enabled). */
+    ComplianceView: {
+      items: components['schemas']['ComplianceRecordView'][];
+      latest: components['schemas']['ComplianceLatest'];
+      writesEnabled: boolean;
     };
     /** @description The recorded differences. */
     ConfigChangeList: {
@@ -12536,7 +12592,7 @@ export interface components {
       ticketsWithoutFills: number;
     };
     /**
-     * @description One thing about the plan the owner should know. `kind`: plan_awaiting_review · plan_nightly_failed · plan_tickets_lapsed · plan_tickets_armed · plan_tickets_invalidated · plan_fills_unmatched · ticket_level_crossed · post_trade_prompt (the last two are carried from P7-20 as it derives them, only while ticket alerts are enabled; their ids are `crossing:{id}` and `prompt:{id}`).
+     * @description One thing about the plan the owner should know. `kind`: plan_awaiting_review · plan_nightly_failed · plan_tickets_lapsed · plan_tickets_armed · plan_tickets_invalidated · plan_fills_unmatched · ticket_level_crossed · post_trade_prompt (these two are carried from P7-20 as it derives them, only while ticket alerts are enabled; their ids are `crossing:{id}` and `prompt:{id}`) · compliance_recheck_overdue (carried from P11-05: the newest compliance record of a kind has a review date that has passed; id `compliance:overdue:{kind}:{yyyy-MM-dd}`, route `/live?tab=compliance`, resolved by a newer record of the kind).
      *     `severity`: error · warning · info. `id` carries what changes, so a worse or bigger situation is unread again: `plan:review:{planId}:{info|warning}`, `plan:{lapsed|armed|invalidated|fills|fills-ambiguous}:{planId}:{count}`, `plan:nightly:{yyyy-MM-dd}:{attempt}`. `route` is an in-app path (`/plans?plan={id}`, or `/plans`
      *     for a run that failed closed and so has no plan); there is no command: the notice only shows and opens. `at` is the moment it is about (the cutoff, the end of the failed run), or null. `since` is when the situation began and `resolved` marks a carried ticket notice that has closed but is still shown for a day (plan items just disappear). The text has counts, never a symbol, a size or a price.
      */
@@ -13699,6 +13755,45 @@ export interface components {
        * @description Items.
        */
       count: number;
+    };
+    /** @description The body of a compliance record (spec P11-05). The owner is never part of it: the actor comes from the signed-in session. The lock end is not part of it either: the server derives it. */
+    RecordComplianceRequest: {
+      /** @description static_ip, sebi_recheck or dhan_ip_read_policy. */
+      kind: null | string;
+      /** @description One of the outcomes of the kind (static_ip: not_needed_for_manual, requested, obtained, whitelisted, declined, blocked; sebi_recheck: rechecked_no_change, rechecked_changed, blocked; dhan_ip_read_policy: reads_not_ip_restricted, reads_ip_restricted, unanswered). */
+      outcome: null | string;
+      /**
+       * Format: date
+       * @description The India date of the decision; not in the future.
+       */
+      decidedOn: string;
+      /** @description 1 to 1000 characters of what you were told or read. No IP address, client id or token: they are refused. */
+      summary: null | string;
+      /** @description At most 10 sources, each an https:// URL or a circular id such as NSE/INVG/73992. */
+      sources: null | string[];
+      /** @description static_ip only: none, requested, active or whitelisted. */
+      staticIpState: null | string;
+      /** @description static_ip only: the provider's name, up to 80 characters, no address. */
+      isp: null | string;
+      /**
+       * Format: double
+       * @description static_ip only: rupees a month.
+       */
+      monthlyCost: null | number;
+      /** @description static_ip only: v4 or v6. */
+      ipVersion: null | string;
+      /**
+       * Format: date
+       * @description static_ip only: the date set at Dhan; required when the state is whitelisted, refused otherwise.
+       */
+      whitelistedAt: null | string;
+      /**
+       * Format: date
+       * @description After decidedOn and at most 400 days ahead.
+       */
+      nextReviewOn: string;
+      /** @description The owner's password, re-entered for THIS save. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
+      password: null | string;
     };
     /** @description One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving. */
     RefreshRunView: {
@@ -25982,6 +26077,89 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLiveCompliance: {
+    parameters: {
+      query?: {
+        kind?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ComplianceView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RecordLiveCompliance: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RecordComplianceRequest'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ComplianceRecordView'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

@@ -278,4 +278,23 @@ describe('derivePlanNotifications', () => {
     expect(list.map((n) => n.kind)).toEqual(['ticket_level_crossed', 'post_trade_prompt']);
     expect(list.every((n) => n.actions.length === 0 && n.href === '/plans?plan=7')).toBe(true);
   });
+
+  it('carries the overdue compliance re-check as a route-only item to the Compliance tab and nowhere else of the Live screen', () => {
+    const list = derivePlanNotifications([
+      buildPlanNotice({
+        id: 'compliance:overdue:sebi_recheck:2026-10-11',
+        kind: 'compliance_recheck_overdue',
+        severity: 'warning',
+        text: 'Compliance re-check overdue: SEBI re-check was due on 11 Oct 2026.',
+        route: '/live?tab=compliance',
+        planId: null,
+      }),
+      buildPlanNotice({ id: 'compliance:x', kind: 'compliance_recheck_overdue', route: '/live?tab=other' }),
+      buildPlanNotice({ id: 'compliance:y', kind: 'compliance_recheck_overdue', route: '/live' }),
+    ]);
+
+    expect(list.map((n) => [n.id, n.kind, n.href, n.actions.length])).toEqual([
+      ['compliance:overdue:sebi_recheck:2026-10-11', 'compliance_recheck_overdue', '/live?tab=compliance', 0],
+    ]);
+  });
 });

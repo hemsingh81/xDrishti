@@ -1,5 +1,7 @@
+using XDrishti.Application.Abstractions.LiveTrading;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Planning;
+using XDrishti.Application.LiveTrading;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Portfolio;
@@ -10,7 +12,7 @@ namespace XDrishti.Application.Planning;
 /// The plan notices of the bell (P8-15, ADR 0101), derived on read like the data and service notices (ADR 0018 §7, ADR 0030): the newest version of each of the last three sessions' plans with the state of their tickets, the newest recorded attempt of the nightly pipeline
 /// and the stored fills of approved tickets, handed to the pure <see cref="PlanNoticeRules"/>. It calls read members of the plan and journal ports only; nothing is stored, no ticket moves and no order exists anywhere.
 /// </summary>
-internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore journal, ITicketNoticeSource ticketNotices, TimeProvider clock) : IQueryHandler<GetPlanNoticesQuery, PlanNotices>
+internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore journal, ITicketNoticeSource ticketNotices, IComplianceStore compliance, TimeProvider clock) : IQueryHandler<GetPlanNoticesQuery, PlanNotices>
 {
     /// <summary>The notices cover the last this many India days: today and the days before it, so three means today, yesterday and the day before. A plan or a failed run of an earlier session is not mentioned any more.</summary>
     public const int RecentDays = 3;
@@ -57,7 +59,7 @@ internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore jour
             unmatched.GetValueOrDefault(p.Row.Id).Would,
             unmatched.GetValueOrDefault(p.Row.Id).Ambiguous)).ToList();
         var own = PlanNoticeRules.Derive(now, facts, latestRun);
-        var carried = await ticketNotices.ListAsync(now, cancellationToken);
+        List<PlanNotice> carried = [.. await ticketNotices.ListAsync(now, cancellationToken), .. ComplianceRules.Notices(await compliance.LatestPerKindAsync(cancellationToken), today)];
         return new PlanNotices(carried.Count == 0 ? own : Merge(own, carried));
     }
 

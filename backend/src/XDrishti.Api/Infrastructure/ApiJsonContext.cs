@@ -27,6 +27,7 @@ using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
 using XDrishti.Application.Live.Push;
+using XDrishti.Application.LiveTrading;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Bars.Eod;
@@ -101,6 +102,9 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(DepthRecorderView))]
 [JsonSerializable(typeof(DepthRecorderSwitched))]
 [JsonSerializable(typeof(DepthSwitchRequest))]
+[JsonSerializable(typeof(ComplianceView))]
+[JsonSerializable(typeof(ComplianceRecordView))]
+[JsonSerializable(typeof(RecordComplianceRequest))]
 [JsonSerializable(typeof(AutonomySettingsView))]
 [JsonSerializable(typeof(ChangeAutonomyRequest))]
 [JsonSerializable(typeof(ChargeSheetStatusView))]

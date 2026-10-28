@@ -13879,6 +13879,114 @@
         }
       }
     },
+    "/api/live-trading/compliance": {
+      "get": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "The compliance records, newest first (kind filters; limit 1 to 200, default 50), with the newest record of each kind (null = nothing recorded for that kind, which is empty and not 'no change') and whether the web may write now. The overdue flag is set on the newest record of a kind whose review date has passed. 422 live.invalid",
+        "operationId": "GetLiveCompliance",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComplianceView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Live trading"
+        ],
+        "summary": "Write one compliance record as the owner; insert-only and audited (kind, outcome, decided date; never the text). Needs a session, the CSRF token, the deployment gate Live:Writes:Enabled (off by default) and the password in the body, checked on EVERY save (an earlier step-up window does not count and is not used up). The record is your note of what you were told: nothing is checked at Dhan or the ISP. 403 live.capability_off, 401 auth.invalid_credentials, 423 auth.locked, 403 live.owner_only, 422 live.invalid (a field that looks like an IP address, client id or token, or a rule of the record), 429 auth.rate_limited",
+        "operationId": "RecordLiveCompliance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordComplianceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComplianceRecordView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/charge-sheet/confirmation": {
       "get": {
         "tags": [
@@ -21416,6 +21524,170 @@
           }
         },
         "description": "Completeness: the 1-minute bars the trading calendar expects in the window against the ones stored. `missingPercent` is of the expected minutes; `unfillableMinutes` are missing\nminutes of sessions a refetch could not fill (a halt, a circuit-locked day): they are a warning, never a failure."
+      },
+      "ComplianceLatest": {
+        "required": [
+          "static_ip",
+          "sebi_recheck",
+          "dhan_ip_read_policy"
+        ],
+        "type": "object",
+        "properties": {
+          "static_ip": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ComplianceRecordView"
+              }
+            ]
+          },
+          "sebi_recheck": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ComplianceRecordView"
+              }
+            ]
+          },
+          "dhan_ip_read_policy": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ComplianceRecordView"
+              }
+            ]
+          }
+        },
+        "description": "The newest record of each kind; null = nothing recorded for that kind (empty, not \"no change\")."
+      },
+      "ComplianceRecordView": {
+        "required": [
+          "id",
+          "kind",
+          "outcome",
+          "decidedOn",
+          "summary",
+          "sources",
+          "staticIpState",
+          "isp",
+          "monthlyCost",
+          "ipVersion",
+          "whitelistedAt",
+          "lockEndsOn",
+          "nextReviewOn",
+          "overdue",
+          "actor",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "decidedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "staticIpState": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isp": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "monthlyCost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "ipVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "whitelistedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "lockEndsOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "nextReviewOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "overdue": {
+            "type": "boolean"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "One stored record as the API shows it."
+      },
+      "ComplianceView": {
+        "required": [
+          "items",
+          "latest",
+          "writesEnabled"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComplianceRecordView"
+            }
+          },
+          "latest": {
+            "$ref": "#/components/schemas/ComplianceLatest"
+          },
+          "writesEnabled": {
+            "type": "boolean"
+          }
+        },
+        "description": "The list (newest first), the latest per kind and whether the web may write now (the capability gate Live:Writes:Enabled)."
       },
       "ConfigChangeList": {
         "required": [
@@ -36983,7 +37255,7 @@
             "default": false
           }
         },
-        "description": "One thing about the plan the owner should know. `kind`: plan_awaiting_review · plan_nightly_failed · plan_tickets_lapsed · plan_tickets_armed · plan_tickets_invalidated · plan_fills_unmatched · ticket_level_crossed · post_trade_prompt (the last two are carried from P7-20 as it derives them, only while ticket alerts are enabled; their ids are `crossing:{id}` and `prompt:{id}`).\n`severity`: error · warning · info. `id` carries what changes, so a worse or bigger situation is unread again: `plan:review:{planId}:{info|warning}`, `plan:{lapsed|armed|invalidated|fills|fills-ambiguous}:{planId}:{count}`, `plan:nightly:{yyyy-MM-dd}:{attempt}`. `route` is an in-app path (`/plans?plan={id}`, or `/plans`\nfor a run that failed closed and so has no plan); there is no command: the notice only shows and opens. `at` is the moment it is about (the cutoff, the end of the failed run), or null. `since` is when the situation began and `resolved` marks a carried ticket notice that has closed but is still shown for a day (plan items just disappear). The text has counts, never a symbol, a size or a price."
+        "description": "One thing about the plan the owner should know. `kind`: plan_awaiting_review · plan_nightly_failed · plan_tickets_lapsed · plan_tickets_armed · plan_tickets_invalidated · plan_fills_unmatched · ticket_level_crossed · post_trade_prompt (these two are carried from P7-20 as it derives them, only while ticket alerts are enabled; their ids are `crossing:{id}` and `prompt:{id}`) · compliance_recheck_overdue (carried from P11-05: the newest compliance record of a kind has a review date that has passed; id `compliance:overdue:{kind}:{yyyy-MM-dd}`, route `/live?tab=compliance`, resolved by a newer record of the kind).\n`severity`: error · warning · info. `id` carries what changes, so a worse or bigger situation is unread again: `plan:review:{planId}:{info|warning}`, `plan:{lapsed|armed|invalidated|fills|fills-ambiguous}:{planId}:{count}`, `plan:nightly:{yyyy-MM-dd}:{attempt}`. `route` is an in-app path (`/plans?plan={id}`, or `/plans`\nfor a run that failed closed and so has no plan); there is no command: the notice only shows and opens. `at` is the moment it is about (the cutoff, the end of the failed run), or null. `since` is when the situation began and `resolved` marks a carried ticket notice that has closed but is still shown for a day (plan items just disappear). The text has counts, never a symbol, a size or a price."
       },
       "PlanNotices": {
         "required": [
@@ -39983,6 +40255,111 @@
           }
         },
         "description": "A reserve reason and its count."
+      },
+      "RecordComplianceRequest": {
+        "required": [
+          "kind",
+          "outcome",
+          "decidedOn",
+          "summary",
+          "sources",
+          "staticIpState",
+          "isp",
+          "monthlyCost",
+          "ipVersion",
+          "whitelistedAt",
+          "nextReviewOn",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "static_ip, sebi_recheck or dhan_ip_read_policy."
+          },
+          "outcome": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "One of the outcomes of the kind (static_ip: not_needed_for_manual, requested, obtained, whitelisted, declined, blocked; sebi_recheck: rechecked_no_change, rechecked_changed, blocked; dhan_ip_read_policy: reads_not_ip_restricted, reads_ip_restricted, unanswered)."
+          },
+          "decidedOn": {
+            "type": "string",
+            "description": "The India date of the decision; not in the future.",
+            "format": "date"
+          },
+          "summary": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "1 to 1000 characters of what you were told or read. No IP address, client id or token: they are refused."
+          },
+          "sources": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "At most 10 sources, each an https:// URL or a circular id such as NSE/INVG/73992."
+          },
+          "staticIpState": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "static_ip only: none, requested, active or whitelisted."
+          },
+          "isp": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "static_ip only: the provider's name, up to 80 characters, no address."
+          },
+          "monthlyCost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "static_ip only: rupees a month.",
+            "format": "double"
+          },
+          "ipVersion": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "static_ip only: v4 or v6."
+          },
+          "whitelistedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "static_ip only: the date set at Dhan; required when the state is whitelisted, refused otherwise.",
+            "format": "date"
+          },
+          "nextReviewOn": {
+            "type": "string",
+            "description": "After decidedOn and at most 400 days ahead.",
+            "format": "date"
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS save. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout."
+          }
+        },
+        "description": "The body of a compliance record (spec P11-05). The owner is never part of it: the actor comes from the signed-in session. The lock end is not part of it either: the server derives it."
       },
       "RefreshRunView": {
         "required": [
@@ -47275,6 +47652,9 @@
     },
     {
       "name": "Depth"
+    },
+    {
+      "name": "Live trading"
     },
     {
       "name": "ChargeSheet"

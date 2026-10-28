@@ -33,6 +33,7 @@ using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
 using XDrishti.Application.Live;
 using XDrishti.Application.Live.Push;
+using XDrishti.Application.LiveTrading;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Bars.Eod;
@@ -89,6 +90,8 @@ public static class DependencyInjection
         services.AddScoped<IFeedHeartbeats, FeedHeartbeats>();
         services.AddScoped<IDepthHeartbeats, DepthHeartbeats>(); // the depth recorder's own row xd-depth (P7-16)
         services.AddScoped<IQueryHandler<GetDepthRecorderQuery, DepthRecorderView>, GetDepthRecorderHandler>(); // the owner's depth switch (P7-16): read
+        services.AddScoped<IQueryHandler<GetComplianceQuery, Result<ComplianceView>>, GetComplianceHandler>(); // the compliance record of the live phase (P11-05): read
+        services.AddScoped<ICommandHandler<RecordComplianceCommand, ComplianceRecordView>, RecordComplianceHandler>(); // and write, insert-only, behind a fresh password and the live-writes gate in the endpoint
         services.AddScoped<ICommandHandler<ChangeDepthRecorderCommand, DepthRecorderSwitched>, ChangeDepthRecorderHandler>(); // and change, insert-only, behind a fresh password in the endpoint
 
         services.AddScoped<ICommandHandler<LoginCommand, LoginResult>, LoginHandler>();

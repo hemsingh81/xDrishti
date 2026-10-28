@@ -85,4 +85,5 @@ public enum AccountEventType
     AutonomySettingsChanged,
     ReportExported,
     DepthRecorderSwitched,
+    ComplianceRecorded,
 }

@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using XDrishti.Application.Abstractions.LiveTrading;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Planning;
+using XDrishti.Domain.LiveTrading;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Research;
 
@@ -18,6 +20,7 @@ public sealed class GetPlanNoticesHandlerTests
     private readonly IPlanStore _plans = Substitute.For<IPlanStore>();
     private readonly IJournalStore _journal = Substitute.For<IJournalStore>();
     private readonly ITicketNoticeSource _tickets = Substitute.For<ITicketNoticeSource>();
+    private readonly IComplianceStore _compliance = Substitute.For<IComplianceStore>();
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -30,13 +33,14 @@ public sealed class GetPlanNoticesHandlerTests
         _journal.EntriesAsync(Arg.Any<long>(), Ct).Returns([]);
         _plans.HistoryAsync(Arg.Any<long>(), Ct).Returns([]);
         _tickets.ListAsync(Arg.Any<DateTimeOffset>(), Ct).Returns([]);
+        _compliance.LatestPerKindAsync(Ct).Returns([]);
     }
 
     // Approved on the evening before the session, before any fill of the session day.
     private static PlanEventRow Approval(long item, DateTimeOffset? at = null) =>
         new(item, item, "proposed", "approved", "owner:me", "ok", 1, at ?? new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
 
-    private GetPlanNoticesHandler Handler() => new(_plans, _journal, _tickets, _time);
+    private GetPlanNoticesHandler Handler() => new(_plans, _journal, _tickets, _compliance, _time);
 
     private static PlanRow Row(long id, DateOnly? date = null, int version = 1, PlanState state = PlanState.Published) =>
         new(id, new NewPlan("k" + id, date ?? Session, Cutoff, version, Hash, "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, []), state, 1, 0, 0);
@@ -51,6 +55,39 @@ public sealed class GetPlanNoticesHandlerTests
     {
         _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns([row]);
         _plans.ItemsAsync(row.Id, Ct).Returns(items);
+    }
+
+    private static StoredCompliance Compliance(string kind, string outcome, DateOnly next, long id = 1)
+    {
+        var decided = new DateOnly(2026, 6, 1);
+        var draft = new ComplianceDraft(kind, outcome, decided, "noted", [], kind == ComplianceKinds.StaticIp ? "none" : null, null, null, null, null, next);
+        return new StoredCompliance(id, ComplianceRecord.Create(draft, decided).Value, "owner:me", DateTimeOffset.UnixEpoch);
+    }
+
+    [Fact]
+    public async Task A_compliance_record_whose_review_date_has_passed_is_one_overdue_notice_with_a_route_and_no_command_and_a_newer_record_resolves_it()
+    {
+        _compliance.LatestPerKindAsync(Ct).Returns([Compliance("sebi_recheck", "rechecked_no_change", new DateOnly(2026, 10, 11))]);
+
+        var before = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
+        _compliance.LatestPerKindAsync(Ct).Returns([Compliance("sebi_recheck", "rechecked_no_change", new DateOnly(2027, 1, 9), id: 2)]);
+        var after = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
+
+        var notice = before.Items.ShouldHaveSingleItem();
+        notice.Kind.ShouldBe("compliance_recheck_overdue");
+        notice.Text.ShouldContain("Compliance re-check overdue");
+        notice.Text.ShouldContain("SEBI re-check");
+        notice.Route.ShouldBe("/live?tab=compliance");
+        notice.Id.ShouldBe("compliance:overdue:sebi_recheck:2026-10-11");
+        after.Items.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_review_date_of_today_is_not_yet_overdue_and_a_kind_with_no_record_has_no_notice()
+    {
+        _compliance.LatestPerKindAsync(Ct).Returns([Compliance("static_ip", "requested", new DateOnly(2026, 10, 12))]);
+
+        (await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct)).Items.ShouldBeEmpty();
     }
 
     [Fact]
