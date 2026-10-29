@@ -61,7 +61,7 @@ If you do not do this, nothing is lost: "no phone access" is a valid state.
 | `back` (internal) | api, worker, sandbox*, db, llm (on demand, P9-01), mcp (on demand, P9-02), seq, feed, proxy (to reach the api) |
 | `egress` (not internal, nothing published) | **api only** (P1-16c, P1-03) |
 | `exec` (internal) | exec, db (P12-01b; no route out) |
-| Egress allowed later | worker, feed, exec (broker/exchange hosts only; exec gets it in P12-02, not before) |
+| Egress allowed later | worker, feed, exec (broker/exchange hosts only; `xd-exec` gets a route out only by an owner deploy act, see the table below; none is configured) |
 
 *`xd-sandbox` has no egress and no access except its job inputs/outputs.
 `xd-api` joins `egress` for Dhan's sign-in ([ADR 0008](../adr/0008-broker-credentials-vault-and-connection.md), [0009](../adr/0009-dhan-consent-flow-only.md)), for the read of the account's holdings ([ADR 0012](../adr/0012-holdings-acquisition-dates-and-returns-model.md)), for the 1-minute chart data of the Data API ([ADR 0016](../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.md)), for the trade history and the ledger of the account ([ADR 0025](../adr/0025-dhan-trade-history-and-ledger-sync.md)) and for the instrument master files and NSE's trading-holiday list ([ADR 0010](../adr/0010-instrument-master-sources-and-scope.md), [ADR 0017](../adr/0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.md)): outbound only, no
@@ -77,6 +77,17 @@ published ports, no other member. The network itself does not filter hosts; the 
 | Instrument master — Dhan | `images.dhan.co`: `/api-data/api-scrip-master-detailed.csv` (doc 05 §7.1) | GET | 120 s, 100 MB |
 | Instrument master — NSE | `nsearchives.nseindia.com`: `/content/indices/ind_niftytotalmarket_list.csv` | GET | 30 s, 5 MB |
 | Trading calendar — NSE holidays | `www.nseindia.com`: `/api/holiday-master` with the query exactly `type=trading` (a fixed query text; the Dhan ledger above takes two date keys, the sign-in calls one key each; doc 05 §4.1, ADR 0017) | GET | 20 s, 1 MB; browser-like `User-Agent` and `Accept: application/json`, **no cookie** (none is kept or sent, and nothing from a stored secret), no redirects; a refusal is only a warning |
+
+`xd-exec` (P12-02, P12-02b; [ADR 0157](../adr/0157-the-dhan-order-adapter-is-a-sandbox-only-guarded-client-inside-the-execution-project-and-the-send-protocol-writes-ahead-and-resolves-unknown-by-lookup-never-by-resend.md), [0158](../adr/0158-the-send-path-is-composed-only-as-legsender-behind-sandbox-and-a-second-default-off-switch-with-a-persistent-insert-only-audit-and-settings-read-at-every-send.md)) is **not** on `egress`: the `exec` network is internal and no route out exists today. Its client exists only in the sandbox environment with the second switch `Execution__SendEnabled` on; the guard (`Dhan/ExecutionEndpoints`) is the one table below, the host is `sandbox.dhan.co` (UNVERIFIED, from a third-party description), no live host string exists in the project, and the data-side table above is unchanged:
+
+| Client | Reaches only | Method | Limits |
+|--------|--------------|--------|--------|
+| Execution (sandbox) place | `sandbox.dhan.co`: `/v2/orders` | POST | 10 s (`exec.send_timeout_s`), connect 5 s; **never retried**; LIMIT, DAY, INTRADAY, NSE_EQ only; the token goes in the `access-token` header and is never logged or stored |
+| Execution (sandbox) modify, cancel | `/v2/orders/{id}` (id a plain token) | PUT, DELETE | as above; looked up by our client id first |
+| Execution (sandbox) lookup | `/v2/orders/{id}` and `/v2/orders/external/{client order id}` | GET | 10 s; retried once after 250 ms; a failed lookup is never "absent" |
+| Execution (sandbox) reads | `/v2/orders`, `/v2/trades`, `/v2/positions`, `/v2/fundlimit`, no query | GET | 10 s; retried once; never counted by the send limiter |
+
+Every other method, path, host, port, scheme, query or redirect is refused before the socket (`GuardHandler`). Sends are capped by `exec.max_orders_per_second/minute/day` (2/30/200, counted from the audit table so a restart keeps them).
 
 Nothing else is needed for the master: no published port, no volume (the file is streamed, never written to disk), no secret; `xd-api` stays within its 1 GB limit (the 35 MB file is read as a stream). The database image already includes `pg_trgm`, which the migration enables for the search indexes (created by `xd-migrate` as `xd_owner`).
 

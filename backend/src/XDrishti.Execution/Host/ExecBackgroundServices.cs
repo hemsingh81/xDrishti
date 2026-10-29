@@ -7,7 +7,7 @@ namespace XDrishti.Execution.Host;
 /// <summary>
 /// The heartbeat and the settings read, every 10 seconds, whatever the environment. The state is always <c>recovering</c> in this slice (entries are blocked until recovery exists, P12-06). It builds no broker client; a failure is logged (counts only) and tried again.
 /// </summary>
-internal sealed partial class ExecHeartbeatService(IOptions<ExecOptions> options, ExecSettingsReader settings, IExecHeartbeats heartbeats, ExecCounters counters, ILogger<ExecHeartbeatService> logger) : BackgroundService
+internal sealed partial class ExecHeartbeatService(IOptions<ExecOptions> options, ExecSettingsReader settings, IExecHeartbeats heartbeats, ExecCounters counters, ExecSettingsCache cache, ILogger<ExecHeartbeatService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -20,6 +20,7 @@ internal sealed partial class ExecHeartbeatService(IOptions<ExecOptions> options
             try
             {
                 var view = await settings.ReadAsync(stoppingToken);
+                cache.Set(view);
                 var replaced = string.Join(',', view.Replaced);
                 if (replaced != lastReplaced)
                 {

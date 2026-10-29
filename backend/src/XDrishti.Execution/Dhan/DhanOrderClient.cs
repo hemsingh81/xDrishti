@@ -10,7 +10,7 @@ namespace XDrishti.Execution.Dhan;
 /// The Dhan order adapter for the sandbox (P12-02, ADR 0157). It cannot be built for any environment but sandbox. Writes are never retried; a read is retried once after 250 ms. The token travels only in the <c>access-token</c> header of one request;
 /// nothing here logs a body, a header or an exception message. The HTTP client is created by <see cref="DhanSandboxRegistration"/> with redirects off and the <see cref="GuardHandler"/> in front of the socket.
 /// </summary>
-public sealed partial class DhanOrderClient : IBrokerOrders
+public sealed partial class DhanOrderClient : IBrokerOrders, IBrokerReads
 {
     private static readonly TimeSpan ReadRetryGap = TimeSpan.FromMilliseconds(250);
 
@@ -19,10 +19,16 @@ public sealed partial class DhanOrderClient : IBrokerOrders
     private readonly ExecEnvironment _environment;
     private readonly ILogger<DhanOrderClient> _logger;
     private readonly TimeProvider _clock;
-    private readonly TimeSpan _writeTimeout;
+    private readonly Func<TimeSpan> _writeTimeout;
     private readonly TimeSpan _readTimeout;
 
     public DhanOrderClient(HttpClient http, IExecCredentials credentials, ExecEnvironment environment, ILogger<DhanOrderClient> logger, TimeProvider clock, TimeSpan writeTimeout, TimeSpan readTimeout)
+        : this(http, credentials, environment, logger, clock, () => writeTimeout, readTimeout)
+    {
+    }
+
+    // The write timeout is read at every write, so a change of exec.send_timeout_s takes effect without a restart.
+    public DhanOrderClient(HttpClient http, IExecCredentials credentials, ExecEnvironment environment, ILogger<DhanOrderClient> logger, TimeProvider clock, Func<TimeSpan> writeTimeout, TimeSpan readTimeout)
     {
         if (environment != ExecEnvironment.Sandbox)
         {
@@ -125,6 +131,60 @@ public sealed partial class DhanOrderClient : IBrokerOrders
             : throw new BrokerLookupFailedException("client_order_id");
     }
 
+    public async Task<BrokerRead<IReadOnlyList<BrokerOrderView>>> GetOrderBookAsync(CancellationToken cancellationToken) =>
+        await ReadAsync(DhanCall.OrdersGet, DhanReads.OrderBook, cancellationToken).ConfigureAwait(false);
+
+    public async Task<BrokerRead<IReadOnlyList<BrokerTradeView>>> GetTradeBookAsync(CancellationToken cancellationToken) =>
+        await ReadAsync(DhanCall.TradesGet, DhanReads.TradeBook, cancellationToken).ConfigureAwait(false);
+
+    public async Task<BrokerRead<IReadOnlyList<BrokerPositionView>>> GetPositionsAsync(CancellationToken cancellationToken) =>
+        await ReadAsync(DhanCall.PositionsGet, DhanReads.Positions, cancellationToken).ConfigureAwait(false);
+
+    public async Task<BrokerRead<BrokerFundsView>> GetFundsAsync(CancellationToken cancellationToken) =>
+        await ReadAsync(DhanCall.FundsGet, DhanReads.Funds, cancellationToken).ConfigureAwait(false);
+
+    // One GET, retried once after 250 ms on a fault or a non-2xx; the answer is parsed by the given reader. Nothing is written and nothing is counted by the send limiter.
+    private async Task<BrokerRead<T>> ReadAsync<T>(DhanCall call, Func<string, BrokerRead<T>> parse, CancellationToken cancellationToken)
+    {
+        if (_credentials.Current() is not { } credentials)
+        {
+            return BrokerRead.Unreadable<T>("execution.token_unavailable");
+        }
+
+        var uri = ExecutionEndpoints.Build(_environment, call);
+        if (uri is null)
+        {
+            return BrokerRead.Unreadable<T>("guard_refused");
+        }
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var deadline = new CancellationTokenSource(_readTimeout, _clock);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
+            try
+            {
+                using var request = Request(call, uri, credentials, null);
+                using var response = await _http.SendAsync(request, timeout.Token).ConfigureAwait(false);
+                var text = await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode)
+                {
+                    return parse(text);
+                }
+            }
+            catch (Exception e) when (e is HttpRequestException or OperationCanceledException or IOException)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            if (attempt == 0)
+            {
+                await Task.Delay(ReadRetryGap, _clock, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        return BrokerRead.Unreadable<T>("read_failed");
+    }
+
     private sealed record View(string OrderId, ExecSide Side, string SecurityId, int Qty, decimal Price);
 
     private async Task<BrokerAck> WriteAsync(DhanCall call, string? id, DhanCredentials credentials, byte[]? body, CancellationToken cancellationToken)
@@ -135,7 +195,7 @@ public sealed partial class DhanOrderClient : IBrokerOrders
             return new BrokerAck(BrokerOutcome.NotSent, null, "guard_refused");
         }
 
-        using var deadline = new CancellationTokenSource(_writeTimeout, _clock);
+        using var deadline = new CancellationTokenSource(_writeTimeout(), _clock);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
         try
         {

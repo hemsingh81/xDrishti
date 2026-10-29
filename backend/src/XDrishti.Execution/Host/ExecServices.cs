@@ -18,8 +18,9 @@ public static class ExecServices
         services.AddSingleton<IModeSource, ClosedModeSource>();
         services.AddSingleton<IHaltSource, ClosedHaltSource>();
         services.TryAddSingleton(TimeProvider.System);
+        AddSendSettings(services);
 
-        // The adapter exists only when the owner set the environment to sandbox. Live registers nothing in P12-02; none registers nothing.
+        // The send path exists only when the owner set the environment to sandbox AND turned Execution:SendEnabled on (default OFF, checked inside). Live registers nothing; none registers nothing.
         var environment = ExecEnvironmentParser.Parse(configuration[$"{ExecOptions.Section}:Environment"]);
         if (environment == ExecEnvironment.Sandbox)
         {
@@ -40,9 +41,22 @@ public static class ExecServices
         services.AddSingleton<IExecCommandStore, PgExecCommandStore>();
         services.AddSingleton<ExecCommandProcessor>();
         services.AddSingleton<IExecHeartbeats, PgExecHeartbeats>();
+        services.TryAddSingleton(TimeProvider.System);
+        AddSendSettings(services);
+        services.AddSingleton<PgSendJournal>();
+        services.AddSingleton<ISendJournal>(sp => sp.GetRequiredService<PgSendJournal>());
+        services.AddSingleton<ISendHistory>(sp => sp.GetRequiredService<PgSendJournal>());
+        services.AddSingleton<ITokenGate, PgTokenGate>();
         services.AddSingleton<ExecCounters>();
         services.AddHostedService<ExecHeartbeatService>();
         services.AddHostedService<ExecCommandPoller>();
         return services;
+    }
+
+    // The settings in force for the send path: filled by the heartbeat service on every read, null (so every send is refused) until the first good read and after a stale one.
+    private static void AddSendSettings(IServiceCollection services)
+    {
+        services.TryAddSingleton<ExecSettingsCache>();
+        services.TryAddSingleton<ISendSettings>(sp => sp.GetRequiredService<ExecSettingsCache>());
     }
 }

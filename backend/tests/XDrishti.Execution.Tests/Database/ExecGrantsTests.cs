@@ -20,6 +20,7 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         ["legs"] = ["INSERT", "SELECT", "UPDATE"],
         ["intent_state"] = ["INSERT", "SELECT", "UPDATE"],
         ["positions"] = ["INSERT", "SELECT", "UPDATE"],
+        ["broker_calls"] = ["INSERT", "SELECT"],
         ["commands"] = ["SELECT"],
         ["settings"] = ["SELECT"],
     };
@@ -71,7 +72,7 @@ public sealed class ExecGrantsTests(ExecDatabase db)
     [Fact]
     public async Task No_role_can_use_a_sequence_it_does_not_need_and_nobody_else_can_enter_the_schema()
     {
-        foreach (var sequence in new[] { "events_id_seq", "intents_id_seq", "legs_id_seq", "fills_id_seq", "settings_id_seq" })
+        foreach (var sequence in new[] { "events_id_seq", "intents_id_seq", "legs_id_seq", "fills_id_seq", "settings_id_seq", "broker_calls_id_seq" })
         {
             ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('xd_app', 'execution.{sequence}', 'USAGE')"))!).ShouldBeFalse(sequence);
             ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('xd_exec', 'execution.{sequence}', 'USAGE')"))!).ShouldBeTrue(sequence);
@@ -139,9 +140,39 @@ public sealed class ExecGrantsTests(ExecDatabase db)
             (await ExecDatabase.SqlStateAsync(db.Exec, $"SELECT count(*) FROM {table}")).ShouldBeNull(table);
         }
 
-        foreach (var table in new[] { "accounts.broker_secrets", "accounts.broker_connections", "auth.sessions", "auth.users", "platform.app_settings" })
+        foreach (var table in new[] { "accounts.broker_secrets", "auth.sessions", "auth.users", "platform.app_settings" })
         {
             (await ExecDatabase.SqlStateAsync(db.Exec, $"SELECT count(*) FROM {table}")).ShouldBe("42501", table);
         }
+    }
+
+    [Fact]
+    public async Task The_execution_role_reads_three_columns_of_the_connections_and_nothing_of_the_vault()
+    {
+        // P12-02b (ADR 0158): the token check needs the status and the expiry; the vault holds ciphertext and xd_exec has no key, the sandbox token is a secret file.
+        (await ExecDatabase.SqlStateAsync(db.Exec, "SELECT account_id, status, expires_at FROM accounts.broker_connections")).ShouldBeNull();
+        foreach (var statement in new[]
+        {
+            "SELECT * FROM accounts.broker_connections",
+            "SELECT broker_user_id FROM accounts.broker_connections",
+            "SELECT broker_user_name FROM accounts.broker_connections",
+            "SELECT last_error FROM accounts.broker_connections",
+            "SELECT ciphertext FROM accounts.broker_secrets",
+            "SELECT account_id FROM accounts.broker_secrets",
+            "SELECT count(*) FROM accounts.broker_secrets",
+            "UPDATE accounts.broker_connections SET status = 'Connected'",
+            "INSERT INTO accounts.broker_secrets (account_id, name, ciphertext, key_version, updated_at) VALUES (gen_random_uuid(), 'x', '\\x00', 1, now())",
+            "DELETE FROM accounts.broker_connections",
+        })
+        {
+            (await ExecDatabase.SqlStateAsync(db.Exec, statement)).ShouldBe("42501", statement);
+        }
+
+        foreach (var (table, privilege) in new[] { ("accounts.broker_secrets", "SELECT"), ("accounts.broker_secrets", "INSERT"), ("accounts.broker_connections", "INSERT"), ("accounts.broker_connections", "UPDATE"), ("accounts.broker_connections", "DELETE") })
+        {
+            ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_table_privilege('xd_exec', '{table}', '{privilege}')"))!).ShouldBeFalse($"{table} {privilege}");
+        }
+
+        ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT bool_or(has_column_privilege('xd_exec', 'accounts.broker_secrets', attname, 'SELECT')) FROM pg_attribute WHERE attrelid = 'accounts.broker_secrets'::regclass AND attnum > 0"))!).ShouldBeFalse();
     }
 }

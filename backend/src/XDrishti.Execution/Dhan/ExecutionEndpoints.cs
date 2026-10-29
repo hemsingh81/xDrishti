@@ -3,7 +3,7 @@ using XDrishti.Execution.Domain;
 
 namespace XDrishti.Execution.Dhan;
 
-/// <summary>The calls of this slice. Everything not named here is refused (super orders, slicing, the kill switch and the rest of the spec's table are later slices).</summary>
+/// <summary>The calls built so far: five order calls and four read-only GETs (order book, trade book, positions, funds). Everything not named here is refused (super orders, slicing, the kill switch and the rest of the spec's table are later slices).</summary>
 public enum DhanCall
 {
     OrdersPost,
@@ -11,6 +11,10 @@ public enum DhanCall
     OrderDelete,
     OrderGet,
     OrderByCorrelationGet,
+    OrdersGet,
+    TradesGet,
+    PositionsGet,
+    FundsGet,
 }
 
 /// <summary>
@@ -31,6 +35,10 @@ public static partial class ExecutionEndpoints
         (DhanCall.OrderDelete, HttpMethod.Delete, "/v2/orders/", true),
         (DhanCall.OrderGet, HttpMethod.Get, "/v2/orders/", true),
         (DhanCall.OrderByCorrelationGet, HttpMethod.Get, "/v2/orders/external/", true),
+        (DhanCall.OrdersGet, HttpMethod.Get, "/v2/orders", false),
+        (DhanCall.TradesGet, HttpMethod.Get, "/v2/trades", false),
+        (DhanCall.PositionsGet, HttpMethod.Get, "/v2/positions", false),
+        (DhanCall.FundsGet, HttpMethod.Get, "/v2/fundlimit", false),
     ];
 
     [GeneratedRegex("^[A-Za-z0-9_-]{1,40}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]

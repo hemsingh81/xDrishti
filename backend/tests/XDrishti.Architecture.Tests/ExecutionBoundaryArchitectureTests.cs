@@ -149,7 +149,7 @@ public sealed class ExecutionBoundaryArchitectureTests
     public void The_dhan_folder_holds_exactly_the_reviewed_files_and_only_the_registration_composes_the_adapter_behind_sandbox()
     {
         Directory.GetFiles(Path.Combine(ExecutionSource, "Dhan"), "*.cs").Select(Path.GetFileName).Order().ToList().ShouldBe(
-            ["DhanCredentials.cs", "DhanErrorMap.cs", "DhanOrderClient.cs", "DhanSandboxRegistration.cs", "DhanWire.cs", "ExecutionEndpoints.cs", "GuardHandler.cs"]);
+            ["DhanCredentials.cs", "DhanErrorMap.cs", "DhanOrderClient.cs", "DhanReads.cs", "DhanSandboxRegistration.cs", "DhanWire.cs", "ExecutionEndpoints.cs", "GuardHandler.cs"]);
 
         // the adapter is composed in exactly one place, behind an explicit sandbox test, and the send protocol in none of the host files
         var callers = SourceFiles(ExecutionSource).Where(f => File.ReadAllText(f).Contains("AddDhanSandbox(", StringComparison.Ordinal)).Select(Path.GetFileName).Order().ToList();
@@ -163,6 +163,23 @@ public sealed class ExecutionBoundaryArchitectureTests
         File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "DhanOrderClient.cs")).ShouldContain("environment != ExecEnvironment.Sandbox");
         File.ReadAllText(Path.Combine(ExecutionSource, "Application", "LegSender.cs")).ShouldContain("environment != ExecEnvironment.Sandbox");
         File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "ExecutionEndpoints.cs")).ShouldNotContain("ExecEnvironment.Live");
+    }
+
+    // P12-02b (ADR 0158): the raw order surface is never a service; the vault is never read; the send switch is a second default-off setting.
+    [Fact]
+    public void The_raw_order_port_is_never_registered_the_vault_is_never_named_and_the_send_switch_defaults_off()
+    {
+        var sources = SourceFiles(ExecutionSource).ToList();
+
+        sources.Where(f => Regex.IsMatch(File.ReadAllText(f), @"Add(Singleton|Scoped|Transient)(<|\()[^;]*IBrokerOrders|TryAdd(Singleton|Scoped|Transient)(<|\()[^;]*IBrokerOrders", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)))
+            .Select(Path.GetFileName).ShouldBeEmpty();
+        sources.Where(f => File.ReadAllText(f).Contains("broker_secrets", StringComparison.OrdinalIgnoreCase)).Select(Path.GetFileName).ShouldBeEmpty();
+        File.ReadAllText(Path.Combine(ExecutionSource, "appsettings.json")).ShouldNotContain("SendEnabled\": true");
+
+        var migration = string.Join('\n', File.ReadAllLines(Path.Combine(Backend, "src", "XDrishti.Infrastructure", "Persistence", "Migrations", "20261029170000_AddExecutionBrokerLog.cs")).Where(l => !l.TrimStart().StartsWith("//", StringComparison.Ordinal) && !l.TrimStart().StartsWith("--", StringComparison.Ordinal)));
+        Regex.Matches(migration, @"GRANT[^;]*broker_secrets", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2)).ShouldBeEmpty();
+        migration.ShouldContain("GRANT SELECT (account_id, status, expires_at) ON accounts.broker_connections TO xd_exec");
+        Regex.Matches(migration, @"GRANT[^;]*(UPDATE|DELETE|TRUNCATE)[^;]*broker_calls", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2)).ShouldBeEmpty();
     }
 
     [Fact]

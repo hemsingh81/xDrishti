@@ -13,6 +13,10 @@ public sealed class ExecutionEndpointsTests
     [InlineData("DELETE", "https://sandbox.dhan.co/v2/orders/112111182198")]
     [InlineData("GET", "https://sandbox.dhan.co/v2/orders/112111182198")]
     [InlineData("GET", "https://sandbox.dhan.co/v2/orders/external/XD2610260000A1E1")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/orders")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/trades")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/positions")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/fundlimit")]
     public void The_rows_of_this_slice_pass_in_the_sandbox(string method, string url) =>
         ExecutionEndpoints.IsAllowed(ExecEnvironment.Sandbox, new HttpMethod(method), U(url)).ShouldBeTrue();
 
@@ -25,8 +29,14 @@ public sealed class ExecutionEndpointsTests
     [InlineData("POST", "https://sandbox.dhan.co/v2/positions/convert")]
     [InlineData("POST", "https://sandbox.dhan.co/v2/killswitch")]
     [InlineData("POST", "https://sandbox.dhan.co/v2/forever/orders")]
-    [InlineData("GET", "https://sandbox.dhan.co/v2/orders")]
     [InlineData("POST", "https://sandbox.dhan.co/v2/orders/123")]
+    [InlineData("POST", "https://sandbox.dhan.co/v2/trades")]
+    [InlineData("PUT", "https://sandbox.dhan.co/v2/positions")]
+    [InlineData("DELETE", "https://sandbox.dhan.co/v2/fundlimit")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/trades/123")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/positions?x=1")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/profile")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/killswitch")]
     [InlineData("DELETE", "https://sandbox.dhan.co/v2/orders")]
     [InlineData("PATCH", "https://sandbox.dhan.co/v2/orders/123")]
     [InlineData("POST", "http://sandbox.dhan.co/v2/orders")]
