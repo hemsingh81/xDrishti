@@ -15,6 +15,7 @@ public static class LiveReportRules
     public const string PaperOnly = "paper_only";
     public const string LiveOpen = "live_open";
     public const string PaperOpen = "paper_open";
+    public const string LiveUncertain = "live_uncertain";
     public const string NoPlanLevels = "no_plan_levels";
     public const string PlanNotGraded = "plan_not_graded";
     public const string Unknown = "unknown";

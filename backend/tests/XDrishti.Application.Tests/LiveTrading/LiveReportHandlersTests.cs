@@ -29,8 +29,8 @@ public sealed class LiveReportHandlersTests
     private static NewLiveExecution Exec(long item, decimal vwap = 1250.475m, decimal? exit = 1262m, long qty = 40, decimal? rho = 10m, decimal? charges = null, double? bps = 3.8, string kind = "ticket_level", decimal? planEntry = 1250m, decimal? planExit = 1264m) =>
         new(item, Live, item, Day, "RELIANCE", "buy", "delivery", "CNC", "L1", 640m, 0.0008m, 0.05m, kind, 1250m, rho, 1250.2m, vwap, qty, 0.475, 0.2, 0.275, 9.5, bps, 0.0475, 0.02, 0.0275, 70, planEntry, planExit, 1240m, 0.0, exit, exit is null ? null : qty, charges);
 
-    private static LiveTrip Trip(long item, NewLiveExecution? e, string outcome = "filled", string strategy = "ORB", double? gradeR = 1.4, DateOnly? date = null) =>
-        new(item, Live, date ?? Day, "RELIANCE", "buy", strategy, outcome, "graded", gradeR, e is null ? null : new StoredLiveExecution(item, e, DateTimeOffset.UnixEpoch));
+    private static LiveTrip Trip(long item, NewLiveExecution? e, string outcome = "filled", string strategy = "ORB", double? gradeR = 1.4, DateOnly? date = null, string? uncertain = null) =>
+        new(item, Live, date ?? Day, "RELIANCE", "buy", strategy, outcome, "graded", gradeR, e is null ? null : new StoredLiveExecution(item, e, DateTimeOffset.UnixEpoch), uncertain);
 
     private static (GetLiveVsPaperHandler Handler, IPaperTradeSource Paper) VsPaper(IReadOnlyList<LiveTrip> trips, PaperAccountsRead accounts, PaperTradesRead? trades = null, Guid? configured = null)
     {
@@ -100,6 +100,22 @@ public sealed class LiveReportHandlersTests
         view.Excluded.Single(e => e.PlanItemId == 2).Detail.ShouldContain("gap_beyond_limit");
         view.Excluded.Single(e => e.PlanItemId == 3).Detail.ShouldContain("missed_no_order");
         view.Evidence.Exclusions.Sum(e => e.Count).ShouldBe(5);
+    }
+
+    [Fact]
+    public async Task A_trip_the_journal_doubts_is_excluded_as_live_uncertain_with_no_r_and_a_clear_trip_still_pairs()
+    {
+        var trips = new List<LiveTrip> { Trip(1, Exec(1)), Trip(2, Exec(2), uncertain: "uncertain: pre-existing position (the account held 25 shares)"), Trip(3, Exec(3, exit: null), uncertain: "uncertain: x") };
+        var paper = new PaperTradesRead(true, [P(1), P(2), P(3)], new Dictionary<long, string>());
+        var (h, _) = VsPaper(trips, One, paper);
+
+        var view = (await h.HandleAsync(Q(), Ct)).Value;
+
+        view.Pairs.Select(p => p.PlanItemId).ShouldBe([1L]);
+        view.Excluded.Single(e => e.PlanItemId == 2).Reason.ShouldBe("live_uncertain");
+        view.Excluded.Single(e => e.PlanItemId == 2).Detail.ShouldContain("pre-existing position");
+        view.Excluded.Single(e => e.PlanItemId == 3).Reason.ShouldBe("live_open"); // one reason each: an open trip is open first
+        view.Evidence.Exclusions.Single(e => e.Reason == "live_uncertain").Count.ShouldBe(1);
     }
 
     [Fact]

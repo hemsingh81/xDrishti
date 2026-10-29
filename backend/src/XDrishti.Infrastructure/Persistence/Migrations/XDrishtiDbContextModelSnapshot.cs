@@ -7603,6 +7603,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("journaled_at");
 
+                    b.Property<Guid?>("LiveFillId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("live_fill_id");
+
                     b.Property<long>("Qty")
                         .HasColumnType("bigint")
                         .HasColumnName("qty");
@@ -7619,7 +7623,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("role");
 
-                    b.Property<Guid>("TransactionId")
+                    b.Property<Guid?>("TransactionId")
                         .HasColumnType("uuid")
                         .HasColumnName("transaction_id");
 
@@ -7632,13 +7636,17 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasIndex("ForDate")
                         .HasDatabaseName("ix_journal_fills_for_date");
 
+                    b.HasIndex("LiveFillId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_journal_fills_live_fill_id");
+
                     b.HasIndex("TransactionId")
                         .IsUnique()
                         .HasDatabaseName("uq_journal_fills_transaction_id");
 
                     b.ToTable("journal_fills", "trading", t =>
                         {
-                            t.HasCheckConstraint("ck_journal_fills_shape", "role IN ('entry', 'exit', 'discretionary') AND (role = 'discretionary') = (entry_id IS NULL) AND qty > 0 AND length(reason) > 0");
+                            t.HasCheckConstraint("ck_journal_fills_shape", "role IN ('entry', 'exit', 'discretionary') AND (role = 'discretionary') = (entry_id IS NULL) AND qty > 0 AND length(reason) > 0 AND (transaction_id IS NULL) <> (live_fill_id IS NULL)");
                         });
                 });
 
@@ -10519,7 +10527,6 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("TransactionId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_journal_fills_transactions_transaction_id");
                 });
 

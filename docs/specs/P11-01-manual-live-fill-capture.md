@@ -85,7 +85,7 @@ Capture one real order book and trade book answer, scrubbed (owner act; the buil
 - `live_orders` unique key: known limit stated (a price-modified order is not a new revision).
 
 ## Amendments at build (2026-10-28, ADR 0149)
-1. **`journal_fills` unchanged; live fills are not journaled here.** The `live_fill_id` change (and acceptance criterion 11's journal clause, the double-journal guard and the grader read of live fills) moves to **P11-01b**. The matching and the outcomes do not depend on it; no fill is journaled twice because `JournalPlansHandler` is untouched.
+1. **`journal_fills` unchanged; live fills are not journaled here.** The `live_fill_id` change (and acceptance criterion 11's journal clause, the double-journal guard and the grader read of live fills) moves to **P11-01b** (built 2026-10-29, [spec](P11-01b-journal-live-fills.md), ADR 0154). The matching and the outcomes do not depend on it; no fill is journaled twice because `JournalPlansHandler` is untouched.
 2. **Charges** come from the existing history mapper (delivery trades only); intraday fills have no charges row (`unavailable`). The history agreement is reported in the settle summary and log, not stored. A mapper entry that keeps intraday is deferred to P11-02.
 3. **No `IHaltSource`** (P11-04b adds it with the halts). The settle does not call grading for today (the use case refuses it); it grades a finished session and reads stored grades.
 4. **Columns added** to `live_ticket_outcomes`: `protection` and `reject_text`. Poll run words: `ok` = both books read, `partial` = trade book only; order evidence = at least one `ok` poll that day.

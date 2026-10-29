@@ -34,6 +34,12 @@ public sealed record FillGrade(
     /// <summary>The label every fill grade carries: these are the owner's executions, not a replay.</summary>
     public const string Basis = "realised fills, not simulated";
 
+    /// <summary>The doubt written when a live round trip has a fill whose charges were not recorded: a net R without them would read better than it was, so the rupee result is stored and no R (the sentence is a marker, see <c>IsChargesDoubt</c>).</summary>
+    public const string ChargesNotRecorded = "uncertain: the charges of an intraday live fill are not recorded";
+
+    /// <summary>True when the grade is uncertain only because charges were not recorded (it says nothing about whether the position was the ticket's own).</summary>
+    public bool IsChargesDoubt => Status == Uncertain && Detail.Contains(ChargesNotRecorded, StringComparison.Ordinal);
+
     /// <summary>R measured against the plan.</summary>
     public const string Graded = "graded";
 

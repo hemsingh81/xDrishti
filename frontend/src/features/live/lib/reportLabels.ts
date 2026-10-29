@@ -12,6 +12,7 @@ export const reasonWords: Readonly<Record<string, string>> = {
   live_only: 'Live only (no paper entry)',
   paper_only: 'Paper only (not taken live)',
   live_open: 'Live position not closed',
+  live_uncertain: 'Live trip in doubt (no R)',
   paper_open: 'Paper trade not closed',
   no_plan_levels: 'No stop, no risk per share',
   plan_not_graded: 'Plan not graded',

@@ -273,7 +273,10 @@ internal sealed class JournalFillRecord
 {
     public long Id { get; set; }
 
-    public Guid TransactionId { get; set; }
+    public Guid? TransactionId { get; set; }
+
+    /// <summary>The captured live fill this link is for (P11-01b); exactly one of this and <see cref="TransactionId"/> is set.</summary>
+    public Guid? LiveFillId { get; set; }
 
     public long? EntryId { get; set; }
 

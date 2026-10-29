@@ -42,6 +42,7 @@ public sealed class LiveCaptureGrantsTests(ApiFactory factory)
 
             await ExecuteAsync(connection, "SET ROLE xd_app");
             await ExecuteAsync(connection, "RESET ROLE");
+            await ExecuteAsync(connection, "ALTER TABLE trading.journal_fills DROP CONSTRAINT fk_journal_fills_live_fills_live_fill_id"); // what Down of AddJournalLiveFills does first
             await ExecuteAsync(connection, "DROP TABLE trading.capacity_scores, trading.slippage_estimates, trading.live_order_classes, trading.live_executions, trading.live_ticket_outcomes, trading.live_fill_charges, trading.live_orders, trading.live_fills, trading.live_capture_runs"); // what Down does
         }
         finally

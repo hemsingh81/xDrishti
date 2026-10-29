@@ -76,7 +76,7 @@ None. (Which paper account to pair with is `Live:Report:PaperAccountId`; with on
 
 ## Amendments at build (2026-10-29, ADR 0152)
 1. **Built as written, read only, no table:** the two GETs, `xd live report`, the lazy Live vs paper tab. The three `Live:Report` options are thresholds, not switches (nothing to default OFF); no owner write.
-2. **`live_uncertain` is not built** (live fills are not journaled until P11-01b). The pair rho is the execution's stored `risk_per_share`; a pair with no plan prices only loses the plan-price line.
+2. **`live_uncertain` is not built** (live fills are not journaled until P11-01b). *Update 2026-10-29: built in [P11-01b](P11-01b-journal-live-fills.md), ADR 0154.* The pair rho is the execution's stored `risk_per_share`; a pair with no plan prices only loses the plan-price line.
 3. **Net rule:** net requested but not every pair has charges on both sides gives the whole report as gross, with the charges part `unavailable` (never per-pair mixing).
 4. **Execution gap:** plan R for a missed ticket (including `rejected`, which carries no `missed_r`) is the plan grade's R; a group whose trips lack recorded charges is gross as a whole; `unknown`, open and ungraded tickets are left out and listed; the total is built from the same tickets.
 5. **API additions:** `paperAccountId`, `page`, `size` on live-vs-paper; 422 `live.paper_account_required`; a paper store that cannot be read gives state `unavailable`.

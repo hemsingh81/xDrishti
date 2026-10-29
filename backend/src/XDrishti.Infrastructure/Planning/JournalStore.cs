@@ -1,6 +1,7 @@
 using Npgsql;
 using NpgsqlTypes;
 using XDrishti.Application.Abstractions.Planning;
+using XDrishti.Domain.LiveTrading;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Portfolio;
 using XDrishti.Domain.Research;
@@ -8,7 +9,8 @@ using XDrishti.Domain.Research;
 namespace XDrishti.Infrastructure.Planning;
 
 /// <summary>
-/// The auto-journal behind <see cref="IJournalStore"/> (spec P7-14, ADR 0093): raw SQL. It only SELECTs from <c>portfolio.transactions</c> (the fills the existing read-only sync stored) and inserts into its own three tables, which the runtime role can
+/// The auto-journal behind <see cref="IJournalStore"/> (spec P7-14, ADR 0093): raw SQL. It only SELECTs from <c>portfolio.transactions</c> (the fills the existing read-only sync stored) and, since P11-01b (ADR 0154), from <c>trading.live_fills</c>
+/// (the intraday fills the live capture stored; a delivery fill or a fill that has a stored twin is never read from there, so no fill is journaled twice), and inserts into its own three tables, which the runtime role can
 /// insert into and read but not change. A second save of the same fill or entry is skipped by the unique indexes (<c>ON CONFLICT DO NOTHING</c>). Nothing here talks to a broker.
 /// </summary>
 internal sealed class JournalStore(NpgsqlDataSource dataSource) : IJournalStore
@@ -21,17 +23,47 @@ internal sealed class JournalStore(NpgsqlDataSource dataSource) : IJournalStore
             WHERE t.source = 'broker' AND t.voided_at IS NULL AND t.trade_date BETWEEN @from AND @to
               AND (t.account_id IN (SELECT s.account_id FROM accounts.trading_settings s WHERE s.enabled)
                    OR t.account_id IN (SELECT a.account_id FROM trading.plan_item_allocations a))
+              -- a stored trade whose live twin is already journaled is not journaled again (live first, stored later; trg_journal_fills_single_source would refuse it and fail the whole save)
+              AND NOT EXISTS (SELECT 1 FROM trading.live_fills l JOIN trading.journal_fills j ON j.live_fill_id = l.id
+                              WHERE l.account_id = t.account_id AND t.external_id = 't:' || to_char(l.trade_date, 'YYYYMMDD') || ':' || l.broker_trade_id)
             ORDER BY t.trade_date, t.trade_time NULLS LAST, t.id
             """);
         select.Parameters.AddWithValue("from", NpgsqlDbType.Date, from);
         select.Parameters.AddWithValue("to", NpgsqlDbType.Date, to);
         var fills = new List<JournalFill>();
-        await using var reader = await select.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
+        await using (var reader = await select.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                fills.Add(new JournalFill(
+                    reader.GetGuid(0), reader.GetGuid(1), TradeRules.NormaliseSymbol(reader.GetString(2)), reader.GetString(3) == "buy" ? Side.Buy : Side.Sell,
+                    reader.GetFieldValue<DateOnly>(4), reader.IsDBNull(5) ? null : reader.GetFieldValue<TimeOnly>(5), reader.GetInt64(6), reader.GetDecimal(7), reader.GetDecimal(8)));
+            }
+        }
+
+        // Shortcut: the stored query above also reads accounts that are Trading-enabled without an allocation; the live query is allocation-only, because the live capture exists only for accounts a live ticket is allocated to.
+        // The live fills (P11-01b): intraday products only (a delivery fill reaches the journal through the stored trade), never one that has a stored twin (same account, identity t:yyyyMMdd:trade id), and only for accounts with an allocation.
+        await using var live = dataSource.CreateCommand("""
+            SELECT l.id, l.account_id, l.symbol, l.side, l.trade_date, l.trade_time, l.qty, l.price, c.charges
+            FROM trading.live_fills l
+            LEFT JOIN trading.live_fill_charges c ON c.fill_id = l.id
+            WHERE l.trade_date BETWEEN @from AND @to
+              AND upper(l.product) <> ALL(@delivery)
+              AND l.account_id IN (SELECT a.account_id FROM trading.plan_item_allocations a)
+              AND NOT EXISTS (SELECT 1 FROM portfolio.transactions t WHERE t.account_id = l.account_id AND t.voided_at IS NULL
+                              AND t.external_id = 't:' || to_char(l.trade_date, 'YYYYMMDD') || ':' || l.broker_trade_id)
+            ORDER BY l.trade_date, l.trade_time NULLS LAST, l.id
+            """);
+        live.Parameters.AddWithValue("from", NpgsqlDbType.Date, from);
+        live.Parameters.AddWithValue("to", NpgsqlDbType.Date, to);
+        live.Parameters.AddWithValue("delivery", NpgsqlDbType.Array | NpgsqlDbType.Varchar, DayLoss.DeliveryProducts.ToArray());
+        await using var liveReader = await live.ExecuteReaderAsync(cancellationToken);
+        while (await liveReader.ReadAsync(cancellationToken))
         {
             fills.Add(new JournalFill(
-                reader.GetGuid(0), reader.GetGuid(1), TradeRules.NormaliseSymbol(reader.GetString(2)), reader.GetString(3) == "buy" ? Side.Buy : Side.Sell,
-                reader.GetFieldValue<DateOnly>(4), reader.IsDBNull(5) ? null : reader.GetFieldValue<TimeOnly>(5), reader.GetInt64(6), reader.GetDecimal(7), reader.GetDecimal(8)));
+                liveReader.GetGuid(0), liveReader.GetGuid(1), TradeRules.NormaliseSymbol(liveReader.GetString(2)), liveReader.GetString(3) == "buy" ? Side.Buy : Side.Sell,
+                liveReader.GetFieldValue<DateOnly>(4), liveReader.IsDBNull(5) ? null : liveReader.GetFieldValue<TimeOnly>(5), liveReader.GetInt64(6), liveReader.GetDecimal(7),
+                liveReader.IsDBNull(8) ? 0m : liveReader.GetDecimal(8), Live: true, ChargesKnown: !liveReader.IsDBNull(8)));
         }
 
         return fills;
@@ -78,11 +110,12 @@ internal sealed class JournalStore(NpgsqlDataSource dataSource) : IJournalStore
         foreach (var l in links.OrderBy(l => l.Link.Fill.Date).ThenBy(l => l.Link.Fill.Time ?? TimeOnly.MaxValue).ThenBy(l => l.Link.Fill.TransactionId))
         {
             await using var insert = new NpgsqlCommand("""
-                INSERT INTO trading.journal_fills (transaction_id, entry_id, role, qty, reason, for_date, journaled_at) VALUES (@tx, @entry, @role, @qty, @reason, @date, @at)
-                ON CONFLICT (transaction_id) DO NOTHING
+                INSERT INTO trading.journal_fills (transaction_id, live_fill_id, entry_id, role, qty, reason, for_date, journaled_at) VALUES (@tx, @live, @entry, @role, @qty, @reason, @date, @at)
+                ON CONFLICT DO NOTHING
                 """, connection, transaction);
             var link = l.Link;
-            insert.Parameters.AddWithValue("tx", NpgsqlDbType.Uuid, link.Fill.TransactionId);
+            insert.Parameters.AddWithValue("tx", NpgsqlDbType.Uuid, link.Fill.Live ? DBNull.Value : link.Fill.TransactionId);
+            insert.Parameters.AddWithValue("live", NpgsqlDbType.Uuid, link.Fill.Live ? link.Fill.TransactionId : DBNull.Value);
             insert.Parameters.AddWithValue("entry", NpgsqlDbType.Bigint, link.ItemId is { } item ? (object)entryIds[(item, link.AccountId)] : DBNull.Value);
             insert.Parameters.AddWithValue("role", NpgsqlDbType.Varchar, link.Role.Code());
             insert.Parameters.AddWithValue("qty", NpgsqlDbType.Bigint, link.Qty);
@@ -139,9 +172,9 @@ internal sealed class JournalStore(NpgsqlDataSource dataSource) : IJournalStore
     {
         await using var select = dataSource.CreateCommand($"""
             SELECT {FillColumns}
-            FROM trading.journal_fills f JOIN portfolio.transactions t ON t.id = f.transaction_id
-            WHERE f.role = 'discretionary' AND f.for_date = @date AND t.voided_at IS NULL
-            ORDER BY t.trade_date, t.trade_time NULLS LAST, f.id
+            FROM trading.journal_fills f {FillJoins}
+            WHERE f.role = 'discretionary' AND f.for_date = @date AND {FillLive}
+            ORDER BY {FillDate}, {FillTime} NULLS LAST, f.id
             """);
         select.Parameters.AddWithValue("date", NpgsqlDbType.Date, forDate);
         var fills = new List<StoredFill>();
@@ -198,11 +231,16 @@ internal sealed class JournalStore(NpgsqlDataSource dataSource) : IJournalStore
     }
 
     // Shortcut: voided fills are left out of every read (a trade voided after it was journaled keeps its row, because the tables are insert-only, but it no longer counts).
-    private const string FillColumns = "t.id, t.account_id, t.trading_symbol, t.side, t.trade_date, t.trade_time, t.qty, t.price, t.charges, f.role, f.qty, f.reason";
+    // A link names a stored trade or a live fill (exactly one, a check constraint); both are read through the same columns. A voided stored trade drops out; a live fill is never voided.
+    private const string FillJoins = "LEFT JOIN portfolio.transactions t ON t.id = f.transaction_id LEFT JOIN trading.live_fills lf ON lf.id = f.live_fill_id LEFT JOIN trading.live_fill_charges lc ON lc.fill_id = lf.id";
+    private const string FillLive = "(f.live_fill_id IS NOT NULL OR t.voided_at IS NULL)";
+    private const string FillDate = "COALESCE(t.trade_date, lf.trade_date)";
+    private const string FillTime = "COALESCE(t.trade_time, lf.trade_time)";
+    private const string FillColumns = "COALESCE(t.id, lf.id), COALESCE(t.account_id, lf.account_id), COALESCE(t.trading_symbol, lf.symbol), COALESCE(t.side, lf.side), COALESCE(t.trade_date, lf.trade_date), COALESCE(t.trade_time, lf.trade_time), COALESCE(t.qty, lf.qty), COALESCE(t.price, lf.price), COALESCE(t.charges, lc.charges, 0), f.role, f.qty, f.reason, (f.live_fill_id IS NOT NULL), (f.live_fill_id IS NULL OR lc.fill_id IS NOT NULL)";
 
     private static StoredFill ReadFill(NpgsqlDataReader r, int o) =>
         new(r.GetGuid(o), r.GetGuid(o + 1), TradeRules.NormaliseSymbol(r.GetString(o + 2)), r.GetString(o + 3), r.GetFieldValue<DateOnly>(o + 4), r.IsDBNull(o + 5) ? null : r.GetFieldValue<TimeOnly>(o + 5),
-            r.GetInt64(o + 6), r.GetDecimal(o + 7), r.GetDecimal(o + 8), r.GetString(o + 9), r.GetInt64(o + 10), r.GetString(o + 11));
+            r.GetInt64(o + 6), r.GetDecimal(o + 7), r.GetDecimal(o + 8), r.GetString(o + 9), r.GetInt64(o + 10), r.GetString(o + 11), r.GetBoolean(o + 12), r.GetBoolean(o + 13));
 
     private async ValueTask<IReadOnlyList<StoredEntry>> ReadEntriesAsync(string where, Action<NpgsqlCommand> bind, CancellationToken cancellationToken)
     {
@@ -211,10 +249,12 @@ internal sealed class JournalStore(NpgsqlDataSource dataSource) : IJournalStore
         await using (var select = dataSource.CreateCommand($"""
             SELECT e.id, e.plan_id, e.item_id, e.account_id, e.for_date, e.uncertain_reason, {FillColumns}
             FROM trading.journal_entries e
-            LEFT JOIN trading.journal_fills f ON f.entry_id = e.id AND EXISTS (SELECT 1 FROM portfolio.transactions v WHERE v.id = f.transaction_id AND v.voided_at IS NULL)
+            LEFT JOIN trading.journal_fills f ON f.entry_id = e.id AND (f.live_fill_id IS NOT NULL OR EXISTS (SELECT 1 FROM portfolio.transactions v WHERE v.id = f.transaction_id AND v.voided_at IS NULL))
             LEFT JOIN portfolio.transactions t ON t.id = f.transaction_id
+            LEFT JOIN trading.live_fills lf ON lf.id = f.live_fill_id
+            LEFT JOIN trading.live_fill_charges lc ON lc.fill_id = lf.id
             WHERE {where}
-            ORDER BY e.for_date, e.id, t.trade_date, t.trade_time NULLS LAST, f.id
+            ORDER BY e.for_date, e.id, COALESCE(t.trade_date, lf.trade_date), COALESCE(t.trade_time, lf.trade_time) NULLS LAST, f.id
             """))
         {
             bind(select);

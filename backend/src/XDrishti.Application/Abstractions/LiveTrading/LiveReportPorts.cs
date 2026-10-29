@@ -1,9 +1,9 @@
 namespace XDrishti.Application.Abstractions.LiveTrading;
 
 /// <summary>
-/// One ticket of one live account as the live-versus-paper report reads it (spec P11-03): its stored outcome, the plan grade's status and R, and the stored execution when it was entered. Plain stored facts; nothing here reaches a broker.
+/// One ticket of one live account as the live-versus-paper report reads it (spec P11-03): its stored outcome, the plan grade's status and R, and the stored execution when it was entered. Plain stored facts; nothing here reaches a broker. <c>Uncertain</c> is the journal's reason (P11-01b) when the round trip may not be the ticket's alone (a pre-existing position or an oversized exit): null when the journal holds no such doubt, and also null when the journal has no entry for the ticket (not evidence of certainty).
 /// </summary>
-public sealed record LiveTrip(long ItemId, Guid AccountId, DateOnly Date, string Symbol, string Side, string Strategy, string Outcome, string GradeStatus, double? GradeR, StoredLiveExecution? Execution);
+public sealed record LiveTrip(long ItemId, Guid AccountId, DateOnly Date, string Symbol, string Side, string Strategy, string Outcome, string GradeStatus, double? GradeR, StoredLiveExecution? Execution, string? Uncertain = null);
 
 /// <summary>The live side of the report: the tickets of a live account in a range of sessions, oldest first, one per stored outcome. Read only.</summary>
 public interface ILivePairSource

@@ -109,6 +109,10 @@ internal sealed class GetLiveVsPaperHandler(
             {
                 excluded.Add(new LiveExcludedView(trip.ItemId, trip.Symbol, trip.Date, LiveReportRules.PaperOpen, "the paper trade has no exit yet"));
             }
+            else if (trip.Uncertain is { } doubt)
+            {
+                excluded.Add(new LiveExcludedView(trip.ItemId, trip.Symbol, trip.Date, LiveReportRules.LiveUncertain, "the journal doubts the round trip, so no R is read from it: " + (doubt.Length <= 200 ? doubt : doubt[..200])));
+            }
             else if (e.RiskPerShare is not { } rho || PairedShortfall.Pair(e.Side == "buy", e.FillVwap, e.ExitVwap.Value, p.EntryPrice, p.ExitPrice.Value, rho) is not { } split)
             {
                 excluded.Add(new LiveExcludedView(trip.ItemId, trip.Symbol, trip.Date, LiveReportRules.NoPlanLevels, "the ticket has no stop, so no risk per share"));

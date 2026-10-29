@@ -14,4 +14,6 @@ namespace XDrishti.Domain.Planning;
 /// <param name="Qty">Shares.</param>
 /// <param name="Price">Price per share, rupees.</param>
 /// <param name="Charges">The charges of the trade as one total, rupees.</param>
-public sealed record JournalFill(Guid TransactionId, Guid AccountId, string Symbol, Side Side, DateOnly Date, TimeOnly? Time, long Qty, decimal Price, decimal Charges);
+/// <param name="Live">True when the fill is a captured live fill (<c>trading.live_fills</c>, P11-01b); then <paramref name="TransactionId"/> holds that row's id, which cannot equal any stored trade's id.</param>
+/// <param name="ChargesKnown">False when the source recorded no charges for the fill (an intraday live fill): <paramref name="Charges"/> is then 0 and means "not recorded", never "free".</param>
+public sealed record JournalFill(Guid TransactionId, Guid AccountId, string Symbol, Side Side, DateOnly Date, TimeOnly? Time, long Qty, decimal Price, decimal Charges, bool Live = false, bool ChargesKnown = true);

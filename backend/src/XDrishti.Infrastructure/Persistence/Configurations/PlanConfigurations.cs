@@ -231,12 +231,13 @@ internal sealed class JournalFillRecordConfiguration : IEntityTypeConfiguration<
 {
     public void Configure(EntityTypeBuilder<JournalFillRecord> builder)
     {
-        builder.ToTable("journal_fills", Schemas.Trading, t => t.HasCheckConstraint("ck_journal_fills_shape", "role IN ('entry', 'exit', 'discretionary') AND (role = 'discretionary') = (entry_id IS NULL) AND qty > 0 AND length(reason) > 0"));
+        builder.ToTable("journal_fills", Schemas.Trading, t => t.HasCheckConstraint("ck_journal_fills_shape", "role IN ('entry', 'exit', 'discretionary') AND (role = 'discretionary') = (entry_id IS NULL) AND qty > 0 AND length(reason) > 0 AND (transaction_id IS NULL) <> (live_fill_id IS NULL)"));
         builder.HasKey(x => x.Id).HasName("pk_journal_fills");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.Property(x => x.Role).HasMaxLength(16).IsRequired();
         builder.Property(x => x.Reason).HasMaxLength(300).IsRequired();
         builder.HasIndex(x => x.TransactionId).IsUnique().HasDatabaseName("uq_journal_fills_transaction_id");
+        builder.HasIndex(x => x.LiveFillId).IsUnique().HasDatabaseName("uq_journal_fills_live_fill_id"); // the foreign key onto trading.live_fills is raw SQL in the migration (that table is not in the model)
         builder.HasIndex(x => x.EntryId).HasDatabaseName("ix_journal_fills_entry_id");
         builder.HasIndex(x => x.ForDate).HasDatabaseName("ix_journal_fills_for_date");
         builder.HasOne<Transaction>().WithMany().HasForeignKey(x => x.TransactionId).HasConstraintName("fk_journal_fills_transactions_transaction_id").OnDelete(DeleteBehavior.Restrict);

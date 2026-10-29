@@ -4,7 +4,7 @@ using XDrishti.Application.Abstractions.Planning;
 namespace XDrishti.Application.LiveTrading;
 
 /// <summary>The live side of the report from stored rows: outcomes of the range, the executions, the plan grades and the strategy of each ticket. Reads only.</summary>
-internal sealed class LivePairSource(ILiveCaptureStore capture, ILiveExecutionStore executions, LiveTicketSource tickets, IGradeStore grades) : ILivePairSource
+internal sealed class LivePairSource(ILiveCaptureStore capture, ILiveExecutionStore executions, LiveTicketSource tickets, IGradeStore grades, IJournalStore journal) : ILivePairSource
 {
     private const int PageSize = 500;
 
@@ -46,13 +46,24 @@ internal sealed class LivePairSource(ILiveCaptureStore capture, ILiveExecutionSt
         }
 
         var stored = await grades.ForPlansAsync([.. ticketsByItem.Values.Select(t => t.PlanId).Distinct()], cancellationToken);
+        // The journal's doubt per ticket (P11-01b): a pre-existing position, or an oversized exit; a grade that is uncertain only because charges were not recorded is NOT a doubt about the trip.
+        var doubts = new Dictionary<(long Item, Guid Account), string>();
+        foreach (var e in await journal.EntriesForPlansAsync([.. ticketsByItem.Values.Select(t => t.PlanId).Distinct()], cancellationToken))
+        {
+            var why = e.Uncertain ?? (e.Grade is { IsChargesDoubt: false, Status: Domain.Planning.FillGrade.Uncertain } g ? g.Detail : null);
+            if (why is not null)
+            {
+                doubts[(e.ItemId, e.AccountId)] = why;
+            }
+        }
+
         return [.. outcomes.OrderBy(o => o.ForDate).ThenBy(o => o.ItemId).Select(o =>
         {
             ticketsByItem.TryGetValue(o.ItemId, out var ticket);
             var grade = stored.GetValueOrDefault(o.ItemId)?.Grade.Grade;
             return new LiveTrip(
                 o.ItemId, o.AccountId, o.ForDate, ticket?.Symbol ?? string.Empty, ticket is null ? string.Empty : ticket.Plan.Side == Domain.Research.Side.Buy ? "buy" : "sell",
-                string.IsNullOrEmpty(ticket?.Strategy) ? "unknown" : ticket.Strategy, o.Outcome.Outcome, o.Outcome.PlanGradeStatus, grade is { HasR: true } ? grade.R : null, byOutcome.GetValueOrDefault(o.Id));
+                string.IsNullOrEmpty(ticket?.Strategy) ? "unknown" : ticket.Strategy, o.Outcome.Outcome, o.Outcome.PlanGradeStatus, grade is { HasR: true } ? grade.R : null, byOutcome.GetValueOrDefault(o.Id), doubts.GetValueOrDefault((o.ItemId, o.AccountId)));
         })];
     }
 }

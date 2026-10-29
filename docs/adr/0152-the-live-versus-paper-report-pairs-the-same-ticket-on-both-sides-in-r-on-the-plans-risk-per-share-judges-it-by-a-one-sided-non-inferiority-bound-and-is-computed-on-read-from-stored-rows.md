@@ -17,7 +17,7 @@ After weeks of small live trading the owner needs to know whether real fills cos
 7. **One handler for later readers.** P11-04b (gates) and P11-06 (phase check) call `GetLiveVsPaperHandler`; they never compute the figures a second time.
 
 ## Amendments at build (what the spec left open or got wrong)
-- `live_uncertain` is **not built**: live fills are not journaled yet (P11-01b), so there is no uncertain trip to read; `unknown` outcomes appear in the gap exclusions.
+- `live_uncertain` is **not built**: live fills are not journaled yet (P11-01b), so there is no uncertain trip to read; `unknown` outcomes appear in the gap exclusions. *Update 2026-10-29: built in P11-01b (ADR 0154).*
 - The pair's risk per share is the live execution's stored `risk_per_share` (the ticket level's or the plan grade's), the plan-price line uses the plan grade's entry and exit; a pair without plan prices makes only that line `unavailable`.
 - Net requested without charges on both sides for every pair gives the gross report (decision 4), not a per-pair net.
 - Strategy of a ticket is read from the plan item (`LiveTicket.Strategy`, an optional trailing field).

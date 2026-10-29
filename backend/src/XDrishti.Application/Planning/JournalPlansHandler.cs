@@ -139,7 +139,10 @@ internal sealed class JournalPlansHandler(
             }
 
             var links = entry.Fills.Select(f => new JournalLink(Fill(f), JournalRoleText.TryParse(f.Role) ?? JournalRole.Discretionary, entry.ItemId, f.AccountId, f.Qty, f.Reason)).ToList();
-            var grade = FillGrader.Grade(side, [.. links.Where(l => l.Role == JournalRole.Entry)], [.. links.Where(l => l.Role == JournalRole.Exit)], stored.Grade.Grade, entry.Uncertain);
+            var used = links.Where(l => l.Role is JournalRole.Entry or JournalRole.Exit).ToList();
+            // A live fill with no recorded charges is not free: net R would read better than it was, so the round trip is graded uncertain (rupee result, no R) and says why.
+            var doubt = entry.Uncertain ?? (used.Any(l => !l.Fill.ChargesKnown) ? FillGrade.ChargesNotRecorded : null);
+            var grade = FillGrader.Grade(side, [.. links.Where(l => l.Role == JournalRole.Entry)], [.. links.Where(l => l.Role == JournalRole.Exit)], stored.Grade.Grade, doubt);
             if (grade is null)
             {
                 pending++;
@@ -155,5 +158,5 @@ internal sealed class JournalPlansHandler(
     }
 
     internal static JournalFill Fill(StoredFill f) =>
-        new(f.TransactionId, f.AccountId, f.Symbol, f.Side == "buy" ? Side.Buy : Side.Sell, f.Date, f.Time, f.TradeQty, f.Price, f.Charges);
+        new(f.TransactionId, f.AccountId, f.Symbol, f.Side == "buy" ? Side.Buy : Side.Sell, f.Date, f.Time, f.TradeQty, f.Price, f.Charges, f.Live, f.ChargesKnown);
 }

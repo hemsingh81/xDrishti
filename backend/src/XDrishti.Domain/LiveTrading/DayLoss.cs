@@ -91,5 +91,9 @@ public sealed record DayLoss(string State, decimal? Realised, decimal? Open, lon
         return new(unmarked > 0 ? MeasureStates.RealisedOnly : MeasureStates.Value, realised, unmarked > 0 ? null : open, carried, unmarked);
     }
 
-    private static bool IsDelivery(string product) => product.ToUpperInvariant() is "CNC" or "MTF" or "MARGIN";
+    /// <summary>The broker products that are held overnight (delivery); every other product is squared off in the session. Upper case.</summary>
+    public static readonly IReadOnlyList<string> DeliveryProducts = ["CNC", "MTF", "MARGIN"];
+
+    /// <summary>True for a delivery product (any case).</summary>
+    public static bool IsDelivery(string product) => DeliveryProducts.Contains(product.ToUpperInvariant());
 }

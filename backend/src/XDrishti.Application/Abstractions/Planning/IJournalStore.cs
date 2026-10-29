@@ -27,7 +27,9 @@ public sealed record JournalSaved(int Entries, int Fills);
 /// <param name="Role">entry, exit or discretionary.</param>
 /// <param name="Qty">Shares that belong to the role.</param>
 /// <param name="Reason">Why.</param>
-public sealed record StoredFill(Guid TransactionId, Guid AccountId, string Symbol, string Side, DateOnly Date, TimeOnly? Time, long TradeQty, decimal Price, decimal Charges, string Role, long Qty, string Reason);
+/// <param name="Live">True when the fill is a captured live fill (<see cref="TransactionId"/> is then the id of its <c>trading.live_fills</c> row).</param>
+/// <param name="ChargesKnown">False when no charges were recorded for the fill.</param>
+public sealed record StoredFill(Guid TransactionId, Guid AccountId, string Symbol, string Side, DateOnly Date, TimeOnly? Time, long TradeQty, decimal Price, decimal Charges, string Role, long Qty, string Reason, bool Live = false, bool ChargesKnown = true);
 
 /// <summary>A journal entry (one ticket on one account) with its fills and its fill grade, if any.</summary>
 /// <param name="Id">The entry row.</param>
@@ -48,11 +50,11 @@ public sealed record NewFillGrade(long EntryId, FillGrade Grade, DateTimeOffset 
 
 /// <summary>
 /// The auto-journal (<c>trading.journal_entries</c>, <c>journal_fills</c>, <c>fill_grades</c>), insert-only (P7-14, ADR 0093). It READS the fills the existing portfolio sync stored (<c>portfolio.transactions</c>, never written here)
-/// and links them to tickets. Nothing here talks to a broker or places an order.
+/// and the intraday fills the live capture stored (<c>trading.live_fills</c>, P11-01b, ADR 0154: a delivery fill is never read from there, so no fill is journaled twice) and links them to tickets. Nothing here talks to a broker or places an order.
 /// </summary>
 public interface IJournalStore
 {
-    /// <summary>The broker fills (source broker, not voided) of Trading accounts and of accounts with an allocation, from <paramref name="from"/> to <paramref name="to"/> inclusive, in a fixed order.</summary>
+    /// <summary>The broker fills (source broker, not voided) of Trading accounts and of accounts with an allocation, plus the non-delivery live fills of accounts with an allocation (flagged <see cref="JournalFill.Live"/>), from <paramref name="from"/> to <paramref name="to"/> inclusive, in a fixed order.</summary>
     ValueTask<IReadOnlyList<JournalFill>> FillsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken);
 
     /// <summary>Stores entries and fill links in one transaction; an entry or a fill that is already linked keeps its first link and is skipped (idempotent).</summary>

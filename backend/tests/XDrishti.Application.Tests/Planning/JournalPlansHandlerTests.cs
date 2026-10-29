@@ -207,4 +207,51 @@ public sealed class JournalPlansHandlerTests
         written.Single().Grade.GrossPnl.ShouldBe(40m);
         result.Value.GradesUncertain.ShouldBe(1);
     }
+
+    [Fact]
+    public async Task A_live_fill_is_linked_like_any_other_fill_and_keeps_its_source_flag()
+    {
+        _plans.ItemsAsync(1, Ct).Returns([Item(11, TicketState.Armed)]);
+        var entry = Fill() with { Live = true, ChargesKnown = false };
+        var exit = Fill(side: Side.Sell, hour: 13) with { Live = true, ChargesKnown = false };
+        _journal.FillsAsync(F, Arg.Any<DateOnly>(), Ct).Returns([entry, exit]);
+
+        var result = await Handler().HandleAsync(new JournalPlansCommand(F), Ct);
+
+        result.Value.Entries.ShouldBe(1);
+        result.Value.Exits.ShouldBe(1);
+        _saved.ShouldAllBe(l => l.Link.Fill.Live);
+        _saved.Select(l => l.Link.Fill.TransactionId).ShouldBe([entry.TransactionId, exit.TransactionId], ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task A_live_round_trip_with_unrecorded_charges_is_graded_without_an_r_and_says_why_while_recorded_charges_grade_it()
+    {
+        _plans.ItemsAsync(1, Ct).Returns([]);
+        var item = Item(11, TicketState.Closed);
+        _plans.FindItemAsync(11, Ct).Returns(item);
+        _plans.FindItemAsync(12, Ct).Returns(item with { Id = 12 });
+        StoredFill Leg(string role, string side, int hour, decimal price, bool known) => new(Guid.NewGuid(), Account, "RELIANCE", side, F, new TimeOnly(hour, 0), 10, price, 0m, role, 10, "x", true, known);
+        _journal.OpenEntriesAsync(Arg.Any<int>(), Ct).Returns(
+        [
+            new StoredEntry(1, 1, 11, Account, F, [Leg("entry", "buy", 10, 100.5m, false), Leg("exit", "sell", 13, 104m, false)], null),
+            new StoredEntry(2, 1, 12, Account, F, [Leg("entry", "buy", 10, 100.5m, true), Leg("exit", "sell", 13, 104m, true)], null),
+        ]);
+        var graded = new TicketGrade(GradeStatus.Graded, 2, 0.5, 2.5, "Target", 100, 104, "gross, no charges", "x", 98);
+        _grades.ForPlansAsync(Arg.Any<IReadOnlyList<long>>(), Ct).Returns(new Dictionary<long, StoredGrade>
+        {
+            [11] = new(1, new NewGrade(1, 11, F, graded, null, DateTimeOffset.UnixEpoch)),
+            [12] = new(2, new NewGrade(1, 12, F, graded, null, DateTimeOffset.UnixEpoch)),
+        });
+        IReadOnlyList<NewFillGrade> written = [];
+        _journal.InsertGradesAsync(Arg.Do<IReadOnlyList<NewFillGrade>>(g => written = g), Ct).Returns(2);
+
+        await Handler().HandleAsync(new JournalPlansCommand(F), Ct);
+
+        var unknown = written.Single(g => g.EntryId == 1).Grade;
+        unknown.Status.ShouldBe(FillGrade.Uncertain);
+        unknown.R.ShouldBeNull();
+        unknown.IsChargesDoubt.ShouldBeTrue();
+        written.Single(g => g.EntryId == 2).Grade.Status.ShouldBe(FillGrade.Graded);
+    }
 }
