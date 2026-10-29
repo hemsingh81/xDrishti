@@ -1,19 +1,31 @@
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using XDrishti.Execution.Application;
 using XDrishti.Execution.Application.Ports;
+using XDrishti.Execution.Dhan;
+using XDrishti.Execution.Domain;
 using XDrishti.Execution.Persistence;
 
 namespace XDrishti.Execution.Host;
 
 public static class ExecServices
 {
-    /// <summary>Registers the skeleton with closed defaults. No HTTP client, no broker adapter: the only <see cref="IBrokerOrders"/> is not registered at all in this slice.</summary>
+    /// <summary>Registers the skeleton with closed defaults. The broker adapter is registered only for environment sandbox (P12-02); the default registers none.</summary>
     public static IServiceCollection AddExecution(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<ExecOptions>().Bind(configuration.GetSection(ExecOptions.Section)).ValidateDataAnnotations().ValidateOnStart();
         services.AddSingleton<IModeSource, ClosedModeSource>();
         services.AddSingleton<IHaltSource, ClosedHaltSource>();
+        services.TryAddSingleton(TimeProvider.System);
+
+        // The adapter exists only when the owner set the environment to sandbox. Live registers nothing in P12-02; none registers nothing.
+        var environment = ExecEnvironmentParser.Parse(configuration[$"{ExecOptions.Section}:Environment"]);
+        if (environment == ExecEnvironment.Sandbox)
+        {
+            services.AddDhanSandbox(configuration);
+        }
+
         return services;
     }
 

@@ -31,6 +31,10 @@ public static class ExecSettingRegistry
         Time("exec.square_off_time", "15:15", "15:00", "15:20"),
         Num("exec.token_min_remaining_min", "20", "5", "120"),
         Num("exec.max_modifications_per_intent", "20", "0", "24"),
+        Num("exec.exit_collar_pct", "1.0", "0.2", "3"),
+        Num("exec.send_timeout_s", "10", "3", "30"),
+        Num("exec.order_valid_for_s", "5", "1", "30"),
+        new("exec.lookup_verified", ExecSettingKind.Flag, "false", "false", "true"),
         new("exec.canary_pending", ExecSettingKind.Flag, "true", "false", "true"),
     ];
 

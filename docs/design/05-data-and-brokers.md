@@ -319,7 +319,7 @@ Adding new tracked instruments triggers a backfill job (CSV first, then Dhan for
 | `IAccountReader` | funds, positions, holdings, trades (history), ledger | Dhan (built so far: holdings §8.2; **trade history and ledger, P2-13, §8.3** as `IBrokerTrades` / `IBrokerLedger`; funds and positions not built) |
 | `IBrokerConnector` (P1-16c) | start/complete the browser consent login | Dhan (API key & secret consent flow) — §8.1 |
 | `ITokenProvider` | get, refresh, expiry for the services | Reads the vault and `accounts.broker_connections` (P1-12) |
-| `IOrderExecutor` | place/modify/cancel (later phase) | — |
+| `IBrokerOrders` (P12-02, ADR 0157; replaces the planned `IOrderExecutor`) | place/modify/cancel/lookup by client id, inside `XDrishti.Execution` only, never in Application | Dhan **sandbox only** (`XDrishti.Execution/Dhan`, guarded, unreachable unless `Execution__Environment=sandbox`); live is refused until its own ADR |
 | `IFileImporter` | CSV profiles → bars | CSV |
 
 Dhan is the only broker ([ADR 0009](../adr/0009-dhan-consent-flow-only.md)); another one means a new decision, one connector and one adapter project. Dhan API keys, secrets and tokens are kept in the encrypted broker vault (`accounts.broker_secrets`, doc 04 §1).

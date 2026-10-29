@@ -111,7 +111,7 @@ public sealed class ExecutionBoundaryArchitectureTests
     }
 
     [Fact]
-    public void The_order_write_paths_appear_nowhere_in_source_except_the_planned_adapter_file()
+    public void The_order_write_paths_appear_nowhere_in_source_except_the_one_adapter_file()
     {
         var offenders = SourceFiles(Path.Combine(Backend, "src"))
             .Where(f => !IsExcluded(SrcRelative(f)))
@@ -120,7 +120,79 @@ public sealed class ExecutionBoundaryArchitectureTests
             .ToList();
 
         offenders.ShouldBeEmpty();
-        Directory.Exists(Path.Combine(ExecutionSource, "Dhan")).ShouldBeFalse("the Dhan adapter is P12-02 and is not part of P12-01");
+        File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "ExecutionEndpoints.cs")).ShouldContain("/v2/orders", Case.Sensitive, "the one guard table holds the order paths");
+    }
+
+    // P12-02 (ADR 0157): the Dhan folder is the only place with HTTP, a host name and the access-token header.
+    [Fact]
+    public void Http_a_host_name_and_the_token_header_exist_only_in_the_dhan_folder_and_only_the_sandbox_host_is_pinned()
+    {
+        var all = SourceFiles(ExecutionSource);
+        var outside = all.Where(f => !SrcRelative(f).StartsWith("XDrishti.Execution/Dhan/", StringComparison.Ordinal)).ToList();
+
+        outside.Where(f => Regex.IsMatch(File.ReadAllText(f), @"HttpClient|HttpMessageHandler|System\.Net\.Http|https?://|access-token|\.dhan\.co", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)))
+            .Select(Path.GetFileName).ShouldBeEmpty();
+
+        var hostFiles = all.Where(f => File.ReadAllText(f).Contains("dhan.co", StringComparison.OrdinalIgnoreCase)).Select(f => SrcRelative(f)).ToList();
+        hostFiles.ShouldBe(["XDrishti.Execution/Dhan/ExecutionEndpoints.cs"]);
+
+        var text = File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "ExecutionEndpoints.cs"));
+        text.ShouldContain("\"sandbox.dhan.co\"");
+        Regex.Matches(text, @"[a-z0-9.-]+\.dhan\.co", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).Select(m => m.Value).Distinct().ShouldBe(["sandbox.dhan.co"]);
+        text.ShouldNotContain("api.dhan.co");
+        text.ShouldNotContain("api-order-update");
+        all.ShouldNotContain(f => File.ReadAllText(f).Contains("api.dhan.co", StringComparison.OrdinalIgnoreCase), "no live host string exists in the execution project");
+        all.ShouldNotContain(f => Regex.IsMatch(File.ReadAllText(f), "AddHttpClient|WebSocket|ClientWebSocket|AllowAutoRedirect\\s*=\\s*true", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)));
+    }
+
+    [Fact]
+    public void The_dhan_folder_holds_exactly_the_reviewed_files_and_only_the_registration_composes_the_adapter_behind_sandbox()
+    {
+        Directory.GetFiles(Path.Combine(ExecutionSource, "Dhan"), "*.cs").Select(Path.GetFileName).Order().ToList().ShouldBe(
+            ["DhanCredentials.cs", "DhanErrorMap.cs", "DhanOrderClient.cs", "DhanSandboxRegistration.cs", "DhanWire.cs", "ExecutionEndpoints.cs", "GuardHandler.cs"]);
+
+        // the adapter is composed in exactly one place, behind an explicit sandbox test, and the send protocol in none of the host files
+        var callers = SourceFiles(ExecutionSource).Where(f => File.ReadAllText(f).Contains("AddDhanSandbox(", StringComparison.Ordinal)).Select(Path.GetFileName).Order().ToList();
+        callers.ShouldBe(["DhanSandboxRegistration.cs", "ExecServices.cs"]);
+        var services = File.ReadAllText(Path.Combine(ExecutionSource, "Host", "ExecServices.cs"));
+        Regex.IsMatch(services, @"environment == ExecEnvironment\.Sandbox\)\s*\{\s*services\.AddDhanSandbox", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBeTrue();
+        services.ShouldNotContain("AddLegSender");
+        SourceFiles(ExecutionSource).Where(f => File.ReadAllText(f).Contains("AddLegSender(", StringComparison.Ordinal)).Select(Path.GetFileName).ShouldBe(["DhanSandboxRegistration.cs"]);
+
+        // the environment live is never a send target: the adapter and the sender name only the sandbox environment as acceptable
+        File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "DhanOrderClient.cs")).ShouldContain("environment != ExecEnvironment.Sandbox");
+        File.ReadAllText(Path.Combine(ExecutionSource, "Application", "LegSender.cs")).ShouldContain("environment != ExecEnvironment.Sandbox");
+        File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "ExecutionEndpoints.cs")).ShouldNotContain("ExecEnvironment.Live");
+    }
+
+    [Fact]
+    public void The_xd_api_allow_list_files_are_byte_for_byte_the_committed_ones()
+    {
+        // zero diff against HEAD for the data-side allow-list and the broker clients (needs git; skipped quietly when the checkout has none)
+        var root = Path.GetDirectoryName(Backend)!;
+        var files = new[] { "backend/src/XDrishti.Infrastructure/Brokers/BrokerEndpoints.cs", "backend/tests/XDrishti.Infrastructure.Tests/BrokerAllowListTests.cs" };
+        foreach (var file in files.Where(f => File.Exists(Path.Combine(root, f))))
+        {
+            var info = new System.Diagnostics.ProcessStartInfo("git", $"diff --quiet HEAD -- {file}") { WorkingDirectory = root, RedirectStandardError = true, RedirectStandardOutput = true };
+            System.Diagnostics.Process? p;
+            try
+            {
+                p = System.Diagnostics.Process.Start(info);
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                return; // no git on this machine
+            }
+
+            using var started = p;
+            if (p is null)
+            {
+                return;
+            }
+
+            p.WaitForExit(10_000);
+            p.ExitCode.ShouldBeOneOf(0, 128, 127);
+        }
     }
 
     [Fact]
@@ -134,12 +206,12 @@ public sealed class ExecutionBoundaryArchitectureTests
     }
 
     [Fact]
-    public void The_execution_project_has_no_http_surface_no_http_client_and_no_broker_library()
+    public void The_execution_project_has_no_http_server_no_http_client_factory_and_no_broker_library()
     {
         var references = Execution.GetReferencedAssemblies().Select(r => r.Name ?? string.Empty).ToList();
 
         references.ShouldNotContain(r => r.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal));
-        references.ShouldNotContain(r => r.StartsWith("System.Net.Http", StringComparison.Ordinal));
+        // P12-02 (ADR 0157): System.Net.Http is allowed, but its use is limited to the Dhan folder (Http_a_host_name_... above); no HTTP server, no Microsoft.Extensions.Http.
         // P12-01b (ADR 0156): plain Npgsql is allowed for the order record (Persistence/), as the role xd_exec; EF Core, the shared Infrastructure and any HTTP library are not.
         references.ShouldNotContain(r => r == "Microsoft.Extensions.Http" || r.Contains("EntityFramework", StringComparison.Ordinal));
         references.ShouldNotContain(r => Regex.IsMatch(r, "dhan|kite|zerodha|upstox|fyers|smartapi|angelone|alpaca|ibapi|ccxt|5paisa|groww|quickfix", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)));
@@ -147,7 +219,7 @@ public sealed class ExecutionBoundaryArchitectureTests
         references.ShouldNotContain("XDrishti.Api");
 
         var sources = SourceFiles(ExecutionSource).Select(File.ReadAllText).ToList();
-        sources.ShouldNotContain(s => s.Contains("HttpClient", StringComparison.Ordinal) || s.Contains("AddHttpClient", StringComparison.Ordinal) || s.Contains("WebSocket", StringComparison.Ordinal));
+        sources.ShouldNotContain(s => s.Contains("AddHttpClient", StringComparison.Ordinal) || s.Contains("WebSocket", StringComparison.Ordinal));
         File.ReadAllText(Path.Combine(ExecutionSource, "XDrishti.Execution.csproj")).ShouldNotContain("Microsoft.NET.Sdk.Web");
     }
 

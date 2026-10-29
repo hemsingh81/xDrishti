@@ -13,6 +13,9 @@ public sealed class FakeBroker : IBrokerOrders
     /// <summary>When set, the next call returns it without touching the book (NotSent or Unknown); then it clears.</summary>
     public BrokerOutcome? NextOutcome { get; set; }
 
+    /// <summary>Fault: the next place is stored by the broker but the answer is lost (the caller sees Unknown).</summary>
+    public bool DropNextResponse { get; set; }
+
     public int Calls { get; private set; }
 
     public IReadOnlyCollection<BrokerLeg> Legs => [.. _legs.Values.Select(v => v.Leg)];
@@ -26,6 +29,12 @@ public sealed class FakeBroker : IBrokerOrders
         }
 
         var stored = _legs.GetOrAdd(leg.ClientOrderId, _ => (leg, "B" + Interlocked.Increment(ref _next).ToString(CultureInfo.InvariantCulture)));
+        if (DropNextResponse)
+        {
+            DropNextResponse = false;
+            return Task.FromResult(new BrokerAck(BrokerOutcome.Unknown, null));
+        }
+
         return Task.FromResult(new BrokerAck(BrokerOutcome.Acknowledged, stored.BrokerId));
     }
 

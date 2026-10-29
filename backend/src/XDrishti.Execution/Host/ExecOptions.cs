@@ -11,5 +11,5 @@ public sealed class ExecOptions
     [Required]
     public string Environment { get; set; } = "none";
 
-    public ExecEnvironment Parsed => Enum.TryParse<ExecEnvironment>(Environment, ignoreCase: true, out var e) ? e : ExecEnvironment.None;
+    public ExecEnvironment Parsed => ExecEnvironmentParser.Parse(Environment);
 }
