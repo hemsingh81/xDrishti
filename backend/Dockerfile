@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# One build stage for the whole solution, one small runtime image per host (target: api | worker | feed | mcp).
+# One build stage for the whole solution, one small runtime image per host (target: api | worker | feed | mcp | exec).
 # Runtime images are Ubuntu "chiseled": no shell, no package manager, non-root user — minimal attack surface.
 ARG SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.400-noble
 # 10.0.13: SignalR (the hub of xd-api) in 10.0.12 and earlier has a known denial-of-service vulnerability (GHSA-334f-vvp4-7g6p).
@@ -28,11 +28,13 @@ COPY src/XDrishti.Api/XDrishti.Api.csproj src/XDrishti.Api/
 COPY src/XDrishti.Worker/XDrishti.Worker.csproj src/XDrishti.Worker/
 COPY src/XDrishti.Feed/XDrishti.Feed.csproj src/XDrishti.Feed/
 COPY src/XDrishti.Mcp/XDrishti.Mcp.csproj src/XDrishti.Mcp/
+COPY src/XDrishti.Execution/XDrishti.Execution.csproj src/XDrishti.Execution/
 RUN --mount=type=cache,id=xd-nuget,target=/root/.nuget/packages \
     dotnet restore src/XDrishti.Api/XDrishti.Api.csproj && \
     dotnet restore src/XDrishti.Worker/XDrishti.Worker.csproj && \
     dotnet restore src/XDrishti.Feed/XDrishti.Feed.csproj && \
-    dotnet restore src/XDrishti.Mcp/XDrishti.Mcp.csproj
+    dotnet restore src/XDrishti.Mcp/XDrishti.Mcp.csproj && \
+    dotnet restore src/XDrishti.Execution/XDrishti.Execution.csproj
 
 # 2) Build and publish the hosts.
 COPY src/ src/
@@ -41,7 +43,8 @@ RUN --mount=type=cache,id=xd-nuget,target=/root/.nuget/packages \
     dotnet publish src/XDrishti.Api/XDrishti.Api.csproj -c Release -o /out/api --no-restore -p:UseAppHost=false -p:Version=${VERSION} && \
     dotnet publish src/XDrishti.Worker/XDrishti.Worker.csproj -c Release -o /out/worker --no-restore -p:UseAppHost=false -p:Version=${VERSION} && \
     dotnet publish src/XDrishti.Feed/XDrishti.Feed.csproj -c Release -o /out/feed --no-restore -p:UseAppHost=false -p:Version=${VERSION} && \
-    dotnet publish src/XDrishti.Mcp/XDrishti.Mcp.csproj -c Release -o /out/mcp --no-restore -p:UseAppHost=false -p:Version=${VERSION}
+    dotnet publish src/XDrishti.Mcp/XDrishti.Mcp.csproj -c Release -o /out/mcp --no-restore -p:UseAppHost=false -p:Version=${VERSION} && \
+    dotnet publish src/XDrishti.Execution/XDrishti.Execution.csproj -c Release -o /out/exec --no-restore -p:UseAppHost=false -p:Version=${VERSION}
 
 FROM ${ASPNET_IMAGE} AS api
 WORKDIR /app
@@ -74,3 +77,11 @@ EXPOSE 8080
 USER $APP_UID
 HEALTHCHECK --interval=15s --timeout=10s --start-period=20s --retries=3 CMD ["dotnet", "XDrishti.Mcp.dll", "--healthcheck"]
 ENTRYPOINT ["dotnet", "XDrishti.Mcp.dll"]
+
+# The execution service (P12-01b, ADR 0156): a worker like the feed, no HTTP surface. Profile `live` in compose; the owner starts it with `xd-up.sh --exec`. Its health check reads its own heartbeat row.
+FROM ${RUNTIME_IMAGE} AS exec
+WORKDIR /app
+COPY --from=build /out/exec ./
+USER $APP_UID
+HEALTHCHECK --interval=15s --timeout=10s --start-period=20s --retries=3 CMD ["dotnet", "XDrishti.Execution.dll", "--healthcheck"]
+ENTRYPOINT ["dotnet", "XDrishti.Execution.dll"]

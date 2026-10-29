@@ -16,6 +16,8 @@
   SPA fallback. `/hubs/*` (SignalR, WebSocket upgrade) and `/api`, `/health` go to `xd-api`; add new backend paths in `caddy/Caddyfile`
   (a test in `Api.IntegrationTests/Live/CaddyfileTests` and `scripts/check-proxy.sh` keep the hub route honest).
 - Changing a port, image or service → update `docs/design/17-deployment-and-operations.md`.
+- Execution service (P12-01b, ADR 0156): profile `live` = `xd-exec` only, never started by a plain `xd-up.sh`; only the owner's `xd-up.sh --exec` (which alone creates the Keychain item `xdrishti/db/exec`). Logs in as the database role `xd_exec` only; one secret (`db_exec_password` as `Database__Password`, also mounted into `xd-migrate` to set the role's login);
+  network `exec` (internal) holds only `xd-exec` and `xd-db`; no published port, no egress until P12-02. Checked by `ExecComposeRulesTests` and `ExecutionBoundaryArchitectureTests`.
 - Eval (P9-09, ADR 0143): profile `eval` = four services (`xd-migrate-eval`, `xd-mcp-eval`, `xd-eval-seed`, `xd-eval`), never part of `xd-up.sh`, started with `scripts/xd-eval.sh`. None publishes a port; all sit on `back` only
   (no egress); `xd-mcp-eval` reads only the database `xdrishti_eval` as the two read-only roles with its own token (`eval_mcp_token`); only `xd-eval` holds that token, and `xd-api` holds no eval token and no path to
   `xd-mcp-eval`. Checked by `EvalComposeRulesTests`.

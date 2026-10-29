@@ -140,7 +140,8 @@ public sealed class ExecutionBoundaryArchitectureTests
 
         references.ShouldNotContain(r => r.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal));
         references.ShouldNotContain(r => r.StartsWith("System.Net.Http", StringComparison.Ordinal));
-        references.ShouldNotContain(r => r == "Microsoft.Extensions.Http" || r.Contains("Npgsql", StringComparison.Ordinal) || r.Contains("EntityFramework", StringComparison.Ordinal));
+        // P12-01b (ADR 0156): plain Npgsql is allowed for the order record (Persistence/), as the role xd_exec; EF Core, the shared Infrastructure and any HTTP library are not.
+        references.ShouldNotContain(r => r == "Microsoft.Extensions.Http" || r.Contains("EntityFramework", StringComparison.Ordinal));
         references.ShouldNotContain(r => Regex.IsMatch(r, "dhan|kite|zerodha|upstox|fyers|smartapi|angelone|alpaca|ibapi|ccxt|5paisa|groww|quickfix", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)));
         references.ShouldNotContain("XDrishti.Infrastructure");
         references.ShouldNotContain("XDrishti.Api");
@@ -167,14 +168,18 @@ public sealed class ExecutionBoundaryArchitectureTests
     }
 
     [Fact]
-    public void The_stack_does_not_yet_contain_the_execution_container_role_secret_or_network()
+    public void The_execution_container_role_secret_and_network_appear_only_in_their_own_blocks()
     {
-        var compose = File.ReadAllText(RepositoryFiles.RepositoryFile("deploy", "compose.yaml"));
+        var compose = string.Join('\n', File.ReadAllLines(RepositoryFiles.RepositoryFile("deploy", "compose.yaml")).Where(l => !l.TrimStart().StartsWith('#')));
+        var blocks = Regex.Split(compose, @"\n(?=  [a-z][a-z0-9-]*:\n)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
 
-        compose.ShouldNotContain("xd-exec");
-        compose.ShouldNotContain("xd_exec");
-        compose.ShouldNotContain("db_exec_password");
-        compose.ShouldNotContain("XDrishti.Execution");
+        string[] Holders(string needle) => [.. blocks.Where(b => b.Contains(needle, StringComparison.Ordinal)).Select(b => b.Trim().Split(':')[0])];
+
+        // the password file: set as the login by xd-migrate, read by xd-exec only; the role name only in xd-exec's own connection string; the network only between xd-db and xd-exec.
+        Holders("source: db_exec_password").ShouldBe(["xd-migrate", "xd-exec"], ignoreOrder: true);
+        Holders("Username=xd_exec").ShouldBe(["xd-exec"]);
+        blocks.Where(b => Regex.IsMatch(b, @"networks: \[[^\]]*\bexec\b", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2))).Select(b => b.Trim().Split(':')[0]).ShouldBe(["xd-db", "xd-exec"], ignoreOrder: true);
+        Holders("XDrishti.Execution.dll").ShouldBe(["xd-exec"]);
     }
 
     [Fact]

@@ -29,6 +29,7 @@ using XDrishti.Application.Autonomy;
 using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Depth;
+using XDrishti.Application.Execution;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
@@ -90,6 +91,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RecordHeartbeatCommand>, RecordHeartbeatHandler>();
         services.AddScoped<IFeedHeartbeats, FeedHeartbeats>();
         services.AddScoped<IDepthHeartbeats, DepthHeartbeats>(); // the depth recorder's own row xd-depth (P7-16)
+        services.AddScoped<IQueryHandler<GetExecutionStatusQuery, ExecutionStatusView>, GetExecutionStatusHandler>(); // the execution service's status (P12-01b): read only
         services.AddScoped<IQueryHandler<GetDepthRecorderQuery, DepthRecorderView>, GetDepthRecorderHandler>(); // the owner's depth switch (P7-16): read
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)
         services.AddScoped<IQueryHandler<GetRampQuery, Result<RampView>>>(sp => sp.GetRequiredService<GetRampHandler>());

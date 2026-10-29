@@ -26,7 +26,7 @@
   schema must call `MakeAppendOnlyForAppRole` for both again (or grant per table with `GrantTableToAppRole`); `ResearchGrantsTests` enforces it.
 - Reads: `AsNoTracking()`, project to DTOs, paginate. Writes: track only what changes; bulk → Npgsql `COPY`.
 - Time series (bars, ticks, valuations) → TimescaleDB hypertables + continuous aggregates (raw SQL in migration).
-- Runtime uses role `xd_app` (DML only); migrations run as `xd_owner` via `xd-api migrate`.
+- Runtime uses role `xd_app` (DML only); migrations run as `xd_owner` via `xd-api migrate`. The execution service uses a second runtime role, `xd_exec` (P12-01b, ADR 0156): it alone writes schema `execution`, which `xd_app` can only read (plus INSERT on `commands`); a new `execution` table needs an explicit grant decision in `ExecGrantsTests`.
 
 ## Code
 - Warnings are errors; analyzers at `latest-recommended`; style from `.editorconfig`. Do not suppress — fix.

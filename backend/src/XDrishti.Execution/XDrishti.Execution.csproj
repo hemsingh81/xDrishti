@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
-  <!-- The execution service (P12-01, ADR 0155): the only project allowed to name an order action. This slice is the skeleton and the pure order state machine only; it contains no network code and no broker client.
-       Nothing references it (ExecutionBoundaryArchitectureTests). It stays free of ASP.NET Core, EF Core, Npgsql and every broker library until the slices that need them (P12-01b, P12-02). -->
+  <!-- The execution service (P12-01, ADR 0155; P12-01b, ADR 0156): the only project allowed to name an order action. It holds the pure order state machine, the database record (plain Npgsql in Persistence/, as the role xd_exec) and the host.
+       It contains no broker client and no HTTP code. Nothing references it (ExecutionBoundaryArchitectureTests). It stays free of ASP.NET Core, EF Core, Infrastructure and every broker library; Npgsql is allowed for the record only. -->
   <ItemGroup>
     <ProjectReference Include="..\XDrishti.Domain\XDrishti.Domain.csproj" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.KeyPerFile" />
+    <PackageReference Include="Npgsql" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
   </ItemGroup>
   <ItemGroup>

@@ -1,6 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\..\src\XDrishti.Execution\XDrishti.Execution.csproj" />
+    <!-- Only to apply the migration chain to a throw-away server (the database tests of P12-01b); the execution project itself does not reference it. -->
+    <ProjectReference Include="..\..\src\XDrishti.Infrastructure\XDrishti.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.PostgreSql" />
   </ItemGroup>
   <Import Project="..\Tests.props" />
 </Project>

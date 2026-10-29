@@ -32,6 +32,7 @@ stateDiagram-v2
     Closed --> Reconciled: matches broker trade book
 ```
 
+- **As built (P12-01 and P12-01b, [ADR 0155](../adr/0155-the-execution-service-starts-as-a-pure-skeleton-the-order-state-machine-closed-ports-and-an-in-memory-fake-broker-with-no-network-code.md), [ADR 0156](../adr/0156-the-execution-record-lives-in-schema-execution-written-only-by-the-role-xd-exec-with-checks-by-trigger-and-the-container-sits-in-profile-live-on-its-own-network.md)):** the machine has 14 states (`submitting` before the call and `closing` for our own exit in flight are added to the diagram) and exactly 23 legal moves; the same 23 pairs are a function and a check constraint in schema `execution`, so the database refuses what the Domain refuses. Events are insert-only with a chain (`seq`, `prev_event_id`); `intent_state` is a projection moved by trigger in the same transaction and equals the fold of the events. `xd-api` instructs the service only by inserting rows into `execution.commands`; the service answers each once in `command_results`. No broker call exists yet (P12-02).
 - **Broker-side stop first** — protection never depends on the Mac staying up.
 - Pre-trade checks: same limits as planning + price band vs LTP, freeze quantity, margin.
 - Idempotent client order ids; order-update stream + end-of-day reconciliation; mismatch ⇒ freeze.

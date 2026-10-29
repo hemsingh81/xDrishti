@@ -68,6 +68,7 @@ if (verb == Verb.Migrate)
     await DatabaseMigrator.MigrateAsync(app.Services);
     await StrategySeeding.SeedAsync(app.Services); // the built-in strategies as stored text (spec P3-02d); idempotent
     await PostMigration.ProvisionReadOnlyRolesAsync(app.Services); // the assistant's read-only roles get a login when both password files exist (spec P9-02); idempotent, otherwise they stay NOLOGIN
+    await PostMigration.ProvisionExecutionRoleAsync(app.Services); // the execution role gets a login when its password file exists (spec P12-01b); otherwise it stays NOLOGIN
     // The migration of the eval's fixture database (P9-09): no owner account is made there (compose sets Migrate__SkipOwner).
     return app.Configuration.GetValue<bool>("Migrate:SkipOwner") ? 0 : await OwnerBootstrap.ProvisionAsync(app.Services);
 }

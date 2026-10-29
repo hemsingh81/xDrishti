@@ -13819,6 +13819,27 @@
         }
       }
     },
+    "/api/execution/status": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "The execution service: down / recovering / ready / halted from its heartbeat (down when older than 30 s), its process environment (none, sandbox, live), each account's mode and gate (closed until the mode ladder exists), halts and the open intents. Read only; an empty database answers environment none and closed gates",
+        "operationId": "GetExecutionStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionStatusView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/depth/recorder": {
       "get": {
         "tags": [
@@ -28980,6 +29001,26 @@
         },
         "description": "How many tickets were left out of the report for one reason."
       },
+      "ExecutionAccountView": {
+        "required": [
+          "accountId",
+          "mode",
+          "gate"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "gate": {
+            "$ref": "#/components/schemas/ExecutionGateView"
+          }
+        }
+      },
       "ExecutionGapView": {
         "required": [
           "state",
@@ -29018,6 +29059,21 @@
         },
         "description": "The execution gap by group, a total that is built from the same tickets, and the evidence."
       },
+      "ExecutionGateView": {
+        "required": [
+          "open",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
       "ExecutionRowView": {
         "required": [
           "id",
@@ -29046,6 +29102,79 @@
           }
         },
         "description": "One row of the paper execution waterfall on the wire."
+      },
+      "ExecutionServiceView": {
+        "required": [
+          "state",
+          "lastBeatAt"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "`recovering`, `ready`, `halted` or `down` (no heartbeat, or one older than 30 seconds)."
+          },
+          "lastBeatAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The last heartbeat, null when there never was one.",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExecutionStatusView": {
+        "required": [
+          "service",
+          "environment",
+          "accounts",
+          "halts",
+          "openIntents",
+          "settingsHash",
+          "entriesBlocked"
+        ],
+        "type": "object",
+        "properties": {
+          "service": {
+            "description": "The service as the heartbeat shows it.",
+            "$ref": "#/components/schemas/ExecutionServiceView"
+          },
+          "environment": {
+            "type": "string",
+            "description": "The service's process environment from its heartbeat: `none`, `sandbox` or `live`; `none` when it never reported."
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionAccountView"
+            },
+            "description": "Every account with its stored mode and its gate. The gate is closed for all of them until the mode ladder exists (P12-07)."
+          },
+          "halts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The halts in force. Always empty in this slice (the halt store comes with P12-05) and EntriesBlocked says so."
+          },
+          "openIntents": {
+            "type": "integer",
+            "description": "Intents not yet in a final state.",
+            "format": "int32"
+          },
+          "settingsHash": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Hash of the settings in force as the service reports it, null when it never reported."
+          },
+          "entriesBlocked": {
+            "type": "boolean",
+            "description": "True while no entry may leave: always true in this slice (recovery and the halt store do not exist yet)."
+          }
+        }
       },
       "ExecutionView": {
         "required": [
@@ -29956,6 +30085,10 @@
           "detail": {
             "type": "string",
             "description": "Why, in a sentence."
+          },
+          "isChargesDoubt": {
+            "type": "boolean",
+            "description": "True when the grade is uncertain only because charges were not recorded (it says nothing about whether the position was the ticket's own)."
           }
         },
         "description": "The grade of what the owner's fills did on a ticket (P7-14, ADR 0093), stored beside the plan-price grade. A realised result, never a simulation: the label is always string FillGrade.Basis."
@@ -50957,6 +51090,9 @@
     },
     {
       "name": "Autonomy"
+    },
+    {
+      "name": "Execution"
     },
     {
       "name": "Depth"

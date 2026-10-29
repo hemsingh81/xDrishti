@@ -60,7 +60,7 @@ public static class AiRoleProvisioner
     }
 
     /// <summary>The password goes in as a parameter of a session setting and is quoted by <c>format('%L')</c> inside the server; the role name is one of two constants.</summary>
-    private static async Task SetLoginAsync(NpgsqlConnection connection, string role, string password, CancellationToken cancellationToken)
+    internal static async Task SetLoginAsync(NpgsqlConnection connection, string role, string password, CancellationToken cancellationToken)
     {
         await using (var set = new NpgsqlCommand("SELECT set_config('xd.pw', @password, false)", connection))
         {

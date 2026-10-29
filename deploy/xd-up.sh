@@ -8,18 +8,19 @@
 #      (xdrishti/broker/vault-key, created on the first run and never replaced) encrypts the broker API keys, secrets and
 #      tokens the owner enters in the app (ADR 0008); only xd-api and xd-feed get it (ADR 0024).
 #   4. Builds images and starts the stack, waits until healthy, prints the URLs.
-# Usage: deploy/xd-up.sh [--no-dev] [--no-build] [--owner-reset]
+# Usage: deploy/xd-up.sh [--no-dev] [--no-build] [--owner-reset] [--exec]
 #   --owner-reset  after the stack is up, replace the owner's password with the one now in the Keychain and
 #                  sign the owner out everywhere (change it first with scripts/auth-secrets.sh).
 set -euo pipefail
 
 cd "$(dirname "$0")"
-DEV=1; BUILD=1; OWNER_RESET=0
+DEV=1; BUILD=1; OWNER_RESET=0; EXEC=0
 for arg in "$@"; do
   case "$arg" in
     --no-dev) DEV=0 ;;
     --no-build) BUILD=0 ;;
     --owner-reset) OWNER_RESET=1 ;;
+    --exec) EXEC=1 ;;
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -144,6 +145,14 @@ write_secret eval_mcp_token "xdrishti/mcp/eval-token"
 # The Hermes PoC's own tool token (P9-10, ADR 0144): Mcp:Tokens:Hermes of xd-mcp / xd-mcp-eval, held by xd-hermes (profile hermes, never started here). Revoke it alone by rotating the Keychain item and restarting xd-mcp.
 write_secret mcp_token_hermes "xdrishti/mcp/hermes-token"
 
+# The execution role's password (P12-01b): the Keychain item is created ONLY by `--exec` (an owner act). Without it the compose file still needs the file to exist: an empty one is made once and never overwritten,
+# which sets the role xd_exec NOLOGIN (xd-migrate gives the login only from a non-empty file). Mounted into xd-migrate and xd-exec only.
+if [ "$EXEC" = 1 ]; then
+  write_secret db_exec_password "xdrishti/db/exec"
+elif [ ! -e "$XD_SECRETS_DIR/db_exec_password" ]; then
+  : > "$XD_SECRETS_DIR/db_exec_password"; chmod 644 "$XD_SECRETS_DIR/db_exec_password"
+fi
+
 # Credential-reference files of P1-16 (ADR 0007, replaced by the vault): plain copies of Keychain items that nothing reads any more.
 if [ -e "$XD_SECRETS_DIR/brokers" ] || [ -e "$XD_SECRETS_DIR/brokers.index" ]; then
   rm -rf "$XD_SECRETS_DIR/brokers" "$XD_SECRETS_DIR/brokers.index"
@@ -152,13 +161,14 @@ fi
 
 # 4) Build and start.
 files=(-f compose.yaml); [ "$DEV" = 1 ] && files+=(-f compose.dev.yaml)
+profiles=(--profile ops); [ "$EXEC" = 1 ] && profiles+=(--profile live)
 if [ "$BUILD" = 1 ]; then
   # One image at a time: the api and worker images share the .NET build stage, built once and reused from cache.
   say "Building images (first run takes a few minutes)…"
-  podman compose "${files[@]}" --profile ops --profile ai --parallel 1 build   # the profile ai only for its image: xd-mcp is built here, started by scripts/xd-ai.sh
+  podman compose "${files[@]}" "${profiles[@]}" --profile ai --parallel 1 build   # the profile ai only for its image: xd-mcp is built here, started by scripts/xd-ai.sh
 fi
 say "Starting containers and waiting until healthy…"
-podman compose "${files[@]}" --profile ops up -d --wait --wait-timeout 300
+podman compose "${files[@]}" "${profiles[@]}" up -d --wait --wait-timeout 300
 
 if [ "$OWNER_RESET" = 1 ]; then
   say "Replacing the owner's password from the Keychain and signing out all sessions…"

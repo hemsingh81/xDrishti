@@ -3984,6 +3984,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/execution/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The execution service: down / recovering / ready / halted from its heartbeat (down when older than 30 s), its process environment (none, sandbox, live), each account's mode and gate (closed until the mode ladder exists), halts and the open intents. Read only; an empty database answers environment none and closed gates */
+    get: operations['GetExecutionStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/depth/recorder': {
     parameters: {
       query?: never;
@@ -9205,6 +9222,12 @@ export interface components {
       /** Format: int32 */
       count: number;
     };
+    ExecutionAccountView: {
+      /** Format: uuid */
+      accountId: string;
+      mode: string;
+      gate: components['schemas']['ExecutionGateView'];
+    };
     /** @description The execution gap by group, a total that is built from the same tickets, and the evidence. */
     ExecutionGapView: {
       state: string;
@@ -9213,6 +9236,10 @@ export interface components {
       total: components['schemas']['LiveGapGroupView'];
       excluded: components['schemas']['LiveGapExcludedView'][];
       evidence: components['schemas']['LiveReportEvidenceView'];
+    };
+    ExecutionGateView: {
+      open: boolean;
+      reason: string;
     };
     /** @description One row of the paper execution waterfall on the wire. */
     ExecutionRowView: {
@@ -9227,6 +9254,34 @@ export interface components {
        * @description Trades.
        */
       n: number;
+    };
+    ExecutionServiceView: {
+      /** @description `recovering`, `ready`, `halted` or `down` (no heartbeat, or one older than 30 seconds). */
+      state: string;
+      /**
+       * Format: date-time
+       * @description The last heartbeat, null when there never was one.
+       */
+      lastBeatAt: null | string;
+    };
+    ExecutionStatusView: {
+      /** @description The service as the heartbeat shows it. */
+      service: components['schemas']['ExecutionServiceView'];
+      /** @description The service's process environment from its heartbeat: `none`, `sandbox` or `live`; `none` when it never reported. */
+      environment: string;
+      /** @description Every account with its stored mode and its gate. The gate is closed for all of them until the mode ladder exists (P12-07). */
+      accounts: components['schemas']['ExecutionAccountView'][];
+      /** @description The halts in force. Always empty in this slice (the halt store comes with P12-05) and EntriesBlocked says so. */
+      halts: string[];
+      /**
+       * Format: int32
+       * @description Intents not yet in a final state.
+       */
+      openIntents: number;
+      /** @description Hash of the settings in force as the service reports it, null when it never reported. */
+      settingsHash: null | string;
+      /** @description True while no entry may leave: always true in this slice (recovery and the halt store do not exist yet). */
+      entriesBlocked: boolean;
     };
     /** @description How a service is run: retries (0–5 after a failed attempt), the timeout of an attempt in minutes (1–240), whether a missed run is made up for when the application starts, and whether a failure raises a notice in the bell. */
     ExecutionView: {
@@ -9616,6 +9671,8 @@ export interface components {
       r: null | number;
       /** @description Why, in a sentence. */
       detail: string;
+      /** @description True when the grade is uncertain only because charges were not recorded (it says nothing about whether the position was the ticket's own). */
+      isChargesDoubt?: boolean;
     };
     /**
      * @description Optional per-holding dates for the first import that happens when the portfolio settings are saved (ADR 0013). Without rows, every holding Dhan lists is
@@ -27035,6 +27092,26 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExecutionStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionStatusView'];
         };
       };
     };

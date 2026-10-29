@@ -32,7 +32,7 @@ services:
     volumes:
       - xd-db-data:/var/lib/postgresql
       - ./db/init:/docker-entrypoint-initdb.d:ro
-    networks: [back]
+    networks: [back, exec] # exec: the execution service's own network (P12-01b); no one else is on it
     shm_size: 256m
     healthcheck:
       test: [CMD-SHELL, pg_isready -U xd_owner -d xdrishti]
@@ -63,6 +63,9 @@ services:
         target: AiRoles__ReadPassword
       - source: db_mcp_sql_password
         target: AiRoles__SqlPassword
+      # The password of the execution role xd_exec (P12-01b): migrate gives the role its login from this file; an absent or empty file (xd-up.sh without --exec) sets the role NOLOGIN.
+      - source: db_exec_password
+        target: ExecRole__Password
     networks: [back]
     pull_policy: never # uses the image built for xd-api (compose builds all images before starting)
     depends_on:
@@ -219,6 +222,36 @@ services:
       xd-migrate: { condition: service_completed_successfully }
     healthcheck:
       test: [CMD, dotnet, XDrishti.Feed.dll, --healthcheck]
+      interval: 15s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+    <<: *hardening
+
+  # The execution service (P12-01b, ADR 0156). Profile `live` = NEVER started by a plain `xd-up.sh`; only the owner's `xd-up.sh --exec`. In this slice it holds no broker code and no egress: it heartbeats, reads its settings and answers rows of
+  # execution.commands. It logs in as the database role xd_exec ONLY (the host refuses any other), whose rights are insert-only on the order record; its single secret is that role's password. Own internal network `exec` shared with xd-db alone;
+  # no published port. Environment `none` unless the owner sets XD_EXEC_ENVIRONMENT. Rules: deploy/CLAUDE.md, checked by ExecComposeRulesTests.
+  xd-exec:
+    profiles: [live]
+    image: localhost/xdrishti/exec:${XD_VERSION:-0.1.0}
+    build:
+      context: ../backend
+      target: exec
+      args: { VERSION: "${XD_VERSION:-0.1.0}" }
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      Database__ConnectionString: Host=xd-db;Port=5432;Database=xdrishti;Username=xd_exec
+      Execution__Environment: ${XD_EXEC_ENVIRONMENT:-none}
+    secrets:
+      - source: db_exec_password
+        target: Database__Password
+    networks: [exec]
+    mem_limit: 256m
+    depends_on:
+      xd-migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: [CMD, dotnet, XDrishti.Execution.dll, --healthcheck]
       interval: 15s
       timeout: 10s
       start_period: 20s
@@ -505,6 +538,9 @@ networks:
     internal: true
   # Outbound internet for xd-api (Dhan sign-in, ADR 0008, 0009; instrument master files, ADR 0010) and xd-feed (the market-data WebSocket, ADR 0024). Not internal, no published ports, no other member.
   egress: {}
+  # The execution service's network (P12-01b): internal (no route out); only xd-exec and xd-db are members. The broker route (egress) is added by P12-02, not here.
+  exec:
+    internal: true
   # The Hermes PoC network (P9-10): internal (no route out); only xd-hermes, xd-llm, xd-mcp and xd-mcp-eval are members.
   ai-edge:
     internal: true
@@ -540,3 +576,5 @@ secrets:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/eval_mcp_token
   mcp_token_hermes:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/mcp_token_hermes
+  db_exec_password:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/db_exec_password

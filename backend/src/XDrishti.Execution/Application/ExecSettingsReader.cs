@@ -9,7 +9,12 @@ public interface IExecSettingsSnapshots
 }
 
 /// <summary>The values in force and the keys whose stored value was replaced by the default (out of range or unparsable) so that the host can log them.</summary>
-public sealed record ExecSettingsView(IReadOnlyDictionary<string, string> Values, IReadOnlyList<string> Replaced);
+public sealed record ExecSettingsView(IReadOnlyDictionary<string, string> Values, IReadOnlyList<string> Replaced)
+{
+    /// <summary>SHA-256 of the values in force (sorted <c>key=value</c> lines): equal values give an equal hash; shown in the heartbeat and the status.</summary>
+    public string Hash() =>
+        Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join('\n', Values.OrderBy(v => v.Key, StringComparer.Ordinal).Select(v => $"{v.Key}={v.Value}")))));
+}
 
 /// <summary>Per registry key, the newest snapshot's value merged over the default. An unknown key is ignored; an invalid value is replaced by the default; no snapshot means all defaults.</summary>
 public sealed class ExecSettingsReader(IExecSettingsSnapshots snapshots)

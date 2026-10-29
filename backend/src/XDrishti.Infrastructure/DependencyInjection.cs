@@ -28,6 +28,7 @@ using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Execution;
 using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Reporting;
@@ -39,6 +40,7 @@ using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Capabilities;
 using XDrishti.Infrastructure.Depth;
+using XDrishti.Infrastructure.Execution;
 using XDrishti.Infrastructure.Lab;
 using XDrishti.Infrastructure.Learning;
 using XDrishti.Infrastructure.LiveTrading;
@@ -217,6 +219,7 @@ public static class DependencyInjection
         services.AddScoped<IBrokerTradeBook, DhanTradeBookClient>(); // GET /v2/trades, the day's trade book: read only (P11-01, ADR 0149)
         services.AddScoped<IBrokerOrderBook, DhanOrderBookClient>(); // GET /v2/orders, the day's order book: read only, never an order action (P11-01, ADR 0149)
         services.AddScoped<IComplianceStore, ComplianceStore>(); // the compliance record of the live phase, insert-only (P11-05)
+        services.AddScoped<IExecutionFactsReader, ExecutionFactsReader>(); // the execution service's heartbeat and record, read only (P12-01b)
         services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IBrokerAllowList, BrokerAllowList>(); // the broker allow-list read only, for the P7 phase check (P7-18, ADR 0097)

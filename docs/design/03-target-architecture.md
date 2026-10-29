@@ -222,7 +222,7 @@ xDrishti/
 │   │   ├── XDrishti.Mcp/            # host: MCP read-only tool server
 │   │   ├── XDrishti.Cli/            # `xd` command-line tool
 │   │   ├── XDrishti.Feed/           # host: market-hours live feed for the active set and the depth recorder (P7-16, off by default)
-│   │   └── XDrishti.Execution/      # host (later): order service
+│   │   └── XDrishti.Execution/      # order service host (P12-01/01b): Domain, Application, Persistence (Npgsql, role xd_exec), Host; Dhan/ is P12-02
 │   └── tests/                       # Domain/Application unit, Architecture (layer rules), Api.IntegrationTests (Testcontainers)
 ├── frontend/                        # React 19 + TypeScript + Vite + MUI; Dockerfile builds xd-proxy (Caddy + app)
 │   └── src/{app, features/<name>, shared/{api,ui,lib}, theme, test}
@@ -480,6 +480,7 @@ SignalR → results in `lab` schema → report page. Details: [11-strategy-lab.m
   records the configuring actor for audit.
 - Secrets per container via Podman secrets; only `xd-worker`/`xd-feed` (data/account tokens) and later
   `xd-exec` (order tokens) receive broker secrets.
+- `xd-exec` (P12-01b, [ADR 0156](../adr/0156-the-execution-record-lives-in-schema-execution-written-only-by-the-role-xd-exec-with-checks-by-trigger-and-the-container-sits-in-profile-live-on-its-own-network.md)) logs in as the **database role `xd_exec`** and no other (the host refuses any other). Schema `execution` (intents, events, legs, fills, intent_state, positions, commands, command_results, settings): `xd_exec` has INSERT on the insert-only tables, INSERT and UPDATE on the projections, SELECT on the rest and on a short list of plan and market tables, no DELETE or TRUNCATE, and writes nothing outside the schema except its heartbeat row; `xd_app` has SELECT on every table and INSERT on `commands` only (the instruction row), so a compromised API cannot forge an event. The chain, the 23 legal moves, the cancel-after-fill rule and the fill ceiling are checked by trigger and constraint. The vault (`accounts.broker_secrets`) is not granted until the broker adapter (P12-02) needs it. Tables are not mapped in the EF model; the service uses plain Npgsql, the API reads with a query.
 - `xd-mcp` uses two **read-only database roles** (`xd_mcp_sql` for ad-hoc queries, `xd_mcp_read` for typed tools; [ADR 0137](../adr/0137-the-assistants-tools-run-in-a-separate-read-only-server-under-two-database-roles-that-can-select-only-from-reviewed-views-and-the-switch-lives-in-the-database.md)): `SELECT` on the reviewed `aiv` views only (no base table, no secret, no account id, no session), a read-only transaction, a statement timeout and a row cap; the model server holds no database login at all. No tool can change config, plans or orders.
 - `xd-sandbox` has no network and a read-only data mount.
 - Audit log for config activations, promotions, approvals and (later) orders.

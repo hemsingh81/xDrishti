@@ -1,0 +1,147 @@
+using Npgsql;
+
+namespace XDrishti.Execution.Tests.Database;
+
+/// <summary>
+/// Criterion 10 of P12-01 (P12-01b): what the two runtime roles may do to the execution record, proved from the catalog over EVERY table of the schema (a table added later without a decision fails here, and so does a migration that re-grants the schema to
+/// <c>xd_app</c> without repeating the revokes) and by real statements as the roles. Runs on a dedicated server where <c>xd_app</c> has the default privileges of <c>deploy/db/init/10-roles.sh</c>.
+/// </summary>
+[Collection(ExecDatabaseSuite.Name)]
+public sealed class ExecGrantsTests(ExecDatabase db)
+{
+    private static readonly string[] Privileges = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"];
+
+    private static readonly Dictionary<string, string[]> ExecExpected = new()
+    {
+        ["events"] = ["INSERT", "SELECT"],
+        ["intents"] = ["INSERT", "SELECT"],
+        ["fills"] = ["INSERT", "SELECT"],
+        ["command_results"] = ["INSERT", "SELECT"],
+        ["legs"] = ["INSERT", "SELECT", "UPDATE"],
+        ["intent_state"] = ["INSERT", "SELECT", "UPDATE"],
+        ["positions"] = ["INSERT", "SELECT", "UPDATE"],
+        ["commands"] = ["SELECT"],
+        ["settings"] = ["SELECT"],
+    };
+
+    private static readonly Dictionary<string, string[]> AppExpected = ExecExpected.ToDictionary(e => e.Key, e => e.Key == "commands" ? new[] { "INSERT", "SELECT" } : new[] { "SELECT" });
+
+    private async Task<List<string>> TablesAsync()
+    {
+        await using var c = new NpgsqlConnection(db.Owner);
+        await c.OpenAsync(TestContext.Current.CancellationToken);
+        await using var cmd = new NpgsqlCommand("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'execution' AND c.relkind IN ('r', 'p', 'v', 'm', 'f') ORDER BY 1", c);
+        var names = new List<string>();
+        await using var r = await cmd.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        while (await r.ReadAsync(TestContext.Current.CancellationToken))
+        {
+            names.Add(r.GetString(0));
+        }
+
+        return names;
+    }
+
+    private async Task<string[]> HeldAsync(string role, string table)
+    {
+        var held = new List<string>();
+        foreach (var p in Privileges)
+        {
+            if ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_table_privilege('{role}', 'execution.{table}', '{p}')"))!)
+            {
+                held.Add(p);
+            }
+        }
+
+        return [.. held.Order(StringComparer.Ordinal)];
+    }
+
+    [Fact]
+    public async Task Every_table_of_the_schema_is_decided_for_both_roles_and_no_other_table_exists()
+    {
+        var tables = await TablesAsync();
+
+        tables.ShouldBe([.. ExecExpected.Keys.Order(StringComparer.Ordinal)]);
+        foreach (var table in tables)
+        {
+            (await HeldAsync("xd_exec", table)).ShouldBe(ExecExpected[table], $"xd_exec on {table}");
+            (await HeldAsync("xd_app", table)).ShouldBe(AppExpected[table], $"xd_app on {table}");
+        }
+    }
+
+    [Fact]
+    public async Task No_role_can_use_a_sequence_it_does_not_need_and_nobody_else_can_enter_the_schema()
+    {
+        foreach (var sequence in new[] { "events_id_seq", "intents_id_seq", "legs_id_seq", "fills_id_seq", "settings_id_seq" })
+        {
+            ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('xd_app', 'execution.{sequence}', 'USAGE')"))!).ShouldBeFalse(sequence);
+            ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('xd_exec', 'execution.{sequence}', 'USAGE')"))!).ShouldBeTrue(sequence);
+        }
+
+        ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_schema_privilege('xd_mcp_read', 'execution', 'USAGE') OR has_schema_privilege('xd_mcp_sql', 'execution', 'USAGE')"))!).ShouldBeFalse();
+        ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_schema_privilege('public', 'execution', 'USAGE')"))!).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task The_runtime_role_can_read_everything_instruct_by_one_row_and_write_nothing_else()
+    {
+        const string Event = "INSERT INTO execution.events (intent_id, seq, kind, source, actor) VALUES (1, 1, 'alarm', 'engine', 'x')";
+        (await ExecDatabase.SqlStateAsync(db.App, "SELECT count(*) FROM execution.events")).ShouldBeNull();
+        (await ExecDatabase.SqlStateAsync(db.App, Event)).ShouldBe("42501");
+        (await ExecDatabase.SqlStateAsync(db.App, "UPDATE execution.intent_state SET state = 'closed'")).ShouldBe("42501");
+        (await ExecDatabase.SqlStateAsync(db.App, "DELETE FROM execution.command_results")).ShouldBe("42501");
+        (await ExecDatabase.SqlStateAsync(db.App, "TRUNCATE execution.commands")).ShouldBe("42501");
+        (await ExecDatabase.SqlStateAsync(db.App, "INSERT INTO execution.command_results (command_id, result, code) VALUES (gen_random_uuid(), 'done', 'x')")).ShouldBe("42501");
+        (await ExecDatabase.SqlStateAsync(db.App, $"INSERT INTO execution.commands (id, kind, actor) VALUES ('{Guid.NewGuid()}', 'ping', 'system:grants')")).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task The_execution_role_inserts_events_and_never_deletes_or_truncates_and_writes_nothing_outside_the_schema_but_its_heartbeat()
+    {
+        foreach (var table in ExecExpected.Keys)
+        {
+            (await ExecDatabase.SqlStateAsync(db.Exec, $"DELETE FROM execution.{table}")).ShouldBe("42501", table);
+            (await ExecDatabase.SqlStateAsync(db.Exec, $"TRUNCATE execution.{table}")).ShouldBe("42501", table);
+        }
+
+        (await ExecDatabase.SqlStateAsync(db.Exec, "UPDATE execution.events SET actor = 'y'")).ShouldBe("42501");
+        (await ExecDatabase.SqlStateAsync(db.Exec, "UPDATE execution.intents SET quantity = 1")).ShouldBe("42501");
+        (await ExecDatabase.SqlStateAsync(db.Exec, "INSERT INTO execution.commands (id, kind, actor) VALUES (gen_random_uuid(), 'ping', 'system:x')")).ShouldBe("42501");
+        (await ExecDatabase.SqlStateAsync(db.Exec, "INSERT INTO execution.settings (actor, reason) VALUES ('owner:x', 'y')")).ShouldBe("42501");
+
+        await using var c = new NpgsqlConnection(db.Owner);
+        await c.OpenAsync(TestContext.Current.CancellationToken);
+        await using var cmd = new NpgsqlCommand(
+            """
+            SELECT n.nspname || '.' || c.relname
+            FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE c.relkind IN ('r', 'p') AND n.nspname NOT IN ('execution', 'pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_%' AND n.nspname NOT LIKE '_timescaledb%'
+              AND (has_table_privilege('xd_exec', c.oid, 'INSERT') OR has_table_privilege('xd_exec', c.oid, 'UPDATE') OR has_table_privilege('xd_exec', c.oid, 'DELETE') OR has_table_privilege('xd_exec', c.oid, 'TRUNCATE'))
+            ORDER BY 1
+            """, c);
+        var writable = new List<string>();
+        await using (var r = await cmd.ExecuteReaderAsync(TestContext.Current.CancellationToken))
+        {
+            while (await r.ReadAsync(TestContext.Current.CancellationToken))
+            {
+                writable.Add(r.GetString(0));
+            }
+        }
+
+        writable.ShouldBe(["platform.service_heartbeats"]);
+        (await ExecDatabase.SqlStateAsync(db.Exec, "DELETE FROM platform.service_heartbeats")).ShouldBe("42501");
+    }
+
+    [Fact]
+    public async Task The_execution_role_reads_the_plan_and_the_market_but_not_the_vault_the_sessions_or_the_connections()
+    {
+        foreach (var table in new[] { "trading.plans", "trading.plan_items", "trading.plan_item_allocations", "trading.plan_events", "workflow.approvals", "accounts.broker_accounts", "market.live_quotes", "market.instruments", "market.instrument_broker_ids", "market.trading_days", "portfolio.holdings" })
+        {
+            (await ExecDatabase.SqlStateAsync(db.Exec, $"SELECT count(*) FROM {table}")).ShouldBeNull(table);
+        }
+
+        foreach (var table in new[] { "accounts.broker_secrets", "accounts.broker_connections", "auth.sessions", "auth.users", "platform.app_settings" })
+        {
+            (await ExecDatabase.SqlStateAsync(db.Exec, $"SELECT count(*) FROM {table}")).ShouldBe("42501", table);
+        }
+    }
+}
