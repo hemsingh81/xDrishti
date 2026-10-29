@@ -20,7 +20,11 @@ public static class DhanSandboxRegistration
 
         services.AddOptions<DhanSandboxOptions>().Bind(configuration.GetSection(DhanSandboxOptions.Section)).ValidateDataAnnotations();
         services.AddSingleton<IExecCredentials, SandboxCredentials>();
-        services.AddSingleton<IPreSendCheck, ClosedPreSendCheck>();
+        // The checklist step (P12-03, ADR 0159). No facts source is wired yet, so it still refuses every entry (check_facts_unavailable); exits go to the closed exit policy.
+        services.AddSingleton<ICheckFactsLoader, ClosedCheckFactsLoader>();
+        services.AddSingleton<IExitSendPolicy, ClosedExitSendPolicy>();
+        services.AddSingleton<IPreSendCheck>(sp => new ChecklistPreSendCheck(
+            sp.GetRequiredService<ICheckFactsLoader>(), sp.GetRequiredService<ICheckStore>(), sp.GetRequiredService<IExitSendPolicy>(), sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton(sp =>
         {
             var socket = new SocketsHttpHandler { AllowAutoRedirect = false, UseProxy = false, UseCookies = false, ConnectTimeout = TimeSpan.FromSeconds(5), AutomaticDecompression = System.Net.DecompressionMethods.None };

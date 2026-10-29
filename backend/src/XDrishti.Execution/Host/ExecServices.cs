@@ -43,6 +43,7 @@ public static class ExecServices
         services.AddSingleton<IExecHeartbeats, PgExecHeartbeats>();
         services.TryAddSingleton(TimeProvider.System);
         AddSendSettings(services);
+        services.AddSingleton<ICheckStore, PgCheckStore>();
         services.AddSingleton<PgSendJournal>();
         services.AddSingleton<ISendJournal>(sp => sp.GetRequiredService<PgSendJournal>());
         services.AddSingleton<ISendHistory>(sp => sp.GetRequiredService<PgSendJournal>());

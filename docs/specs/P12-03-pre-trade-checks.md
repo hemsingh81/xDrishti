@@ -1,6 +1,6 @@
 # P12-03 — Pre-trade checks (34 checks, `unavailable` is a reject)
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (2026-10-29, the owner's instruction to build P12; amended at build, ADR 0159) - built 2026-10-29, not committed
 - **Phase / roadmap row:** P12 — Execution service, slice P12-03 of [P12-00](P12-00-execution-service-plan.md)
 - **Design refs:** docs/design/20-extended-modules.md §A ("same limits as planning + price band vs LTP, freeze quantity, margin") · 10-trade-selection.md §5, §6b · 08-exits-and-risk.md §6, §7 · 04 §4.1 · 16-configuration.md (`risk_profiles`, `execution.price_band_pct`) · 19 §4 · ADR 0087 (pre-trade checklist: unavailable never passes), ADR 0091 (auto means every check Pass), ADR 0085, ADR 0084. **Design change:** none to docs 08/10; doc 20 §A gains the check list as a table. ADR: next free ADR number at build time.
 - **Needs:** P12-01, P12-02 (reads: quote, funds, margin, kill switch, profile, static IP, positions). Soft inputs wait for P7-06 (correlation) and P15 (results, ban); P12-05 and P12-06 supply `no_halt` and `streams_alive` (until built they read `unavailable`, which rejects: correct).
@@ -86,3 +86,11 @@ None.
 - New run kind `advisory` for assisted sheets (intent-less, never authorises a send).
 - Criterion 4/8: a Soft confirmation is bound to the exact Soft set and void if it changes; the post-tap run must pass its Hard checks; abort after write-ahead is `submitting>failed`.
 - Criterion 10: stop placement and flatten permitted at every halt level, including `freeze`.
+
+## Amendments at build (ADR 0159)
+- **34 checks, not 33.** The list is 8 gates + 5 ticket/shape + 4 price + 9 money/risk = 26 Hard, plus 8 Soft. The roadmap title said 33 before `canary_cap` was added; the list above is the truth.
+- **Built:** the pure `ExecChecklist` (Domain/Checks), `ExecLimits` (five new registry settings), the stored record (migration `AddExecutionChecks`: `check_runs`, `check_results`, `check_confirmations`, insert-only, xd_exec INSERT/SELECT, xd_app SELECT), `PgCheckStore`, `ChecklistPreSendCheck` (the real `IPreSendCheck`), the ports `ICheckFactsLoader`, `ICheckStore`, `IExitSendPolicy`.
+- **Not built, moved:** the fact loader (no source for quote, margin, profile, calendar, plan exists in the execution project; the default answers null, which refuses), the read endpoint `GET /api/execution/intents/{id}/checks` and `gen-api` (no run can exist and no screen reads it before P12-10; criterion 11 moves to P12-10), advisory runs for sheets (P12-07 writes them; the table accepts them), the state-machine moves `checking>rejected` and the Soft-only wait (P12-08), the second `static_ip_ok` source (P12-11 supplies the attestation).
+- **Exits:** the entry checklist is never consulted for a stop, target, exit or flatten; they go to `IExitSendPolicy`, whose default refuses until P12-04 supplies the reduce-only rule. This is stricter than criterion 10 asks and keeps the default closed.
+- **Fast runs** store only their seven results (the primary key allows it); a fast run never authorises a send, it only confirms a valid full run.
+- **Parity (criterion 5)** is tested for the eight Soft twins and `exposure_headroom`; `risk_per_trade`, `daily_loss` and `circuit_band` differ by design (rupee caps, R-multiple, two-tick margin) and are covered by boundary tests instead.

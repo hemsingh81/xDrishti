@@ -36,6 +36,11 @@ public static class ExecSettingRegistry
         Num("exec.order_valid_for_s", "5", "1", "30"),
         new("exec.lookup_verified", ExecSettingKind.Flag, "false", "false", "true"),
         new("exec.canary_pending", ExecSettingKind.Flag, "true", "false", "true"),
+        Num("exec.max_loss_per_trade_inr", "1000", "100", "50000"),
+        Num("exec.max_spread_ticks", "3", "1", "20"),
+        Num("exec.max_spread_pct", "0.25", "0.05", "1"),
+        Num("exec.min_depth_multiple", "2", "1", "10"),
+        Num("exec.check_valid_for_s", "10", "2", "60"),
     ];
 
     public static ExecSetting? Find(string key) => All.FirstOrDefault(s => s.Key == key);

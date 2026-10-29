@@ -21,6 +21,9 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         ["intent_state"] = ["INSERT", "SELECT", "UPDATE"],
         ["positions"] = ["INSERT", "SELECT", "UPDATE"],
         ["broker_calls"] = ["INSERT", "SELECT"],
+        ["check_runs"] = ["INSERT", "SELECT"],
+        ["check_results"] = ["INSERT", "SELECT"],
+        ["check_confirmations"] = ["INSERT", "SELECT"],
         ["commands"] = ["SELECT"],
         ["settings"] = ["SELECT"],
     };
