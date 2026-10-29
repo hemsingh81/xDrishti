@@ -9,6 +9,7 @@ public sealed class ExecutionEndpointsTests
 
     [Theory]
     [InlineData("POST", "https://sandbox.dhan.co/v2/orders")]
+    [InlineData("POST", "https://sandbox.dhan.co/v2/super/orders")] // P12-04, UNVERIFIED path
     [InlineData("PUT", "https://sandbox.dhan.co/v2/orders/112111182198")]
     [InlineData("DELETE", "https://sandbox.dhan.co/v2/orders/112111182198")]
     [InlineData("GET", "https://sandbox.dhan.co/v2/orders/112111182198")]
@@ -22,7 +23,8 @@ public sealed class ExecutionEndpointsTests
 
     [Theory]
     [InlineData("POST", "https://sandbox.dhan.co/v2/orders/slicing")]
-    [InlineData("POST", "https://sandbox.dhan.co/v2/super/orders")]
+    [InlineData("PUT", "https://sandbox.dhan.co/v2/super/orders/1")]
+    [InlineData("DELETE", "https://sandbox.dhan.co/v2/super/orders/1")]
     [InlineData("PUT", "https://sandbox.dhan.co/v2/ip/setIP")]
     [InlineData("PUT", "https://sandbox.dhan.co/v2/ip/modifyIP")]
     [InlineData("POST", "https://sandbox.dhan.co/v2/RenewToken")]

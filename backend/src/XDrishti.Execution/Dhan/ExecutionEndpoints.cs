@@ -3,10 +3,11 @@ using XDrishti.Execution.Domain;
 
 namespace XDrishti.Execution.Dhan;
 
-/// <summary>The calls built so far: five order calls and four read-only GETs (order book, trade book, positions, funds). Everything not named here is refused (super orders, slicing, the kill switch and the rest of the spec's table are later slices).</summary>
+/// <summary>The calls built so far: six order calls (the super-order entry, UNVERIFIED, is the one added in P12-04) and four read-only GETs (order book, trade book, positions, funds). Everything not named here is refused (super-order changes, slicing, the kill switch and the rest of the spec's table are later slices).</summary>
 public enum DhanCall
 {
     OrdersPost,
+    SuperOrdersPost,
     OrderPut,
     OrderDelete,
     OrderGet,
@@ -31,6 +32,7 @@ public static partial class ExecutionEndpoints
     private static readonly (DhanCall Call, HttpMethod Method, string Prefix, bool HasId)[] Table =
     [
         (DhanCall.OrdersPost, HttpMethod.Post, "/v2/orders", false),
+        (DhanCall.SuperOrdersPost, HttpMethod.Post, "/v2/super/orders", false),
         (DhanCall.OrderPut, HttpMethod.Put, "/v2/orders/", true),
         (DhanCall.OrderDelete, HttpMethod.Delete, "/v2/orders/", true),
         (DhanCall.OrderGet, HttpMethod.Get, "/v2/orders/", true),

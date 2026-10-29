@@ -10,7 +10,7 @@ namespace XDrishti.Execution.Application;
 /// changed; an expired token answers DH-901; more than 10 writes in one second answer DH-904; <see cref="EndOfDay"/> expires what is open. A repeated client id is acknowledged with the first broker id and stored once.
 /// Faults: <see cref="NextOutcome"/> (a scripted NotSent or Unknown that touches nothing), <see cref="DropNextResponse"/> (stored, answer lost), <see cref="RejectNextWith"/> (a coded refusal).
 /// </summary>
-public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBrokerReads
+public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBrokerStops, IBrokerReads
 {
     public const int ModificationCap = 25;
     public const int WritesPerSecondCap = 10;
@@ -33,6 +33,9 @@ public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBro
         public int Filled { get; set; }
 
         public int Modifications { get; set; }
+
+        /// <summary>A stop-loss leg has seen its trigger price; from then on it rests as a limit order at its limit.</summary>
+        public bool Triggered { get; set; }
     }
 
     /// <summary>When set, the next call returns it without touching the book (NotSent or Unknown); then it clears.</summary>
@@ -118,6 +121,11 @@ public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBro
                 return Task.FromResult(new BrokerAck(BrokerOutcome.NotSent, null, "order_not_open"));
             }
 
+            if (order.Leg.Trigger is not null)
+            {
+                return Task.FromResult(new BrokerAck(BrokerOutcome.NotSent, null, "use_modify_stop"));
+            }
+
             if (order.Modifications >= ModificationCap)
             {
                 return Task.FromResult(new BrokerAck(BrokerOutcome.NotSent, null, "modification_cap"));
@@ -126,6 +134,53 @@ public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBro
             order.Modifications++;
             order.Leg = order.Leg with { Price = price };
             return Task.FromResult(new BrokerAck(BrokerOutcome.Acknowledged, order.BrokerId));
+        }
+    }
+
+    public Task<BrokerAck> ModifyStopAsync(string clientOrderId, decimal trigger, decimal limit, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            Calls++;
+            if (Refusal() is { } refused)
+            {
+                return Task.FromResult(refused);
+            }
+
+            if (!_orders.TryGetValue(clientOrderId, out var order) || IsFinal(order.Status) || order.Leg.Trigger is null)
+            {
+                return Task.FromResult(new BrokerAck(BrokerOutcome.NotSent, null, "order_not_open"));
+            }
+
+            if (order.Modifications >= ModificationCap)
+            {
+                return Task.FromResult(new BrokerAck(BrokerOutcome.NotSent, null, "modification_cap"));
+            }
+
+            order.Modifications++;
+            order.Leg = order.Leg with { Trigger = trigger, Price = limit };
+            return Task.FromResult(new BrokerAck(BrokerOutcome.Acknowledged, order.BrokerId));
+        }
+    }
+
+    /// <summary>Fault: the broker drops an open order without telling anyone (a stop leg silently deleted). Nothing is recorded as a call.</summary>
+    public void SilentlyDelete(string clientOrderId)
+    {
+        lock (_gate)
+        {
+            if (_orders.TryGetValue(clientOrderId, out var order) && !IsFinal(order.Status))
+            {
+                order.Status = "CANCELLED";
+            }
+        }
+    }
+
+    /// <summary>How many times the order was modified.</summary>
+    public int ModificationsOf(string clientOrderId)
+    {
+        lock (_gate)
+        {
+            return _orders.TryGetValue(clientOrderId, out var o) ? o.Modifications : 0;
         }
     }
 
@@ -164,7 +219,14 @@ public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBro
         {
             foreach (var order in _orders.Values.Where(o => !IsFinal(o.Status) && o.Leg.SecurityId == securityId))
             {
-                var crosses = order.Leg.Side == ExecSide.Buy ? price <= order.Leg.Price : price >= order.Leg.Price;
+                if (order.Leg.Trigger is { } trigger && price <= trigger)
+                {
+                    order.Triggered = true;
+                }
+
+                var crosses = order.Leg.Trigger is not null && !order.Triggered
+                    ? false
+                    : order.Leg.Side == ExecSide.Buy ? price <= order.Leg.Price : price >= order.Leg.Price;
                 if (!crosses)
                 {
                     continue;
@@ -197,7 +259,7 @@ public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBro
         {
             return Task.FromResult(TokenExpired
                 ? BrokerRead.Unreadable<IReadOnlyList<BrokerOrderView>>("token_invalid")
-                : BrokerRead.Ok<IReadOnlyList<BrokerOrderView>>([.. _orders.Select(o => new BrokerOrderView(o.Value.BrokerId, o.Key, o.Value.Status, o.Value.Leg.SecurityId, o.Value.Leg.Side, o.Value.Leg.Qty, o.Value.Filled, o.Value.Leg.Price))]));
+                : BrokerRead.Ok<IReadOnlyList<BrokerOrderView>>([.. _orders.Select(o => new BrokerOrderView(o.Value.BrokerId, o.Key, o.Value.Status, o.Value.Leg.SecurityId, o.Value.Leg.Side, o.Value.Leg.Qty, o.Value.Filled, o.Value.Leg.Price, o.Value.Leg.Trigger))]));
         }
     }
 

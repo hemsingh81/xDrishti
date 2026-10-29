@@ -23,6 +23,7 @@ using XDrishti.Application.Autonomy;
 using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Depth;
+using XDrishti.Application.Execution;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
@@ -115,6 +116,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(LiveVsPaperView))]
 [JsonSerializable(typeof(LivePhaseCheckView))]
 [JsonSerializable(typeof(ExecutionGapView))]
+[JsonSerializable(typeof(ExecutionAlarmView))]
+[JsonSerializable(typeof(IReadOnlyList<ExecutionAlarmView>))]
 [JsonSerializable(typeof(RampEventView))]
 [JsonSerializable(typeof(SetRampStepRequest))]
 [JsonSerializable(typeof(RampActRequest))]

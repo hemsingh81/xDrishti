@@ -4001,6 +4001,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/execution/alarms': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The alarms of the execution service's protection logic, newest first (at most 200): protection pending or breached, flatten started or incomplete, oversold and the rest. open=true keeps only those not cleared. Read only; an alarm is cleared by the engine or the owner, never deleted */
+    get: operations['GetExecutionAlarms'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/depth/recorder': {
     parameters: {
       query?: never;
@@ -9227,6 +9244,23 @@ export interface components {
       accountId: string;
       mode: string;
       gate: components['schemas']['ExecutionGateView'];
+    };
+    /** @description One alarm. Severity is `info`, `warn` or `critical`; the intent is null for an alarm about no single intent; ClearedAt and ClearedBy are null while the alarm is open. */
+    ExecutionAlarmView: {
+      /** Format: int64 */
+      id: number;
+      /** Format: date-time */
+      at: string;
+      code: string;
+      severity: string;
+      /** Format: uuid */
+      accountId: null | string;
+      /** Format: uuid */
+      intentPublicId: null | string;
+      detail: string;
+      /** Format: date-time */
+      clearedAt: null | string;
+      clearedBy: null | string;
     };
     /** @description The execution gap by group, a total that is built from the same tickets, and the evidence. */
     ExecutionGapView: {
@@ -27112,6 +27146,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ExecutionStatusView'];
+        };
+      };
+    };
+  };
+  GetExecutionAlarms: {
+    parameters: {
+      query?: {
+        open?: boolean;
+        accountId?: string;
+        take?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionAlarmView'][];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

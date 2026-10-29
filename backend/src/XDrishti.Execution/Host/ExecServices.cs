@@ -44,6 +44,7 @@ public static class ExecServices
         services.TryAddSingleton(TimeProvider.System);
         AddSendSettings(services);
         services.AddSingleton<ICheckStore, PgCheckStore>();
+        services.AddSingleton<IAlarmStore, PgAlarmStore>(); // the alarm record only; the watchdog, the policy and the services that write alarms are composed by no host in P12-04 (ADR 0160)
         services.AddSingleton<PgSendJournal>();
         services.AddSingleton<ISendJournal>(sp => sp.GetRequiredService<PgSendJournal>());
         services.AddSingleton<ISendHistory>(sp => sp.GetRequiredService<PgSendJournal>());

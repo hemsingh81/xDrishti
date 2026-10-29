@@ -10,7 +10,7 @@ namespace XDrishti.Execution.Dhan;
 /// The Dhan order adapter for the sandbox (P12-02, ADR 0157). It cannot be built for any environment but sandbox. Writes are never retried; a read is retried once after 250 ms. The token travels only in the <c>access-token</c> header of one request;
 /// nothing here logs a body, a header or an exception message. The HTTP client is created by <see cref="DhanSandboxRegistration"/> with redirects off and the <see cref="GuardHandler"/> in front of the socket.
 /// </summary>
-public sealed partial class DhanOrderClient : IBrokerOrders, IBrokerReads
+public sealed partial class DhanOrderClient : IBrokerOrders, IBrokerStops, IBrokerReads
 {
     private static readonly TimeSpan ReadRetryGap = TimeSpan.FromMilliseconds(250);
 
@@ -56,7 +56,39 @@ public sealed partial class DhanOrderClient : IBrokerOrders, IBrokerReads
             return new BrokerAck(BrokerOutcome.NotSent, null, "execution.token_unavailable");
         }
 
-        return await WriteAsync(DhanCall.OrdersPost, null, credentials, DhanWire.PlaceBody(credentials, leg), cancellationToken).ConfigureAwait(false);
+        return leg.Super is null
+            ? await WriteAsync(DhanCall.OrdersPost, null, credentials, DhanWire.PlaceBody(credentials, leg), cancellationToken).ConfigureAwait(false)
+            : await WriteAsync(DhanCall.SuperOrdersPost, null, credentials, DhanWire.SuperPlaceBody(credentials, leg), cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<BrokerAck> ModifyStopAsync(string clientOrderId, decimal trigger, decimal limit, CancellationToken cancellationToken)
+    {
+        if (trigger <= 0m || trigger % DhanWire.Tick != 0m || limit <= 0m || limit % DhanWire.Tick != 0m || limit > trigger
+            || !ClientOrderId.TryParse(clientOrderId, out var id) || id.Kind != LegKind.Stop)
+        {
+            return new BrokerAck(BrokerOutcome.NotSent, null, DhanWire.InstructionInvalid + ":stop");
+        }
+
+        if (_credentials.Current() is not { } credentials)
+        {
+            return new BrokerAck(BrokerOutcome.NotSent, null, "execution.token_unavailable");
+        }
+
+        View? view;
+        try
+        {
+            view = await FindAsync(clientOrderId, credentials, cancellationToken).ConfigureAwait(false);
+        }
+        catch (BrokerLookupFailedException)
+        {
+            return new BrokerAck(BrokerOutcome.NotSent, null, "lookup_failed");
+        }
+
+        return view is null
+            ? new BrokerAck(BrokerOutcome.NotSent, null, "order_not_found")
+            : view.Side != ExecSide.Sell
+                ? new BrokerAck(BrokerOutcome.NotSent, null, DhanWire.InstructionInvalid + ":stop_wrong_side")
+                : await WriteAsync(DhanCall.OrderPut, view.OrderId, credentials, DhanWire.ModifyStopBody(credentials, view.OrderId, view.Qty, trigger, limit), cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<BrokerAck> ModifyAsync(string clientOrderId, decimal price, CancellationToken cancellationToken)
@@ -64,6 +96,12 @@ public sealed partial class DhanOrderClient : IBrokerOrders, IBrokerReads
         if (price <= 0m || price % DhanWire.Tick != 0m)
         {
             return new BrokerAck(BrokerOutcome.NotSent, null, DhanWire.InstructionInvalid + ":price_or_tick");
+        }
+
+        if (ClientOrderId.TryParse(clientOrderId, out var parsed) && parsed.Kind == LegKind.Stop)
+        {
+            // A stop leg changes with its trigger (ModifyStopAsync); a plain LIMIT body would drop the trigger.
+            return new BrokerAck(BrokerOutcome.NotSent, null, DhanWire.InstructionInvalid + ":use_modify_stop");
         }
 
         if (_credentials.Current() is not { } credentials)

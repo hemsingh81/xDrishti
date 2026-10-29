@@ -50,7 +50,8 @@ public sealed class LegSender(
         }
 
         var mode = await modes.AnswerAsync(request.AccountId, cancellationToken).ConfigureAwait(false);
-        if (AccountGate.MayAct(mode, environment) is { Open: false } closed)
+        var reducesRisk = request.Leg.Kind is LegKind.Stop or LegKind.Exit or LegKind.Flatten;
+        if ((reducesRisk ? ProtectionGate.MayProtect(mode, environment) : AccountGate.MayAct(mode, environment)) is { Open: false } closed)
         {
             return Refuse(closed.Reason);
         }

@@ -18,7 +18,8 @@ internal static class DhanReads
         var security = Str(row, "securityId");
         return id is null || status is null || security is null || !Int(row, out var qty, "quantity") || !Dec(row, out var price, "price")
             ? null
-            : new BrokerOrderView(id, Str(row, "correlationId"), status.ToUpperInvariant(), security, Side(row), qty, Int(row, out var filled, "filled_qty", "filledQty") ? filled : 0, price);
+            : new BrokerOrderView(id, Str(row, "correlationId"), status.ToUpperInvariant(), security, Side(row), qty, Int(row, out var filled, "filled_qty", "filledQty") ? filled : 0, price,
+                Dec(row, out var trigger, "triggerPrice") && trigger > 0m ? trigger : null, Str(row, "legName"));
     });
 
     public static BrokerRead<IReadOnlyList<BrokerTradeView>> TradeBook(string text) => Rows(text, row =>

@@ -41,6 +41,12 @@ public static class ExecSettingRegistry
         Num("exec.max_spread_pct", "0.25", "0.05", "1"),
         Num("exec.min_depth_multiple", "2", "1", "10"),
         Num("exec.check_valid_for_s", "10", "2", "60"),
+        Num("exec.stop_limit_buffer_pct", "0.5", "0.1", "2"),
+        Num("exec.flatten_step_collar_pct", "0.5", "0.1", "2"),
+        Num("exec.flatten_walk_steps", "3", "1", "5"),
+        Num("exec.breakeven_at_r", "0", "0", "3"),
+        Num("exec.stop_unfilled_s", "5", "2", "30"),
+        Num("exec.blind_alarm_s", "30", "10", "120"),
     ];
 
     public static ExecSetting? Find(string key) => All.FirstOrDefault(s => s.Key == key);

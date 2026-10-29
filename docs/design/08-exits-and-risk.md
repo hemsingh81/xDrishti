@@ -8,6 +8,8 @@
 
 ## 2. Exit policy library
 
+> **What the live system supports (P12-04, [ADR 0160](../adr/0160-protection-is-judged-from-the-brokers-book-by-a-pure-monitor-and-enforced-by-a-watchdog-whose-every-action-only-reduces-risk-and-which-no-host-composes-yet.md)):** `FIXED_RR` and a tighten-only stop (plus an optional break-even move to entry plus one tick, default off). `PARTIAL_BE`, `PARTIAL_TRAIL`, `PYRAMID`, `EMA_TRAIL` and the signal exits stay simulator-only: they need several broker orders sharing shares, and emulating them with extra resting sells would risk a double sell.
+
 | Policy | Description | Key parameters |
 |--------|-------------|----------------|
 | `FIXED_RR` | Full exit at k×R or stop | `rr`: a list of candidate k, each in (0, 10], e.g. {1.5, 2, 2.5, 3} |

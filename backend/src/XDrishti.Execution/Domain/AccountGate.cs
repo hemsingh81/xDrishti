@@ -38,3 +38,18 @@ public static class AccountGate
         _ => GateDecision.Allowed,
     };
 }
+
+public static class ProtectionGate
+{
+    /// <summary>
+    /// The gate for a leg that only reduces risk (stop, exit, flatten; P12-04 Authority). The mode is not consulted: an account lowered to paper while a position is open must still be able to protect it. The global switch and the environment still are,
+    /// and "no answer" is a refusal. Whether there is a position to protect is the exit policy's question, so the gate alone never admits an entry.
+    /// </summary>
+    public static GateDecision MayProtect(ModeAnswer? answer, ExecEnvironment environment) => answer switch
+    {
+        null => new GateDecision(false, "no_mode_answer"),
+        { ExecutionEnabled: false } => new GateDecision(false, "execution_disabled"),
+        _ when environment is not (ExecEnvironment.Sandbox or ExecEnvironment.Live) => new GateDecision(false, "environment_none"),
+        _ => GateDecision.Allowed,
+    };
+}
