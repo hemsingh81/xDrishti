@@ -3,6 +3,8 @@
     <ProjectReference Include="..\..\src\XDrishti.Api\XDrishti.Api.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.Worker\XDrishti.Worker.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.Feed\XDrishti.Feed.csproj" />
+    <!-- The execution service (P12-01): loaded here only so ExecutionBoundaryArchitectureTests can inspect it; it is not a shipped assembly of the other rules. -->
+    <ProjectReference Include="..\..\src\XDrishti.Execution\XDrishti.Execution.csproj" />
     <!-- The read-only tool server (P9-02): loaded here to inspect what it references. -->
     <ProjectReference Include="..\..\src\XDrishti.Mcp\XDrishti.Mcp.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.Indicators\XDrishti.Indicators.csproj" />

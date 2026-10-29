@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <!-- The execution service (P12-01, ADR 0155): the only project allowed to name an order action. This slice is the skeleton and the pure order state machine only; it contains no network code and no broker client.
+       Nothing references it (ExecutionBoundaryArchitectureTests). It stays free of ASP.NET Core, EF Core, Npgsql and every broker library until the slices that need them (P12-01b, P12-02). -->
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.Domain\XDrishti.Domain.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="XDrishti.Execution.Tests" />
+  </ItemGroup>
+</Project>

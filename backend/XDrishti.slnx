@@ -20,6 +20,7 @@
     <Project Path="src/XDrishti.Api/XDrishti.Api.csproj" />
     <Project Path="src/XDrishti.Worker/XDrishti.Worker.csproj" />
     <Project Path="src/XDrishti.Feed/XDrishti.Feed.csproj" />
+    <Project Path="src/XDrishti.Execution/XDrishti.Execution.csproj" />
     <Project Path="src/XDrishti.Mcp/XDrishti.Mcp.csproj" />
   </Folder>
   <Folder Name="/tests/">
@@ -35,6 +36,7 @@
     <Project Path="tests/XDrishti.Learning.MlNet.Tests/XDrishti.Learning.MlNet.Tests.csproj" />
     <Project Path="tests/XDrishti.Infrastructure.Tests/XDrishti.Infrastructure.Tests.csproj" />
     <Project Path="tests/XDrishti.Feed.Tests/XDrishti.Feed.Tests.csproj" />
+    <Project Path="tests/XDrishti.Execution.Tests/XDrishti.Execution.Tests.csproj" />
     <Project Path="tests/XDrishti.Mcp.Tests/XDrishti.Mcp.Tests.csproj" />
     <Project Path="tests/XDrishti.Architecture.Tests/XDrishti.Architecture.Tests.csproj" />
     <Project Path="tests/XDrishti.Api.IntegrationTests/XDrishti.Api.IntegrationTests.csproj" />
