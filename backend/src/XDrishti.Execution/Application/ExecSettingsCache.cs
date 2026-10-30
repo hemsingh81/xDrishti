@@ -1,5 +1,6 @@
 using System.Globalization;
 using XDrishti.Execution.Application.Ports;
+using XDrishti.Execution.Domain.Intents;
 using XDrishti.Execution.Domain.Readiness;
 
 namespace XDrishti.Execution.Application;
@@ -8,23 +9,26 @@ namespace XDrishti.Execution.Application;
 /// The newest settings view the heartbeat service read, kept for the send path. <see cref="Current"/> is null until a read succeeded and again when the last good read is older than <see cref="MaxAge"/> (a database that cannot be read must not leave
 /// old, possibly looser, caps in force silently). The values come through <see cref="Domain.ExecSettingRegistry"/>, so each is inside its range.
 /// </summary>
-public sealed class ExecSettingsCache(TimeProvider clock) : ISendSettings, IReadinessSettings
+public sealed class ExecSettingsCache(TimeProvider clock) : ISendSettings, IReadinessSettings, IIntentSettings
 {
     public static readonly TimeSpan MaxAge = TimeSpan.FromSeconds(60);
 
     private readonly Lock _gate = new();
     private SendSettings? _value;
     private ReadinessSettings? _readiness;
+    private IntentSettings? _intent;
     private DateTimeOffset _readAt;
 
     public void Set(ExecSettingsView view)
     {
         var settings = From(view);
         var readiness = ReadinessFrom(view);
+        var intent = IntentFrom(view);
         lock (_gate)
         {
             _value = settings;
             _readiness = readiness;
+            _intent = intent;
             _readAt = clock.GetUtcNow();
         }
     }
@@ -43,6 +47,25 @@ public sealed class ExecSettingsCache(TimeProvider clock) : ISendSettings, IRead
         {
             return _readiness is not null && clock.GetUtcNow() - _readAt <= MaxAge ? _readiness : null;
         }
+    }
+
+    IntentSettings? IIntentSettings.Current()
+    {
+        lock (_gate)
+        {
+            return _intent is not null && clock.GetUtcNow() - _readAt <= MaxAge ? _intent : null;
+        }
+    }
+
+    public static IntentSettings IntentFrom(ExecSettingsView view)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+        return new(
+            TimeOnly.ParseExact(view.Values["exec.entry_window_start"], "HH:mm", CultureInfo.InvariantCulture),
+            TimeOnly.ParseExact(view.Values["exec.entry_window_end"], "HH:mm", CultureInfo.InvariantCulture),
+            decimal.Parse(view.Values["exec.price_band_pct"], NumberStyles.Number, CultureInfo.InvariantCulture),
+            bool.Parse(view.Values["exec.canary_pending"]),
+            TimeSpan.FromSeconds(Int(view, "exec.feed_max_age_s")));
     }
 
     public static ReadinessSettings ReadinessFrom(ExecSettingsView view)

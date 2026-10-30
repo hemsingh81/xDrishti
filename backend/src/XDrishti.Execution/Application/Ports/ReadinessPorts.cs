@@ -29,11 +29,15 @@ public sealed record ReadinessCheckRecord(long Id, DateTimeOffset At, Guid Accou
 
 public sealed record DayStateDraft(Guid AccountId, DateOnly SessionDate, ReadinessState State, IReadOnlyList<ReadinessReason> Reasons, long? CheckId, bool Late, DateTimeOffset At);
 
-/// <summary>The insert-only readiness record. There is no update and no delete; a day state exists once per account and session.</summary>
-public interface IReadinessStore
+/// <summary>The newest readiness check of an account, read only (what the intent creator of P12-08 needs; it cannot write the record).</summary>
+public interface IReadinessReads
 {
     Task<ReadinessCheckRecord?> LastCheckAsync(Guid accountId, CancellationToken cancellationToken);
+}
 
+/// <summary>The insert-only readiness record. There is no update and no delete; a day state exists once per account and session.</summary>
+public interface IReadinessStore : IReadinessReads
+{
     Task<ReadinessCheckRecord> AppendCheckAsync(ReadinessCheckDraft draft, CancellationToken cancellationToken);
 
     Task<bool> HasDayStateAsync(Guid accountId, DateOnly session, CancellationToken cancellationToken);
