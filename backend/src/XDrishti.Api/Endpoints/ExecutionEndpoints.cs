@@ -58,6 +58,93 @@ internal sealed class ExecutionEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .WithSummary("Resolves a reconciliation break as the owner: only the owner can, with the gate Live:Writes:Enabled on (checked BEFORE the password; 403 live.capability_off), a fresh password for this act (401 auth.invalid_credentials; an earlier step-up window does not count) and the actor from the session. resolution is accept_broker (the engine then appends an adoption event; nothing is rewritten) or dismiss_foreign (a foreign conflict only); note is at most 300 characters. 400 execution.resolution_invalid, 404 execution.break_unknown, 409 execution.break_resolved. The freeze it caused can be released once every break of the account is resolved");
+
+        group.MapGet("/modes", GetModesAsync)
+            .WithName("GetExecutionModes")
+            .WithSummary("The execution mode of each account with a Trading role (paper, manual_live, assisted): configured and effective, a change waiting for the next open, the open promotion request, the evidence for the next step (every check with pass, fail or unavailable; unavailable never passes) and the latest 20 trail rows. Read only; no token, secret, client id or balance");
+
+        group.MapPost("/modes/{accountId:guid}/promotion-requests", RequestPromotionAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy) // a password is checked here, so the sign-in limit applies
+            .WithName("RequestExecutionPromotion")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .WithSummary("The owner asks for the next mode (one step up): only the owner, with Live:Writes:Enabled on (checked BEFORE the password; 403 live.capability_off), a fresh password and a reason. Stores the evidence and its hash and a window (confirmable from the close of the second trading session, until the close of the fifth) and grants nothing. 409 execution.mode_not_adjacent, execution.mode_gate_failed with every reason (unavailable never passes). Only assisted exists; semi_auto and auto_live are 400 execution.values_invalid");
+
+        group.MapPost("/modes/{accountId:guid}/promotion-requests/{id:guid}/confirm", ConfirmPromotionAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy)
+            .WithName("ConfirmExecutionPromotion")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .WithSummary("The owner confirms the request inside its window, with the live-writes gate before a fresh password. The gate is evaluated again. 409 execution.cooling_off, execution.request_expired, execution.mode_gate_failed, execution.stale. Writes one trail row that takes effect at 09:00 India time of the next trading day");
+
+        group.MapPost("/modes/{accountId:guid}/demotions", DemoteAsync)
+            .WithName("DemoteExecutionMode")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .WithSummary("The owner lowers the mode at once: a session and the CSRF token and NO password and no live-writes gate, because it lowers risk. 409 execution.mode_not_lower unless the target is below the effective mode");
+    }
+
+    private static async Task<Ok<ExecutionModesView>> GetModesAsync(IQueryHandler<GetExecutionModesQuery, ExecutionModesView> handler, HttpContext http, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        return TypedResults.Ok(await handler.HandleAsync(new GetExecutionModesQuery(), cancellationToken));
+    }
+
+    private static async Task<Results<Ok<ExecutionPromotionRequestView>, ProblemHttpResult>> RequestPromotionAsync(
+        Guid accountId, PromotionRequestBody request, HttpContext http, ILiveWritesGate gate, ICommandHandler<StepUpCommand, StepUpResult> passwordCheck, ICommandHandler<RequestPromotionCommand, ExecutionPromotionRequestView> handler, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        if (!gate.Enabled)
+        {
+            return ProblemResults.From(Error.Forbidden("live.capability_off", "The live writes are switched off in this deployment (Live__Writes__Enabled is false)."), http);
+        }
+
+        var owner = await OwnerAct.AuthorizeAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new RequestPromotionCommand(owner.Value, accountId, request.ToMode, request.Reason), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : ProblemResults.From(result.Error, http);
+    }
+
+    private static async Task<Results<Ok<ExecutionTrailView>, ProblemHttpResult>> ConfirmPromotionAsync(
+        Guid accountId, Guid id, ConfirmPromotionBody request, HttpContext http, ILiveWritesGate gate, ICommandHandler<StepUpCommand, StepUpResult> passwordCheck, ICommandHandler<ConfirmPromotionCommand, ExecutionTrailView> handler, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        if (!gate.Enabled)
+        {
+            return ProblemResults.From(Error.Forbidden("live.capability_off", "The live writes are switched off in this deployment (Live__Writes__Enabled is false)."), http);
+        }
+
+        var owner = await OwnerAct.AuthorizeAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new ConfirmPromotionCommand(owner.Value, accountId, id), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : ProblemResults.From(result.Error, http);
+    }
+
+    private static async Task<Results<Ok<ExecutionTrailView>, ProblemHttpResult>> DemoteAsync(
+        Guid accountId, DemotionBody request, HttpContext http, ICommandHandler<DemoteModeCommand, ExecutionTrailView> handler, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var owner = OwnerAct.SessionOwner(http);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new DemoteModeCommand(owner.Value, accountId, request.ToMode, request.Reason), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : ProblemResults.From(result.Error, http);
     }
 
     private static async Task<Ok<ExecutionReconciliationView>> GetReconciliationAsync(

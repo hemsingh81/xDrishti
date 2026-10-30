@@ -4087,6 +4087,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/execution/modes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The execution mode of each account with a Trading role (paper, manual_live, assisted): configured and effective, a change waiting for the next open, the open promotion request, the evidence for the next step (every check with pass, fail or unavailable; unavailable never passes) and the latest 20 trail rows. Read only; no token, secret, client id or balance */
+    get: operations['GetExecutionModes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/modes/{accountId}/promotion-requests': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The owner asks for the next mode (one step up): only the owner, with Live:Writes:Enabled on (checked BEFORE the password; 403 live.capability_off), a fresh password and a reason. Stores the evidence and its hash and a window (confirmable from the close of the second trading session, until the close of the fifth) and grants nothing. 409 execution.mode_not_adjacent, execution.mode_gate_failed with every reason (unavailable never passes). Only assisted exists; semi_auto and auto_live are 400 execution.values_invalid */
+    post: operations['RequestExecutionPromotion'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/modes/{accountId}/promotion-requests/{id}/confirm': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The owner confirms the request inside its window, with the live-writes gate before a fresh password. The gate is evaluated again. 409 execution.cooling_off, execution.request_expired, execution.mode_gate_failed, execution.stale. Writes one trail row that takes effect at 09:00 India time of the next trading day */
+    post: operations['ConfirmExecutionPromotion'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/modes/{accountId}/demotions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The owner lowers the mode at once: a session and the CSRF token and NO password and no live-writes gate, because it lowers risk. 409 execution.mode_not_lower unless the target is below the effective mode */
+    post: operations['DemoteExecutionMode'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/depth/recorder': {
     parameters: {
       query?: never;
@@ -7175,6 +7243,10 @@ export interface components {
       run: boolean;
       password: null | string;
     };
+    /** @description The owner's confirmation: the password is checked afresh for this act. */
+    ConfirmPromotionBody: {
+      password: null | string;
+    };
     /** @description Where to send the owner's browser to sign in at Dhan (same tab): Dhan's consent login page. The sign-in must come back before ExpiresAt. */
     ConnectStartView: {
       authorizeUrl: string;
@@ -8161,6 +8233,11 @@ export interface components {
       name: string;
       /** Format: double */
       quantity: number;
+    };
+    /** @description The owner's step down. */
+    DemotionBody: {
+      toMode: null | string;
+      reason: null | string;
     };
     /** @description The answer of a switch change: the row and the new value. */
     DepthRecorderSwitched: {
@@ -9399,6 +9476,52 @@ export interface components {
       reason: string;
       end: null | components['schemas']['ExecutionHaltEnd'];
     };
+    ExecutionLadderStepView: {
+      from: string;
+      to: string;
+      verdict: string;
+      checks: components['schemas']['ExecutionModeCheckView'][];
+    };
+    /** @description One account: its configured and effective mode, a change that waits for the next open, the open request, the next step of the ladder (null where there is none) and the latest 20 trail rows. */
+    ExecutionModeAccountView: {
+      /** Format: uuid */
+      accountId: string;
+      name: string;
+      configuredMode: string;
+      effectiveMode: string;
+      pending: null | components['schemas']['ExecutionTrailView'];
+      request: null | components['schemas']['ExecutionPromotionRequestView'];
+      next: null | components['schemas']['ExecutionLadderStepView'];
+      trail: components['schemas']['ExecutionTrailView'][];
+    };
+    ExecutionModeCheckView: {
+      code: string;
+      outcome: string;
+      text: string;
+      /** Format: int32 */
+      n: null | number;
+      /** Format: int32 */
+      needed: null | number;
+    };
+    /** @description bool? ExecutionModesView.ExecutionEnabled is null when the switch could not be read (it then counts as OFF). */
+    ExecutionModesView: {
+      executionEnabled: null | boolean;
+      /** Format: int32 */
+      gatePolicyVersion: number;
+      accounts: components['schemas']['ExecutionModeAccountView'][];
+    };
+    ExecutionPromotionRequestView: {
+      /** Format: uuid */
+      id: string;
+      toMode: string;
+      /** Format: date-time */
+      requestedAt: string;
+      /** Format: date-time */
+      eligibleFrom: string;
+      /** Format: date-time */
+      expiresAt: string;
+      evidenceHash: string;
+    };
     /** @description One reconciliation run. A run that could not read the broker is `Readable` false and carries a break: it is never clean. */
     ExecutionReconRunView: {
       /** Format: int64 */
@@ -9465,6 +9588,19 @@ export interface components {
       settingsHash: null | string;
       /** @description True while no entry may leave: always true in this slice (recovery and the halt store do not exist yet). */
       entriesBlocked: boolean;
+    };
+    ExecutionTrailView: {
+      /** Format: int64 */
+      id: number;
+      from: string;
+      to: string;
+      kind: string;
+      actor: string;
+      reason: string;
+      /** Format: date-time */
+      effectiveFrom: string;
+      /** Format: date-time */
+      changedAt: string;
     };
     /** @description How a service is run: retries (0–5 after a failed attempt), the timeout of an attempt in minutes (1–240), whether a missed run is made up for when the application starts, and whether a failure raises a notice in the bell. */
     ExecutionView: {
@@ -14420,6 +14556,12 @@ export interface components {
        * @description Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.
        */
       wouldClose?: number;
+    };
+    /** @description The owner's request for the next mode. The actor is never taken from the body. */
+    PromotionRequestBody: {
+      toMode: null | string;
+      reason: null | string;
+      password: null | string;
     };
     /** @description One post-trade prompt with its derived status (open, matched, expired_no_fill, ambiguous) and, when matched, how (journal or trade_on_record). `sameTradeItems` names the other tickets of an ambiguous prompt. */
     PromptView: {
@@ -27525,6 +27667,204 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ExecutionBreakView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExecutionModes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionModesView'];
+        };
+      };
+    };
+  };
+  RequestExecutionPromotion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        accountId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PromotionRequestBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionPromotionRequestView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ConfirmExecutionPromotion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        accountId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ConfirmPromotionBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionTrailView'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DemoteExecutionMode: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        accountId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DemotionBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionTrailView'];
         };
       };
       /** @description Bad Request */

@@ -14,6 +14,7 @@ Designed now so v1 leaves room for them; built after v1 is proven.
 
 **Modes per account:** `paper` → `manual_live` → `assisted` (system prepares exact order / super-order
 parameters) → `semi_auto` (one-tap confirm in UI) → `auto_live` (within hard limits, every action notified).
+**As built (P12-07, [ADR 0163](../adr/0163-an-account-moves-up-the-mode-ladder-one-step-on-stored-evidence-by-an-owner-act-with-a-cooling-off-and-down-at-any-time-and-no-mode-built-here-can-send.md)):** only `paper`, `manual_live` and `assisted` exist; the mode is an insert-only trail, up one step at a time by the owner (live-writes gate, then a fresh password, a cooling-off of two to five sessions, the evidence gate evaluated again at the confirm) and down at any time (the owner without a password, the system when the Trading role is off or the account archived). The gate to `assisted` needs a sandbox suite result and a static-IP attestation that no module stores yet, so it is closed and nothing is promotable. The assisted sheet, `semi_auto` and `auto_live` are later slices; nothing here can send.
 
 ```mermaid
 stateDiagram-v2

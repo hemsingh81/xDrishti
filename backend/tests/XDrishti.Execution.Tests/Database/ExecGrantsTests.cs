@@ -35,11 +35,13 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         ["recon_runs"] = ["INSERT", "SELECT"],
         ["recon_breaks"] = ["INSERT", "SELECT"],
         ["break_resolutions"] = ["SELECT"],
+        ["mode_trail"] = ["INSERT", "SELECT"], // system demotions only; the trigger refuses the rest (P12-07)
+        ["promotion_requests"] = ["SELECT"],
         ["commands"] = ["SELECT"],
         ["settings"] = ["SELECT"],
     };
 
-    private static readonly Dictionary<string, string[]> AppExpected = ExecExpected.ToDictionary(e => e.Key, e => e.Key is "commands" or "halt_releases" or "break_resolutions" ? new[] { "INSERT", "SELECT" } : new[] { "SELECT" });
+    private static readonly Dictionary<string, string[]> AppExpected = ExecExpected.ToDictionary(e => e.Key, e => e.Key is "commands" or "halt_releases" or "break_resolutions" or "mode_trail" or "promotion_requests" ? new[] { "INSERT", "SELECT" } : new[] { "SELECT" });
 
     private async Task<List<string>> TablesAsync()
     {
@@ -90,6 +92,12 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         {
             ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('xd_app', 'execution.{sequence}', 'USAGE')"))!).ShouldBeFalse(sequence);
             ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('xd_exec', 'execution.{sequence}', 'USAGE')"))!).ShouldBeTrue(sequence);
+        }
+
+        // The mode trail is written by both roles (owner acts by xd_app, system demotions by xd_exec; the trigger decides which kind each may write), so both need its sequence (P12-07).
+        foreach (var role in new[] { "xd_app", "xd_exec" })
+        {
+            ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('{role}', 'execution.mode_trail_id_seq', 'USAGE')"))!).ShouldBeTrue(role);
         }
 
         ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_schema_privilege('xd_mcp_read', 'execution', 'USAGE') OR has_schema_privilege('xd_mcp_sql', 'execution', 'USAGE')"))!).ShouldBeFalse();
