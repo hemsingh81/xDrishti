@@ -92,6 +92,9 @@ public static class DependencyInjection
         services.AddScoped<IFeedHeartbeats, FeedHeartbeats>();
         services.AddScoped<IDepthHeartbeats, DepthHeartbeats>(); // the depth recorder's own row xd-depth (P7-16)
         services.AddScoped<IQueryHandler<GetExecutionAlarmsQuery, Result<IReadOnlyList<ExecutionAlarmView>>>, GetExecutionAlarmsHandler>(); // the execution alarms (P12-04): read only
+        services.AddScoped<IQueryHandler<GetExecutionHaltsQuery, Result<IReadOnlyList<ExecutionHaltView>>>, GetExecutionHaltsHandler>(); // the halt record (P12-05): read only
+        services.AddScoped<ICommandHandler<StartExecutionHaltCommand, ExecutionHaltStarted>, StartExecutionHaltHandler>(); // the owner's button: leaves a command row, never a password (P12-05)
+        services.AddScoped<ICommandHandler<ReleaseExecutionHaltCommand, ExecutionHaltView>, ReleaseExecutionHaltHandler>(); // the owner's release: gate, fresh password and the rules (P12-05)
         services.AddScoped<IQueryHandler<GetExecutionStatusQuery, ExecutionStatusView>, GetExecutionStatusHandler>(); // the execution service's status (P12-01b): read only
         services.AddScoped<IQueryHandler<GetDepthRecorderQuery, DepthRecorderView>, GetDepthRecorderHandler>(); // the owner's depth switch (P7-16): read
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)

@@ -47,6 +47,16 @@ public static class ExecSettingRegistry
         Num("exec.breakeven_at_r", "0", "0", "3"),
         Num("exec.stop_unfilled_s", "5", "2", "30"),
         Num("exec.blind_alarm_s", "30", "10", "120"),
+        Num("exec.drawdown_halt_pct", "8.0", "1", "30"),
+        Num("exec.disaster_loss_pct", "3.0", "0.5", "10"),
+        Num("exec.feed_loss_halt_s", "15", "5", "60"),
+        Num("exec.runaway_orders_10s", "6", "3", "20"),
+        Num("exec.reject_burst", "5", "2", "20"),
+        Num("exec.crash_loop_starts", "3", "2", "10"),
+        Num("exec.clock_skew_halt_ms", "2000", "500", "5000"),
+        Num("exec.index_halt_pct", "9.0", "3", "20"),
+        Num("exec.broker_outage_s", "60", "20", "300"),
+        new("exec.broker_kill_switch_on_halt", ExecSettingKind.Flag, "false", "false", "true"),
     ];
 
     public static ExecSetting? Find(string key) => All.FirstOrDefault(s => s.Key == key);

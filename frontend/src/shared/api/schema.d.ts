@@ -4018,6 +4018,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/execution/halts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The halts of the execution service (the kill switch), newest first (at most 200): scope, account, level (entries, cancel, exit_all, freeze), the trigger code, who started it and, once it ended, how (owner release or automatic clear). active=true keeps only those in force. Read only */
+    get: operations['GetExecutionHalts'];
+    put?: never;
+    /** The owner's button: leaves a halt command for the execution service, which records the halt (the answer is the command id; read the halts to see it). Needs a session and the CSRF token and NO password: starting a halt is the safe direction. exit_all additionally needs the step-up window (403 auth.step_up_required) because it realises losses. 400 execution.halt_invalid */
+    post: operations['StartExecutionHalt'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/halts/{id}/release': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Releases a halt as the owner: only the owner can, with the gate Live:Writes:Enabled on (checked BEFORE the password; 403 live.capability_off), a fresh password for this act (401 auth.invalid_credentials; an earlier step-up window does not count), the actor from the session and a reason. Refused with 409 execution.release_refused and every reason when the halt already ended, the reason is missing or too short (a drawdown halt needs 20 characters), an exit_all halt still has an open position, a protection halt still has an open protection alarm, or the halt is a freeze (released only after reconciliation exists). 404 execution.halt_unknown */
+    post: operations['ReleaseExecutionHalt'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/depth/recorder': {
     parameters: {
       query?: never;
@@ -9274,6 +9309,35 @@ export interface components {
     ExecutionGateView: {
       open: boolean;
       reason: string;
+    };
+    /** @description How a halt ended: by the owner (release) or automatically (a clear of a code that may clear itself). The release reason is the owner's own text; the automatic clear carries none. */
+    ExecutionHaltEnd: {
+      /** Format: date-time */
+      at: string;
+      by: string;
+      how: string;
+      reason: null | string;
+    };
+    /** @description The command row left for the execution service; the halt itself is recorded when xd-exec carries it out (read the halts to see it). */
+    ExecutionHaltStarted: {
+      /** Format: uuid */
+      commandId: string;
+    };
+    /** @description One halt. Scope is `system` or `account`; level is `entries`, `cancel`, `exit_all` or `freeze`; End is null while it is active. */
+    ExecutionHaltView: {
+      /** Format: int64 */
+      id: number;
+      /** Format: date-time */
+      at: string;
+      scope: string;
+      /** Format: uuid */
+      accountId: null | string;
+      level: string;
+      trigger: string;
+      source: string;
+      actor: string;
+      reason: string;
+      end: null | components['schemas']['ExecutionHaltEnd'];
     };
     /** @description One row of the paper execution waterfall on the wire. */
     ExecutionRowView: {
@@ -15011,6 +15075,11 @@ export interface components {
       /** @description Why, 1 to 500 characters. */
       reason: null | string;
     };
+    /** @description The owner's release of a halt: a reason and the password, checked afresh for this act. */
+    ReleaseHaltRequest: {
+      reason: null | string;
+      password: null | string;
+    };
     /** @description Instruments to remove from a basket (1 to 500; repeats count once). */
     RemoveMembersInput: {
       instrumentIds: null | string[];
@@ -16289,6 +16358,15 @@ export interface components {
       reason: null | string;
       /** @description The owner's password, re-entered for THIS start and checked on every request (an earlier step-up window does not count and is not used up). */
       password: null | string;
+    };
+    /** @description The owner's button. `scope` is system or account (then `accountId` is required); `level` is entries, cancel or exit_all (exit_all needs the step-up window). The actor is never taken from the body. */
+    StartHaltRequest: {
+      scope: null | string;
+      /** Format: uuid */
+      accountId: null | string;
+      level: null | string;
+      reason: null | string;
+      brokerKillSwitch: null | boolean;
     };
     /** @description Body of `POST /api/lab/runs` (spec P5-02): a stored strategy version (the latest when `version` is omitted), the universe, the method (`quick`) and optionally the window (default: the last year of stored data). */
     StartLabRunRequest: {
@@ -27174,6 +27252,134 @@ export interface operations {
       };
       /** @description Bad Request */
       400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExecutionHalts: {
+    parameters: {
+      query?: {
+        active?: boolean;
+        accountId?: string;
+        take?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionHaltView'][];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  StartExecutionHalt: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['StartHaltRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionHaltStarted'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ReleaseExecutionHalt: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReleaseHaltRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionHaltView'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

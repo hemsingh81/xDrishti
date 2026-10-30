@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using XDrishti.Execution.Application;
+using XDrishti.Execution.Application.Halts;
 using XDrishti.Execution.Application.Ports;
 using XDrishti.Execution.Dhan;
 using XDrishti.Execution.Domain;
@@ -45,6 +46,11 @@ public static class ExecServices
         AddSendSettings(services);
         services.AddSingleton<ICheckStore, PgCheckStore>();
         services.AddSingleton<IAlarmStore, PgAlarmStore>(); // the alarm record only; the watchdog, the policy and the services that write alarms are composed by no host in P12-04 (ADR 0160)
+
+        // The halt record and the owner's halt command (P12-05, ADR 0161): both can only make the system stricter. IHaltSource stays the closed default (Unreadable) and the enforcer, the drill and the kill switch are composed by no host.
+        services.AddSingleton<IHaltStore, PgHaltStore>();
+        services.AddSingleton<HaltService>();
+        services.AddSingleton<IDayMarkStore, PgDayMarkStore>();
         services.AddSingleton<PgSendJournal>();
         services.AddSingleton<ISendJournal>(sp => sp.GetRequiredService<PgSendJournal>());
         services.AddSingleton<ISendHistory>(sp => sp.GetRequiredService<PgSendJournal>());

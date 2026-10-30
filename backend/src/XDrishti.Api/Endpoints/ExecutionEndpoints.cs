@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using XDrishti.Api.Auth;
+using XDrishti.Application.Abstractions.LiveTrading;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Auth;
 using XDrishti.Application.Execution;
 using XDrishti.Domain.Common;
 
@@ -24,6 +26,69 @@ internal sealed class ExecutionEndpoints : IEndpointModule
             .WithName("GetExecutionAlarms")
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .WithSummary("The alarms of the execution service's protection logic, newest first (at most 200): protection pending or breached, flatten started or incomplete, oversold and the rest. open=true keeps only those not cleared. Read only; an alarm is cleared by the engine or the owner, never deleted");
+
+        group.MapGet("/halts", GetHaltsAsync)
+            .WithName("GetExecutionHalts")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .WithSummary("The halts of the execution service (the kill switch), newest first (at most 200): scope, account, level (entries, cancel, exit_all, freeze), the trigger code, who started it and, once it ended, how (owner release or automatic clear). active=true keeps only those in force. Read only");
+
+        group.MapPost("/halts", StartHaltAsync)
+            .WithName("StartExecutionHalt")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .WithSummary("The owner's button: leaves a halt command for the execution service, which records the halt (the answer is the command id; read the halts to see it). Needs a session and the CSRF token and NO password: starting a halt is the safe direction. exit_all additionally needs the step-up window (403 auth.step_up_required) because it realises losses. 400 execution.halt_invalid");
+
+        group.MapPost("/halts/{id:long}/release", ReleaseHaltAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy) // a password is checked here, so the sign-in limit applies
+            .WithName("ReleaseExecutionHalt")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .WithSummary("Releases a halt as the owner: only the owner can, with the gate Live:Writes:Enabled on (checked BEFORE the password; 403 live.capability_off), a fresh password for this act (401 auth.invalid_credentials; an earlier step-up window does not count), the actor from the session and a reason. Refused with 409 execution.release_refused and every reason when the halt already ended, the reason is missing or too short (a drawdown halt needs 20 characters), an exit_all halt still has an open position, a protection halt still has an open protection alarm, or the halt is a freeze (released only after reconciliation exists). 404 execution.halt_unknown");
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<ExecutionHaltView>>, ProblemHttpResult>> GetHaltsAsync(
+        IQueryHandler<GetExecutionHaltsQuery, Result<IReadOnlyList<ExecutionHaltView>>> handler, HttpContext http, CancellationToken cancellationToken, bool active = false, Guid? accountId = null, int take = 200)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var result = await handler.HandleAsync(new GetExecutionHaltsQuery(active, accountId, take), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : ProblemResults.From(result.Error, http);
+    }
+
+    private static async Task<Results<Ok<ExecutionHaltStarted>, ProblemHttpResult>> StartHaltAsync(
+        StartHaltRequest request, HttpContext http, ICommandHandler<StartExecutionHaltCommand, ExecutionHaltStarted> handler, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var owner = OwnerAct.SessionOwner(http);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var stepUp = http.GetVerifiedSession()?.Info.ElevatedUntil is not null;
+        var result = await handler.HandleAsync(new StartExecutionHaltCommand(owner.Value, request.Scope ?? string.Empty, request.AccountId, request.Level ?? string.Empty, request.Reason, request.BrokerKillSwitch ?? false, stepUp), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : ProblemResults.From(result.Error, http);
+    }
+
+    private static async Task<Results<Ok<ExecutionHaltView>, ProblemHttpResult>> ReleaseHaltAsync(
+        long id, ReleaseHaltRequest request, HttpContext http, ILiveWritesGate gate, ICommandHandler<StepUpCommand, StepUpResult> passwordCheck, ICommandHandler<ReleaseExecutionHaltCommand, ExecutionHaltView> handler, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+
+        // The order of every owner write: the gate first (a switched-off act neither counts toward the sign-in lockout nor says anything about the password), then the fresh password for THIS act, then the actor from the session.
+        if (!gate.Enabled)
+        {
+            return ProblemResults.From(Error.Forbidden("live.capability_off", "The live writes are switched off in this deployment (Live__Writes__Enabled is false)."), http);
+        }
+
+        var owner = await OwnerAct.AuthorizeAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new ReleaseExecutionHaltCommand(owner.Value, id, request.Reason), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : ProblemResults.From(result.Error, http);
     }
 
     private static async Task<Results<Ok<IReadOnlyList<ExecutionAlarmView>>, ProblemHttpResult>> GetAlarmsAsync(

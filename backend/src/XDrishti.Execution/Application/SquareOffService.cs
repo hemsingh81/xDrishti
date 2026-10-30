@@ -16,23 +16,31 @@ public sealed class SquareOffService(IProtectionSource source, LegSender sender,
     private readonly HashSet<long> _entryCancelTried = [];
     private readonly Dictionary<long, (int Sent, DateTimeOffset At, bool Unknown)> _exits = [];
 
-    public async Task TickAsync(CancellationToken cancellationToken)
+    public Task TickAsync(CancellationToken cancellationToken) => ForceTickAsync(_ => false, cancellationToken);
+
+    /// <summary>
+    /// The same sequence, with the clock of every account for which <paramref name="forced"/> answers true held at no earlier than the square-off time. This is how a halt at level <c>exit_all</c> flattens (P12-05): entries cancelled and verified first,
+    /// the target leg cancelled, the exit sent reduce-only and re-priced, the stop cancelled only once flat. Nothing else about the sequence changes.
+    /// </summary>
+    public async Task ForceTickAsync(Func<Guid, bool> forced, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(forced);
         if (settings() is not { } s || await source.ReadAsync(cancellationToken).ConfigureAwait(false) is not { } snapshot)
         {
             return;
         }
 
         var now = clock.GetUtcNow();
-        var ist = TimeOnly.FromDateTime(now.ToOffset(IstOffset).DateTime);
+        var real = TimeOnly.FromDateTime(now.ToOffset(IstOffset).DateTime);
+        TimeOnly Clock(Guid account) => forced(account) && real < s.SquareOffTime ? s.SquareOffTime : real;
         foreach (var group in snapshot.Entries.GroupBy(e => e.IntentId))
         {
-            await EntriesAsync(group.ToList(), ist, s, snapshot, cancellationToken).ConfigureAwait(false);
+            await EntriesAsync(group.ToList(), Clock(group.First().AccountId), s, snapshot, cancellationToken).ConfigureAwait(false);
         }
 
         foreach (var p in snapshot.Positions.Where(p => p.NetQty > 0 || ProtectionBook.StopLegs(snapshot.OrderBook, p.SecurityId).Any(l => l.Status == ProtectionMonitor.StatusPending)))
         {
-            await PositionAsync(p, snapshot, s, ist, now, cancellationToken).ConfigureAwait(false);
+            await PositionAsync(p, snapshot, s, Clock(p.AccountId), now, cancellationToken).ConfigureAwait(false);
         }
     }
 
