@@ -9,6 +9,7 @@ const WRITER_FEATURES = new Set([
   'auth',
   'baskets',
   'data',
+  'execution',
   'exports',
   'instruments',
   'lab',

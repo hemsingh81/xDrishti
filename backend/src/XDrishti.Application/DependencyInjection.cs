@@ -97,6 +97,9 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ReleaseExecutionHaltCommand, ExecutionHaltView>, ReleaseExecutionHaltHandler>(); // the owner's release: gate, fresh password and the rules (P12-05)
         services.AddScoped<IQueryHandler<GetExecutionReconciliationQuery, ExecutionReconciliationView>, GetExecutionReconciliationHandler>(); // runs and breaks, read only (P12-06)
         services.AddScoped<ICommandHandler<ResolveExecutionBreakCommand, ExecutionBreakView>, ResolveExecutionBreakHandler>(); // the owner's resolution of a break: gate, fresh password and the rules (P12-06)
+        services.AddScoped<IQueryHandler<GetExecutionReadinessQuery, Result<ExecutionReadinessView>>, GetExecutionReadinessHandler>(); // readiness per account, read only (P12-11)
+        services.AddScoped<ICommandHandler<RecordIpAttestationCommand, ExecutionIpAttestationView>, RecordIpAttestationHandler>(); // the owner's attestation of the static IP: a claim, no broker call (P12-11)
+        services.AddScoped<ICommandHandler<RequestReadinessCheckCommand, ExecutionReadinessRequested>, RequestReadinessCheckHandler>(); // check now: leaves a readiness_now command row (P12-11)
         services.AddScoped<ModeEvidence>(); // the gate facts: stored records plus the live phase check, read only (P12-07)
         services.AddScoped<IQueryHandler<GetExecutionModesQuery, ExecutionModesView>, GetExecutionModesHandler>(); // the modes of the accounts and the evidence for the next step (P12-07): read only
         services.AddScoped<ICommandHandler<RequestPromotionCommand, ExecutionPromotionRequestView>, RequestPromotionHandler>(); // the owner's request: gate, fresh password, stores the evidence, grants nothing (P12-07)

@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Text.Json;
+using XDrishti.Domain.Market;
 using XDrishti.Execution.Application.Ports;
 using XDrishti.Execution.Domain;
+using XDrishti.Execution.Domain.Readiness;
 
 namespace XDrishti.Execution.Dhan;
 
@@ -48,6 +50,52 @@ internal static class DhanReads
             return BrokerRead.Unreadable<BrokerFundsView>("funds_unreadable");
         }
     }
+
+    private static readonly string[] DateFormats = ["yyyy-MM-dd", "dd/MM/yyyy", "dd-MM-yyyy"];
+
+    /// <summary>The profile, reduced to <c>tokenValidity</c> (India time, "dd/MM/yyyy HH:mm"). No other field is kept; an unreadable or missing validity is a profile without one, never a guessed one. UNVERIFIED against the sandbox.</summary>
+    public static BrokerRead<ProfileFacts> Profile(string text)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return BrokerRead.Unreadable<ProfileFacts>("profile_unreadable");
+            }
+
+            DateTimeOffset? valid = Str(doc.RootElement, "tokenValidity") is { } s && DateTime.TryParseExact(s, ["dd/MM/yyyy HH:mm", "dd/MM/yyyy HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm:ss"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var at)
+                ? new DateTimeOffset(at, IndiaTime.Offset)
+                : null;
+            return BrokerRead.Ok(new ProfileFacts(valid));
+        }
+        catch (JsonException)
+        {
+            return BrokerRead.Unreadable<ProfileFacts>("profile_unreadable");
+        }
+    }
+
+    /// <summary>The configured static IPs (<c>primaryIP</c>, <c>secondaryIP</c>, <c>modifyDatePrimary</c>, <c>modifyDateSecondary</c>). An empty slot is null; the answer says nothing about the address a request came from. UNVERIFIED against the sandbox.</summary>
+    public static BrokerRead<IpFacts> StaticIp(string text)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return BrokerRead.Unreadable<IpFacts>("ip_unreadable");
+            }
+
+            var root = doc.RootElement;
+            return BrokerRead.Ok(new IpFacts(Str(root, "primaryIP"), Str(root, "secondaryIP"), Date(Str(root, "modifyDatePrimary")), Date(Str(root, "modifyDateSecondary"))));
+        }
+        catch (JsonException)
+        {
+            return BrokerRead.Unreadable<IpFacts>("ip_unreadable");
+        }
+    }
+
+    private static DateOnly? Date(string? s) => s is not null && DateOnly.TryParseExact(s, DateFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
 
     private static BrokerRead<IReadOnlyList<T>> Rows<T>(string text, Func<JsonElement, T?> read)
         where T : class

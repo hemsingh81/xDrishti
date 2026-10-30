@@ -37,11 +37,14 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         ["break_resolutions"] = ["SELECT"],
         ["mode_trail"] = ["INSERT", "SELECT"], // system demotions only; the trigger refuses the rest (P12-07)
         ["promotion_requests"] = ["SELECT"],
+        ["readiness_checks"] = ["INSERT", "SELECT"], // the readiness probe (P12-11)
+        ["day_states"] = ["INSERT", "SELECT"], // the 09:10:30 mark (P12-11)
+        ["ip_attestations"] = ["SELECT"], // the owner's claim, written by the API (P12-11)
         ["commands"] = ["SELECT"],
         ["settings"] = ["SELECT"],
     };
 
-    private static readonly Dictionary<string, string[]> AppExpected = ExecExpected.ToDictionary(e => e.Key, e => e.Key is "commands" or "halt_releases" or "break_resolutions" or "mode_trail" or "promotion_requests" ? new[] { "INSERT", "SELECT" } : new[] { "SELECT" });
+    private static readonly Dictionary<string, string[]> AppExpected = ExecExpected.ToDictionary(e => e.Key, e => e.Key is "commands" or "halt_releases" or "break_resolutions" or "mode_trail" or "promotion_requests" or "ip_attestations" ? new[] { "INSERT", "SELECT" } : new[] { "SELECT" });
 
     private async Task<List<string>> TablesAsync()
     {
@@ -88,7 +91,7 @@ public sealed class ExecGrantsTests(ExecDatabase db)
     [Fact]
     public async Task No_role_can_use_a_sequence_it_does_not_need_and_nobody_else_can_enter_the_schema()
     {
-        foreach (var sequence in new[] { "events_id_seq", "intents_id_seq", "legs_id_seq", "fills_id_seq", "settings_id_seq", "broker_calls_id_seq", "halts_id_seq", "drills_id_seq", "kill_switch_log_id_seq", "recon_runs_id_seq", "recon_breaks_id_seq" })
+        foreach (var sequence in new[] { "events_id_seq", "intents_id_seq", "legs_id_seq", "fills_id_seq", "settings_id_seq", "broker_calls_id_seq", "halts_id_seq", "drills_id_seq", "kill_switch_log_id_seq", "recon_runs_id_seq", "recon_breaks_id_seq", "readiness_checks_id_seq", "day_states_id_seq" })
         {
             ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('xd_app', 'execution.{sequence}', 'USAGE')"))!).ShouldBeFalse(sequence);
             ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('xd_exec', 'execution.{sequence}', 'USAGE')"))!).ShouldBeTrue(sequence);
@@ -99,6 +102,10 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         {
             ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('{role}', 'execution.mode_trail_id_seq', 'USAGE')"))!).ShouldBeTrue(role);
         }
+
+        // The attestation is the owner's act: the API writes it, the execution service only reads it (P12-11).
+        ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_sequence_privilege('xd_app', 'execution.ip_attestations_id_seq', 'USAGE')"))!).ShouldBeTrue();
+        ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_sequence_privilege('xd_exec', 'execution.ip_attestations_id_seq', 'USAGE')"))!).ShouldBeFalse();
 
         ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_schema_privilege('xd_mcp_read', 'execution', 'USAGE') OR has_schema_privilege('xd_mcp_sql', 'execution', 'USAGE')"))!).ShouldBeFalse();
         ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_schema_privilege('public', 'execution', 'USAGE')"))!).ShouldBeFalse();

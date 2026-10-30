@@ -4,6 +4,7 @@ using Npgsql;
 using XDrishti.Execution.Application;
 using XDrishti.Execution.Application.Halts;
 using XDrishti.Execution.Application.Ports;
+using XDrishti.Execution.Application.Readiness;
 using XDrishti.Execution.Application.Recon;
 using XDrishti.Execution.Dhan;
 using XDrishti.Execution.Domain;
@@ -52,6 +53,19 @@ public static class ExecServices
         services.AddSingleton<IHaltStore, PgHaltStore>();
         services.AddSingleton<HaltService>();
         services.AddSingleton<IDayMarkStore, PgDayMarkStore>();
+        services.AddSingleton<HaltAutoClearService>();
+
+        // The readiness record and probe (P12-11, ADR 0164): it reads the stored connection and, through IBrokerFacts, the broker's profile and configured IP, and writes insert-only rows. IBrokerFacts is the closed default (unreadable, so the verdict is unavailable) until the
+        // Dhan adapter of those two reads exists; nothing here can send an order.
+        services.AddSingleton<PgReadinessStore>();
+        services.AddSingleton<IReadinessStore>(sp => sp.GetRequiredService<PgReadinessStore>());
+        services.AddSingleton<IReadinessAccounts>(sp => sp.GetRequiredService<PgReadinessStore>());
+        services.AddSingleton<IConnectionFacts>(sp => sp.GetRequiredService<PgReadinessStore>());
+        services.TryAddSingleton<IBrokerFacts, ClosedBrokerFacts>();
+        services.AddSingleton<IReadinessSettings>(sp => sp.GetRequiredService<ExecSettingsCache>());
+        services.AddSingleton<ReadinessSignal>();
+        services.AddSingleton<ReadinessLoop>();
+        services.AddHostedService<ReadinessService>();
 
         // The reconciliation record, our side of the books (read only) and the authoritative fill writer (P12-06, ADR 0162). Nothing here runs: the break service, the recovery, the poll and the stream client are composed by no host.
         services.AddSingleton<IReconStore, PgReconStore>();

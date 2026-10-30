@@ -113,6 +113,6 @@ public sealed class GateBookSettingsTests
     public void Every_default_is_inside_its_own_range()
     {
         ExecSettingRegistry.All.ShouldAllBe(s => ExecSettingRegistry.IsValid(s, s.Default));
-        ExecSettingRegistry.All.Count.ShouldBe(46);
+        ExecSettingRegistry.All.Count.ShouldBe(50); // four readiness keys from P12-11
     }
 }

@@ -59,6 +59,23 @@ internal sealed class ExecutionEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status409Conflict)
             .WithSummary("Resolves a reconciliation break as the owner: only the owner can, with the gate Live:Writes:Enabled on (checked BEFORE the password; 403 live.capability_off), a fresh password for this act (401 auth.invalid_credentials; an earlier step-up window does not count) and the actor from the session. resolution is accept_broker (the engine then appends an adoption event; nothing is rewritten) or dismiss_foreign (a foreign conflict only); note is at most 300 characters. 400 execution.resolution_invalid, 404 execution.break_unknown, 409 execution.break_resolved. The freeze it caused can be released once every break of the account is resolved");
 
+        group.MapGet("/readiness", GetReadinessAsync)
+            .WithName("GetExecutionReadiness")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .WithSummary("Whether execution can act today, per account (optional date, default the current session in India): state ready, not_ready or unavailable (also when nothing was ever recorded; only ready lets anything act), the six checks with pass, fail or unavailable and their ages, when the token ends, since when the account has been ready, the first day the IP can be changed at Dhan, the owner's newest IP attestation, P11-05's newest SEBI re-check, the last 20 states recorded at 09:10:30 India time and the highest sends per second. Read only; no token, client id, key or secret");
+
+        group.MapPost("/readiness/checks", RequestReadinessCheckAsync)
+            .WithName("RequestExecutionReadinessCheck")
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .WithSummary("Check now: leaves a readiness_now command row; the execution service probes within a second and the new record shows in GET /readiness. A session and the CSRF token, no password. It reads two things at the broker (profile and configured IP) and sends nothing");
+
+        group.MapPost("/ip-attestations", RecordIpAttestationAsync)
+            .WithName("RecordExecutionIpAttestation")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .WithSummary("The owner records that Dhan's web tool (IP Setup, Get Static IP) showed orders allowed (or not) for an IP: accountId, ip (one IPv4 or IPv6 address), ordersAllowed and a plain-text note of at most 200 characters. A session and the CSRF token, the actor from the session, the time from the database. It is a claim and never contacts the broker; ordersAllowed false is recorded and keeps the attestation check failing. 400 execution.values_invalid, 404 execution.not_found");
+
         group.MapGet("/modes", GetModesAsync)
             .WithName("GetExecutionModes")
             .WithSummary("The execution mode of each account with a Trading role (paper, manual_live, assisted): configured and effective, a change waiting for the next open, the open promotion request, the evidence for the next step (every check with pass, fail or unavailable; unavailable never passes) and the latest 20 trail rows. Read only; no token, secret, client id or balance");
@@ -87,6 +104,42 @@ internal sealed class ExecutionEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .WithSummary("The owner lowers the mode at once: a session and the CSRF token and NO password and no live-writes gate, because it lowers risk. 409 execution.mode_not_lower unless the target is below the effective mode");
+    }
+
+    private static async Task<Results<Ok<ExecutionReadinessView>, ProblemHttpResult>> GetReadinessAsync(
+        IQueryHandler<GetExecutionReadinessQuery, Result<ExecutionReadinessView>> handler, HttpContext http, CancellationToken cancellationToken, DateOnly? date = null)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var result = await handler.HandleAsync(new GetExecutionReadinessQuery(date), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : ProblemResults.From(result.Error, http);
+    }
+
+    private static async Task<Results<Ok<ExecutionReadinessRequested>, ProblemHttpResult>> RequestReadinessCheckAsync(
+        ICommandHandler<RequestReadinessCheckCommand, ExecutionReadinessRequested> handler, HttpContext http, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var owner = OwnerAct.SessionOwner(http);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new RequestReadinessCheckCommand(owner.Value), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : ProblemResults.From(result.Error, http);
+    }
+
+    private static async Task<Results<Ok<ExecutionIpAttestationView>, ProblemHttpResult>> RecordIpAttestationAsync(
+        IpAttestationRequest request, ICommandHandler<RecordIpAttestationCommand, ExecutionIpAttestationView> handler, HttpContext http, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var owner = OwnerAct.SessionOwner(http);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new RecordIpAttestationCommand(owner.Value, request.AccountId, request.Ip, request.OrdersAllowed, request.Note), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : ProblemResults.From(result.Error, http);
     }
 
     private static async Task<Ok<ExecutionModesView>> GetModesAsync(IQueryHandler<GetExecutionModesQuery, ExecutionModesView> handler, HttpContext http, CancellationToken cancellationToken)

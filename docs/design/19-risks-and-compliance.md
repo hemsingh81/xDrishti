@@ -68,7 +68,7 @@
 - **Personal use only**: one user, own accounts. Sharing or selling recommendations could require SEBI
   Research Analyst / Investment Adviser registration — out of scope by design.
 - **SEBI retail algo framework** (mandatory since 1 April 2026) applies when orders are placed via broker APIs:
-  registered app on a **whitelisted static IP**, daily login/2FA, broker as principal. Own strategies staying
+  registered app on a **whitelisted static IP**, daily login/2FA, broker as principal. Operating steps (daily login, token cover, the 09:10:30 record, invalid-IP rejection, the quarterly re-check): [execution runbook](../engineering/execution-runbook.md), P12-11. Own strategies staying
   **≤ 10 orders/second per exchange** are tagged with the broker's generic algo ID; above that, exchange
   approval is needed. v1 places no orders; Phase 12 caps at 2 orders/s. Re-check circulars before Phase 12.
   Static-IP decision (Q6, 2026-10-09): not needed until Phase 12; ask the ISP and re-check circulars at the P11 exit.

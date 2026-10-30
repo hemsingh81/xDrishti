@@ -53,6 +53,7 @@ export const navigation: NavSection[] = [
       { path: '/portfolio', label: 'Portfolio', icon: PieChartIcon },
       { path: '/paper', label: 'Paper trading', icon: AccountBalanceIcon },
       { path: '/live', label: 'Live trading', icon: GavelIcon },
+      { path: '/execution', label: 'Execution', icon: ChecklistIcon },
     ],
   },
   {

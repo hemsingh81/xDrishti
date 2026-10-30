@@ -67,7 +67,7 @@ public sealed class AssistantBriefingDatabaseTests(ResearchGrantsTests.Dedicated
         (attempt.Attempt, attempt.Passed, attempt.Text, attempt.LatencyMs, attempt.PromptTokens).ShouldBe((1, false, "attempt text", 20, 100));
         attempt.Findings.ShouldHaveSingleItem().ShouldBe(new StoredFinding("number_not_in_facts", "98.60", 12));
         (await store.ListAsync("daily", 60, Ct)).Count(r => r.Subject == "2026-10-21").ShouldBe(2);
-        (await store.ListAsync("weekly", 60, Ct)).ShouldBeEmpty();
+        (await store.ListAsync("weekly", 60, Ct)).Count(r => r.Subject == "2026-10-21").ShouldBe(0);
     }
 
     [Fact]

@@ -28,10 +28,11 @@ public sealed class ExecPlaneTests(ExecDatabase db)
     {
         var ping = Guid.NewGuid();
         var odd = Guid.NewGuid();
-        await ExecDatabase.ExecuteAsync(db.App, $"INSERT INTO execution.commands (id, kind, actor) VALUES ('{ping}', 'ping', 'owner:me@example.com'), ('{odd}', 'flatten_everything', 'system:test')");
         using var data = NpgsqlDataSource.Create(db.Exec);
         var store = new PgExecCommandStore(data);
         var processor = new ExecCommandProcessor(store);
+        await processor.RunOnceAsync(Ct); // the shared database may hold a command another test class left unanswered (ExecGrantsTests inserts a ping); answer it first so only this test's two are counted
+        await ExecDatabase.ExecuteAsync(db.App, $"INSERT INTO execution.commands (id, kind, actor) VALUES ('{ping}', 'ping', 'owner:me@example.com'), ('{odd}', 'flatten_everything', 'system:test')");
 
         (await processor.RunOnceAsync(Ct)).ShouldBe(2);
         (await processor.RunOnceAsync(Ct)).ShouldBe(0);

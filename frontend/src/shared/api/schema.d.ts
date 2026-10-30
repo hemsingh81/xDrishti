@@ -4087,6 +4087,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/execution/readiness': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Whether execution can act today, per account (optional date, default the current session in India): state ready, not_ready or unavailable (also when nothing was ever recorded; only ready lets anything act), the six checks with pass, fail or unavailable and their ages, when the token ends, since when the account has been ready, the first day the IP can be changed at Dhan, the owner's newest IP attestation, P11-05's newest SEBI re-check, the last 20 states recorded at 09:10:30 India time and the highest sends per second. Read only; no token, client id, key or secret */
+    get: operations['GetExecutionReadiness'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/readiness/checks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Check now: leaves a readiness_now command row; the execution service probes within a second and the new record shows in GET /readiness. A session and the CSRF token, no password. It reads two things at the broker (profile and configured IP) and sends nothing */
+    post: operations['RequestExecutionReadinessCheck'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/ip-attestations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The owner records that Dhan's web tool (IP Setup, Get Static IP) showed orders allowed (or not) for an IP: accountId, ip (one IPv4 or IPv6 address), ordersAllowed and a plain-text note of at most 200 characters. A session and the CSRF token, the actor from the session, the time from the database. It is a claim and never contacts the broker; ordersAllowed false is recorded and keeps the attestation check failing. 400 execution.values_invalid, 404 execution.not_found */
+    post: operations['RecordExecutionIpAttestation'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/execution/modes': {
     parameters: {
       query?: never;
@@ -9434,6 +9485,16 @@ export interface components {
       at: string;
       resolution: null | components['schemas']['ExecutionBreakResolution'];
     };
+    /** @description The state recorded at 09:10:30 India time for one session. Late means the service was not running then; the state is then `unavailable`. */
+    ExecutionDayStateView: {
+      /** Format: date */
+      sessionDate: string;
+      state: string;
+      late: boolean;
+      /** Format: date-time */
+      at: string;
+      reasons: string[];
+    };
     /** @description The execution gap by group, a total that is built from the same tickets, and the evidence. */
     ExecutionGapView: {
       state: string;
@@ -9475,6 +9536,18 @@ export interface components {
       actor: string;
       reason: string;
       end: null | components['schemas']['ExecutionHaltEnd'];
+    };
+    /** @description The owner's claim, from Dhan's web tool, that orders are allowed for the address. A claim, not a verification (spec D5). */
+    ExecutionIpAttestationView: {
+      /** Format: int64 */
+      id: number;
+      /** Format: uuid */
+      accountId: string;
+      ip: string;
+      ordersAllowed: boolean;
+      note: string;
+      /** Format: date-time */
+      at: string;
     };
     ExecutionLadderStepView: {
       from: string;
@@ -9521,6 +9594,55 @@ export interface components {
       /** Format: date-time */
       expiresAt: string;
       evidenceHash: string;
+    };
+    /**
+     * @description One account's readiness: `State` is `ready`, `not_ready` or `unavailable` (also when no check was ever recorded: nothing is ready until it says so). ReadyAt is the start of the current unbroken run of ready checks of the session. IpModifyAfter is the first day the
+     *     IP can be changed at Dhan again. SendsPerSecondMax is the highest number of order sends within one second recorded in `broker_calls` for the date, or null when there is none.
+     */
+    ExecutionReadinessAccount: {
+      /** Format: uuid */
+      accountId: string;
+      name: string;
+      state: string;
+      checks: components['schemas']['ExecutionReadinessCheck'][];
+      /** Format: date-time */
+      checkedAt: null | string;
+      /** Format: date-time */
+      tokenExpiresAt: null | string;
+      /** Format: date-time */
+      readyAt: null | string;
+      /** Format: date */
+      ipModifyAfter: null | string;
+      attestation: null | components['schemas']['ExecutionIpAttestationView'];
+      lastRecheck: null | components['schemas']['ExecutionRecheckView'];
+      dayStates: components['schemas']['ExecutionDayStateView'][];
+      /** Format: int32 */
+      sendsPerSecondMax: null | number;
+    };
+    /** @description One check of the readiness verdict. Outcome is `pass`, `fail` or `unavailable`; only `pass` is ever shown as good. The text never holds a token, a client id or an address. */
+    ExecutionReadinessCheck: {
+      code: string;
+      outcome: string;
+      text: string;
+      /** Format: int32 */
+      ageSeconds: null | number;
+    };
+    ExecutionReadinessRequested: {
+      /** Format: uuid */
+      commandId: string;
+    };
+    ExecutionReadinessView: {
+      /** Format: date */
+      date: string;
+      accounts: components['schemas']['ExecutionReadinessAccount'][];
+    };
+    /** @description The newest SEBI re-check of P11-05, read only. */
+    ExecutionRecheckView: {
+      outcome: string;
+      /** Format: date */
+      decidedOn: string;
+      /** Format: date */
+      nextReviewOn: string;
     };
     /** @description One reconciliation run. A run that could not read the broker is `Readable` false and carries a break: it is never clean. */
     ExecutionReconRunView: {
@@ -11054,6 +11176,14 @@ export interface components {
       intraday: string[];
       swingBuy: string[];
       swingSell: string[];
+    };
+    /** @description The owner's attestation of the static IP. The actor is never taken from the body. */
+    IpAttestationRequest: {
+      /** Format: uuid */
+      accountId: null | string;
+      ip: null | string;
+      ordersAllowed: null | boolean;
+      note: null | string;
     };
     /** @description One ticket's journal line: plan grade and fill grade side by side. */
     JournalEntryView: {
@@ -27698,6 +27828,117 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExecutionReadiness: {
+    parameters: {
+      query?: {
+        date?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionReadinessView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RequestExecutionReadinessCheck: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionReadinessRequested'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RecordExecutionIpAttestation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['IpAttestationRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionIpAttestationView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

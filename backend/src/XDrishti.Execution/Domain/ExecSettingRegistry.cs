@@ -1,4 +1,5 @@
 using System.Globalization;
+using XDrishti.Domain.Execution;
 
 namespace XDrishti.Execution.Domain;
 
@@ -7,10 +8,19 @@ public enum ExecSettingKind
     Number,
     Flag,
     TimeOfDay,
+    Text,
+}
+
+/// <summary>Which way a change makes the system riskier (spec P12-07 D-risk, used from P12-11): a higher value, a lower value, or neither.</summary>
+public enum ExecRiskDirection
+{
+    None,
+    HigherIsRiskier,
+    LowerIsRiskier,
 }
 
 /// <summary>One setting: its default and the range it may take. The upper bound is the compiled ceiling; a ceiling changes only by code.</summary>
-public sealed record ExecSetting(string Key, ExecSettingKind Kind, string Default, string Min, string Max);
+public sealed record ExecSetting(string Key, ExecSettingKind Kind, string Default, string Min, string Max, ExecRiskDirection Risk = ExecRiskDirection.None);
 
 /// <summary>The registry of execution settings (P12-01) and the rule that decides a value. It moves to the shared Domain when P12-07 gives xd-api a use for it.</summary>
 public static class ExecSettingRegistry
@@ -63,6 +73,10 @@ public static class ExecSettingRegistry
         Num("exec.recon_grace_s", "30", "10", "120"),
         Num("exec.stream_backoff_max_s", "30", "10", "120"),
         Num("exec.recovery_max_s", "60", "20", "300"),
+        Time("exec.ready_token_until", "16:45", "16:45", "18:00", ExecRiskDirection.LowerIsRiskier),
+        Num("exec.readiness_interval_s", "300", "60", "900", ExecRiskDirection.HigherIsRiskier),
+        new("exec.expected_static_ip", ExecSettingKind.Text, string.Empty, string.Empty, string.Empty),
+        Num("exec.attestation_max_age_days", "30", "7", "90", ExecRiskDirection.HigherIsRiskier),
     ];
 
     public static ExecSetting? Find(string key) => All.FirstOrDefault(s => s.Key == key);
@@ -73,13 +87,14 @@ public static class ExecSettingRegistry
         ExecSettingKind.Number => decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var v)
             && v >= Parse(setting.Min) && v <= Parse(setting.Max),
         ExecSettingKind.Flag => bool.TryParse(value, out _),
+        ExecSettingKind.Text => value.Length == 0 || IpLiteral.TryNormalize(value, out var ip) && ip == value, // the only text setting is the expected static IP: empty (not set) or one normal-form literal
         _ => TimeOnly.TryParseExact(value, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var t)
             && t >= TimeOnly.ParseExact(setting.Min, "HH:mm", CultureInfo.InvariantCulture) && t <= TimeOnly.ParseExact(setting.Max, "HH:mm", CultureInfo.InvariantCulture),
     };
 
     private static decimal Parse(string s) => decimal.Parse(s, CultureInfo.InvariantCulture);
 
-    private static ExecSetting Num(string key, string def, string min, string max) => new(key, ExecSettingKind.Number, def, min, max);
+    private static ExecSetting Num(string key, string def, string min, string max, ExecRiskDirection risk = ExecRiskDirection.None) => new(key, ExecSettingKind.Number, def, min, max, risk);
 
-    private static ExecSetting Time(string key, string def, string min, string max) => new(key, ExecSettingKind.TimeOfDay, def, min, max);
+    private static ExecSetting Time(string key, string def, string min, string max, ExecRiskDirection risk = ExecRiskDirection.None) => new(key, ExecSettingKind.TimeOfDay, def, min, max, risk);
 }
