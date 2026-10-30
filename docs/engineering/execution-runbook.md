@@ -16,3 +16,12 @@ Operating notes for the owner (spec [P12-11](../specs/P12-11-daily-login-token-a
 ## What is recorded
 
 `execution.readiness_checks` when the verdict or a reason changes and at least every 15 minutes from 08:00 to 16:30 on trading days; `execution.day_states` once per account and session at 09:10:30 (if the service was not running then, the first run afterwards stores it late and *unavailable*); `execution.ip_attestations` when you attest. All three are insert-only.
+
+## The confirm ticket (`semi_auto`, P12-08b)
+
+Spec [P12-08](../specs/P12-08-semi-auto-one-tap-confirm.md), [ADR 0166](../adr/0166-a-confirm-ticket-is-exact-text-the-server-wrote-decided-once-by-a-primary-key-and-judged-by-the-database-clock-and-a-confirmation-older-than-30-seconds-sends-nothing.md). No account can be `semi_auto` yet, so no ticket exists; this is what will happen once one can.
+
+- **Unlock the day first** (`POST /api/execution/day-unlocks`, your password, once per account and trading day, valid until 15:30). Without it every tap answers *not unlocked*.
+- **Read the card, then tap once.** The text is the order; it expires 90 seconds after it was issued (`exec.confirm_ttl_s`) by the server's clock. Large tickets (at least 10 % of the account's fixed capital), tickets with a Soft check not passed (give a reason) or an account without a fixed capital need your password with the tap.
+- **A refusal sends nothing and says why:** expired, mode changed, execution switched off, halted, not ready, not unlocked, price moved more than 0.30 % from the card (or no fresh price), Soft checks changed. A price or Soft-set refusal closes the card; one new card may follow while the entry window is open.
+- **A confirmed tap that is not sent within 30 seconds is cancelled** (`expired_after_confirm`), for example after a restart: nothing stale is sent. Skipping is a decision, not an error.

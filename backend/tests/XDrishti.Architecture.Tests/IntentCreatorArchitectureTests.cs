@@ -87,6 +87,6 @@ public sealed class IntentCreatorArchitectureTests
             .Order()
             .ToList();
 
-        ids.ShouldBe([6710, 6711, 6712, 6713, 6714, 6715]);
+        ids.ShouldBe([6710, 6711, 6712, 6713, 6714, 6715, 6716, 6717, 6718, 6719]); // 6716 to 6719: the ticket issuer, the closer and the hand-off of P12-08b
     }
 }

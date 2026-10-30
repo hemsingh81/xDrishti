@@ -30,7 +30,11 @@ const readiness = (accounts: unknown[]) =>
 
 describe('Execution readiness', () => {
   beforeEach(() => {
-    server.use(http.get('/api/plans', () => HttpResponse.json([{ id: 1, state: 'approved' }])));
+    server.use(
+      http.get('/api/plans', () => HttpResponse.json([{ id: 1, state: 'approved' }])),
+      http.get('/api/execution/confirm-tickets', () => HttpResponse.json([])),
+      http.get('/api/execution/day-unlocks', () => HttpResponse.json([])),
+    );
   });
 
   it('shows the state as a word with the checks, token end and IP date', async () => {
@@ -65,13 +69,13 @@ describe('Execution readiness', () => {
     expect(screen.getByText(/^No checks recorded/)).toBeInTheDocument();
   });
 
-  it('shows the morning checklist with Unlock today not yet available', async () => {
+  it('shows the morning checklist with an Unlock today action', async () => {
     server.use(readiness([account()]));
     renderWithProviders(<ExecutionPage />);
 
     const list = within(await screen.findByRole('region', { name: 'Morning checklist' }));
     expect(list.getByText('1. Connect Dhan')).toBeInTheDocument();
-    expect(list.getByText('Not yet available (P12-08)')).toBeInTheDocument();
+    expect(await list.findByRole('button', { name: 'Unlock today' })).toBeInTheDocument();
     expect(await list.findByText('3. Plan approved')).toBeInTheDocument();
     expect(list.getByText('4. Feed connected')).toBeInTheDocument();
   });
@@ -96,7 +100,7 @@ describe('Execution readiness', () => {
     server.use(http.get('/api/execution/readiness', () => HttpResponse.json({ title: 'boom' }, { status: 500 })));
     renderWithProviders(<ExecutionPage />);
 
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 

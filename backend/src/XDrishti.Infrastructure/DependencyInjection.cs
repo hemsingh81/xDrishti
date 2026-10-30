@@ -230,6 +230,8 @@ public static class DependencyInjection
         services.AddScoped<IComplianceRecords, ComplianceRecords>(); // P11-05's newest sebi_recheck, read only (P12-11)
         services.AddScoped<IExecutionModeStore, ExecutionModeStore>(); // the mode trail and promotion requests: read, plus the two owner-act inserts (P12-07)
         services.AddScoped<IExecutionModeFacts, ExecutionModeFacts>(); // the stored facts of the mode gate, read only (P12-07)
+        services.AddScoped<IConfirmTicketAccess, ConfirmTicketAccess>(); // the confirm tickets: read, plus the owner's confirmed and skipped outcomes (P12-08b)
+        services.AddScoped<IDayUnlockAccess, DayUnlockAccess>(); // the day unlocks: read, plus the owner's unlock (P12-08b)
         services.AddScoped<IExecutionFactsReader, ExecutionFactsReader>(); // the execution service's heartbeat and record, read only (P12-01b)
         services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)

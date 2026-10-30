@@ -27,5 +27,6 @@
     <InternalsVisibleTo Include="XDrishti.Infrastructure.Tests" />
     <InternalsVisibleTo Include="XDrishti.Api.IntegrationTests" />
     <InternalsVisibleTo Include="XDrishti.Mcp.Tests" />
+    <InternalsVisibleTo Include="XDrishti.Execution.Tests" /><!-- the confirm path of P12-08b run as xd_app on the real-role database fixture -->
   </ItemGroup>
 </Project>

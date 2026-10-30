@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using XDrishti.Execution.Application;
+using XDrishti.Execution.Application.Confirm;
 using XDrishti.Execution.Application.Halts;
 using XDrishti.Execution.Application.Ports;
 using XDrishti.Execution.Application.Readiness;
@@ -75,6 +76,13 @@ public static class ExecServices
         services.AddSingleton<ISendJournal>(sp => sp.GetRequiredService<PgSendJournal>());
         services.AddSingleton<ISendHistory>(sp => sp.GetRequiredService<PgSendJournal>());
         services.AddSingleton<ITokenGate, PgTokenGate>();
+        // The confirm record (P12-08b, ADR 0166): only the safe direction runs here. The expiry loop closes unanswered tickets and the closer refuses a ticket the owner's tap was refused for (a command of the API). The issuer, the
+        // stored confirm gate and the hand-off are composed by no host: IConfirmGate stays the closed default and no account can be semi_auto (ADR 0163).
+        services.AddSingleton<PgConfirmTickets>();
+        services.AddSingleton<IConfirmTicketStore>(sp => sp.GetRequiredService<PgConfirmTickets>());
+        services.TryAddSingleton<IConfirmGate, ClosedConfirmGate>();
+        services.AddSingleton<TicketCloser>();
+        services.AddHostedService<TicketExpiryService>();
         services.AddSingleton<ExecCounters>();
         services.AddHostedService<ExecHeartbeatService>();
         services.AddHostedService<ExecCommandPoller>();

@@ -40,11 +40,14 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         ["readiness_checks"] = ["INSERT", "SELECT"], // the readiness probe (P12-11)
         ["day_states"] = ["INSERT", "SELECT"], // the 09:10:30 mark (P12-11)
         ["ip_attestations"] = ["SELECT"], // the owner's claim, written by the API (P12-11)
+        ["confirm_tickets"] = ["INSERT", "SELECT"], // the issuer of the confirm ticket (P12-08b)
+        ["ticket_outcomes"] = ["INSERT", "SELECT"], // expired and refused only; the trigger refuses the owner's two outcomes from this role (P12-08b)
+        ["day_unlocks"] = ["SELECT"], // the owner's unlock, written by the API (P12-08b)
         ["commands"] = ["SELECT"],
         ["settings"] = ["SELECT"],
     };
 
-    private static readonly Dictionary<string, string[]> AppExpected = ExecExpected.ToDictionary(e => e.Key, e => e.Key is "commands" or "halt_releases" or "break_resolutions" or "mode_trail" or "promotion_requests" or "ip_attestations" ? new[] { "INSERT", "SELECT" } : new[] { "SELECT" });
+    private static readonly Dictionary<string, string[]> AppExpected = ExecExpected.ToDictionary(e => e.Key, e => e.Key is "commands" or "halt_releases" or "break_resolutions" or "mode_trail" or "promotion_requests" or "ip_attestations" or "ticket_outcomes" or "day_unlocks" ? new[] { "INSERT", "SELECT" } : new[] { "SELECT" });
 
     private async Task<List<string>> TablesAsync()
     {
@@ -106,6 +109,10 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         // The attestation is the owner's act: the API writes it, the execution service only reads it (P12-11).
         ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_sequence_privilege('xd_app', 'execution.ip_attestations_id_seq', 'USAGE')"))!).ShouldBeTrue();
         ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_sequence_privilege('xd_exec', 'execution.ip_attestations_id_seq', 'USAGE')"))!).ShouldBeFalse();
+
+        // The day unlock is the owner's act: the API writes it, the execution service only reads it (P12-08b).
+        ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_sequence_privilege('xd_app', 'execution.day_unlocks_id_seq', 'USAGE')"))!).ShouldBeTrue();
+        ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_sequence_privilege('xd_exec', 'execution.day_unlocks_id_seq', 'USAGE')"))!).ShouldBeFalse();
 
         ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_schema_privilege('xd_mcp_read', 'execution', 'USAGE') OR has_schema_privilege('xd_mcp_sql', 'execution', 'USAGE')"))!).ShouldBeFalse();
         ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_schema_privilege('public', 'execution', 'USAGE')"))!).ShouldBeFalse();

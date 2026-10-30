@@ -1,5 +1,6 @@
 using System.Globalization;
 using XDrishti.Domain.Execution;
+using XDrishti.Domain.Execution.Confirm;
 
 namespace XDrishti.Execution.Domain;
 
@@ -77,6 +78,9 @@ public static class ExecSettingRegistry
         Num("exec.readiness_interval_s", "300", "60", "900", ExecRiskDirection.HigherIsRiskier),
         new("exec.expected_static_ip", ExecSettingKind.Text, string.Empty, string.Empty, string.Empty),
         Num("exec.attestation_max_age_days", "30", "7", "90", ExecRiskDirection.HigherIsRiskier),
+        Num(ConfirmSettings.TtlKey, "90", "15", "300", ExecRiskDirection.HigherIsRiskier),
+        Num(ConfirmSettings.DriftKey, "0.30", "0.05", "1.00", ExecRiskDirection.HigherIsRiskier),
+        Num(ConfirmSettings.StepUpKey, "10", "1", "100", ExecRiskDirection.HigherIsRiskier),
     ];
 
     public static ExecSetting? Find(string key) => All.FirstOrDefault(s => s.Key == key);

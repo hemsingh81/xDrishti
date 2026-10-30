@@ -1,5 +1,6 @@
 
 using System.Text.Json;
+using XDrishti.Execution.Application.Confirm;
 using XDrishti.Execution.Application.Halts;
 using XDrishti.Execution.Application.Ports;
 using XDrishti.Execution.Application.Readiness;
@@ -19,10 +20,11 @@ public interface IExecCommandStore
 }
 
 /// <summary>
-/// Answers every pending command once. Three kinds are known: <c>ping</c> (proves the plane works, changes nothing), from P12-05 <c>halt</c> (the owner's button: it can only record a halt, which makes the system stricter) and from P12-11 <c>readiness_now</c> (wakes the readiness loop, which then reads two things at the broker and writes a record). Every other kind is refused
+/// Answers every pending command once. Four kinds are known: <c>ping</c> (proves the plane works, changes nothing), from P12-05 <c>halt</c> (the owner's button: it can only record a halt, which makes the system stricter), from P12-11 <c>readiness_now</c> (wakes the readiness loop, which then reads two things at the broker and writes a record) and from P12-08b <c>ticket_refuse</c> (closes a confirm ticket <c>refused</c> after the owner's tap was refused for its price or Soft set; closing is the safe direction). Every other kind is refused
 /// with <c>execution.command_unknown</c>. No kind reaches a broker. A halt whose record cannot be written is NOT answered, so it is tried again on the next poll until it lands.
 /// </summary>
-public sealed partial class ExecCommandProcessor(IExecCommandStore store, HaltService? halts = null, TimeProvider? timeProvider = null, ILogger<ExecCommandProcessor>? logger = null, ReadinessSignal? readiness = null)
+public sealed partial class ExecCommandProcessor(
+    IExecCommandStore store, HaltService? halts = null, TimeProvider? timeProvider = null, ILogger<ExecCommandProcessor>? logger = null, ReadinessSignal? readiness = null, TicketCloser? tickets = null)
 {
     public static readonly TimeSpan MaxBackoff = TimeSpan.FromSeconds(30);
 
@@ -32,6 +34,8 @@ public sealed partial class ExecCommandProcessor(IExecCommandStore store, HaltSe
     public const string Ping = "ping";
     public const string Halt = "halt";
     public const string ReadinessNow = "readiness_now";
+    public const string TicketRefuse = "ticket_refuse";
+    public const string TicketRefuseInvalidCode = "execution.ticket_refuse_invalid";
     public const string UnknownCode = "execution.command_unknown";
     public const string HaltInvalidCode = "execution.halt_invalid";
     public const string ReadinessInvalidCode = "execution.readiness_invalid";
@@ -54,6 +58,7 @@ public sealed partial class ExecCommandProcessor(IExecCommandStore store, HaltSe
                     Ping => ("done", "execution.ok"),
                     Halt when halts is not null => await HaltAsync(command, cancellationToken).ConfigureAwait(false),
                     ReadinessNow when readiness is not null => ReadinessAsync(command),
+                    TicketRefuse when tickets is not null => await TicketRefuseAsync(command, cancellationToken).ConfigureAwait(false),
                     _ => ("refused", UnknownCode),
                 };
             }
@@ -83,7 +88,7 @@ public sealed partial class ExecCommandProcessor(IExecCommandStore store, HaltSe
         return applied;
     }
 
-    [LoggerMessage(EventId = 6663, Level = LogLevel.Warning, Message = "A halt command could not be recorded ({Kind}), failure {Failures}; trying again with backoff")]
+    [LoggerMessage(EventId = 6663, Level = LogLevel.Warning, Message = "A halt or ticket command could not be recorded ({Kind}), failure {Failures}; trying again with backoff")]
     private static partial void LogHaltFailed(ILogger logger, string kind, int failures);
 
     // An owner's check now: the loop probes within a second. The instruction carries no data, so nothing in the payload is read.
@@ -96,6 +101,39 @@ public sealed partial class ExecCommandProcessor(IExecCommandStore store, HaltSe
 
         readiness!.Request();
         return ("done", "execution.readiness_requested");
+    }
+
+    // The owner's tap was refused for its price or its Soft set (P12-08b): the API, which may not write a refused outcome, asks this service to close the ticket. Only those three reasons are accepted; the primary key decides a race.
+    private async Task<(string Result, string Code)> TicketRefuseAsync(ExecCommand command, CancellationToken cancellationToken)
+    {
+        Guid ticket;
+        string? code;
+        try
+        {
+            using var doc = JsonDocument.Parse(command.Payload);
+            var root = doc.RootElement;
+            code = root.TryGetProperty("code", out var c) ? c.GetString() : null;
+            if (!root.TryGetProperty("ticketId", out var t) || !t.TryGetGuid(out ticket))
+            {
+                return ("refused", TicketRefuseInvalidCode);
+            }
+        }
+        catch (JsonException)
+        {
+            return ("refused", TicketRefuseInvalidCode);
+        }
+
+        if (!command.Actor.StartsWith("owner:", StringComparison.Ordinal) || code is null)
+        {
+            return ("refused", TicketRefuseInvalidCode);
+        }
+
+        return await tickets!.RefuseAsync(ticket, code, cancellationToken).ConfigureAwait(false) switch
+        {
+            true => ("done", "execution.ticket_refused"),
+            false => ("done", "execution.ticket_decided"),
+            null => ("refused", TicketRefuseInvalidCode),
+        };
     }
 
     private async Task<(string Result, string Code)> HaltAsync(ExecCommand command, CancellationToken cancellationToken)

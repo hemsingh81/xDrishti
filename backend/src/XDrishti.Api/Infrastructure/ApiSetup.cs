@@ -40,6 +40,9 @@ internal static class ApiSetup
     /// <summary>Chat questions per minute per session (spec P9-03).</summary>
     public const int AssistantChatsPerMinute = 10;
 
+    /// <summary>Taps and skips of confirm tickets per minute and client (spec P12-08): the routes that check a password only when the ticket asks for it have their own limit; the day unlock, which always checks one, has the sign-in limit.</summary>
+    public const int ConfirmActsPerMinute = 60;
+
     private static readonly string[] TrustedProxyNetworks = ["127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"];
 
     public static IServiceCollection AddApi(this IServiceCollection services)
@@ -120,6 +123,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, ReportsPhaseCheckEndpoints>(); // the P8 phase check (P8-17): one GET, computed on read
         services.AddSingleton<IEndpointCatalogue, EndpointCatalogue>(); // the route table for the phase check's read-only criterion
         services.AddSingleton<IEndpointModule, AutonomyEndpoints>();
+        services.AddSingleton<IEndpointModule, ExecutionConfirmEndpoints>(); // the confirm tickets and day unlocks (P12-08b): the owner's tap writes an outcome row and sends nothing
         services.AddSingleton<IEndpointModule, ExecutionEndpoints>(); // the execution service's status (P12-01b): read only, no write route
         services.AddSingleton<IEndpointModule, DepthEndpoints>(); // the owner's depth-recorder switch (P7-16): fresh password per change, insert-only; no depth data is readable
         services.AddSingleton<IEndpointModule, LiveTradingEndpoints>(); // the compliance record of the small live phase (P11-05): fresh password, gate Live:Writes:Enabled (OFF), insert-only; no broker call
@@ -278,6 +282,9 @@ internal static class ApiSetup
             o.AddPolicy(SessionAuthentication.PlanDecisionRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = PlanDecisionsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(ExecutionConfirmEndpoints.ConfirmRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+                "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown"),
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = ConfirmActsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             // The limiter runs before the session is looked at, so a cookie cannot be trusted as a key: a rotating fake cookie would grow the table and dodge the limit. One owner, one address (the proxy's, with the real one in X-Forwarded-For): the key is the address.
             o.AddPolicy(AssistantEndpoints.ChatRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
                 "ip:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown"),

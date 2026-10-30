@@ -105,6 +105,11 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RequestPromotionCommand, ExecutionPromotionRequestView>, RequestPromotionHandler>(); // the owner's request: gate, fresh password, stores the evidence, grants nothing (P12-07)
         services.AddScoped<ICommandHandler<ConfirmPromotionCommand, ExecutionTrailView>, ConfirmPromotionHandler>(); // the owner's confirmation after the cooling-off, gate evaluated again (P12-07)
         services.AddScoped<ICommandHandler<DemoteModeCommand, ExecutionTrailView>, DemoteModeHandler>(); // the owner's step down: no password, it lowers risk (P12-07)
+        services.AddScoped<IQueryHandler<GetConfirmTicketsQuery, Result<IReadOnlyList<ConfirmTicketView>>>, GetConfirmTicketsHandler>(); // the confirm tickets of a session, read only (P12-08b)
+        services.AddScoped<ICommandHandler<ConfirmTicketCommand, ConfirmResultView>, ConfirmTicketHandler>(); // the owner's tap: writes one confirmed outcome or refuses with the cause; sends nothing (P12-08b)
+        services.AddScoped<ICommandHandler<SkipTicketCommand, ConfirmResultView>, SkipTicketHandler>(); // the owner's skip: a declined decision (P12-08b)
+        services.AddScoped<IQueryHandler<GetDayUnlocksQuery, IReadOnlyList<DayUnlockView>>, GetDayUnlocksHandler>(); // the day unlocks, read only (P12-08b)
+        services.AddScoped<ICommandHandler<UnlockDayCommand, DayUnlockView>, UnlockDayHandler>(); // the owner's daily unlock after a fresh password (P12-08b)
         services.AddScoped<IQueryHandler<GetExecutionStatusQuery, ExecutionStatusView>, GetExecutionStatusHandler>(); // the execution service's status (P12-01b): read only
         services.AddScoped<IQueryHandler<GetDepthRecorderQuery, DepthRecorderView>, GetDepthRecorderHandler>(); // the owner's depth switch (P7-16): read
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)

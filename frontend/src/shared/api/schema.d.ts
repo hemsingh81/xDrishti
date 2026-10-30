@@ -3984,6 +3984,75 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/execution/confirm-tickets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The confirm tickets of a session (date, default today in India): state=open (default, the cards waiting for a tap) or all. Each has the exact text (show it verbatim), its hash, the client order id, the reference price, the notional, the worst case at the stop, the expiry and serverNow (the database clock: count down from it, not from the browser clock alone), whether the password is needed and why, the Soft codes not passed at issue and, once decided, the outcome. Read only */
+    get: operations['GetConfirmTickets'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/confirm-tickets/{id}/confirm': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The owner's tap on one ticket: textHash must be the hash of the stored text (409 execution.text_changed, nothing stored), before the expiry by the database clock (409 execution.ticket_expired), the account still semi_auto (execution.mode_changed), execution_enabled ON (execution.disabled), no halt or kill switch (execution.halted), ready (execution.not_ready), the day unlocked (execution.not_unlocked) and the last price within the drift limit (execution.price_moved, execution.price_unavailable; the ticket is then closed refused). The password is needed when the ticket says so (400 execution.password_required, 401 auth.invalid_credentials, 423 auth.locked; it counts toward the lockout); a reason when Soft checks did not pass (400 execution.reason_required). An optional Idempotency-Key header must equal the ticket id (400 execution.values_invalid). A repeat answers the saved decision with alreadyDecided true; after a skip, expiry or refusal 409 execution.ticket_closed. It writes one confirmed outcome and sends nothing */
+    post: operations['ConfirmTicket'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/confirm-tickets/{id}/skip': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The owner declines one ticket: a decision (counted as declined), not an error. An optional plain-text reason of at most 200 characters. A session and the CSRF token, no password. 409 execution.ticket_closed when it was decided otherwise, execution.ticket_expired after its expiry */
+    post: operations['SkipConfirmTicket'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/day-unlocks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The day unlocks of a session (date, default today in India): account, when it was unlocked and until when (15:30 India time). Read only */
+    get: operations['GetDayUnlocks'];
+    put?: never;
+    /** The owner unlocks one account for today: a fresh password for this act (401 auth.invalid_credentials; an earlier step-up window does not count) and the actor from the session. Only on a trading day (409 execution.not_trading_day), only for an account in semi_auto or auto_live (409 execution.mode_not_executing) and before 15:30 India time (409 execution.unlock_closed). Locking the session does not remove it; a second unlock answers the first */
+    post: operations['UnlockExecutionDay'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/execution/status': {
     parameters: {
       query?: never;
@@ -7298,6 +7367,58 @@ export interface components {
     ConfirmPromotionBody: {
       password: null | string;
     };
+    /** @description The answer to a tap or a skip. `AlreadyDecided` is true when an earlier request decided the ticket (the same decision, the same `DecidedAt`). */
+    ConfirmResultView: {
+      /** Format: uuid */
+      ticketId: string;
+      outcome: string;
+      alreadyDecided: boolean;
+      /** Format: date-time */
+      decidedAt: string;
+    };
+    /** @description The owner's tap: the hash of the text the card showed, the password when the ticket asks for it, and a reason when Soft checks did not pass. The actor is never taken from the body. */
+    ConfirmTicketBody: {
+      textHash: null | string;
+      password: null | string;
+      reason: null | string;
+    };
+    /**
+     * @description One confirm ticket as the owner's card shows it (spec P12-08 Contract). `Text` is shown verbatim and never re-typed; `ServerNow` is the database clock at the read, so the countdown is the server's. `State` is
+     *     `open`, `confirmed`, `skipped`, `expired` or `refused` (a ticket past its expiry without an outcome reads `expired` before the loop writes it). `SoftCodes` lists the Soft checks not passed at issue: a
+     *     confirm then needs a reason.
+     */
+    ConfirmTicketView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      accountId: string;
+      accountName: string;
+      /** Format: int64 */
+      planItemId: number;
+      text: string;
+      textHash: string;
+      kind: string;
+      clientOrderId: string;
+      /** Format: double */
+      refPrice: number;
+      /** Format: double */
+      notional: number;
+      /** Format: double */
+      riskAtStop: number;
+      /** Format: date-time */
+      issuedAt: string;
+      /** Format: date-time */
+      expiresAt: string;
+      /** Format: date-time */
+      serverNow: string;
+      requiresPassword: boolean;
+      passwordReasons: string[];
+      softCodes: string[];
+      state: string;
+      outcomeReason: null | string;
+      /** Format: date-time */
+      decidedAt: null | string;
+    };
     /** @description Where to send the owner's browser to sign in at Dhan (same tab): Dhan's consent login page. The sign-in must come back before ExpiresAt. */
     ConnectStartView: {
       authorizeUrl: string;
@@ -8231,6 +8352,25 @@ export interface components {
       /** Format: double */
       latencyMs: number;
       error: null | string;
+    };
+    /** @description The owner's daily unlock of one account: a fresh password for this act. */
+    DayUnlockBody: {
+      /** Format: uuid */
+      accountId: null | string;
+      password: null | string;
+    };
+    /** @description The owner's unlock of one account for one India session date, valid until 15:30 India time. */
+    DayUnlockView: {
+      /** Format: int64 */
+      id: number;
+      /** Format: uuid */
+      accountId: string;
+      /** Format: date */
+      sessionDate: string;
+      /** Format: date-time */
+      unlockedAt: string;
+      /** Format: date-time */
+      expiresAt: string;
     };
     /** @description A security whose depository quantity differs from the synced holding's. */
     DematDifference: {
@@ -16579,6 +16719,10 @@ export interface components {
       /** Format: double */
       pValue: number;
       label: string;
+    };
+    /** @description The owner's skip, with an optional plain-text reason of at most 200 characters. */
+    SkipTicketBody: {
+      reason: null | string;
     };
     /** @description A ticket approve-all left alone, and why. */
     SkippedTicket: {
@@ -27558,6 +27702,282 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetConfirmTickets: {
+    parameters: {
+      query?: {
+        state?: string;
+        date?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfirmTicketView'][];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ConfirmTicket: {
+    parameters: {
+      query?: never;
+      header?: {
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ConfirmTicketBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfirmResultView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SkipConfirmTicket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SkipTicketBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfirmResultView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetDayUnlocks: {
+    parameters: {
+      query?: {
+        date?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DayUnlockView'][];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UnlockExecutionDay: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DayUnlockBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DayUnlockView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
       /** @description Conflict */

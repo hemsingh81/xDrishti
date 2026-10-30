@@ -5,6 +5,7 @@ import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
 import { readinessQuery } from '../api/readinessApi';
 import { AttestationForm } from './AttestationForm';
 import { MorningChecklist } from './MorningChecklist';
+import { ConfirmSection } from './ConfirmSection';
 import { ReadinessCard } from './ReadinessCard';
 import { RunbookSteps } from './RunbookSteps';
 
@@ -19,6 +20,7 @@ export function ExecutionPage() {
         hue="system"
         description="Whether execution can act today, and what is missing. Nothing is ready until a check says so."
       />
+      <ConfirmSection />
       {isPending && <LoadingState label="Loading readiness" />}
       {error && <ErrorState error={error} />}
       {data?.accounts.length === 0 && <Alert severity="info">No account is set up for execution.</Alert>}
