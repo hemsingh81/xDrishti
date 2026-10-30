@@ -80,8 +80,8 @@ public sealed class HaltRulesAndTriggersTests
     [Fact]
     public void Every_trigger_code_of_the_spec_exists_once_and_only_the_named_ones_clear_themselves()
     {
-        HaltTriggers.All.Count.ShouldBe(19, "the owner's button, the 17 automatic codes and the drill");
-        HaltTriggers.All.Select(t => t.Code).Distinct().Count().ShouldBe(19);
+        HaltTriggers.All.Count.ShouldBe(20, "the owner's button, the 17 automatic codes, the drill and the foreign conflict (P12-06)");
+        HaltTriggers.All.Select(t => t.Code).Distinct().Count().ShouldBe(20);
         HaltTriggers.All.Where(t => t.AutoClear is not null).Select(t => t.Code).Order().ShouldBe(["broker_outage", "clock_skew", "drill", "feed_loss", "ip_not_allowed", "protection_unknown", "token_invalid"]);
         foreach (var owner in new[] { "owner_button", "daily_loss", "loss_cap", "drawdown", "disaster_loss", "reconciliation_break", "protection_breach", "flatten_incomplete", "oversold", "runaway_rate", "crash_loop", "exchange_halt" })
         {

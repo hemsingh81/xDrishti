@@ -13,9 +13,9 @@ public static class BrokerRead
     public static BrokerRead<T> Unreadable<T>(string reason) => new(false, default, reason);
 }
 
-public sealed record BrokerOrderView(string OrderId, string? ClientOrderId, string Status, string SecurityId, ExecSide? Side, int Qty, int FilledQty, decimal Price, decimal? Trigger = null, string? LegName = null);
+public sealed record BrokerOrderView(string OrderId, string? ClientOrderId, string Status, string SecurityId, ExecSide? Side, int Qty, int FilledQty, decimal Price, decimal? Trigger = null, string? LegName = null, string? ParentOrderId = null);
 
-public sealed record BrokerTradeView(string OrderId, string SecurityId, ExecSide? Side, int Qty, decimal Price);
+public sealed record BrokerTradeView(string OrderId, string SecurityId, ExecSide? Side, int Qty, decimal Price, string? ExchangeTradeId = null);
 
 public sealed record BrokerPositionView(string SecurityId, int NetQty);
 

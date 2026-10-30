@@ -194,7 +194,7 @@ public sealed class ProtectionRulesTests
     [Fact]
     public void The_twelve_alarm_codes_have_a_severity_and_the_protection_ones_are_critical()
     {
-        AlarmCodes.All.Count.ShouldBe(12);
+        AlarmCodes.All.Count.ShouldBe(15);
         AlarmCodes.All[AlarmCodes.ProtectionBreach].ShouldBe(AlarmSeverity.Critical);
         AlarmCodes.All[AlarmCodes.Oversold].ShouldBe(AlarmSeverity.Critical);
         AlarmCodes.All[AlarmCodes.ProtectionPending].ShouldBe(AlarmSeverity.Warn);

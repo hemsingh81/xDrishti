@@ -57,6 +57,12 @@ public static class ExecSettingRegistry
         Num("exec.index_halt_pct", "9.0", "3", "20"),
         Num("exec.broker_outage_s", "60", "20", "300"),
         new("exec.broker_kill_switch_on_halt", ExecSettingKind.Flag, "false", "false", "true"),
+        Num("exec.poll_busy_s", "5", "2", "30"),
+        Num("exec.poll_idle_s", "30", "10", "120"),
+        Num("exec.recon_interval_s", "60", "30", "300"),
+        Num("exec.recon_grace_s", "30", "10", "120"),
+        Num("exec.stream_backoff_max_s", "30", "10", "120"),
+        Num("exec.recovery_max_s", "60", "20", "300"),
     ];
 
     public static ExecSetting? Find(string key) => All.FirstOrDefault(s => s.Key == key);

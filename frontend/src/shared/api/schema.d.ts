@@ -4045,8 +4045,42 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Releases a halt as the owner: only the owner can, with the gate Live:Writes:Enabled on (checked BEFORE the password; 403 live.capability_off), a fresh password for this act (401 auth.invalid_credentials; an earlier step-up window does not count), the actor from the session and a reason. Refused with 409 execution.release_refused and every reason when the halt already ended, the reason is missing or too short (a drawdown halt needs 20 characters), an exit_all halt still has an open position, a protection halt still has an open protection alarm, or the halt is a freeze (released only after reconciliation exists). 404 execution.halt_unknown */
+    /** Releases a halt as the owner: only the owner can, with the gate Live:Writes:Enabled on (checked BEFORE the password; 403 live.capability_off), a fresh password for this act (401 auth.invalid_credentials; an earlier step-up window does not count), the actor from the session and a reason. Refused with 409 execution.release_refused and every reason when the halt already ended, the reason is missing or too short (a drawdown halt needs 20 characters), an exit_all halt still has an open position, a protection halt still has an open protection alarm, or the halt is a freeze (released only when it came from a reconciliation break and every break of its account has a resolution). 404 execution.halt_unknown */
     post: operations['ReleaseExecutionHalt'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/reconciliation': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The reconciliation runs and breaks of the execution service (at most 200 of each, newest first): per run the kind (continuous, eod, final, recovery), whether the broker could be read and how many breaks; per break the kind (position_mismatch, trade_missing, trade_extra, order_mismatch, fill_mismatch, unknown_xd_order, foreign_conflict, unavailable), the account, the figures' summary and the owner's resolution if any. Optional date (the session) and accountId. Read only; a break is never corrected automatically */
+    get: operations['GetExecutionReconciliation'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/breaks/{id}/resolve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resolves a reconciliation break as the owner: only the owner can, with the gate Live:Writes:Enabled on (checked BEFORE the password; 403 live.capability_off), a fresh password for this act (401 auth.invalid_credentials; an earlier step-up window does not count) and the actor from the session. resolution is accept_broker (the engine then appends an adoption event; nothing is rewritten) or dismiss_foreign (a foreign conflict only); note is at most 300 characters. 400 execution.resolution_invalid, 404 execution.break_unknown, 409 execution.break_resolved. The freeze it caused can be released once every break of the account is resolved */
+    post: operations['ResolveExecutionBreak'];
     delete?: never;
     options?: never;
     head?: never;
@@ -9297,6 +9331,32 @@ export interface components {
       clearedAt: null | string;
       clearedBy: null | string;
     };
+    /** @description The owner's answer to a break: `accept_broker` (adopt the broker's figure as true) or `dismiss_foreign` (a foreign item, remembered as explained for the day). The note is the owner's own text, at most 300 characters. */
+    ExecutionBreakResolution: {
+      /** Format: date-time */
+      at: string;
+      by: string;
+      resolution: string;
+      note: string;
+    };
+    /** @description One break of a reconciliation run with its resolution, if any. Kind is one of the eight of spec P12-06. */
+    ExecutionBreakView: {
+      /** Format: int64 */
+      id: number;
+      /** Format: int64 */
+      runId: number;
+      /** Format: uuid */
+      accountId: string;
+      kind: string;
+      severity: string;
+      symbol: null | string;
+      /** Format: int64 */
+      intentId: null | number;
+      detail: string;
+      /** Format: date-time */
+      at: string;
+      resolution: null | components['schemas']['ExecutionBreakResolution'];
+    };
     /** @description The execution gap by group, a total that is built from the same tickets, and the evidence. */
     ExecutionGapView: {
       state: string;
@@ -9338,6 +9398,31 @@ export interface components {
       actor: string;
       reason: string;
       end: null | components['schemas']['ExecutionHaltEnd'];
+    };
+    /** @description One reconciliation run. A run that could not read the broker is `Readable` false and carries a break: it is never clean. */
+    ExecutionReconRunView: {
+      /** Format: int64 */
+      id: number;
+      /** Format: date-time */
+      at: string;
+      /** Format: uuid */
+      accountId: string;
+      /** Format: date */
+      sessionDate: string;
+      kind: string;
+      readable: boolean;
+      /** Format: int32 */
+      orders: number;
+      /** Format: int32 */
+      trades: number;
+      /** Format: int32 */
+      positions: number;
+      /** Format: int32 */
+      breaks: number;
+    };
+    ExecutionReconciliationView: {
+      runs: components['schemas']['ExecutionReconRunView'][];
+      breaks: components['schemas']['ExecutionBreakView'][];
     };
     /** @description One row of the paper execution waterfall on the wire. */
     ExecutionRowView: {
@@ -15497,6 +15582,12 @@ export interface components {
        * @description The second call; null when the read was refused.
        */
       warmMs: null | number;
+    };
+    /** @description The owner's resolution of a break: `accept_broker` or `dismiss_foreign` (a foreign conflict only), an optional note of at most 300 characters and the password, checked afresh for this act. */
+    ResolveBreakRequest: {
+      resolution: null | string;
+      note: null | string;
+      password: null | string;
     };
     /** @description Pasted tickers, canonical symbols (`NSE:RELIANCE`) or ISINs, up to 5,000 entries. */
     ResolveInput: {
@@ -27358,6 +27449,91 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ExecutionHaltView'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExecutionReconciliation: {
+    parameters: {
+      query?: {
+        date?: string;
+        accountId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionReconciliationView'];
+        };
+      };
+    };
+  };
+  ResolveExecutionBreak: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResolveBreakRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionBreakView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
       /** @description Forbidden */

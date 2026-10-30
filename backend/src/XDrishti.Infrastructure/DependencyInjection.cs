@@ -223,6 +223,8 @@ public static class DependencyInjection
         services.AddScoped<IExecutionHaltReader, ExecutionHaltReader>(); // the execution halt record, read only (P12-05)
         services.AddScoped<IExecutionCommands, ExecutionCommands>(); // the one write into the execution schema: a command row (P12-05)
         services.AddScoped<IExecutionHaltReleases, ExecutionHaltReleases>(); // the owner's release row, the only INSERT the runtime role holds on a halt table (P12-05)
+        services.AddScoped<IExecutionReconReader, ExecutionReconReader>(); // the runs and breaks of the reconciliation, read only (P12-06)
+        services.AddScoped<IExecutionBreakResolutions, ExecutionBreakResolutions>(); // the owner's resolution row, the only INSERT the runtime role holds on the reconciliation tables (P12-06)
         services.AddScoped<IExecutionFactsReader, ExecutionFactsReader>(); // the execution service's heartbeat and record, read only (P12-01b)
         services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)

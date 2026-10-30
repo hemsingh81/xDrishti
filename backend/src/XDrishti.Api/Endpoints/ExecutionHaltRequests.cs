@@ -5,3 +5,6 @@ internal sealed record StartHaltRequest(string? Scope, Guid? AccountId, string? 
 
 /// <summary>The owner's release of a halt: a reason and the password, checked afresh for this act.</summary>
 internal sealed record ReleaseHaltRequest(string? Reason, string? Password);
+
+/// <summary>The owner's resolution of a break: <c>accept_broker</c> or <c>dismiss_foreign</c> (a foreign conflict only), an optional note of at most 300 characters and the password, checked afresh for this act.</summary>
+internal sealed record ResolveBreakRequest(string? Resolution, string? Note, string? Password);

@@ -28,7 +28,7 @@ internal static class DhanReads
         var security = Str(row, "securityId");
         return id is null || security is null || !Int(row, out var qty, "tradedQuantity", "quantity") || !Dec(row, out var price, "tradedPrice", "price")
             ? null
-            : new BrokerTradeView(id, security, Side(row), qty, price);
+            : new BrokerTradeView(id, security, Side(row), qty, price, Str(row, "exchangeTradeId"));
     });
 
     public static BrokerRead<IReadOnlyList<BrokerPositionView>> Positions(string text) => Rows(text, row =>

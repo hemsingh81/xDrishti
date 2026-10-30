@@ -32,11 +32,14 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         ["day_marks"] = ["INSERT", "SELECT"],
         ["drills"] = ["INSERT", "SELECT"],
         ["kill_switch_log"] = ["INSERT", "SELECT"],
+        ["recon_runs"] = ["INSERT", "SELECT"],
+        ["recon_breaks"] = ["INSERT", "SELECT"],
+        ["break_resolutions"] = ["SELECT"],
         ["commands"] = ["SELECT"],
         ["settings"] = ["SELECT"],
     };
 
-    private static readonly Dictionary<string, string[]> AppExpected = ExecExpected.ToDictionary(e => e.Key, e => e.Key is "commands" or "halt_releases" ? new[] { "INSERT", "SELECT" } : new[] { "SELECT" });
+    private static readonly Dictionary<string, string[]> AppExpected = ExecExpected.ToDictionary(e => e.Key, e => e.Key is "commands" or "halt_releases" or "break_resolutions" ? new[] { "INSERT", "SELECT" } : new[] { "SELECT" });
 
     private async Task<List<string>> TablesAsync()
     {
@@ -83,7 +86,7 @@ public sealed class ExecGrantsTests(ExecDatabase db)
     [Fact]
     public async Task No_role_can_use_a_sequence_it_does_not_need_and_nobody_else_can_enter_the_schema()
     {
-        foreach (var sequence in new[] { "events_id_seq", "intents_id_seq", "legs_id_seq", "fills_id_seq", "settings_id_seq", "broker_calls_id_seq", "halts_id_seq", "drills_id_seq", "kill_switch_log_id_seq" })
+        foreach (var sequence in new[] { "events_id_seq", "intents_id_seq", "legs_id_seq", "fills_id_seq", "settings_id_seq", "broker_calls_id_seq", "halts_id_seq", "drills_id_seq", "kill_switch_log_id_seq", "recon_runs_id_seq", "recon_breaks_id_seq" })
         {
             ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('xd_app', 'execution.{sequence}', 'USAGE')"))!).ShouldBeFalse(sequence);
             ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('xd_exec', 'execution.{sequence}', 'USAGE')"))!).ShouldBeTrue(sequence);

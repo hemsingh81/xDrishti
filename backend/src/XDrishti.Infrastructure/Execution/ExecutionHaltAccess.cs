@@ -43,7 +43,9 @@ internal sealed class ExecutionHaltReader(XDrishtiDbContext db) : IExecutionHalt
                CASE WHEN r.halt_id IS NOT NULL THEN 'owner' WHEN c.halt_id IS NOT NULL THEN 'auto' END, r.reason,
                EXISTS (SELECT 1 FROM execution.positions p WHERE p.net_qty <> 0 AND (h.scope = 'system' OR p.account_id = h.account_id)),
                EXISTS (SELECT 1 FROM execution.alarms a WHERE a.code IN ('protection_breach', 'flatten_incomplete', 'oversold', 'protection_unknown')
-                       AND NOT EXISTS (SELECT 1 FROM execution.alarm_clears k WHERE k.alarm_id = a.id) AND (h.scope = 'system' OR a.account_id IS NULL OR a.account_id = h.account_id))
+                       AND NOT EXISTS (SELECT 1 FROM execution.alarm_clears k WHERE k.alarm_id = a.id) AND (h.scope = 'system' OR a.account_id IS NULL OR a.account_id = h.account_id)),
+               (SELECT count(*) FROM execution.recon_breaks b WHERE h.scope = 'system' OR b.account_id = h.account_id),
+               (SELECT count(*) FROM execution.recon_breaks b WHERE (h.scope = 'system' OR b.account_id = h.account_id) AND NOT EXISTS (SELECT 1 FROM execution.break_resolutions q WHERE q.break_id = b.id))
         FROM execution.halts h
         LEFT JOIN execution.halt_releases r ON r.halt_id = h.id
         LEFT JOIN execution.halt_auto_clears c ON c.halt_id = h.id
@@ -72,7 +74,7 @@ internal sealed class ExecutionHaltReader(XDrishtiDbContext db) : IExecutionHalt
             await using var command = new NpgsqlCommand($"{Select} WHERE h.id = @id", connection);
             command.Parameters.Add(new NpgsqlParameter("id", NpgsqlDbType.Bigint) { Value = id });
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            return await reader.ReadAsync(cancellationToken) ? new HaltReleaseFacts(Map(reader), reader.GetBoolean(13), reader.GetBoolean(14)) : null;
+            return await reader.ReadAsync(cancellationToken) ? new HaltReleaseFacts(Map(reader), reader.GetBoolean(13), reader.GetBoolean(14), (int)reader.GetInt64(15), (int)reader.GetInt64(16)) : null;
         }, cancellationToken);
 
     private static ExecutionHaltView Map(NpgsqlDataReader r) => new(

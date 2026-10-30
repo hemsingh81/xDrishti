@@ -20,7 +20,11 @@ public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBro
     private readonly Dictionary<string, Order> _orders = new(StringComparer.Ordinal);
     private readonly List<BrokerTradeView> _trades = [];
     private readonly Queue<DateTimeOffset> _writes = new();
+    private readonly List<BrokerOrderView> _manual = [];
+    private readonly Dictionary<string, int> _positionShift = new(StringComparer.Ordinal);
     private int _next;
+    private int _tradeNo;
+    private int _lagReads;
 
     private sealed class Order(BrokerLeg leg, string brokerId)
     {
@@ -175,6 +179,78 @@ public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBro
         }
     }
 
+    // Drift injection (P12-06): what a real account does behind our back. Each member changes only what the broker reports; none touches our record.
+
+    /// <summary>A working or finished order that was not placed by us (no client id): the owner trading by hand.</summary>
+    public void AddManualOrder(string orderId, string securityId, ExecSide side, int qty, decimal price, string status = "PENDING", int filled = 0)
+    {
+        lock (_gate)
+        {
+            _manual.Add(new BrokerOrderView(orderId, null, status, securityId, side, qty, filled, price));
+        }
+    }
+
+    /// <summary>A manual trade: a finished order without our prefix and its trade, which moves the broker's position.</summary>
+    public void AddManualTrade(string orderId, string securityId, ExecSide side, int qty, decimal price)
+    {
+        lock (_gate)
+        {
+            _manual.Add(new BrokerOrderView(orderId, null, "TRADED", securityId, side, qty, qty, price));
+            _trades.Add(new BrokerTradeView(orderId, securityId, side, qty, price, "T" + (++_tradeNo).ToString(CultureInfo.InvariantCulture)));
+        }
+    }
+
+    /// <summary>The trade book loses a trade (by exchange trade id).</summary>
+    public void RemoveTrade(string exchangeTradeId)
+    {
+        lock (_gate)
+        {
+            _trades.RemoveAll(t => t.ExchangeTradeId == exchangeTradeId);
+        }
+    }
+
+    /// <summary>The broker's position changes without a trade.</summary>
+    public void ShiftPosition(string securityId, int delta)
+    {
+        lock (_gate)
+        {
+            _positionShift[securityId] = _positionShift.GetValueOrDefault(securityId) + delta;
+        }
+    }
+
+    /// <summary>The next <paramref name="reads"/> trade-book reads leave out the newest trade (the book lags the order book).</summary>
+    public void LagTradeBook(int reads)
+    {
+        lock (_gate)
+        {
+            _lagReads = reads;
+        }
+    }
+
+    /// <summary>The trades as the book holds them (for a test that needs a trade id).</summary>
+    public IReadOnlyList<BrokerTradeView> Trades
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _trades];
+            }
+        }
+    }
+
+    /// <summary>The order's status is changed at the broker without an update (a status flipped).</summary>
+    public void ForceStatus(string clientOrderId, string status)
+    {
+        lock (_gate)
+        {
+            if (_orders.TryGetValue(clientOrderId, out var order))
+            {
+                order.Status = status;
+            }
+        }
+    }
+
     /// <summary>How many times the order was modified.</summary>
     public int ModificationsOf(string clientOrderId)
     {
@@ -236,7 +312,7 @@ public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBro
                 var take = MaxFillPerStep > 0 ? Math.Min(remaining, MaxFillPerStep) : remaining;
                 order.Filled += take;
                 order.Status = order.Filled >= order.Leg.Qty ? "TRADED" : "PART_TRADED";
-                _trades.Add(new BrokerTradeView(order.BrokerId, securityId, order.Leg.Side, take, price));
+                _trades.Add(new BrokerTradeView(order.BrokerId, securityId, order.Leg.Side, take, price, "T" + (++_tradeNo).ToString(CultureInfo.InvariantCulture)));
             }
         }
     }
@@ -259,7 +335,7 @@ public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBro
         {
             return Task.FromResult(TokenExpired
                 ? BrokerRead.Unreadable<IReadOnlyList<BrokerOrderView>>("token_invalid")
-                : BrokerRead.Ok<IReadOnlyList<BrokerOrderView>>([.. _orders.Select(o => new BrokerOrderView(o.Value.BrokerId, o.Key, o.Value.Status, o.Value.Leg.SecurityId, o.Value.Leg.Side, o.Value.Leg.Qty, o.Value.Filled, o.Value.Leg.Price, o.Value.Leg.Trigger))]));
+                : BrokerRead.Ok<IReadOnlyList<BrokerOrderView>>([.. _orders.Select(o => new BrokerOrderView(o.Value.BrokerId, o.Key, o.Value.Status, o.Value.Leg.SecurityId, o.Value.Leg.Side, o.Value.Leg.Qty, o.Value.Filled, o.Value.Leg.Price, o.Value.Leg.Trigger)), .. _manual]));
         }
     }
 
@@ -267,6 +343,12 @@ public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBro
     {
         lock (_gate)
         {
+            if (_lagReads > 0)
+            {
+                _lagReads--;
+                return Task.FromResult(TokenExpired ? BrokerRead.Unreadable<IReadOnlyList<BrokerTradeView>>("token_invalid") : BrokerRead.Ok<IReadOnlyList<BrokerTradeView>>([.. _trades.Take(Math.Max(0, _trades.Count - 1))]));
+            }
+
             return Task.FromResult(TokenExpired ? BrokerRead.Unreadable<IReadOnlyList<BrokerTradeView>>("token_invalid") : BrokerRead.Ok<IReadOnlyList<BrokerTradeView>>([.. _trades]));
         }
     }
@@ -280,7 +362,8 @@ public sealed class FakeBroker(TimeProvider? clock = null) : IBrokerOrders, IBro
                 return Task.FromResult(BrokerRead.Unreadable<IReadOnlyList<BrokerPositionView>>("token_invalid"));
             }
 
-            var net = _trades.GroupBy(t => t.SecurityId).Select(g => new BrokerPositionView(g.Key, g.Sum(t => t.Side == ExecSide.Buy ? t.Qty : -t.Qty))).ToList();
+            var net = _trades.GroupBy(t => t.SecurityId).Select(g => new BrokerPositionView(g.Key, g.Sum(t => t.Side == ExecSide.Buy ? t.Qty : -t.Qty) + _positionShift.GetValueOrDefault(g.Key))).ToList();
+            net.AddRange(_positionShift.Where(p => net.All(n => n.SecurityId != p.Key)).Select(p => new BrokerPositionView(p.Key, p.Value)));
             return Task.FromResult(BrokerRead.Ok<IReadOnlyList<BrokerPositionView>>(net));
         }
     }

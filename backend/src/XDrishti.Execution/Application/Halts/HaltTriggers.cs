@@ -15,7 +15,7 @@ public sealed record AutoClearRule(AutoClearKind Kind, int Amount);
 /// <summary>One trigger code: the level it asks for by default, the scope it normally has and how it ends (null rule: only the owner ends it).</summary>
 public sealed record HaltTrigger(string Code, HaltLevel DefaultLevel, HaltScope DefaultScope, AutoClearRule? AutoClear);
 
-/// <summary>The 18 trigger codes of P12-05 (the owner's button and the 17 automatic ones) and the drill. A code outside this list cannot be a halt: the store and the database both refuse it.</summary>
+/// <summary>The trigger codes of P12-05 (the owner's button and the 17 automatic ones), the drill and, from P12-06, the foreign conflict (entries only, owner release). A code outside this list cannot be a halt: the store and the database both refuse it.</summary>
 public static class HaltTriggers
 {
     public const string OwnerButton = "owner_button";
@@ -37,6 +37,7 @@ public static class HaltTriggers
     public const string ExchangeHalt = "exchange_halt";
     public const string BrokerOutage = "broker_outage";
     public const string Drill = "drill";
+    public const string ForeignConflict = "foreign_conflict";
 
     public static readonly IReadOnlyList<HaltTrigger> All =
     [
@@ -59,6 +60,7 @@ public static class HaltTriggers
         new(ExchangeHalt, HaltLevel.Entries, HaltScope.System, null),
         new(BrokerOutage, HaltLevel.Entries, HaltScope.System, new(AutoClearKind.GoodReads, 3)),
         new(Drill, HaltLevel.Cancel, HaltScope.Account, new(AutoClearKind.QuietSeconds, 0)),
+        new(ForeignConflict, HaltLevel.Entries, HaltScope.Account, null),
     ];
 
     public static HaltTrigger? Find(string code) => All.FirstOrDefault(t => t.Code == code);

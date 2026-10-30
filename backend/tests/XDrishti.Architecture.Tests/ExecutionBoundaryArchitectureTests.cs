@@ -130,7 +130,7 @@ public sealed class ExecutionBoundaryArchitectureTests
         var all = SourceFiles(ExecutionSource);
         var outside = all.Where(f => !SrcRelative(f).StartsWith("XDrishti.Execution/Dhan/", StringComparison.Ordinal)).ToList();
 
-        outside.Where(f => Regex.IsMatch(File.ReadAllText(f), @"HttpClient|HttpMessageHandler|System\.Net\.Http|https?://|access-token|\.dhan\.co", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)))
+        outside.Where(f => Regex.IsMatch(File.ReadAllText(f), @"HttpClient|HttpMessageHandler|System\.Net\.Http|(https?|wss?)://|access-token|\.dhan\.co", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)))
             .Select(Path.GetFileName).ShouldBeEmpty();
 
         var hostFiles = all.Where(f => File.ReadAllText(f).Contains("dhan.co", StringComparison.OrdinalIgnoreCase)).Select(f => SrcRelative(f)).ToList();

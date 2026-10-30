@@ -7,7 +7,7 @@ public enum AlarmSeverity
     Critical,
 }
 
-/// <summary>The twelve alarm codes of spec P12-04 criterion 11 and their severities. A code outside this list cannot be raised.</summary>
+/// <summary>The alarm codes (the twelve of spec P12-04 criterion 11 and the three of P12-06) and their severities. A code outside this list cannot be raised.</summary>
 public static class AlarmCodes
 {
     public const string ProtectionPending = "protection_pending";
@@ -22,6 +22,9 @@ public static class AlarmCodes
     public const string ProtectionUnknown = "protection_unknown";
     public const string ExitFailed = "exit_failed";
     public const string BrokerSquareoff = "broker_squareoff";
+    public const string RecoverySlow = "recovery_slow";
+    public const string JournalGap = "journal_gap";
+    public const string ForeignConflict = "foreign_conflict";
 
     public static readonly IReadOnlyDictionary<string, AlarmSeverity> All = new Dictionary<string, AlarmSeverity>(StringComparer.Ordinal)
     {
@@ -37,5 +40,8 @@ public static class AlarmCodes
         [ProtectionUnknown] = AlarmSeverity.Critical,
         [ExitFailed] = AlarmSeverity.Critical,
         [BrokerSquareoff] = AlarmSeverity.Info,
+        [RecoverySlow] = AlarmSeverity.Critical,
+        [JournalGap] = AlarmSeverity.Warn,
+        [ForeignConflict] = AlarmSeverity.Critical,
     };
 }

@@ -44,7 +44,48 @@ internal sealed class ExecutionEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
-            .WithSummary("Releases a halt as the owner: only the owner can, with the gate Live:Writes:Enabled on (checked BEFORE the password; 403 live.capability_off), a fresh password for this act (401 auth.invalid_credentials; an earlier step-up window does not count), the actor from the session and a reason. Refused with 409 execution.release_refused and every reason when the halt already ended, the reason is missing or too short (a drawdown halt needs 20 characters), an exit_all halt still has an open position, a protection halt still has an open protection alarm, or the halt is a freeze (released only after reconciliation exists). 404 execution.halt_unknown");
+            .WithSummary("Releases a halt as the owner: only the owner can, with the gate Live:Writes:Enabled on (checked BEFORE the password; 403 live.capability_off), a fresh password for this act (401 auth.invalid_credentials; an earlier step-up window does not count), the actor from the session and a reason. Refused with 409 execution.release_refused and every reason when the halt already ended, the reason is missing or too short (a drawdown halt needs 20 characters), an exit_all halt still has an open position, a protection halt still has an open protection alarm, or the halt is a freeze (released only when it came from a reconciliation break and every break of its account has a resolution). 404 execution.halt_unknown");
+
+        group.MapGet("/reconciliation", GetReconciliationAsync)
+            .WithName("GetExecutionReconciliation")
+            .WithSummary("The reconciliation runs and breaks of the execution service (at most 200 of each, newest first): per run the kind (continuous, eod, final, recovery), whether the broker could be read and how many breaks; per break the kind (position_mismatch, trade_missing, trade_extra, order_mismatch, fill_mismatch, unknown_xd_order, foreign_conflict, unavailable), the account, the figures' summary and the owner's resolution if any. Optional date (the session) and accountId. Read only; a break is never corrected automatically");
+
+        group.MapPost("/breaks/{id:long}/resolve", ResolveBreakAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy) // a password is checked here, so the sign-in limit applies
+            .WithName("ResolveExecutionBreak")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .WithSummary("Resolves a reconciliation break as the owner: only the owner can, with the gate Live:Writes:Enabled on (checked BEFORE the password; 403 live.capability_off), a fresh password for this act (401 auth.invalid_credentials; an earlier step-up window does not count) and the actor from the session. resolution is accept_broker (the engine then appends an adoption event; nothing is rewritten) or dismiss_foreign (a foreign conflict only); note is at most 300 characters. 400 execution.resolution_invalid, 404 execution.break_unknown, 409 execution.break_resolved. The freeze it caused can be released once every break of the account is resolved");
+    }
+
+    private static async Task<Ok<ExecutionReconciliationView>> GetReconciliationAsync(
+        IQueryHandler<GetExecutionReconciliationQuery, ExecutionReconciliationView> handler, HttpContext http, CancellationToken cancellationToken, DateOnly? date = null, Guid? accountId = null)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        return TypedResults.Ok(await handler.HandleAsync(new GetExecutionReconciliationQuery(date, accountId), cancellationToken));
+    }
+
+    private static async Task<Results<Ok<ExecutionBreakView>, ProblemHttpResult>> ResolveBreakAsync(
+        long id, ResolveBreakRequest request, HttpContext http, ILiveWritesGate gate, ICommandHandler<StepUpCommand, StepUpResult> passwordCheck, ICommandHandler<ResolveExecutionBreakCommand, ExecutionBreakView> handler, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+
+        // The order of every owner write: the gate first, then the fresh password for THIS act, then the actor from the session.
+        if (!gate.Enabled)
+        {
+            return ProblemResults.From(Error.Forbidden("live.capability_off", "The live writes are switched off in this deployment (Live__Writes__Enabled is false)."), http);
+        }
+
+        var owner = await OwnerAct.AuthorizeAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new ResolveExecutionBreakCommand(owner.Value, id, request.Resolution, request.Note), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : ProblemResults.From(result.Error, http);
     }
 
     private static async Task<Results<Ok<IReadOnlyList<ExecutionHaltView>>, ProblemHttpResult>> GetHaltsAsync(

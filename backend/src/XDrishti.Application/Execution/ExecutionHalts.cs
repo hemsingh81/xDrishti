@@ -16,7 +16,7 @@ public sealed record ExecutionHaltEnd(DateTimeOffset At, string By, string How, 
 public sealed record ExecutionHaltView(long Id, DateTimeOffset At, string Scope, Guid? AccountId, string Level, string Trigger, string Source, string Actor, string Reason, ExecutionHaltEnd? End);
 
 /// <summary>Everything the release rules judge, read now from the record.</summary>
-public sealed record HaltReleaseFacts(ExecutionHaltView Halt, bool OpenPositions, bool OpenProtectionAlarms);
+public sealed record HaltReleaseFacts(ExecutionHaltView Halt, bool OpenPositions, bool OpenProtectionAlarms, int BreaksOnRecord = 0, int UnresolvedBreaks = 0);
 
 public interface IExecutionHaltReader
 {
@@ -91,8 +91,9 @@ public static class HaltReleaseRules
             refused.Add("drawdown_review_too_short");
         }
 
-        if (facts.Halt.Level == "freeze")
+        if (facts.Halt.Level == "freeze" && !(facts.Halt.Trigger == "reconciliation_break" && facts.BreaksOnRecord > 0 && facts.UnresolvedBreaks == 0))
         {
+            // A freeze ends only after the reconciliation breaks of its account are all resolved by the owner (P12-06); a freeze of any other cause stays until the cause has its own release rule.
             refused.Add("freeze_needs_reconciliation");
         }
 

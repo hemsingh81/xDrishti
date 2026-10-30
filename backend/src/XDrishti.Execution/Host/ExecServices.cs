@@ -4,6 +4,7 @@ using Npgsql;
 using XDrishti.Execution.Application;
 using XDrishti.Execution.Application.Halts;
 using XDrishti.Execution.Application.Ports;
+using XDrishti.Execution.Application.Recon;
 using XDrishti.Execution.Dhan;
 using XDrishti.Execution.Domain;
 using XDrishti.Execution.Persistence;
@@ -51,6 +52,11 @@ public static class ExecServices
         services.AddSingleton<IHaltStore, PgHaltStore>();
         services.AddSingleton<HaltService>();
         services.AddSingleton<IDayMarkStore, PgDayMarkStore>();
+
+        // The reconciliation record, our side of the books (read only) and the authoritative fill writer (P12-06, ADR 0162). Nothing here runs: the break service, the recovery, the poll and the stream client are composed by no host.
+        services.AddSingleton<IReconStore, PgReconStore>();
+        services.AddSingleton<IReconOurSource, PgReconOurSource>();
+        services.AddSingleton<IFillWriter, PgFillWriter>();
         services.AddSingleton<PgSendJournal>();
         services.AddSingleton<ISendJournal>(sp => sp.GetRequiredService<PgSendJournal>());
         services.AddSingleton<ISendHistory>(sp => sp.GetRequiredService<PgSendJournal>());
