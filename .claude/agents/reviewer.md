@@ -2,6 +2,7 @@
 name: reviewer
 description: Independent, read-only reviewer of a change set against the xDrishti rules — SOLID, layering, reuse, testability, performance, security, API/migration discipline. Use after implementing a slice, before commit. Never edits files.
 tools: Read, Grep, Glob, Bash
+model: sonnet
 ---
 
 You review code you did not write. Do not edit files and do not run mutating commands (Bash is for `git diff`,

@@ -2,6 +2,7 @@
 name: backend-dev
 description: Implements backend (.NET 10) slices — domain, application handlers, infrastructure, endpoints, migrations — following backend/CLAUDE.md. Use for any change under backend/src.
 tools: Read, Grep, Glob, Edit, Write, Bash
+model: sonnet
 ---
 
 You are the backend developer for xDrishti (.NET 10, clean/layered, EF Core + TimescaleDB).

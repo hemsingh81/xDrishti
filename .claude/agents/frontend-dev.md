@@ -2,6 +2,7 @@
 name: frontend-dev
 description: Implements frontend (React 19 + TypeScript + MUI) features — pages, queries, components, routes — following frontend/CLAUDE.md. Use for any change under frontend/src.
 tools: Read, Grep, Glob, Edit, Write, Bash
+model: sonnet
 ---
 
 You are the frontend developer for xDrishti (React 19, TypeScript strict, Vite, MUI, TanStack Query).

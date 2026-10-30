@@ -43,3 +43,20 @@ the roadmap phases in `docs/design/18-roadmap.md`. Engineering standards: `docs/
 - Local only (Podman Desktop); every published port binds to 127.0.0.1 until login exists.
 - Short names: `xd` (CLI), `xd-*` (containers), `XDrishti.*` (.NET), `xdrishti` (database, Keychain paths).
 - Pin exact versions (NuGet in `Directory.Packages.props`, npm with `save-exact`, image tags in compose/Dockerfiles).
+
+## Model Routing & Token Optimization Protocol
+Agents `backend-dev`, `frontend-dev`, `test-writer` and `reviewer` are pinned to `model: sonnet` in their frontmatter.
+Never run two subagents in parallel (one at a time). Keep the main session short; delegate output-heavy work.
+
+| Trigger | Model / delegate |
+|---|---|
+| `ponytail` | No switch; applies to whichever model is running |
+| `/new-feature` | Main on Sonnet; delegate to `backend-dev`, `frontend-dev`, `test-writer` in turn. `/model opus` only for the first slice of a new phase or money-path code (order placement, halts, freezes, reconciliation, safety gates) |
+| `/add-endpoint`, `/new-migration` | Sonnet; delegate to `backend-dev` |
+| `/phase-done` | Sonnet; delegate the verdict to `reviewer` (Haiku may gather the checklist only) |
+| `deep-research` | Sonnet; Opus only for architectural questions |
+| Spec/design, ADRs, multi-module planning | `/model opus` to plan, then back to Sonnet to execute |
+| `scripts/check.sh`, `gen-api.sh`, `build-docs.sh`, `deploy/xd-up.sh` | Run in the shell or a Haiku delegate; report only pass/fail and the first failures. Diagnosing a red gate stays on Sonnet |
+| Pre-commit review | `reviewer` (Sonnet); never Haiku, since it is the last gate on trading-safety code |
+
+A "Haiku delegate" is a general-purpose subagent started with the `haiku` model override; for money-path slices pass `model: opus` when delegating to `backend-dev`. Switch back to Sonnet after any Opus step. Use model aliases (`sonnet`, `haiku`, `opus`), not dated IDs.
