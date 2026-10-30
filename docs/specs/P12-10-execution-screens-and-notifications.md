@@ -1,6 +1,6 @@
 # P12-10 — Execution screens and notifications: the day at a glance, orders, positions, activity, modes and limits, the stop button
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-10-31: run the roadmap loop in build order; written 2026-10-24, decisions researched under the owner's delegation)
 - **Phase / roadmap row:** P12 — Execution service, slice P12-10 of [P12-00](P12-00-execution-service-plan.md) (id only)
 - **Design refs:** docs/design/13-reports-and-ui.md (screens, responsive 360 px to 4K, accessibility) · 20 §A (state diagram, "every action notified") · 04 §4.1 · 19 §4 · 15 (notifications) · ADR 0027 (actionable notifications, bell items with actions) · P8-00 D3 (honest states), D1 (evidence line), D7 (bundle), `frontend/CLAUDE.md`
 - **Needs (build order of the group: P12-07, P12-11, P12-08, P12-09, P12-10, P12-12):** P12-08 (creates the feature `execution`, the route `/execution`, the nav entry and the Confirm section; this slice extends the same page), P12-07 (modes, settings, sheets), P12-09 (limits, `action_log`, ledger), P12-01 (`GET /api/execution/status`, intents, events, legs, fills, positions), P12-03 (check results), P12-04 (alarms), P12-05 (halts, drills), P12-06 (`GET /api/execution/reconciliation`, `GET /api/execution/stream`, `recon_runs`, `recon_breaks`), P12-11 (readiness card slot). Feeds P12-12 (the phase check is shown here).

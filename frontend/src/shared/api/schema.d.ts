@@ -4104,6 +4104,91 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/execution/overview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Today at a glance, per account (optional date, default the current session in India): effective mode and since when, the meters (orders, notional, worst-case loss, open positions) against the limits sheet in force with the pending raise beside it, open tickets, halts, alarms and positions without confirmed protection, the canary switch and the evidence line. A figure is value, insufficient, unavailable, not_evaluable or empty and an unreadable input is unavailable with its reason, never 0. Read only; no token, client id, secret or balance */
+    get: operations['GetExecutionOverview'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/blotter': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The orders of a day, newest first, 50 a page (date, accountId, stateGroup pending|working|live|done|stopped, page from 1): state in P12-01's words (an unknown word is passed through with stateKnown false), who caused it (tap, auto, system, owner), broker ids as received, per-fill slippage in ticks and percent against the ticket price (positive is worse), rejection codes and the broker code. 422 execution.invalid on an unknown filter. Read only */
+    get: operations['GetExecutionBlotter'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/positions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The open positions (optional accountId): net quantity, average, last price and unrealised result (unavailable when the price is older than the feed limit), risk to the stop, protection confirmed|missing|unknown (confirmed only from a recent clean read of the broker's order book), source ours|foreign and reconciliation matched|break|not_run|unavailable. Read only */
+    get: operations['GetExecutionPositions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/activity': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The action log with the alarms, halts, drills, mode and settings changes, newest first, 50 a page (date, kind, by auto|tap|system|owner, page from 1). 422 execution.invalid on an unknown filter. Read only: the log is insert-only */
+    get: operations['GetExecutionActivity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/notices': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The execution items for the bell, derived on every read from insert-only rows: exec_confirm_waiting, exec_auto_action, exec_order_rejected, exec_protection_missing, exec_halted, exec_kill_switch, exec_demoted, exec_recon_break, exec_not_ready, exec_ip_invalid, exec_cap_near, exec_day_summary. Each id includes its cause; a resolved item stays 24 hours and is not counted. Read only */
+    get: operations['GetExecutionNotices'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/execution/alarms': {
     parameters: {
       query?: never;
@@ -5452,6 +5537,18 @@ export interface components {
       /** Format: int32 */
       lagging: number;
     };
+    /** @description One line of the day's activity, newest first. string ActivityRow.Kind is an action-log kind or `alarm`, `halt`, `drill`, `mode_change`, `settings_change`; string ActivityRow.By is `auto`, `tap`, `system` or `owner`. */
+    ActivityRow: {
+      id: string;
+      /** Format: date-time */
+      at: string;
+      kind: string;
+      by: string;
+      /** Format: uuid */
+      accountId: null | string;
+      text: string;
+      codes: string[];
+    };
     /**
      * @description Adds a day to the calendar, confirmed (source manual), replacing what the date had before. `date` is `yyyy-MM-dd`; `kind` is holiday (a weekday,
      *     no session window) or special (`sessionFrom` and `sessionTo` as `HH:mm` India time, from before to; both left out means the regular 09:15 to 15:30);
@@ -6171,6 +6268,53 @@ export interface components {
       serviceId: string;
       /** @description The warning. */
       text: string;
+    };
+    BlotterFill: {
+      /** Format: date-time */
+      at: string;
+      /** Format: int32 */
+      quantity: number;
+      /** Format: double */
+      price: number;
+      slippageTicks: components['schemas']['ExecMetric'];
+      slippagePercent: components['schemas']['ExecMetric'];
+    };
+    /**
+     * @description One order of the day. string BlotterRow.State is P12-01's word, passed through unchanged when it is not one of the fourteen (bool BlotterRow.StateKnown false). string BlotterRow.By is `tap`, `auto`, `system` or `owner`. Slippage is the fill's
+     *     price against the ticket price, positive when worse for the owner. string? BlotterRow.AlgoId is only what the broker returned.
+     */
+    BlotterRow: {
+      /** Format: uuid */
+      intentId: string;
+      /** Format: date-time */
+      at: string;
+      /** Format: uuid */
+      accountId: string;
+      account: string;
+      symbol: string;
+      side: string;
+      /** Format: int32 */
+      quantity: number;
+      orderType: string;
+      /** Format: double */
+      price: number;
+      state: string;
+      stateGroup: string;
+      stateKnown: boolean;
+      by: string;
+      canary: boolean;
+      clientOrderId: null | string;
+      brokerOrderId: null | string;
+      algoId: null | string;
+      /** Format: int32 */
+      filledQuantity: number;
+      /** Format: double */
+      fillPrice: null | number;
+      slippageTicks: components['schemas']['ExecMetric'];
+      slippagePercent: components['schemas']['ExecMetric'];
+      fills: components['schemas']['BlotterFill'][];
+      rejectionCodes: string[];
+      brokerCode: null | string;
     };
     /** @description One breach rule that fires now (B1 to B7) or still holds a hold. */
     BreachView: {
@@ -9610,6 +9754,20 @@ export interface components {
       /** Format: int32 */
       count: number;
     };
+    /**
+     * @description A figure of the execution screens (spec P12-10 Contract, P8-00 D3). string ExecMetric.State is `value`, `insufficient`, `unavailable`, `not_evaluable` or `empty`; a digit exists only for `value`. An input that cannot be read is
+     *     `unavailable` with its string? ExecMetric.Reason, never zero. decimal? ExecMetric.Cap is the limit in force (null when the sheet leaves it unset, with the reason `cap_unset`).
+     */
+    ExecMetric: {
+      state: string;
+      /** Format: double */
+      value?: null | number;
+      /** Format: double */
+      cap?: null | number;
+      reason?: null | string;
+      /** Format: int32 */
+      n?: null | number;
+    };
     ExecutionAccountView: {
       /** Format: uuid */
       accountId: string;
@@ -9757,6 +9915,34 @@ export interface components {
       gatePolicyVersion: number;
       accounts: components['schemas']['ExecutionModeAccountView'][];
     };
+    /** @description An item for the bell, in the shape of the portfolio notices. The id includes the cause, so a changed situation is a new item. A resolved item stays 24 hours and is not counted. */
+    ExecutionNotice: {
+      id: string;
+      kind: string;
+      severity: string;
+      text: string;
+      title: string;
+      /** Format: date-time */
+      at: string;
+      actions: components['schemas']['AttentionAction'][];
+      /** Format: date-time */
+      since: string;
+      resolved: boolean;
+      /** Format: uuid */
+      accountId: null | string;
+    };
+    ExecutionNotices: {
+      items: components['schemas']['ExecutionNotice'][];
+    };
+    /** @description bool? ExecutionOverview.CanaryPending is `exec.canary_pending` (null when it could not be read). IReadOnlyList&lt;string&gt; ExecutionOverview.Limits is the evidence line: what the numbers are and are not. */
+    ExecutionOverview: {
+      /** Format: date */
+      date: string;
+      canaryPending: null | boolean;
+      executionEnabled: null | boolean;
+      accounts: components['schemas']['OverviewAccount'][];
+      limits: string[];
+    };
     ExecutionPromotionRequestView: {
       /** Format: uuid */
       id: string;
@@ -9884,6 +10070,27 @@ export interface components {
       settingsHash: null | string;
       /** @description True while no entry may leave: always true in this slice (recovery and the halt store do not exist yet). */
       entriesBlocked: boolean;
+      /**
+       * @description True while execution is enabled and an account's mode sends orders without the owner typing them (semi_auto or auto_live). No account can be there today.
+       * @default false
+       */
+      anyAutomated: boolean;
+      /**
+       * @description True while any halt is in force (spec P12-10).
+       * @default false
+       */
+      killSwitchActive: boolean;
+      /**
+       * Format: int32
+       * @description How often the bell asks for notices: 5 while something is automated and the market is open, else 60.
+       * @default 60
+       */
+      pollSeconds: number;
+      /**
+       * @description True inside today's session in India time.
+       * @default false
+       */
+      marketOpen: boolean;
     };
     ExecutionTrailView: {
       /** Format: int64 */
@@ -13174,6 +13381,37 @@ export interface components {
       /** Format: int64 */
       after: null | number;
     };
+    /** @description One account on Today. string OverviewAccount.Mode is the effective mode and DateTimeOffset? OverviewAccount.EffectiveFrom the time its trail row took effect (null: never changed from the configured one). */
+    OverviewAccount: {
+      /** Format: uuid */
+      accountId: string;
+      name: string;
+      mode: string;
+      /** Format: date-time */
+      effectiveFrom: null | string;
+      pendingMode: null | string;
+      /** Format: date-time */
+      pendingFrom: null | string;
+      gate: components['schemas']['ExecutionGateView'];
+      readiness: components['schemas']['OverviewReadiness'];
+      caps: components['schemas']['OverviewCaps'];
+      /** Format: int32 */
+      openTickets: number;
+      halts: components['schemas']['ExecutionHaltView'][];
+      alarms: components['schemas']['ExecutionAlarmView'][];
+      /** Format: int32 */
+      positionsAtRisk: number;
+    };
+    /** @description The four meters of an account against the sheet in force; LimitsRowView? OverviewCaps.PendingLimits is the raise that waits for its time, shown beside it. */
+    OverviewCaps: {
+      orders: components['schemas']['ExecMetric'];
+      notional: components['schemas']['ExecMetric'];
+      worstCaseLoss: components['schemas']['ExecMetric'];
+      openPositions: components['schemas']['ExecMetric'];
+      /** Format: int64 */
+      limitsId: null | number;
+      pendingLimits: null | components['schemas']['LimitsRowView'];
+    };
     /** @description A name and how many records carry it (P6-18). */
     OverviewCount: {
       /** @description A role, outcome or state. */
@@ -13202,6 +13440,13 @@ export interface components {
        * @description When it was recorded.
        */
       at: string;
+    };
+    OverviewReadiness: {
+      state: string;
+      /** Format: date-time */
+      checkedAt: null | string;
+      /** Format: date-time */
+      coveredUntil: null | string;
     };
     /** @description One kind of learning record in the overview (P6-18): how many were counted, the split by role, outcome or state, and the newest record. */
     OverviewSection: {
@@ -14761,6 +15006,28 @@ export interface components {
       /** Format: int32 */
       totalTracked: number;
       hint: string;
+    };
+    /**
+     * @description One open position. string PositionRow.Protection is `confirmed` only when the broker's order book, read within TimeSpan ExecutionScreens.ProtectionReadLimit, was compared with our stop and showed no difference; `missing` when the engine raised a
+     *     protection breach; else `unknown`. string PositionRow.Source is `ours` or `foreign`; string PositionRow.Reconciliation is `matched`, `break`, `not_run` or `unavailable`.
+     */
+    PositionRow: {
+      /** Format: uuid */
+      accountId: string;
+      account: string;
+      symbol: string;
+      /** Format: int32 */
+      netQuantity: number;
+      /** Format: double */
+      averagePrice: number;
+      lastPrice: components['schemas']['ExecMetric'];
+      unrealised: components['schemas']['ExecMetric'];
+      riskToStop: components['schemas']['ExecMetric'];
+      /** Format: double */
+      stopPrice: null | number;
+      protection: string;
+      source: string;
+      reconciliation: string;
     };
     /** @description The baseline a preview is about. */
     PreviewBaselineView: {
@@ -28236,6 +28503,147 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ExecutionStatusView'];
+        };
+      };
+    };
+  };
+  GetExecutionOverview: {
+    parameters: {
+      query?: {
+        date?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionOverview'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExecutionBlotter: {
+    parameters: {
+      query?: {
+        date?: string;
+        accountId?: string;
+        stateGroup?: string;
+        page?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BlotterRow'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExecutionPositions: {
+    parameters: {
+      query?: {
+        accountId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PositionRow'][];
+        };
+      };
+    };
+  };
+  GetExecutionActivity: {
+    parameters: {
+      query?: {
+        date?: string;
+        kind?: string;
+        by?: string;
+        page?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActivityRow'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExecutionNotices: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionNotices'];
         };
       };
     };

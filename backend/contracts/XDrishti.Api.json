@@ -14358,6 +14358,237 @@
         }
       }
     },
+    "/api/execution/overview": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Today at a glance, per account (optional date, default the current session in India): effective mode and since when, the meters (orders, notional, worst-case loss, open positions) against the limits sheet in force with the pending raise beside it, open tickets, halts, alarms and positions without confirmed protection, the canary switch and the evidence line. A figure is value, insufficient, unavailable, not_evaluable or empty and an unreadable input is unavailable with its reason, never 0. Read only; no token, client id, secret or balance",
+        "operationId": "GetExecutionOverview",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionOverview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/execution/blotter": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "The orders of a day, newest first, 50 a page (date, accountId, stateGroup pending|working|live|done|stopped, page from 1): state in P12-01's words (an unknown word is passed through with stateKnown false), who caused it (tap, auto, system, owner), broker ids as received, per-fill slippage in ticks and percent against the ticket price (positive is worse), rejection codes and the broker code. 422 execution.invalid on an unknown filter. Read only",
+        "operationId": "GetExecutionBlotter",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "stateGroup",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BlotterRow"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/execution/positions": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "The open positions (optional accountId): net quantity, average, last price and unrealised result (unavailable when the price is older than the feed limit), risk to the stop, protection confirmed|missing|unknown (confirmed only from a recent clean read of the broker's order book), source ours|foreign and reconciliation matched|break|not_run|unavailable. Read only",
+        "operationId": "GetExecutionPositions",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PositionRow"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/execution/activity": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "The action log with the alarms, halts, drills, mode and settings changes, newest first, 50 a page (date, kind, by auto|tap|system|owner, page from 1). 422 execution.invalid on an unknown filter. Read only: the log is insert-only",
+        "operationId": "GetExecutionActivity",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActivityRow"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/execution/notices": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "The execution items for the bell, derived on every read from insert-only rows: exec_confirm_waiting, exec_auto_action, exec_order_rejected, exec_protection_missing, exec_halted, exec_kill_switch, exec_demoted, exec_recon_break, exec_not_ready, exec_ip_invalid, exec_cap_near, exec_day_summary. Each id includes its cause; a resolved item stays 24 hours and is not counted. Read only",
+        "operationId": "GetExecutionNotices",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionNotices"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/execution/alarms": {
       "get": {
         "tags": [
@@ -19098,6 +19329,50 @@
         },
         "description": "Rules that could not be evaluated: `Lagging` holdings held long enough for the lagging-Nifty rule but without a usable benchmark or XIRR."
       },
+      "ActivityRow": {
+        "required": [
+          "id",
+          "at",
+          "kind",
+          "by",
+          "accountId",
+          "text",
+          "codes"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "by": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "text": {
+            "type": "string"
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "One line of the day's activity, newest first. string ActivityRow.Kind is an action-log kind or `alarm`, `halt`, `drill`, `mode_change`, `settings_change`; string ActivityRow.By is `auto`, `tap`, `system` or `owner`."
+      },
       "AddCalendarDayRequest": {
         "required": [
           "date",
@@ -21249,6 +21524,168 @@
           }
         },
         "description": "A service that would restart the count when it runs."
+      },
+      "BlotterFill": {
+        "required": [
+          "at",
+          "quantity",
+          "price",
+          "slippageTicks",
+          "slippagePercent"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "slippageTicks": {
+            "$ref": "#/components/schemas/ExecMetric"
+          },
+          "slippagePercent": {
+            "$ref": "#/components/schemas/ExecMetric"
+          }
+        }
+      },
+      "BlotterRow": {
+        "required": [
+          "intentId",
+          "at",
+          "accountId",
+          "account",
+          "symbol",
+          "side",
+          "quantity",
+          "orderType",
+          "price",
+          "state",
+          "stateGroup",
+          "stateKnown",
+          "by",
+          "canary",
+          "clientOrderId",
+          "brokerOrderId",
+          "algoId",
+          "filledQuantity",
+          "fillPrice",
+          "slippageTicks",
+          "slippagePercent",
+          "fills",
+          "rejectionCodes",
+          "brokerCode"
+        ],
+        "type": "object",
+        "properties": {
+          "intentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "account": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "orderType": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "state": {
+            "type": "string"
+          },
+          "stateGroup": {
+            "type": "string"
+          },
+          "stateKnown": {
+            "type": "boolean"
+          },
+          "by": {
+            "type": "string"
+          },
+          "canary": {
+            "type": "boolean"
+          },
+          "clientOrderId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "brokerOrderId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "algoId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "filledQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fillPrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "slippageTicks": {
+            "$ref": "#/components/schemas/ExecMetric"
+          },
+          "slippagePercent": {
+            "$ref": "#/components/schemas/ExecMetric"
+          },
+          "fills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlotterFill"
+            }
+          },
+          "rejectionCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "brokerCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One order of the day. string BlotterRow.State is P12-01's word, passed through unchanged when it is not one of the fourteen (bool BlotterRow.StateKnown false). string BlotterRow.By is `tap`, `auto`, `system` or `owner`. Slippage is the fill's\nprice against the ticket price, positive when worse for the owner. string? BlotterRow.AlgoId is only what the broker returned."
       },
       "BreachView": {
         "required": [
@@ -30540,6 +30977,45 @@
         },
         "description": "How many tickets were left out of the report for one reason."
       },
+      "ExecMetric": {
+        "required": [
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "cap": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "n": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "A figure of the execution screens (spec P12-10 Contract, P8-00 D3). string ExecMetric.State is `value`, `insufficient`, `unavailable`, `not_evaluable` or `empty`; a digit exists only for `value`. An input that cannot be read is\n`unavailable` with its string? ExecMetric.Reason, never zero. decimal? ExecMetric.Cap is the limit in force (null when the sheet leaves it unset, with the reason `cap_unset`)."
+      },
       "ExecutionAccountView": {
         "required": [
           "accountId",
@@ -31088,6 +31564,118 @@
         },
         "description": "bool? ExecutionModesView.ExecutionEnabled is null when the switch could not be read (it then counts as OFF)."
       },
+      "ExecutionNotice": {
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "text",
+          "title",
+          "at",
+          "actions",
+          "since",
+          "resolved",
+          "accountId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttentionAction"
+            }
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolved": {
+            "type": "boolean"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "An item for the bell, in the shape of the portfolio notices. The id includes the cause, so a changed situation is a new item. A resolved item stays 24 hours and is not counted."
+      },
+      "ExecutionNotices": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionNotice"
+            }
+          }
+        }
+      },
+      "ExecutionOverview": {
+        "required": [
+          "date",
+          "canaryPending",
+          "executionEnabled",
+          "accounts",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "canaryPending": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "executionEnabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewAccount"
+            }
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "bool? ExecutionOverview.CanaryPending is `exec.canary_pending` (null when it could not be read). IReadOnlyList&lt;string&gt; ExecutionOverview.Limits is the evidence line: what the numbers are and are not."
+      },
       "ExecutionPromotionRequestView": {
         "required": [
           "id",
@@ -31477,6 +32065,27 @@
           "entriesBlocked": {
             "type": "boolean",
             "description": "True while no entry may leave: always true in this slice (recovery and the halt store do not exist yet)."
+          },
+          "anyAutomated": {
+            "type": "boolean",
+            "description": "True while execution is enabled and an account's mode sends orders without the owner typing them (semi_auto or auto_live). No account can be there today.",
+            "default": false
+          },
+          "killSwitchActive": {
+            "type": "boolean",
+            "description": "True while any halt is in force (spec P12-10).",
+            "default": false
+          },
+          "pollSeconds": {
+            "type": "integer",
+            "description": "How often the bell asks for notices: 5 while something is automated and the market is open, else 60.",
+            "format": "int32",
+            "default": 60
+          },
+          "marketOpen": {
+            "type": "boolean",
+            "description": "True inside today's session in India time.",
+            "default": false
           }
         }
       },
@@ -40814,6 +41423,129 @@
         },
         "description": "The quantity the lots count as opening (the shares the trades do not explain): now, and after the rebuild. Null where it cannot be told (no holding, or a quantity that is not whole after a split or bonus)."
       },
+      "OverviewAccount": {
+        "required": [
+          "accountId",
+          "name",
+          "mode",
+          "effectiveFrom",
+          "pendingMode",
+          "pendingFrom",
+          "gate",
+          "readiness",
+          "caps",
+          "openTickets",
+          "halts",
+          "alarms",
+          "positionsAtRisk"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "effectiveFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "pendingMode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pendingFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "gate": {
+            "$ref": "#/components/schemas/ExecutionGateView"
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/OverviewReadiness"
+          },
+          "caps": {
+            "$ref": "#/components/schemas/OverviewCaps"
+          },
+          "openTickets": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "halts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionHaltView"
+            }
+          },
+          "alarms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionAlarmView"
+            }
+          },
+          "positionsAtRisk": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One account on Today. string OverviewAccount.Mode is the effective mode and DateTimeOffset? OverviewAccount.EffectiveFrom the time its trail row took effect (null: never changed from the configured one)."
+      },
+      "OverviewCaps": {
+        "required": [
+          "orders",
+          "notional",
+          "worstCaseLoss",
+          "openPositions",
+          "limitsId",
+          "pendingLimits"
+        ],
+        "type": "object",
+        "properties": {
+          "orders": {
+            "$ref": "#/components/schemas/ExecMetric"
+          },
+          "notional": {
+            "$ref": "#/components/schemas/ExecMetric"
+          },
+          "worstCaseLoss": {
+            "$ref": "#/components/schemas/ExecMetric"
+          },
+          "openPositions": {
+            "$ref": "#/components/schemas/ExecMetric"
+          },
+          "limitsId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "pendingLimits": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LimitsRowView"
+              }
+            ]
+          }
+        },
+        "description": "The four meters of an account against the sheet in force; LimitsRowView? OverviewCaps.PendingLimits is the raise that waits for its time, shown beside it."
+      },
       "OverviewCount": {
         "required": [
           "name",
@@ -40867,6 +41599,33 @@
           }
         },
         "description": "The newest record of one kind, as the overview shows it (P6-18): what it is, the verdict that was stored and one line of the stored numbers. Nothing here is computed."
+      },
+      "OverviewReadiness": {
+        "required": [
+          "state",
+          "checkedAt",
+          "coveredUntil"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "checkedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "coveredUntil": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
       },
       "OverviewSection": {
         "required": [
@@ -44218,6 +44977,69 @@
           }
         },
         "description": "What a track action did. `Requested` distinct master-list instruments were asked to be tracked, `Added` of them are newly tracked (or tracked again), `AlreadyTracked` were; `NotInMaster` open holdings in scope\nare not in the instrument master (nothing to track), `Retired` instruments are no longer listed and were skipped. `TotalTracked` is the number tracked now. No job is started: `Hint` says the next <i>Update data</i> builds the bars."
+      },
+      "PositionRow": {
+        "required": [
+          "accountId",
+          "account",
+          "symbol",
+          "netQuantity",
+          "averagePrice",
+          "lastPrice",
+          "unrealised",
+          "riskToStop",
+          "stopPrice",
+          "protection",
+          "source",
+          "reconciliation"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "account": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "netQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "averagePrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "lastPrice": {
+            "$ref": "#/components/schemas/ExecMetric"
+          },
+          "unrealised": {
+            "$ref": "#/components/schemas/ExecMetric"
+          },
+          "riskToStop": {
+            "$ref": "#/components/schemas/ExecMetric"
+          },
+          "stopPrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "protection": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "reconciliation": {
+            "type": "string"
+          }
+        },
+        "description": "One open position. string PositionRow.Protection is `confirmed` only when the broker's order book, read within TimeSpan ExecutionScreens.ProtectionReadLimit, was compared with our stop and showed no difference; `missing` when the engine raised a\nprotection breach; else `unknown`. string PositionRow.Source is `ours` or `foreign`; string PositionRow.Reconciliation is `matched`, `break`, `not_run` or `unavailable`."
       },
       "PreviewBaselineView": {
         "required": [

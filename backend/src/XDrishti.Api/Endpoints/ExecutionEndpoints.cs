@@ -22,6 +22,29 @@ internal sealed class ExecutionEndpoints : IEndpointModule
             .WithName("GetExecutionStatus")
             .WithSummary("The execution service: down / recovering / ready / halted from its heartbeat (down when older than 30 s), its process environment (none, sandbox, live), each account's mode and gate (closed until the mode ladder exists), halts and the open intents. Read only; an empty database answers environment none and closed gates");
 
+        group.MapGet("/overview", GetOverviewAsync)
+            .WithName("GetExecutionOverview")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .WithSummary("Today at a glance, per account (optional date, default the current session in India): effective mode and since when, the meters (orders, notional, worst-case loss, open positions) against the limits sheet in force with the pending raise beside it, open tickets, halts, alarms and positions without confirmed protection, the canary switch and the evidence line. A figure is value, insufficient, unavailable, not_evaluable or empty and an unreadable input is unavailable with its reason, never 0. Read only; no token, client id, secret or balance");
+
+        group.MapGet("/blotter", GetBlotterAsync)
+            .WithName("GetExecutionBlotter")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .WithSummary("The orders of a day, newest first, 50 a page (date, accountId, stateGroup pending|working|live|done|stopped, page from 1): state in P12-01's words (an unknown word is passed through with stateKnown false), who caused it (tap, auto, system, owner), broker ids as received, per-fill slippage in ticks and percent against the ticket price (positive is worse), rejection codes and the broker code. 422 execution.invalid on an unknown filter. Read only");
+
+        group.MapGet("/positions", GetPositionsAsync)
+            .WithName("GetExecutionPositions")
+            .WithSummary("The open positions (optional accountId): net quantity, average, last price and unrealised result (unavailable when the price is older than the feed limit), risk to the stop, protection confirmed|missing|unknown (confirmed only from a recent clean read of the broker's order book), source ours|foreign and reconciliation matched|break|not_run|unavailable. Read only");
+
+        group.MapGet("/activity", GetActivityAsync)
+            .WithName("GetExecutionActivity")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .WithSummary("The action log with the alarms, halts, drills, mode and settings changes, newest first, 50 a page (date, kind, by auto|tap|system|owner, page from 1). 422 execution.invalid on an unknown filter. Read only: the log is insert-only");
+
+        group.MapGet("/notices", GetNoticesAsync)
+            .WithName("GetExecutionNotices")
+            .WithSummary("The execution items for the bell, derived on every read from insert-only rows: exec_confirm_waiting, exec_auto_action, exec_order_rejected, exec_protection_missing, exec_halted, exec_kill_switch, exec_demoted, exec_recon_break, exec_not_ready, exec_ip_invalid, exec_cap_near, exec_day_summary. Each id includes its cause; a resolved item stays 24 hours and is not counted. Read only");
+
         group.MapGet("/alarms", GetAlarmsAsync)
             .WithName("GetExecutionAlarms")
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -285,4 +308,48 @@ internal sealed class ExecutionEndpoints : IEndpointModule
         http.Response.Headers.CacheControl = "no-store";
         return TypedResults.Ok(await handler.HandleAsync(new GetExecutionStatusQuery(), cancellationToken));
     }
+
+    private static async Task<Results<Ok<ExecutionOverview>, ProblemHttpResult>> GetOverviewAsync(
+        IQueryHandler<GetExecutionOverviewQuery, Result<ExecutionOverview>> handler, HttpContext http, CancellationToken cancellationToken, DateOnly? date = null)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var result = await handler.HandleAsync(new GetExecutionOverviewQuery(date), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Problem(result.Error, http);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<BlotterRow>>, ProblemHttpResult>> GetBlotterAsync(
+        IQueryHandler<GetExecutionBlotterQuery, Result<IReadOnlyList<BlotterRow>>> handler, HttpContext http, CancellationToken cancellationToken, DateOnly? date = null, Guid? accountId = null, string? stateGroup = null, int page = 1)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var result = await handler.HandleAsync(new GetExecutionBlotterQuery(date, accountId, stateGroup, page), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Problem(result.Error, http);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<PositionRow>>, ProblemHttpResult>> GetPositionsAsync(
+        IQueryHandler<GetExecutionPositionsQuery, Result<IReadOnlyList<PositionRow>>> handler, HttpContext http, CancellationToken cancellationToken, Guid? accountId = null)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var result = await handler.HandleAsync(new GetExecutionPositionsQuery(accountId), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Problem(result.Error, http);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<ActivityRow>>, ProblemHttpResult>> GetActivityAsync(
+        IQueryHandler<GetExecutionActivityQuery, Result<IReadOnlyList<ActivityRow>>> handler, HttpContext http, CancellationToken cancellationToken, DateOnly? date = null, string? kind = null, string? by = null, int page = 1)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var result = await handler.HandleAsync(new GetExecutionActivityQuery(date, kind, by, page), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Problem(result.Error, http);
+    }
+
+    private static async Task<Ok<ExecutionNotices>> GetNoticesAsync(IQueryHandler<GetExecutionNoticesQuery, ExecutionNotices> handler, HttpContext http, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        return TypedResults.Ok(await handler.HandleAsync(new GetExecutionNoticesQuery(), cancellationToken));
+    }
+
+    /// <summary>An unknown filter is 422 <c>execution.invalid</c> (the spec's word); every other failure is the shared mapping.</summary>
+    private static ProblemHttpResult Problem(Error error, HttpContext http) =>
+        error.Code == ExecutionScreenErrors.Invalid
+            ? TypedResults.Problem(ProblemResults.Create(StatusCodes.Status422UnprocessableEntity, error.Message, error.Code))
+            : ProblemResults.From(error, http);
 }

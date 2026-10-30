@@ -112,6 +112,11 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<UnlockDayCommand, DayUnlockView>, UnlockDayHandler>(); // the owner's daily unlock after a fresh password (P12-08b)
         services.AddScoped<IQueryHandler<GetExecutionLimitsQuery, Result<LimitsView>>, GetExecutionLimitsHandler>(); // the limits sheet of an account, read only (P12-09)
         services.AddScoped<ICommandHandler<ChangeExecutionLimitsCommand, LimitsView>, ChangeExecutionLimitsHandler>(); // the owner's limits sheet: a raise needs the password and waits a full session, a lowering is at once (P12-09)
+        services.AddScoped<IQueryHandler<GetExecutionOverviewQuery, Result<ExecutionOverview>>, GetExecutionOverviewHandler>(); // Today: modes, meters against the limits in force, tickets, halts, alarms (P12-10): read only
+        services.AddScoped<IQueryHandler<GetExecutionBlotterQuery, Result<IReadOnlyList<BlotterRow>>>, GetExecutionBlotterHandler>(); // the orders of a day with per-fill slippage (P12-10): read only
+        services.AddScoped<IQueryHandler<GetExecutionPositionsQuery, Result<IReadOnlyList<PositionRow>>>, GetExecutionPositionsHandler>(); // open positions with protection, source and reconciliation (P12-10): read only
+        services.AddScoped<IQueryHandler<GetExecutionActivityQuery, Result<IReadOnlyList<ActivityRow>>>, GetExecutionActivityHandler>(); // the action log with alarms, halts, drills and changes (P12-10): read only
+        services.AddScoped<IQueryHandler<GetExecutionNoticesQuery, ExecutionNotices>, GetExecutionNoticesHandler>(); // the bell's execution items, derived on read (P12-10): read only
         services.AddScoped<IQueryHandler<GetExecutionStatusQuery, ExecutionStatusView>, GetExecutionStatusHandler>(); // the execution service's status (P12-01b): read only
         services.AddScoped<IQueryHandler<GetDepthRecorderQuery, DepthRecorderView>, GetDepthRecorderHandler>(); // the owner's depth switch (P7-16): read
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)

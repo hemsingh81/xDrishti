@@ -13,6 +13,8 @@ internal sealed class ExecutionFactsReader(XDrishtiDbContext db) : IExecutionFac
     {
         var beat = await db.Set<ServiceHeartbeat>().AsNoTracking().Where(h => h.Id == "exec").Select(h => new { h.State, h.LastSeenAt, h.Details }).FirstOrDefaultAsync(cancellationToken);
         var open = await db.Database.SqlQuery<int>($"SELECT count(*)::int AS \"Value\" FROM execution.intent_state WHERE state NOT IN ('rejected', 'cancelled', 'failed', 'reconciled')").SingleAsync(cancellationToken);
+        var halted = await db.Database.SqlQuery<bool>($"SELECT EXISTS (SELECT 1 FROM execution.halts h WHERE NOT EXISTS (SELECT 1 FROM execution.halt_releases r WHERE r.halt_id = h.id) AND NOT EXISTS (SELECT 1 FROM execution.halt_auto_clears c WHERE c.halt_id = h.id)) AS \"Value\"").SingleAsync(cancellationToken);
+        var enabled = await db.Database.SqlQuery<bool>($"SELECT COALESCE((SELECT execution_enabled FROM execution.settings WHERE effective_from <= now() ORDER BY id DESC LIMIT 1), false) AS \"Value\"").SingleAsync(cancellationToken);
         var accounts = await db.Set<XDrishti.Domain.Accounts.BrokerAccount>().AsNoTracking().Where(a => a.ArchivedAt == null).OrderBy(a => a.Name)
             .Select(a => new { a.Id, Mode = a.Trading.Mode.ToString() }).ToListAsync(cancellationToken);
 
@@ -25,7 +27,7 @@ internal sealed class ExecutionFactsReader(XDrishtiDbContext db) : IExecutionFac
             hash = document.RootElement.TryGetProperty("settingsHash", out var h) ? h.GetString() : null;
         }
 
-        return new ExecutionFacts(beat?.State, beat?.LastSeenAt, environment, hash, open, [.. accounts.Select(a => (a.Id, Snake(a.Mode)))]);
+        return new ExecutionFacts(beat?.State, beat?.LastSeenAt, environment, hash, open, [.. accounts.Select(a => (a.Id, Snake(a.Mode)))], halted, enabled);
     }
 
     /// <summary>The doc 20 spelling of a mode (<c>ManualLive</c> is <c>manual_live</c>).</summary>
