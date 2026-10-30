@@ -1,6 +1,7 @@
 using System.Globalization;
 using XDrishti.Domain.Execution;
 using XDrishti.Domain.Execution.Confirm;
+using XDrishti.Execution.Domain.Limits;
 
 namespace XDrishti.Execution.Domain;
 
@@ -81,6 +82,12 @@ public static class ExecSettingRegistry
         Num(ConfirmSettings.TtlKey, "90", "15", "300", ExecRiskDirection.HigherIsRiskier),
         Num(ConfirmSettings.DriftKey, "0.30", "0.05", "1.00", ExecRiskDirection.HigherIsRiskier),
         Num(ConfirmSettings.StepUpKey, "10", "1", "100", ExecRiskDirection.HigherIsRiskier),
+
+        // auto_live (P12-09): for a flag, "higher" is true.
+        new(AutoLiveSettings.AllowAutoApprovedKey, ExecSettingKind.Flag, "false", "false", "true", ExecRiskDirection.HigherIsRiskier),
+        new(AutoLiveSettings.RequireDayUnlockKey, ExecSettingKind.Flag, "true", "false", "true", ExecRiskDirection.LowerIsRiskier),
+        new(AutoLiveSettings.RequireAttendedKey, ExecSettingKind.Flag, "true", "false", "true", ExecRiskDirection.LowerIsRiskier),
+        Num(AutoLiveSettings.AttendedMinutesKey, "10", "1", "30", ExecRiskDirection.HigherIsRiskier),
     ];
 
     public static ExecSetting? Find(string key) => All.FirstOrDefault(s => s.Key == key);

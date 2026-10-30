@@ -42,7 +42,7 @@
 |------|----------------|
 | Bad data → wrong plan | Quality gates; fail closed |
 | Misconfigured schedules (e.g. pre-open before cutoff, nightly before data) | Dependency & timing rules block invalid schedules; timeline view; catch-up |
-| Automation over-reach (system changes too much on its own) | Autonomy levels; weekly cap on automatic changes; always-ask list (risk increases, new strategies, live execution, accounts); change log with revert; automatic rollback after 60-trade monitoring |
+| Automation over-reach (system changes too much on its own) | Autonomy levels; weekly cap on automatic changes; always-ask list (risk increases, new strategies, live execution, accounts); change log with revert; automatic rollback after 60-trade monitoring **As built (P12-09, ADR 0167):** `AlwaysAskList` maps each item to its enforcement point with a probe a test checks; risk increases (stop loosening, adding, re-entry) are refused in every mode, limit raises need the password and a full session, a strategy's first live use goes to a ticket. |
 | Overfitting through repeated experiments | Required improvement rises with trials (multiple-testing guard); 12 OOS folds; judged after live gap and on total R; shadow before apply |
 | Smart rules filtering too much (e.g. too many no-trade days) or learned on noise | Evidence shown per rule; review flag when a rule removes > 50% of trades or its skipped trades are not worse than taken ones; rules learned from walk-forward data, not only live trades |
 | Learning from plan prices that cannot be achieved | Grade on actual fills; slippage model per liquidity bucket; capacity score |

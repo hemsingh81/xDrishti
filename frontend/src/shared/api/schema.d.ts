@@ -4053,6 +4053,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/execution/limits': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The limits sheet of one account (accountId): the row in force (null: no sheet, nothing is allowed), the raise waiting for its effectiveFrom, complete and the missing fields (an incomplete sheet allows nothing), the latest 20 rows, the compiled ceilings and serverNow (the database clock). Read only */
+    get: operations['GetExecutionLimits'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/limits/{accountId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** The owner's new limits sheet for one account, stored as a complete snapshot (an unset value allows nothing). A change that loosens anything against the row in force (a cap up, a wider window, a symbol or product added, exitAllOnLossHalt switched OFF; a mixed change counts as a raise) needs the password (400 execution.password_required, 401 auth.invalid_credentials, 423 auth.locked) and takes effect at 09:00 India time of the next trading day after one full closed session; a pure lowering needs only the session and the CSRF token and takes effect at once. 400 execution.values_invalid names the field (ceilings: 20 orders a day, 10 open positions, 50 symbols, window 09:16 to 15:00, products EQ_MIS only); 409 execution.disabled when the account's Trading role is off and the change is a raise; 409 execution.stale when the database refused the row. The answer is the sheet view with the row in force and the pending row */
+    put: operations['ChangeExecutionLimits'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/execution/status': {
     parameters: {
       query?: never;
@@ -11906,6 +11940,81 @@ export interface components {
       history: components['schemas']['LessonStepView'][];
       /** @description What a lesson does and does not do. */
       note: string;
+    };
+    /** @description The compiled ceilings the owner cannot exceed (code constants, not settings). Money caps have none; the order rate is P12-01's `exec.max_orders_per_second`. */
+    LimitsCeilingsView: {
+      /** Format: int32 */
+      maxOrdersPerDay: number;
+      /** Format: int32 */
+      maxOpenPositions: number;
+      /** Format: int32 */
+      maxAllowList: number;
+      windowEarliest: string;
+      windowLatest: string;
+      products: string[];
+    };
+    /** @description The owner's limits sheet. A missing value is unset and allows nothing. Times are India time HH:mm. The password is needed only for a raise. The actor is never taken from the body. */
+    LimitsChangeBody: {
+      /** Format: int32 */
+      maxOrdersPerDay: null | number;
+      /** Format: double */
+      maxNotionalPerOrder: null | number;
+      /** Format: double */
+      maxNotionalPerDay: null | number;
+      /** Format: double */
+      maxLossPerDay: null | number;
+      /** Format: int32 */
+      maxOpenPositions: null | number;
+      allowList: null | string[];
+      windowStart: null | string;
+      windowEnd: null | string;
+      products: null | string[];
+      exitAllOnLossHalt: null | boolean;
+      reason: null | string;
+      password: null | string;
+    };
+    /** @description One stored limits snapshot as the owner sees it (spec P12-09 Contract). A null cap is unset: it allows nothing. Times are India time `HH:mm`. */
+    LimitsRowView: {
+      /** Format: int64 */
+      id: number;
+      /** Format: uuid */
+      accountId: string;
+      /** Format: int32 */
+      maxOrdersPerDay: null | number;
+      /** Format: double */
+      maxNotionalPerOrder: null | number;
+      /** Format: double */
+      maxNotionalPerDay: null | number;
+      /** Format: double */
+      maxLossPerDay: null | number;
+      /** Format: int32 */
+      maxOpenPositions: null | number;
+      allowList: string[];
+      windowStart: null | string;
+      windowEnd: null | string;
+      products: string[];
+      exitAllOnLossHalt: boolean;
+      actor: string;
+      reason: string;
+      /** Format: date-time */
+      changedAt: string;
+      /** Format: date-time */
+      effectiveFrom: string;
+      snapshotHash: string;
+    };
+    /**
+     * @description The limits of one account: the row in force (null: no sheet, nothing is allowed), the raise waiting for its `effectiveFrom`, whether the sheet in force is complete and which fields are missing (an incomplete sheet allows nothing),
+     *     the latest 20 rows and the ceilings.
+     */
+    LimitsView: {
+      inForce: null | components['schemas']['LimitsRowView'];
+      pending: null | components['schemas']['LimitsRowView'];
+      complete: boolean;
+      missing: string[];
+      history: components['schemas']['LimitsRowView'][];
+      ceilings: components['schemas']['LimitsCeilingsView'];
+      /** Format: date-time */
+      serverNow: string;
     };
     /** @description The body of a lesson link: the fix to link is a hypothesis or an experiment. */
     LinkLessonRequest: {
@@ -27982,6 +28091,126 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExecutionLimits: {
+    parameters: {
+      query?: {
+        accountId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LimitsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ChangeExecutionLimits: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        accountId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LimitsChangeBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LimitsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
         headers: {
           [name: string]: unknown;
         };

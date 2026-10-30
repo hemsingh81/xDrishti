@@ -154,6 +154,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ConfirmTicketBody))]
 [JsonSerializable(typeof(SkipTicketBody))]
 [JsonSerializable(typeof(DayUnlockBody))]
+[JsonSerializable(typeof(LimitsView))]
+[JsonSerializable(typeof(LimitsChangeBody))]
 [JsonSerializable(typeof(RampEventView))]
 [JsonSerializable(typeof(SetRampStepRequest))]
 [JsonSerializable(typeof(RampActRequest))]

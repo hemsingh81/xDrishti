@@ -232,6 +232,7 @@ public static class DependencyInjection
         services.AddScoped<IExecutionModeFacts, ExecutionModeFacts>(); // the stored facts of the mode gate, read only (P12-07)
         services.AddScoped<IConfirmTicketAccess, ConfirmTicketAccess>(); // the confirm tickets: read, plus the owner's confirmed and skipped outcomes (P12-08b)
         services.AddScoped<IDayUnlockAccess, DayUnlockAccess>(); // the day unlocks: read, plus the owner's unlock (P12-08b)
+        services.AddScoped<IExecutionLimitsAccess, ExecutionLimitsAccess>(); // the limits sheets: read, plus the owner's snapshot (P12-09)
         services.AddScoped<IExecutionFactsReader, ExecutionFactsReader>(); // the execution service's heartbeat and record, read only (P12-01b)
         services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)

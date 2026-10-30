@@ -1,6 +1,6 @@
 # P12-09 — `auto_live` within hard limits: the caps, the guard, the always-ask list and "every action notified"
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved to BUILD ONLY (owner, 2026-10-31: run the roadmap loop in build order; written 2026-10-24, decisions researched under the owner's delegation). Built behind every default: auto_live_enabled OFF, empty limits sheet, no account promotable, composed nowhere. Using it is the owner's later act after P12-12 is MET.
 - **Phase / roadmap row:** P12 — Execution service, slice P12-09 of [P12-00](P12-00-execution-service-plan.md) (id only; written in parallel)
 - **Design refs:** docs/design/20-extended-modules.md §A (`auto_live`: within hard limits, every action notified; kill switch triggers: max drawdown, daily loss, feed loss) · 19 §4 (automation over-reach, always-ask list, runaway orders), §5 (≤ 2 orders/s) · 16 (`autonomy.always_ask`, `execution`) · 09 §13 · 08 (risk) · ADR 0091 (the setting rule, database-checked), 0083/0095
 - **Needs (build order of the group: P12-07, P12-11, P12-08, P12-09, P12-10, P12-12):** P12-11 (readiness, which the guard reads), P12-07 (modes, `ExecutionSettings`, risk-direction rule), P12-08 (`ActionClass`, tickets for always-ask actions, `day_unlocks`), P12-01 (submit path calls the ledger), P12-03 (pre-trade checks; its registry already holds the global `exec.max_order_value_inr`, `exec.max_orders_per_day`, `exec.entry_window_*` and `exec.max_orders_per_second`), the intent creator (P12-08), P12-04 (broker-side stop), P12-05 (halts, kill switch), P12-06 (reconciliation state), P12-11 (readiness). Feeds P12-10, P12-12.
@@ -84,3 +84,8 @@ None blocking. Owner acts (defaults until then): turn `auto_live_enabled` ON (OF
 - Products are `EQ_MIS` only (P12-02 criterion 4); EQ_CNC is dropped; entries are BUY only until P12-13.
 - `StopLoosen`, `AddToPosition`, `ReEntry` are refused until P12-13 (no ticket).
 - Build order is P12-07, P12-11, P12-08, P12-09, P12-10, P12-12.
+
+## Build notes 2026-10-31 (backend)
+- Built behind every default and composed nowhere ([ADR 0167](../adr/0167-auto-live-sends-only-inside-an-owner-chosen-limits-sheet-that-the-database-proves-for-every-entry-an-empty-sheet-allows-nothing-and-no-action-happens-without-its-row.md)): `ReserveEntry`, `AutoActions` and `LossCapEvaluator` are registered by no host, no hand-over port is implemented, `IOwnerPresence` is the closed default (no grant on `auth.sessions`), and no account can be `semi_auto` or `auto_live`, so the ledger trigger refuses every row today.
+- Codes the spec left unnamed: `unlock.missing`, `readiness.not_ready`, `halt.active`, `cap.open_positions`, `cap.unavailable`; database-only: `settings.stale`, `limits.stale`, `action_log.missing`, `ledger.missing`. Cap columns are nullable (unset allows nothing) so a partial sheet can be stored and its missing fields listed. `execution.disabled` answers a raise while the Trading role is off. `exit_all_on_loss_halt` OFF counts as a loosening.
+- The frontend (limits form, action feed) is P12-10.

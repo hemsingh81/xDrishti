@@ -311,6 +311,8 @@ reports: { default_range_days: 90, weekly_pack: true }
 
 # Later-phase modules (doc 20) — disabled until their phase
 execution:     { enabled: false, broker_side_stop_required: true, max_orders_per_second: 2, price_band_pct: 2.0 }
+# As built (P12-09, ADR 0167): auto_live keys exec.auto_live_allow_auto_approved false, exec.auto_live_require_day_unlock true, exec.auto_live_require_attended true,
+# exec.auto_live_attended_min 10 (1..30); the per-account limits sheet is a record (execution.limits), empty by default, and an empty sheet allows nothing.
 feed_recorder: { enabled: false, depth_levels: 20, max_instruments: 50 }
 options:       { enabled: false, underlyings: [NIFTY, BANKNIFTY], structures: [option_buy, debit_spread, credit_spread] }
 fundamentals:  { enabled: false, quality_filter: { min_profit_quarters_of_last_4: 3, max_promoter_pledge_pct: 25 } }

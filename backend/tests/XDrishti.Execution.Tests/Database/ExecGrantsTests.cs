@@ -43,11 +43,14 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         ["confirm_tickets"] = ["INSERT", "SELECT"], // the issuer of the confirm ticket (P12-08b)
         ["ticket_outcomes"] = ["INSERT", "SELECT"], // expired and refused only; the trigger refuses the owner's two outcomes from this role (P12-08b)
         ["day_unlocks"] = ["SELECT"], // the owner's unlock, written by the API (P12-08b)
+        ["limits"] = ["SELECT"], // the owner's limits sheet, written by the API (P12-09)
+        ["ledger_entries"] = ["INSERT", "SELECT"], // one row per system-sent entry; the trigger judges it against the sheet in force (P12-09)
+        ["action_log"] = ["INSERT", "SELECT"], // one row per automatic action and refusal (P12-09)
         ["commands"] = ["SELECT"],
         ["settings"] = ["SELECT"],
     };
 
-    private static readonly Dictionary<string, string[]> AppExpected = ExecExpected.ToDictionary(e => e.Key, e => e.Key is "commands" or "halt_releases" or "break_resolutions" or "mode_trail" or "promotion_requests" or "ip_attestations" or "ticket_outcomes" or "day_unlocks" ? new[] { "INSERT", "SELECT" } : new[] { "SELECT" });
+    private static readonly Dictionary<string, string[]> AppExpected = ExecExpected.ToDictionary(e => e.Key, e => e.Key is "commands" or "halt_releases" or "break_resolutions" or "mode_trail" or "promotion_requests" or "ip_attestations" or "ticket_outcomes" or "day_unlocks" or "limits" ? new[] { "INSERT", "SELECT" } : new[] { "SELECT" });
 
     private async Task<List<string>> TablesAsync()
     {
@@ -94,7 +97,7 @@ public sealed class ExecGrantsTests(ExecDatabase db)
     [Fact]
     public async Task No_role_can_use_a_sequence_it_does_not_need_and_nobody_else_can_enter_the_schema()
     {
-        foreach (var sequence in new[] { "events_id_seq", "intents_id_seq", "legs_id_seq", "fills_id_seq", "settings_id_seq", "broker_calls_id_seq", "halts_id_seq", "drills_id_seq", "kill_switch_log_id_seq", "recon_runs_id_seq", "recon_breaks_id_seq", "readiness_checks_id_seq", "day_states_id_seq" })
+        foreach (var sequence in new[] { "events_id_seq", "intents_id_seq", "legs_id_seq", "fills_id_seq", "settings_id_seq", "broker_calls_id_seq", "halts_id_seq", "drills_id_seq", "kill_switch_log_id_seq", "recon_runs_id_seq", "recon_breaks_id_seq", "readiness_checks_id_seq", "day_states_id_seq", "ledger_entries_id_seq", "action_log_id_seq" })
         {
             ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('xd_app', 'execution.{sequence}', 'USAGE')"))!).ShouldBeFalse(sequence);
             ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_sequence_privilege('xd_exec', 'execution.{sequence}', 'USAGE')"))!).ShouldBeTrue(sequence);
@@ -113,6 +116,10 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         // The day unlock is the owner's act: the API writes it, the execution service only reads it (P12-08b).
         ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_sequence_privilege('xd_app', 'execution.day_unlocks_id_seq', 'USAGE')"))!).ShouldBeTrue();
         ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_sequence_privilege('xd_exec', 'execution.day_unlocks_id_seq', 'USAGE')"))!).ShouldBeFalse();
+
+        // The limits sheet is the owner's act: the API writes it, the execution service only reads it (P12-09).
+        ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_sequence_privilege('xd_app', 'execution.limits_id_seq', 'USAGE')"))!).ShouldBeTrue();
+        ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_sequence_privilege('xd_exec', 'execution.limits_id_seq', 'USAGE')"))!).ShouldBeFalse();
 
         ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_schema_privilege('xd_mcp_read', 'execution', 'USAGE') OR has_schema_privilege('xd_mcp_sql', 'execution', 'USAGE')"))!).ShouldBeFalse();
         ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_schema_privilege('public', 'execution', 'USAGE')"))!).ShouldBeFalse();

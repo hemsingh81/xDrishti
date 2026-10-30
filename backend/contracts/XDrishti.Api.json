@@ -14184,6 +14184,159 @@
         }
       }
     },
+    "/api/execution/limits": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "The limits sheet of one account (accountId): the row in force (null: no sheet, nothing is allowed), the raise waiting for its effectiveFrom, complete and the missing fields (an incomplete sheet allows nothing), the latest 20 rows, the compiled ceilings and serverNow (the database clock). Read only",
+        "operationId": "GetExecutionLimits",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimitsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/execution/limits/{accountId}": {
+      "put": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "The owner's new limits sheet for one account, stored as a complete snapshot (an unset value allows nothing). A change that loosens anything against the row in force (a cap up, a wider window, a symbol or product added, exitAllOnLossHalt switched OFF; a mixed change counts as a raise) needs the password (400 execution.password_required, 401 auth.invalid_credentials, 423 auth.locked) and takes effect at 09:00 India time of the next trading day after one full closed session; a pure lowering needs only the session and the CSRF token and takes effect at once. 400 execution.values_invalid names the field (ceilings: 20 orders a day, 10 open positions, 50 symbols, window 09:16 to 15:00, products EQ_MIS only); 409 execution.disabled when the account's Trading role is off and the change is a raise; 409 execution.stale when the database refused the row. The answer is the sheet view with the row in force and the pending row",
+        "operationId": "ChangeExecutionLimits",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LimitsChangeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimitsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/execution/status": {
       "get": {
         "tags": [
@@ -36923,6 +37076,316 @@
           }
         },
         "description": "A lesson as the API shows it (P6-16, ADR 0078): the newest row of its log, with the legal next states and, for one lesson, its history."
+      },
+      "LimitsCeilingsView": {
+        "required": [
+          "maxOrdersPerDay",
+          "maxOpenPositions",
+          "maxAllowList",
+          "windowEarliest",
+          "windowLatest",
+          "products"
+        ],
+        "type": "object",
+        "properties": {
+          "maxOrdersPerDay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxOpenPositions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxAllowList": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "windowEarliest": {
+            "type": "string"
+          },
+          "windowLatest": {
+            "type": "string"
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The compiled ceilings the owner cannot exceed (code constants, not settings). Money caps have none; the order rate is P12-01's `exec.max_orders_per_second`."
+      },
+      "LimitsChangeBody": {
+        "required": [
+          "maxOrdersPerDay",
+          "maxNotionalPerOrder",
+          "maxNotionalPerDay",
+          "maxLossPerDay",
+          "maxOpenPositions",
+          "allowList",
+          "windowStart",
+          "windowEnd",
+          "products",
+          "exitAllOnLossHalt",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "maxOrdersPerDay": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxNotionalPerOrder": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxNotionalPerDay": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxLossPerDay": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxOpenPositions": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "allowList": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "windowStart": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "windowEnd": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "products": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "exitAllOnLossHalt": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The owner's limits sheet. A missing value is unset and allows nothing. Times are India time HH:mm. The password is needed only for a raise. The actor is never taken from the body."
+      },
+      "LimitsRowView": {
+        "required": [
+          "id",
+          "accountId",
+          "maxOrdersPerDay",
+          "maxNotionalPerOrder",
+          "maxNotionalPerDay",
+          "maxLossPerDay",
+          "maxOpenPositions",
+          "allowList",
+          "windowStart",
+          "windowEnd",
+          "products",
+          "exitAllOnLossHalt",
+          "actor",
+          "reason",
+          "changedAt",
+          "effectiveFrom",
+          "snapshotHash"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "maxOrdersPerDay": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxNotionalPerOrder": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxNotionalPerDay": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxLossPerDay": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxOpenPositions": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "allowList": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "windowStart": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "windowEnd": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exitAllOnLossHalt": {
+            "type": "boolean"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "snapshotHash": {
+            "type": "string"
+          }
+        },
+        "description": "One stored limits snapshot as the owner sees it (spec P12-09 Contract). A null cap is unset: it allows nothing. Times are India time `HH:mm`."
+      },
+      "LimitsView": {
+        "required": [
+          "inForce",
+          "pending",
+          "complete",
+          "missing",
+          "history",
+          "ceilings",
+          "serverNow"
+        ],
+        "type": "object",
+        "properties": {
+          "inForce": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LimitsRowView"
+              }
+            ]
+          },
+          "pending": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LimitsRowView"
+              }
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LimitsRowView"
+            }
+          },
+          "ceilings": {
+            "$ref": "#/components/schemas/LimitsCeilingsView"
+          },
+          "serverNow": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "The limits of one account: the row in force (null: no sheet, nothing is allowed), the raise waiting for its `effectiveFrom`, whether the sheet in force is complete and which fields are missing (an incomplete sheet allows nothing),\nthe latest 20 rows and the ceilings."
       },
       "LinkLessonRequest": {
         "required": [

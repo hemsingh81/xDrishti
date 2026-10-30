@@ -110,6 +110,8 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<SkipTicketCommand, ConfirmResultView>, SkipTicketHandler>(); // the owner's skip: a declined decision (P12-08b)
         services.AddScoped<IQueryHandler<GetDayUnlocksQuery, IReadOnlyList<DayUnlockView>>, GetDayUnlocksHandler>(); // the day unlocks, read only (P12-08b)
         services.AddScoped<ICommandHandler<UnlockDayCommand, DayUnlockView>, UnlockDayHandler>(); // the owner's daily unlock after a fresh password (P12-08b)
+        services.AddScoped<IQueryHandler<GetExecutionLimitsQuery, Result<LimitsView>>, GetExecutionLimitsHandler>(); // the limits sheet of an account, read only (P12-09)
+        services.AddScoped<ICommandHandler<ChangeExecutionLimitsCommand, LimitsView>, ChangeExecutionLimitsHandler>(); // the owner's limits sheet: a raise needs the password and waits a full session, a lowering is at once (P12-09)
         services.AddScoped<IQueryHandler<GetExecutionStatusQuery, ExecutionStatusView>, GetExecutionStatusHandler>(); // the execution service's status (P12-01b): read only
         services.AddScoped<IQueryHandler<GetDepthRecorderQuery, DepthRecorderView>, GetDepthRecorderHandler>(); // the owner's depth switch (P7-16): read
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)
