@@ -247,7 +247,8 @@ services:
       DOTNET_ENVIRONMENT: Production
       Database__ConnectionString: Host=xd-db;Port=5432;Database=xdrishti;Username=xd_exec
       Execution__Environment: ${XD_EXEC_ENVIRONMENT:-none}
-      # The live readiness reads with the account's token from the sealed hand-over (ADR 0171 step 6): OFF by default, effective only in live. Until the egress decision (step 5) every live read is still refused.
+      # The live readiness reads with the account's token from the sealed hand-over (ADR 0171 step 6): OFF by default, effective only in live. Their only route out is xd-exec-proxy (ADR 0172), which with the proxy
+      # variable exists only in compose.exec-live.yaml, added by xd-up.sh with --exec AND XD_EXEC_READINESS_LIVE=true; this file gives xd-exec no proxy variable and no route.
       Execution__ReadinessLiveEnabled: ${XD_EXEC_READINESS_LIVE:-false}
     secrets:
       - source: db_exec_password
@@ -547,7 +548,7 @@ networks:
     internal: true
   # Outbound internet for xd-api (Dhan sign-in, ADR 0008, 0009; instrument master files, ADR 0010) and xd-feed (the market-data WebSocket, ADR 0024). Not internal, no published ports, no other member.
   egress: {}
-  # The execution service's network (P12-01b): internal (no route out); only xd-exec and xd-db are members. The broker route (egress) is added by P12-02, not here.
+  # The execution service's network (P12-01b): internal (no route out); in this file only xd-exec and xd-db are members. The one route to the live broker is xd-exec-proxy (ADR 0172, compose.exec-live.yaml), on exec and egress.
   exec:
     internal: true
   # The Hermes PoC network (P9-10): internal (no route out); only xd-hermes, xd-llm, xd-mcp and xd-mcp-eval are members.

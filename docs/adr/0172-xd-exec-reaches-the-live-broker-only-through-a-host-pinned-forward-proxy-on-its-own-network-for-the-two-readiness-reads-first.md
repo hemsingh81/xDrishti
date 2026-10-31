@@ -31,5 +31,37 @@ With ADR 0171 built, `xd-exec` can hold the day's token for a connected account 
 - The proxy sees only the host names it forwards (TLS passes through); it holds no token and logs no body.
 - The order-update socket and order paths still need a later ADR (live send), which would add `api-order-update.dhan.co:443` and the order paths, and would be the point where the owner decides whether `xd-exec` may send at all.
 
+## Build (2026-10-31)
+- **Where the route lives.** `deploy/compose.exec-live.yaml`, an overlay read by `deploy/xd-up.sh` only with `--exec` AND `XD_EXEC_READINESS_LIVE=true` (case-insensitive). A single file cannot express "profile `live` AND a switch": a service with profile `live` would start with every `--exec`, and an always-present `HTTPS_PROXY` (even empty) would contradict step 3. The overlay defines `xd-exec-proxy` (profile `live`) and adds to `xd-exec` only `HTTPS_PROXY=http://xd-exec-proxy:8888` and a health dependency. A deploy without the overlay removes the proxy container by its exact name (`podman rm -f xdrishti-xd-exec-proxy-1`); `--remove-orphans` is NOT used (review F1: it was not proven safe for the profile-gated Hermes and eval containers); a running `xd-exec` keeps its proxy variable until the next `--exec` deploy recreates it and fails closed meanwhile (review F2); `xd-down.sh` always includes the overlay.
+- **The proxy.** tinyproxy `1.11.2-r0` on `docker.io/library/alpine:3.22.2@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412` (the multi-arch index), built from `deploy/exec-proxy/` (Dockerfile, entrypoint), runs as the image's user `tinyproxy`. The entrypoint writes the config to `/tmp` from the read-only `deploy/exec-proxy/allowlist.txt` at every start: one anchored pattern `^host:port$` per line with `FilterURLs On`, `FilterDefaultDeny Yes`, `FilterCaseSensitive Yes`, `FilterType ere`, and one `ConnectPort` per listed port; a malformed or empty list stops the start. Compose: networks `exec` + `egress`, no secret, no environment, no database, no published port, `read_only` with tmpfs `/tmp`, `cap_drop ALL`, `no-new-privileges`, 32 MB, health check `nc -z 127.0.0.1 8888`.
+- **Code.** `ExecutionEndpoints` gains `LiveHost = "api.dhan.co"` and a live table of exactly two rows (`GET /v2/profile`, `GET /v2/ip/getIP`; no id, no query, https, default port). The GET machinery moved from `DhanOrderClient` into `DhanReader` (no write, no body), shared by the sandbox client and `LiveBrokerFacts`. `LiveBrokerFacts` builds its own client: `GuardHandler(Live)` over a `SocketsHttpHandler` whose only proxy is `HTTPS_PROXY` (strictly parsed by `ExecOptions.LiveProxy`: plain-HTTP absolute address, nothing else), no redirects, no cookies; own limit 5/s; 401/DH-901 is `token_invalid`; log event 6616 now names the environment (`Dhan live read ...`), never a token, host or address. Switch off: `token_unavailable`; no proxy: `no_live_route`; no token: `token_unavailable`; none of them makes a request. `DhanOrderClient` still throws for any environment but sandbox and no `IExecCredentials` is composed in live.
+- **Tests.** `ExecComposeRules` gains nine rules, each with planted violations (`no-proxy-in-base`, `proxy-profile-live`, `proxy-networks`, `one-bridge`, `proxy-no-secret-db-or-port`, `proxy-hardening`, `proxy-image-pinned`, `exec-gets-only-the-proxy-variable`, `allow-list-accepted-hosts`; the last fails on any line but `api.dhan.co:443`), plus the up-script gate. `ExecutionEndpointsTests` pin the two live rows and fifty refused live requests, and an end-to-end test through `GuardHandler(Live)` with a stub socket lets only the two GETs reach it. `LiveBrokerFactsTests` cover every refusal, the reads, the retry, the token rule, the limit and the audit with a stub socket. The architecture tripwires now pin the two hosts and the two live rows in the one guard file instead of "no live host" (the ADR's change), plus: the proxy setting is read in one file, `UseProxy = true` exists only in the live reads, and the overlay adds only the proxy to `exec`.
+
+## Verification (2026-10-31, Podman 6.0.2 on the owner's Mac; nothing of the stack was started)
+The image was built from `deploy/exec-proxy/` and run alone as compose runs it (`--read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true --memory 32m`, the repo's `allowlist.txt` mounted read-only) on a throwaway network; a second container sent raw proxy requests with `nc`. Generated config: `ConnectPort 443`, filter `^api\.dhan\.co:443$`; health check `nc -z` answered; process uid 100 (`tinyproxy`); memory in use 1.7 MB. Answers (first line):
+
+| Request to the proxy | Answer |
+|---|---|
+| `CONNECT api.dhan.co:443` | `HTTP/1.1 200 Connection established` |
+| `CONNECT example.com:443` | `403 Filtered` |
+| `CONNECT sandbox.dhan.co:443` | `403 Filtered` |
+| `CONNECT api-order-update.dhan.co:443` | `403 Filtered` |
+| `CONNECT api.dhan.co:80` | `403 Access violation` |
+| `CONNECT api.dhan.co:8443` | `403 Access violation` |
+| `CONNECT API.DHAN.CO:443` | `403 Filtered` |
+| `CONNECT api.dhan.co.evil.test:443` | `403 Filtered` |
+| `CONNECT 1.1.1.1:443` | `403 Filtered` |
+| `GET http://api.dhan.co/` (plain forward) | `403 Filtered` |
+| `GET http://api.dhan.co:443/` | `403 Filtered` |
+| `GET http://example.com/` | `403 Filtered` |
+
+A list holding a malformed line made the container exit 1 (`refusing a malformed allow-list line`). No HTTP request was sent to Dhan through the tunnel (the 200 only proves the TCP route to `api.dhan.co:443`). The container, network and image were removed afterwards. **Still UNVERIFIED:** that `api.dhan.co` serves `/v2/profile` and `/v2/ip/getIP` for a live token and that the source address seen by Dhan is the registered one; both need the owner's smoke (runbook, "The live readiness route"), and until it is recorded the switch stays off.
+
 ## Owner decision (2026-10-31)
 Accept B, choose D (stay unavailable), or ask for A. If B: confirm that `api.dhan.co:443` is the only live host for the two reads, and whether the proxy should be started by `--exec` automatically or only with an additional `XD_EXEC_READINESS_LIVE=true`.
+
+## Known limits (build review, 2026-10-31)
+- The proxy has no `Allow` directive: any member of `exec` or `egress` (xd-exec, xd-db, xd-api, xd-feed) could use it, but only for `api.dhan.co:443`, so it adds no reach. Not a wider pin.
+- `HTTPS_PROXY` is accepted as any `http://host:port`; it comes only from compose. The port in the list is not range-checked (a bad port gives a dead rule), and where tinyproxy logs under `-d` is unverified.
+- The proxy starts with `--exec` plus the switch even if `XD_EXEC_ENVIRONMENT` is not `live`; the app then does not use it.
+- The sandbox `FindAsync` loop still has its own copy of the GET retry loop (not a regression).

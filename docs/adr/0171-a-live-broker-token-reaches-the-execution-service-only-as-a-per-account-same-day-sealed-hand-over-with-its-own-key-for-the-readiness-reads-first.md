@@ -39,7 +39,7 @@ Corrected from the first draft: (a) the table does not go in schema `execution` 
 - A token that merely expires stays sealed at rest until the next login, disconnect or archive; the reader refuses it (status Connected and `expires_at` in the future), so it is not usable, only present.
 - `SetAsync` is find-then-add like the vault's; two simultaneous logins of one account could collide on the key, and the second save fails whole (the connect fails, nothing half-written).
 - Archive also deletes the hand-over. `xd-exec` starts without the key and fails every lookup closed with one warning.
-- Minor cleanups left: `LiveBrokerFacts` has a dead `enabled` branch and an unreachable `no_live_route` arm until the live guard rows exist.
+- Minor cleanups left: `LiveBrokerFacts` has a dead `enabled` branch and an unreachable `no_live_route` arm until the live guard rows exist (resolved by ADR 0172: `no_live_route` now means no proxy configured).
 
 ## Owner decisions still open
 1. Egress for `xd-exec` to the live Dhan host (step 5), as its own ADR.

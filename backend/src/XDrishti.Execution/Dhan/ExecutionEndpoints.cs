@@ -21,15 +21,26 @@ public enum DhanCall
 }
 
 /// <summary>
-/// The single guard table and the only file with order paths and the only file with a host name (P12-02, ADR 0157). A request passes only when: the environment is sandbox, the scheme is https, the host is exactly the sandbox host, the port is the
-/// default, there is no user info, no query, no fragment, the method and the path match one row, and the id is a plain token. The live environment passes nothing in this slice and no live host string exists in this project.
+/// The single guard table and the only file with order paths and the only file with a host name (P12-02, ADR 0157). A request passes only when: the scheme is https, the host is exactly the host of the environment, the port is the default, there is no
+/// user info, no query, no fragment, the method and the path match one row of that environment, and the id is a plain token. The sandbox has the rows of <see cref="Table"/>. The live environment has exactly the two readiness GETs of
+/// <see cref="LiveTable"/> (ADR 0172) and nothing else: no order, no setIP, modifyIP or RenewToken, no positions or funds; a live order path needs its own ADR that widens this table and the proxy allow-list.
 /// </summary>
 public static partial class ExecutionEndpoints
 {
     /// <summary>Taken from a third-party description (marketcalls.in, 2025-05-19) and not verified by Dhan's own pages: UNVERIFIED until the owner's first sandbox smoke.</summary>
     public const string SandboxHost = "sandbox.dhan.co";
 
+    /// <summary>The live API host of the two readiness reads (ADR 0172). The only live host string in the execution project, and the only line of <c>deploy/exec-proxy/allowlist.txt</c>. UNVERIFIED until the owner's live smoke of the two reads is recorded in the runbook.</summary>
+    public const string LiveHost = "api.dhan.co";
+
     public const string AccessTokenHeader = "access-token";
+
+    // The live rows (ADR 0172): the two readiness reads, GET only, no id, no query. Nothing else is ever added here without its own accepted ADR.
+    private static readonly (DhanCall Call, HttpMethod Method, string Path)[] LiveTable =
+    [
+        (DhanCall.ProfileGet, HttpMethod.Get, "/v2/profile"),
+        (DhanCall.StaticIpGet, HttpMethod.Get, "/v2/ip/getIP"),
+    ];
 
     private static readonly (DhanCall Call, HttpMethod Method, string Prefix, bool HasId)[] Table =
     [
@@ -62,6 +73,11 @@ public static partial class ExecutionEndpoints
     /// <summary>The absolute URI for a call, or null when the environment does not allow it or the id is not a plain token.</summary>
     public static Uri? Build(ExecEnvironment environment, DhanCall call, string? id = null)
     {
+        if (environment == ExecEnvironment.Live)
+        {
+            return id is null && LiveTable.Any(t => t.Call == call) ? new Uri($"https://{LiveHost}{LiveTable.First(t => t.Call == call).Path}", UriKind.Absolute) : null;
+        }
+
         if (environment != ExecEnvironment.Sandbox)
         {
             return null;
@@ -79,13 +95,23 @@ public static partial class ExecutionEndpoints
     /// <summary>Whether this exact request (method and URI) is one of the rows for the environment. Used by the handler on every outgoing request.</summary>
     public static bool IsAllowed(ExecEnvironment environment, HttpMethod method, Uri? uri)
     {
-        if (environment != ExecEnvironment.Sandbox || uri is null || !uri.IsAbsoluteUri || uri.Scheme != Uri.UriSchemeHttps || !string.Equals(uri.Host, SandboxHost, StringComparison.Ordinal)
+        var host = environment switch
+        {
+            ExecEnvironment.Sandbox => SandboxHost,
+            ExecEnvironment.Live => LiveHost,
+            _ => null,
+        };
+        if (host is null || uri is null || !uri.IsAbsoluteUri || uri.Scheme != Uri.UriSchemeHttps || !string.Equals(uri.Host, host, StringComparison.Ordinal)
             || !uri.IsDefaultPort || uri.UserInfo.Length > 0 || uri.Query.Length > 0 || uri.Fragment.Length > 0)
         {
             return false;
         }
 
         var path = uri.AbsolutePath;
+        if (environment == ExecEnvironment.Live)
+        {
+            return LiveTable.Any(t => t.Method == method && string.Equals(path, t.Path, StringComparison.Ordinal));
+        }
         foreach (var row in Table.Where(t => t.Method == method))
         {
             if (!row.HasId)

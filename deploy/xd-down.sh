@@ -10,7 +10,7 @@ export XD_SECRETS_DIR="${XD_SECRETS_DIR:-$HOME/Library/Application Support/xDris
 if [ "${1:-}" = "--purge" ]; then
   read -r -p "Delete ALL xDrishti data (database, logs)? Type 'delete': " answer
   [ "$answer" = "delete" ] || { echo "Cancelled."; exit 1; }
-  podman compose -f compose.yaml -f compose.dev.yaml --profile ops --profile ai --profile live down --volumes
+  podman compose -f compose.yaml -f compose.dev.yaml -f compose.exec-live.yaml --profile ops --profile ai --profile live down --volumes
 else
-  podman compose -f compose.yaml -f compose.dev.yaml --profile ops --profile ai --profile live down
+  podman compose -f compose.yaml -f compose.dev.yaml -f compose.exec-live.yaml --profile ops --profile ai --profile live down
 fi

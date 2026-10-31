@@ -1,0 +1,32 @@
+# The live readiness route of xd-exec (ADR 0172). Added by deploy/xd-up.sh ONLY with `--exec` AND XD_EXEC_READINESS_LIVE=true (an owner act); a plain deploy or `--exec` alone never reads this file,
+# so neither the proxy nor the proxy variable of xd-exec exists then, and the next deploy without it removes the proxy by its exact name (no orphan sweep). Rules: deploy/CLAUDE.md, checked by ExecComposeRulesTests.
+services:
+  # The host-pinned forward proxy: the only member of both `exec` (internal, shared with xd-exec and xd-db) and `egress`. tinyproxy allows CONNECT to the host:port pairs of exec-proxy/allowlist.txt and refuses
+  # everything else (other hosts, other ports, plain-HTTP forwarding). TLS passes through: it sees host names only, holds no token, no secret and no database access, publishes no port.
+  xd-exec-proxy:
+    profiles: [live]
+    image: localhost/xdrishti/exec-proxy:${XD_VERSION:-0.1.0}
+    build:
+      context: ./exec-proxy
+    restart: unless-stopped
+    volumes:
+      - ./exec-proxy/allowlist.txt:/etc/xd/allowlist.txt:ro
+    networks: [exec, egress]
+    mem_limit: 32m
+    healthcheck:
+      test: [CMD, nc, -z, 127.0.0.1, "8888"]
+      interval: 15s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  # xd-exec stays on `exec` only; it gains the proxy address and nothing else. Its live reads build their own client from this variable (LiveBrokerFacts); no other client of the process uses a proxy.
+  xd-exec:
+    environment:
+      HTTPS_PROXY: http://xd-exec-proxy:8888
+    depends_on:
+      xd-exec-proxy: { condition: service_healthy }

@@ -1,0 +1,3 @@
+# The hosts xd-exec may reach through xd-exec-proxy (ADR 0172). One host:port per line, nothing else.
+# Adding a line is a reviewed commit with an accepted ADR naming the host (ADR 0133 rule); ExecComposeRulesTests fails on any other host.
+api.dhan.co:443

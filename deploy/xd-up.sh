@@ -177,6 +177,16 @@ fi
 # 4) Build and start.
 files=(-f compose.yaml); [ "$DEV" = 1 ] && files+=(-f compose.dev.yaml)
 profiles=(--profile ops); [ "$EXEC" = 1 ] && profiles+=(--profile live)
+# The live readiness route (ADR 0172): the host-pinned proxy xd-exec-proxy and the proxy variable of xd-exec exist ONLY with --exec AND XD_EXEC_READINESS_LIVE=true (both owner acts).
+# Without them the file is not read and a proxy left from an earlier start is removed by name below (not by sweeping orphans, which could touch the profile-gated Hermes and eval containers).
+readiness_live="$(printf '%s' "${XD_EXEC_READINESS_LIVE:-false}" | tr '[:upper:]' '[:lower:]')"
+if [ "$EXEC" = 1 ] && [ "$readiness_live" = true ]; then
+  files+=(-f compose.exec-live.yaml)
+  say "Live readiness reads ON: starting xd-exec-proxy (CONNECT only to deploy/exec-proxy/allowlist.txt)."
+else
+  # The route is off: remove only the proxy container, by its exact name. A running xd-exec keeps its proxy variable until it is recreated by the next --exec deploy; it then fails closed (no route).
+  podman rm -f xdrishti-xd-exec-proxy-1 >/dev/null 2>&1 || true
+fi
 if [ "$BUILD" = 1 ]; then
   # One image at a time: the api and worker images share the .NET build stage, built once and reused from cache.
   say "Building images (first run takes a few minutes)…"

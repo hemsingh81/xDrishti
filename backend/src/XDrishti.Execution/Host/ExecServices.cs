@@ -62,13 +62,15 @@ public static class ExecServices
         services.AddSingleton<IReadinessStore>(sp => sp.GetRequiredService<PgReadinessStore>());
         services.AddSingleton<IReadinessAccounts>(sp => sp.GetRequiredService<PgReadinessStore>());
         services.AddSingleton<IConnectionFacts>(sp => sp.GetRequiredService<PgReadinessStore>());
-        // ADR 0171 step 6: in live, and only with Execution:ReadinessLiveEnabled on (default OFF), the two reads take the account's token from the sealed hand-over (SELECT only, never the vault). The guard table has no live row and xd-exec has no route out
-        // (step 5 is open), so every live read is still refused before a request. Not an IExecCredentials: the order client never sees this token.
+        // ADR 0171 step 6 and ADR 0172: in live, and only with Execution:ReadinessLiveEnabled on (default OFF), the two reads take the account's token from the sealed hand-over (SELECT only, never the vault) and go out only through the host-pinned proxy
+        // xd-exec-proxy (HTTPS_PROXY, set only by deploy/compose.exec-live.yaml); without it they answer no_live_route. The live guard rows are the two GETs only. Not an IExecCredentials: the order client never sees this token and still refuses live.
         if (ExecEnvironmentParser.Parse(configuration[$"{ExecOptions.Section}:Environment"]) == ExecEnvironment.Live && ExecOptions.IsReadinessLiveEnabled(configuration))
         {
             services.AddOptions<ExecHandoverKeyOptions>().Bind(configuration.GetSection(ExecHandoverKeyOptions.Section));
             services.AddSingleton<ILiveTokenSource, PgExecTokenHandover>();
-            services.TryAddSingleton<IBrokerFacts>(sp => new LiveBrokerFacts(sp.GetRequiredService<ILiveTokenSource>(), enabled: true));
+            var proxy = ExecOptions.LiveProxy(configuration);
+            services.TryAddSingleton<IBrokerFacts>(sp => new LiveBrokerFacts(
+                sp.GetRequiredService<ILiveTokenSource>(), enabled: true, LiveBrokerFacts.ProxySocket(proxy), sp.GetRequiredService<ILogger<LiveBrokerFacts>>(), sp.GetRequiredService<TimeProvider>()));
         }
 
         services.TryAddSingleton<IBrokerFacts, ClosedBrokerFacts>();
