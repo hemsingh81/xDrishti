@@ -2,6 +2,7 @@ import { Alert, Stack } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { LoadingState } from '@/shared/ui';
 import { modesQuery } from '../api/viewsApi';
+import { PhaseCheckPanel } from './PhaseCheckPanel';
 import { LadderCard } from './LadderCard';
 import { RetryError } from './RetryError';
 import { SwitchesPanel } from './SwitchesPanel';
@@ -22,6 +23,7 @@ export function ModesTab() {
       {data?.accounts.map((a) => (
         <LadderCard key={a.accountId} account={a} />
       ))}
+      <PhaseCheckPanel />
     </Stack>
   );
 }

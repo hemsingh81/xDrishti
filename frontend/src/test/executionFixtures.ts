@@ -114,10 +114,68 @@ export const buildHalt = (over: Partial<Schemas['ExecutionHaltView']> = {}): Sch
 });
 
 /** Defaults for every execution read: execution off, nothing to show. Tests override what they care about. */
+export const buildSessionLine = (over: Partial<Schemas['SessionLine']> = {}): Schemas['SessionLine'] => ({
+  date: '2026-10-28',
+  class: 'counted',
+  reasons: [],
+  ordersSent: 2,
+  sandboxIntents: 0,
+  tickets: { issued: 2, confirmed: 2, skipped: 0, expired: 0, refused: 0, medianMinutes: null },
+  eodRun: 'readable',
+  finalRun: 'readable',
+  breaks: 0,
+  breakKinds: [],
+  alarms: [],
+  halts: [],
+  dayState: 'ready',
+  medianMinutes: 1,
+  medianState: 'insufficient',
+  ...over,
+});
+
+export const buildPhaseAccount = (
+  over: Partial<Schemas['AccountPhaseReport']> = {},
+): Schemas['AccountPhaseReport'] => ({
+  accountId: execAccountId,
+  name: 'Test Dhan Main',
+  windowStart: null,
+  mode: 'manual_live',
+  verdict: 'NOT EVALUABLE',
+  streak: 0,
+  counted: 0,
+  idle: 0,
+  broken: 0,
+  outOfMode: 0,
+  sandboxSessions: 0,
+  firstMetAt: null,
+  lastBreak: null,
+  sessions: [],
+  facts: [],
+  label: 'NOT EVALUABLE (no semi-auto window)',
+  ...over,
+});
+
+export const buildPhaseCheck = (
+  report: Partial<Schemas['ExecutionPhaseReport']> = {},
+): Schemas['ExecutionPhaseCheckView'] => ({
+  report: {
+    through: '2026-10-30',
+    exitVerdict: 'NOT EVALUABLE',
+    exitCriterion: 'NOT EVALUABLE (no account has a semi-auto window)',
+    needed: 30,
+    accounts: [buildPhaseAccount()],
+    boundary: { name: 'Boundary', state: 'info', text: 'Sessions before the window are not counted.' },
+    limits: ['Sends per second are unavailable.'],
+    ...report,
+  },
+  text: '',
+});
+
 export const executionHandlers = [
   http.get('/api/execution/status', () => HttpResponse.json(buildExecStatus())),
   http.get('/api/execution/overview', () => HttpResponse.json(buildOverview())),
   http.get('/api/execution/positions', () => HttpResponse.json([])),
+  http.get('/api/execution/phase-check', () => HttpResponse.json(buildPhaseCheck())),
   http.get('/api/execution/notices', () => HttpResponse.json({ items: [] })),
 ];
 

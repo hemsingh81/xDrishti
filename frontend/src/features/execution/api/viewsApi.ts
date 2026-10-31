@@ -63,3 +63,8 @@ export const limitsQuery = (accountId: string) =>
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/execution/limits', { params: { query: { accountId } }, signal })),
   });
+
+export const phaseCheckQuery = queryOptions({
+  queryKey: ['execution', 'phase-check'] as const,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/execution/phase-check', { signal })),
+});
