@@ -23,7 +23,7 @@ internal sealed class ConnectionsFixture
 
     public Microsoft.Extensions.Time.Testing.FakeTimeProvider Clock => Accounts.Clock;
 
-    private ConnectionWriter Writer => new(Data, Connections, Data);
+    private ConnectionWriter Writer => new(Data, Connections, Data, Data);
 
     public StartConnectHandler StartHandler() =>
         new(Data, Connections, Data, Writer, Dhan, Clock, NullLogger<StartConnectHandler>.Instance);
@@ -58,6 +58,9 @@ internal sealed class ConnectionsFixture
 
     public string? Stored(Guid accountId, BrokerSecretName name) =>
         Data.Secrets.TryGetValue((accountId, name), out var entry) ? entry.Value.Reveal() : null;
+
+    /// <summary>The token of the account's execution hand-over (ADR 0171); null when there is none.</summary>
+    public string? HandedOver(Guid accountId) => Data.Handovers.TryGetValue(accountId, out var entry) ? entry.Token.Reveal() : null;
 
     public BrokerConnection? Connection(Guid accountId) => Connections.Connections.SingleOrDefault(c => c.AccountId == accountId);
 

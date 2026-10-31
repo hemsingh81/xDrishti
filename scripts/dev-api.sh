@@ -9,6 +9,9 @@ export Database__Password
 # The API refuses to start without the broker vault key (created by deploy/xd-up.sh on its first run).
 BrokerVault__Key="$(security find-generic-password -a xdrishti -s xdrishti/broker/vault-key -w)"
 export BrokerVault__Key
+# ... and without the execution token hand-over key (ADR 0171; also created by deploy/xd-up.sh).
+ExecHandover__Key="$(security find-generic-password -a xdrishti -s xdrishti/exec/handover-key -w)"
+export ExecHandover__Key
 # The 1-minute CSV files (ADR 0016) are read from the repository's data folder.
 export Data__CsvFolder="$ROOT/data/Stocks_CSV"
 # The model files (P6-07, ADR 0070), named by their SHA-256.

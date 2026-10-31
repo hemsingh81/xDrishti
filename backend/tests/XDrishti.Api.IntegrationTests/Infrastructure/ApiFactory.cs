@@ -61,6 +61,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>The broker vault key of this test run (random, never a real one).</summary>
     public string VaultKey { get; } = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
+    /// <summary>The execution hand-over key (ADR 0171): its own key, apart from the vault key.</summary>
+    public string HandoverKey { get; } = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
     /// <summary>Every log event the API wrote during the run, rendered with all its properties.</summary>
     public CapturedLogs Logs { get; } = new();
 
@@ -113,6 +116,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseEnvironment("Testing");
         builder.UseSetting("Database:ConnectionString", _database.GetConnectionString());
         builder.UseSetting("BrokerVault:Key", VaultKey);
+        builder.UseSetting("ExecHandover:Key", HandoverKey);
         builder.UseSetting("Instruments:AutoRefresh:Enabled", "false"); // tests start refreshes themselves
         builder.UseSetting("Portfolio:AutoRefresh:Enabled", "false"); // tests drive the holdings schedule themselves
         builder.UseSetting("Data:Context:Breadth:MinVoters", "3"); // the product default is 50 (unit-tested); the integration fixtures have a handful of shares

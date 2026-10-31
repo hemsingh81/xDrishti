@@ -41,10 +41,14 @@ public sealed class ExecComposeRulesTests
         { "exec-network-internal", "xd-db", "networks: [back, exec]", "networks: [back, exec]\n    x-planted: true" },
         { "hardening", "xd-exec", "<<: *hardening", "cap_drop: [ALL]\n    security_opt: [no-new-privileges:true]" },
         { "role-xd-exec-only", "xd-exec", "Username=xd_exec", "Username=xd_app" },
-        { "one-secret", "xd-exec", "      - source: db_exec_password\n        target: Database__Password", "      - source: db_exec_password\n        target: Database__Password\n      - source: broker_vault_key\n        target: BrokerVault__Key" },
+        { "two-secrets", "xd-exec", "      - source: exec_handover_key\n        target: ExecHandover__Key", "      - source: exec_handover_key\n        target: ExecHandover__Key\n      - source: broker_vault_key\n        target: BrokerVault__Key" },
         { "secret-holders", "xd-api", "      - source: mcp_token\n        target: Assistant__Mcp__Token", "      - source: mcp_token\n        target: Assistant__Mcp__Token\n      - source: db_exec_password\n        target: Database__Password" },
+        { "secret-holders", "xd-api", "      - source: exec_handover_key\n        target: ExecHandover__Key\n", "" },
+        { "handover-key-not-in-feed-or-worker", "xd-feed", "      - source: broker_vault_key\n        target: BrokerVault__Key", "      - source: broker_vault_key\n        target: BrokerVault__Key\n      - source: exec_handover_key\n        target: ExecHandover__Key" },
+        { "handover-key-not-in-feed-or-worker", "xd-worker", "      - source: db_app_password\n        target: Database__Password", "      - source: db_app_password\n        target: Database__Password\n      - source: exec_handover_key\n        target: ExecHandover__Key" },
         { "network-members", "xd-worker", "networks: [back]", "networks: [back, exec]" },
         { "environment-none-by-default", "xd-exec", "${XD_EXEC_ENVIRONMENT:-none}", "${XD_EXEC_ENVIRONMENT:-live}" },
+        { "readiness-live-off-by-default", "xd-exec", "${XD_EXEC_READINESS_LIVE:-false}", "${XD_EXEC_READINESS_LIVE:-true}" },
         { "image-and-limits", "xd-exec", "mem_limit: 256m", "mem_limit: 2g" },
     };
 
@@ -60,6 +64,19 @@ public sealed class ExecComposeRulesTests
 
     [Fact]
     public void Every_rule_has_a_planted_test() => Plants.Select(p => p.Data.Item1).Distinct().Order().ShouldBe(ExecComposeRules.All.Order());
+
+    [Fact]
+    public void The_up_script_creates_the_hand_over_key_like_the_vault_key_on_every_start_and_the_dev_script_reads_it()
+    {
+        var up = File.ReadAllText(FindUp("deploy", "xd-up.sh"));
+
+        up.ShouldContain("local service=\"xdrishti/exec/handover-key\" value");
+        up.ShouldContain("printf '%s' \"$value\" > \"$XD_SECRETS_DIR/exec_handover_key\"");
+        up.ShouldContain("\nwrite_handover_key\n");
+        up.Split("> \"$XD_SECRETS_DIR/exec_handover_key\"").Length.ShouldBe(2, "written in exactly one place");
+        up.IndexOf("write_handover_key\n", StringComparison.Ordinal).ShouldBeLessThan(up.IndexOf("if [ \"$EXEC\" = 1 ]; then", StringComparison.Ordinal), "on every start, not behind --exec");
+        File.ReadAllText(FindUp("scripts", "dev-api.sh")).ShouldContain("xdrishti/exec/handover-key");
+    }
 
     [Fact]
     public void The_up_script_creates_the_keychain_item_and_starts_the_service_only_with_the_exec_flag()

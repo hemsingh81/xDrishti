@@ -40,6 +40,8 @@ The Dhan API key and secret (and the daily access token the consent login return
 (write-only, step-up) and stored encrypted in `accounts.broker_secrets` with AES-256-GCM ([ADR 0008](../docs/adr/0008-broker-credentials-vault-and-connection.md)).
 The encryption key comes from the Keychain item `xdrishti/broker/vault-key`: `deploy/xd-up.sh` creates it on the first run (32 random characters) and
 writes it as the secret file `broker_vault_key`, mounted **into `xd-api` only** as `BrokerVault__Key`. The API refuses to start without it.
+A second key, `xdrishti/exec/handover-key` (ADR 0171), is created the same way and written as `exec_handover_key`, mounted into `xd-api` and `xd-exec` only as
+`ExecHandover__Key`: the API seals the day's access token with it at every login for the execution service, and refuses to start without it.
 
 - **Never delete or replace the vault key**: the stored secrets can only be read with the key that encrypted them. If the Keychain item exists but
   cannot be read (locked Keychain, denied access), `xd-up.sh` stops instead of creating a new one. Back it up together with the database.

@@ -132,6 +132,21 @@ write_vault_key() {
 }
 write_vault_key
 
+# Execution token hand-over key (ADR 0171): xd-api seals the day's access token with it at every login, xd-exec opens it (readiness reads only). A second key, apart from the vault key, mounted into xd-api and
+# xd-exec only. Created only when the Keychain has no such item, like the vault key; an item that exists but cannot be read stops the start. A changed key makes every hand-over unreadable until the next login.
+write_handover_key() {
+  local service="xdrishti/exec/handover-key" value
+  if security find-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$service" >/dev/null 2>&1; then
+    value=$(strict_secret "$service") || exit 1
+  else
+    value=$(secret "$service")
+  fi
+  printf '%s' "$value" > "$XD_SECRETS_DIR/exec_handover_key"
+  chmod 644 "$XD_SECRETS_DIR/exec_handover_key"
+  unset value
+}
+write_handover_key
+
 # Key of the local model server (P9-01): xd-llm checks it, xd-api sends it. Created once, never replaced; the server itself is started by the owner (scripts/xd-ai.sh).
 write_secret llm_api_key "xdrishti/llm/api-key"
 

@@ -54,10 +54,11 @@ builder.Services
     .AddInfrastructure(builder.Configuration)
     .AddApi();
 
-// The API serves the broker vault: it refuses to start without its key. Only the build-time contract generation runs without secrets.
+// The API serves the broker vault and seals the execution token hand-over at every login (ADR 0171): it refuses to start without either key. Only the build-time
+// contract generation runs without secrets.
 if (!OpenApiGeneration.IsRunning)
 {
-    builder.Services.RequireBrokerVaultKey();
+    builder.Services.RequireBrokerVaultKey().RequireExecHandoverKey();
 }
 
 var app = builder.Build();

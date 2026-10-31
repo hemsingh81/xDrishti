@@ -256,6 +256,9 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     /// <summary>Encrypted broker secrets; used only by the broker vault.</summary>
     internal DbSet<BrokerSecretRecord> BrokerSecrets => Set<BrokerSecretRecord>();
 
+    /// <summary>The sealed same-day token hand-over to the execution service (ADR 0171); used only by <see cref="ExecTokenHandover"/>.</summary>
+    internal DbSet<ExecTokenHandoverRecord> ExecTokenHandovers => Set<ExecTokenHandoverRecord>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("timescaledb");

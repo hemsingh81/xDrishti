@@ -36,6 +36,18 @@ public sealed class ReadinessLoopTests
     }
 
     [Fact]
+    public async Task Each_account_is_probed_with_its_own_account_for_both_broker_reads()
+    {
+        var other = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        _world.Assisted.Add(other);
+        var loop = Loop();
+
+        await RunAt(loop, Ist.At(27, 9, 0));
+
+        _world.ReadsFor.ShouldBe([MemReadiness.Account, MemReadiness.Account, other, other]);
+    }
+
+    [Fact]
     public async Task An_unchanged_verdict_is_stored_again_only_after_15_minutes_and_a_change_is_stored_at_once()
     {
         var loop = Loop();

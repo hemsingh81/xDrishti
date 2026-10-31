@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using XDrishti.Domain.Accounts;
 using XDrishti.Infrastructure.Accounts;
@@ -111,5 +112,38 @@ public sealed class BrokerSecretCipherTests
 
         _cipher.TryDecrypt(Account, "access_token", 1, _cipher.Encrypt(Account, "access_token", Secret(token)), out var value).ShouldBeTrue();
         value.Reveal().ShouldBe(token);
+    }
+
+    // ADR 0171: the purpose parameter must not change how a vault row written before it decrypts. The row is sealed here by hand with the vault's
+    // original derivation (salt "xdrishti/broker-vault", info "aes-256-gcm/key-v1", account big-endian then name as associated data).
+    [Fact]
+    public void A_vault_row_written_before_the_purpose_parameter_still_decrypts()
+    {
+        var key = HKDF.DeriveKey(HashAlgorithmName.SHA256, Encoding.UTF8.GetBytes(Key), 32, "xdrishti/broker-vault"u8.ToArray(), "aes-256-gcm/key-v1"u8.ToArray());
+        var plaintext = Encoding.UTF8.GetBytes(Marker);
+        var stored = new byte[BrokerSecretCipher.NonceSize + BrokerSecretCipher.TagSize + plaintext.Length];
+        stored.AsSpan(0, BrokerSecretCipher.NonceSize).Fill(0x07);
+        var associated = new byte[16 + "api_key".Length];
+        Account.TryWriteBytes(associated.AsSpan(0, 16), bigEndian: true, out _);
+        Encoding.UTF8.GetBytes("api_key", associated.AsSpan(16));
+        using (var aes = new AesGcm(key, BrokerSecretCipher.TagSize))
+        {
+            aes.Encrypt(stored.AsSpan(0, BrokerSecretCipher.NonceSize), plaintext, stored.AsSpan(BrokerSecretCipher.NonceSize + BrokerSecretCipher.TagSize), stored.AsSpan(BrokerSecretCipher.NonceSize, BrokerSecretCipher.TagSize), associated);
+        }
+
+        _cipher.TryDecrypt(Account, "api_key", 1, stored, out var value).ShouldBeTrue();
+        value.Reveal().ShouldBe(Marker);
+    }
+
+    [Fact]
+    public void The_hand_over_purpose_derives_another_key_from_the_same_material()
+    {
+        var handover = new BrokerSecretCipher(Key, SecretCipherPurpose.ExecHandover);
+        var sealedToken = handover.Encrypt(Account, "access_token", Secret());
+
+        _cipher.TryDecrypt(Account, "access_token", 1, sealedToken, out _).ShouldBeFalse();
+        handover.TryDecrypt(Account, "access_token", 1, _cipher.Encrypt(Account, "access_token", Secret()), out _).ShouldBeFalse();
+        handover.TryDecrypt(Account, "access_token", 1, sealedToken, out var value).ShouldBeTrue();
+        value.Reveal().ShouldBe(Marker);
     }
 }

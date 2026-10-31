@@ -3107,6 +3107,31 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("broker_secrets", "accounts");
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Accounts.ExecTokenHandoverRecord", b =>
+                {
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("KeyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("key_version");
+
+                    b.Property<byte[]>("SealedToken")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("sealed_token");
+
+                    b.HasKey("AccountId")
+                        .HasName("pk_exec_token_handover");
+
+                    b.ToTable("exec_token_handover", "accounts");
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Capabilities.CapabilityChangeRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -10166,6 +10191,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_broker_secrets_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Accounts.ExecTokenHandoverRecord", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_exec_token_handover_broker_accounts_account_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.HypothesisRecord", b =>

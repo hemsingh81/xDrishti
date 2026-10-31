@@ -67,19 +67,7 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         return names;
     }
 
-    private async Task<string[]> HeldAsync(string role, string table)
-    {
-        var held = new List<string>();
-        foreach (var p in Privileges)
-        {
-            if ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_table_privilege('{role}', 'execution.{table}', '{p}')"))!)
-            {
-                held.Add(p);
-            }
-        }
-
-        return [.. held.Order(StringComparer.Ordinal)];
-    }
+    private Task<string[]> HeldAsync(string role, string table) => HeldOnAsync(role, $"execution.{table}");
 
     [Fact]
     public async Task Every_table_of_the_schema_is_decided_for_both_roles_and_no_other_table_exists()
@@ -178,7 +166,7 @@ public sealed class ExecGrantsTests(ExecDatabase db)
     [Fact]
     public async Task The_execution_role_reads_the_plan_and_the_market_but_not_the_vault_the_sessions_or_the_connections()
     {
-        foreach (var table in new[] { "trading.plans", "trading.plan_items", "trading.plan_item_allocations", "trading.plan_events", "workflow.approvals", "accounts.broker_accounts", "market.live_quotes", "market.instruments", "market.instrument_broker_ids", "market.trading_days", "portfolio.holdings" })
+        foreach (var table in new[] { "trading.plans", "trading.plan_items", "trading.plan_item_allocations", "trading.plan_events", "workflow.approvals", "accounts.broker_accounts", "market.live_quotes", "market.instruments", "market.instrument_broker_ids", "market.trading_days", "portfolio.holdings", "accounts.exec_token_handover" })
         {
             (await ExecDatabase.SqlStateAsync(db.Exec, $"SELECT count(*) FROM {table}")).ShouldBeNull(table);
         }
@@ -217,5 +205,51 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         }
 
         ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT bool_or(has_column_privilege('xd_exec', 'accounts.broker_secrets', attname, 'SELECT')) FROM pg_attribute WHERE attrelid = 'accounts.broker_secrets'::regclass AND attnum > 0"))!).ShouldBeFalse();
+    }
+
+    // ADR 0171 step 1: the hand-over is a credential, not evidence, so it lives in schema accounts. xd_app keeps its default rights (it writes and deletes the row with the vault's token); xd_exec may only read it; no other role has any right on it.
+    [Fact]
+    public async Task The_token_hand_over_is_written_by_the_app_role_read_by_the_execution_role_and_reachable_by_no_other_role()
+    {
+        (await HeldOnAsync("xd_app", "accounts.exec_token_handover")).ShouldBe(["DELETE", "INSERT", "SELECT", "UPDATE"]);
+        (await HeldOnAsync("xd_exec", "accounts.exec_token_handover")).ShouldBe(["SELECT"]);
+
+        await using var c = new NpgsqlConnection(db.Owner);
+        await c.OpenAsync(TestContext.Current.CancellationToken);
+        await using var cmd = new NpgsqlCommand(
+            """
+            SELECT r.rolname FROM pg_roles r
+            WHERE NOT r.rolsuper AND r.rolname NOT IN ('xd_app', 'xd_exec') AND r.rolname NOT LIKE 'pg\_%'
+              AND (has_table_privilege(r.oid, 'accounts.exec_token_handover', 'SELECT') OR has_table_privilege(r.oid, 'accounts.exec_token_handover', 'INSERT')
+                   OR has_table_privilege(r.oid, 'accounts.exec_token_handover', 'UPDATE') OR has_table_privilege(r.oid, 'accounts.exec_token_handover', 'DELETE'))
+            ORDER BY 1
+            """, c);
+        var others = new List<string>();
+        await using (var r = await cmd.ExecuteReaderAsync(TestContext.Current.CancellationToken))
+        {
+            while (await r.ReadAsync(TestContext.Current.CancellationToken))
+            {
+                others.Add(r.GetString(0));
+            }
+        }
+
+        others.ShouldBeEmpty();
+        ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_table_privilege('public', 'accounts.exec_token_handover', 'SELECT')"))!).ShouldBeFalse();
+        ((bool)(await ExecDatabase.ScalarAsync(db.Owner, "SELECT has_table_privilege('xd_exec', 'accounts.broker_secrets', 'SELECT')"))!).ShouldBeFalse("the hand-over does not open the vault");
+        (await ExecDatabase.SqlStateAsync(db.Exec, "SELECT ciphertext FROM accounts.broker_secrets")).ShouldBe("42501");
+    }
+
+    private async Task<string[]> HeldOnAsync(string role, string qualifiedTable)
+    {
+        var held = new List<string>();
+        foreach (var p in Privileges)
+        {
+            if ((bool)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT has_table_privilege('{role}', '{qualifiedTable}', '{p}')"))!)
+            {
+                held.Add(p);
+            }
+        }
+
+        return [.. held.Order(StringComparer.Ordinal)];
     }
 }

@@ -57,11 +57,20 @@ public static class ExecServices
         services.AddSingleton<HaltAutoClearService>();
 
         // The readiness record and probe (P12-11, ADR 0164): it reads the stored connection and, through IBrokerFacts, the broker's profile and configured IP, and writes insert-only rows. IBrokerFacts is the closed default (unreadable, so the verdict is unavailable) unless the
-        // sandbox composition registered the Dhan adapter of those two reads first (sandbox and Execution:SendEnabled, ADR 0170); live has no token source, so it stays closed. Nothing here can send an order.
+        // sandbox composition registered the Dhan adapter of those two reads first (sandbox and Execution:SendEnabled, ADR 0170) or live readiness is on (below, ADR 0171). Nothing here can send an order.
         services.AddSingleton<PgReadinessStore>();
         services.AddSingleton<IReadinessStore>(sp => sp.GetRequiredService<PgReadinessStore>());
         services.AddSingleton<IReadinessAccounts>(sp => sp.GetRequiredService<PgReadinessStore>());
         services.AddSingleton<IConnectionFacts>(sp => sp.GetRequiredService<PgReadinessStore>());
+        // ADR 0171 step 6: in live, and only with Execution:ReadinessLiveEnabled on (default OFF), the two reads take the account's token from the sealed hand-over (SELECT only, never the vault). The guard table has no live row and xd-exec has no route out
+        // (step 5 is open), so every live read is still refused before a request. Not an IExecCredentials: the order client never sees this token.
+        if (ExecEnvironmentParser.Parse(configuration[$"{ExecOptions.Section}:Environment"]) == ExecEnvironment.Live && ExecOptions.IsReadinessLiveEnabled(configuration))
+        {
+            services.AddOptions<ExecHandoverKeyOptions>().Bind(configuration.GetSection(ExecHandoverKeyOptions.Section));
+            services.AddSingleton<ILiveTokenSource, PgExecTokenHandover>();
+            services.TryAddSingleton<IBrokerFacts>(sp => new LiveBrokerFacts(sp.GetRequiredService<ILiveTokenSource>(), enabled: true));
+        }
+
         services.TryAddSingleton<IBrokerFacts, ClosedBrokerFacts>();
         services.AddSingleton<IReadinessSettings>(sp => sp.GetRequiredService<ExecSettingsCache>());
         services.AddSingleton<ReadinessSignal>();

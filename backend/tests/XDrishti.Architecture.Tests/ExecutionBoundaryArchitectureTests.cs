@@ -167,6 +167,20 @@ public sealed class ExecutionBoundaryArchitectureTests
         File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "ExecutionEndpoints.cs")).ShouldNotContain("ExecEnvironment.Live");
     }
 
+    // ADR 0171 step 6: the live readiness reads and their token source are composed in one place, behind live AND the default-off readiness switch; the token source feeds only those reads (never the order client) and nothing adds a live host.
+    [Fact]
+    public void The_live_readiness_reads_are_composed_only_behind_live_and_the_switch_and_the_hand_over_token_reaches_nothing_else()
+    {
+        var sources = SourceFiles(ExecutionSource).ToList();
+
+        sources.Where(f => File.ReadAllText(f).Contains("new LiveBrokerFacts(", StringComparison.Ordinal)).Select(f => SrcRelative(f)).ShouldBe(["XDrishti.Execution/Host/ExecServices.cs"]);
+        var services = File.ReadAllText(Path.Combine(ExecutionSource, "Host", "ExecServices.cs"));
+        Regex.IsMatch(services, @"== ExecEnvironment\.Live && ExecOptions\.IsReadinessLiveEnabled\(configuration\)\)\s*\{[^}]*new LiveBrokerFacts\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBeTrue();
+        sources.Where(f => File.ReadAllText(f).Contains("ILiveTokenSource", StringComparison.Ordinal)).Select(f => SrcRelative(f)).Order(StringComparer.Ordinal).ShouldBe(
+            ["XDrishti.Execution/Application/Ports/ILiveTokenSource.cs", "XDrishti.Execution/Dhan/DhanBrokerFacts.cs", "XDrishti.Execution/Host/ExecServices.cs", "XDrishti.Execution/Persistence/PgExecTokenHandover.cs"]);
+        File.ReadAllText(Path.Combine(ExecutionSource, "appsettings.json")).ShouldNotContain("ReadinessLiveEnabled\": true");
+    }
+
     // P12-02b (ADR 0158): the raw order surface is never a service; the vault is never read; the send switch is a second default-off setting.
     [Fact]
     public void The_raw_order_port_is_never_registered_the_vault_is_never_named_and_the_send_switch_defaults_off()

@@ -19,6 +19,8 @@ public sealed class DhanBrokerFactsTests
     private const string Token = "SECRET-TOKEN-VALUE";
     private const string ClientId = "1100003626";
 
+    private static readonly Guid Account = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
     private const string ProfileSample = """
         {"dhanClientId":"1100003626","tokenValidity":"27/10/2026 17:00","activeSegment":"Equity, Derivative, Currency, Commodity","ddpi":"Active","mtf":"Active","dataPlan":"Active","dataValidity":"2026-12-05 09:37:52.0"}
         """;
@@ -87,7 +89,7 @@ public sealed class DhanBrokerFactsTests
     {
         var rig = Make(_ => Json(ProfileSample));
 
-        var read = await rig.Facts.GetProfileAsync(CancellationToken.None);
+        var read = await rig.Facts.GetProfileAsync(Account, CancellationToken.None);
 
         read.Readable.ShouldBeTrue();
         read.Value.ShouldBe(new ProfileFacts(new DateTimeOffset(2026, 10, 27, 17, 0, 0, TimeSpan.FromHours(5.5))));
@@ -99,7 +101,7 @@ public sealed class DhanBrokerFactsTests
     {
         var rig = Make(_ => Json(IpSample));
 
-        var read = await rig.Facts.GetStaticIpAsync(CancellationToken.None);
+        var read = await rig.Facts.GetStaticIpAsync(Account, CancellationToken.None);
 
         read.Readable.ShouldBeTrue();
         read.Value.ShouldBe(new IpFacts("203.0.113.10", "198.51.100.7", new DateOnly(2026, 9, 23), new DateOnly(2026, 9, 24)));
@@ -115,8 +117,8 @@ public sealed class DhanBrokerFactsTests
     {
         var rig = Make(_ => Json(body, (HttpStatusCode)status));
 
-        var profile = await rig.Facts.GetProfileAsync(CancellationToken.None);
-        var ip = await rig.Facts.GetStaticIpAsync(CancellationToken.None);
+        var profile = await rig.Facts.GetProfileAsync(Account, CancellationToken.None);
+        var ip = await rig.Facts.GetStaticIpAsync(Account, CancellationToken.None);
 
         (profile.Readable, profile.Value, profile.Reason).ShouldBe((false, null, "token_invalid"));
         (ip.Readable, ip.Value, ip.Reason).ShouldBe((false, null, "token_invalid"));
@@ -131,8 +133,8 @@ public sealed class DhanBrokerFactsTests
     {
         var rig = Make(_ => Json("""{"status":"error"}""", (HttpStatusCode)status));
 
-        var profile = await Drive(rig.Facts.GetProfileAsync(CancellationToken.None), rig.Clock);
-        var ip = await Drive(rig.Facts.GetStaticIpAsync(CancellationToken.None), rig.Clock);
+        var profile = await Drive(rig.Facts.GetProfileAsync(Account, CancellationToken.None), rig.Clock);
+        var ip = await Drive(rig.Facts.GetStaticIpAsync(Account, CancellationToken.None), rig.Clock);
 
         (profile.Readable, profile.Reason).ShouldBe((false, "read_failed"));
         (ip.Readable, ip.Reason).ShouldBe((false, "read_failed"));
@@ -149,8 +151,8 @@ public sealed class DhanBrokerFactsTests
     {
         var rig = Make(_ => Json(body));
 
-        var profile = await rig.Facts.GetProfileAsync(CancellationToken.None);
-        var ip = await rig.Facts.GetStaticIpAsync(CancellationToken.None);
+        var profile = await rig.Facts.GetProfileAsync(Account, CancellationToken.None);
+        var ip = await rig.Facts.GetStaticIpAsync(Account, CancellationToken.None);
 
         (profile.Readable, profile.Value, profile.Reason).ShouldBe((false, null, "profile_unreadable"));
         (ip.Readable, ip.Value, ip.Reason).ShouldBe((false, null, "ip_unreadable"));
@@ -161,7 +163,7 @@ public sealed class DhanBrokerFactsTests
     {
         var rig = Make(_ => Json("""{"dhanClientId":"1100003626","tokenValidity":"tomorrow"}"""));
 
-        var profile = await rig.Facts.GetProfileAsync(CancellationToken.None);
+        var profile = await rig.Facts.GetProfileAsync(Account, CancellationToken.None);
 
         profile.Value.ShouldBe(new ProfileFacts(null));
     }
@@ -171,8 +173,8 @@ public sealed class DhanBrokerFactsTests
     {
         var rig = Make(_ => Json(ProfileSample), creds: false);
 
-        var profile = await rig.Facts.GetProfileAsync(CancellationToken.None);
-        var ip = await rig.Facts.GetStaticIpAsync(CancellationToken.None);
+        var profile = await rig.Facts.GetProfileAsync(Account, CancellationToken.None);
+        var ip = await rig.Facts.GetStaticIpAsync(Account, CancellationToken.None);
 
         (profile.Readable, profile.Reason).ShouldBe((false, "execution.token_unavailable"));
         (ip.Readable, ip.Reason).ShouldBe((false, "execution.token_unavailable"));
@@ -186,12 +188,12 @@ public sealed class DhanBrokerFactsTests
 
         for (var i = 0; i < DhanBrokerFacts.ReadsPerSecond; i++)
         {
-            (await rig.Facts.GetStaticIpAsync(CancellationToken.None)).Readable.ShouldBeTrue();
+            (await rig.Facts.GetStaticIpAsync(Account, CancellationToken.None)).Readable.ShouldBeTrue();
         }
 
-        var refused = await rig.Facts.GetProfileAsync(CancellationToken.None);
+        var refused = await rig.Facts.GetProfileAsync(Account, CancellationToken.None);
         rig.Clock.Advance(TimeSpan.FromSeconds(1));
-        var later = await rig.Facts.GetProfileAsync(CancellationToken.None);
+        var later = await rig.Facts.GetProfileAsync(Account, CancellationToken.None);
 
         (refused.Readable, refused.Reason).ShouldBe((false, "read_rate_limited"));
         later.Readable.ShouldBeTrue();
@@ -204,11 +206,11 @@ public sealed class DhanBrokerFactsTests
         var replies = new Queue<HttpResponseMessage>([Json(ProfileSample), Json("{}", HttpStatusCode.ServiceUnavailable), Json(IpSample), Json("", HttpStatusCode.Unauthorized)]);
         var rig = Make(_ => replies.Dequeue());
 
-        await rig.Facts.GetProfileAsync(CancellationToken.None);
-        await Drive(rig.Facts.GetStaticIpAsync(CancellationToken.None), rig.Clock);
-        await rig.Facts.GetProfileAsync(CancellationToken.None);
+        await rig.Facts.GetProfileAsync(Account, CancellationToken.None);
+        await Drive(rig.Facts.GetStaticIpAsync(Account, CancellationToken.None), rig.Clock);
+        await rig.Facts.GetProfileAsync(Account, CancellationToken.None);
         var none = Make(_ => Json(ProfileSample), creds: false);
-        await none.Facts.GetStaticIpAsync(CancellationToken.None);
+        await none.Facts.GetStaticIpAsync(Account, CancellationToken.None);
 
         rig.Log.Lines.Select(l => l.Line).ShouldBe([
             "Dhan sandbox read ProfileGet GET /v2/profile answered 200: ok",
@@ -267,7 +269,7 @@ public sealed class DhanBrokerFactsTests
         await using var provider = services.BuildServiceProvider();
         var facts = provider.GetRequiredService<IBrokerFacts>();
         facts.ShouldBeOfType<DhanBrokerFacts>();
-        (await facts.GetProfileAsync(CancellationToken.None)).Reason.ShouldBe("execution.token_unavailable");
-        (await facts.GetStaticIpAsync(CancellationToken.None)).Reason.ShouldBe("execution.token_unavailable");
+        (await facts.GetProfileAsync(Account, CancellationToken.None)).Reason.ShouldBe("execution.token_unavailable");
+        (await facts.GetStaticIpAsync(Account, CancellationToken.None)).Reason.ShouldBe("execution.token_unavailable");
     }
 }

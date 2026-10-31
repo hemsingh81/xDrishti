@@ -35,6 +35,12 @@ Corrected from the first draft: (a) the table does not go in schema `execution` 
 - One secret file, one table, one migration; a compromise of `xd-exec` exposes the day's tokens of connected accounts (24 hours), not the long-lived credentials, and it still has no live sender.
 - The vault key is already held by two services, so option A would have added one more holder; B still keeps the exec process away from every long-lived secret.
 
+## Known limits (build review, 2026-10-31)
+- A token that merely expires stays sealed at rest until the next login, disconnect or archive; the reader refuses it (status Connected and `expires_at` in the future), so it is not usable, only present.
+- `SetAsync` is find-then-add like the vault's; two simultaneous logins of one account could collide on the key, and the second save fails whole (the connect fails, nothing half-written).
+- Archive also deletes the hand-over. `xd-exec` starts without the key and fails every lookup closed with one warning.
+- Minor cleanups left: `LiveBrokerFacts` has a dead `enabled` branch and an unreachable `no_live_route` arm until the live guard rows exist.
+
 ## Owner decisions still open
 1. Egress for `xd-exec` to the live Dhan host (step 5), as its own ADR.
 2. Whether the hand-over may later feed the order client (a live-send ADR; not decided here).

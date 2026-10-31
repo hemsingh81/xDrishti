@@ -17,6 +17,7 @@ internal sealed class ArchiveAccountHandler(
     IAccountStore accounts,
     DefaultBuckets defaultBuckets,
     IBrokerSecretVault vault,
+    IExecTokenHandover handover,
     IBrokerConnectionStore connections,
     IPendingConnectStore pending,
     IAccountEventLog events,
@@ -45,6 +46,8 @@ internal sealed class ArchiveAccountHandler(
         {
             await vault.DeleteAsync(account.Id, secret.Name, cancellationToken);
         }
+
+        await handover.DeleteAsync(account.Id, cancellationToken); // the token's hand-over to the execution service goes with the token (ADR 0171)
 
         (await connections.FindAsync(account.Id, cancellationToken))?.Disconnect();
         await defaultBuckets.ArchiveAsync(account, now, cancellationToken);

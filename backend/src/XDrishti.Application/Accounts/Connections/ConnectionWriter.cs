@@ -4,7 +4,7 @@ using XDrishti.Domain.Accounts;
 namespace XDrishti.Application.Accounts.Connections;
 
 /// <summary>The steps of connecting an account: reading the app credentials, storing the token, clearing a connection and noting failures.</summary>
-internal sealed class ConnectionWriter(IBrokerSecretVault vault, IBrokerConnectionStore connections, IAccountEventLog events)
+internal sealed class ConnectionWriter(IBrokerSecretVault vault, IBrokerConnectionStore connections, IAccountEventLog events, IExecTokenHandover handover)
 {
     /// <summary>The account's API key and secret; null when either is not set (or cannot be decrypted).</summary>
     public async ValueTask<BrokerAppCredentials?> AppAsync(Guid accountId, CancellationToken cancellationToken)
@@ -27,18 +27,25 @@ internal sealed class ConnectionWriter(IBrokerSecretVault vault, IBrokerConnecti
         return connection;
     }
 
-    /// <summary>Stores the token encrypted and marks the account connected until Dhan's expiry (or 24 hours when Dhan states none).</summary>
+    /// <summary>
+    /// Stores the token encrypted, seals the execution service's hand-over of it (ADR 0171; replaces an earlier one) and marks the account connected until Dhan's
+    /// expiry (or 24 hours when Dhan states none). All three are saved by the caller's one unit of work: if any write fails, nothing is connected.
+    /// </summary>
     public async ValueTask<BrokerConnection> StoreAsync(BrokerToken token, Guid accountId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         await vault.SetAsync(accountId, BrokerSecretName.AccessToken, token.AccessToken, now, cancellationToken);
+        await handover.SetAsync(accountId, token.AccessToken, now, cancellationToken);
         var connection = await ConnectionAsync(accountId, cancellationToken);
         connection.Connect(BrokerTokenExpiry.Of(now, token.ExpiresAt), token.BrokerUserId, token.BrokerUserName, now);
         return connection;
     }
 
-    /// <summary>Removes the stored access token.</summary>
-    public async ValueTask DeleteTokenAsync(Guid accountId, CancellationToken cancellationToken) =>
+    /// <summary>Removes the stored access token and the execution service's hand-over of it (ADR 0171), in the caller's unit of work.</summary>
+    public async ValueTask DeleteTokenAsync(Guid accountId, CancellationToken cancellationToken)
+    {
         await vault.DeleteAsync(accountId, BrokerSecretName.AccessToken, cancellationToken);
+        await handover.DeleteAsync(accountId, cancellationToken);
+    }
 
     /// <summary>
     /// Forgets the account's connection: deletes the stored token and resets the connection to not connected (no broker call). Returns

@@ -155,6 +155,10 @@ services:
       # Key of the encrypted broker vault (accounts.broker_secrets, ADR 0008). Only the API and the live feed (ADR 0024) get it: the API refuses to start without it.
       - source: broker_vault_key
         target: BrokerVault__Key
+      # Key of the execution token hand-over (accounts.exec_token_handover, ADR 0171): the API seals the day's access token with it at every login. Only the API and xd-exec get it (never xd-feed or xd-worker);
+      # the API refuses to start without it.
+      - source: exec_handover_key
+        target: ExecHandover__Key
       # Key of the local model server (xd-llm checks it; the API sends it). Same file as xd-llm's.
       - source: llm_api_key
         target: Assistant__Llm__ApiKey
@@ -229,8 +233,8 @@ services:
     <<: *hardening
 
   # The execution service (P12-01b, ADR 0156). Profile `live` = NEVER started by a plain `xd-up.sh`; only the owner's `xd-up.sh --exec`. In this slice it holds no broker code and no egress: it heartbeats, reads its settings and answers rows of
-  # execution.commands. It logs in as the database role xd_exec ONLY (the host refuses any other), whose rights are insert-only on the order record; its single secret is that role's password. Own internal network `exec` shared with xd-db alone;
-  # no published port. Environment `none` unless the owner sets XD_EXEC_ENVIRONMENT. Rules: deploy/CLAUDE.md, checked by ExecComposeRulesTests.
+  # execution.commands. It logs in as the database role xd_exec ONLY (the host refuses any other), whose rights are insert-only on the order record; its first secret is that role's password. Own internal network `exec` shared with xd-db alone;
+  # no published port. Environment `none` unless the owner sets XD_EXEC_ENVIRONMENT. Its second secret is the token hand-over key (ADR 0171). Rules: deploy/CLAUDE.md, checked by ExecComposeRulesTests.
   xd-exec:
     profiles: [live]
     image: localhost/xdrishti/exec:${XD_VERSION:-0.1.0}
@@ -243,9 +247,14 @@ services:
       DOTNET_ENVIRONMENT: Production
       Database__ConnectionString: Host=xd-db;Port=5432;Database=xdrishti;Username=xd_exec
       Execution__Environment: ${XD_EXEC_ENVIRONMENT:-none}
+      # The live readiness reads with the account's token from the sealed hand-over (ADR 0171 step 6): OFF by default, effective only in live. Until the egress decision (step 5) every live read is still refused.
+      Execution__ReadinessLiveEnabled: ${XD_EXEC_READINESS_LIVE:-false}
     secrets:
       - source: db_exec_password
         target: Database__Password
+      # The hand-over key (ADR 0171): opens the day's sealed access token of a connected account, never the vault. The second and last secret of this service.
+      - source: exec_handover_key
+        target: ExecHandover__Key
     networks: [exec]
     mem_limit: 256m
     depends_on:
@@ -578,3 +587,5 @@ secrets:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/mcp_token_hermes
   db_exec_password:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/db_exec_password
+  exec_handover_key:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/exec_handover_key

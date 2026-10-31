@@ -80,7 +80,7 @@ internal sealed class AccountsFixture
     public static GetDhanRedirectHandler DhanRedirect(string publicBaseUrl = PublicBaseUrl) => new(new FixedBrokerSettings(publicBaseUrl));
 
     public UpdateConnectionHandler UpdateConnection() =>
-        new(Data, DefaultBuckets, Data, Data, new ConnectionWriter(Data, Connections, Data), Connections, Views, Clock, NullLogger<UpdateConnectionHandler>.Instance);
+        new(Data, DefaultBuckets, Data, Data, new ConnectionWriter(Data, Connections, Data, Data), Connections, Views, Clock, NullLogger<UpdateConnectionHandler>.Instance);
 
     public UpdateRolesHandler UpdateRoles() => new(Data, DefaultBuckets, Data, Data, Views, Clock, NullLogger<UpdateRolesHandler>.Instance);
 
@@ -100,7 +100,7 @@ internal sealed class AccountsFixture
 
     public UpdateDataHandler UpdateData() => new(Data, Data, Data, Views, Clock, NullLogger<UpdateDataHandler>.Instance);
 
-    public ArchiveAccountHandler Archive() => new(Data, DefaultBuckets, Data, Connections, Connections, Data, Data, Clock, NullLogger<ArchiveAccountHandler>.Instance);
+    public ArchiveAccountHandler Archive() => new(Data, DefaultBuckets, Data, Data, Connections, Connections, Data, Data, Clock, NullLogger<ArchiveAccountHandler>.Instance);
 
     public ListRiskProfilesHandler ListProfiles() => new(Data);
 

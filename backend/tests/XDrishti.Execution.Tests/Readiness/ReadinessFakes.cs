@@ -41,6 +41,9 @@ internal sealed class MemReadiness : IReadinessStore, IReadinessAccounts, IConne
 
     public int IpReads { get; private set; }
 
+    /// <summary>The account of every broker read, in order (ADR 0171: the reads are account-scoped).</summary>
+    public List<Guid> ReadsFor { get; } = [];
+
     public MemReadiness WithAttestation(bool allowed = true)
     {
         Attestations.Add(new(Account, Ip, allowed, Ist.At(26, 20, 0)));
@@ -79,15 +82,17 @@ internal sealed class MemReadiness : IReadinessStore, IReadinessAccounts, IConne
 
     ReadinessSettings? IReadinessSettings.Current() => Settings;
 
-    public Task<BrokerRead<ProfileFacts>> GetProfileAsync(CancellationToken cancellationToken)
+    public Task<BrokerRead<ProfileFacts>> GetProfileAsync(Guid accountId, CancellationToken cancellationToken)
     {
         ProfileReads++;
+        ReadsFor.Add(accountId);
         return BrokerThrows ? throw new InvalidOperationException("boom") : Task.FromResult(Profile);
     }
 
-    public Task<BrokerRead<IpFacts>> GetStaticIpAsync(CancellationToken cancellationToken)
+    public Task<BrokerRead<IpFacts>> GetStaticIpAsync(Guid accountId, CancellationToken cancellationToken)
     {
         IpReads++;
+        ReadsFor.Add(accountId);
         return Task.FromResult(StaticIp);
     }
 }

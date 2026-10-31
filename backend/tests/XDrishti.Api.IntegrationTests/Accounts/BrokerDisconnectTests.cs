@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Accounts;
@@ -36,6 +37,17 @@ public sealed class BrokerDisconnectTests(ApiFactory factory) : IAsyncLifetime
         return (await scope.ServiceProvider.GetRequiredService<IBrokerSecretVault>().GetAsync(accountId, name, Ct))?.Reveal();
     }
 
+    // The account's hand-over row (ADR 0171): the sealed token and its key version, or null when there is none.
+    private async Task<(byte[] Sealed, int KeyVersion)?> HandoverAsync(Guid accountId)
+    {
+        await using var connection = new NpgsqlConnection(factory.AdminConnectionString);
+        await connection.OpenAsync(Ct);
+        await using var command = new NpgsqlCommand("SELECT sealed_token, key_version FROM accounts.exec_token_handover WHERE account_id = @id", connection);
+        command.Parameters.AddWithValue("id", accountId);
+        await using var reader = await command.ExecuteReaderAsync(Ct);
+        return await reader.ReadAsync(Ct) ? (reader.GetFieldValue<byte[]>(0), reader.GetInt32(1)) : null;
+    }
+
     private static async Task<AccountDetail> ConnectAsync(HttpClient client, Guid accountId)
     {
         await client.StartConnectAsync(accountId, Ct);
@@ -59,6 +71,24 @@ public sealed class BrokerDisconnectTests(ApiFactory factory) : IAsyncLifetime
         detail.TokenStatus.ShouldBe("expired");
         list.Single().TokenStatus.ShouldBe("expired");
         factory.Brokers.Requests.Count.ShouldBe(calls);
+    }
+
+    [Fact]
+    public async Task A_connect_hands_the_token_over_sealed_with_its_own_key_and_a_disconnect_deletes_the_hand_over()
+    {
+        var client = (await factory.SignInElevatedAsync(Ct)).Client;
+        var account = await client.CreateAccountAsync(AccountsApi.NewAccount(), Ct);
+        await ConnectAsync(client, account.Id);
+        var (sealedToken, keyVersion) = (await HandoverAsync(account.Id)).ShouldNotBeNull();
+
+        new SecretCipher(factory.HandoverKey, SecretCipherPurpose.ExecHandover).TryDecrypt(account.Id, "access_token", keyVersion, sealedToken, out var token).ShouldBeTrue();
+        token.Reveal().ShouldBe(FakeBrokers.DhanAccessToken);
+        new SecretCipher(factory.VaultKey, SecretCipherPurpose.BrokerVault).TryDecrypt(account.Id, "access_token", keyVersion, sealedToken, out _).ShouldBeFalse();
+        new SecretCipher(factory.HandoverKey, SecretCipherPurpose.ExecHandover).TryDecrypt(Guid.NewGuid(), "access_token", keyVersion, sealedToken, out _).ShouldBeFalse();
+
+        (await client.DeleteAsync($"/api/accounts/{account.Id}/token", Ct)).EnsureSuccessStatusCode();
+
+        (await HandoverAsync(account.Id)).ShouldBeNull();
     }
 
     [Fact]
@@ -97,6 +127,7 @@ public sealed class BrokerDisconnectTests(ApiFactory factory) : IAsyncLifetime
         detail.TokenStatus.ShouldBe("not_connected");
         (await RevealAsync(account.Id, BrokerSecretName.AccessToken)).ShouldBeNull();
         (await RevealAsync(account.Id, BrokerSecretName.ApiKey)).ShouldBe(AccountsApi.ApiKey);
+        (await HandoverAsync(account.Id)).ShouldBeNull();
         lateCallback.Location().ShouldBe(ConnectApi.Failed(null, "accounts.connect_expired"));
         factory.Brokers.Requests.Count.ShouldBe(calls); // no broker call, and the old sign-in never completed
         var activity = await (await client.GetAsync($"/api/accounts/{account.Id}/activity", Ct)).ReadAsync<List<AccountEventView>>(Ct);
@@ -119,6 +150,7 @@ public sealed class BrokerDisconnectTests(ApiFactory factory) : IAsyncLifetime
             await db.BrokerConnections.AsNoTracking().Where(c => c.AccountId == account.Id).Select(c => c.Status).SingleAsync(Ct),
             await db.PendingConnects.AsNoTracking().CountAsync(p => p.AccountId == account.Id, Ct)));
         secrets.ShouldBe(0);
+        (await HandoverAsync(account.Id)).ShouldBeNull();
         status.ShouldBe(ConnectionStatus.NotConnected);
         pending.ShouldBe(0);
     }

@@ -49,6 +49,22 @@ public sealed class BrokersApiTests(ApiFactory factory)
         }
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("too-short-0123456789")]
+    public void The_API_refuses_to_start_without_a_hand_over_key_of_at_least_32_characters(string key)
+    {
+        using var broken = factory.WithWebHostBuilder(b => b.UseSetting("ExecHandover:Key", key));
+
+        var error = Should.Throw<OptionsValidationException>(() => broken.CreateClient());
+
+        error.Message.ShouldContain("ExecHandover");
+        if (key.Length > 0)
+        {
+            error.Message.ShouldNotContain(key);
+        }
+    }
+
     [Fact]
     public void The_API_refuses_to_start_with_an_invalid_public_base_URL()
     {

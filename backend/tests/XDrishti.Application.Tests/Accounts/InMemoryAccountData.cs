@@ -8,7 +8,7 @@ namespace XDrishti.Application.Tests.Accounts;
 /// One in-memory stand-in for all account persistence ports (the vault included: it keeps the values unencrypted, as a database never
 /// would); entities are shared by reference like a tracked DbContext.
 /// </summary>
-internal sealed class InMemoryAccountData : IAccountStore, IRiskProfileStore, IBucketStore, IAccountEventLog, IAccountUnitOfWork, IBrokerSecretVault
+internal sealed class InMemoryAccountData : IAccountStore, IRiskProfileStore, IBucketStore, IAccountEventLog, IAccountUnitOfWork, IBrokerSecretVault, IExecTokenHandover
 {
     private readonly List<Action> _pendingSecretUndo = [];
 
@@ -28,6 +28,12 @@ internal sealed class InMemoryAccountData : IAccountStore, IRiskProfileStore, IB
 
     /// <summary>The vault's content: value and last change per account and secret name.</summary>
     public Dictionary<(Guid AccountId, BrokerSecretName Name), (SecretValue Value, DateTimeOffset UpdatedAt)> Secrets { get; } = [];
+
+    /// <summary>The execution token hand-over (ADR 0171): the token and when it was sealed, per account (unsealed here, as a database never would).</summary>
+    public Dictionary<Guid, (SecretValue Token, DateTimeOffset At)> Handovers { get; } = [];
+
+    /// <summary>When set, writing a hand-over throws it (a failed write: the connect must fail as a whole).</summary>
+    public Exception? FailHandoverWith { get; set; }
 
     public int SaveCount { get; private set; }
 
@@ -212,6 +218,37 @@ internal sealed class InMemoryAccountData : IAccountStore, IRiskProfileStore, IB
         else
         {
             _pendingSecretUndo.Add(() => Secrets.Remove(key));
+        }
+    }
+
+    ValueTask IExecTokenHandover.SetAsync(Guid accountId, SecretValue accessToken, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (FailHandoverWith is { } failure)
+        {
+            throw failure;
+        }
+
+        RememberHandoverUndo(accountId);
+        Handovers[accountId] = (accessToken, now);
+        return ValueTask.CompletedTask;
+    }
+
+    ValueTask IExecTokenHandover.DeleteAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        RememberHandoverUndo(accountId);
+        Handovers.Remove(accountId);
+        return ValueTask.CompletedTask;
+    }
+
+    private void RememberHandoverUndo(Guid accountId)
+    {
+        if (Handovers.TryGetValue(accountId, out var previous))
+        {
+            _pendingSecretUndo.Add(() => Handovers[accountId] = previous);
+        }
+        else
+        {
+            _pendingSecretUndo.Add(() => Handovers.Remove(accountId));
         }
     }
 }

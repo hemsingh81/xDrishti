@@ -32,6 +32,7 @@ using XDrishti.Application.Execution;
 using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Reporting;
+using XDrishti.Domain.Accounts;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Ai.Assistant;
 using XDrishti.Infrastructure.Ai.Llm;
@@ -130,6 +131,13 @@ public static class DependencyInjection
             .ValidateDataAnnotations();
         services.AddSingleton(sp => new BrokerSecretCipher(sp.GetRequiredService<IOptions<BrokerVaultOptions>>().Value.Key));
         services.AddScoped<IBrokerSecretVault, BrokerSecretVault>();
+
+        // The execution token hand-over (ADR 0171): its own key, checked at start by the hosts that write it (RequireExecHandoverKey).
+        services.AddOptions<ExecHandoverOptions>()
+            .Bind(configuration.GetSection(ExecHandoverOptions.SectionName))
+            .ValidateDataAnnotations();
+        services.AddKeyedSingleton(SecretCipherPurpose.ExecHandover, (sp, _) => new BrokerSecretCipher(sp.GetRequiredService<IOptions<ExecHandoverOptions>>().Value.Key, SecretCipherPurpose.ExecHandover));
+        services.AddScoped<IExecTokenHandover, ExecTokenHandover>();
         services.AddScoped<IAccountStore, AccountStore>();
         services.AddScoped<IRiskProfileStore, RiskProfileStore>();
         services.AddScoped<IBucketStore, BucketStore>();
@@ -482,6 +490,16 @@ public static class DependencyInjection
     public static IServiceCollection RequireBrokerVaultKey(this IServiceCollection services)
     {
         services.AddOptions<BrokerVaultOptions>().ValidateOnStart();
+        return services;
+    }
+
+    /// <summary>
+    /// Makes the host refuse to start without a valid execution hand-over key (<c>ExecHandover:Key</c>, at least 32 characters; ADR 0171). For the API, which seals the
+    /// token at every login; a connect cannot succeed without it.
+    /// </summary>
+    public static IServiceCollection RequireExecHandoverKey(this IServiceCollection services)
+    {
+        services.AddOptions<ExecHandoverOptions>().ValidateOnStart();
         return services;
     }
 

@@ -128,8 +128,8 @@ public sealed partial class ReadinessLoop(
             try
             {
                 var connection = await ReadOrNull(() => connections.ReadAsync(account, cancellationToken)).ConfigureAwait(false);
-                var profile = await broker.GetProfileAsync(cancellationToken).ConfigureAwait(false);
-                var ip = await broker.GetStaticIpAsync(cancellationToken).ConfigureAwait(false);
+                var profile = await broker.GetProfileAsync(account, cancellationToken).ConfigureAwait(false);
+                var ip = await broker.GetStaticIpAsync(account, cancellationToken).ConfigureAwait(false);
                 var after = clock.GetUtcNow();
                 var profileReading = new Reading<ProfileFacts>(profile.Readable, profile.Value, profile.Reason, profile.Readable ? after : null);
                 var ipReading = new Reading<IpFacts>(ip.Readable, ip.Value, ip.Reason, ip.Readable ? after : null);
