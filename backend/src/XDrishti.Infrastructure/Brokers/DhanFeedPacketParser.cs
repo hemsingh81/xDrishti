@@ -8,7 +8,7 @@ namespace XDrishti.Infrastructure.Brokers;
 /// (int32) - and a payload by code:
 /// <list type="table">
 /// <item><term>2 ticker (16 bytes)</term><description>last price float32, last trade time int32 (epoch seconds)</description></item>
-/// <item><term>4 quote (50 bytes)</term><description>last price float32, last quantity int16, last trade time int32, average price float32, volume int32, total sell quantity int32, total buy quantity int32, day open, close, high, low float32</description></item>
+/// <item><term>4 quote (50 bytes)</term><description>last price float32, last quantity uint16, last trade time int32, average price float32, volume uint32, total sell quantity int32, total buy quantity int32, day open, close, high, low float32</description></item>
 /// <item><term>6 previous close (16 bytes)</term><description>previous close float32, previous open interest int32</description></item>
 /// <item><term>50 disconnect (10 bytes)</term><description>reason code int16</description></item>
 /// </list>
@@ -149,7 +149,9 @@ internal sealed class DhanFeedPacketParser(TimeProvider clock)
                     return false;
                 }
 
-                var volume = BinaryPrimitives.ReadInt32LittleEndian(message[22..]);
+                // Volume read as uint32 and the last quantity as uint16 (P7-16b; signedness UNVERIFIED until the pilot). Zero is "none" for both.
+                var volume = BinaryPrimitives.ReadUInt32LittleEndian(message[22..]);
+                var lastQuantity = BinaryPrimitives.ReadUInt16LittleEndian(message[12..]);
                 packet = new FeedPacket(
                     FeedPacketKind.Quote,
                     security,
@@ -159,7 +161,8 @@ internal sealed class DhanFeedPacketParser(TimeProvider clock)
                     OptionalPrice(message[34..]),
                     OptionalPrice(message[42..]),
                     OptionalPrice(message[46..]),
-                    OptionalPrice(message[38..]));
+                    OptionalPrice(message[38..]),
+                    LastQuantity: lastQuantity > 0 ? lastQuantity : null);
                 break;
         }
 

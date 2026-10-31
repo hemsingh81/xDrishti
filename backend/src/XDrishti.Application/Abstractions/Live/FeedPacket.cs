@@ -19,7 +19,7 @@ public enum FeedPacketKind
 /// <summary>
 /// One parsed packet of Dhan's market feed (ADR 0024). <see cref="Price"/> is the last price (or, for <see cref="FeedPacketKind.PreviousClose"/>, the previous close) and is positive for every kind but <see cref="FeedPacketKind.Disconnect"/>;
 /// <see cref="TradeTime"/> is set for ticker and quote packets. <see cref="Volume"/>, <see cref="Open"/>, <see cref="High"/>, <see cref="Low"/> and <see cref="Close"/> belong to quote packets (null when the packet gave none that is usable).
-/// <see cref="Reason"/> is the disconnect reason code.
+/// <see cref="Reason"/> is the disconnect reason code. <see cref="LastQuantity"/> is the last trade's quantity of a quote packet (uint16 as sent; null when zero or not a quote): only the trade-tick recorder (P7-16b) reads it, the live feed never does.
 /// </summary>
 public sealed record FeedPacket(
     FeedPacketKind Kind,
@@ -31,4 +31,5 @@ public sealed record FeedPacket(
     decimal? High = null,
     decimal? Low = null,
     decimal? Close = null,
-    int Reason = 0);
+    int Reason = 0,
+    int? LastQuantity = null);

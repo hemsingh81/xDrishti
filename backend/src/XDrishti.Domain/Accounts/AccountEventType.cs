@@ -88,4 +88,5 @@ public enum AccountEventType
     ComplianceRecorded,
     RampStepSet,
     LiveSettingsChanged,
+    TickRecorderSwitched,
 }

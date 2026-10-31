@@ -55,7 +55,47 @@ public sealed class DhanFeedPacketParserTests
     {
         var packet = Parse(FeedPackets.Quote(Equity, 2885, 2950.5f, FeedPackets.Epoch(FeedPackets.FixtureTime), 1_234_567, 2940f, 2931f, 2955.75f, 2938.5f), out _);
 
-        packet.ShouldBe(new FeedPacket(FeedPacketKind.Quote, new FeedSecurity(FeedSegments.NseEquity, 2885), 2950.5m, FeedPackets.FixtureTime, 1_234_567, 2940m, 2955.75m, 2938.5m, 2931m));
+        packet.ShouldBe(new FeedPacket(FeedPacketKind.Quote, new FeedSecurity(FeedSegments.NseEquity, 2885), 2950.5m, FeedPackets.FixtureTime, 1_234_567, 2940m, 2955.75m, 2938.5m, 2931m, LastQuantity: 25));
+    }
+
+    // ---- P7-16b: the last quantity (uint16) and the volume (uint32); constructed frames, UNVERIFIED ----
+
+    [Theory]
+    [InlineData((ushort)1, 1)]
+    [InlineData((ushort)500, 500)]
+    [InlineData((ushort)40_000, 40_000)] // above short.MaxValue: read unsigned
+    [InlineData(ushort.MaxValue, 65_535)]
+    public void A_quote_packet_carries_the_last_quantity_from_bytes_13_and_14_read_unsigned(ushort raw, int expected)
+    {
+        var bytes = FeedPackets.Quote(Equity, 2885, 2950.5f, FeedPackets.Epoch(FeedPackets.FixtureTime));
+        BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(12), raw);
+
+        Parse(bytes, out _)!.LastQuantity.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void A_quote_packet_with_a_zero_last_quantity_has_none()
+    {
+        var bytes = FeedPackets.Quote(Equity, 2885, 2950.5f, FeedPackets.Epoch(FeedPackets.FixtureTime));
+        BinaryPrimitives.WriteUInt16LittleEndian(bytes.AsSpan(12), 0);
+
+        Parse(bytes, out _)!.LastQuantity.ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_volume_above_int_max_is_read_as_unsigned_and_kept()
+    {
+        var bytes = FeedPackets.Quote(Equity, 2885, 2950.5f, FeedPackets.Epoch(FeedPackets.FixtureTime));
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(22), 3_000_000_000u);
+
+        Parse(bytes, out _)!.Volume.ShouldBe(3_000_000_000L);
+    }
+
+    [Fact]
+    public void Ticker_and_previous_close_packets_carry_no_last_quantity()
+    {
+        Parse(FeedPackets.Ticker(Equity, 1333, 1650.25f, FeedPackets.Epoch(FeedPackets.FixtureTime)), out _)!.LastQuantity.ShouldBeNull();
+        Parse(FeedPackets.PreviousClose(Equity, 2885, 2931f), out _)!.LastQuantity.ShouldBeNull();
     }
 
     [Fact]

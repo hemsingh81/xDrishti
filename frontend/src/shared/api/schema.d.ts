@@ -4429,6 +4429,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/ticks/recorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The owner's trade-tick recorder switch (OFF = never set), its history and why the recorder is not running now (deployment flag, switch, service, token, plan, disk). No tick data */
+    get: operations['GetTickRecorder'];
+    /** Switch the trade-tick recorder ON or OFF as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). It only allows the recorder: the deployment flag Ticks__Enabled and the service tick-recorder must be on too. 401 auth.invalid_credentials, 423 auth.locked, 403 ticks.owner_only, 400 ticks.reason_invalid, 429 auth.rate_limited */
+    put: operations['ChangeTickRecorder'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/live-trading/compliance': {
     parameters: {
       query?: never;
@@ -17642,6 +17660,46 @@ export interface components {
        */
       lostR: null | number;
     };
+    /** @description The answer of a switch change: the row and the new value. */
+    TickRecorderSwitched: {
+      /** Format: int64 */
+      id: number;
+      enabled: boolean;
+    };
+    /**
+     * @description The recorder as the owner sees it: the stored switch (`false` when never set), its history (newest first, the latest 50), the state word of the recorder's heartbeat (null when the feed host never reported) and the reasons it is not running now.
+     *     Nothing in it is tick data.
+     */
+    TickRecorderView: {
+      enabled: boolean;
+      /** Format: int64 */
+      switchId: null | number;
+      state: null | string;
+      /** Format: date-time */
+      lastSeenAt: null | string;
+      notRunningBecause: string[];
+      notice: string;
+      history: components['schemas']['TickSwitchChangeView'][];
+    };
+    /** @description One change of the switch. */
+    TickSwitchChangeView: {
+      /** Format: int64 */
+      id: number;
+      enabled: boolean;
+      actor: string;
+      reason: string;
+      /** Format: date-time */
+      changedAt: string;
+    };
+    /** @description The body of the trade-tick recorder switch. The owner is never part of it: the actor comes from the signed-in session. */
+    TickSwitchRequest: {
+      /** @description The new value of the owner's switch: ON allows the recorder to run (when the deployment flag and the service are on too), OFF stops it. */
+      enabled: boolean;
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS change - ON or OFF. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
+      password: null | string;
+    };
     /** @description One daily bar. */
     TicketChartBar: {
       /**
@@ -29380,6 +29438,59 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['DepthRecorderSwitched'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetTickRecorder: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TickRecorderView'];
+        };
+      };
+    };
+  };
+  ChangeTickRecorder: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TickSwitchRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TickRecorderSwitched'];
         };
       };
       /** @description Bad Request */

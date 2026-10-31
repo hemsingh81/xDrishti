@@ -51,6 +51,7 @@ stateDiagram-v2
 - Dhan live feed + **20-level depth** (up to 50 instruments/connection) and **200-level depth** (NSE equity
   & derivatives) over WebSocket (binary). No historical depth from brokers ⇒ record our own.
   **Built in P7-16 ([ADR 0135](../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.md)):** the 20-level book of up to 50 shares, about once a second, in `market.depth_snapshots`; off by default behind three gates; nothing reads it until P13.
+  **Built in P7-16b ([ADR 0173](../adr/0173-the-trade-tick-recorder-stores-last-trade-updates-of-the-depth-set-when-cumulative-volume-rises-on-a-second-quote-socket-behind-three-gates-its-own-cap-and-no-reader.md)):** the last-trade updates (receive time, raw exchange time, price in paise, last quantity, cumulative volume) of the same set in `market.trade_ticks`, a row only when the cumulative volume rises, from a second Quote-mode socket to the allowed live-feed host; the source of P13's aggressive volume delta (classified against the recorded book, not stored); its own 12 GB cap, the shared 20 GB free floor; off by default behind three gates; nothing reads it until P13.
 - Extends the v1 `xd-feed` (which already streams the active set): adds 20-level depth subscriptions for a
   configured recording list; writes to Timescale hypertables (compressed); ~50–100 GB/year.
 - **Start recording in P7** so ≥ 6 months exist by P13.

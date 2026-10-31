@@ -14,6 +14,7 @@ using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Abstractions.Ticks;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
@@ -73,6 +74,7 @@ using XDrishti.Application.Reporting;
 using XDrishti.Application.Research;
 using XDrishti.Application.Research.CostSheets;
 using XDrishti.Application.Selection;
+using XDrishti.Application.Ticks;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Planning;
@@ -91,6 +93,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RecordHeartbeatCommand>, RecordHeartbeatHandler>();
         services.AddScoped<IFeedHeartbeats, FeedHeartbeats>();
         services.AddScoped<IDepthHeartbeats, DepthHeartbeats>(); // the depth recorder's own row xd-depth (P7-16)
+        services.AddScoped<ITickHeartbeats, TickHeartbeats>(); // the trade-tick recorder's own row xd-ticks (P7-16b)
         services.AddScoped<IQueryHandler<GetExecutionAlarmsQuery, Result<IReadOnlyList<ExecutionAlarmView>>>, GetExecutionAlarmsHandler>(); // the execution alarms (P12-04): read only
         services.AddScoped<IQueryHandler<GetExecutionHaltsQuery, Result<IReadOnlyList<ExecutionHaltView>>>, GetExecutionHaltsHandler>(); // the halt record (P12-05): read only
         services.AddScoped<ICommandHandler<StartExecutionHaltCommand, ExecutionHaltStarted>, StartExecutionHaltHandler>(); // the owner's button: leaves a command row, never a password (P12-05)
@@ -120,6 +123,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetExecutionNoticesQuery, ExecutionNotices>, GetExecutionNoticesHandler>(); // the bell's execution items, derived on read (P12-10): read only
         services.AddScoped<IQueryHandler<GetExecutionStatusQuery, ExecutionStatusView>, GetExecutionStatusHandler>(); // the execution service's status (P12-01b): read only
         services.AddScoped<IQueryHandler<GetDepthRecorderQuery, DepthRecorderView>, GetDepthRecorderHandler>(); // the owner's depth switch (P7-16): read
+        services.AddScoped<IQueryHandler<GetTickRecorderQuery, TickRecorderView>, GetTickRecorderHandler>(); // the owner's tick switch (P7-16b): read
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)
         services.AddScoped<IQueryHandler<GetRampQuery, Result<RampView>>>(sp => sp.GetRequiredService<GetRampHandler>());
         services.AddScoped<ICommandHandler<SetRampStepCommand, RampView>, SetRampStepHandler>();
@@ -158,6 +162,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, LiveEstimatesService>(); // the weekly estimates (P11-02); starts paused, reads stored rows, places no order
         services.AddScoped<ICommandHandler<RecordComplianceCommand, ComplianceRecordView>, RecordComplianceHandler>(); // and write, insert-only, behind a fresh password and the live-writes gate in the endpoint
         services.AddScoped<ICommandHandler<ChangeDepthRecorderCommand, DepthRecorderSwitched>, ChangeDepthRecorderHandler>(); // and change, insert-only, behind a fresh password in the endpoint
+        services.AddScoped<ICommandHandler<ChangeTickRecorderCommand, TickRecorderSwitched>, ChangeTickRecorderHandler>(); // the tick switch (P7-16b): change, insert-only, behind a fresh password in the endpoint
 
         services.AddScoped<ICommandHandler<LoginCommand, LoginResult>, LoginHandler>();
         services.AddScoped<ICommandHandler<LogoutCommand>, LogoutHandler>();
@@ -220,6 +225,17 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// The trade-tick recorder (P7-16b) - only for the <c>xd-feed</c> host: its own supervisor (three gates, window, run record, heartbeat <c>xd-ticks</c>) and its own session (a second Quote-mode socket to the allowed live-feed host). The host provides
+    /// <see cref="TickSettings"/> and <see cref="DepthSettings"/> (the set inputs and the shared free floor) and, through <c>AddTickRecording</c>, the ports. Registered paused and off.
+    /// </summary>
+    public static IServiceCollection AddTickRecorder(this IServiceCollection services)
+    {
+        services.AddSingleton<ITickSession, TickRecorder>();
+        services.AddSingleton<ITickSupervisor, TickRecorderSupervisor>();
+        return services;
+    }
+
+    /// <summary>
     /// The SignalR hub's push (ADR 0024 §7, P2-10a) - only for the <c>xd-api</c> host: the coordinator that follows the connected screens (a singleton; the host runs its loop) and the status query. The host provides <see cref="ILiveClients"/>
     /// (the way out to the connections); <c>AddInfrastructure</c> provides the listener, the scope resolver and the price reader.
     /// </summary>
@@ -257,6 +273,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, PaperReviewService>(); // the weekly paper review (P10-03); starts paused, builds and stores one text per week and epoch, applies nothing
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<IScheduledService, DepthRecorderService>(); // the depth recorder (P7-16): shown and edited here, run by xd-feed; starts paused, Run now is refused
+        services.AddSingleton<IScheduledService, TickRecorderService>(); // the trade-tick recorder (P7-16b): as the depth recorder
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
         services.AddSingleton<ServiceScheduler>();

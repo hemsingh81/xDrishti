@@ -45,9 +45,9 @@ internal sealed class RunServiceNowHandler(
             return Result.Failure<ServiceRunView>(ServiceErrors.NotFound);
         }
 
-        if (command.ServiceId == XDrishti.Application.Depth.DepthRecorderService.Id)
+        if (command.ServiceId is XDrishti.Application.Depth.DepthRecorderService.Id or XDrishti.Application.Ticks.TickRecorderService.Id)
         {
-            return Result.Failure<ServiceRunView>(ServiceErrors.RunNowUnavailable); // the depth recorder follows its three gates and its window; "Run now" cannot start it (P7-16)
+            return Result.Failure<ServiceRunView>(ServiceErrors.RunNowUnavailable); // the depth and tick recorders follow their three gates and window; "Run now" cannot start them (P7-16, P7-16b)
         }
 
         if (registry.IsExternal(command.ServiceId))

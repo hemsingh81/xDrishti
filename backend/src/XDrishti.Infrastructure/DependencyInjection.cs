@@ -28,6 +28,7 @@ using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Abstractions.Ticks;
 using XDrishti.Application.Execution;
 using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Application.Planning;
@@ -59,6 +60,7 @@ using XDrishti.Infrastructure.Platform;
 using XDrishti.Infrastructure.Portfolio;
 using XDrishti.Infrastructure.Reporting;
 using XDrishti.Infrastructure.Research;
+using XDrishti.Infrastructure.Ticks;
 
 namespace XDrishti.Infrastructure;
 
@@ -245,6 +247,7 @@ public static class DependencyInjection
         services.AddScoped<IExecutionScreenReader, ExecutionScreenReader>(); // the execution screens' bounded reads, SELECT only (P12-10)
         services.AddScoped<IExecutionFactsReader, ExecutionFactsReader>(); // the execution service's heartbeat and record, read only (P12-01b)
         services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
+        services.AddScoped<ITickSwitchStore, TickSwitchStore>(); // the owner's tick-recorder switch, insert-only; no row = OFF (P7-16b)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IBrokerAllowList, BrokerAllowList>(); // the broker allow-list read only, for the P7 phase check (P7-18, ADR 0097)
         services.AddSingleton<IPlanBuilderSettings, PlanBuilderSettings>(); // off by default: the empty skeleton stays the nightly builder (P7-04, ADR 0088)
@@ -480,6 +483,17 @@ public static class DependencyInjection
         services.AddSingleton<IDepthFeedConnector, DhanDepthConnector>();
         services.AddScoped<IDepthStore, DepthStore>();
         services.AddScoped<IDepthUniverse, DepthUniverse>();
+        return services;
+    }
+
+    /// <summary>
+    /// The adapters of the trade-tick recorder (P7-16b) - for the <c>xd-feed</c> host: its own feed connector (a second socket to the live feed's allowed host, no new allow-list entry), the write-only tick store and the owner's switch store. No port here
+    /// reads a tick row. The depth universe it builds a set from when depth is off comes from <see cref="AddDepthRecording"/>.
+    /// </summary>
+    public static IServiceCollection AddTickRecording(this IServiceCollection services)
+    {
+        services.AddSingleton<ITickFeedConnector, TickFeedConnector>();
+        services.AddScoped<ITickStore, TickStore>();
         return services;
     }
 

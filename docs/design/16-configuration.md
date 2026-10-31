@@ -429,6 +429,17 @@ Depth:
   MinFreeGb: 20           # 5–500: free disk space below which recording stops
 ```
 
+### Trade-tick recorder (`Ticks:*`, [ADR 0173](../adr/0173-the-trade-tick-recorder-stores-last-trade-updates-of-the-depth-set-when-cumulative-volume-rises-on-a-second-quote-socket-behind-three-gates-its-own-cap-and-no-reader.md), P7-16b)
+
+`appsettings.json` / environment of `xd-feed` (`Ticks__Enabled`; compose passes `XD_TICKS_ENABLED`); bounds are checked at start-up. **Off by default, three gates:** this deployment flag (restart to change), the owner's stored switch (`PUT /api/ticks/recorder`, the password typed again for every change, ON and OFF) and the service `tick-recorder` (starts paused; window 09:14–15:31 on trading days). The day's set is the depth recorder's (or built the same way from `Depth:*` when none is stored by 09:14:30); the free-space floor is the shared `Depth:MinFreeGb`. Only 09:15:00–15:30:00 is stored, a row only when the cumulative volume rose.
+
+```yaml
+Ticks:
+  Enabled: false          # the deployment gate; false = nothing is read, built or opened
+  FlushSeconds: 5         # 1–30: how often the queue is written (COPY); rows unwritten for 30 s are dropped, oldest first
+  MaxStoredGb: 12         # 1–500: the stored size of market.trade_ticks above which recording stops (the app never deletes data)
+```
+
 ## 4. Most-used settings
 
 | Setting | Meaning | Default |

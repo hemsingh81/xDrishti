@@ -21,7 +21,9 @@ internal static class FeedHost
             .AddLiveFeed()
             .AddFeedEngine()
             .AddDepthRecording()
-            .AddDepthRecorder();
+            .AddDepthRecorder()
+            .AddTickRecording()
+            .AddTickRecorder();
 
         // The feed reads the Data account's token from the vault: it refuses to start without the key.
         builder.Services.RequireBrokerVaultKey();
@@ -37,8 +39,15 @@ internal static class FeedHost
             .ValidateDataAnnotations()
             .ValidateOnStart();
         builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<DepthOptions>>().Value.ToSettings());
+
+        // The trade-tick recorder (P7-16b): off by default (Ticks:Enabled false), registered paused, behind its own stored switch; the free floor is the depth recorder's (shared).
+        builder.Services.AddOptions<TickOptions>()
+            .Bind(builder.Configuration.GetSection(TickOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<TickOptions>>().Value.ToSettings(sp.GetRequiredService<IOptions<DepthOptions>>().Value.MinFreeGb));
         return builder;
     }
 
-    public static IServiceCollection AddFeedService(this IServiceCollection services) => services.AddHostedService<FeedService>().AddHostedService<DepthService>();
+    public static IServiceCollection AddFeedService(this IServiceCollection services) => services.AddHostedService<FeedService>().AddHostedService<DepthService>().AddHostedService<TickService>();
 }

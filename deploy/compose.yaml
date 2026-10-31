@@ -213,6 +213,8 @@ services:
       Planning__TicketAlerts__Enabled: ${XD_TICKET_ALERTS:-false}
       # The depth recorder (P7-16, ADR 0135): the deployment gate, OFF by default. Recording also needs the owner's switch (PUT /api/depth/recorder, password) and the resumed service depth-recorder.
       Depth__Enabled: ${XD_DEPTH_ENABLED:-false}
+      # The trade-tick recorder (P7-16b, ADR 0173): the deployment gate, OFF by default. A second Quote-mode socket to the same allowed host (api-feed.dhan.co); recording also needs the owner's switch (PUT /api/ticks/recorder, password) and the resumed service tick-recorder.
+      Ticks__Enabled: ${XD_TICKS_ENABLED:-false}
     secrets:
       - source: db_app_password
         target: Database__Password

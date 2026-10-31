@@ -57,6 +57,7 @@ using XDrishti.Application.Portfolio.Income;
 using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Application.Reporting;
+using XDrishti.Application.Ticks;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Portfolio;
 
@@ -103,6 +104,9 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(DepthRecorderView))]
 [JsonSerializable(typeof(DepthRecorderSwitched))]
 [JsonSerializable(typeof(DepthSwitchRequest))]
+[JsonSerializable(typeof(TickRecorderView))]
+[JsonSerializable(typeof(TickRecorderSwitched))]
+[JsonSerializable(typeof(TickSwitchRequest))]
 [JsonSerializable(typeof(ComplianceView))]
 [JsonSerializable(typeof(ComplianceRecordView))]
 [JsonSerializable(typeof(RecordComplianceRequest))]

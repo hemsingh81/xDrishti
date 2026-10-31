@@ -29,6 +29,10 @@ What the owner checks on the first real session of the feed (ADR 0024) - every i
 
 What the owner checks on the first real run (ADR 0019): the `client-id` header is accepted, `last_price` and `ohlc.close` are the names in the answer, `ohlc.close` is the previous session's close (compare day change with the Dhan app), and the rate limit of 1 request/s holds.
 
+## Quote packets for the trade-tick recorder (P7-16b, ADR 0173)
+
+The tick recorder reads the same quote packet (code 4, 50 bytes) as `feed-quote.hex`, plus two fields the live feed ignores: the **last traded quantity** at bytes 13-14 (1-based; offset 12) read as **uint16**, and the **cumulative day volume** at offset 22 read as **uint32**. The test frames are constructed in `FeedPackets.Quote` (and `TickTestData.Quote`) from the documentation: **UNVERIFIED** until the pilot - signedness of both fields, whether the last trade time is UTC or an India-time epoch (a 19,800 s offset), whether one update covers several trades, the packet rate per instrument and whether the depth socket counts toward the five. The subscription is request code 17, at most 100 instruments per message.
+
 ## 20-level depth (P7-16, ADR 0135)
 
 | File | Endpoint | Status |
