@@ -2,8 +2,7 @@ import { Suspense } from 'react';
 import { createBrowserRouter, type RouteObject } from 'react-router';
 import { AccountPage, LoginPage, RequireAuth } from '@/features/auth';
 import { LoadingState } from '@/shared/ui';
-import { plannedNavItems } from './navigation';
-import { ComingSoonPage } from './pages/ComingSoonPage';
+import { plannedPaths } from './plannedPaths';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { RouteErrorPage } from './pages/RouteErrorPage';
 
@@ -110,13 +109,16 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'execution',
-            lazy: async () => ({ Component: (await import('@/features/execution')).ExecutionPage }),
+            lazy: async () => ({ Component: await (await import('@/features/execution')).loadExecutionPage() }),
           },
           {
             path: 'system',
             lazy: async () => ({ Component: (await import('@/features/system-status')).SystemStatusPage }),
           },
-          ...plannedNavItems.map((item) => ({ path: item.path.slice(1), element: <ComingSoonPage /> })),
+          ...plannedPaths.map((path) => ({
+            path: path.slice(1),
+            lazy: async () => ({ Component: (await import('./pages/ComingSoonPage')).ComingSoonPage }),
+          })),
           {
             // Not in the sidebar: reached by the links of the screens whose write control a switch holds back.
             path: 'owner-acts',

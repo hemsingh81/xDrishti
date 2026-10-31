@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@/test/render';
 import { server } from '@/test/server';
-import { ExecutionPage } from './index';
+import { ExecutionPage } from './components/ExecutionPage';
+import { recordWrites } from './testing';
 
 const account = (over: Record<string, unknown> = {}) => ({
   accountId: '11111111-1111-4111-8111-111111111111',
@@ -27,6 +28,8 @@ const account = (over: Record<string, unknown> = {}) => ({
 
 const readiness = (accounts: unknown[]) =>
   http.get('/api/execution/readiness', () => HttpResponse.json({ date: '2026-10-30', accounts }));
+
+recordWrites();
 
 describe('Execution readiness', () => {
   beforeEach(() => {

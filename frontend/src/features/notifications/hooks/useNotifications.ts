@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { accountsQuery, useNow } from '@/features/accounts';
+import { executionNoticesQuery, executionStatusQuery, pollIntervalMs } from '@/features/execution';
 import { dataNoticesQuery, planNoticesQuery, portfolioNoticesQuery, serviceNoticesQuery } from '@/shared/api';
+import { deriveExecutionNotifications } from '../lib/deriveExecutionNotifications';
 import { deriveDataNotifications } from '../lib/deriveDataNotifications';
 import { derivePlanNotifications } from '../lib/derivePlanNotifications';
 import { derivePortfolioNotifications } from '../lib/derivePortfolioNotifications';
@@ -35,6 +37,14 @@ export function useNotifications(): NotificationsState {
   const portfolioItems = portfolioNotices.data?.items;
   const planNotices = useQuery(planNoticesQuery);
   const planItems = planNotices.data?.items;
+  // The server picks the cadence (5 s while something is automated in the market, else 60 s); a hidden tab asks every 60 s.
+  const executionStatus = useQuery(executionStatusQuery);
+  const executionNotices = useQuery({
+    ...executionNoticesQuery,
+    refetchInterval: () => pollIntervalMs(executionStatus.data, document.visibilityState === 'hidden'),
+    refetchIntervalInBackground: true,
+  });
+  const executionItems = executionNotices.data?.items;
   const notifications = useMemo(
     () =>
       [
@@ -43,8 +53,9 @@ export function useNotifications(): NotificationsState {
         ...deriveServiceNotifications(serviceItems ?? []),
         ...derivePortfolioNotifications(portfolioItems ?? []),
         ...derivePlanNotifications(planItems ?? []),
+        ...deriveExecutionNotifications(executionItems ?? []),
       ].sort(compareNotifications),
-    [data, now, noticeItems, serviceItems, portfolioItems, planItems],
+    [data, now, noticeItems, serviceItems, portfolioItems, planItems, executionItems],
   );
   return {
     notifications,

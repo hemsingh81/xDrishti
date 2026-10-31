@@ -29,6 +29,7 @@ import { actionCenterHandlers } from './actionCenterFixtures';
 import { answerGroupHoldings, groupHandlers } from './groupFixtures';
 import { historyHandlers } from './historyFixtures';
 import { buildTimeline, sampleServicesWithQuotes } from './servicesFixtures';
+import { executionHandlers } from './executionFixtures';
 import { planHandlers } from './planFixtures';
 import { tradeHandlers } from './tradeFixtures';
 
@@ -46,6 +47,8 @@ export const handlers = [
   http.get('/api/system/status', () => HttpResponse.json(buildSystemStatus())),
   // Plans (P7-17): only the list, empty; a plan's own endpoints are never defaulted (see planFixtures).
   ...planHandlers,
+  // Execution (P12-10): off, nothing to show; the execution tests bring their own.
+  ...executionHandlers,
   // Briefing and weekly review texts (P9-06): none stored by default; the briefing tests bring their own.
   http.get('/api/assistant/briefings/:kind', () =>
     problemResponse({ title: 'No briefing is stored.', code: 'assistant.briefing_not_found' }, 404),

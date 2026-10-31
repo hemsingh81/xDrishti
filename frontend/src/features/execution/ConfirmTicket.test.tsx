@@ -4,7 +4,8 @@ import { http, HttpResponse } from 'msw';
 import { pinClock } from '@/test/pinClock';
 import { renderWithProviders } from '@/test/render';
 import { server } from '@/test/server';
-import { ExecutionPage } from './index';
+import { ExecutionPage } from './components/ExecutionPage';
+import { recordWrites } from './testing';
 
 const nowMs = pinClock('2026-10-30T04:00:00Z');
 const iso = (offsetS: number) => new Date(nowMs + offsetS * 1000).toISOString();
@@ -42,6 +43,8 @@ const waitEnabled = (name: string) =>
     },
     { timeout: 2000 },
   );
+
+recordWrites();
 
 describe('Confirm ticket card', () => {
   beforeEach(() => {

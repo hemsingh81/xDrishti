@@ -11,7 +11,11 @@ export function ConfirmSection() {
     <Stack component="section" aria-label="Confirm" sx={{ gap: 2, mb: 3 }}>
       {query.isPending && <LoadingState label="Loading orders waiting" />}
       {query.error && <ErrorState error={query.error} />}
-      {query.data?.length === 0 && <Alert severity="info">No order is waiting</Alert>}
+      {query.data?.length === 0 && (
+        <Alert severity="info" role="status">
+          No order is waiting
+        </Alert>
+      )}
       {tickets.map((t) => {
         const mine = confirm.variables?.ticket.id === t.id;
         const mineSkip = skip.variables?.id === t.id;

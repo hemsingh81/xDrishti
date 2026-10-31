@@ -1,47 +1,82 @@
 import ChecklistIcon from '@mui/icons-material/ChecklistOutlined';
-import { Alert, Grid, Stack } from '@mui/material';
+import { Box, Tab, Tabs } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useUrlState } from '@/shared/analytics';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
-import { readinessQuery } from '../api/readinessApi';
-import { AttestationForm } from './AttestationForm';
-import { MorningChecklist } from './MorningChecklist';
-import { ConfirmSection } from './ConfirmSection';
-import { ReadinessCard } from './ReadinessCard';
-import { RunbookSteps } from './RunbookSteps';
+import { executionStatusQuery, pollIntervalMs } from '../api/statusApi';
+import { overviewQuery } from '../api/viewsApi';
+import { ActivityTab } from './ActivityTab';
+import { EvidenceFoot } from './EvidenceFoot';
+import { ModesTab } from './ModesTab';
+import { OrdersTab } from './OrdersTab';
+import { CanaryBanner, ProtectionBanner, StaleView } from './PageBanners';
+import { PositionsTab } from './PositionsTab';
+import { TodayTab } from './TodayTab';
 
-/** Execution, Today (minimal until P12-08/P12-10): readiness, the morning checklist and the IP attestation. */
+const tabs = [
+  ['today', 'Today'],
+  ['orders', 'Orders'],
+  ['positions', 'Positions'],
+  ['activity', 'Activity'],
+  ['modes', 'Modes'],
+] as const;
+type TabId = (typeof tabs)[number][0];
+const tabIds = tabs.map(([id]) => id);
+
+/** Execution: one page, five tabs (?tab=today|orders|positions|activity|modes), the tab in the address. */
 export function ExecutionPage() {
-  const { data, error, isPending } = useQuery(readinessQuery);
+  const url = useUrlState();
+  const tab: TabId = url.choice('tab', tabIds, 'today');
+  const status = useQuery(executionStatusQuery);
+  const overview = useQuery({
+    ...overviewQuery(),
+    refetchInterval: pollIntervalMs(status.data, false),
+  });
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => {
+      setNow(Date.now());
+    }, 5000);
+    return () => {
+      clearInterval(id);
+    };
+  }, []);
   return (
     <>
       <PageHeader
         title="Execution"
         icon={ChecklistIcon}
         hue="system"
-        description="Whether execution can act today, and what is missing. Nothing is ready until a check says so."
+        description="Whether execution can act today, what it did, and what is waiting for you. Nothing is ready until a check says so."
       />
-      <ConfirmSection />
-      {isPending && <LoadingState label="Loading readiness" />}
-      {error && <ErrorState error={error} />}
-      {data?.accounts.length === 0 && <Alert severity="info">No account is set up for execution.</Alert>}
-      {data?.accounts.map((a) => (
-        <Stack key={a.accountId} sx={{ gap: 2, mb: 3 }}>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, lg: 6 }}>
-              <ReadinessCard account={a} />
-            </Grid>
-            <Grid size={{ xs: 12, lg: 6 }}>
-              <MorningChecklist account={a} />
-            </Grid>
-            <Grid size={{ xs: 12, lg: 6 }}>
-              <AttestationForm account={a} />
-            </Grid>
-            <Grid size={{ xs: 12, lg: 6 }}>
-              <RunbookSteps />
-            </Grid>
-          </Grid>
-        </Stack>
-      ))}
+      {status.isPending && <LoadingState label="Loading execution status" />}
+      {status.error && <ErrorState error={status.error} />}
+      <ProtectionBanner />
+      <CanaryBanner pending={overview.data?.canaryPending} />
+      <StaleView updatedAt={overview.dataUpdatedAt} marketOpen={status.data?.marketOpen === true} now={now} />
+      <Tabs
+        value={tab}
+        onChange={(_, value: TabId) => {
+          url.update({ tab: value === 'today' ? null : value, page: null });
+        }}
+        aria-label="Execution views"
+        variant="scrollable"
+        scrollButtons="auto"
+        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+      >
+        {tabs.map(([id, label]) => (
+          <Tab key={id} value={id} label={label} id={`exec-tab-${id}`} aria-controls="exec-panel" />
+        ))}
+      </Tabs>
+      <Box role="tabpanel" id="exec-panel" aria-labelledby={`exec-tab-${tab}`}>
+        {tab === 'today' && <TodayTab />}
+        {tab === 'orders' && <OrdersTab />}
+        {tab === 'positions' && <PositionsTab />}
+        {tab === 'activity' && <ActivityTab />}
+        {tab === 'modes' && <ModesTab />}
+      </Box>
+      <EvidenceFoot limits={overview.data?.limits} date={overview.data?.date} />
     </>
   );
 }

@@ -27,7 +27,20 @@ export type NotificationKind =
   | 'plan_fills_unmatched'
   | 'ticket_level_crossed'
   | 'post_trade_prompt'
-  | 'compliance_recheck_overdue';
+  | 'compliance_recheck_overdue'
+  | 'exec_confirm_waiting'
+  | 'exec_auto_action'
+  | 'exec_order_rejected'
+  | 'exec_protection_missing'
+  | 'exec_halted'
+  | 'exec_kill_switch'
+  | 'exec_demoted'
+  | 'exec_recon_break'
+  | 'exec_not_ready'
+  | 'exec_ip_invalid'
+  | 'exec_cap_near'
+  | 'exec_attended_pause'
+  | 'exec_day_summary';
 export type NotificationSeverity = 'error' | 'warn' | 'info';
 
 /**
@@ -44,6 +57,14 @@ export const attentionKinds: ReadonlySet<NotificationKind> = new Set<Notificatio
   'rows_dropped',
   'key_expired',
   'key_expiring',
+  // Execution items that are errors (P12-10): they pop up once; the rest wait in the bell.
+  'exec_order_rejected',
+  'exec_protection_missing',
+  'exec_halted',
+  'exec_kill_switch',
+  'exec_demoted',
+  'exec_recon_break',
+  'exec_ip_invalid',
 ]);
 
 /** What the owner can do about a notification: go to a place in the app, or run an existing endpoint of the API. */

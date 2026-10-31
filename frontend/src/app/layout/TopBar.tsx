@@ -6,6 +6,7 @@ import { Suspense } from 'react';
 import { NotificationBell } from '@/features/notifications';
 import { HeaderAccounts } from '@/features/accounts';
 import { UserMenu } from '@/features/auth';
+import { StopChip } from '@/features/execution';
 import { IstClock } from '@/shared/ui/IstClock';
 import { layout, rem, useColorMode } from '@/theme';
 import { SearchButton } from './palette/SearchButton';
@@ -61,6 +62,10 @@ export function TopBar({ title, onMenu }: { title: string; onMenu: () => void })
           }
         >
           <HeaderAccounts />
+        </Suspense>
+        {/* The stop control: shown only while something is automated or a halt is active, so no placeholder. */}
+        <Suspense fallback={null}>
+          <StopChip />
         </Suspense>
         {/* Same size as the bell, so it loading in does not move the other controls. */}
         <Suspense
