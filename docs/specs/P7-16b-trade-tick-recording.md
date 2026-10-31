@@ -1,6 +1,6 @@
 # P7-16b — Trade-tick recording: last-trade updates of the depth set recorded from the Data account, stored compressed, no trading use
 
-- **Status:** Draft (written 2026-10-31; decisions researched, the owner's Approved is needed before an agent builds it)
+- **Status:** Approved (owner, 2026-10-31, with the recommended answers: third socket accepted; own 12 GB cap plus the shared 20 GB free floor; own switch and service; when depth is off, ticks are recorded on a set built the same way)
 - **Phase / roadmap row:** P7 — finding "P7-16b trade-tick recording" of [JOURNEY](JOURNEY.md) (extra slices table: "P13 aggressive-volume feature has no source", 2 days); companion of [P7-16](P7-16-depth-recording-service.md).
 - **Design refs:** docs/design/20 §B ("aggressive volume delta"), 17 §1-2 (VM disk 120 GB, "revisit before tick data"), 16 (`feed_recorder`) · ADR 0024 (live feed), 0133 (allow-list rule), 0135 (depth recorder), 0091/0128 (fresh-password switch), 0083 (no order). New ADR: **next free number at build time**.
 - **Needs:** P2-10, P7-16 (built). **Needed by:** P13-03 (`vol_delta_5m`, sole consumer; P13-00 R2 and D10).
