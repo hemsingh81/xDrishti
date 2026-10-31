@@ -1,6 +1,6 @@
 # 0172 - xd-exec reaches the live broker only through a host-pinned forward proxy on its own network, for the two readiness reads first
 
-- **Status:** Proposed (owner decision needed; it is a network and security change, so nothing is built from it until it is Accepted).
+- **Status:** Accepted (owner, 2026-10-31: option B; the proxy starts only with `--exec` AND `XD_EXEC_READINESS_LIVE=true`; `api.dhan.co:443` is the only host).
 - **Date:** 2026-10-31.
 - **Relation to other ADRs:** closes step 5 of ADR 0171 (egress for `xd-exec`) and the "no route out" of ADR 0156 §4 and doc 17 §3. Builds on ADR 0133 (a new broker endpoint enters the allow-list in the commit of the slice that uses it), ADR 0157 and 0158 (one guard table, `Environment=live` refused today), ADR 0170 (readiness reads).
 
@@ -31,5 +31,5 @@ With ADR 0171 built, `xd-exec` can hold the day's token for a connected account 
 - The proxy sees only the host names it forwards (TLS passes through); it holds no token and logs no body.
 - The order-update socket and order paths still need a later ADR (live send), which would add `api-order-update.dhan.co:443` and the order paths, and would be the point where the owner decides whether `xd-exec` may send at all.
 
-## Owner decision needed
+## Owner decision (2026-10-31)
 Accept B, choose D (stay unavailable), or ask for A. If B: confirm that `api.dhan.co:443` is the only live host for the two reads, and whether the proxy should be started by `--exec` automatically or only with an additional `XD_EXEC_READINESS_LIVE=true`.
