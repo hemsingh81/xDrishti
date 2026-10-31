@@ -13,6 +13,10 @@ Operating notes for the owner (spec [P12-11](../specs/P12-11-daily-login-token-a
 
 `connected`, `token_covers_session` (the token must last past `exec.ready_token_until`, default 16:45, and at least `exec.token_min_remaining_min` from now), `token_live` (the broker answered the profile in the last 5 minutes and agrees), `ip_configured` (the broker lists `exec.expected_static_ip`, read in the last 15 minutes), `ip_attested` (your attestation of that address, at most `exec.attestation_max_age_days` old, orders allowed) and `no_blocking_halt`. Any check that cannot be read shows *unavailable* and blocks like a failure. A rejected IP or token (`ip_rejected`, `token_rejected`) holds until a fresh attestation or a good profile read after it, never by time.
 
+## Where the broker reads are real (ADR 0170)
+
+The `token_live` and `ip_configured` checks read Dhan's profile and `getIP` only in an `xd-exec` started with `Execution:Environment` = `sandbox` **and** `Execution:SendEnabled` = `true`, using the sandbox secret files `Execution__Sandbox__ClientId` and `Execution__Sandbox__Token`; without those files the reads are refused locally and the card says *unavailable*. In every other environment, `live` included, the reads are closed and the card is always *unavailable*: there is no live token source for `xd-exec` yet, so no live account can be Ready. In a sandbox process the two reads are those of the one sandbox login and are applied to every account the loop checks, so do not run a sandbox `xd-exec` against accounts whose readiness record you mean as live evidence. Each read leaves log event 6616 (call, path, status, reason code; never a token, client id or address).
+
 ## What is recorded
 
 `execution.readiness_checks` when the verdict or a reason changes and at least every 15 minutes from 08:00 to 16:30 on trading days; `execution.day_states` once per account and session at 09:10:30 (if the service was not running then, the first run afterwards stores it late and *unavailable*); `execution.ip_attestations` when you attest. All three are insert-only.

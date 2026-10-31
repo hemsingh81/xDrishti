@@ -4,7 +4,7 @@ namespace XDrishti.Execution.Application.Ports;
 
 /// <summary>
 /// The two broker reads readiness needs and nothing else (spec P12-11 criterion 13): the profile (<c>GET /v2/profile</c>) and the configured static IP (<c>GET /v2/ip/getIP</c>). The adapter reads the token only through P12-02's token source; no order, trade, position or funds call is
-/// reachable through this port. Until that adapter exists the only implementation answers unreadable, which makes readiness unavailable.
+/// reachable through this port. The Dhan adapter (<c>DhanBrokerFacts</c>, ADR 0170) is composed only with the sandbox send composition; everywhere else, live included, <see cref="ClosedBrokerFacts"/> answers unreadable, which makes readiness unavailable.
 /// </summary>
 public interface IBrokerFacts
 {

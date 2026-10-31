@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using XDrishti.Execution.Application.Ports;
 using XDrishti.Execution.Domain;
+using XDrishti.Execution.Domain.Readiness;
 
 namespace XDrishti.Execution.Dhan;
 
@@ -181,37 +182,62 @@ public sealed partial class DhanOrderClient : IBrokerOrders, IBrokerStops, IBrok
     public async Task<BrokerRead<BrokerFundsView>> GetFundsAsync(CancellationToken cancellationToken) =>
         await ReadAsync(DhanCall.FundsGet, DhanReads.Funds, cancellationToken).ConfigureAwait(false);
 
-    // One GET, retried once after 250 ms on a fault or a non-2xx; the answer is parsed by the given reader. Nothing is written and nothing is counted by the send limiter.
-    private async Task<BrokerRead<T>> ReadAsync<T>(DhanCall call, Func<string, BrokerRead<T>> parse, CancellationToken cancellationToken)
+    /// <summary>
+    /// The broker's profile (<c>GET /v2/profile</c>) for readiness (P12-11). Not on any public port: only <see cref="DhanBrokerFacts"/> calls it, through its own read limiter (<paramref name="admit"/>, asked before every request) and never through the send limiter.
+    /// Every request and every local refusal writes one audit log line (call, path template, status, reason code).
+    /// </summary>
+    internal Task<BrokerRead<ProfileFacts>> GetProfileAsync(Func<bool> admit, CancellationToken cancellationToken) => ReadAsync(DhanCall.ProfileGet, DhanReads.Profile, cancellationToken, admit);
+
+    /// <summary>The configured static IP (<c>GET /v2/ip/getIP</c>) for readiness (P12-11); as <see cref="GetProfileAsync(Func{bool}, CancellationToken)"/>.</summary>
+    internal Task<BrokerRead<IpFacts>> GetStaticIpAsync(Func<bool> admit, CancellationToken cancellationToken) => ReadAsync(DhanCall.StaticIpGet, DhanReads.StaticIp, cancellationToken, admit);
+
+    // One GET, retried once after 250 ms on a fault or a non-2xx other than a refused token (401 or DH-901: token_invalid at once, a second try with the same token cannot change it); the answer is parsed by the given reader. Nothing is written and
+    // nothing is counted by the send limiter. With an admission function (the readiness reads) each request must be admitted by it first, and every request and refusal is audited in the log.
+    private async Task<BrokerRead<T>> ReadAsync<T>(DhanCall call, Func<string, BrokerRead<T>> parse, CancellationToken cancellationToken, Func<bool>? admit = null)
     {
         if (_credentials.Current() is not { } credentials)
         {
-            return BrokerRead.Unreadable<T>("execution.token_unavailable");
+            return Audited(admit, call, 0, BrokerRead.Unreadable<T>("execution.token_unavailable"));
         }
 
         var uri = ExecutionEndpoints.Build(_environment, call);
         if (uri is null)
         {
-            return BrokerRead.Unreadable<T>("guard_refused");
+            return Audited(admit, call, 0, BrokerRead.Unreadable<T>("guard_refused"));
         }
 
         for (var attempt = 0; attempt < 2; attempt++)
         {
+            if (admit is not null && !admit())
+            {
+                return Audited(admit, call, 0, BrokerRead.Unreadable<T>("read_rate_limited"));
+            }
+
             using var deadline = new CancellationTokenSource(_readTimeout, _clock);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
+            var status = 0;
             try
             {
                 using var request = Request(call, uri, credentials, null);
                 using var response = await _http.SendAsync(request, timeout.Token).ConfigureAwait(false);
+                status = (int)response.StatusCode;
                 var text = await response.Content.ReadAsStringAsync(timeout.Token).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
-                    return parse(text);
+                    return Audited(admit, call, status, parse(text));
                 }
+
+                if (DhanErrorMap.IsTokenRejected(response.StatusCode, text))
+                {
+                    return Audited(admit, call, status, BrokerRead.Unreadable<T>("token_invalid"));
+                }
+
+                Audit(admit, call, status, "read_failed");
             }
             catch (Exception e) when (e is HttpRequestException or OperationCanceledException or IOException)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                Audit(admit, call, status, "read_fault");
             }
 
             if (attempt == 0)
@@ -221,6 +247,22 @@ public sealed partial class DhanOrderClient : IBrokerOrders, IBrokerStops, IBrok
         }
 
         return BrokerRead.Unreadable<T>("read_failed");
+    }
+
+    private BrokerRead<T> Audited<T>(Func<bool>? admit, DhanCall call, int status, BrokerRead<T> read)
+    {
+        Audit(admit, call, status, read.Readable ? "ok" : read.Reason ?? "unreadable");
+        return read;
+    }
+
+    // Only the reads that come with an admission function (the readiness reads) are audited: the call, the path template from the guard table, the HTTP status (0 when no answer) and a reason code. Never a body, header, token, client id, query or id value.
+    private void Audit(Func<bool>? admit, DhanCall call, int status, string reason)
+    {
+        if (admit is not null && _logger.IsEnabled(LogLevel.Information))
+        {
+            var path = ExecutionEndpoints.TemplateOf(call);
+            LogRead(_logger, call, path, status, reason);
+        }
     }
 
     private sealed record View(string OrderId, ExecSide Side, string SecurityId, int Qty, decimal Price);
@@ -395,4 +437,7 @@ public sealed partial class DhanOrderClient : IBrokerOrders, IBrokerStops, IBrok
 
     [LoggerMessage(EventId = 6615, Level = LogLevel.Information, Message = "Dhan sandbox call {Call} answered {Status}: {Outcome} {Reason}")]
     private static partial void LogOutcome(ILogger logger, DhanCall call, int status, BrokerOutcome outcome, string? reason);
+
+    [LoggerMessage(EventId = 6616, Level = LogLevel.Information, Message = "Dhan sandbox read {Call} GET {Path} answered {Status}: {Reason}")]
+    private static partial void LogRead(ILogger logger, DhanCall call, string path, int status, string reason);
 }

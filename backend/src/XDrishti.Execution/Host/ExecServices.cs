@@ -56,8 +56,8 @@ public static class ExecServices
         services.AddSingleton<IDayMarkStore, PgDayMarkStore>();
         services.AddSingleton<HaltAutoClearService>();
 
-        // The readiness record and probe (P12-11, ADR 0164): it reads the stored connection and, through IBrokerFacts, the broker's profile and configured IP, and writes insert-only rows. IBrokerFacts is the closed default (unreadable, so the verdict is unavailable) until the
-        // Dhan adapter of those two reads exists; nothing here can send an order.
+        // The readiness record and probe (P12-11, ADR 0164): it reads the stored connection and, through IBrokerFacts, the broker's profile and configured IP, and writes insert-only rows. IBrokerFacts is the closed default (unreadable, so the verdict is unavailable) unless the
+        // sandbox composition registered the Dhan adapter of those two reads first (sandbox and Execution:SendEnabled, ADR 0170); live has no token source, so it stays closed. Nothing here can send an order.
         services.AddSingleton<PgReadinessStore>();
         services.AddSingleton<IReadinessStore>(sp => sp.GetRequiredService<PgReadinessStore>());
         services.AddSingleton<IReadinessAccounts>(sp => sp.GetRequiredService<PgReadinessStore>());

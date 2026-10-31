@@ -9,7 +9,7 @@ public static class DhanSandboxRegistration
     /// <summary>
     /// Composes the sandbox send path. Called only when the process environment is <c>sandbox</c> (<see cref="Host.ExecServices.AddExecution"/>) and, inside, only when the owner-level host setting <c>Execution:SendEnabled</c> is on (default OFF).
     /// The raw adapter is never a service: <see cref="IBrokerOrders"/> is not registered. What is registered is <see cref="LegSender"/> (the only order surface: gate, halt, token, collar, rate, write-ahead), <see cref="LegLookup"/> (reads one order by our
-    /// client id) and a read-only view <see cref="IBrokerReads"/>. No redirects, a 5 s connect timeout, no proxy, no cookies, and the guard in front of the socket. Nothing in the running host calls <see cref="LegSender"/>.
+    /// client id), a read-only view <see cref="IBrokerReads"/> and the readiness reads <see cref="IBrokerFacts"/>. No redirects, a 5 s connect timeout, no proxy, no cookies, and the guard in front of the socket. Nothing in the running host calls <see cref="LegSender"/>.
     /// </summary>
     public static IServiceCollection AddDhanSandbox(this IServiceCollection services, IConfiguration configuration)
     {
@@ -35,6 +35,8 @@ public static class DhanSandboxRegistration
                 () => settings.Current()?.SendTimeout ?? TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10)));
         });
         services.AddSingleton<IBrokerReads>(sp => new ReadOnlyBroker(sp.GetRequiredService<SandboxBroker>().Client));
+        // The readiness reads (P12-11, ADR 0170): profile and configured static IP of the sandbox credentials, through the same guarded client, with their own read limiter. This replaces the closed default that AddExecutionRecord adds only if none is registered.
+        services.AddSingleton<IBrokerFacts>(sp => new DhanBrokerFacts(sp.GetRequiredService<SandboxBroker>().Client, sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton(sp => new LegLookup(sp.GetRequiredService<SandboxBroker>().Client, sp.GetRequiredService<TimeProvider>()));
         return services.AddLegSender();
     }

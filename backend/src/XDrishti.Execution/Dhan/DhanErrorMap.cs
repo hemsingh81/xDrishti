@@ -54,6 +54,10 @@ public static class DhanErrorMap
         }
     }
 
+    /// <summary>Whether a non-2xx answer to a read says the token was refused: HTTP 401, or a 4xx with a Dhan error body whose code is DH-901. Such an answer is final; another try with the same token cannot change it.</summary>
+    internal static bool IsTokenRejected(HttpStatusCode status, string body) =>
+        status == HttpStatusCode.Unauthorized || ((int)status is >= 400 and < 500 && ParseError(body) is { } error && string.Equals(error.Code, "DH-901", StringComparison.OrdinalIgnoreCase));
+
     private static (string Code, string Message)? ParseError(string body)
     {
         try

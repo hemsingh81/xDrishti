@@ -108,4 +108,15 @@ public sealed class DhanReadsTests
         (await none.GetFundsAsync(CancellationToken.None)).Reason.ShouldBe("execution.token_unavailable");
         handler.Seen.ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task A_refused_token_on_a_read_is_token_invalid_at_once_as_the_fake_broker_says_and_is_not_retried()
+    {
+        var (client, handler, _) = Make(_ => Json("""{"errorType":"Invalid_Authentication","errorCode":"DH-901","errorMessage":"expired"}""", HttpStatusCode.Unauthorized));
+
+        var funds = await client.GetFundsAsync(CancellationToken.None);
+
+        (funds.Readable, funds.Reason).ShouldBe((false, "token_invalid"));
+        handler.Seen.Count.ShouldBe(1);
+    }
 }

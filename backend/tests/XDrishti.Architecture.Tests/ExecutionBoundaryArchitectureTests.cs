@@ -149,7 +149,7 @@ public sealed class ExecutionBoundaryArchitectureTests
     public void The_dhan_folder_holds_exactly_the_reviewed_files_and_only_the_registration_composes_the_adapter_behind_sandbox()
     {
         Directory.GetFiles(Path.Combine(ExecutionSource, "Dhan"), "*.cs").Select(Path.GetFileName).Order().ToList().ShouldBe(
-            ["DhanCredentials.cs", "DhanErrorMap.cs", "DhanOrderClient.cs", "DhanReads.cs", "DhanSandboxRegistration.cs", "DhanWire.cs", "ExecutionEndpoints.cs", "GuardHandler.cs"]);
+            ["DhanBrokerFacts.cs", "DhanCredentials.cs", "DhanErrorMap.cs", "DhanOrderClient.cs", "DhanReads.cs", "DhanSandboxRegistration.cs", "DhanWire.cs", "ExecutionEndpoints.cs", "GuardHandler.cs"]);
 
         // the adapter is composed in exactly one place, behind an explicit sandbox test, and the send protocol in none of the host files
         var callers = SourceFiles(ExecutionSource).Where(f => File.ReadAllText(f).Contains("AddDhanSandbox(", StringComparison.Ordinal)).Select(Path.GetFileName).Order().ToList();
@@ -157,6 +157,8 @@ public sealed class ExecutionBoundaryArchitectureTests
         var services = File.ReadAllText(Path.Combine(ExecutionSource, "Host", "ExecServices.cs"));
         Regex.IsMatch(services, @"environment == ExecEnvironment\.Sandbox\)\s*\{\s*services\.AddDhanSandbox", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBeTrue();
         services.ShouldNotContain("AddLegSender");
+        // the readiness reads (ADR 0170) are composed only inside the sandbox registration, never by the host files
+        SourceFiles(ExecutionSource).Where(f => File.ReadAllText(f).Contains("new DhanBrokerFacts(", StringComparison.Ordinal)).Select(Path.GetFileName).ShouldBe(["DhanSandboxRegistration.cs"]);
         SourceFiles(ExecutionSource).Where(f => File.ReadAllText(f).Contains("AddLegSender(", StringComparison.Ordinal)).Select(Path.GetFileName).ShouldBe(["DhanSandboxRegistration.cs"]);
 
         // the environment live is never a send target: the adapter and the sender name only the sandbox environment as acceptable

@@ -94,7 +94,7 @@ public sealed class ExecutionTicketsDatabaseTests(ExecDatabase db)
             INSERT INTO market.instruments (id, canonical_symbol, exchange, exchange_segment, type, name, display_name, isin, series, lot_size, underlying_symbol, sector, fno_eligible, first_seen_at, last_seen_at)
             VALUES ('{instrument}', 'NSE:CF{tag[..6].ToUpperInvariant()}', 'NSE', 'NSE_EQ', 'share', 'Confirm probe', 'probe', NULL, 'EQ', 1, 'probe', NULL, false, now(), now());
             INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at)
-            VALUES ('confirm-{tag}', '{session:yyyy-MM-dd}', '{session:yyyy-MM-dd} 03:35:00+00', {Random.Shared.Next(2, int.MaxValue)}, repeat('d', 64), 'b', true, 'n', 'l', 'probe', now());
+            VALUES ('confirm-{tag}', '{session:yyyy-MM-dd}', now() + interval '1 hour', {Random.Shared.Next(2, int.MaxValue)}, repeat('d', 64), 'b', true, 'n', 'l', 'probe', now());
             INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons, cell_key, trades, data_range, p_win_basis, unavailable)
             SELECT id, 1, 'primary', 'NSE:CF{tag[..6].ToUpperInvariant()}', 'BUY', 'x', 'h', 't', 's', 't', 'v', ARRAY[]::text[], 'c', 1, 'd', 'b', ARRAY[]::text[] FROM trading.plans WHERE plan_key = 'confirm-{tag}';
             INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, cutoff, decided_at)

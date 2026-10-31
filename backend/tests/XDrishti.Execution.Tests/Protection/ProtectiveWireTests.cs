@@ -163,7 +163,8 @@ public sealed class ProtectiveWireTests
         ExecutionEndpoints.IsAllowed(ExecEnvironment.Sandbox, HttpMethod.Delete, new Uri("https://sandbox.dhan.co/v2/super/orders/1/STOP_LOSS_LEG")).ShouldBeFalse();
         ExecutionEndpoints.IsAllowed(ExecEnvironment.Sandbox, HttpMethod.Post, new Uri("https://api.dhan.co/v2/super/orders")).ShouldBeFalse();
         ExecutionEndpoints.IsAllowed(ExecEnvironment.Sandbox, HttpMethod.Post, new Uri("https://sandbox.dhan.co/v2/super/orders?x=1")).ShouldBeFalse();
-        Enum.GetValues<DhanCall>().Length.ShouldBe(10);
+        Enum.GetValues<DhanCall>().Length.ShouldBe(12); // ADR 0170 added two GETs (profile, getIP); the writes stay the four below
+        Enum.GetValues<DhanCall>().Where(c => ExecutionEndpoints.MethodOf(c) != HttpMethod.Get).Order().ShouldBe([DhanCall.OrdersPost, DhanCall.SuperOrdersPost, DhanCall.OrderPut, DhanCall.OrderDelete]);
     }
 
     [Fact]

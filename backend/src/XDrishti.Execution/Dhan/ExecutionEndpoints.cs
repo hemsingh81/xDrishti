@@ -3,7 +3,7 @@ using XDrishti.Execution.Domain;
 
 namespace XDrishti.Execution.Dhan;
 
-/// <summary>The calls built so far: six order calls (the super-order entry, UNVERIFIED, is the one added in P12-04) and four read-only GETs (order book, trade book, positions, funds). Everything not named here is refused (super-order changes, slicing, the kill switch and the rest of the spec's table are later slices).</summary>
+/// <summary>The calls built so far: six order calls (the super-order entry, UNVERIFIED, is the one added in P12-04), four read-only GETs (order book, trade book, positions, funds) and the two readiness GETs (profile, configured static IP; P12-11). Everything not named here is refused (super-order changes, slicing, the kill switch and the rest of the spec's table are later slices).</summary>
 public enum DhanCall
 {
     OrdersPost,
@@ -16,6 +16,8 @@ public enum DhanCall
     TradesGet,
     PositionsGet,
     FundsGet,
+    ProfileGet,
+    StaticIpGet,
 }
 
 /// <summary>
@@ -41,12 +43,21 @@ public static partial class ExecutionEndpoints
         (DhanCall.TradesGet, HttpMethod.Get, "/v2/trades", false),
         (DhanCall.PositionsGet, HttpMethod.Get, "/v2/positions", false),
         (DhanCall.FundsGet, HttpMethod.Get, "/v2/fundlimit", false),
+        (DhanCall.ProfileGet, HttpMethod.Get, "/v2/profile", false),
+        (DhanCall.StaticIpGet, HttpMethod.Get, "/v2/ip/getIP", false),
     ];
 
     [GeneratedRegex("^[A-Za-z0-9_-]{1,40}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
     private static partial Regex IdPattern();
 
     public static HttpMethod MethodOf(DhanCall call) => Table.First(t => t.Call == call).Method;
+
+    /// <summary>The path template of a call for the audit log: the fixed prefix, with <c>{id}</c> in place of any id value. Never a host, a query or an id.</summary>
+    public static string TemplateOf(DhanCall call)
+    {
+        var row = Table.First(t => t.Call == call);
+        return row.HasId ? row.Prefix + "{id}" : row.Prefix;
+    }
 
     /// <summary>The absolute URI for a call, or null when the environment does not allow it or the id is not a plain token.</summary>
     public static Uri? Build(ExecEnvironment environment, DhanCall call, string? id = null)

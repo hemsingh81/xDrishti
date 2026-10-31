@@ -18,6 +18,8 @@ public sealed class ExecutionEndpointsTests
     [InlineData("GET", "https://sandbox.dhan.co/v2/trades")]
     [InlineData("GET", "https://sandbox.dhan.co/v2/positions")]
     [InlineData("GET", "https://sandbox.dhan.co/v2/fundlimit")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/profile")] // P12-11 readiness, ADR 0170
+    [InlineData("GET", "https://sandbox.dhan.co/v2/ip/getIP")] // P12-11 readiness, ADR 0170
     public void The_rows_of_this_slice_pass_in_the_sandbox(string method, string url) =>
         ExecutionEndpoints.IsAllowed(ExecEnvironment.Sandbox, new HttpMethod(method), U(url)).ShouldBeTrue();
 
@@ -37,7 +39,21 @@ public sealed class ExecutionEndpointsTests
     [InlineData("DELETE", "https://sandbox.dhan.co/v2/fundlimit")]
     [InlineData("GET", "https://sandbox.dhan.co/v2/trades/123")]
     [InlineData("GET", "https://sandbox.dhan.co/v2/positions?x=1")]
-    [InlineData("GET", "https://sandbox.dhan.co/v2/profile")]
+    [InlineData("POST", "https://sandbox.dhan.co/v2/profile")]
+    [InlineData("PUT", "https://sandbox.dhan.co/v2/profile")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/profile/1100003626")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/profile?dhanClientId=1")]
+    [InlineData("POST", "https://sandbox.dhan.co/v2/ip/getIP")]
+    [InlineData("POST", "https://sandbox.dhan.co/v2/ip/setIP")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/ip/setIP")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/ip/modifyIP")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/ip/getip")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/ip/getIP/1")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/ip/getIP?x=1")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/ip")]
+    [InlineData("GET", "https://sandbox.dhan.co/v2/RenewToken")]
+    [InlineData("GET", "https://evil.test/v2/profile")]
+    [InlineData("GET", "http://sandbox.dhan.co/v2/ip/getIP")]
     [InlineData("GET", "https://sandbox.dhan.co/v2/killswitch")]
     [InlineData("DELETE", "https://sandbox.dhan.co/v2/orders")]
     [InlineData("PATCH", "https://sandbox.dhan.co/v2/orders/123")]
@@ -84,14 +100,30 @@ public sealed class ExecutionEndpointsTests
         using var client = new HttpClient(new GuardHandler(ExecEnvironment.Sandbox, inner));
 
         await Should.ThrowAsync<HttpRequestException>(() => client.PostAsync("https://api.example.test/v2/orders", new StringContent("{}"), TestContext.Current.CancellationToken));
-        await Should.ThrowAsync<HttpRequestException>(() => client.GetAsync("https://sandbox.dhan.co/v2/profile", TestContext.Current.CancellationToken));
+        await Should.ThrowAsync<HttpRequestException>(() => client.GetAsync("https://sandbox.dhan.co/v2/killswitch", TestContext.Current.CancellationToken));
         inner.Calls.ShouldBe(0);
         (await client.GetAsync("https://sandbox.dhan.co/v2/orders/1", TestContext.Current.CancellationToken)).IsSuccessStatusCode.ShouldBeTrue();
         inner.Calls.ShouldBe(1);
 
         using var live = new HttpClient(new GuardHandler(ExecEnvironment.Live, inner));
         await Should.ThrowAsync<HttpRequestException>(() => live.GetAsync("https://sandbox.dhan.co/v2/orders/1", TestContext.Current.CancellationToken));
+        await Should.ThrowAsync<HttpRequestException>(() => live.GetAsync("https://sandbox.dhan.co/v2/profile", TestContext.Current.CancellationToken));
         inner.Calls.ShouldBe(1);
+    }
+
+    [Fact]
+    public void The_readiness_reads_build_only_in_the_sandbox_and_their_audit_templates_carry_no_id_or_query()
+    {
+        ExecutionEndpoints.Build(ExecEnvironment.Sandbox, DhanCall.ProfileGet)!.ToString().ShouldBe("https://sandbox.dhan.co/v2/profile");
+        ExecutionEndpoints.Build(ExecEnvironment.Sandbox, DhanCall.StaticIpGet)!.ToString().ShouldBe("https://sandbox.dhan.co/v2/ip/getIP");
+        ExecutionEndpoints.Build(ExecEnvironment.Sandbox, DhanCall.ProfileGet, "1").ShouldBeNull();
+        ExecutionEndpoints.Build(ExecEnvironment.Live, DhanCall.ProfileGet).ShouldBeNull();
+        ExecutionEndpoints.Build(ExecEnvironment.None, DhanCall.StaticIpGet).ShouldBeNull();
+        ExecutionEndpoints.MethodOf(DhanCall.ProfileGet).ShouldBe(HttpMethod.Get);
+        ExecutionEndpoints.MethodOf(DhanCall.StaticIpGet).ShouldBe(HttpMethod.Get);
+        ExecutionEndpoints.TemplateOf(DhanCall.ProfileGet).ShouldBe("/v2/profile");
+        ExecutionEndpoints.TemplateOf(DhanCall.StaticIpGet).ShouldBe("/v2/ip/getIP");
+        ExecutionEndpoints.TemplateOf(DhanCall.OrderByCorrelationGet).ShouldBe("/v2/orders/external/{id}");
     }
 
     private sealed class CountingHandler : HttpMessageHandler
