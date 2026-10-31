@@ -83,3 +83,6 @@ None for the build. Owner acts, default until done = OFF and nothing connects: (
 - The start switch is now an owner act with a fresh password on every change (stored insert-only switch, `AutonomyEndpoints` / `Elevate: false` pattern), in addition to the deployment flag and the paused service; criterion 6 and Decision 8.
 - Checked and stated: the recording list and the disk guard never touch the trading path (new criterion 10; the set is read-only inputs, not an active-set provider; a failing recorder changes nothing else).
 - Log ids come after the highest in use (4801 on 2026-10-25, `LogEventIdTests` decides); the next ADR (0102 today) stays "next free at build time". P8-22's category table gets `DepthRecorderSwitched` under `service`.
+
+> **Amendment 2026-11-01:** criterion 10 ("no frontend file mentions depth") has one exception, the owner's switch on the Services page; see the amendment to ADR 0135.
+

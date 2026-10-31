@@ -42,4 +42,5 @@ P13's aggressive-volume feature (`vol_delta_5m`) needs a trade stream aligned wi
 - `TickRecorderSupervisor` is a near copy of `DepthRecorderSupervisor` by design (independent recorders); a shared base for the gate and run lifecycle would stop the two drifting.
 - `xd-feed` keeps `mem_limit: 256m` with a third socket and a 50,000-row queue: watch memory in the first pilot sessions (runbook).
 - The architecture tests' list of areas that must not use tick types omits `Application.Execution`, `Application.Accounts` and `Application.Platform`, and exempts the whole `Infrastructure.Brokers` namespace; narrow both later.
+- The Services page shows the tick recorder's switch together with the depth recorder's (same two files as in the amendment to ADR 0135); the tick recorder has no other screen.
 

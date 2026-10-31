@@ -1,6 +1,6 @@
-import { Box } from '@mui/material';
+import { Box, Button } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
-import { Suspense, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { PortfolioRefreshDialog } from '@/features/accounts';
 import { queryRoots, type ServiceView } from '@/shared/api';
 import { formatIstDayAndTime } from '@/shared/lib/format';
@@ -18,6 +18,10 @@ import { ServiceGrid } from './ServiceGrid';
 import { ServicesHeader } from './ServicesHeader';
 import { SummaryStrip } from './SummaryStrip';
 import { TimelineCard } from './TimelineCard';
+
+const RecordersSection = lazy(async () => ({
+  default: (await import('./RecordersSection')).RecordersSection,
+}));
 
 /**
  * The Services screen: what runs by itself, when, and how the last run went. From `md` it fills the viewport under the
@@ -38,6 +42,7 @@ function ServicesContent() {
   const [history, setHistory] = useState<ServiceView | null>(null);
   // By id, so the dialog's line about the sync follows the list when it is read again.
   const [settingsId, setSettingsId] = useState<string | null>(null);
+  const [recorders, setRecorders] = useState(false);
   const items = services.data?.items;
 
   const handlers: ServiceActionHandlers = {
@@ -72,6 +77,25 @@ function ServicesContent() {
           <SummaryStrip services={items} />
           <TimelineCard />
           <ServiceGrid services={items} busyId={actions.busyId} handlers={handlers} />
+          <Box sx={{ mt: 1 }}>
+            <Button
+              size="small"
+              aria-expanded={recorders}
+              aria-controls="recorders-section"
+              onClick={() => {
+                setRecorders((open) => !open);
+              }}
+            >
+              Recorders
+            </Button>
+            {recorders && (
+              <Box sx={{ maxHeight: { md: '45vh' }, overflowY: { md: 'auto' } }}>
+                <Suspense fallback={<LoadingState label="Loading recorders" />}>
+                  <RecordersSection />
+                </Suspense>
+              </Box>
+            )}
+          </Box>
         </>
       )}
       {configuring && items && (

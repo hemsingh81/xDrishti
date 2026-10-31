@@ -143,8 +143,9 @@ public sealed class DepthRecordingArchitectureTests
         var files = Directory.GetFiles(Path.GetFullPath(frontend), "*.*", SearchOption.AllDirectories)
             .Where(f => (f.EndsWith(".ts", StringComparison.Ordinal) || f.EndsWith(".tsx", StringComparison.Ordinal)) && !f.EndsWith("schema.d.ts", StringComparison.Ordinal) && !f.Contains(".test.", StringComparison.Ordinal))
             .Where(f => File.ReadAllText(f).Contains("depth", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        files.ShouldBeEmpty();
+            .Select(f => Path.GetRelativePath(Path.GetFullPath(frontend), f).Replace('\\', '/')).Order().ToList();
+        // See the ADR 0135 amendment: the owner's switch of the recorder on the Services screen (its read and its change) is the one exception; it shows no depth data.
+        files.ShouldBe(["features/services/api/recordersApi.ts", "features/services/components/RecordersSection.tsx"]);
     }
 
     [Fact]

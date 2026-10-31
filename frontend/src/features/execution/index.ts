@@ -9,3 +9,8 @@ export const loadExecutionPage = async () => (await import('./components/Executi
 
 /** The stop control of the app bar. Loaded on demand; render inside <Suspense>. */
 export const StopChip = lazy(async () => ({ default: (await import('./components/StopChip')).StopChip }));
+
+/** The dialog that asks for a fresh password and a reason for one owner act. Loaded on demand; render inside <Suspense>. */
+export const PasswordReasonDialog = lazy(async () => ({
+  default: (await import('./components/PasswordReasonDialog')).PasswordReasonDialog,
+}));

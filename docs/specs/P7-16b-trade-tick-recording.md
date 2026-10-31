@@ -73,3 +73,6 @@ Unit: parser LTQ/uint32 volume (frames from the documented layout, UNVERIFIED), 
 - [ ] `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any path from tick data or the socket to a decision, order or broker write, any write to a depth table, and any way the recorder can stall the live feed)
 - [ ] Migration `AddTickRecording` with `Down`; `PinnedAllowList` unchanged; no new package
 - [ ] ADR written; docs 20 §B, 16, 17 (disk precondition 72 GiB, backups) updated; quote fixtures listed as UNVERIFIED in `docs/research/dhan-samples/README.md`
+
+> **Amendment 2026-11-01:** the owner's switch for ticks is shown on the Services page together with the depth switch (switch, state, reasons, notice, history only; no tick data); see the amendment to ADR 0135 and ADR 0173.
+
