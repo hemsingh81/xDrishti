@@ -215,7 +215,7 @@ public sealed class ExecutionHaltsApiTests(ApiFactory factory) : DataTestBase(fa
     }
 
     [Fact]
-    public async Task There_is_no_route_that_edits_deletes_or_clears_a_halt_without_the_owner_and_no_drill_route()
+    public async Task There_is_no_route_that_edits_deletes_or_clears_a_halt_without_the_owner_and_the_drill_route_needs_the_password()
     {
         foreach (var method in new[] { HttpMethod.Put, HttpMethod.Delete, HttpMethod.Patch })
         {
@@ -225,6 +225,6 @@ public sealed class ExecutionHaltsApiTests(ApiFactory factory) : DataTestBase(fa
         }
 
         using var drill = await Client.PostAsJsonAsync(new Uri("/api/execution/drills", UriKind.Relative), new { accountId = Guid.NewGuid() }, Ct);
-        ((int)drill.StatusCode).ShouldBeOneOf(404, 405);
+        drill.StatusCode.ShouldBe(HttpStatusCode.Unauthorized); // ADR 0174: the drill exists now and asks a fresh password first
     }
 }

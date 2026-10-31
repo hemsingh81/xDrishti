@@ -13,7 +13,7 @@ internal sealed class PgModeTrail(NpgsqlDataSource data) : IModeTrail
     {
         try
         {
-            await using var command = data.CreateCommand("SELECT execution.effective_mode(@a), COALESCE((SELECT s.execution_enabled FROM execution.settings s ORDER BY s.id DESC LIMIT 1), false)");
+            await using var command = data.CreateCommand("SELECT execution.effective_mode(@a), COALESCE((SELECT s.execution_enabled FROM execution.settings s WHERE s.effective_from <= clock_timestamp() ORDER BY s.id DESC LIMIT 1), false)");
             command.Parameters.AddWithValue("a", accountId);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             return await reader.ReadAsync(cancellationToken).ConfigureAwait(false) && !reader.IsDBNull(0) ? new ModeRecord(reader.GetString(0), reader.GetBoolean(1)) : null;

@@ -243,6 +243,8 @@ public static class DependencyInjection
         services.AddScoped<IConfirmTicketAccess, ConfirmTicketAccess>(); // the confirm tickets: read, plus the owner's confirmed and skipped outcomes (P12-08b)
         services.AddScoped<IDayUnlockAccess, DayUnlockAccess>(); // the day unlocks: read, plus the owner's unlock (P12-08b)
         services.AddScoped<IExecutionLimitsAccess, ExecutionLimitsAccess>(); // the limits sheets: read, plus the owner's snapshot (P12-09)
+        services.AddScoped<IExecutionSettingsAccess, ExecutionSettingsAccess>(); // the global switches: read, plus the owner's snapshot under the check_settings trigger (ADR 0174)
+        services.AddScoped<IExecutionDrillReader, ExecutionDrillReader>(); // the drills and the drill command rows, read only (ADR 0174)
         services.AddScoped<IExecutionRecordsReader, ExecutionRecordsReader>(); // the phase check's read-only SQL over the execution tables (P12-12)
         services.AddScoped<IExecutionScreenReader, ExecutionScreenReader>(); // the execution screens' bounded reads, SELECT only (P12-10)
         services.AddScoped<IExecutionFactsReader, ExecutionFactsReader>(); // the execution service's heartbeat and record, read only (P12-01b)

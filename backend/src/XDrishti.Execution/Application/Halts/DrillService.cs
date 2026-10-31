@@ -87,15 +87,17 @@ public sealed class DrillService(HaltService halts, IHaltStore store, IProtectio
 
         var started = clock.GetTimestamp();
         var raised = (await store.AppendAsync(new HaltDraft(HaltScope.Account, accountId, HaltLevel.Cancel, HaltTriggers.Drill, "system", Actor, "kill-switch drill", clock.GetUtcNow()), cancellationToken).ConfigureAwait(false)).Halt;
-        var seen = await halts.ReadAsync(cancellationToken).ConfigureAwait(false) == HaltReading.Halted;
-        var latency = (int)Math.Min(int.MaxValue, clock.GetElapsedTime(started).TotalMilliseconds);
-
         var transport = new RefusingBrokerOrders();
+        var seen = false;
+        var latency = 0;
         var stopped = false;
         var table = false;
         var cleared = false;
         try
         {
+            // Everything after the drill's own halt is raised sits inside the try, so the finally clears that halt whatever throws (a cancelled read included).
+            seen = await halts.ReadAsync(cancellationToken).ConfigureAwait(false) == HaltReading.Halted;
+            latency = (int)Math.Min(int.MaxValue, clock.GetElapsedTime(started).TotalMilliseconds);
             var sender = new LegSender(transport, new DrillMode(), halts, new ClosedPreSendCheck(), new NoJournal(), new ExecRateLimiter(clock, 5, 5, 5), ExecEnvironment.Sandbox, clock, TimeSpan.FromSeconds(5));
             var entry = new BrokerLeg("DRILL0000000000", LegKind.Entry, ExecSide.Buy, "0", 1, 1m);
             var attempt = await sender.SendAsync(new SendRequest(accountId, 0, entry, clock.GetUtcNow()), cancellationToken).ConfigureAwait(false);

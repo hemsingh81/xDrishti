@@ -56,6 +56,15 @@ public static class ExecServices
         services.AddSingleton<IDayMarkStore, PgDayMarkStore>();
         services.AddSingleton<HaltAutoClearService>();
 
+        // The kill-switch drill (ADR 0174): only in the sandbox send composition (environment sandbox AND Execution:SendEnabled), where IBrokerReads exists to judge flatness. Its transport refuses everything and it clears its own halt. In
+        // none and live nothing is registered and the drill command answers execution.drill_unavailable. The enforcer and the broker kill-switch port stay composed nowhere.
+        if (ExecEnvironmentParser.Parse(configuration[$"{ExecOptions.Section}:Environment"]) == ExecEnvironment.Sandbox && ExecOptions.IsSendEnabled(configuration))
+        {
+            services.AddSingleton<IDrillStore, PgDrillStore>();
+            services.AddSingleton(sp => new DrillRunner(
+                sp.GetRequiredService<HaltService>(), sp.GetRequiredService<IHaltStore>(), sp.GetRequiredService<IBrokerReads>(), sp.GetRequiredService<IReconOurSource>(), sp.GetRequiredService<IDrillStore>(), sp.GetRequiredService<TimeProvider>()));
+        }
+
         // The readiness record and probe (P12-11, ADR 0164): it reads the stored connection and, through IBrokerFacts, the broker's profile and configured IP, and writes insert-only rows. IBrokerFacts is the closed default (unreadable, so the verdict is unavailable) unless the
         // sandbox composition registered the Dhan adapter of those two reads first (sandbox and Execution:SendEnabled, ADR 0170) or live readiness is on (below, ADR 0171). Nothing here can send an order.
         services.AddSingleton<PgReadinessStore>();

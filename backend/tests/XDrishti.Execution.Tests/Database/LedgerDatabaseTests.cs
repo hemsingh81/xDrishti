@@ -300,7 +300,7 @@ public sealed class ExecutionSettingsDatabaseTests(ExecDatabase db)
     [Fact]
     public async Task The_settings_source_reads_the_newest_row_and_its_auto_live_keys()
     {
-        await ExecDatabase.ExecuteAsync(db.Owner, $"INSERT INTO execution.settings (execution_enabled, auto_live_enabled, \"values\", actor, reason) VALUES (true, true, '{{\"exec.auto_live_attended_min\": \"25\", \"exec.auto_live_require_day_unlock\": \"maybe\"}}', '{LimitsDb.Owner}', 'test')");
+        await _db.SettingsAsync($"INSERT INTO execution.settings (execution_enabled, auto_live_enabled, \"values\", actor, reason) VALUES (true, true, '{{\"exec.auto_live_attended_min\": \"25\", \"exec.auto_live_require_day_unlock\": \"maybe\"}}', '{LimitsDb.Owner}', 'test') RETURNING id");
         await using var data = NpgsqlDataSource.Create(db.Exec);
 
         var settings = await ((IAutoLiveSettingsSource)new PgLimits(data)).ReadAsync(TestContext.Current.CancellationToken);

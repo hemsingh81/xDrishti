@@ -68,7 +68,7 @@ public sealed class ExecPlaneTests(ExecDatabase db)
         after.Replaced.ShouldBe(["exec.price_band_pct"]);
         after.Values.ContainsKey("exec.unknown").ShouldBeFalse();
         after.Hash().ShouldNotBe(before.Hash());
-        (await ExecDatabase.SqlStateAsync(db.App, "INSERT INTO execution.settings (actor, reason) VALUES ('owner:x', 'y')")).ShouldBe("42501"); // the owner act has its own slice and trigger (P12-07)
+        (await ExecDatabase.SqlStateAsync(db.App, "INSERT INTO execution.settings (auto_live_enabled, actor, reason) VALUES (true, 'owner:x', 'y')")).ShouldBe("23514"); // the owner act has its own trigger (ADR 0174, ExecSettingsDatabaseTests)
     }
 
     [Fact]

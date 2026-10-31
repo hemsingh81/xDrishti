@@ -4087,6 +4087,42 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/execution/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The two global execution switches: the row in force (null: never written, both OFF), the raise waiting for its effectiveFrom, the latest 20 rows, autoLiveLocked (always true: no route turns auto_live_enabled on) and serverNow (the database clock). Read only */
+    get: operations['GetExecutionSettings'];
+    /** The owner switches execution_enabled, with a reason of 1 to 300 characters and the password on EVERY change (400 execution.password_required, 401 auth.invalid_credentials, 423 auth.locked). Switching it ON while OFF is in force needs the gate Live:Writes:Enabled (checked BEFORE the password; 403 live.capability_off) and takes effect at 09:00 India time of the next trading day after one full closed session; OFF is in force at once and supersedes a waiting raise. autoLiveEnabled true is always 409 execution.auto_live_locked. 400 execution.values_invalid, 403 execution.owner_only, 409 execution.stale when the database refused the row. The values object is not changed here */
+    put: operations['ChangeExecutionSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/execution/drills': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The kill-switch drills newest first (at most 50: passed, latency in ms, what was proved), the latest 20 drill requests with the execution service's answer (execution.drill_passed, execution.drill_failed, execution.drill_refused:<why>, execution.drill_unavailable outside the sandbox; null while unanswered), maxAgeDays (30: the ladder gate needs a drill no older) and serverNow. Optional accountId. Read only */
+    get: operations['GetExecutionDrills'];
+    put?: never;
+    /** Run drill: leaves a drill command for the execution service (the answer is the command id; read the drills to see the result). Needs the session, the CSRF token and a fresh password (401 auth.invalid_credentials, 423 auth.locked). The service runs it only in the sandbox: it refuses when the account holds a position or a working order or any halt is active, raises a cancel halt of its own, proves that an entry is stopped at the send path before a transport that refuses everything, clears its halt and stores the row. No order is sent in any case. 409 execution.drill_refused while a halt is in force, 404 execution.account_unknown, 400 execution.values_invalid */
+    post: operations['RequestExecutionDrill'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/execution/status': {
     parameters: {
       query?: never;
@@ -9426,6 +9462,12 @@ export interface components {
       /** Format: date */
       to: null | string;
     };
+    /** @description Run drill for one account, with a fresh password. The actor is never taken from the body. */
+    DrillRequestBody: {
+      /** Format: uuid */
+      accountId: null | string;
+      password: null | string;
+    };
     /** @description One cell of a stored entry-window study (P8-13b). A window is HH:mm text; a metric that cannot be computed is null. A status other than `Proposed` is the answer, shown as such. */
     EntryWindowCellView: {
       cellKey: string;
@@ -9890,6 +9932,49 @@ export interface components {
       at: string;
       reasons: string[];
     };
+    /**
+     * @description One drill the owner asked for: the command row and, once the execution service carried it out, its answer. string? ExecutionDrillRequestView.Result is `done` or `refused`; string? ExecutionDrillRequestView.Code is `execution.drill_passed`, `execution.drill_failed`,
+     *     `execution.drill_refused:&lt;why&gt;` or `execution.drill_unavailable` (the service runs no drill outside the sandbox). Both null while the service has not answered.
+     */
+    ExecutionDrillRequestView: {
+      /** Format: uuid */
+      commandId: string;
+      /** Format: uuid */
+      accountId: null | string;
+      /** Format: date-time */
+      at: string;
+      result: null | string;
+      code: null | string;
+      /** Format: date-time */
+      answeredAt: null | string;
+    };
+    /** @description The command row left for the execution service; the drill row appears when the service has run it (read the drills to see it). */
+    ExecutionDrillStarted: {
+      /** Format: uuid */
+      commandId: string;
+    };
+    /** @description One stored drill (spec P12-05 criterion 10): passed, how long the halt took to be seen in milliseconds, and the detail of what was proved. No order was sent in any case. */
+    ExecutionDrillView: {
+      /** Format: int64 */
+      id: number;
+      /** Format: date-time */
+      at: string;
+      /** Format: uuid */
+      accountId: string;
+      passed: boolean;
+      /** Format: int32 */
+      latencyMs: number;
+      detail: string;
+    };
+    /** @description The drills newest first (at most 50), the latest 20 requests with their answers, the age after which the mode ladder no longer counts a drill (int ExecutionDrillsView.MaxAgeDays) and the database clock. */
+    ExecutionDrillsView: {
+      drills: components['schemas']['ExecutionDrillView'][];
+      requests: components['schemas']['ExecutionDrillRequestView'][];
+      /** Format: int32 */
+      maxAgeDays: number;
+      /** Format: date-time */
+      serverNow: string;
+    };
     /** @description The execution gap by group, a total that is built from the same tickets, and the evidence. */
     ExecutionGapView: {
       state: string;
@@ -10130,6 +10215,39 @@ export interface components {
        * @description The last heartbeat, null when there never was one.
        */
       lastBeatAt: null | string;
+    };
+    /** @description The owner's change of the global switches. The password is needed for every change; autoLiveEnabled true is always refused. The actor is never taken from the body. */
+    ExecutionSettingsChangeBody: {
+      executionEnabled: null | boolean;
+      autoLiveEnabled: null | boolean;
+      reason: null | string;
+      password: null | string;
+    };
+    /** @description One stored snapshot of the global execution switches (spec P12-07 criterion 13, ADR 0174). The `values` object is not shown: this route does not change it. */
+    ExecutionSettingsRowView: {
+      /** Format: int64 */
+      id: number;
+      executionEnabled: boolean;
+      autoLiveEnabled: boolean;
+      actor: string;
+      reason: string;
+      /** Format: date-time */
+      changedAt: string;
+      /** Format: date-time */
+      effectiveFrom: string;
+      snapshotHash: string;
+    };
+    /**
+     * @description The two global switches: the row in force (null: never written, both OFF), the raise waiting for its `effectiveFrom` (null: none), the latest 20 rows, and bool ExecutionSettingsView.AutoLiveLocked (always true: no route turns `auto_live_enabled`
+     *     on in this build). DateTimeOffset ExecutionSettingsView.ServerNow is the database clock.
+     */
+    ExecutionSettingsView: {
+      inForce: null | components['schemas']['ExecutionSettingsRowView'];
+      pending: null | components['schemas']['ExecutionSettingsRowView'];
+      history: components['schemas']['ExecutionSettingsRowView'][];
+      autoLiveLocked: boolean;
+      /** Format: date-time */
+      serverNow: string;
     };
     ExecutionStatusView: {
       /** @description The service as the heartbeat shows it. */
@@ -28592,6 +28710,195 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['LimitsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExecutionSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionSettingsView'];
+        };
+      };
+    };
+  };
+  ChangeExecutionSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ExecutionSettingsChangeBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionSettingsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExecutionDrills: {
+    parameters: {
+      query?: {
+        accountId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionDrillsView'];
+        };
+      };
+    };
+  };
+  RequestExecutionDrill: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DrillRequestBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionDrillStarted'];
         };
       };
       /** @description Bad Request */

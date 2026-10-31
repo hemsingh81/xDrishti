@@ -177,6 +177,33 @@ public sealed class DrillTests
         drills.Rows.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task If_the_read_right_after_the_drills_halt_is_cancelled_the_drills_own_halt_is_still_cleared()
+    {
+        var (_, store, drills, rig) = Build();
+        var cancelling = new CancelSecondRead(store);
+        var drill = new DrillService(new HaltService(cancelling, rig.Clock), cancelling, rig.Source, drills, rig.Clock);
+
+        await Should.ThrowAsync<OperationCanceledException>(() => drill.RunAsync(Rig.Account, CancellationToken.None));
+
+        (await store.ActiveAsync(CancellationToken.None)).ShouldBeEmpty();
+        store.AutoClears.Single().Code.ShouldBe("drill");
+        drills.Rows.ShouldBeEmpty();
+    }
+
+    // The drill's refusal check is the first read; the second is the halt read right after the drill raised its own halt.
+    private sealed class CancelSecondRead(InMemoryHaltStore inner) : IHaltStore
+    {
+        private int _reads;
+
+        public Task<(ActiveHalt Halt, bool Created)> AppendAsync(HaltDraft draft, CancellationToken cancellationToken) => inner.AppendAsync(draft, cancellationToken);
+
+        public Task<IReadOnlyList<ActiveHalt>> ActiveAsync(CancellationToken cancellationToken) =>
+            ++_reads == 2 ? throw new OperationCanceledException("cancelled after the halt was raised") : inner.ActiveAsync(cancellationToken);
+
+        public Task<bool> AutoClearAsync(long haltId, string triggerCode, string detail, DateTimeOffset at, CancellationToken cancellationToken) => inner.AutoClearAsync(haltId, triggerCode, detail, at, cancellationToken);
+    }
+
     private sealed class ThrowingDrills : IDrillStore
     {
         public Task AppendAsync(DrillResult result, CancellationToken cancellationToken) => throw new InvalidOperationException("store down");

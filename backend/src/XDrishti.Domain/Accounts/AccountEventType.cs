@@ -89,4 +89,6 @@ public enum AccountEventType
     RampStepSet,
     LiveSettingsChanged,
     TickRecorderSwitched,
+    ExecutionSettingsChanged,
+    ExecutionDrillRequested,
 }

@@ -49,7 +49,7 @@ internal sealed class PgLimits(NpgsqlDataSource data) : ILimitsStore, IAutoLiveS
     {
         try
         {
-            await using var command = data.CreateCommand("SELECT id, execution_enabled, auto_live_enabled, \"values\"::text FROM execution.settings ORDER BY id DESC LIMIT 1");
+            await using var command = data.CreateCommand("SELECT id, execution_enabled, auto_live_enabled, \"values\"::text FROM execution.settings WHERE effective_from <= clock_timestamp() ORDER BY id DESC LIMIT 1");
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {

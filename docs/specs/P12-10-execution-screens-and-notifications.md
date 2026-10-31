@@ -85,3 +85,6 @@ None blocking. Owner acts: none in this slice beyond using it.
 - The halt row is written by `xd-exec`'s command path (`xd_app` cannot write halts); the chip says "Stop requested" until the halt row exists.
 - Screens show the canary state (`exec.canary_pending`, criterion 17).
 - Build order is P12-07, P12-11, P12-08, P12-09, P12-10, P12-12.
+
+## Amendment 2026-11-01 (ADR 0174)
+- The two writes this slice deferred now exist on the backend: `PUT /api/execution/settings` (criterion 7, switches only) and `POST /api/execution/drills` (criterion 9); both are in the criterion 15 allow-list already. The frontend controls are the next step.

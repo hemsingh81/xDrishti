@@ -34,7 +34,7 @@ public static class AuditKinds
     private static readonly Dictionary<AccountEventType, string> AccountCategories = Build<AccountEventType>(
         (Security, [AccountEventType.RolesChanged, AccountEventType.PrimaryDataChanged, AccountEventType.SecretsReplaced]),
         (Broker, [AccountEventType.ConnectionUpdated, AccountEventType.BrokerConnected, AccountEventType.BrokerConnectFailed, AccountEventType.BrokerDisconnected]),
-        (Service, [AccountEventType.ServiceScheduleChanged, AccountEventType.ServicePaused, AccountEventType.ServiceResumed, AccountEventType.ServiceRunRequested, AccountEventType.DepthRecorderSwitched, AccountEventType.TickRecorderSwitched]),
+        (Service, [AccountEventType.ServiceScheduleChanged, AccountEventType.ServicePaused, AccountEventType.ServiceResumed, AccountEventType.ServiceRunRequested, AccountEventType.DepthRecorderSwitched, AccountEventType.TickRecorderSwitched, AccountEventType.ExecutionDrillRequested]),
         (Alert, [AccountEventType.ActionSnoozed, AccountEventType.ActionDone, AccountEventType.ActionReopened, AccountEventType.ActionThresholdsChanged, AccountEventType.PriceAlertCreated, AccountEventType.PriceAlertTriggered, AccountEventType.PriceAlertCancelled]),
         (Configuration,
         [
@@ -42,7 +42,7 @@ public static class AuditKinds
             AccountEventType.CapabilityChanged, AccountEventType.BucketAdded, AccountEventType.BucketCreated, AccountEventType.BucketRenamed, AccountEventType.PortfolioRefreshSettingsChanged, AccountEventType.PortfolioBenchmarkChanged, AccountEventType.FirstImportDateChanged, AccountEventType.ComplianceRecorded,
         ]),
         (Learning, [AccountEventType.ExperimentJobStarted, AccountEventType.ExperimentJobCancelled, AccountEventType.LessonMoved, AccountEventType.HypothesisMoved, AccountEventType.ChangelogReverted, AccountEventType.ReportExported]),
-        (Autonomy, [AccountEventType.AutonomySettingsChanged, AccountEventType.RampStepSet, AccountEventType.LiveSettingsChanged]),
+        (Autonomy, [AccountEventType.AutonomySettingsChanged, AccountEventType.RampStepSet, AccountEventType.LiveSettingsChanged, AccountEventType.ExecutionSettingsChanged]),
         (MarketData,
         [
             AccountEventType.BasketCreated, AccountEventType.BasketRenamed, AccountEventType.BasketUpdated, AccountEventType.BasketArchived, AccountEventType.BasketsReordered, AccountEventType.BasketMembersAdded, AccountEventType.BasketMembersRemoved, AccountEventType.BasketMembersReordered,

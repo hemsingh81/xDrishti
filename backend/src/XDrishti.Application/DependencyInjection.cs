@@ -115,6 +115,10 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<UnlockDayCommand, DayUnlockView>, UnlockDayHandler>(); // the owner's daily unlock after a fresh password (P12-08b)
         services.AddScoped<IQueryHandler<GetExecutionLimitsQuery, Result<LimitsView>>, GetExecutionLimitsHandler>(); // the limits sheet of an account, read only (P12-09)
         services.AddScoped<ICommandHandler<ChangeExecutionLimitsCommand, LimitsView>, ChangeExecutionLimitsHandler>(); // the owner's limits sheet: a raise needs the password and waits a full session, a lowering is at once (P12-09)
+        services.AddScoped<IQueryHandler<GetExecutionSettingsQuery, ExecutionSettingsView>, GetExecutionSettingsHandler>(); // the two global switches, read only (P12-07 criterion 13, ADR 0174)
+        services.AddScoped<ICommandHandler<ChangeExecutionSettingsCommand, ExecutionSettingsView>, ChangeExecutionSettingsHandler>(); // the owner's switch change: password always, raise behind the gate and a full session, auto_live stays OFF (ADR 0174)
+        services.AddScoped<IQueryHandler<GetExecutionDrillsQuery, ExecutionDrillsView>, GetExecutionDrillsHandler>(); // the kill-switch drills and their requests, read only (P12-05 criterion 10)
+        services.AddScoped<ICommandHandler<RequestExecutionDrillCommand, ExecutionDrillStarted>, RequestExecutionDrillHandler>(); // the owner's drill: leaves a drill command row, sends nothing (P12-05 criterion 10, ADR 0174)
         services.AddScoped<IQueryHandler<EvaluateExecutionPhaseCheckQuery, Result<ExecutionPhaseCheckView>>, EvaluateExecutionPhaseCheckHandler>(); // the P12 phase check: 30 counted semi-auto sessions, per account, read only (P12-12, ADR 0169)
         services.AddScoped<IQueryHandler<GetExecutionOverviewQuery, Result<ExecutionOverview>>, GetExecutionOverviewHandler>(); // Today: modes, meters against the limits in force, tickets, halts, alarms (P12-10): read only
         services.AddScoped<IQueryHandler<GetExecutionBlotterQuery, Result<IReadOnlyList<BlotterRow>>>, GetExecutionBlotterHandler>(); // the orders of a day with per-fill slippage (P12-10): read only

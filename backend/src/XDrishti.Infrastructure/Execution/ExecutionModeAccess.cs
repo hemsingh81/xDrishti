@@ -138,7 +138,7 @@ internal sealed class ExecutionModeFacts(XDrishtiDbContext db) : IExecutionModeF
         {
             try
             {
-                await using var command = new NpgsqlCommand("SELECT execution_enabled FROM execution.settings ORDER BY id DESC LIMIT 1", connection);
+                await using var command = new NpgsqlCommand("SELECT execution_enabled FROM execution.settings WHERE effective_from <= clock_timestamp() ORDER BY id DESC LIMIT 1", connection);
                 return await command.ExecuteScalarAsync(cancellationToken) is bool enabled && enabled; // no settings row is the default: OFF
             }
             catch (NpgsqlException)

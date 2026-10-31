@@ -32,7 +32,7 @@ internal sealed class ConfirmTicketAccess(XDrishtiDbContext db) : IConfirmTicket
 
     private const string Facts = """
         SELECT clock_timestamp(),
-               COALESCE((SELECT s.execution_enabled FROM execution.settings s ORDER BY s.id DESC LIMIT 1), false),
+               COALESCE((SELECT s.execution_enabled FROM execution.settings s WHERE s.effective_from <= clock_timestamp() ORDER BY s.id DESC LIMIT 1), false),
                execution.effective_mode(@a),
                EXISTS (SELECT 1 FROM execution.halts h WHERE (h.scope = 'system' OR h.account_id = @a)
                        AND NOT EXISTS (SELECT 1 FROM execution.halt_releases r WHERE r.halt_id = h.id) AND NOT EXISTS (SELECT 1 FROM execution.halt_auto_clears c WHERE c.halt_id = h.id)),
@@ -41,7 +41,7 @@ internal sealed class ConfirmTicketAccess(XDrishtiDbContext db) : IConfirmTicket
                q.price, q.at,
                (SELECT ARRAY(SELECT x.code::text FROM execution.check_results x WHERE x.run_id = r.id AND x.class = 'soft' AND x.outcome <> 'pass' ORDER BY x.code)
                   FROM execution.check_runs r JOIN execution.intents i ON i.id = r.intent_id WHERE i.public_id = @intent AND r.kind = 'full' ORDER BY r.id DESC LIMIT 1),
-               (SELECT s."values"::text FROM execution.settings s ORDER BY s.id DESC LIMIT 1)
+               (SELECT s."values"::text FROM execution.settings s WHERE s.effective_from <= clock_timestamp() ORDER BY s.id DESC LIMIT 1)
           FROM (SELECT 1) one
           LEFT JOIN LATERAL (SELECT c.verdict, c.session_date, c.at FROM execution.readiness_checks c WHERE c.account_id = @a AND c.session_date = @d ORDER BY c.id DESC LIMIT 1) rc ON true
           LEFT JOIN LATERAL (SELECT CASE WHEN count(*) = 1 THEN max(l.last_price) END AS price, CASE WHEN count(*) = 1 THEN max(l.tick_at) END AS at

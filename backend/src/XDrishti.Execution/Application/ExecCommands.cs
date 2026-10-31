@@ -20,11 +20,11 @@ public interface IExecCommandStore
 }
 
 /// <summary>
-/// Answers every pending command once. Four kinds are known: <c>ping</c> (proves the plane works, changes nothing), from P12-05 <c>halt</c> (the owner's button: it can only record a halt, which makes the system stricter), from P12-11 <c>readiness_now</c> (wakes the readiness loop, which then reads two things at the broker and writes a record) and from P12-08b <c>ticket_refuse</c> (closes a confirm ticket <c>refused</c> after the owner's tap was refused for its price or Soft set; closing is the safe direction). Every other kind is refused
+/// Answers every pending command once. Five kinds are known: <c>ping</c> (proves the plane works, changes nothing), from P12-05 <c>halt</c> (the owner's button: it can only record a halt, which makes the system stricter), from P12-11 <c>readiness_now</c> (wakes the readiness loop, which then reads two things at the broker and writes a record) and from P12-08b <c>ticket_refuse</c> (closes a confirm ticket <c>refused</c> after the owner's tap was refused for its price or Soft set; closing is the safe direction). From ADR 0174 <c>drill</c> (the kill-switch drill: composed only in the sandbox, it raises and clears a halt of its own and sends nothing; elsewhere refused <c>execution.drill_unavailable</c>). Every other kind is refused
 /// with <c>execution.command_unknown</c>. No kind reaches a broker. A halt whose record cannot be written is NOT answered, so it is tried again on the next poll until it lands.
 /// </summary>
 public sealed partial class ExecCommandProcessor(
-    IExecCommandStore store, HaltService? halts = null, TimeProvider? timeProvider = null, ILogger<ExecCommandProcessor>? logger = null, ReadinessSignal? readiness = null, TicketCloser? tickets = null)
+    IExecCommandStore store, HaltService? halts = null, TimeProvider? timeProvider = null, ILogger<ExecCommandProcessor>? logger = null, ReadinessSignal? readiness = null, TicketCloser? tickets = null, DrillRunner? drills = null)
 {
     public static readonly TimeSpan MaxBackoff = TimeSpan.FromSeconds(30);
 
@@ -35,6 +35,9 @@ public sealed partial class ExecCommandProcessor(
     public const string Halt = "halt";
     public const string ReadinessNow = "readiness_now";
     public const string TicketRefuse = "ticket_refuse";
+    public const string Drill = "drill";
+    public const string DrillUnavailableCode = "execution.drill_unavailable";
+    public const string DrillInvalidCode = "execution.drill_invalid";
     public const string TicketRefuseInvalidCode = "execution.ticket_refuse_invalid";
     public const string UnknownCode = "execution.command_unknown";
     public const string HaltInvalidCode = "execution.halt_invalid";
@@ -59,6 +62,8 @@ public sealed partial class ExecCommandProcessor(
                     Halt when halts is not null => await HaltAsync(command, cancellationToken).ConfigureAwait(false),
                     ReadinessNow when readiness is not null => ReadinessAsync(command),
                     TicketRefuse when tickets is not null => await TicketRefuseAsync(command, cancellationToken).ConfigureAwait(false),
+                    Drill when drills is not null => await DrillAsync(command, cancellationToken).ConfigureAwait(false),
+                    Drill => ("refused", DrillUnavailableCode), // no drill outside the sandbox composition: the answer says so
                     _ => ("refused", UnknownCode),
                 };
             }
@@ -134,6 +139,24 @@ public sealed partial class ExecCommandProcessor(
             false => ("done", "execution.ticket_decided"),
             null => ("refused", TicketRefuseInvalidCode),
         };
+    }
+
+    // The owner's drill (P12-05 criterion 10, ADR 0174): only an owner actor with an account. A refusal names its reason in the code; the drill itself sends nothing in any case. A drill that throws is not answered and is tried again,
+    // like a halt; its own halt has already been cleared by the drill.
+    private async Task<(string Result, string Code)> DrillAsync(ExecCommand command, CancellationToken cancellationToken)
+    {
+        if (!command.Actor.StartsWith("owner:", StringComparison.Ordinal) || command.AccountId is not { } account)
+        {
+            return ("refused", DrillInvalidCode);
+        }
+
+        var result = await drills!.RunAsync(account, cancellationToken).ConfigureAwait(false);
+        if (result.Detail.StartsWith("refused:", StringComparison.Ordinal))
+        {
+            return ("refused", "execution.drill_refused:" + result.Detail["refused:".Length..]);
+        }
+
+        return ("done", result.Passed ? "execution.drill_passed" : "execution.drill_failed");
     }
 
     private async Task<(string Result, string Code)> HaltAsync(ExecCommand command, CancellationToken cancellationToken)

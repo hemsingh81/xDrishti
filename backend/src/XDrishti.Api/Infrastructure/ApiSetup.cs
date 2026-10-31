@@ -125,6 +125,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, AutonomyEndpoints>();
         services.AddSingleton<IEndpointModule, ExecutionConfirmEndpoints>(); // the confirm tickets and day unlocks (P12-08b): the owner's tap writes an outcome row and sends nothing
         services.AddSingleton<IEndpointModule, ExecutionLimitsEndpoints>(); // the per-account limits sheet (P12-09): a raise needs the password and waits a full session; sends nothing
+        services.AddSingleton<IEndpointModule, ExecutionSwitchEndpoints>(); // the owner's switch writes and the kill-switch drill (ADR 0174): password every time, auto_live stays OFF; sends nothing
         services.AddSingleton<IEndpointModule, ExecutionEndpoints>(); // the execution service's status (P12-01b): read only, no write route
         services.AddSingleton<IEndpointModule, DepthEndpoints>(); // the owner's depth-recorder switch (P7-16): fresh password per change, insert-only; no depth data is readable
         services.AddSingleton<IEndpointModule, TickEndpoints>(); // the owner's trade-tick recorder switch (P7-16b): fresh password per change, insert-only; no tick data is readable

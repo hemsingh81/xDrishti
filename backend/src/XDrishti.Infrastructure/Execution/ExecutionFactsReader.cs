@@ -27,7 +27,8 @@ internal sealed class ExecutionFactsReader(XDrishtiDbContext db) : IExecutionFac
             hash = document.RootElement.TryGetProperty("settingsHash", out var h) ? h.GetString() : null;
         }
 
-        return new ExecutionFacts(beat?.State, beat?.LastSeenAt, environment, hash, open, [.. accounts.Select(a => (a.Id, Snake(a.Mode)))], halted, enabled);
+        // An account without a Trading row (a Data-only account) reads as paper, the safe side; before ADR 0174 it made the read throw.
+        return new ExecutionFacts(beat?.State, beat?.LastSeenAt, environment, hash, open, [.. accounts.Select(a => (a.Id, a.Mode is null ? "paper" : Snake(a.Mode)))], halted, enabled);
     }
 
     /// <summary>The doc 20 spelling of a mode (<c>ManualLive</c> is <c>manual_live</c>).</summary>

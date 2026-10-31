@@ -58,10 +58,37 @@ internal sealed class LimitsDb(ExecDatabase db)
     }
 
     /// <summary>A settings row (the newest one is in force for everyone on this server) with P12-01's entry window opened to the whole day, so that the tests run at any hour; answers its id.</summary>
-    public async Task<long> SwitchesAsync(bool execution, bool autoLive) =>
-        (long)(await ExecDatabase.ScalarAsync(
-            db.Owner,
-            $$"""INSERT INTO execution.settings (execution_enabled, auto_live_enabled, "values", actor, reason) VALUES ({{execution.ToString().ToLowerInvariant()}}, {{autoLive.ToString().ToLowerInvariant()}}, '{"exec.entry_window_start": "00:00", "exec.entry_window_end": "23:59"}', '{{Owner}}', 'test') RETURNING id"""))!;
+    public Task<long> SwitchesAsync(bool execution, bool autoLive) =>
+        SettingsAsync(
+            $$"""INSERT INTO execution.settings (execution_enabled, auto_live_enabled, "values", actor, reason) VALUES ({{execution.ToString().ToLowerInvariant()}}, {{autoLive.ToString().ToLowerInvariant()}}, '{"exec.entry_window_start": "00:00", "exec.entry_window_end": "23:59"}', '{{Owner}}', 'test') RETURNING id""");
+
+    /// <summary>
+    /// Writes a settings row as the owner past the auto_live lock (ADR 0174: no slice can store auto_live_enabled ON): the CHECK is dropped, the row written and the CHECK put back NOT VALID, in one transaction. Answers the id.
+    /// </summary>
+    public async Task<long> SettingsAsync(string insertReturningId)
+    {
+        await using var connection = new NpgsqlConnection(db.Owner);
+        await connection.OpenAsync(Ct);
+        await using var tx = await connection.BeginTransactionAsync(Ct);
+        await using (var drop = new NpgsqlCommand("ALTER TABLE execution.settings DROP CONSTRAINT IF EXISTS ck_exec_settings_auto_live_off", connection, tx))
+        {
+            await drop.ExecuteNonQueryAsync(Ct);
+        }
+
+        long id;
+        await using (var insert = new NpgsqlCommand(insertReturningId, connection, tx))
+        {
+            id = (long)(await insert.ExecuteScalarAsync(Ct))!;
+        }
+
+        await using (var restore = new NpgsqlCommand("ALTER TABLE execution.settings ADD CONSTRAINT ck_exec_settings_auto_live_off CHECK (NOT auto_live_enabled) NOT VALID", connection, tx))
+        {
+            await restore.ExecuteNonQueryAsync(Ct);
+        }
+
+        await tx.CommitAsync(Ct);
+        return id;
+    }
 
     /// <summary>
     /// The hand example's sheet, in force now. <paramref name="window"/> null is all day (00:00 to 23:59:59, past the window constraint so that the tests run at any hour); otherwise the given India window, which the constraint admits.

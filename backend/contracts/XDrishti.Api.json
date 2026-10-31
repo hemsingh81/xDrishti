@@ -14337,6 +14337,226 @@
         }
       }
     },
+    "/api/execution/settings": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "The two global execution switches: the row in force (null: never written, both OFF), the raise waiting for its effectiveFrom, the latest 20 rows, autoLiveLocked (always true: no route turns auto_live_enabled on) and serverNow (the database clock). Read only",
+        "operationId": "GetExecutionSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionSettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "The owner switches execution_enabled, with a reason of 1 to 300 characters and the password on EVERY change (400 execution.password_required, 401 auth.invalid_credentials, 423 auth.locked). Switching it ON while OFF is in force needs the gate Live:Writes:Enabled (checked BEFORE the password; 403 live.capability_off) and takes effect at 09:00 India time of the next trading day after one full closed session; OFF is in force at once and supersedes a waiting raise. autoLiveEnabled true is always 409 execution.auto_live_locked. 400 execution.values_invalid, 403 execution.owner_only, 409 execution.stale when the database refused the row. The values object is not changed here",
+        "operationId": "ChangeExecutionSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionSettingsChangeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionSettingsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/execution/drills": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "The kill-switch drills newest first (at most 50: passed, latency in ms, what was proved), the latest 20 drill requests with the execution service's answer (execution.drill_passed, execution.drill_failed, execution.drill_refused:<why>, execution.drill_unavailable outside the sandbox; null while unanswered), maxAgeDays (30: the ladder gate needs a drill no older) and serverNow. Optional accountId. Read only",
+        "operationId": "GetExecutionDrills",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionDrillsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Run drill: leaves a drill command for the execution service (the answer is the command id; read the drills to see the result). Needs the session, the CSRF token and a fresh password (401 auth.invalid_credentials, 423 auth.locked). The service runs it only in the sandbox: it refuses when the account holds a position or a working order or any halt is active, raises a cancel halt of its own, proves that an entry is stopped at the send path before a transport that refuses everything, clears its halt and stores the row. No order is sent in any case. 409 execution.drill_refused while a halt is in force, 404 execution.account_unknown, 400 execution.values_invalid",
+        "operationId": "RequestExecutionDrill",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrillRequestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionDrillStarted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/execution/status": {
       "get": {
         "tags": [
@@ -30139,6 +30359,29 @@
         },
         "description": "The largest peak-to-trough fall of a NAV series: `Pct` is a percent number (12.5 means it fell 12.5 %) from the peak on `From` to the low on `To`. A series that never falls (flat or rising)\ngives 0 and no dates."
       },
+      "DrillRequestBody": {
+        "required": [
+          "accountId",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Run drill for one account, with a fresh password. The actor is never taken from the body."
+      },
       "EntryWindowCellView": {
         "required": [
           "cellKey",
@@ -31426,6 +31669,135 @@
         },
         "description": "The state recorded at 09:10:30 India time for one session. Late means the service was not running then; the state is then `unavailable`."
       },
+      "ExecutionDrillRequestView": {
+        "required": [
+          "commandId",
+          "accountId",
+          "at",
+          "result",
+          "code",
+          "answeredAt"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "result": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "answeredAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "One drill the owner asked for: the command row and, once the execution service carried it out, its answer. string? ExecutionDrillRequestView.Result is `done` or `refused`; string? ExecutionDrillRequestView.Code is `execution.drill_passed`, `execution.drill_failed`,\n`execution.drill_refused:&lt;why&gt;` or `execution.drill_unavailable` (the service runs no drill outside the sandbox). Both null while the service has not answered."
+      },
+      "ExecutionDrillStarted": {
+        "required": [
+          "commandId"
+        ],
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "description": "The command row left for the execution service; the drill row appears when the service has run it (read the drills to see it)."
+      },
+      "ExecutionDrillView": {
+        "required": [
+          "id",
+          "at",
+          "accountId",
+          "passed",
+          "latencyMs",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "latencyMs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "description": "One stored drill (spec P12-05 criterion 10): passed, how long the halt took to be seen in milliseconds, and the detail of what was proved. No order was sent in any case."
+      },
+      "ExecutionDrillsView": {
+        "required": [
+          "drills",
+          "requests",
+          "maxAgeDays",
+          "serverNow"
+        ],
+        "type": "object",
+        "properties": {
+          "drills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionDrillView"
+            }
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionDrillRequestView"
+            }
+          },
+          "maxAgeDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "serverNow": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "The drills newest first (at most 50), the latest 20 requests with their answers, the age after which the mode ladder no longer counts a drill (int ExecutionDrillsView.MaxAgeDays) and the database clock."
+      },
       "ExecutionGapView": {
         "required": [
           "state",
@@ -32279,6 +32651,131 @@
             "format": "date-time"
           }
         }
+      },
+      "ExecutionSettingsChangeBody": {
+        "required": [
+          "executionEnabled",
+          "autoLiveEnabled",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "executionEnabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "autoLiveEnabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The owner's change of the global switches. The password is needed for every change; autoLiveEnabled true is always refused. The actor is never taken from the body."
+      },
+      "ExecutionSettingsRowView": {
+        "required": [
+          "id",
+          "executionEnabled",
+          "autoLiveEnabled",
+          "actor",
+          "reason",
+          "changedAt",
+          "effectiveFrom",
+          "snapshotHash"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "executionEnabled": {
+            "type": "boolean"
+          },
+          "autoLiveEnabled": {
+            "type": "boolean"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "snapshotHash": {
+            "type": "string"
+          }
+        },
+        "description": "One stored snapshot of the global execution switches (spec P12-07 criterion 13, ADR 0174). The `values` object is not shown: this route does not change it."
+      },
+      "ExecutionSettingsView": {
+        "required": [
+          "inForce",
+          "pending",
+          "history",
+          "autoLiveLocked",
+          "serverNow"
+        ],
+        "type": "object",
+        "properties": {
+          "inForce": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExecutionSettingsRowView"
+              }
+            ]
+          },
+          "pending": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExecutionSettingsRowView"
+              }
+            ]
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExecutionSettingsRowView"
+            }
+          },
+          "autoLiveLocked": {
+            "type": "boolean"
+          },
+          "serverNow": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "The two global switches: the row in force (null: never written, both OFF), the raise waiting for its `effectiveFrom` (null: none), the latest 20 rows, and bool ExecutionSettingsView.AutoLiveLocked (always true: no route turns `auto_live_enabled`\non in this build). DateTimeOffset ExecutionSettingsView.ServerNow is the database clock."
       },
       "ExecutionStatusView": {
         "required": [

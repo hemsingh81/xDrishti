@@ -6,7 +6,7 @@ using XDrishti.Execution.Host;
 
 namespace XDrishti.Execution.Tests.Halts;
 
-/// <summary>P12-05 changes nothing a host can send with: the enforcer, the drill, the kill-switch coordinator and its port are composed nowhere, and the entry gate's halt source is still the closed default.</summary>
+/// <summary>P12-05 changes nothing a host can send with: the enforcer, the kill-switch coordinator and its port are composed nowhere, the drill service itself is no service (ADR 0174 composes its runner only in the sandbox send composition, see <see cref="DrillRunnerTests"/>), and the entry gate's halt source is still the closed default.</summary>
 public sealed class HaltCompositionTests
 {
     private static string Source(params string[] path) => File.ReadAllText(Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "XDrishti.Execution", .. path]));
@@ -52,6 +52,7 @@ public sealed class HaltCompositionTests
         host.ShouldNotContain("IHaltRequests");
         host.ShouldNotContain("HaltEnforcer");
         host.ShouldNotContain("DrillService");
+        host.ShouldContain("== ExecEnvironment.Sandbox && ExecOptions.IsSendEnabled(configuration))\n        {\n            services.AddSingleton<IDrillStore, PgDrillStore>();", Case.Sensitive, "the drill runner is registered only inside the sandbox-and-send condition (ADR 0174)");
         host.ShouldNotContain("KillSwitchCoordinator");
         host.ShouldNotContain("IBrokerKillSwitch");
     }
