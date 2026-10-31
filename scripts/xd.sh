@@ -15,6 +15,7 @@
 #   scripts/xd.sh assistant briefing [--kind daily|weekly] [--subject S] [--store] [--new-version]   (P9-06, ADR 0140: the briefing or weekly review text; prints the fixed-format text, --store keeps it; the model phrases only under both switches)
 #   scripts/xd.sh eval compare|accept|show ...   (P9-09, ADR 0143: the assistant eval; `run` and `grade` need the model and the eval tool server inside the stack: use scripts/xd-eval.sh, which runs this verb in a one-shot container; `accept` is the owner's act)
 #   scripts/xd.sh plan phase-check [--through YYYY-MM-DD]   (P7-18, ADR 0097: the P7 exit criteria from stored plan runs, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
+#   scripts/xd.sh exec phase-check [--account ID] [--through YYYY-MM-DD]   (P12-12, ADR 0169: 30 counted semi-auto sessions with zero reconciliation breaks, per account, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
 #   scripts/xd.sh reports phase-check   (P8-17, ADR 0126: the P8 exit criteria from stored runs, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
 #   scripts/xd.sh charge-sheet show [--sheet ID]   (P8-23, ADR 0127: whether the owner's charge-sheet confirmation stands; read only; confirm and revoke are the owner's act with a fresh password on the Settings screen, the verb refuses them)
 #   scripts/xd.sh lab runs [--strategy ID] [--state succeeded] [--limit 20]

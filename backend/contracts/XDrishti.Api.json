@@ -14358,6 +14358,55 @@
         }
       }
     },
+    "/api/execution/phase-check": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "The P12 phase check (read only): per Trading account, 30 consecutive counted semi-auto sessions with zero reconciliation breaks, judged from stored records up to through (default: the newest session whose final reconciliation is due) as MET, NOT MET or NOT EVALUABLE with the per-session lines, the facts beside the verdict, the boundary fact and the honest limits. The phase exit is MET when at least one account is MET; an unavailable or missing fact never counts as clean. Optional accountId. 422 execution.invalid on a later date or an unknown account. Nothing is written; no token, client id, secret or balance",
+        "operationId": "GetExecutionPhaseCheck",
+        "parameters": [
+          {
+            "name": "through",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionPhaseCheckView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/execution/overview": {
       "get": {
         "tags": [
@@ -18727,6 +18776,102 @@
           }
         },
         "description": "Per-account replacements for values of the risk profile; null means \"use the profile's value\"."
+      },
+      "AccountPhaseReport": {
+        "required": [
+          "accountId",
+          "name",
+          "windowStart",
+          "mode",
+          "verdict",
+          "streak",
+          "counted",
+          "idle",
+          "broken",
+          "outOfMode",
+          "sandboxSessions",
+          "firstMetAt",
+          "lastBreak",
+          "sessions",
+          "facts",
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "windowStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "streak": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "counted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "idle": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "broken": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "outOfMode": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sandboxSessions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstMetAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "lastBreak": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionLine"
+            }
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhaseFact"
+            }
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "description": "The verdict of one account with its numbers. DateOnly? AccountPhaseReport.FirstMetAt is the date the streak first reached the need (a later break does not rewrite it); string? AccountPhaseReport.LastBreak names the date and the reasons of the last broken session."
       },
       "AccountResponse": {
         "required": [
@@ -31676,6 +31821,65 @@
         },
         "description": "bool? ExecutionOverview.CanaryPending is `exec.canary_pending` (null when it could not be read). IReadOnlyList&lt;string&gt; ExecutionOverview.Limits is the evidence line: what the numbers are and are not."
       },
+      "ExecutionPhaseCheckView": {
+        "required": [
+          "report",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "report": {
+            "$ref": "#/components/schemas/ExecutionPhaseReport"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "ExecutionPhaseReport": {
+        "required": [
+          "through",
+          "exitVerdict",
+          "exitCriterion",
+          "needed",
+          "accounts",
+          "boundary",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "through": {
+            "type": "string",
+            "format": "date"
+          },
+          "exitVerdict": {
+            "type": "string"
+          },
+          "exitCriterion": {
+            "type": "string"
+          },
+          "needed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountPhaseReport"
+            }
+          },
+          "boundary": {
+            "$ref": "#/components/schemas/PhaseFact"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The report (spec P12-12 Contract). string ExecutionPhaseReport.ExitVerdict is the bare word, string ExecutionPhaseReport.ExitCriterion the labelled line; PhaseFact ExecutionPhaseReport.Boundary is a printed fact that does not change a streak."
+      },
       "ExecutionPromotionRequestView": {
         "required": [
           "id",
@@ -42961,6 +43165,26 @@
         },
         "description": "An epoch of the history, with whether it is the one judged."
       },
+      "PhaseFact": {
+        "required": [
+          "name",
+          "state",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "description": "string PhaseFact.State is `value`, `empty`, `insufficient` or `unavailable`; the text carries the n. Printed beside the verdict, never part of it."
+      },
       "PhaseNotJudged": {
         "required": [
           "name",
@@ -50832,6 +51056,94 @@
         },
         "description": "What the client needs to know about its session."
       },
+      "SessionLine": {
+        "required": [
+          "date",
+          "class",
+          "reasons",
+          "ordersSent",
+          "sandboxIntents",
+          "tickets",
+          "eodRun",
+          "finalRun",
+          "breaks",
+          "breakKinds",
+          "alarms",
+          "halts",
+          "dayState",
+          "medianMinutes",
+          "medianState"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "class": {
+            "type": "string"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ordersSent": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sandboxIntents": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tickets": {
+            "$ref": "#/components/schemas/TicketTally"
+          },
+          "eodRun": {
+            "type": "string"
+          },
+          "finalRun": {
+            "type": "string"
+          },
+          "breaks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "breakKinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "alarms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "halts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dayState": {
+            "type": "string"
+          },
+          "medianMinutes": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "medianState": {
+            "type": "string"
+          }
+        },
+        "description": "The per-session line (criterion 8). Runs read `readable`, `unreadable` or `missing`; string SessionLine.MedianState is `value` or `insufficient`."
+      },
       "SetOutcome": {
         "required": [
           "set",
@@ -52709,6 +53021,47 @@
           }
         },
         "description": "The indicative numbers of a ticket (spec P7-19, ADR 0109): rupees as of the close of the session, not tomorrow's price and not an order."
+      },
+      "TicketTally": {
+        "required": [
+          "issued",
+          "confirmed",
+          "skipped",
+          "expired",
+          "refused",
+          "medianMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "issued": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "confirmed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expired": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "refused": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "medianMinutes": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "The confirm tickets of a session by outcome; double? TicketTally.MedianMinutes is the median from issue to tap and null (insufficient) below int TicketTally.MinForMedian tickets."
       },
       "TimeframeCheck": {
         "required": [

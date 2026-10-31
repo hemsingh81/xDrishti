@@ -22,6 +22,11 @@ internal sealed class ExecutionEndpoints : IEndpointModule
             .WithName("GetExecutionStatus")
             .WithSummary("The execution service: down / recovering / ready / halted from its heartbeat (down when older than 30 s), its process environment (none, sandbox, live), each account's mode and gate (closed until the mode ladder exists), halts and the open intents. Read only; an empty database answers environment none and closed gates");
 
+        group.MapGet("/phase-check", GetPhaseCheckAsync)
+            .WithName("GetExecutionPhaseCheck")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .WithSummary("The P12 phase check (read only): per Trading account, 30 consecutive counted semi-auto sessions with zero reconciliation breaks, judged from stored records up to through (default: the newest session whose final reconciliation is due) as MET, NOT MET or NOT EVALUABLE with the per-session lines, the facts beside the verdict, the boundary fact and the honest limits. The phase exit is MET when at least one account is MET; an unavailable or missing fact never counts as clean. Optional accountId. 422 execution.invalid on a later date or an unknown account. Nothing is written; no token, client id, secret or balance");
+
         group.MapGet("/overview", GetOverviewAsync)
             .WithName("GetExecutionOverview")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
@@ -307,6 +312,14 @@ internal sealed class ExecutionEndpoints : IEndpointModule
     {
         http.Response.Headers.CacheControl = "no-store";
         return TypedResults.Ok(await handler.HandleAsync(new GetExecutionStatusQuery(), cancellationToken));
+    }
+
+    private static async Task<Results<Ok<ExecutionPhaseCheckView>, ProblemHttpResult>> GetPhaseCheckAsync(
+        IQueryHandler<EvaluateExecutionPhaseCheckQuery, Result<ExecutionPhaseCheckView>> handler, HttpContext http, CancellationToken cancellationToken, DateOnly? through = null, Guid? accountId = null)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var result = await handler.HandleAsync(new EvaluateExecutionPhaseCheckQuery(through, accountId), cancellationToken);
+        return result.IsSuccess ? TypedResults.Ok(result.Value) : Problem(result.Error, http);
     }
 
     private static async Task<Results<Ok<ExecutionOverview>, ProblemHttpResult>> GetOverviewAsync(

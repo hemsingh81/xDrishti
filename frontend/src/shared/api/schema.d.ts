@@ -4104,6 +4104,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/execution/phase-check': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The P12 phase check (read only): per Trading account, 30 consecutive counted semi-auto sessions with zero reconciliation breaks, judged from stored records up to through (default: the newest session whose final reconciliation is due) as MET, NOT MET or NOT EVALUABLE with the per-session lines, the facts beside the verdict, the boundary fact and the honest limits. The phase exit is MET when at least one account is MET; an unavailable or missing fact never counts as clean. Optional accountId. 422 execution.invalid on a later date or an unknown account. Nothing is written; no token, client id, secret or balance */
+    get: operations['GetExecutionPhaseCheck'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/execution/overview': {
     parameters: {
       query?: never;
@@ -5344,6 +5361,34 @@ export interface components {
       maxOpenPositions: null | number;
       /** Format: double */
       dailyLossPct: null | number;
+    };
+    /** @description The verdict of one account with its numbers. DateOnly? AccountPhaseReport.FirstMetAt is the date the streak first reached the need (a later break does not rewrite it); string? AccountPhaseReport.LastBreak names the date and the reasons of the last broken session. */
+    AccountPhaseReport: {
+      /** Format: uuid */
+      accountId: string;
+      name: string;
+      /** Format: date */
+      windowStart: null | string;
+      mode: string;
+      verdict: string;
+      /** Format: int32 */
+      streak: number;
+      /** Format: int32 */
+      counted: number;
+      /** Format: int32 */
+      idle: number;
+      /** Format: int32 */
+      broken: number;
+      /** Format: int32 */
+      outOfMode: number;
+      /** Format: int32 */
+      sandboxSessions: number;
+      /** Format: date */
+      firstMetAt: null | string;
+      lastBreak: null | string;
+      sessions: components['schemas']['SessionLine'][];
+      facts: components['schemas']['PhaseFact'][];
+      label: string;
     };
     /** @description What the owner may see about their own account (never the hash or the lockout state). */
     AccountResponse: {
@@ -9943,6 +9988,22 @@ export interface components {
       accounts: components['schemas']['OverviewAccount'][];
       limits: string[];
     };
+    ExecutionPhaseCheckView: {
+      report: components['schemas']['ExecutionPhaseReport'];
+      text: string;
+    };
+    /** @description The report (spec P12-12 Contract). string ExecutionPhaseReport.ExitVerdict is the bare word, string ExecutionPhaseReport.ExitCriterion the labelled line; PhaseFact ExecutionPhaseReport.Boundary is a printed fact that does not change a streak. */
+    ExecutionPhaseReport: {
+      /** Format: date */
+      through: string;
+      exitVerdict: string;
+      exitCriterion: string;
+      /** Format: int32 */
+      needed: number;
+      accounts: components['schemas']['AccountPhaseReport'][];
+      boundary: components['schemas']['PhaseFact'];
+      limits: string[];
+    };
     ExecutionPromotionRequestView: {
       /** Format: uuid */
       id: string;
@@ -14091,6 +14152,12 @@ export interface components {
       /** @description True for the epoch judged; earlier epochs are never pooled into it. */
       current: boolean;
     };
+    /** @description string PhaseFact.State is `value`, `empty`, `insufficient` or `unavailable`; the text carries the n. Printed beside the verdict, never part of it. */
+    PhaseFact: {
+      name: string;
+      state: string;
+      text: string;
+    };
     /** @description A thing the check never judges, and the tests that prove it. */
     PhaseNotJudged: {
       /** @description The property. */
@@ -17036,6 +17103,29 @@ export interface components {
        */
       elevatedUntil?: null | string;
     };
+    /** @description The per-session line (criterion 8). Runs read `readable`, `unreadable` or `missing`; string SessionLine.MedianState is `value` or `insufficient`. */
+    SessionLine: {
+      /** Format: date */
+      date: string;
+      class: string;
+      reasons: string[];
+      /** Format: int32 */
+      ordersSent: number;
+      /** Format: int32 */
+      sandboxIntents: number;
+      tickets: components['schemas']['TicketTally'];
+      eodRun: string;
+      finalRun: string;
+      /** Format: int32 */
+      breaks: number;
+      breakKinds: string[];
+      alarms: string[];
+      halts: string[];
+      dayState: string;
+      /** Format: double */
+      medianMinutes: null | number;
+      medianState: string;
+    };
     /** @description The outcome of one set: the state and, for a failure, the thresholds that did not hold, in words. */
     SetOutcome: {
       set: string;
@@ -17719,6 +17809,21 @@ export interface components {
       rewardRisk: null | number;
       /** @description The pinned sentence on what the numbers are. */
       basis: string;
+    };
+    /** @description The confirm tickets of a session by outcome; double? TicketTally.MedianMinutes is the median from issue to tap and null (insufficient) below int TicketTally.MinForMedian tickets. */
+    TicketTally: {
+      /** Format: int32 */
+      issued: number;
+      /** Format: int32 */
+      confirmed: number;
+      /** Format: int32 */
+      skipped: number;
+      /** Format: int32 */
+      expired: number;
+      /** Format: int32 */
+      refused: number;
+      /** Format: double */
+      medianMinutes: null | number;
     };
     /** @description The aggregates of one timeframe compared with the recomputed ones: `compared` buckets (stored or recomputed), `differences` among them. */
     TimeframeCheck: {
@@ -28503,6 +28608,38 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ExecutionStatusView'];
+        };
+      };
+    };
+  };
+  GetExecutionPhaseCheck: {
+    parameters: {
+      query?: {
+        through?: string;
+        accountId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExecutionPhaseCheckView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

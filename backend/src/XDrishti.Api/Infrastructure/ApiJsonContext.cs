@@ -155,6 +155,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(SkipTicketBody))]
 [JsonSerializable(typeof(DayUnlockBody))]
 [JsonSerializable(typeof(ExecutionOverview))]
+[JsonSerializable(typeof(ExecutionPhaseCheckView))]
 [JsonSerializable(typeof(OverviewAccount))]
 [JsonSerializable(typeof(OverviewCaps))]
 [JsonSerializable(typeof(OverviewReadiness))]
