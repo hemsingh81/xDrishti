@@ -1,6 +1,6 @@
 # 0171 - A live broker token reaches the execution service only as a per-account, same-day, sealed hand-over with its own key, for the readiness reads first
 
-- **Status:** Proposed (owner decision needed; nothing is built from this ADR until it is Accepted).
+- **Status:** Accepted in part (owner approved option B on 2026-10-31, after due diligence by an independent review against the code, which corrected the first draft). The sealed hand-over (steps 1 to 4 below) may be built. Reading from the broker with a live token is blocked on a separate egress decision (step 5) that is still open.
 - **Date:** 2026-10-31.
 - **Relation to other ADRs:** closes the open point of ADR 0158 §3 ("a later live ADR decides how the live token reaches the process") and of ADR 0170 (live readiness stays unavailable). Builds on ADR 0008 and 0009 (the consent flow is the only login), ADR 0156 (`xd_exec` is the only writer of `execution`), ADR 0164 (readiness).
 
@@ -17,18 +17,24 @@ Live readiness is `unavailable` for every account, because `xd-exec` cannot get 
 - **C. Keep live readiness `unavailable` and make the owner attest the morning by hand.** No new secret path. Readiness stays honest but permanently manual, and the phase check (ADR 0169) can never count a session as proved. Acceptable as a fallback if B is declined.
 - **D. The API proxies the two reads for `xd-exec`.** No token leaves the API. Adds a network path and a dependency of the execution service on the API being up at 08:00; weaker than B for the thing readiness must prove.
 
-## Decision (proposed): B, in two steps
-1. **Readiness only first.** The new token source is registered for `IBrokerFacts` only and only in `Environment=live` when `Execution:ReadinessLiveEnabled` is true (default false). It is not an `IExecCredentials` for the order client. The order client keeps refusing live (ADR 0157). A later live-send ADR decides whether the same source may feed it.
-2. **Account-scoped facts.** `IBrokerFacts` gains an account argument, so one account's token is never used for another, and the sandbox-applies-to-all-accounts caveat of ADR 0170 is removed for live. Sandbox readiness rows get an environment column so they cannot read as live evidence.
-3. **Smallest secret exposure.** The exec key is separate from the vault key and rotates on its own; only the access token is sealed, never the API key, secret or any PIN. Rows older than two days are not read (the API may prune them; the app never deletes evidence tables otherwise, so the cleanup is a separate decision).
-4. **Audit.** Reading a handed-over token writes no token, id or client id anywhere; one log line per read with the account slug and the reason code. The read-call audit gap of ADR 0170 (reads not in `execution.broker_calls`) is closed in the same slice by widening that table with a `read` phase.
-5. **Grants and tests.** A new grant decision in `ExecGrantsTests` (INSERT-only for `xd_app`, SELECT for `xd_exec`, no UPDATE/DELETE for anyone, the table in the insert-only list), a test that `xd_exec` still cannot read `broker_secrets`, a test that an expired or undecryptable row is `token_unavailable`, a test that the feed and worker containers do not get the exec key.
+## Due diligence (2026-10-31, read-only review against the code)
+Confirmed: the API holds the plaintext token only inside one consent request, where `CompleteConnect` stores the vault row and the connection in one unit of work (so a hand-over row can commit atomically with them); `Disconnect` and `ClearAsync` delete the vault token in the same unit of work; `BrokerSecretCipher` can be reused with another key; the vault key goes only to `xd-api` and `xd-feed` (ADR 0024), so `xd-feed` and `xd-worker` can be excluded from a new key; `xd_exec` has no access to `broker_secrets` and reads three columns of `broker_connections`.
+Corrected from the first draft: (a) the table does not go in schema `execution` (a credential is not evidence, and the schema's default privileges would give `xd_app` UPDATE and DELETE); (b) it is one row per account, not append-only, because Disconnect deletes the vault token today and an append-only row would leave a valid token readable after a disconnect; (c) no copied `expires_at`; (d) the compose rules and grant tests must be rewritten; (e) `xd-exec` has no route to Dhan.
+
+## Decision
+1. **The table is `accounts.exec_token_handover`**, one row per account (`account_id` key, `sealed_token`, `key_version`, `created_at`). `xd_app` keeps its default rights on it; `xd_exec` gets `SELECT` on this table only; no other role. ADR 0156 §3 gains one line: `xd_exec` also reads this table.
+2. **Written and removed with the connection.** `ConnectionWriter` (through a new Application port `IExecTokenHandover`, implemented in Infrastructure) upserts the row in the same unit of work as the vault row and the connection at consent; `Disconnect`, `ClearAsync` and a new login replace or delete it in the same unit of work. If the write fails the whole connect fails; there is no connect without a hand-over.
+3. **Its own key.** `ExecHandover__Key` is a new secret file (Keychain `xdrishti/exec/handover-key`, created by `xd-up.sh` like the vault key), mounted into `xd-api` and `xd-exec` only. The cipher gets a purpose parameter (own salt and info) and the associated data binds account and name, so a row cannot be moved to another account. The decrypt half is a small public type shared with `XDrishti.Execution`, which does not reference Infrastructure. Only the access token is sealed.
+4. **Freshness comes from the connection.** `xd_exec` uses the token only when `broker_connections.status` is Connected and `expires_at` is in the future, and the row decrypts; otherwise the answer is `token_unavailable`. A key rotation makes every row unreadable until the next login (acceptable for a 24-hour token). Tests: the grants table, `xd_exec` still refused on `broker_secrets`, an expired or undecryptable row is unavailable, a row cannot decrypt for another account, the feed and worker lack the key, and `ExecComposeRules` (`one-secret`, `secret-holders`) is rewritten for two secrets.
+5. **Prerequisite, not decided here: egress.** `xd-exec` is on the `exec` network, which is `internal` with only `xd-db` and `xd-exec`, and `ExecComposeRules` pins "no route out". Even with a token, the live reads cannot run. Giving `xd-exec` a route to the live Dhan host (pinned by name) is a security change of its own and needs its own ADR and the owner's explicit decision. Until then the hand-over can be built and tested but the live readiness stays `unavailable`.
+6. **Readiness only.** The token source feeds `IBrokerFacts` only, behind `Execution:ReadinessLiveEnabled` (default false) in `Environment=live`. It is not an `IExecCredentials` for the order client, which keeps refusing live (ADR 0157). `IBrokerFacts` becomes account-scoped, which removes the sandbox-applies-to-all-accounts caveat of ADR 0170 for live.
+7. **Split out.** The `read` phase of `broker_calls` (it needs a new constraint, and the send limiter must ignore it) and the environment column on `readiness_checks` are separate slices, not part of this one.
 
 ## Consequences
-- Live readiness becomes real for a connected account, so the morning checklist, the halt auto-clear and the phase check can reach READY / MET on real data.
-- One new secret file, one new table and one migration; `xd-up.sh` creates the key in the Keychain flow like the vault key.
-- A compromise of `xd-exec` exposes today's access tokens of connected accounts (24 h), not the long-lived API credentials. Because the exec process has no live sender, it still cannot place an order.
-- The step that would let the exec process use this token to send is a separate decision and is not taken here.
+- After the egress decision, live readiness becomes real for a connected account, and the checklist, halt auto-clear and phase check can reach READY or MET on real data.
+- One secret file, one table, one migration; a compromise of `xd-exec` exposes the day's tokens of connected accounts (24 hours), not the long-lived credentials, and it still has no live sender.
+- The vault key is already held by two services, so option A would have added one more holder; B still keeps the exec process away from every long-lived secret.
 
-## Owner decision needed
-Accept B (two-step), choose C (manual attestation only), or ask for D. If B: say whether the exec key may live in the same Keychain folder as the vault key, and whether rows should be pruned after two days.
+## Owner decisions still open
+1. Egress for `xd-exec` to the live Dhan host (step 5), as its own ADR.
+2. Whether the hand-over may later feed the order client (a live-send ADR; not decided here).
