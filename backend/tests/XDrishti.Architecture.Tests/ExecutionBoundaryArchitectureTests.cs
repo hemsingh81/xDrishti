@@ -220,14 +220,47 @@ public sealed class ExecutionBoundaryArchitectureTests
     }
 
     [Fact]
-    public void The_xd_api_allow_list_files_are_byte_for_byte_the_committed_ones()
+    public void The_xd_api_allow_list_files_are_byte_for_byte_the_committed_ones_but_for_the_exact_option_chain_lines_of_P14_02()
     {
-        // zero diff against HEAD for the data-side allow-list and the broker clients (needs git; skipped quietly when the checkout has none)
-        var root = Path.GetDirectoryName(Backend)!;
-        var files = new[] { "backend/src/XDrishti.Infrastructure/Brokers/BrokerEndpoints.cs", "backend/tests/XDrishti.Infrastructure.Tests/BrokerAllowListTests.cs" };
-        foreach (var file in files.Where(f => File.Exists(Path.Combine(root, f))))
+        // The data-side allow-list, its pin and its test have zero diff against HEAD (needs git; skipped quietly when the checkout has none). The one tolerated diff is the exact set of lines P14-02 adds (ADR 0176): the diff
+        // must be EMPTY (after the slice is committed this is always the case) or its added lines, trimmed and without blank lines, must be EXACTLY this set, and no line may be removed or changed. Any later edit to these
+        // files must change the literal set below in the same commit, with an ADR.
+        var expected = new Dictionary<string, string[]>
         {
-            var info = new System.Diagnostics.ProcessStartInfo("git", $"diff --quiet HEAD -- {file}") { WorkingDirectory = root, RedirectStandardError = true, RedirectStandardOutput = true };
+            ["backend/src/XDrishti.Infrastructure/Brokers/BrokerEndpoints.cs"] = [
+                "/// <para>P14-02 (ADR 0176) adds the option chain and its expiry list of the Data API: <c>POST /v2/optionchain</c> and <c>POST /v2/optionchain/expirylist</c>, no query, each an exact row of its own.</para>",
+                "/// <summary>The option chain of one underlying and expiry (JSON body <c>{\"UnderlyingScrip\":13,\"UnderlyingSeg\":\"IDX_I\",\"Expiry\":\"yyyy-MM-dd\"}</c>, headers <c>access-token</c> and <c>client-id</c>; P14-02, ADR 0176). Read-only despite the POST; no query. Exact path: <c>/v2/optionchain/expirylist</c> is its own row.</summary>",
+                "public static readonly Uri DhanOptionChain = new(\"https://api.dhan.co/v2/optionchain\");",
+                "/// <summary>The expiry dates of one underlying (JSON body without <c>Expiry</c>, same headers; P14-02, ADR 0176). Read-only despite the POST; no query.</summary>",
+                "public static readonly Uri DhanOptionChainExpiryList = new(\"https://api.dhan.co/v2/optionchain/expirylist\");",
+                "(HttpMethod.Post, DhanOptionChain, null),",
+                "(HttpMethod.Post, DhanOptionChainExpiryList, null),",
+            ],
+            ["backend/src/XDrishti.Domain/Planning/PlanPhaseCheck.cs"] = [
+                "// P14-02 (ADR 0176) added the two option-chain lines below, in the same commit as the allow-list rows.",
+                "\"POST api.dhan.co/v2/optionchain\",",
+                "\"POST api.dhan.co/v2/optionchain/expirylist\",",
+            ],
+            ["backend/tests/XDrishti.Infrastructure.Tests/Brokers/BrokerAllowListTests.cs"] = [
+                "[InlineData(\"POST\", \"https://api.dhan.co/v2/optionchain\")]",
+                "[InlineData(\"POST\", \"https://api.dhan.co/v2/optionchain/expirylist\")]",
+                "[Fact]",
+                "public void The_option_chain_rows_are_exactly_two_posts_without_a_query_and_the_pin_lists_the_same_two_lines()",
+                "{",
+                "string[] lines = [\"POST api.dhan.co/v2/optionchain\", \"POST api.dhan.co/v2/optionchain/expirylist\"];",
+                "BrokerEndpoints.Describe().Where(l => l.Contains(\"optionchain\", StringComparison.Ordinal)).ShouldBe(lines);",
+                "PlanPhaseCheck.PinnedAllowList.Where(l => l.Contains(\"optionchain\", StringComparison.Ordinal)).ShouldBe(lines);",
+                "BrokerEndpoints.Describe().ShouldBe(PlanPhaseCheck.PinnedAllowList);",
+                "new BrokerAllowList().Allows(\"POST\", \"https://api.dhan.co/v2/charts/rollingoption\").ShouldBeFalse();",
+                "new BrokerAllowList().Allows(\"POST\", \"https://api.dhan.co/v2/optionchain?x=1\").ShouldBeFalse();",
+                "}",
+            ],
+        };
+        var root = Path.GetDirectoryName(Backend)!;
+        foreach (var (file, lines) in expected)
+        {
+            File.Exists(Path.Combine(root, file)).ShouldBeTrue(file + " is guarded and must exist");
+            var info = new System.Diagnostics.ProcessStartInfo("git", $"diff -U0 HEAD -- {file}") { WorkingDirectory = root, RedirectStandardError = true, RedirectStandardOutput = true };
             System.Diagnostics.Process? p;
             try
             {
@@ -244,8 +277,20 @@ public sealed class ExecutionBoundaryArchitectureTests
                 return;
             }
 
+            var diff = p.StandardOutput.ReadToEnd();
             p.WaitForExit(10_000);
-            p.ExitCode.ShouldBeOneOf(0, 128, 127);
+            if (p.ExitCode is not 0)
+            {
+                continue; // not a checkout (128) or no git (127)
+            }
+
+            var changed = diff.Split('\n').Where(l => (l.StartsWith('+') || l.StartsWith('-')) && !l.StartsWith("+++", StringComparison.Ordinal) && !l.StartsWith("---", StringComparison.Ordinal)).ToList();
+            changed.Where(l => l.StartsWith('-')).ShouldBeEmpty(file + ": no line of the committed file may be changed or removed");
+            var added = changed.Select(l => l[1..].Trim()).Where(l => l.Length > 0).ToList();
+            if (added.Count > 0)
+            {
+                added.Order(StringComparer.Ordinal).ShouldBe(lines.Order(StringComparer.Ordinal), file + ": the added lines must be exactly the pinned set of P14-02");
+            }
         }
     }
 

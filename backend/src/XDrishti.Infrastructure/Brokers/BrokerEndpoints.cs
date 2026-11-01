@@ -5,6 +5,7 @@ namespace XDrishti.Infrastructure.Brokers;
 /// (<c>GET /v2/holdings</c>, no query), the day's trade book and order book (<c>GET /v2/trades</c> and <c>GET /v2/orders</c>, no query, no id; ADR 0149), the trade history (<c>GET /v2/trades/{from}/{to}/{page}</c>, dates in the path, no query) and the ledger (<c>GET /v2/ledger?from-date=…&amp;to-date=…</c>, exactly those two query keys), the 1-minute chart data of the Data API (<c>POST /v2/charts/intraday</c>, no query) and the market quote of the holdings
 /// (<c>POST /v2/marketfeed/quote</c>, no query; ADR 0019) — never an order action, positions or funds, and no other market-feed path (<c>ltp</c>, <c>ohlc</c>). Enforced for every request of the broker HTTP clients by <see cref="BrokerEndpointGuard"/>. The two login pages are opened by the owner's
 /// browser, never by the server.
+/// <para>P14-02 (ADR 0176) adds the option chain and its expiry list of the Data API: <c>POST /v2/optionchain</c> and <c>POST /v2/optionchain/expirylist</c>, no query, each an exact row of its own.</para>
 /// </summary>
 internal static class BrokerEndpoints
 {
@@ -45,6 +46,12 @@ internal static class BrokerEndpoints
     /// <summary>The market quote of up to 1,000 securities (JSON body <c>{"NSE_EQ":[ids]}</c>, headers <c>access-token</c> and <c>client-id</c>; ADR 0019 §1). Read-only despite the POST; <c>ltp</c>, <c>ohlc</c> and every other market-feed path stay refused.</summary>
     public static readonly Uri DhanMarketQuote = new("https://api.dhan.co/v2/marketfeed/quote");
 
+    /// <summary>The option chain of one underlying and expiry (JSON body <c>{"UnderlyingScrip":13,"UnderlyingSeg":"IDX_I","Expiry":"yyyy-MM-dd"}</c>, headers <c>access-token</c> and <c>client-id</c>; P14-02, ADR 0176). Read-only despite the POST; no query. Exact path: <c>/v2/optionchain/expirylist</c> is its own row.</summary>
+    public static readonly Uri DhanOptionChain = new("https://api.dhan.co/v2/optionchain");
+
+    /// <summary>The expiry dates of one underlying (JSON body without <c>Expiry</c>, same headers; P14-02, ADR 0176). Read-only despite the POST; no query.</summary>
+    public static readonly Uri DhanOptionChainExpiryList = new("https://api.dhan.co/v2/optionchain/expirylist");
+
     /// <summary>
     /// Dhan's market-data WebSocket (ADR 0024 §8; unverified until the owner's first real session): <c>wss://api-feed.dhan.co</c> with exactly the query keys <see cref="FeedQueryKeys"/> (<c>version</c>, <c>token</c>, <c>clientId</c>,
     /// <c>authType</c>). The only socket the application may open, checked by <see cref="IsAllowedWebSocket"/> before the connection is made.
@@ -76,6 +83,8 @@ internal static class BrokerEndpoints
         (HttpMethod.Get, DhanOrderBook, null),
         (HttpMethod.Post, DhanIntradayChart, null),
         (HttpMethod.Post, DhanMarketQuote, null),
+        (HttpMethod.Post, DhanOptionChain, null),
+        (HttpMethod.Post, DhanOptionChainExpiryList, null),
     ];
 
     /// <summary>One allowed request shape: method, host, how it reads in the phase check (ADR 0097) and what the rest of the URL must look like.</summary>

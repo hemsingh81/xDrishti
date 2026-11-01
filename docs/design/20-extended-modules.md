@@ -64,6 +64,7 @@ stateDiagram-v2
 
 - Data: Dhan **option chain API** (OI, Greeks, IV, bid/ask; ~1 request / 3 s per underlying-expiry) and
   **expired options data API** for backtests; own chain snapshots (5-min for indices, EOD for stocks).
+- Chain recorder (built, P14-02, [ADR 0176](../adr/0176-the-option-chain-recorder-stores-five-minute-index-chains-and-a-daily-stock-pass-from-two-new-allow-listed-data-api-endpoints-behind-three-gates-its-own-cap-and-no-reader.md)): `options.chain_snapshots` (strike by strike with bid, ask, last, OI, volume, IV and Greeks as Dhan sends them, prices in paise, a missing quote null with a flag), `chain_requests` (every planned request and how it ended) and `chain_sessions`; the index chains every 5 minutes of the session (09:20-15:30) and the stock chains once a day (14:30-15:25); two new allow-listed endpoints, one request per 3 seconds at most; off by default behind three gates, its own 4 GB cap and the shared 20 GB free floor; compressed, insert-only, nothing reads it yet.
 - Reference data (built, P14-01, [ADR 0175](../adr/0175-option-contracts-of-a-configured-underlying-list-are-kept-from-the-master-refresh-in-their-own-schema-with-a-dated-lot-history-and-dated-rule-epochs-never-in-the-master-list.md)):
   `options.contracts` (the contracts of the listed underlyings from the daily master refresh, never deleted),
   `options.lot_sizes` (dated lot history) and `options.market_epochs` (dated rule changes); every seed is unconfirmed

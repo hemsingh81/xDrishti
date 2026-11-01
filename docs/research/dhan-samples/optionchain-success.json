@@ -1,0 +1,51 @@
+{
+  "_status": "UNVERIFIED: written from the Dhan documentation (https://dhanhq.co/docs/v2/option-chain/, read 2026-11-01), not recorded from the real API",
+  "request": {
+    "method": "POST",
+    "url": "https://api.dhan.co/v2/optionchain",
+    "headers": { "access-token": "<token>", "client-id": "<client id>", "Content-Type": "application/json" },
+    "body": { "UnderlyingScrip": 13, "UnderlyingSeg": "IDX_I", "Expiry": "2026-11-03" }
+  },
+  "response": {
+    "data": {
+      "last_price": 25642.8,
+      "oc": {
+        "25650.000000": {
+          "ce": {
+            "average_price": 146.99,
+            "greeks": { "delta": 0.53871, "theta": -15.1539, "gamma": 0.00132, "vega": 12.18593 },
+            "implied_volatility": 9.789,
+            "last_price": 134,
+            "oi": 3786445,
+            "previous_close_price": 244.85,
+            "previous_oi": 402220,
+            "previous_volume": 31931705,
+            "security_id": 42528,
+            "top_ask_price": 134,
+            "top_ask_quantity": 1365,
+            "top_bid_price": 133.55,
+            "top_bid_quantity": 1625,
+            "volume": 117567970
+          },
+          "pe": {
+            "average_price": 150.1,
+            "greeks": { "delta": -0.47, "theta": -9.1, "gamma": 0.00132, "vega": 12.18 },
+            "implied_volatility": 11.1,
+            "last_price": 132.5,
+            "oi": 5000,
+            "previous_close_price": 210.5,
+            "previous_oi": 4000,
+            "previous_volume": 100,
+            "security_id": 42529,
+            "top_ask_price": 0,
+            "top_ask_quantity": 0,
+            "top_bid_price": 0,
+            "top_bid_quantity": 0,
+            "volume": 2000
+          }
+        }
+      }
+    },
+    "status": "success"
+  }
+}

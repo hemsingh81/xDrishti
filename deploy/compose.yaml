@@ -199,7 +199,7 @@ services:
 
   # The live feed (P2-10, ADR 0024): the Dhan WebSocket for the active set during market hours (09:00-15:35 IST on trading days; the window is the service
   # `live-feed` on the Services screen). It reads the Data account's token through the broker vault, so it gets the vault key like xd-api, and it writes
-  # prices into the database only. Outbound to api-feed.dhan.co (wss) only: its client refuses every other endpoint. No published port.
+  # prices into the database only. Outbound to api-feed.dhan.co (wss) and, for the option-chain recorder (P14-02), the two option-chain paths of api.dhan.co (https) only: its clients refuse every other endpoint. No published port.
   xd-feed:
     image: localhost/xdrishti/feed:${XD_VERSION:-0.1.0}
     build:
@@ -215,6 +215,8 @@ services:
       Depth__Enabled: ${XD_DEPTH_ENABLED:-false}
       # The trade-tick recorder (P7-16b, ADR 0173): the deployment gate, OFF by default. A second Quote-mode socket to the same allowed host (api-feed.dhan.co); recording also needs the owner's switch (PUT /api/ticks/recorder, password) and the resumed service tick-recorder.
       Ticks__Enabled: ${XD_TICKS_ENABLED:-false}
+      # The option-chain recorder (P14-02, ADR 0176): the deployment gate, OFF by default. REST requests of the Data account to POST api.dhan.co/v2/optionchain and /v2/optionchain/expirylist only (the client's guard refuses every other endpoint), at most one per 3 seconds; recording also needs the owner's switch (PUT /api/options/chain-recorder, password) and the resumed service option-chain-recorder.
+      Options__Chain__Enabled: ${XD_OPTIONS_CHAIN_ENABLED:-false}
     secrets:
       - source: db_app_password
         target: Database__Password

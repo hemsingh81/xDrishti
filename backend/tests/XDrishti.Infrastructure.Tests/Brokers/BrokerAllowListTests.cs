@@ -27,6 +27,8 @@ public sealed class BrokerAllowListTests
     [InlineData("GET", "https://api.dhan.co/v2/holdings")]
     [InlineData("POST", "https://api.dhan.co/v2/charts/intraday")]
     [InlineData("POST", "https://api.dhan.co/v2/marketfeed/quote")]
+    [InlineData("POST", "https://api.dhan.co/v2/optionchain")]
+    [InlineData("POST", "https://api.dhan.co/v2/optionchain/expirylist")]
     [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0")]
     [InlineData("GET", "https://api.dhan.co/v2/trades")]
     [InlineData("GET", "https://api.dhan.co/v2/orders")]
@@ -34,6 +36,18 @@ public sealed class BrokerAllowListTests
     public void The_declared_data_endpoints_are_allowed(string method, string url)
     {
         new BrokerAllowList().Allows(method, url).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void The_option_chain_rows_are_exactly_two_posts_without_a_query_and_the_pin_lists_the_same_two_lines()
+    {
+        string[] lines = ["POST api.dhan.co/v2/optionchain", "POST api.dhan.co/v2/optionchain/expirylist"];
+
+        BrokerEndpoints.Describe().Where(l => l.Contains("optionchain", StringComparison.Ordinal)).ShouldBe(lines);
+        PlanPhaseCheck.PinnedAllowList.Where(l => l.Contains("optionchain", StringComparison.Ordinal)).ShouldBe(lines);
+        BrokerEndpoints.Describe().ShouldBe(PlanPhaseCheck.PinnedAllowList);
+        new BrokerAllowList().Allows("POST", "https://api.dhan.co/v2/charts/rollingoption").ShouldBeFalse();
+        new BrokerAllowList().Allows("POST", "https://api.dhan.co/v2/optionchain?x=1").ShouldBeFalse();
     }
 
     [Fact]

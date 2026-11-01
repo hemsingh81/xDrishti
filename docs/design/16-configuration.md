@@ -440,6 +440,27 @@ Ticks:
   MaxStoredGb: 12         # 1–500: the stored size of market.trade_ticks above which recording stops (the app never deletes data)
 ```
 
+### Option-chain recorder (`Options:*`, [ADR 0176](../adr/0176-the-option-chain-recorder-stores-five-minute-index-chains-and-a-daily-stock-pass-from-two-new-allow-listed-data-api-endpoints-behind-three-gates-its-own-cap-and-no-reader.md), P14-02)
+
+`appsettings.json` / environment of `xd-feed` (`Options__Chain__Enabled`; compose passes `XD_OPTIONS_CHAIN_ENABLED`); bounds are checked at start-up. **Off by default, three gates:** this deployment flag (restart to change), the owner's stored switch (`PUT /api/options/chain-recorder`, the password typed again for every change, ON and OFF) and the service `option-chain-recorder` (starts paused; window 09:14-15:31 on trading days; "Run now" refused). The underlyings are the app setting `options.underlyings` (doc 06 §2.1); the indices asked each slot are those of `IndexExpiries`, the other listed underlyings are the daily stock pass. The recorder sends at most one request per 3 seconds (Dhan: "one unique request every 3 seconds", UNVERIFIED whether per user); a larger `SpacingMs` is allowed, a smaller one is refused at start. A bound `IndexExpiries` list replaces the default.
+
+```yaml
+Options:
+  MinFreeGb: 20           # 5-500: free disk space below which an options recorder stops (the app never deletes data)
+  Chain:
+    Enabled: false        # the deployment gate; false = nothing is read, built or sent
+    IntervalMinutes: 5    # 5-60: the grid of slots from 09:20 to 15:30 (75 at 5)
+    SpacingMs: 3000       # 3000-60000: the gap between any two requests of the process; never below 3000
+    StrikesEachSide: 30   # 5-50: strikes kept either side of the one nearest the underlying (indices)
+    StockStrikesEachSide: 15  # 3-30: the same for the stock chains
+    IndexExpiries:        # empty = the default below; Weekly = the earliest expiries, Monthly = the earliest month-end ones not among them
+      - { Symbol: "NSE:NIFTY", Weekly: 3, Monthly: 1 }
+      - { Symbol: "NSE:BANKNIFTY", Weekly: 0, Monthly: 2 }
+    StockExpiries: 2      # 1-3: expiries asked of each share, once a day from 14:30 to 15:25
+    TimeoutSeconds: 10    # 1-15: a request that takes longer is a timeout gap, never retried
+    MaxStoredGb: 4        # 1-100: the stored size of options.chain_snapshots above which recording stops
+```
+
 ## 4. Most-used settings
 
 | Setting | Meaning | Default |

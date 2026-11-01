@@ -1,0 +1,10 @@
+{
+  "_status": "UNVERIFIED: written from the Dhan documentation (https://dhanhq.co/docs/v2/option-chain/, read 2026-11-01), not recorded from the real API",
+  "request": {
+    "method": "POST",
+    "url": "https://api.dhan.co/v2/optionchain/expirylist",
+    "headers": { "access-token": "<token>", "client-id": "<client id>", "Content-Type": "application/json" },
+    "body": { "UnderlyingScrip": 13, "UnderlyingSeg": "IDX_I" }
+  },
+  "response": { "data": ["2026-11-03", "2026-11-10", "2026-11-17", "2026-11-24", "2026-12-29"], "status": "success" }
+}

@@ -43,3 +43,12 @@ The tick recorder reads the same quote packet (code 4, 50 bytes) as `feed-quote.
 Hex text as above. Little-endian (UNVERIFIED); a 12-byte header (message length int16, response code, segment, security id int32, sequence uint32) and 20 levels of 16 bytes (price float64, quantity uint32, orders uint32). The subscription is JSON text: `{"RequestCode":23,"InstrumentCount":n,"InstrumentList":[{"ExchangeSegment":"NSE_EQ","SecurityId":"1333"}]}` (50 instruments per connection); the URL is `wss://depth-api-feed.dhan.co/twentydepth?token=…&clientId=…&authType=2` (no `version`).
 
 What the owner checks on the first real depth session: the plan includes depth (806 means it does not); the byte order is little endian; the code sits at byte 3 of the header (the documentation's text says "byte 12", its table says byte 3 - the parser follows the table and the length check); the sequence number's meaning; how many packets per second arrive per instrument; the disconnect packet's layout (reason code after the header); the codes 805 and 806. Then replace these two files with sanitised captures.
+
+## Option chain and expiry list (P14-02, ADR 0176)
+
+| File | Endpoint | Status |
+|------|----------|--------|
+| `optionchain-success.json` | `POST https://api.dhan.co/v2/optionchain`, body `{UnderlyingScrip, UnderlyingSeg, Expiry}` | UNVERIFIED (written from the documentation of 2026-11-01) |
+| `optionchain-expirylist.json` | `POST https://api.dhan.co/v2/optionchain/expirylist`, body without `Expiry` | UNVERIFIED |
+
+The tests carry the same shapes inline. What the owner checks in the five-session pilot: whether "one unique request every 3 seconds" is per user or per (underlying, expiry) (the build keeps one request per 3 seconds for the whole process); the units of `implied_volatility` (percent assumed) and `theta` (per day assumed) against one hand-computed Black-Scholes value; whether a strike with no quote sends zeros or omits the fields (zero or missing bid, ask and last price are stored as NULL with a flag); the answer after 15:30; the `UnderlyingSeg` of a share (`NSE_EQ` assumed); the `IDX_I` ids of Bank Nifty and the other indices (they come from the master list, not from the documentation, which names only Nifty's `13`); and the error codes (the annexure lists `DH-901`, `DH-902`, `DH-904`, `DH-907`, `DH-908`, `DH-909`).

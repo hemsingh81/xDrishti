@@ -23,7 +23,9 @@ internal static class FeedHost
             .AddDepthRecording()
             .AddDepthRecorder()
             .AddTickRecording()
-            .AddTickRecorder();
+            .AddTickRecorder()
+            .AddOptionChainRecording()
+            .AddOptionChainRecorder();
 
         // The feed reads the Data account's token from the vault: it refuses to start without the key.
         builder.Services.RequireBrokerVaultKey();
@@ -46,8 +48,15 @@ internal static class FeedHost
             .ValidateDataAnnotations()
             .ValidateOnStart();
         builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<TickOptions>>().Value.ToSettings(sp.GetRequiredService<IOptions<DepthOptions>>().Value.MinFreeGb));
+
+        // The option-chain recorder (P14-02): off by default (Options:Chain:Enabled false), registered paused, behind its own stored switch; REST requests to the two allowed option-chain endpoints, one per 3 seconds at most.
+        builder.Services.AddOptions<OptionsOptions>()
+            .Bind(builder.Configuration.GetSection(OptionsOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<OptionsOptions>>().Value.ToChainSettings());
         return builder;
     }
 
-    public static IServiceCollection AddFeedService(this IServiceCollection services) => services.AddHostedService<FeedService>().AddHostedService<DepthService>().AddHostedService<TickService>();
+    public static IServiceCollection AddFeedService(this IServiceCollection services) => services.AddHostedService<FeedService>().AddHostedService<DepthService>().AddHostedService<TickService>().AddHostedService<OptionChainService>();
 }

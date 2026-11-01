@@ -91,4 +91,5 @@ public enum AccountEventType
     TickRecorderSwitched,
     ExecutionSettingsChanged,
     ExecutionDrillRequested,
+    OptionChainRecorderSwitched,
 }

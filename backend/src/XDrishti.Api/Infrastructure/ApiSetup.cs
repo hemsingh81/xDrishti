@@ -128,6 +128,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, ExecutionSwitchEndpoints>(); // the owner's switch writes and the kill-switch drill (ADR 0174): password every time, auto_live stays OFF; sends nothing
         services.AddSingleton<IEndpointModule, ExecutionEndpoints>(); // the execution service's status (P12-01b): read only, no write route
         services.AddSingleton<IEndpointModule, DepthEndpoints>(); // the owner's depth-recorder switch (P7-16): fresh password per change, insert-only; no depth data is readable
+        services.AddSingleton<IEndpointModule, OptionChainEndpoints>(); // the owner's option-chain recorder switch (P14-02): fresh password per change, insert-only; no chain data is readable
         services.AddSingleton<IEndpointModule, TickEndpoints>(); // the owner's trade-tick recorder switch (P7-16b): fresh password per change, insert-only; no tick data is readable
         services.AddSingleton<IEndpointModule, LiveTradingEndpoints>(); // the compliance record of the small live phase (P11-05): fresh password, gate Live:Writes:Enabled (OFF), insert-only; no broker call
         services.AddSingleton<IEndpointModule, ChargeSheetEndpoints>(); // the owner's confirmation of the charge sheet (P8-23, ADR 0127)

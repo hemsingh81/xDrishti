@@ -22,6 +22,7 @@ using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Market.Quality;
+using XDrishti.Application.Abstractions.OptionChain;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Platform;
@@ -53,6 +54,7 @@ using XDrishti.Infrastructure.Market.Calendar;
 using XDrishti.Infrastructure.Market.Context;
 using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Market.Quality;
+using XDrishti.Infrastructure.OptionChain;
 using XDrishti.Infrastructure.Paper;
 using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Planning;
@@ -250,6 +252,7 @@ public static class DependencyInjection
         services.AddScoped<IExecutionFactsReader, ExecutionFactsReader>(); // the execution service's heartbeat and record, read only (P12-01b)
         services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
         services.AddScoped<ITickSwitchStore, TickSwitchStore>(); // the owner's tick-recorder switch, insert-only; no row = OFF (P7-16b)
+        services.AddScoped<IOptionChainSwitchStore, OptionChainSwitchStore>(); // the owner's option-chain-recorder switch, insert-only; no row = OFF (P14-02)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IBrokerAllowList, BrokerAllowList>(); // the broker allow-list read only, for the P7 phase check (P7-18, ADR 0097)
         services.AddSingleton<IPlanBuilderSettings, PlanBuilderSettings>(); // off by default: the empty skeleton stays the nightly builder (P7-04, ADR 0088)
@@ -310,6 +313,12 @@ public static class DependencyInjection
             .RemoveAllLoggers();
         services.AddSingleton<QuoteThrottle>();
         services.AddScoped<IQuoteSource, DhanQuoteClient>();
+
+        // The option chain and its expiry list of the Data API (P14-02, ADR 0176): the guard allows only POST /v2/optionchain and /v2/optionchain/expirylist, no query; one request per 3 seconds at most, shared by every caller of the process (a singleton throttle).
+        services.AddHttpClient(BrokerHttpClientNames.DhanOptionChain, BrokerHttp.ConfigureQuote)
+            .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<BrokerEndpointGuard>()
+            .RemoveAllLoggers();
 
         // The 1-minute chart data of the Data API (ADR 0016 §7): 15-second timeout, answers up to 16 MB; the guard allows only POST /v2/charts/intraday.
         services.AddHttpClient(BrokerHttpClientNames.DhanChart, BrokerHttp.ConfigureChart)
@@ -498,6 +507,19 @@ public static class DependencyInjection
     {
         services.AddSingleton<ITickFeedConnector, TickFeedConnector>();
         services.AddScoped<ITickStore, TickStore>();
+        return services;
+    }
+
+    /// <summary>
+    /// The adapters of the option-chain recorder (P14-02) - for the <c>xd-feed</c> host: the client of the two allowed option-chain endpoints with its one throttle, the write-only chain store and the underlyings it resolves from the master list. No port here
+    /// reads a snapshot row. The host provides <c>OptionChainSettings</c>.
+    /// </summary>
+    public static IServiceCollection AddOptionChainRecording(this IServiceCollection services)
+    {
+        services.AddSingleton<ChainThrottle>();
+        services.AddScoped<IOptionChainClient, DhanOptionChainClient>();
+        services.AddScoped<IOptionChainStore, OptionChainStore>();
+        services.AddScoped<IChainTargets, ChainTargets>();
         return services;
     }
 
