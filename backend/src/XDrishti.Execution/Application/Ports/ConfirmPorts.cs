@@ -1,5 +1,6 @@
 using XDrishti.Domain.Execution.Confirm;
 using XDrishti.Execution.Domain;
+using XDrishti.Execution.Domain.Checks;
 
 namespace XDrishti.Execution.Application.Ports;
 
@@ -90,4 +91,13 @@ public interface IConfirmGate
 internal sealed class ClosedConfirmGate : IConfirmGate
 {
     public Task<GateDecision> CheckAsync(long intentId, CancellationToken cancellationToken) => Task.FromResult(new GateDecision(false, "no_confirm_gate"));
+}
+
+/// <summary>What the rejection step reads in one statement: the intent's account, the newest full or fast run of the intent with its non-pass codes, the newest ticket with its outcome, and the database clock at the read.</summary>
+public sealed record RejectionView(Guid AccountId, RejectionRun? Run, RejectionTicket? Ticket, DateTimeOffset DbNow);
+
+/// <summary>Reads the <see cref="RejectionView"/> of an intent; null when it cannot be read (nothing is moved then, and the next pass reads again).</summary>
+public interface IRejectionReads
+{
+    Task<RejectionView?> ReadAsync(long intentId, CancellationToken cancellationToken);
 }

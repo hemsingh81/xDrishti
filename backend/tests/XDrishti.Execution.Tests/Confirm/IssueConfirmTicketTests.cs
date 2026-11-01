@@ -182,6 +182,19 @@ public sealed class IssueConfirmTicketTests
     }
 
     [Fact]
+    public async Task A_card_closed_because_its_intent_was_rejected_is_final_and_no_second_card_follows_even_while_the_intent_is_still_checking()
+    {
+        var scene = new TicketScene();
+        var first = (await scene.Issuer().IssueAsync(7, Ct)).Value;
+        scene.Decide(first.Id, TicketOutcomes.Refused, XDrishti.Execution.Domain.Checks.RejectionReasons.IntentRejected);
+
+        var again = await scene.Issuer().IssueAsync(7, Ct);
+
+        again.Value.Id.ShouldBe(first.Id, "the rejection step closed it; a failed move leaves the intent checking, never a fresh card");
+        scene.Tickets.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task A_fourth_open_ticket_of_an_account_is_stored_closed_too_many_open_and_never_reaches_the_owner()
     {
         var scene = new TicketScene();

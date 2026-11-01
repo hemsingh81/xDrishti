@@ -24,6 +24,7 @@ public sealed class ConfirmTicketArchitectureTests
         Received(typeof(TicketCloser)).ShouldBe(["IConfirmTicketStore", "ILogger`1"]);
         Received(typeof(StoredConfirmGate)).ShouldBe(["IConfirmDecisions"]);
         Received(typeof(ConfirmHandOff)).ShouldBe(["IConfirmGate", "IExecEventStore", "TimeProvider", "ILogger`1"]);
+        Received(typeof(CheckRejectionMover)).ShouldBe(["IRejectionReads", "IConfirmTicketStore", "IModeSource", "IExecEventStore", "TimeProvider", "ILogger`1"]);
     }
 
     [Fact]
@@ -52,6 +53,7 @@ public sealed class ConfirmTicketArchitectureTests
             text.ShouldNotContain("ConfirmTicketIssuer", customMessage: file);
             text.ShouldNotContain("StoredConfirmGate", customMessage: file);
             text.ShouldNotContain("ConfirmHandOff", customMessage: file);
+            text.ShouldNotContain("CheckRejectionMover", customMessage: file);
             text.ShouldNotContain("IConfirmDecisions", customMessage: file);
         }
 

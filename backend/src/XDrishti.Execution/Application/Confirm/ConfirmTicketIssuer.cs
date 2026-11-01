@@ -4,6 +4,7 @@ using XDrishti.Domain.Common;
 using XDrishti.Domain.Execution.Confirm;
 using XDrishti.Execution.Application.Ports;
 using XDrishti.Execution.Domain;
+using XDrishti.Execution.Domain.Checks;
 using XDrishti.Execution.Domain.Intents;
 
 namespace XDrishti.Execution.Application.Confirm;
@@ -53,9 +54,10 @@ public sealed partial class ConfirmTicketIssuer(
 
         var tickets = await store.TicketsAsync(intent.PublicId, cancellationToken).ConfigureAwait(false);
         var newest = tickets.Count > 0 ? tickets[^1] : null;
-        if (newest is not null && (newest.Outcome != TicketOutcomes.Refused || tickets.Count >= ConfirmPolicy.MaxAttempts))
+        if (newest is not null && (newest.Outcome != TicketOutcomes.Refused || tickets.Count >= ConfirmPolicy.MaxAttempts || newest.OutcomeReason == RejectionReasons.IntentRejected))
         {
-            return Result.Success(newest); // the same hand-over again: the open or decided ticket, never a third
+            // The same hand-over again: the open or decided ticket, never a third. A card closed because its intent was rejected (P12-03 alignment) is final: no second card follows it.
+            return Result.Success(newest);
         }
 
         var now = clock.GetUtcNow().ToUniversalTime();

@@ -8,9 +8,11 @@ using XDrishti.Application.Auth;
 using XDrishti.Application.Execution;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Execution.Confirm;
+using XDrishti.Execution.Application;
 using XDrishti.Execution.Application.Confirm;
 using XDrishti.Execution.Application.Ports;
 using XDrishti.Execution.Domain;
+using XDrishti.Execution.Domain.Checks;
 using XDrishti.Execution.Domain.Intents;
 using XDrishti.Execution.Persistence;
 using XDrishti.Infrastructure.Execution;
@@ -471,6 +473,180 @@ public sealed class ExecutionTicketsDatabaseTests(ExecDatabase db)
         }
 
         heard.ShouldBeGreaterThanOrEqualTo(2);
+    }
+
+    /// <summary>The event chain as xd_exec whose move fails, as a store that drops its connection at the append would.</summary>
+    private sealed class FailingMove(IExecEventStore inner) : IExecEventStore
+    {
+        public Task<Result> StartAsync(ExecIntent intent, DateOnly sessionDate, ExecEnvironment environment, string createdBy, CancellationToken cancellationToken) => inner.StartAsync(intent, sessionDate, environment, createdBy, cancellationToken);
+
+        public Task<Result> AppendAsync(long intentId, ExecEvent e, CancellationToken cancellationToken) => throw new NpgsqlException("connection lost at the move");
+
+        public Task<ExecIntentState?> StateAsync(long intentId, CancellationToken cancellationToken) => inner.StateAsync(intentId, cancellationToken);
+
+        public Task<IReadOnlyList<ExecEvent>> EventsAsync(long intentId, CancellationToken cancellationToken) => inner.EventsAsync(intentId, cancellationToken);
+
+        public Task<Result<ExecIntent>> RebuildAsync(long intentId, CancellationToken cancellationToken) => inner.RebuildAsync(intentId, cancellationToken);
+    }
+
+    /// <summary>The P12-03 rejection step over the real store and event chain as xd_exec, with the mode of the fakes (semi_auto).</summary>
+    private async Task<(RejectionStep Step, string State, string? Payload)> RejectStepAsync(Seeded s, bool moveFails = false)
+    {
+        await using var data = NpgsqlDataSource.Create(db.Exec);
+        IExecEventStore chain = moveFails ? new FailingMove(new PgExecEventStore(data)) : new PgExecEventStore(data);
+        var step = await new CheckRejectionMover(new PgConfirmTickets(data), new PgConfirmTickets(data), new Fakes(), chain, TimeProvider.System).RunAsync(s.IntentId, Ct);
+        var state = (string)(await ExecDatabase.ScalarAsync(db.Owner, $"SELECT state FROM execution.intent_state WHERE intent_id = {s.IntentId}"))!;
+        var payload = await ExecDatabase.ScalarAsync(db.Owner, $"SELECT concat_ws('|', actor, payload->>'reason', payload->'codes') FROM execution.events WHERE intent_id = {s.IntentId} AND to_state = 'rejected'") as string;
+        return (step, state, payload);
+    }
+
+    [Fact]
+    public async Task A_soft_only_rejection_stays_checking_while_its_ticket_is_open_and_is_rejected_with_its_codes_once_the_database_clock_passes_the_expiry()
+    {
+        var open = await SeedAsync("adv_share", "fno_ban");
+        await IssueAsync(open);
+        var late = await SeedAsync("adv_share");
+        var lateTicket = await OldTicketAsync(late, 91);
+        var none = await SeedAsync("adv_share");
+
+        (await RejectStepAsync(open)).ShouldBe((RejectionStep.AwaitTicket, "checking", null));
+        (await RejectStepAsync(late)).ShouldBe((RejectionStep.RejectNow, "rejected", $"{CheckRejectionMover.Actor}|ticket_expired|[\"adv_share\"]"));
+        (await ExecDatabase.ScalarAsync(db.Owner, $"SELECT concat_ws('|', outcome, reason, actor) FROM execution.ticket_outcomes WHERE ticket_id = '{lateTicket}'"))
+            .ShouldBe($"expired|ttl|{TicketOutcomes.ExpiryActor}", "a card past its expiry is closed expired, never refused");
+        (await RejectStepAsync(none)).ShouldBe((RejectionStep.RejectNow, "rejected", $"{CheckRejectionMover.Actor}|no_ticket|[\"adv_share\"]"));
+        (await RefusalAsync(db.Exec, RawTicket(none.IntentId, 1, "clock_timestamp()"))).ShouldContain("only for an intent in checking", customMessage: "a rejected intent gets no new ticket");
+    }
+
+    private async Task NewRunAsync(Seeded s, string kind, string verdict, params (string Code, string Class, string Outcome)[] results)
+    {
+        var run = (long)(await ExecDatabase.ScalarAsync(
+            db.Exec,
+            $"INSERT INTO execution.check_runs (kind, intent_id, at, verdict, settings_hash, inputs_hash, valid_until) VALUES ('{kind}', {s.IntentId}, now(), '{verdict}', repeat('a', 16), repeat('b', 16), now() + interval '10 seconds') RETURNING id"))!;
+        if (results.Length > 0)
+        {
+            await ExecDatabase.ExecuteAsync(
+                db.Exec,
+                "INSERT INTO execution.check_results (run_id, ord, code, class, outcome, value, limit_value, detail, input_age_ms, source) VALUES "
+                + string.Join(", ", results.Select((r, i) => $"({run}, {i}, '{r.Code}', '{r.Class}', '{r.Outcome}', NULL, NULL, 'x', NULL, 'test')")));
+        }
+    }
+
+    [Fact]
+    public async Task A_newer_full_run_with_a_hard_failure_closes_the_open_card_then_rejects_and_a_late_tap_is_refused()
+    {
+        var s = await SeedAsync("adv_share");
+        var ticket = await IssueAsync(s);
+        await NewRunAsync(s, "full", "rejected", ("feed_fresh", "hard", "unavailable"), ("adv_share", "soft", "fail"));
+
+        (await RejectStepAsync(s)).ShouldBe((RejectionStep.RejectNow, "rejected", $"{CheckRejectionMover.Actor}|hard_check|[\"feed_fresh\", \"adv_share\"]"));
+        (await ExecDatabase.ScalarAsync(db.Owner, $"SELECT concat_ws('|', outcome, reason, actor) FROM execution.ticket_outcomes WHERE ticket_id = '{ticket.Id}'"))
+            .ShouldBe($"refused|intent_rejected|{CheckRejectionMover.Actor}");
+        await SwitchAsync(true);
+        await SemiAutoAsync(s.Account);
+        await UnlockAsync(s);
+        (await RefusalAsync(db.App, Outcome(ticket.Id, "confirmed", Owner, "late"))).ShouldStartWith("23505", customMessage: "every other condition holds; the closed card alone refuses the late tap");
+        (await ExecDatabase.ScalarAsync(db.Owner, $"SELECT count(*) FROM execution.check_confirmations c JOIN execution.check_runs r ON r.id = c.run_id WHERE r.intent_id = {s.IntentId}")).ShouldBe(0L);
+    }
+
+    [Fact]
+    public async Task A_card_refused_intent_rejected_before_a_failed_move_gets_no_second_card_from_the_issuer_or_the_database_and_down_refuses_to_roll_back()
+    {
+        var s = await SeedAsync("adv_share");
+        var ticket = await IssueAsync(s);
+        await NewRunAsync(s, "full", "rejected", ("no_halt", "hard", "fail"));
+
+        (await RejectStepAsync(s, moveFails: true)).ShouldBe((RejectionStep.None, "checking", null));
+        (await ExecDatabase.ScalarAsync(db.Owner, $"SELECT concat_ws('|', outcome, reason) FROM execution.ticket_outcomes WHERE ticket_id = '{ticket.Id}'")).ShouldBe("refused|intent_rejected");
+
+        (await IssueAsync(s)).Id.ShouldBe(ticket.Id, "the issuer gives no second card after intent_rejected");
+        (await RefusalAsync(db.Exec, RawTicket(s.IntentId, 2, "clock_timestamp()"))).ShouldContain("only a refused first", customMessage: "the database refuses it too");
+        (await RefusalAsync(db.Owner, XDrishti.Infrastructure.Persistence.Migrations.GuardConfirmTicketReissue.DownFailClosed)).ShouldContain("rolling back would let a second card follow it");
+
+        (await RejectStepAsync(s)).ShouldBe((RejectionStep.RejectNow, "rejected", $"{CheckRejectionMover.Actor}|hard_check|[\"no_halt\"]"), "the next pass finishes the move");
+    }
+
+    [Fact]
+    public async Task A_card_insert_waits_for_a_move_holding_the_intent_and_is_then_refused_for_the_rejected_intent()
+    {
+        var s = await SeedAsync("adv_share");
+        await using var holder = new NpgsqlConnection(db.Exec);
+        await holder.OpenAsync(Ct);
+        await using var tx = await holder.BeginTransactionAsync(Ct);
+        await using (var take = new NpgsqlCommand($"SELECT 1 FROM execution.intent_state WHERE intent_id = {s.IntentId} FOR UPDATE", holder, tx))
+        {
+            await take.ExecuteNonQueryAsync(Ct);
+        }
+
+        var waiting = RefusalAsync(db.Exec, RawTicket(s.IntentId, 1, "clock_timestamp()"));
+        await Task.Delay(TimeSpan.FromMilliseconds(700), Ct);
+        var blocked = !waiting.IsCompleted;
+        await using (var move = new NpgsqlCommand(
+            $"INSERT INTO execution.events (intent_id, seq, kind, from_state, to_state, prev_event_id, source, actor) SELECT {s.IntentId}, 3, 'state', 'checking', 'rejected', e.id, 'engine', 'system:check-reject' FROM execution.events e WHERE e.intent_id = {s.IntentId} AND e.seq = 2",
+            holder,
+            tx))
+        {
+            await move.ExecuteNonQueryAsync(Ct);
+        }
+
+        await tx.CommitAsync(Ct);
+
+        blocked.ShouldBeTrue("the card insert waits on the state row the move holds");
+        (await waiting).ShouldContain("only for an intent in checking", customMessage: "after the wait it reads the committed state");
+    }
+
+    [Fact]
+    public async Task A_card_is_written_only_at_read_committed_and_the_function_has_a_pinned_search_path()
+    {
+        var s = await SeedAsync();
+        await using var connection = new NpgsqlConnection(db.Exec);
+        await connection.OpenAsync(Ct);
+        await using var tx = await connection.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, Ct);
+        await using var insert = new NpgsqlCommand(RawTicket(s.IntentId, 1, "clock_timestamp()"), connection, tx);
+
+        var refusal = await Should.ThrowAsync<PostgresException>(() => insert.ExecuteNonQueryAsync(Ct));
+
+        refusal.MessageText.ShouldContain("execution.isolation_refused");
+        (await ExecDatabase.ScalarAsync(db.Owner, "SELECT array_to_string(proconfig, ',') FROM pg_catalog.pg_proc WHERE oid = 'execution.check_confirm_ticket()'::regprocedure")).ShouldBe("search_path=pg_catalog, pg_temp");
+    }
+
+    [Fact]
+    public async Task The_newest_run_is_judged_even_when_it_is_a_fast_run()
+    {
+        var s = await SeedAsync("adv_share");
+        await IssueAsync(s);
+        await NewRunAsync(s, "fast", "rejected", ("gate_open", "hard", "pass"), ("no_halt", "hard", "fail"));
+
+        (await RejectStepAsync(s)).ShouldBe((RejectionStep.RejectNow, "rejected", $"{CheckRejectionMover.Actor}|hard_check|[\"no_halt\"]"));
+    }
+
+    [Fact]
+    public async Task A_refused_first_ticket_followed_by_an_open_second_one_waits()
+    {
+        var s = await SeedAsync("adv_share");
+        var first = await IssueAsync(s);
+        await using (var data = NpgsqlDataSource.Create(db.Exec))
+        {
+            (await new TicketCloser(new PgConfirmTickets(data)).RefuseAsync(first.Id, ConfirmCodes.PriceMoved, Ct)).ShouldBe(true);
+        }
+
+        var second = await IssueAsync(s);
+
+        second.Attempt.ShouldBe(2);
+        (await RejectStepAsync(s)).ShouldBe((RejectionStep.AwaitTicket, "checking", null));
+        (await ExecDatabase.ScalarAsync(db.Owner, $"SELECT count(*) FROM execution.ticket_outcomes WHERE ticket_id = '{second.Id}'")).ShouldBe(0L);
+    }
+
+    [Fact]
+    public async Task A_ticket_the_owner_confirmed_for_the_same_soft_set_moves_nothing()
+    {
+        var s = await SeedAsync("adv_share");
+        var ticket = await IssueAsync(s);
+        await SwitchAsync(true);
+        await SemiAutoAsync(s.Account);
+        await UnlockAsync(s);
+        (await RefusalAsync(db.App, Outcome(ticket.Id, "confirmed", Owner, "low volume known"))).ShouldBeEmpty();
+
+        (await RejectStepAsync(s)).ShouldBe((RejectionStep.None, "checking", null));
     }
 
     [Fact]

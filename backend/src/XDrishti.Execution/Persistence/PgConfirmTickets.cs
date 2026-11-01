@@ -4,6 +4,7 @@ using NpgsqlTypes;
 using XDrishti.Domain.Execution.Confirm;
 using XDrishti.Execution.Application.Ports;
 using XDrishti.Execution.Domain;
+using XDrishti.Execution.Domain.Checks;
 
 namespace XDrishti.Execution.Persistence;
 
@@ -11,8 +12,22 @@ namespace XDrishti.Execution.Persistence;
 /// The confirm record as the role xd_exec (P12-08b): it inserts tickets and the system's two outcomes (<c>expired</c>, <c>refused</c>) and reads the intent, the plan approval, the account's name and fixed capital and the newest full check run.
 /// The triggers of <c>AddConfirmTickets</c> judge every row again (issued now, one BUY intent in checking, a second attempt only after a refused first; an expiry only at or after the expiry). Nothing is updated or deleted.
 /// </summary>
-internal sealed class PgConfirmTickets(NpgsqlDataSource data) : IConfirmTicketStore, IConfirmDecisions
+internal sealed class PgConfirmTickets(NpgsqlDataSource data) : IConfirmTicketStore, IConfirmDecisions, IRejectionReads
 {
+    // One statement, so the run, the ticket, its outcome and the clock are one snapshot. A stored result whose class or outcome text is unknown counts as a non-pass of its class; an unknown class counts as Hard.
+    private const string Rejection = """
+        SELECT i.account_id, r.id, r.verdict,
+               ARRAY(SELECT x.code::text FROM execution.check_results x WHERE x.run_id = r.id AND x.class <> 'soft' AND x.outcome <> 'pass' ORDER BY x.ord),
+               ARRAY(SELECT x.code::text FROM execution.check_results x WHERE x.run_id = r.id AND x.class = 'soft' AND x.outcome <> 'pass' ORDER BY x.code),
+               t.id, o.outcome, t.expires_at, t.soft_codes,
+               clock_timestamp()
+          FROM execution.intents i
+          LEFT JOIN LATERAL (SELECT c.id, c.verdict FROM execution.check_runs c WHERE c.intent_id = i.id AND c.kind IN ('full', 'fast') ORDER BY c.id DESC LIMIT 1) r ON true
+          LEFT JOIN LATERAL (SELECT k.id, k.expires_at, k.soft_codes FROM execution.confirm_tickets k WHERE k.intent_public_id = i.public_id ORDER BY k.attempt DESC LIMIT 1) t ON true
+          LEFT JOIN execution.ticket_outcomes o ON o.ticket_id = t.id
+         WHERE i.id = @id
+        """;
+
     private const string TicketSelect = """
         SELECT t.id, t.intent_public_id, t.account_id, t.attempt, t.text, t.text_hash, t.requires_password, t.issued_at, t.expires_at, o.outcome, o.reason, o.decided_at
           FROM execution.confirm_tickets t LEFT JOIN execution.ticket_outcomes o ON o.ticket_id = t.id
@@ -211,6 +226,33 @@ internal sealed class PgConfirmTickets(NpgsqlDataSource data) : IConfirmTicketSt
             ? new ConfirmDecision(reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetFieldValue<DateTimeOffset>(2), reader.GetFieldValue<DateTimeOffset>(3))
             : null;
     }
+
+    public async Task<RejectionView?> ReadAsync(long intentId, CancellationToken cancellationToken)
+    {
+        await using var command = data.CreateCommand(Rejection);
+        command.Parameters.AddWithValue("id", intentId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        var run = reader.IsDBNull(1)
+            ? null
+            : new RejectionRun(reader.GetInt64(1), ParseVerdict(reader.GetString(2)), reader.GetFieldValue<string[]>(3), reader.GetFieldValue<string[]>(4));
+        var ticket = !reader.IsDBNull(5)
+            ? new RejectionTicket(reader.GetGuid(5), reader.IsDBNull(6) ? null : reader.GetString(6), reader.GetFieldValue<DateTimeOffset>(7), reader.IsDBNull(8) ? [] : reader.GetFieldValue<string[]>(8))
+            : null;
+        return new RejectionView(reader.GetGuid(0), run, ticket, reader.GetFieldValue<DateTimeOffset>(9));
+    }
+
+    // An unknown stored text reads as rejected: never a pass.
+    private static CheckVerdict ParseVerdict(string text) => text switch
+    {
+        "cleared" => CheckVerdict.Cleared,
+        "cleared_by_confirmation" => CheckVerdict.ClearedByConfirmation,
+        _ => CheckVerdict.Rejected,
+    };
 
     private static StoredTicket Read(NpgsqlDataReader r) => new(
         r.GetGuid(0), r.GetGuid(1), r.GetGuid(2), r.GetInt16(3), r.GetString(4), r.GetString(5).Trim(), r.GetBoolean(6), r.GetFieldValue<DateTimeOffset>(7), r.GetFieldValue<DateTimeOffset>(8),
