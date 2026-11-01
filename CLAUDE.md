@@ -45,7 +45,7 @@ the roadmap phases in `docs/design/18-roadmap.md`. Engineering standards: `docs/
 - Pin exact versions (NuGet in `Directory.Packages.props`, npm with `save-exact`, image tags in compose/Dockerfiles).
 
 ## Model Routing & Token Optimization Protocol
-Agents `backend-dev`, `frontend-dev`, `test-writer` and `reviewer` are pinned to `model: sonnet` in their frontmatter.
+Agents are pinned in their frontmatter (owner's tiers, 2026-11-01): `backend-dev` and `frontend-dev` `sonnet`, `test-writer` `haiku`, `reviewer` `opus`.
 Never run two subagents in parallel (one at a time). Keep the main session short; delegate output-heavy work.
 
 | Trigger | Model / delegate |
@@ -57,6 +57,6 @@ Never run two subagents in parallel (one at a time). Keep the main session short
 | `deep-research` | Sonnet; Opus only for architectural questions |
 | Spec/design, ADRs, multi-module planning | `/model opus` to plan, then back to Sonnet to execute |
 | `scripts/check.sh`, `gen-api.sh`, `build-docs.sh`, `deploy/xd-up.sh` | Run in the shell or a Haiku delegate; report only pass/fail and the first failures. Diagnosing a red gate stays on Sonnet |
-| Pre-commit review | `reviewer` (Sonnet); never Haiku, since it is the last gate on trading-safety code |
+| Pre-commit review | `reviewer` (Opus, pinned); never Haiku, since it is the last gate on trading-safety code |
 
-A "Haiku delegate" is a general-purpose subagent started with the `haiku` model override; for money-path slices pass `model: opus` when delegating to `backend-dev`. Switch back to Sonnet after any Opus step. Use model aliases (`sonnet`, `haiku`, `opus`), not dated IDs.
+A "Haiku delegate" is a general-purpose subagent started with the `haiku` model override; `backend-dev` stays on Sonnet, including money-path slices: the independent Opus `reviewer` is the safeguard (owner, 2026-11-01). Switch back to Sonnet after any Opus step. Use model aliases (`sonnet`, `haiku`, `opus`), not dated IDs.

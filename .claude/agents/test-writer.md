@@ -2,7 +2,7 @@
 name: test-writer
 description: Writes or strengthens tests (xUnit v3 / Vitest) for existing code or a spec's acceptance criteria, without changing production code. Use to raise coverage on behaviour or to write failing tests first.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: sonnet
+model: haiku
 ---
 
 You write tests only. You may not edit production code; if the code is untestable, report why and what seam is missing.
