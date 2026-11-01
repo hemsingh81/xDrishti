@@ -220,78 +220,123 @@ public sealed class ExecutionBoundaryArchitectureTests
     }
 
     [Fact]
-    public void The_xd_api_allow_list_files_are_byte_for_byte_the_committed_ones_but_for_the_exact_option_chain_lines_of_P14_02()
+    public void The_xd_api_allow_list_files_are_byte_for_byte_the_committed_ones_but_for_the_exact_rolling_option_lines_of_P14_03()
     {
-        // The data-side allow-list, its pin and its test have zero diff against HEAD (needs git; skipped quietly when the checkout has none). The one tolerated diff is the exact set of lines P14-02 adds (ADR 0176): the diff
-        // must be EMPTY (after the slice is committed this is always the case) or its added lines, trimmed and without blank lines, must be EXACTLY this set, and no line may be removed or changed. Any later edit to these
-        // files must change the literal set below in the same commit, with an ADR.
-        var expected = new Dictionary<string, string[]>
+        // The data-side allow-list, its pin and its test have zero diff against HEAD. The one tolerated diff is the exact set of lines P14-03 adds and removes (ADR 0177): the diff must be EMPTY (after the slice is committed
+        // this is always the case) or its added lines, trimmed and without blank lines, must be EXACTLY this list (a line added twice is not this list) and its removed lines EXACTLY the removed list. Any later edit to these files
+        // must change the literal sets below in the same commit, with an ADR. The check needs git: when the checkout has a .git and git cannot run, exits non-zero or hangs, the test FAILS (it never passes silently).
+        var expected = new Dictionary<string, (string[] Added, string[] Removed)>
         {
-            ["backend/src/XDrishti.Infrastructure/Brokers/BrokerEndpoints.cs"] = [
-                "/// <para>P14-02 (ADR 0176) adds the option chain and its expiry list of the Data API: <c>POST /v2/optionchain</c> and <c>POST /v2/optionchain/expirylist</c>, no query, each an exact row of its own.</para>",
-                "/// <summary>The option chain of one underlying and expiry (JSON body <c>{\"UnderlyingScrip\":13,\"UnderlyingSeg\":\"IDX_I\",\"Expiry\":\"yyyy-MM-dd\"}</c>, headers <c>access-token</c> and <c>client-id</c>; P14-02, ADR 0176). Read-only despite the POST; no query. Exact path: <c>/v2/optionchain/expirylist</c> is its own row.</summary>",
-                "public static readonly Uri DhanOptionChain = new(\"https://api.dhan.co/v2/optionchain\");",
-                "/// <summary>The expiry dates of one underlying (JSON body without <c>Expiry</c>, same headers; P14-02, ADR 0176). Read-only despite the POST; no query.</summary>",
-                "public static readonly Uri DhanOptionChainExpiryList = new(\"https://api.dhan.co/v2/optionchain/expirylist\");",
-                "(HttpMethod.Post, DhanOptionChain, null),",
-                "(HttpMethod.Post, DhanOptionChainExpiryList, null),",
+            ["backend/src/XDrishti.Infrastructure/Brokers/BrokerEndpoints.cs"] = (
+            [
+                "/// <para>P14-03 (ADR 0177) adds the expired-options data of the Data API: <c>POST /v2/charts/rollingoption</c>, no query, one exact row of its own.</para>",
+                "/// <summary>The expired-options bars of one underlying, expiry kind, strike offset, side and window of at most 30 days (JSON body, headers <c>access-token</c> and <c>client-id</c>; P14-03, ADR 0177). Read-only despite the POST; no query. Every other path under <c>/v2/charts</c> stays refused.</summary>",
+                "public static readonly Uri DhanRollingOption = new(\"https://api.dhan.co/v2/charts/rollingoption\");",
+                "(HttpMethod.Post, DhanRollingOption, null),",
             ],
-            ["backend/src/XDrishti.Domain/Planning/PlanPhaseCheck.cs"] = [
-                "// P14-02 (ADR 0176) added the two option-chain lines below, in the same commit as the allow-list rows.",
-                "\"POST api.dhan.co/v2/optionchain\",",
-                "\"POST api.dhan.co/v2/optionchain/expirylist\",",
+            []),
+            ["backend/src/XDrishti.Domain/Planning/PlanPhaseCheck.cs"] = (
+            [
+                "// P14-03 (ADR 0177) added the rolling-option line below, in the same commit as its allow-list row.",
+                "\"POST api.dhan.co/v2/charts/rollingoption\",",
             ],
-            ["backend/tests/XDrishti.Infrastructure.Tests/Brokers/BrokerAllowListTests.cs"] = [
-                "[InlineData(\"POST\", \"https://api.dhan.co/v2/optionchain\")]",
-                "[InlineData(\"POST\", \"https://api.dhan.co/v2/optionchain/expirylist\")]",
+            []),
+            ["backend/tests/XDrishti.Infrastructure.Tests/Brokers/BrokerAllowListTests.cs"] = (
+            [
+                "[InlineData(\"POST\", \"https://api.dhan.co/v2/charts/rollingoption\")]",
+                "new BrokerAllowList().Allows(\"POST\", \"https://api.dhan.co/v2/charts/historical\").ShouldBeFalse();",
                 "[Fact]",
-                "public void The_option_chain_rows_are_exactly_two_posts_without_a_query_and_the_pin_lists_the_same_two_lines()",
+                "public void The_rolling_option_row_is_exactly_one_post_without_a_query_and_the_pin_lists_the_same_line()",
                 "{",
-                "string[] lines = [\"POST api.dhan.co/v2/optionchain\", \"POST api.dhan.co/v2/optionchain/expirylist\"];",
-                "BrokerEndpoints.Describe().Where(l => l.Contains(\"optionchain\", StringComparison.Ordinal)).ShouldBe(lines);",
-                "PlanPhaseCheck.PinnedAllowList.Where(l => l.Contains(\"optionchain\", StringComparison.Ordinal)).ShouldBe(lines);",
+                "BrokerEndpoints.Describe().Where(l => l.Contains(\"rollingoption\", StringComparison.Ordinal)).ShouldBe([\"POST api.dhan.co/v2/charts/rollingoption\"]);",
+                "PlanPhaseCheck.PinnedAllowList.Where(l => l.Contains(\"rollingoption\", StringComparison.Ordinal)).ShouldBe([\"POST api.dhan.co/v2/charts/rollingoption\"]);",
                 "BrokerEndpoints.Describe().ShouldBe(PlanPhaseCheck.PinnedAllowList);",
-                "new BrokerAllowList().Allows(\"POST\", \"https://api.dhan.co/v2/charts/rollingoption\").ShouldBeFalse();",
-                "new BrokerAllowList().Allows(\"POST\", \"https://api.dhan.co/v2/optionchain?x=1\").ShouldBeFalse();",
+                "new BrokerAllowList().Allows(\"POST\", \"https://api.dhan.co/v2/charts\").ShouldBeFalse();",
+                "new BrokerAllowList().Allows(\"GET\", \"https://api.dhan.co/v2/charts/rollingoption\").ShouldBeFalse();",
                 "}",
             ],
+            [
+                "new BrokerAllowList().Allows(\"POST\", \"https://api.dhan.co/v2/charts/rollingoption\").ShouldBeFalse();",
+            ]),
         };
         var root = Path.GetDirectoryName(Backend)!;
+        var isCheckout = Directory.Exists(Path.Combine(root, ".git")) || File.Exists(Path.Combine(root, ".git")); // a worktree has a .git file
         foreach (var (file, lines) in expected)
         {
             File.Exists(Path.Combine(root, file)).ShouldBeTrue(file + " is guarded and must exist");
-            var info = new System.Diagnostics.ProcessStartInfo("git", $"diff -U0 HEAD -- {file}") { WorkingDirectory = root, RedirectStandardError = true, RedirectStandardOutput = true };
-            System.Diagnostics.Process? p;
-            try
+            if (!isCheckout)
             {
-                p = System.Diagnostics.Process.Start(info);
-            }
-            catch (System.ComponentModel.Win32Exception)
-            {
-                return; // no git on this machine
+                continue; // an unpacked source tree has no history to compare with
             }
 
-            using var started = p;
-            if (p is null)
+            var diff = GitDiff(root, file);
+            var (added, removed) = ParseDiff(diff);
+            if (added.Count > 0 || removed.Count > 0)
             {
-                return;
-            }
-
-            var diff = p.StandardOutput.ReadToEnd();
-            p.WaitForExit(10_000);
-            if (p.ExitCode is not 0)
-            {
-                continue; // not a checkout (128) or no git (127)
-            }
-
-            var changed = diff.Split('\n').Where(l => (l.StartsWith('+') || l.StartsWith('-')) && !l.StartsWith("+++", StringComparison.Ordinal) && !l.StartsWith("---", StringComparison.Ordinal)).ToList();
-            changed.Where(l => l.StartsWith('-')).ShouldBeEmpty(file + ": no line of the committed file may be changed or removed");
-            var added = changed.Select(l => l[1..].Trim()).Where(l => l.Length > 0).ToList();
-            if (added.Count > 0)
-            {
-                added.Order(StringComparer.Ordinal).ShouldBe(lines.Order(StringComparer.Ordinal), file + ": the added lines must be exactly the pinned set of P14-02");
+                added.ShouldBe([.. lines.Added.Order(StringComparer.Ordinal)], file + ": the added lines must be exactly the pinned list of P14-03");
+                removed.ShouldBe([.. lines.Removed.Order(StringComparer.Ordinal)], file + ": the removed lines must be exactly the pinned list of P14-03");
             }
         }
+    }
+
+    /// <summary>The added and removed lines of a <c>-U0</c> diff, trimmed, without blank lines, sorted. Header lines are skipped only before the first <c>@@</c>; inside a hunk every line that starts with <c>+</c> or <c>-</c> counts, so a content line that starts with <c>++</c> or <c>--</c> cannot hide.</summary>
+    internal static (List<string> Added, List<string> Removed) ParseDiff(string diff)
+    {
+        List<string> added = [], removed = [];
+        var inHunk = false;
+        foreach (var line in diff.Split('\n'))
+        {
+            if (line.StartsWith("@@", StringComparison.Ordinal))
+            {
+                inHunk = true;
+            }
+            else if (inHunk && line.Length > 0 && line[0] is '+' or '-')
+            {
+                var text = line[1..].Trim();
+                if (text.Length > 0)
+                {
+                    (line[0] == '+' ? added : removed).Add(text);
+                }
+            }
+        }
+
+        return (added.Order(StringComparer.Ordinal).ToList(), removed.Order(StringComparer.Ordinal).ToList());
+    }
+
+    [Fact]
+    public void The_diff_parser_counts_a_content_line_that_starts_with_two_plus_or_two_minus_signs_and_skips_only_the_header()
+    {
+        const string Diff = "diff --git a/f b/f\nindex 1..2 100644\n--- a/f\n+++ b/f\n@@ -1,0 +2,3 @@\n+real\n+++ hidden?\n--- gone?\n@@ -9 +9 @@\n-old\n";
+
+        var (added, removed) = ParseDiff(Diff);
+
+        added.ShouldBe(["++ hidden?", "real"]);
+        removed.ShouldBe(["-- gone?", "old"]);
+        ParseDiff("--- a/f\n+++ b/f\n").Added.ShouldBeEmpty();
+    }
+
+    /// <summary><c>git --no-pager -c color.ui=never diff --no-color --no-ext-diff -U0 HEAD -- file</c>: the options are pinned so a user config (colour, an external diff tool, a pager) cannot blank or change the diff. Both streams are read, with a timeout; a start failure, a non-zero exit or a hang fails the test.</summary>
+    private static string GitDiff(string root, string file)
+    {
+        var info = new System.Diagnostics.ProcessStartInfo("git") { WorkingDirectory = root, RedirectStandardError = true, RedirectStandardOutput = true, RedirectStandardInput = true };
+        foreach (var argument in new[] { "--no-pager", "-c", "color.ui=never", "diff", "--no-color", "--no-ext-diff", "-U0", "--no-textconv", "HEAD", "--", file })
+        {
+            info.ArgumentList.Add(argument);
+        }
+
+        using var process = System.Diagnostics.Process.Start(info) ?? throw new InvalidOperationException("git did not start in a checkout that has a .git");
+        process.StandardInput.Close();
+        var output = process.StandardOutput.ReadToEndAsync();
+        var errors = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(30_000))
+        {
+            process.Kill(entireProcessTree: true);
+            throw new TimeoutException("git diff did not finish in 30 seconds for " + file);
+        }
+
+        process.WaitForExit(); // flush the async readers
+        process.ExitCode.ShouldBe(0, "git diff failed for " + file + ": " + errors.GetAwaiter().GetResult());
+        return output.GetAwaiter().GetResult();
     }
 
     [Fact]

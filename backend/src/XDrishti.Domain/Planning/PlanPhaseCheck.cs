@@ -41,6 +41,7 @@ public static class PlanPhaseCheck
 
     /// <summary>The broker allow-list as pinned when the slice was built (ADR 0097): read-only data endpoints (P11-01 added the two reads of the day's trade book and order book, ADR 0149) and the consent flow, no order write, position or fund endpoint. A change is an owner-approved item and must change this list in the same commit.</summary>
     // P14-02 (ADR 0176) added the two option-chain lines below, in the same commit as the allow-list rows.
+    // P14-03 (ADR 0177) added the rolling-option line below, in the same commit as its allow-list row.
     public static readonly IReadOnlyList<string> PinnedAllowList =
     [
         "GET api.dhan.co/v2/holdings",
@@ -49,6 +50,7 @@ public static class PlanPhaseCheck
         "GET api.dhan.co/v2/trades",
         "GET api.dhan.co/v2/trades/{from}/{to}/{page}",
         "POST api.dhan.co/v2/charts/intraday",
+        "POST api.dhan.co/v2/charts/rollingoption",
         "POST api.dhan.co/v2/marketfeed/quote",
         "POST api.dhan.co/v2/optionchain",
         "POST api.dhan.co/v2/optionchain/expirylist",

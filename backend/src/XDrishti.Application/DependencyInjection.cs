@@ -10,6 +10,7 @@ using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.LiveTrading;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.OptionBackfill;
 using XDrishti.Application.Abstractions.OptionChain;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
@@ -51,6 +52,7 @@ using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Tracking;
+using XDrishti.Application.OptionBackfill;
 using XDrishti.Application.OptionChain;
 using XDrishti.Application.OwnerActs;
 using XDrishti.Application.Paper;
@@ -97,6 +99,7 @@ public static class DependencyInjection
         services.AddScoped<IDepthHeartbeats, DepthHeartbeats>(); // the depth recorder's own row xd-depth (P7-16)
         services.AddScoped<ITickHeartbeats, TickHeartbeats>(); // the trade-tick recorder's own row xd-ticks (P7-16b)
         services.AddScoped<IOptionChainHeartbeats, OptionChainHeartbeats>(); // the option-chain recorder's own row xd-options (P14-02)
+        services.AddScoped<IOptionBackfillHeartbeats, OptionBackfillHeartbeats>(); // the expired-options backfill's own row xd-backfill (P14-03)
         services.AddScoped<IQueryHandler<GetExecutionAlarmsQuery, Result<IReadOnlyList<ExecutionAlarmView>>>, GetExecutionAlarmsHandler>(); // the execution alarms (P12-04): read only
         services.AddScoped<IQueryHandler<GetExecutionHaltsQuery, Result<IReadOnlyList<ExecutionHaltView>>>, GetExecutionHaltsHandler>(); // the halt record (P12-05): read only
         services.AddScoped<ICommandHandler<StartExecutionHaltCommand, ExecutionHaltStarted>, StartExecutionHaltHandler>(); // the owner's button: leaves a command row, never a password (P12-05)
@@ -132,6 +135,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetDepthRecorderQuery, DepthRecorderView>, GetDepthRecorderHandler>(); // the owner's depth switch (P7-16): read
         services.AddScoped<IQueryHandler<GetTickRecorderQuery, TickRecorderView>, GetTickRecorderHandler>(); // the owner's tick switch (P7-16b): read
         services.AddScoped<IQueryHandler<GetOptionChainRecorderQuery, OptionChainRecorderView>, GetOptionChainRecorderHandler>(); // the owner's option-chain switch (P14-02): read
+        services.AddScoped<IQueryHandler<GetOptionBackfillQuery, OptionBackfillView>, GetOptionBackfillHandler>(); // the owner's backfill switch, acceptance and progress (P14-03): read
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)
         services.AddScoped<IQueryHandler<GetRampQuery, Result<RampView>>>(sp => sp.GetRequiredService<GetRampHandler>());
         services.AddScoped<ICommandHandler<SetRampStepCommand, RampView>, SetRampStepHandler>();
@@ -172,6 +176,8 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ChangeDepthRecorderCommand, DepthRecorderSwitched>, ChangeDepthRecorderHandler>(); // and change, insert-only, behind a fresh password in the endpoint
         services.AddScoped<ICommandHandler<ChangeTickRecorderCommand, TickRecorderSwitched>, ChangeTickRecorderHandler>(); // the tick switch (P7-16b): change, insert-only, behind a fresh password in the endpoint
         services.AddScoped<ICommandHandler<ChangeOptionChainRecorderCommand, OptionChainRecorderSwitched>, ChangeOptionChainRecorderHandler>(); // the option-chain switch (P14-02): change, insert-only, behind a fresh password in the endpoint
+        services.AddScoped<ICommandHandler<ChangeOptionBackfillCommand, OptionBackfillSwitched>, ChangeOptionBackfillHandler>(); // the backfill switch (P14-03): change, insert-only, behind a fresh password in the endpoint
+        services.AddScoped<ICommandHandler<AcceptBackfillProbeCommand, BackfillProbeAccepted>, AcceptBackfillProbeHandler>(); // the owner's acceptance of the probe result (P14-03): insert-only, behind a fresh password in the endpoint
 
         services.AddScoped<ICommandHandler<LoginCommand, LoginResult>, LoginHandler>();
         services.AddScoped<ICommandHandler<LogoutCommand>, LogoutHandler>();
@@ -256,6 +262,19 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// The expired-options backfill (P14-03) - only for the <c>xd-feed</c> host: its own supervisor (four gates, night window, run record, heartbeat <c>xd-backfill</c>) and its own job (REST requests to the one allowed rolling-option endpoint, one a second at most),
+    /// and the probe the owner runs by hand. The host provides <see cref="OptionBackfillSettings"/> and, through <c>AddOptionBackfillRecording</c>, the ports. Registered paused and off.
+    /// </summary>
+    public static IServiceCollection AddOptionBackfill(this IServiceCollection services)
+    {
+        services.AddSingleton<IBackfillSession, OptionBackfillJob>();
+        services.AddSingleton<IOptionBackfillSupervisor, OptionBackfillSupervisor>();
+        services.AddScoped<BackfillProgressReader>();
+        services.AddScoped<BackfillProbe>();
+        return services;
+    }
+
+    /// <summary>
     /// The SignalR hub's push (ADR 0024 §7, P2-10a) - only for the <c>xd-api</c> host: the coordinator that follows the connected screens (a singleton; the host runs its loop) and the status query. The host provides <see cref="ILiveClients"/>
     /// (the way out to the connections); <c>AddInfrastructure</c> provides the listener, the scope resolver and the price reader.
     /// </summary>
@@ -295,6 +314,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, DepthRecorderService>(); // the depth recorder (P7-16): shown and edited here, run by xd-feed; starts paused, Run now is refused
         services.AddSingleton<IScheduledService, TickRecorderService>(); // the trade-tick recorder (P7-16b): as the depth recorder
         services.AddSingleton<IScheduledService, OptionChainRecorderService>(); // the option-chain recorder (P14-02): as the tick recorder; starts paused, "Run now" refused
+        services.AddSingleton<IScheduledService, OptionBackfillService>(); // the expired-options backfill (P14-03): as the recorders; starts paused, "Run now" refused
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
         services.AddSingleton<ServiceScheduler>();

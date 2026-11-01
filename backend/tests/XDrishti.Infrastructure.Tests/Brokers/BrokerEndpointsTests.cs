@@ -18,6 +18,8 @@ public sealed class BrokerEndpointsTests
     [InlineData("POST", "https://api.dhan.co/v2/optionchain")] // the option chain and its expiry list (P14-02, ADR 0176)
     [InlineData("POST", "https://API.DHAN.CO/v2/optionchain")]
     [InlineData("POST", "https://api.dhan.co/v2/optionchain/expirylist")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/rollingoption")] // the expired-options bars (P14-03, ADR 0177)
+    [InlineData("POST", "https://API.DHAN.CO/v2/charts/rollingoption")]
     [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0")] // the trade history, a page at a time (ADR 0025)
     [InlineData("GET", "https://API.DHAN.CO/v2/trades/2026-09-01/2026-09-01/12")]
     [InlineData("GET", "https://api.dhan.co/v2/trades/2024-02-29/2026-09-30/10000")]
@@ -115,7 +117,6 @@ public sealed class BrokerEndpointsTests
     [InlineData("POST", "https://api.dhan.co/v2/charts/Intraday")]
     [InlineData("POST", "https://api.dhan.co/v2/charts/intraday/1")]
     [InlineData("POST", "https://api.dhan.co/v2/charts/historical")] // other chart paths
-    [InlineData("POST", "https://api.dhan.co/v2/charts/rollingoption")]
     [InlineData("POST", "https://api.dhan.co/v2/charts")]
     [InlineData("POST", "http://api.dhan.co/v2/charts/intraday")] // not HTTPS
     [InlineData("POST", "https://api.dhan.co:8443/v2/charts/intraday")] // other port
@@ -154,6 +155,21 @@ public sealed class BrokerEndpointsTests
     [InlineData("POST", "https://user@api.dhan.co/v2/optionchain")]
     [InlineData("POST", "https://auth.dhan.co/v2/optionchain")]
     [InlineData("POST", "https://api.dhan.co.example.invalid/v2/optionchain")]
+    [InlineData("GET", "https://api.dhan.co/v2/charts/rollingoption")] // the expired-options bars are a POST with a body (P14-03)
+    [InlineData("PUT", "https://api.dhan.co/v2/charts/rollingoption")]
+    [InlineData("DELETE", "https://api.dhan.co/v2/charts/rollingoption")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/rollingoption?x=1")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/rollingoption?")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/rollingoption/")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/rollingoption#x")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/RollingOption")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/rollingoption/1")]
+    [InlineData("POST", "http://api.dhan.co/v2/charts/rollingoption")]
+    [InlineData("POST", "https://api.dhan.co:8443/v2/charts/rollingoption")]
+    [InlineData("POST", "https://user@api.dhan.co/v2/charts/rollingoption")]
+    [InlineData("POST", "https://auth.dhan.co/v2/charts/rollingoption")]
+    [InlineData("POST", "https://api.dhan.co.example.invalid/v2/charts/rollingoption")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/rollingoption/../historical")]
     [InlineData("GET", "https://api.dhan.co/v2/optionchain/expirylist")] // the option chain is a POST with a body (P14-02)
     [InlineData("PUT", "https://api.dhan.co/v2/optionchain/expirylist")] // the option chain is a POST with a body (P14-02)
     [InlineData("DELETE", "https://api.dhan.co/v2/optionchain/expirylist")] // the option chain is a POST with a body (P14-02)

@@ -25,7 +25,9 @@ internal static class FeedHost
             .AddTickRecording()
             .AddTickRecorder()
             .AddOptionChainRecording()
-            .AddOptionChainRecorder();
+            .AddOptionChainRecorder()
+            .AddOptionBackfillRecording()
+            .AddOptionBackfill();
 
         // The feed reads the Data account's token from the vault: it refuses to start without the key.
         builder.Services.RequireBrokerVaultKey();
@@ -55,8 +57,11 @@ internal static class FeedHost
             .ValidateDataAnnotations()
             .ValidateOnStart();
         builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<OptionsOptions>>().Value.ToChainSettings());
+
+        // The expired-options backfill (P14-03): off by default (Options:Backfill:Enabled false), registered paused, behind its own stored switch and the owner's acceptance of the probe result; REST requests to the one allowed rolling-option endpoint, one a second at most, only from 16:30 to 08:30.
+        builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<OptionsOptions>>().Value.ToBackfillSettings());
         return builder;
     }
 
-    public static IServiceCollection AddFeedService(this IServiceCollection services) => services.AddHostedService<FeedService>().AddHostedService<DepthService>().AddHostedService<TickService>().AddHostedService<OptionChainService>();
+    public static IServiceCollection AddFeedService(this IServiceCollection services) => services.AddHostedService<FeedService>().AddHostedService<DepthService>().AddHostedService<TickService>().AddHostedService<OptionChainService>().AddHostedService<OptionBackfillService>();
 }

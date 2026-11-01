@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Options;
+using XDrishti.Application.Abstractions.OptionBackfill;
 using XDrishti.Application.Abstractions.OptionChain;
 
 namespace XDrishti.Feed;
@@ -20,7 +21,13 @@ internal sealed class OptionsOptions
     [ValidateObjectMembers]
     public ChainOptions Chain { get; set; } = new();
 
+    [Required]
+    [ValidateObjectMembers]
+    public BackfillOptions Backfill { get; set; } = new();
+
     public OptionChainSettings ToChainSettings() => Chain.ToSettings(MinFreeGb);
+
+    public OptionBackfillSettings ToBackfillSettings() => Backfill.ToSettings(MinFreeGb);
 }
 
 /// <summary>An index and how many of its expiries the recorder asks (a bound array item of <c>Options:Chain:IndexExpiries</c>).</summary>
@@ -82,4 +89,49 @@ internal sealed class ChainOptions
         TimeSpan.FromSeconds(TimeoutSeconds),
         MaxStoredGb * OptionChainSettings.Gb,
         minFreeGb * OptionChainSettings.Gb);
+}
+
+/// <summary><c>Options:Backfill:*</c> (P14-03).</summary>
+internal sealed class BackfillOptions
+{
+    /// <summary>The deployment gate (<c>Options__Backfill__Enabled</c>).</summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>Requests a second: 0.2 to 2 (Dhan's Data limit is 5 a second, shared with the day's calls).</summary>
+    [Range(0.2, 2.0)]
+    public double RequestsPerSecond { get; set; } = 1;
+
+    [Range(1000, 90000)]
+    public int MaxRequestsPerDay { get; set; } = 40000;
+
+    [Range(1, 5)]
+    public int Years { get; set; } = 5;
+
+    [Range(0, 30)]
+    public int StockCount { get; set; } = 20;
+
+    [Range(0, 10)]
+    public int IndexOffsets { get; set; } = 10;
+
+    [Range(0, 3)]
+    public int StockOffsets { get; set; } = 3;
+
+    [Range(5, 60)]
+    public int TimeoutSeconds { get; set; } = 15;
+
+    /// <summary>The stored size of <c>options.rolling_bars</c> above which fetching stops (GiB; the app never deletes data).</summary>
+    [Range(1, 50)]
+    public int MaxStoredGb { get; set; } = 3;
+
+    public OptionBackfillSettings ToSettings(int minFreeGb) => new(
+        Enabled,
+        RequestsPerSecond,
+        MaxRequestsPerDay,
+        Years,
+        StockCount,
+        IndexOffsets,
+        StockOffsets,
+        TimeSpan.FromSeconds(TimeoutSeconds),
+        MaxStoredGb * OptionBackfillSettings.Gb,
+        minFreeGb * OptionBackfillSettings.Gb);
 }

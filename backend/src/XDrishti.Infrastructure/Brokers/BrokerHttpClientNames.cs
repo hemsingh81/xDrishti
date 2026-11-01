@@ -19,4 +19,7 @@ public static class BrokerHttpClientNames
 
     /// <summary>The Dhan client for the option chain and its expiry list (P14-02): the quote client's limits (15-second timeout, answers up to 4 MB); tests replace its primary handler too.</summary>
     public const string DhanOptionChain = "xd-broker-dhan-optionchain";
+
+    /// <summary>The Dhan client for the expired-options bars (P14-03): the quote client's limits (15-second timeout, answers up to 4 MB); tests replace its primary handler too.</summary>
+    public const string DhanRollingOption = "xd-broker-dhan-rollingoption";
 }

@@ -22,6 +22,7 @@ using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Market.Quality;
+using XDrishti.Application.Abstractions.OptionBackfill;
 using XDrishti.Application.Abstractions.OptionChain;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
@@ -54,6 +55,7 @@ using XDrishti.Infrastructure.Market.Calendar;
 using XDrishti.Infrastructure.Market.Context;
 using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Market.Quality;
+using XDrishti.Infrastructure.OptionBackfill;
 using XDrishti.Infrastructure.OptionChain;
 using XDrishti.Infrastructure.Paper;
 using XDrishti.Infrastructure.Persistence;
@@ -253,6 +255,8 @@ public static class DependencyInjection
         services.AddScoped<IDepthSwitchStore, DepthSwitchStore>(); // the owner's depth-recorder switch, insert-only; no row = OFF (P7-16)
         services.AddScoped<ITickSwitchStore, TickSwitchStore>(); // the owner's tick-recorder switch, insert-only; no row = OFF (P7-16b)
         services.AddScoped<IOptionChainSwitchStore, OptionChainSwitchStore>(); // the owner's option-chain-recorder switch, insert-only; no row = OFF (P14-02)
+        services.AddScoped<IOptionBackfillSwitchStore, OptionBackfillSwitchStore>(); // the owner's expired-options-backfill switch, insert-only; no row = OFF (P14-03)
+        services.AddScoped<IBackfillProbeAckStore, BackfillProbeAckStore>(); // the owner's acceptance of the probe result, insert-only; no row = not accepted (P14-03)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IBrokerAllowList, BrokerAllowList>(); // the broker allow-list read only, for the P7 phase check (P7-18, ADR 0097)
         services.AddSingleton<IPlanBuilderSettings, PlanBuilderSettings>(); // off by default: the empty skeleton stays the nightly builder (P7-04, ADR 0088)
@@ -316,6 +320,12 @@ public static class DependencyInjection
 
         // The option chain and its expiry list of the Data API (P14-02, ADR 0176): the guard allows only POST /v2/optionchain and /v2/optionchain/expirylist, no query; one request per 3 seconds at most, shared by every caller of the process (a singleton throttle).
         services.AddHttpClient(BrokerHttpClientNames.DhanOptionChain, BrokerHttp.ConfigureQuote)
+            .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<BrokerEndpointGuard>()
+            .RemoveAllLoggers();
+
+        // The expired-options bars of the Data API (P14-03, ADR 0177): the guard allows only POST /v2/charts/rollingoption, no query; one request per second at most, shared by every caller of the process (a singleton throttle).
+        services.AddHttpClient(BrokerHttpClientNames.DhanRollingOption, BrokerHttp.ConfigureQuote)
             .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
             .AddHttpMessageHandler<BrokerEndpointGuard>()
             .RemoveAllLoggers();
@@ -520,6 +530,20 @@ public static class DependencyInjection
         services.AddScoped<IOptionChainClient, DhanOptionChainClient>();
         services.AddScoped<IOptionChainStore, OptionChainStore>();
         services.AddScoped<IChainTargets, ChainTargets>();
+        return services;
+    }
+
+    /// <summary>
+    /// The adapters of the expired-options backfill (P14-03) - for the <c>xd-feed</c> host: the client of the one allowed rolling-option endpoint with its throttle, the write-only bar store, the fetch log and the underlyings it resolves from the master
+    /// list. No port here reads a bar. The host provides <c>OptionBackfillSettings</c>.
+    /// </summary>
+    public static IServiceCollection AddOptionBackfillRecording(this IServiceCollection services)
+    {
+        services.AddSingleton<BackfillThrottle>();
+        services.AddScoped<IOptionBackfillClient, DhanRollingOptionClient>();
+        services.AddScoped<IRollingBarStore, RollingBarStore>();
+        services.AddScoped<IBackfillFetchLog, BackfillFetchLog>();
+        services.AddScoped<IBackfillTargets, BackfillTargets>();
         return services;
     }
 

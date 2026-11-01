@@ -4483,6 +4483,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/options/backfill': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The owner's expired-options backfill switch (OFF = never set), whether the probe result was accepted, its history, the progress (keys done, empty, given up, left, estimated hours) and why the backfill is not running now. No bars */
+    get: operations['GetOptionBackfill'];
+    /** Switch the expired-options backfill ON or OFF as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). It only allows the backfill: the deployment flag Options__Backfill__Enabled, the probe acceptance and the service options-backfill must be on too. 401 auth.invalid_credentials, 423 auth.locked, 403 options.owner_only, 400 options.reason_invalid, 429 auth.rate_limited */
+    put: operations['ChangeOptionBackfill'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/options/backfill/probe-acceptance': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Record, as the owner, that the probe result of the backfill was read and accepted (ADR 0177); the backfill refuses to run until this exists. Appends an audited row. Needs a session, the CSRF token and the password in the body, checked on every call. 401 auth.invalid_credentials, 423 auth.locked, 403 options.owner_only, 400 options.reason_invalid, 429 auth.rate_limited */
+    put: operations['AcceptOptionBackfillProbe'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ticks/recorder': {
     parameters: {
       query?: never;
@@ -6047,6 +6082,20 @@ export interface components {
       notice: string;
       /** @description The changes, newest first (the latest 50). */
       history: components['schemas']['AutonomyChangeView'][];
+    };
+    /** @description The answer of an acceptance: the row. */
+    BackfillProbeAccepted: {
+      /** Format: int64 */
+      id: number;
+    };
+    /** @description The acceptance of the probe result. */
+    BackfillProbeAcceptedView: {
+      /** Format: int64 */
+      id: number;
+      actor: string;
+      note: string;
+      /** Format: date-time */
+      acceptedAt: string;
     };
     /** @description The backtest-versus-paper report (spec P10-04, R14). Every figure is a state and a number only for a value or provisional figure. */
     BacktestVsPaperView: {
@@ -13595,6 +13644,72 @@ export interface components {
       before: null | number;
       /** Format: int64 */
       after: null | number;
+    };
+    /** @description The body of the acceptance of the probe result. The owner is never part of it: the actor comes from the signed-in session. */
+    OptionBackfillProbeRequest: {
+      /** @description What was read and where it is recorded (ADR 0177), 1 to 500 characters. */
+      note: null | string;
+      /** @description The owner's password, re-entered for THIS act. It is checked on every request. */
+      password: null | string;
+    };
+    /** @description How far the backfill is: the keys the plan has, finished, empty, answered "no data", given up and left, and the hours the left keys need at the current rate (null until the feed host reported progress). Counts only. */
+    OptionBackfillProgressView: {
+      /** Format: int32 */
+      planned: number;
+      /** Format: int32 */
+      done: number;
+      /** Format: int32 */
+      empty: number;
+      /** Format: int32 */
+      noData: number;
+      /** Format: int32 */
+      givenUp: number;
+      /** Format: int32 */
+      left: number;
+      /** Format: double */
+      estimatedHours: null | number;
+    };
+    /** @description One change of the switch. */
+    OptionBackfillSwitchChangeView: {
+      /** Format: int64 */
+      id: number;
+      enabled: boolean;
+      actor: string;
+      reason: string;
+      /** Format: date-time */
+      changedAt: string;
+    };
+    /** @description The body of the expired-options backfill switch. The owner is never part of it: the actor comes from the signed-in session. */
+    OptionBackfillSwitchRequest: {
+      /** @description The new value of the owner's switch: ON allows the backfill to run (when the deployment flag, the probe acceptance and the service are on too), OFF stops it. */
+      enabled: boolean;
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS change - ON or OFF. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
+      password: null | string;
+    };
+    /** @description The answer of a switch change: the row and the new value. */
+    OptionBackfillSwitched: {
+      /** Format: int64 */
+      id: number;
+      enabled: boolean;
+    };
+    /**
+     * @description The backfill as the owner sees it: the stored switch (`false` when never set), its history (newest first, the latest 50), the probe acceptance (null = not accepted), the state word of the heartbeat (null when the feed host never reported), the progress
+     *     and the reasons it is not running now. Nothing in it is a bar.
+     */
+    OptionBackfillView: {
+      enabled: boolean;
+      /** Format: int64 */
+      switchId: null | number;
+      probeAccepted: null | components['schemas']['BackfillProbeAcceptedView'];
+      state: null | string;
+      /** Format: date-time */
+      lastSeenAt: null | string;
+      progress: null | components['schemas']['OptionBackfillProgressView'];
+      notRunningBecause: string[];
+      notice: string;
+      history: components['schemas']['OptionBackfillSwitchChangeView'][];
     };
     /** @description The answer of a switch change: the row and the new value. */
     OptionChainRecorderSwitched: {
@@ -29856,6 +29971,92 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['OptionChainRecorderSwitched'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetOptionBackfill: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OptionBackfillView'];
+        };
+      };
+    };
+  };
+  ChangeOptionBackfill: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OptionBackfillSwitchRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OptionBackfillSwitched'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  AcceptOptionBackfillProbe: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OptionBackfillProbeRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BackfillProbeAccepted'];
         };
       };
       /** @description Bad Request */

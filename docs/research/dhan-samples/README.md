@@ -52,3 +52,11 @@ What the owner checks on the first real depth session: the plan includes depth (
 | `optionchain-expirylist.json` | `POST https://api.dhan.co/v2/optionchain/expirylist`, body without `Expiry` | UNVERIFIED |
 
 The tests carry the same shapes inline. What the owner checks in the five-session pilot: whether "one unique request every 3 seconds" is per user or per (underlying, expiry) (the build keeps one request per 3 seconds for the whole process); the units of `implied_volatility` (percent assumed) and `theta` (per day assumed) against one hand-computed Black-Scholes value; whether a strike with no quote sends zeros or omits the fields (zero or missing bid, ask and last price are stored as NULL with a flag); the answer after 15:30; the `UnderlyingSeg` of a share (`NSE_EQ` assumed); the `IDX_I` ids of Bank Nifty and the other indices (they come from the master list, not from the documentation, which names only Nifty's `13`); and the error codes (the annexure lists `DH-901`, `DH-902`, `DH-904`, `DH-907`, `DH-908`, `DH-909`).
+
+## Expired options, rolling ATM offset (P14-03, ADR 0177)
+
+| File | Endpoint | Status |
+|------|----------|--------|
+| `rollingoption-success.json` | `POST https://api.dhan.co/v2/charts/rollingoption`, body `{exchangeSegment, interval, securityId, instrument, expiryFlag, expiryCode, strike, drvOptionType, requiredData, fromDate, toDate}` | UNVERIFIED (written from the documentation of 2026-11-01; the three bars are 09:15, 09:20 and 09:25 India time if the timestamps are Unix seconds) |
+
+The tests carry the same shape. The owner runs `scripts/xd-probe-backfill.sh` (at most five requests, nothing stored) and records the table of ADR 0177: the meaning of `expiryCode` (1 nearest is assumed), whether code 2 accepts offsets up to 10, the timestamp zone (the first bar of a session must read 09:15 India time), the unit of `iv` (percent assumed), whether a window before an underlying's weekly era is empty or `DH-907`, bars per window, whether `strike` is the absolute strike of each bar (assumed) and whether `interval` is sent as text (assumed). Until then every field above is a guess.

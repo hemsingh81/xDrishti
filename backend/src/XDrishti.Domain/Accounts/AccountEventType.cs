@@ -92,4 +92,6 @@ public enum AccountEventType
     ExecutionSettingsChanged,
     ExecutionDrillRequested,
     OptionChainRecorderSwitched,
+    OptionBackfillSwitched,
+    OptionBackfillProbeAccepted,
 }

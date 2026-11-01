@@ -461,6 +461,24 @@ Options:
     MaxStoredGb: 4        # 1-100: the stored size of options.chain_snapshots above which recording stops
 ```
 
+### Expired-options backfill (`Options:Backfill:*`, [ADR 0177](../adr/0177-the-expired-options-backfill-fetches-rolling-atm-offset-bars-from-one-new-allow-listed-data-api-endpoint-at-night-behind-four-gates-after-an-owner-run-probe-its-own-cap-and-no-reader.md), P14-03)
+
+`appsettings.json` / environment of `xd-feed` (`Options__Backfill__Enabled`; compose passes `XD_OPTIONS_BACKFILL_ENABLED`); bounds are checked at start-up. **Off by default, four gates:** this deployment flag (restart to change), the owner's stored switch (`PUT /api/options/backfill`, the password typed again for every change, ON and OFF), the owner's acceptance of the probe result (`PUT /api/options/backfill/probe-acceptance`, password; the probe is `scripts/xd-probe-backfill.sh`, at most five requests, nothing stored) and the service `options-backfill` (starts paused; "Run now" refused). It runs only between 16:30 and 08:30 India time, every day. `Options:MinFreeGb` (above) is the shared free-space floor.
+
+```yaml
+Options:
+  Backfill:
+    Enabled: false        # the deployment gate; false = nothing is read, built or sent
+    RequestsPerSecond: 1  # 0.2-2: requests a second for the whole process (Dhan's Data limit is 5 a second, shared with the day's calls)
+    MaxRequestsPerDay: 40000  # 1000-90000: per India day, counted from the fetch log
+    Years: 5              # 1-5: windows of 30 days back from the first of the month
+    StockCount: 20        # 0-30: the best-ranked shares of options.underlyings (by turnover), MONTH 1 at 15 minutes
+    IndexOffsets: 10      # 0-10: NIFTY and BANKNIFTY at ATM-n..ATM+n, 5 minutes (set from the probe)
+    StockOffsets: 3       # 0-3: shares at ATM-n..ATM+n
+    TimeoutSeconds: 15    # 5-60: a request that takes longer is a timeout, tried again up to three times
+    MaxStoredGb: 3        # 1-50: the stored size of options.rolling_bars above which fetching stops (the app never deletes data)
+```
+
 ## 4. Most-used settings
 
 | Setting | Meaning | Default |

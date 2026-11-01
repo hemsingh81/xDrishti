@@ -171,7 +171,8 @@ public sealed class OptionChainRecordingArchitectureTests
         System.Text.RegularExpressions.Regex.Matches(text, "TryAddWithoutValidation\\(\"([^\"]+)\"", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)).Select(m => m.Groups[1].Value).Order().ShouldBe(["access-token", "client-id"]);
         var endpoints = Source("XDrishti.Infrastructure", "Brokers", "BrokerEndpoints.cs");
         System.Text.RegularExpressions.Regex.Count(endpoints, "new\\(\"https://api\\.dhan\\.co/v2/optionchain[^\"]*\"\\)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)).ShouldBe(2);
-        endpoints.ShouldNotContain("rollingoption");
+        endpoints.ShouldContain("rollingoption", Case.Sensitive); // the one row of P14-03 (ADR 0177); the option-chain client uses only its own two constants
+        System.Text.RegularExpressions.Regex.Count(endpoints, "new\\(\"https://api\\.dhan\\.co/v2/charts/rollingoption\"\\)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)).ShouldBe(1);
     }
 
     [Fact]
@@ -183,7 +184,7 @@ public sealed class OptionChainRecordingArchitectureTests
         OptionChainSettings.Off.Spacing.ShouldBe(TimeSpan.FromSeconds(3));
         OptionChainSettings.Off.Enabled.ShouldBeFalse();
         OptionChainSettings.Off.MaxStoredBytes.ShouldBe(4L * OptionChainSettings.Gb);
-        Source("XDrishti.Infrastructure", "Brokers", "ChainThrottle.cs").ShouldContain("spacing < Floor ? Floor : spacing");
+        Source("XDrishti.Infrastructure", "Brokers", "SpacingThrottle.cs").ShouldContain("spacing < floor ? floor : spacing");
     }
 
     [Fact]

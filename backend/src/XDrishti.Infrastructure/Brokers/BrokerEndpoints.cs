@@ -6,6 +6,7 @@ namespace XDrishti.Infrastructure.Brokers;
 /// (<c>POST /v2/marketfeed/quote</c>, no query; ADR 0019) — never an order action, positions or funds, and no other market-feed path (<c>ltp</c>, <c>ohlc</c>). Enforced for every request of the broker HTTP clients by <see cref="BrokerEndpointGuard"/>. The two login pages are opened by the owner's
 /// browser, never by the server.
 /// <para>P14-02 (ADR 0176) adds the option chain and its expiry list of the Data API: <c>POST /v2/optionchain</c> and <c>POST /v2/optionchain/expirylist</c>, no query, each an exact row of its own.</para>
+/// <para>P14-03 (ADR 0177) adds the expired-options data of the Data API: <c>POST /v2/charts/rollingoption</c>, no query, one exact row of its own.</para>
 /// </summary>
 internal static class BrokerEndpoints
 {
@@ -52,6 +53,9 @@ internal static class BrokerEndpoints
     /// <summary>The expiry dates of one underlying (JSON body without <c>Expiry</c>, same headers; P14-02, ADR 0176). Read-only despite the POST; no query.</summary>
     public static readonly Uri DhanOptionChainExpiryList = new("https://api.dhan.co/v2/optionchain/expirylist");
 
+    /// <summary>The expired-options bars of one underlying, expiry kind, strike offset, side and window of at most 30 days (JSON body, headers <c>access-token</c> and <c>client-id</c>; P14-03, ADR 0177). Read-only despite the POST; no query. Every other path under <c>/v2/charts</c> stays refused.</summary>
+    public static readonly Uri DhanRollingOption = new("https://api.dhan.co/v2/charts/rollingoption");
+
     /// <summary>
     /// Dhan's market-data WebSocket (ADR 0024 §8; unverified until the owner's first real session): <c>wss://api-feed.dhan.co</c> with exactly the query keys <see cref="FeedQueryKeys"/> (<c>version</c>, <c>token</c>, <c>clientId</c>,
     /// <c>authType</c>). The only socket the application may open, checked by <see cref="IsAllowedWebSocket"/> before the connection is made.
@@ -85,6 +89,7 @@ internal static class BrokerEndpoints
         (HttpMethod.Post, DhanMarketQuote, null),
         (HttpMethod.Post, DhanOptionChain, null),
         (HttpMethod.Post, DhanOptionChainExpiryList, null),
+        (HttpMethod.Post, DhanRollingOption, null),
     ];
 
     /// <summary>One allowed request shape: method, host, how it reads in the phase check (ADR 0097) and what the rest of the URL must look like.</summary>

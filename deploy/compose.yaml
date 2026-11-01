@@ -199,7 +199,7 @@ services:
 
   # The live feed (P2-10, ADR 0024): the Dhan WebSocket for the active set during market hours (09:00-15:35 IST on trading days; the window is the service
   # `live-feed` on the Services screen). It reads the Data account's token through the broker vault, so it gets the vault key like xd-api, and it writes
-  # prices into the database only. Outbound to api-feed.dhan.co (wss) and, for the option-chain recorder (P14-02), the two option-chain paths of api.dhan.co (https) only: its clients refuse every other endpoint. No published port.
+  # prices into the database only. Outbound to api-feed.dhan.co (wss) and, for the option-chain recorder (P14-02) and the expired-options backfill (P14-03), the two option-chain paths and the rolling-option path of api.dhan.co (https) only: its clients refuse every other endpoint. No published port.
   xd-feed:
     image: localhost/xdrishti/feed:${XD_VERSION:-0.1.0}
     build:
@@ -217,6 +217,8 @@ services:
       Ticks__Enabled: ${XD_TICKS_ENABLED:-false}
       # The option-chain recorder (P14-02, ADR 0176): the deployment gate, OFF by default. REST requests of the Data account to POST api.dhan.co/v2/optionchain and /v2/optionchain/expirylist only (the client's guard refuses every other endpoint), at most one per 3 seconds; recording also needs the owner's switch (PUT /api/options/chain-recorder, password) and the resumed service option-chain-recorder.
       Options__Chain__Enabled: ${XD_OPTIONS_CHAIN_ENABLED:-false}
+      # The expired-options backfill (P14-03, ADR 0177): the deployment gate, OFF by default. REST requests of the Data account to POST api.dhan.co/v2/charts/rollingoption only (the client's guard refuses every other endpoint), at most one a second, only from 16:30 to 08:30 India time; fetching also needs the owner's acceptance of the probe result (PUT /api/options/backfill/probe-acceptance, password), the owner's switch (PUT /api/options/backfill, password) and the resumed service options-backfill.
+      Options__Backfill__Enabled: ${XD_OPTIONS_BACKFILL_ENABLED:-false}
     secrets:
       - source: db_app_password
         target: Database__Password
