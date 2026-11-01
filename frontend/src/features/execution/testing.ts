@@ -12,6 +12,8 @@ export const allowedWrites: readonly (readonly [string, RegExp])[] = [
   ['POST', /^\/api\/execution\/halts\/[^/]+\/release$/],
   ['POST', /^\/api\/execution\/readiness\/checks$/],
   ['POST', /^\/api\/execution\/ip-attestations$/],
+  ['PUT', /^\/api\/execution\/settings$/],
+  ['POST', /^\/api\/execution\/drills$/],
   // The app's own step-up (password re-entry), which exit-all needs.
   ['POST', /^\/api\/auth\/step-up$/],
 ];

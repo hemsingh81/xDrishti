@@ -136,13 +136,11 @@ describe('Modes tab', () => {
     });
   });
 
-  it('offers no move down from paper and says there is no switch or drill control here', async () => {
+  it('offers no move down from paper', async () => {
     const base = buildModeAccount();
     modes({ ...base, effectiveMode: 'paper', configuredMode: 'paper' });
     open();
     await card();
     expect(screen.queryByRole('button', { name: 'Move down one step' })).not.toBeInTheDocument();
-    expect(screen.getByText(/execution_enabled: off/)).toBeInTheDocument();
-    expect(screen.getByText(/Raising risk waits one closed session/)).toBeInTheDocument();
   });
 });

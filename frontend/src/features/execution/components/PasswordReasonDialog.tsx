@@ -7,6 +7,8 @@ interface Props {
   title: string;
   confirmLabel: string;
   intro?: ReactNode;
+  /** False when the act takes no reason (the reason is then sent empty and not asked). */
+  askReason?: boolean;
   pending: boolean;
   error: unknown;
   /** Called with the typed password and reason; the dialog stays open until the caller closes it. */
@@ -15,7 +17,17 @@ interface Props {
 }
 
 /** The password and the reason, asked for one act. The server's refusal is shown as it came. */
-export function PasswordReasonDialog({ open, title, confirmLabel, intro, pending, error, onSubmit, onClose }: Props) {
+export function PasswordReasonDialog({
+  open,
+  title,
+  confirmLabel,
+  intro,
+  askReason = true,
+  pending,
+  error,
+  onSubmit,
+  onClose,
+}: Props) {
   const id = useId();
   const [password, setPassword] = useState('');
   const [reason, setReason] = useState('');
@@ -26,7 +38,7 @@ export function PasswordReasonDialog({ open, title, confirmLabel, intro, pending
   }
   const submit = (e: SyntheticEvent) => {
     e.preventDefault();
-    if (password === '' || reason.trim() === '' || pending) return;
+    if (password === '' || (askReason && reason.trim() === '') || pending) return;
     onSubmit({ password, reason: reason.trim() });
   };
   return (
@@ -35,18 +47,20 @@ export function PasswordReasonDialog({ open, title, confirmLabel, intro, pending
         <DialogTitle id={`${id}-title`}>{title}</DialogTitle>
         <DialogContent>
           {intro}
-          <TextField
-            label="Reason"
-            value={reason}
-            onChange={(e) => {
-              setReason(e.target.value);
-            }}
-            margin="dense"
-            fullWidth
-            required
-            multiline
-            minRows={2}
-          />
+          {askReason && (
+            <TextField
+              label="Reason"
+              value={reason}
+              onChange={(e) => {
+                setReason(e.target.value);
+              }}
+              margin="dense"
+              fullWidth
+              required
+              multiline
+              minRows={2}
+            />
+          )}
           <TextField
             label="Password"
             type="password"
@@ -67,7 +81,11 @@ export function PasswordReasonDialog({ open, title, confirmLabel, intro, pending
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={pending || password === '' || reason.trim() === ''}>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={pending || password === '' || (askReason && reason.trim() === '')}
+          >
             {confirmLabel}
           </Button>
         </DialogActions>

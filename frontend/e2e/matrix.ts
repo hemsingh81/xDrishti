@@ -14,6 +14,7 @@ import { mount as mountPlans } from '../src/test/planScreen';
 import { replayServer } from '../src/test/replayFixtures';
 import { runKeyA } from '../src/test/reportFixtures';
 import { server } from '../src/test/server';
+import { mountModes } from './executionMounts';
 import { noStudies } from './noStudies';
 import { learningEmpty, learningFull, learningThin, records, recordsEmpty } from './learningMounts';
 import { mountTrades, reportBase, reportEmpty } from './reportMounts';
@@ -202,6 +203,11 @@ export const screens: Screen[] = [
       },
       empty: () => undefined,
     },
+  },
+  {
+    id: 'execution-modes',
+    route: '/execution?tab=modes',
+    mounts: { full: mountModes },
   },
   {
     id: 'audit',

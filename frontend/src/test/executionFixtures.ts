@@ -171,7 +171,42 @@ export const buildPhaseCheck = (
   text: '',
 });
 
+export const buildSettingsRow = (
+  over: Partial<Schemas['ExecutionSettingsRowView']> = {},
+): Schemas['ExecutionSettingsRowView'] => ({
+  id: 1,
+  executionEnabled: false,
+  autoLiveEnabled: false,
+  actor: 'owner',
+  reason: 'initial',
+  changedAt: '2026-10-29T04:00:00Z',
+  effectiveFrom: '2026-10-29T04:00:00Z',
+  snapshotHash: 'h',
+  ...over,
+});
+
+export const buildSettings = (
+  over: Partial<Schemas['ExecutionSettingsView']> = {},
+): Schemas['ExecutionSettingsView'] => ({
+  inForce: buildSettingsRow(),
+  pending: null,
+  history: [buildSettingsRow()],
+  autoLiveLocked: true,
+  serverNow: '2026-10-30T04:00:00Z',
+  ...over,
+});
+
+export const buildDrills = (over: Partial<Schemas['ExecutionDrillsView']> = {}): Schemas['ExecutionDrillsView'] => ({
+  drills: [],
+  requests: [],
+  maxAgeDays: 30,
+  serverNow: '2026-10-30T04:00:00Z',
+  ...over,
+});
+
 export const executionHandlers = [
+  http.get('/api/execution/settings', () => HttpResponse.json(buildSettings())),
+  http.get('/api/execution/drills', () => HttpResponse.json(buildDrills())),
   http.get('/api/execution/status', () => HttpResponse.json(buildExecStatus())),
   http.get('/api/execution/overview', () => HttpResponse.json(buildOverview())),
   http.get('/api/execution/positions', () => HttpResponse.json([])),
