@@ -141,14 +141,15 @@ public sealed class OptionBackfillArchitectureTests
     }
 
     [Fact]
-    public void Only_the_bar_store_names_the_bar_table_and_only_the_log_and_the_store_name_the_fetch_log_in_the_whole_source()
+    public void Only_the_bar_store_and_the_quality_reader_name_the_bar_table_and_only_the_log_the_store_and_the_quality_reader_name_the_fetch_log_in_the_whole_source()
     {
         var files = Directory.GetFiles(Path.Combine(Root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal)).ToList();
         string[] Naming(string table) => [.. files.Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN)\\s+options\\." + table, System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5))).Select(f => Path.GetFileName(f)).Order()];
 
-        Naming("rolling_bars").ShouldBe(["RollingBarStore.cs"]);
-        Naming("fetch_log").ShouldBe(["BackfillFetchLog.cs", "RollingBarStore.cs"]);
+        // P14-04 (ADR 0178) added exactly one reader: the quality checks' OptionArchiveReader. A third name here is a failure.
+        Naming("rolling_bars").ShouldBe(["OptionArchiveReader.cs", "RollingBarStore.cs"]);
+        Naming("fetch_log").ShouldBe(["BackfillFetchLog.cs", "OptionArchiveReader.cs", "RollingBarStore.cs"]);
     }
 
     [Fact]

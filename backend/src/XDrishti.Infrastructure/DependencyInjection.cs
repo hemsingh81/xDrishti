@@ -57,6 +57,7 @@ using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Market.Quality;
 using XDrishti.Infrastructure.OptionBackfill;
 using XDrishti.Infrastructure.OptionChain;
+using XDrishti.Infrastructure.OptionQuality;
 using XDrishti.Infrastructure.Paper;
 using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Planning;
@@ -257,6 +258,11 @@ public static class DependencyInjection
         services.AddScoped<IOptionChainSwitchStore, OptionChainSwitchStore>(); // the owner's option-chain-recorder switch, insert-only; no row = OFF (P14-02)
         services.AddScoped<IOptionBackfillSwitchStore, OptionBackfillSwitchStore>(); // the owner's expired-options-backfill switch, insert-only; no row = OFF (P14-03)
         services.AddScoped<IBackfillProbeAckStore, BackfillProbeAckStore>(); // the owner's acceptance of the probe result, insert-only; no row = not accepted (P14-03)
+        services.AddOptions<OptionQualityOptions>().Bind(configuration.GetSection(OptionQualityOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // Options:Quality:* (P14-04)
+        services.AddSingleton<XDrishti.Application.Abstractions.OptionQuality.IOptionQualitySettings, OptionQualitySettings>();
+        services.AddScoped<XDrishti.Application.Abstractions.OptionQuality.IOptionArchiveReader, OptionArchiveReader>(); // the quality checks' bounded reads of the option archive, SELECT only (P14-04)
+        services.AddScoped<XDrishti.Application.Abstractions.OptionQuality.IOptionReference, OptionReference>(); // symbols, strike step, lots and rule epochs for the quality checks (P14-04)
+        services.AddScoped<XDrishti.Application.Abstractions.OptionQuality.IOptionQualityStore, OptionQualityStore>(); // the quality runs and results, insert-only (P14-04)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IBrokerAllowList, BrokerAllowList>(); // the broker allow-list read only, for the P7 phase check (P7-18, ADR 0097)
         services.AddSingleton<IPlanBuilderSettings, PlanBuilderSettings>(); // off by default: the empty skeleton stays the nightly builder (P7-04, ADR 0088)

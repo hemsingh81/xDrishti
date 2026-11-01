@@ -38,13 +38,13 @@ public sealed class OptionMigrationTests(ApiFactory factory)
         await using var connection = new NpgsqlConnection(scratch.ConnectionString);
         await connection.OpenAsync(Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'options' ORDER BY 1")).ShouldBe(["backfill_probe_ack", "backfill_switch", "chain_recorder_switch", "chain_requests", "chain_sessions", "chain_snapshots", "contracts", "fetch_log", "lot_sizes", "market_epochs", "rolling_bars"]); // the three of P14-01, the four of P14-02 and the four of P14-03
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'options' ORDER BY 1")).ShouldBe(["backfill_probe_ack", "backfill_switch", "chain_recorder_switch", "chain_requests", "chain_sessions", "chain_snapshots", "contracts", "fetch_log", "lot_sizes", "market_epochs", "quality_results", "quality_runs", "rolling_bars"]); // the three of P14-01, the four of P14-02 and the four of P14-03
         (await ListAsync(connection, "SELECT column_name || '|' || data_type || '|' || is_nullable FROM information_schema.columns WHERE table_schema = 'options' AND table_name = 'contracts' ORDER BY ordinal_position")).ShouldBe(
         [
             "security_id|bigint|NO", "underlying_id|uuid|NO", "instrument|character varying|NO", "expiry|date|NO", "strike_px|integer|NO", "side|character|NO", "expiry_kind|character varying|YES",
             "lot_size_seen|integer|NO", "tick_px|integer|YES", "first_seen_on|date|NO", "last_seen_on|date|NO",
         ]);
-        (await ListAsync(connection, "SELECT conname FROM pg_constraint WHERE connamespace = 'options'::regnamespace AND contype <> 'n' AND conname NOT LIKE '%chain!_%' ESCAPE '!' AND conname NOT SIMILAR TO '%(rolling_bars|fetch_log|backfill_switch|backfill_probe_ack)%' ORDER BY 1")).ShouldBe(
+        (await ListAsync(connection, "SELECT conname FROM pg_constraint WHERE connamespace = 'options'::regnamespace AND contype <> 'n' AND conname NOT LIKE '%chain!_%' ESCAPE '!' AND conname NOT SIMILAR TO '%(rolling_bars|fetch_log|backfill_switch|backfill_probe_ack|quality_runs|quality_results)%' ORDER BY 1")).ShouldBe(
         [
             "ck_contracts_expiry_kind", "ck_contracts_instrument", "ck_contracts_lot_size_seen", "ck_contracts_seen", "ck_contracts_side", "ck_contracts_strike_px", "ck_contracts_tick_px",
             "ck_lot_sizes_confirmed", "ck_lot_sizes_lot_size", "ck_lot_sizes_source", "ck_market_epochs_confirmed", "fk_contracts_underlying", "fk_lot_sizes_underlying",
@@ -74,6 +74,6 @@ public sealed class OptionMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'options' ORDER BY 1")).ShouldBe(["backfill_probe_ack", "backfill_switch", "chain_recorder_switch", "chain_requests", "chain_sessions", "chain_snapshots", "contracts", "fetch_log", "lot_sizes", "market_epochs", "rolling_bars"]); // the three of P14-01, the four of P14-02 and the four of P14-03
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'options' ORDER BY 1")).ShouldBe(["backfill_probe_ack", "backfill_switch", "chain_recorder_switch", "chain_requests", "chain_sessions", "chain_snapshots", "contracts", "fetch_log", "lot_sizes", "market_epochs", "quality_results", "quality_runs", "rolling_bars"]); // the three of P14-01, the four of P14-02 and the four of P14-03
     }
 }

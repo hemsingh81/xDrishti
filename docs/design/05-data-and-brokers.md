@@ -454,6 +454,8 @@ the function deletes only CSV rows of the one instrument within the range (ends 
 The nightly plan is not produced (fail closed) if index data fails or more than X% of tracked instruments fail;
 individual instruments that fail validation are skipped by the scan (per-instrument fail-closed).
 
+**Option archive quality (built, P14-04, [ADR 0178](../adr/0178-the-option-archive-quality-checks-read-the-recorded-chains-and-rolling-bars-in-bounded-ranges-and-store-insert-only-verdicts-with-an-honest-unavailable-and-no-trading-use.md)).** A separate set of checks reads the recorded option chains and the backfilled rolling bars after the session and stores one verdict per underlying, session and check (`pass`, `warn`, `fail` or `unavailable` with a reason; `unavailable` never counts as `pass`): chain and rolling coverage (95 % pass, 80 % warn), put-call parity at a rate of 6.5 % (UNVERIFIED; 90 % / 70 %), IV and Greek sanity (2 % / 10 %), cumulative-volume and open-interest jumps, and rolling-series stitching with the underlying's 1-minute close. Insert-only tables `options.quality_runs` and `options.quality_results`; the service `options-quality` (daily 16:15, on by default, bounded per run); `GET /api/options/coverage` returns statuses, usable flags and the cumulative usable chain sessions, never a price. The checks are the only reader of the archive tables and nothing trades on them.
+
 ### 10b. Data quality window (validation workbench)
 
 The **Data validation** service runs after every end-of-day fetch (and on demand) over the last N sessions

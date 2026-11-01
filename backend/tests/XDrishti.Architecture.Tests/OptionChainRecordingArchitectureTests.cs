@@ -136,14 +136,15 @@ public sealed class OptionChainRecordingArchitectureTests
     }
 
     [Fact]
-    public void Only_the_chain_store_names_the_snapshot_table_in_the_whole_source()
+    public void Only_the_chain_store_and_the_quality_reader_name_the_snapshot_table_in_the_whole_source()
     {
         var named = Directory.GetFiles(Path.Combine(Root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "\"[^\"\\n]*chain_snapshots", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)))
+            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "\"[^\"\\n]*chain_snapshots|(FROM|INTO|UPDATE|JOIN)\\s+options\\.chain_snapshots", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)))
             .Select(Path.GetFileName).Order().ToList();
 
-        named.ShouldBe(["OptionChainStore.cs"]);
+        // P14-04 (ADR 0178) added exactly one reader, the quality checks' OptionArchiveReader (the pattern now also catches a name inside a multi-line SQL string). A third file here is a failure.
+        named.ShouldBe(["OptionArchiveReader.cs", "OptionChainStore.cs"]);
     }
 
     [Fact]

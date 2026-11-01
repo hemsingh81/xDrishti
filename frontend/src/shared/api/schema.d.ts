@@ -4518,6 +4518,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/options/coverage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The quality verdicts of one underlying's option archive between from and to (default: the last 30 days; at most 400): per session and check the status (pass|warn|fail|unavailable), value, threshold and reason, whether the session is usable, and the cumulative usable chain sessions up to to. 400 options.invalid_query for an unknown underlying or a bad range; an empty list when nothing is recorded. No price, IV or Greek */
+    get: operations['GetOptionCoverage'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ticks/recorder': {
     parameters: {
       query?: never;
@@ -13750,6 +13767,33 @@ export interface components {
       reason: null | string;
       /** @description The owner's password, re-entered for THIS change - ON or OFF. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
       password: null | string;
+    };
+    /** @description One check of a session as the API shows it: the code, the status word (`pass`, `warn`, `fail`, `unavailable`), the measured share, the threshold it was judged by and the reason. No price, IV or Greek. */
+    OptionCoverageCheckView: {
+      code: string;
+      status: string;
+      /** Format: double */
+      value: null | number;
+      /** Format: double */
+      threshold: null | number;
+      reason: null | string;
+    };
+    /** @description One session of the archive: a chain session of the underlying, or one rolling series (FetchKey) on a day. */
+    OptionCoverageSessionView: {
+      /** Format: date */
+      date: string;
+      source: string;
+      fetchKey: null | string;
+      checks: components['schemas']['OptionCoverageCheckView'][];
+      usable: boolean;
+    };
+    /** @description The checked sessions of one underlying in a range and the cumulative count of usable chain sessions up to the end of the range (the number P14-07 compares with 60). Truncated is true when more rolling sessions exist than are listed. */
+    OptionCoverageView: {
+      underlying: string;
+      sessions: components['schemas']['OptionCoverageSessionView'][];
+      /** Format: int32 */
+      usableChainSessions: number;
+      truncated: boolean;
     };
     /** @description One account on Today. string OverviewAccount.Mode is the effective mode and DateTimeOffset? OverviewAccount.EffectiveFrom the time its trail row took effect (null: never changed from the configured one). */
     OverviewAccount: {
@@ -30057,6 +30101,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['BackfillProbeAccepted'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetOptionCoverage: {
+    parameters: {
+      query?: {
+        underlying?: string;
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OptionCoverageView'];
         };
       };
       /** @description Bad Request */

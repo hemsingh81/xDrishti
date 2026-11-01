@@ -479,6 +479,31 @@ Options:
     MaxStoredGb: 3        # 1-50: the stored size of options.rolling_bars above which fetching stops (the app never deletes data)
 ```
 
+### Option archive quality (`Options:Quality:*`, [ADR 0178](../adr/0178-the-option-archive-quality-checks-read-the-recorded-chains-and-rolling-bars-in-bounded-ranges-and-store-insert-only-verdicts-with-an-honest-unavailable-and-no-trading-use.md), P14-04)
+
+`appsettings.json` / environment of `xd-api` (`Options__Quality__Rate`); bounds are checked at start-up. The service `options-quality` is **on by default** (it only reads the archive and writes its own result rows); these are the numbers it judges by and the bounds of one run.
+
+```yaml
+Options:
+  Quality:
+    Rate: 0.065               # 0-0.2: yearly rate of the put-call parity check (UNVERIFIED; set it if you want another)
+    MaxIv: 300                # 1-1000: IV (percent assumed) at or above which a value is a violation
+    OiJumpPct: 50             # 1-1000: an open-interest change above this percent (and above OiJumpMinLots lots) is counted
+    OiJumpMinLots: 10         # 0-1000
+    OiWarnShare: 0.01         # 0-0.5: jumps over this share of pairs warn (never fail)
+    CoveragePass: 0.95        # 0.5-1: coverage at or above passes
+    CoverageWarn: 0.80        # 0.1-1: at or above warns, below fails
+    ParityPass: 0.90          # 0.5-1
+    ParityWarn: 0.70          # 0.1-1
+    GreeksWarn: 0.02          # 0-0.5: violations over this share of points warn
+    GreeksFail: 0.10          # 0-1: over this share fail
+    TickPaise: 5              # 1-100: one tick in the parity tolerance
+    LookbackDays: 10          # 1-60: days back in which a day with no chain session row is reported as not recorded
+    MaxChainSessionsPerRun: 20    # 1-400
+    MaxRollingWindowsPerRun: 5000  # 1-5000: ceiling of fetch windows checked in one run, oldest first (MaxRunMinutes is the real bound)
+    MaxRunMinutes: 30         # 1-120: a run stops between two units of work after this
+```
+
 ## 4. Most-used settings
 
 | Setting | Meaning | Default |

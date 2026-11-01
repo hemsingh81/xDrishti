@@ -76,14 +76,15 @@ public sealed class OptionArchiveArchitectureTests
     }
 
     [Fact]
-    public void Only_the_option_store_writes_or_reads_the_option_tables_in_sql_and_no_api_route_reaches_them()
+    public void Only_the_option_store_and_the_quality_reference_read_the_option_tables_in_sql_and_no_api_route_reaches_them()
     {
         var named = Directory.GetFiles(Path.Combine(Root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN)\\s+options\\.(contracts|lot_sizes|market_epochs)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)))
             .Select(Path.GetFileName).Order().ToList();
 
-        named.ShouldBe(["OptionContractStore.cs"]);
+        // P14-04 (ADR 0178) added exactly one reader of these reference tables, the quality checks' OptionReference (strike step, lot history, rule epochs). A third file here is a failure.
+        named.ShouldBe(["OptionContractStore.cs", "OptionReference.cs"]);
         Directory.GetFiles(Path.Combine(Root, "src", "XDrishti.Api"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && File.ReadAllText(f).Contains("XDrishti.Application.Abstractions.Options", StringComparison.Ordinal)).ShouldBeEmpty();
     }

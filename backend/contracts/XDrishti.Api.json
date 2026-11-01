@@ -15842,6 +15842,62 @@
         }
       }
     },
+    "/api/options/coverage": {
+      "get": {
+        "tags": [
+          "Options"
+        ],
+        "summary": "The quality verdicts of one underlying's option archive between from and to (default: the last 30 days; at most 400): per session and check the status (pass|warn|fail|unavailable), value, threshold and reason, whether the session is usable, and the cumulative usable chain sessions up to to. 400 options.invalid_query for an unknown underlying or a bad range; an empty list when nothing is recorded. No price, IV or Greek",
+        "operationId": "GetOptionCoverage",
+        "parameters": [
+          {
+            "name": "underlying",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptionCoverageView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ticks/recorder": {
       "get": {
         "tags": [
@@ -42733,6 +42789,108 @@
           }
         },
         "description": "The body of the option-chain recorder switch. The owner is never part of it: the actor comes from the signed-in session."
+      },
+      "OptionCoverageCheckView": {
+        "required": [
+          "code",
+          "status",
+          "value",
+          "threshold",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "threshold": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One check of a session as the API shows it: the code, the status word (`pass`, `warn`, `fail`, `unavailable`), the measured share, the threshold it was judged by and the reason. No price, IV or Greek."
+      },
+      "OptionCoverageSessionView": {
+        "required": [
+          "date",
+          "source",
+          "fetchKey",
+          "checks",
+          "usable"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "source": {
+            "type": "string"
+          },
+          "fetchKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionCoverageCheckView"
+            }
+          },
+          "usable": {
+            "type": "boolean"
+          }
+        },
+        "description": "One session of the archive: a chain session of the underlying, or one rolling series (FetchKey) on a day."
+      },
+      "OptionCoverageView": {
+        "required": [
+          "underlying",
+          "sessions",
+          "usableChainSessions",
+          "truncated"
+        ],
+        "type": "object",
+        "properties": {
+          "underlying": {
+            "type": "string"
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionCoverageSessionView"
+            }
+          },
+          "usableChainSessions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "description": "The checked sessions of one underlying in a range and the cumulative count of usable chain sessions up to the end of the range (the number P14-07 compares with 60). Truncated is true when more rolling sessions exist than are listed."
       },
       "OverviewAccount": {
         "required": [

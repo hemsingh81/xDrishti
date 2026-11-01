@@ -54,6 +54,7 @@ using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.OptionBackfill;
 using XDrishti.Application.OptionChain;
+using XDrishti.Application.OptionQuality;
 using XDrishti.Application.OwnerActs;
 using XDrishti.Application.Paper;
 using XDrishti.Application.Planning;
@@ -136,6 +137,8 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetTickRecorderQuery, TickRecorderView>, GetTickRecorderHandler>(); // the owner's tick switch (P7-16b): read
         services.AddScoped<IQueryHandler<GetOptionChainRecorderQuery, OptionChainRecorderView>, GetOptionChainRecorderHandler>(); // the owner's option-chain switch (P14-02): read
         services.AddScoped<IQueryHandler<GetOptionBackfillQuery, OptionBackfillView>, GetOptionBackfillHandler>(); // the owner's backfill switch, acceptance and progress (P14-03): read
+        services.AddScoped<IQueryHandler<GetOptionCoverageQuery, Result<OptionCoverageView>>, GetOptionCoverageHandler>(); // the stored quality verdicts of the option archive, aggregates only (P14-04): read
+        services.AddScoped<OptionArchiveQualityRunner>(); // one run of the option-archive quality checks (P14-04): reads the archive, writes only its own result rows
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)
         services.AddScoped<IQueryHandler<GetRampQuery, Result<RampView>>>(sp => sp.GetRequiredService<GetRampHandler>());
         services.AddScoped<ICommandHandler<SetRampStepCommand, RampView>, SetRampStepHandler>();
@@ -315,6 +318,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, TickRecorderService>(); // the trade-tick recorder (P7-16b): as the depth recorder
         services.AddSingleton<IScheduledService, OptionChainRecorderService>(); // the option-chain recorder (P14-02): as the tick recorder; starts paused, "Run now" refused
         services.AddSingleton<IScheduledService, OptionBackfillService>(); // the expired-options backfill (P14-03): as the recorders; starts paused, "Run now" refused
+        services.AddSingleton<IScheduledService, OptionArchiveQualityService>(); // the option-archive quality checks (P14-04): daily 16:15, on by default, reads the archive and writes only its own result rows
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
         services.AddSingleton<ServiceScheduler>();
