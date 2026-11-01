@@ -64,6 +64,10 @@ stateDiagram-v2
 
 - Data: Dhan **option chain API** (OI, Greeks, IV, bid/ask; ~1 request / 3 s per underlying-expiry) and
   **expired options data API** for backtests; own chain snapshots (5-min for indices, EOD for stocks).
+- Reference data (built, P14-01, [ADR 0175](../adr/0175-option-contracts-of-a-configured-underlying-list-are-kept-from-the-master-refresh-in-their-own-schema-with-a-dated-lot-history-and-dated-rule-epochs-never-in-the-master-list.md)):
+  `options.contracts` (the contracts of the listed underlyings from the daily master refresh, never deleted),
+  `options.lot_sizes` (dated lot history) and `options.market_epochs` (dated rule changes); every seed is unconfirmed
+  until the owner checks it against the circular; the list is the app setting `options.underlyings` (doc 06 §2.1).
 - Families: directional expression (ITM/ATM options for our signals), defined-risk debit spreads (swing),
   index credit spreads / iron condors in range regimes, event/IV-aware positioning.
 - New learning dimension **instrument expression** (cash / future / option_buy / debit_spread …).

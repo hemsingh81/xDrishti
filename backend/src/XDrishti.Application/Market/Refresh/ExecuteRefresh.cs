@@ -2,18 +2,23 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Import;
+using XDrishti.Application.Options;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
 
 namespace XDrishti.Application.Market.Refresh;
 
-/// <summary>Carries out a registered refresh: download, read, enrich, save. Runs in the background; the run record shows progress and result.</summary>
+/// <summary>
+/// Carries out a registered refresh: download, read, enrich, save. Runs in the background; the run record shows progress and result. The same single read of the
+/// file also collects the option contracts of the listed underlyings, saved after the master list (P14-01, <see cref="OptionContractImport"/>).
+/// </summary>
 public sealed record ExecuteRefreshCommand(Guid RunId) : ICommand;
 
 internal sealed class ExecuteRefreshHandler(
     IRefreshRunStore runs,
     IInstrumentSource source,
     IInstrumentCatalog catalog,
+    OptionContractImport options,
     TimeProvider clock,
     ILogger<ExecuteRefreshHandler> logger) : ICommandHandler<ExecuteRefreshCommand>
 {
@@ -52,6 +57,10 @@ internal sealed class ExecuteRefreshHandler(
         var known = run.Force || await catalog.CountActiveAsync(cancellationToken) == 0 ? null : await runs.GetLastStampsAsync(RefreshRules.Version, cancellationToken);
         await ProgressAsync(run, RefreshPhase.Downloading, 0, cancellationToken);
 
+        // The option list is read before the download, so no database work runs while the download stream is open (P14-01).
+        // shortcut: it is also read on a run that then finds the file unchanged (304) or fails to download; one small app-settings read (the turnover ranking
+        // only while no list is stored) is cheaper than deciding first, and a default fixed on such a day is the same default (ADR 0175 item 10).
+        var (listed, listingProblems) = await options.ListingAsync(IndiaTime.Today(clock.GetUtcNow()), clock.GetUtcNow(), cancellationToken);
         SourceStamp dhanStamp;
         MasterParse parse;
         await using (var master = await source.OpenMasterAsync(known?.Dhan, cancellationToken))
@@ -77,7 +86,7 @@ internal sealed class ExecuteRefreshHandler(
             try
             {
                 parsed = await DhanMasterParser.ParseAsync(
-                    master.Content!, rows => runs.ReportProgressAsync(run.Id, RefreshPhase.Parsing, rows, cancellationToken), cancellationToken);
+                    master.Content!, rows => runs.ReportProgressAsync(run.Id, RefreshPhase.Parsing, rows, cancellationToken), cancellationToken, listed);
             }
             catch (IOException ex)
             {
@@ -121,6 +130,9 @@ internal sealed class ExecuteRefreshHandler(
 
         await ProgressAsync(run, RefreshPhase.Saving, parse.RowsRead, cancellationToken);
         var applied = await catalog.ApplyAsync(build.Candidates, parse.Protected, sectors is not null, clock.GetUtcNow(), cancellationToken);
+
+        // Option problems go first so the cap on stored warnings (RefreshRun.MaxWarnings) never drops them.
+        warnings.InsertRange(0, [.. listingProblems, .. await options.ApplyAsync(parse.Options, listed, today, cancellationToken)]);
 
         var outcome = new RefreshOutcome(
             applied.Added,

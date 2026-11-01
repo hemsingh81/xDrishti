@@ -32,9 +32,9 @@ public sealed class DhanMasterParserTests
         var counts = parse.Rows.GroupBy(r => r.Type).ToDictionary(g => g.Key, g => g.Count());
         counts[InstrumentType.Share].ShouldBe(30);
         counts[InstrumentType.Etf].ShouldBe(3);
-        counts[InstrumentType.Index].ShouldBe(4);
+        counts[InstrumentType.Index].ShouldBe(6);
         counts[InstrumentType.Future].ShouldBe(24);
-        parse.OutOfScope.ShouldBe(75 - 61);
+        parse.OutOfScope.ShouldBe(77 - 63);
     }
 
     [Fact]

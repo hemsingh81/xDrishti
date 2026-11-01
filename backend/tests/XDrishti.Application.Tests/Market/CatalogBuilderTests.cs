@@ -174,14 +174,27 @@ public sealed class CatalogBuilderTests
     }
 
     [Fact]
+    public async Task The_four_option_index_underlyings_of_the_real_file_map_to_the_default_list_symbols()
+    {
+        var build = CatalogBuilder.Build(await RowsAsync(), null, Today);
+
+        var indices = build.Candidates.Where(c => c.Type == InstrumentType.Index).Select(c => c.CanonicalSymbol).ToList();
+
+        indices.ShouldContain("NSE:FINNIFTY");
+        indices.ShouldContain("NSE:MIDCPNIFTY");
+        XDrishti.Domain.Options.OptionUnderlyings.DefaultIndices.ShouldBeSubsetOf(indices);
+        build.Candidates.Single(c => c.CanonicalSymbol == "NSE:MIDCPNIFTY").DisplayName.ShouldBe("Nifty Midcap Select");
+    }
+
+    [Fact]
     public async Task The_kept_figures_add_up()
     {
         var build = CatalogBuilder.Build(await RowsAsync(), null, Today);
 
         build.KeptByType["share"].ShouldBe(30);
         build.KeptByType["etf"].ShouldBe(3);
-        build.KeptByType["index"].ShouldBe(4);
+        build.KeptByType["index"].ShouldBe(6);
         build.KeptByType["future"].ShouldBe(23);
-        build.Candidates.Count.ShouldBe(60);
+        build.Candidates.Count.ShouldBe(62);
     }
 }

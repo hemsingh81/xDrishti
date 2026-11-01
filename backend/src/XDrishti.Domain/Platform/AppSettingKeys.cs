@@ -11,4 +11,7 @@ public static class AppSettingKeys
 
     /// <summary>The prefix of the keys of the charge sheets (P3-03f, ADR 0044): <c>research.cost_sheet.&lt;id&gt;</c>, the value the canonical JSON of the sheet. The research module checks the value; the id is lower case.</summary>
     public const string CostSheetPrefix = "research.cost_sheet.";
+
+    /// <summary>The option underlyings (P14-01, ADR 0175): a JSON array of canonical symbols; without the row the default is built and written once at the next refresh.</summary>
+    public const string OptionUnderlyings = "options.underlyings";
 }

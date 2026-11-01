@@ -6,7 +6,7 @@ namespace XDrishti.Application.Tests.Market;
 /// <summary>The committed samples of the two source files (real rows; see <c>Fixtures/</c>), as streams.</summary>
 internal static class MasterFixtures
 {
-    /// <summary>Dhan's scrip master sample: 75 rows, the real 33-column header. The SBIN September 2026 future (id 99001) is a copy with an expiry already past.</summary>
+    /// <summary>Dhan's scrip master sample: 77 rows, the real 33-column header. The SBIN September 2026 future (id 99001) is a copy with an expiry already past; the last two rows are the real FINNIFTY and MIDCPNIFTY index rows (2026-11-01, P14-01).</summary>
     public const string Master = "dhan-master-sample.csv";
 
     public const string Sectors = "nse-sector-sample.csv";

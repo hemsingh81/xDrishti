@@ -37,14 +37,14 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
         run.Status.ShouldBe("succeeded");
         run.Phase.ShouldBeNull();
         run.FinishedAt.ShouldNotBeNull();
-        (run.Added, run.Updated, run.Retired, run.Revived, run.Unchanged).ShouldBe((60, 0, 0, 0, 0));
-        run.TotalActive.ShouldBe(60);
-        run.RowsRead.ShouldBe(75);
+        (run.Added, run.Updated, run.Retired, run.Revived, run.Unchanged).ShouldBe((62, 0, 0, 0, 0));
+        run.TotalActive.ShouldBe(62);
+        run.RowsRead.ShouldBe(77);
         run.SkippedByScope.ShouldBe(15);
         run.Collisions.ShouldBe(0);
         run.KeptByType["share"].ShouldBe(30);
         run.KeptByType["etf"].ShouldBe(3);
-        run.KeptByType["index"].ShouldBe(4);
+        run.KeptByType["index"].ShouldBe(6);
         run.KeptByType["future"].ShouldBe(23);
         run.FnoUnderlyings.ShouldBe(8);
         (run.SectorMatched, run.SectorUnmatched).ShouldBe((13, 17));
@@ -52,7 +52,7 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
         run.Error.ShouldBeNull();
 
         var status = await GetStatusAsync();
-        status.TotalActive.ShouldBe(60);
+        status.TotalActive.ShouldBe(62);
         (status.AutoRefresh.Enabled, status.AutoRefresh.TimeIst).ShouldBe((false, "08:45")); // switched off for the tests, default time
     }
 
@@ -101,7 +101,7 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
 
         second.Status.ShouldBe("unchanged");
         (second.Added, second.Updated, second.Retired, second.Revived, second.Unchanged).ShouldBe((0, 0, 0, 0, 0));
-        second.TotalActive.ShouldBe(60);
+        second.TotalActive.ShouldBe(62);
         Factory.MasterData.MasterRequests.Count().ShouldBe(2);
         Factory.MasterData.MasterRequests.Last().Header("If-None-Match").ShouldBe("\"dhan-v1\"");
         Factory.MasterData.SectorRequests.Count().ShouldBe(1, "an unchanged master needs no sector list");
@@ -129,8 +129,8 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
 
         forced.Trigger.ShouldBe("forced");
         forced.Status.ShouldBe("succeeded");
-        (forced.Added, forced.Updated, forced.Retired, forced.Revived, forced.Unchanged).ShouldBe((0, 0, 0, 0, 60));
-        forced.TotalActive.ShouldBe(60);
+        (forced.Added, forced.Updated, forced.Retired, forced.Revived, forced.Unchanged).ShouldBe((0, 0, 0, 0, 62));
+        forced.TotalActive.ShouldBe(62);
         Factory.MasterData.MasterRequests.Last().Header("If-None-Match").ShouldBeEmpty();
         Factory.MasterData.SectorRequests.Count().ShouldBe(2);
     }
@@ -150,8 +150,8 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
         var second = await RefreshAsync();
 
         second.Status.ShouldBe("succeeded");
-        (second.Added, second.Updated, second.Retired, second.Revived, second.Unchanged).ShouldBe((1, 1, 1, 0, 58));
-        second.TotalActive.ShouldBe(60);
+        (second.Added, second.Updated, second.Retired, second.Revived, second.Unchanged).ShouldBe((1, 1, 1, 0, 60));
+        second.TotalActive.ShouldBe(62);
         (await SearchAsync("?q=NSE:TCS&type=share")).Items.Single().LotSize.ShouldBe(5);
         (await SearchAsync("?q=NEWCO")).Items.Single().Name.ShouldBe("NEW CO LTD");
         (await SearchAsync("?q=RELIANCE-2026-10")).Items.ShouldBeEmpty("a retired instrument is hidden by default");
@@ -165,8 +165,8 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
 
         var third = await RefreshAsync();
 
-        (third.Added, third.Updated, third.Retired, third.Revived, third.Unchanged).ShouldBe((0, 1, 1, 1, 58));
-        third.TotalActive.ShouldBe(60);
+        (third.Added, third.Updated, third.Retired, third.Revived, third.Unchanged).ShouldBe((0, 1, 1, 1, 60));
+        third.TotalActive.ShouldBe(62);
         (await SearchAsync("?q=RELIANCE-2026-10")).Items.Single().Retired.ShouldBeFalse();
         (await SearchAsync("?q=NEWCO")).Items.ShouldBeEmpty();
         (await SearchAsync("?q=NEWCO&includeRetired=true")).Items.Single().Retired.ShouldBeTrue();
@@ -201,7 +201,7 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
         failed.Error.ShouldBe("Dhan's instrument file answered HTTP 503.");
         failed.FinishedAt.ShouldNotBeNull();
         (await SearchAsync("?pageSize=100")).Items.ShouldBe(before.Items);
-        (await GetStatusAsync()).TotalActive.ShouldBe(60);
+        (await GetStatusAsync()).TotalActive.ShouldBe(62);
 
         // The next try works again, and the failure did not spoil the validators.
         Factory.MasterData.MasterOverride = null;
@@ -220,7 +220,7 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
         failed.Status.ShouldBe("failed");
         failed.Error!.ShouldContain("changed shape");
         failed.Error!.ShouldContain("TICK_SIZE");
-        (await GetStatusAsync()).TotalActive.ShouldBe(60);
+        (await GetStatusAsync()).TotalActive.ShouldBe(62);
         (await SearchAsync("?q=NSE:TCS")).Items.ShouldNotBeEmpty();
     }
 
@@ -261,7 +261,7 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
 
         (await SearchAsync("?q=NEWCO")).Items.ShouldBeEmpty("no part of the failed import is visible");
         (await SearchAsync("?q=RELIANCE-2026-10")).Items.Single().Retired.ShouldBeFalse();
-        (await GetStatusAsync()).TotalActive.ShouldBe(60);
+        (await GetStatusAsync()).TotalActive.ShouldBe(62);
     }
 
     [Fact]
@@ -274,7 +274,7 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
 
         run.Status.ShouldBe("succeeded");
         run.Warnings.ShouldContain(w => w.Contains("Sectors were not updated", StringComparison.Ordinal) && w.Contains("HTTP 403", StringComparison.Ordinal));
-        (run.Added, run.Updated, run.Unchanged).ShouldBe((0, 0, 60));
+        (run.Added, run.Updated, run.Unchanged).ShouldBe((0, 0, 62));
         (await SearchAsync("?q=NSE:RELIANCE&type=share")).Items.Single().Sector.ShouldBe("Oil Gas & Consumable Fuels");
     }
 
@@ -443,7 +443,7 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
         var second = await RefreshAsync();
 
         second.Status.ShouldBe("succeeded");
-        (second.Added, second.Updated, second.Unchanged).ShouldBe((0, 13, 47)); // the 13 shares with a sector
+        (second.Added, second.Updated, second.Unchanged).ShouldBe((0, 13, 49)); // the 13 shares with a sector
         (await SearchAsync("?q=NSE:RELIANCE&type=share")).Items.Single().Sector.ShouldBe("Oil Gas & Consumable Fuels");
         (await RefreshAsync()).Status.ShouldBe("unchanged");
     }
@@ -461,7 +461,7 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
         var second = await RefreshAsync();
 
         second.Status.ShouldBe("succeeded");
-        (second.Added, second.Updated, second.Unchanged).ShouldBe((0, 0, 60));
+        (second.Added, second.Updated, second.Unchanged).ShouldBe((0, 0, 62));
         Factory.MasterData.MasterRequests.Last().Header("If-None-Match").ShouldBeEmpty();
         (await RefreshAsync()).Status.ShouldBe("unchanged");
     }
@@ -472,14 +472,14 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
         await RefreshAsync();
         await Factory.WithDbAsync(async db =>
         {
-            await db.Database.ExecuteSqlRawAsync("DELETE FROM market.instrument_broker_ids; DELETE FROM market.instruments");
+            await db.Database.ExecuteSqlRawAsync("DELETE FROM market.instrument_broker_ids; DELETE FROM options.lot_sizes; DELETE FROM options.contracts; DELETE FROM market.instruments");
             return 0;
         });
 
         var second = await RefreshAsync();
 
         second.Status.ShouldBe("succeeded");
-        second.Added.ShouldBe(60);
+        second.Added.ShouldBe(62);
         Factory.MasterData.MasterRequests.Last().Header("If-None-Match").ShouldBeEmpty();
     }
 
@@ -489,7 +489,7 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
         var padding = string.Join('\n', Enumerable.Range(0, 140).Select(i => ShareRow((800000 + i).ToString(System.Globalization.CultureInfo.InvariantCulture), "PAD" + i, "PAD " + i + " LTD", "INE8" + i.ToString("D6", System.Globalization.CultureInfo.InvariantCulture) + "01")));
         Factory.MasterData.MasterCsv += "\n" + padding;
         var first = await RefreshAsync();
-        first.Added.ShouldBe(200);
+        first.Added.ShouldBe(202);
         Factory.MasterData.MasterCsv = WithLine(Factory.MasterData.MasterCsv, "TATA CONSULTANCY SERV LT", line => line.Replace(",ES,EQ,1.0,", ",ES,EQ,zero,", StringComparison.Ordinal));
         Factory.MasterData.MasterETag = "\"dhan-v2\"";
 
@@ -497,9 +497,9 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
 
         second.Status.ShouldBe("succeeded");
         second.Warnings.ShouldContain(w => w.StartsWith("Skipped Dhan id 11536:", StringComparison.Ordinal) && w.Contains("lot size", StringComparison.Ordinal));
-        (second.Retired, second.Added, second.Updated, second.Unchanged).ShouldBe((0, 0, 0, 199));
+        (second.Retired, second.Added, second.Updated, second.Unchanged).ShouldBe((0, 0, 0, 201));
         (await SearchAsync("?q=NSE:TCS&type=share")).Items.Single().Retired.ShouldBeFalse();
-        (await GetStatusAsync()).TotalActive.ShouldBe(200);
+        (await GetStatusAsync()).TotalActive.ShouldBe(202);
     }
 
     [Fact]
@@ -514,13 +514,13 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
         var refused = await RefreshAsync();
 
         refused.Status.ShouldBe("failed");
-        refused.Error.ShouldBe("The new list has only 10 instruments while 60 are active; it was not applied. If the file is right, run a forced refresh.");
-        (await GetStatusAsync()).TotalActive.ShouldBe(60);
+        refused.Error.ShouldBe("The new list has only 10 instruments while 62 are active; it was not applied. If the file is right, run a forced refresh.");
+        (await GetStatusAsync()).TotalActive.ShouldBe(62);
 
         var forced = await RefreshAsync(force: true);
 
         forced.Status.ShouldBe("succeeded");
-        (forced.Retired, forced.TotalActive).ShouldBe((50, 10));
+        (forced.Retired, forced.TotalActive).ShouldBe((52, 10));
     }
 
     [Fact]
@@ -533,7 +533,7 @@ public sealed class RefreshApiTests(ApiFactory factory) : MarketTestBase(factory
         var run = await RefreshAsync();
 
         run.Status.ShouldBe("succeeded");
-        run.Added.ShouldBe(60);
+        run.Added.ShouldBe(62);
         run.Warnings.ShouldHaveSingleItem().ShouldContain("NEW_FLAG");
     }
 

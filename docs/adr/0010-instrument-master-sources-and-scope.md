@@ -28,3 +28,6 @@ BSE, MCX, currency, commodity and ~115k option rows are not needed by v1. The fi
 - Sector coverage is limited to the ~750 Nifty Total Market stocks until another file is added; the sector facet shows "Unclassified" for the rest.
 - The master depends on two public NSE/Dhan files whose format can change; the importer validates the header and fails closed with a clear message.
 - Data stays local; using the files follows the sources' terms for personal use (see doc 19).
+
+## Amendment (2026-11-01, P14-01, [ADR 0175](0175-option-contracts-of-a-configured-underlying-list-are-kept-from-the-master-refresh-in-their-own-schema-with-a-dated-lot-history-and-dated-rule-epochs-never-in-the-master-list.md))
+The master list still skips option rows. The same single read of the file now also collects the NSE index and stock option contracts of the underlyings listed in the setting `options.underlyings` into schema `options` (contracts kept for good, a dated lot history, dated rule epochs); nothing about `market.instruments`, its counts, search or baskets changes.

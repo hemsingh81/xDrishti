@@ -6,5 +6,6 @@ namespace XDrishti.Domain.Market;
 /// </summary>
 public static class RefreshRules
 {
-    public const int Version = 1;
+    /// <summary>2: the read also collects the option contracts of the listed underlyings (P14-01, ADR 0175), so the first refresh after it reads the whole file.</summary>
+    public const int Version = 2;
 }

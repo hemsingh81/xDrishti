@@ -19,9 +19,11 @@ internal sealed class MarketFixture
 
     public FakeRefreshSettings Settings { get; } = new();
 
+    public XDrishti.Application.Tests.Options.InMemoryOptionData Options { get; } = new();
+
     public StartRefreshHandler Start => new(Data, Data, Clock, NullLogger<StartRefreshHandler>.Instance);
 
-    public ExecuteRefreshHandler Execute => new(Data, Source, Data, Clock, NullLogger<ExecuteRefreshHandler>.Instance);
+    public ExecuteRefreshHandler Execute => new(Data, Source, Data, new XDrishti.Application.Options.OptionContractImport(Options, Options, NullLogger<XDrishti.Application.Options.OptionContractImport>.Instance), Clock, NullLogger<ExecuteRefreshHandler>.Instance);
 
     public GetRefreshStatusHandler Status => new(Data, Data, ServiceReaders.Schedules(Clock, refresh: Settings));
 

@@ -87,9 +87,9 @@ public sealed class TrackingApiTests(ApiFactory factory) : MarketTestBase(factor
         var untracked = await SearchAsync("?tracked=false&pageSize=100");
         tracked.Items.Select(i => i.Symbol).Order().ShouldBe(["NSE:RELIANCE", "NSE:TCS"]);
         tracked.Total.ShouldBe(2);
-        untracked.Total.ShouldBe(58);
+        untracked.Total.ShouldBe(60);
         untracked.Items.ShouldNotContain(i => i.Id == tcs.Id);
-        (await SearchAsync("?pageSize=100")).Total.ShouldBe(60, "no filter lists tracked and untracked together");
+        (await SearchAsync("?pageSize=100")).Total.ShouldBe(62, "no filter lists tracked and untracked together");
         (await FacetsAsync()).Tracked.ShouldBe(2);
 
         var audit = (await TrackingEventsAsync()).ShouldHaveSingleItem();

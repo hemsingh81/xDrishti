@@ -20,7 +20,7 @@ public sealed class ExecuteRefreshHandlerTests
         run.Phase.ShouldBeNull();
         run.FinishedAt.ShouldBe(_f.Clock.GetUtcNow());
         (run.Added, run.Updated, run.Retired, run.Revived, run.Unchanged, run.TotalActive).ShouldBe((40, 10, 3, 2, 7, 52));
-        run.RowsRead.ShouldBe(75);
+        run.RowsRead.ShouldBe(77);
         run.SkippedByScope.ShouldBe(14 + 1, "rows out of scope plus the expired SBIN future");
         run.Collisions.ShouldBe(0);
         run.KeptByType["share"].ShouldBe(30);
@@ -40,7 +40,7 @@ public sealed class ExecuteRefreshHandlerTests
         await _f.RunAsync(_f.Register());
 
         var (candidates, sectorsAvailable, now) = _f.Data.Applied.Single();
-        candidates.Count.ShouldBe(60);
+        candidates.Count.ShouldBe(62);
         sectorsAvailable.ShouldBeTrue();
         now.ShouldBe(_f.Clock.GetUtcNow());
         candidates.Single(c => c.CanonicalSymbol == "NSE:RELIANCE").Sector.ShouldBe("Oil Gas & Consumable Fuels");
@@ -278,19 +278,19 @@ public sealed class ExecuteRefreshHandlerTests
     [Fact]
     public async Task A_list_that_would_lose_more_than_half_of_the_active_instruments_is_not_applied()
     {
-        _f.Data.ActiveCount = 130; // the file has 60
+        _f.Data.ActiveCount = 130; // the file has 62
 
         var run = await _f.RunAsync(_f.Register());
 
         run.Status.ShouldBe(RefreshStatus.Failed);
-        run.Error.ShouldBe("The new list has only 60 instruments while 130 are active; it was not applied. If the file is right, run a forced refresh.");
+        run.Error.ShouldBe("The new list has only 62 instruments while 130 are active; it was not applied. If the file is right, run a forced refresh.");
         _f.Data.Applied.ShouldBeEmpty();
     }
 
     [Fact]
     public async Task The_tripwire_allows_exactly_half_and_ignores_an_empty_list()
     {
-        _f.Data.ActiveCount = 120;
+        _f.Data.ActiveCount = 124;
         var atHalf = await _f.RunAsync(_f.Register());
         var fresh = new MarketFixture();
         var first = await fresh.RunAsync(fresh.Register());

@@ -1,7 +1,9 @@
 using System.Globalization;
 using XDrishti.Application.Abstractions.Market;
+using XDrishti.Application.Options.Import;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
+using XDrishti.Domain.Options;
 
 namespace XDrishti.Application.Market.Import;
 
@@ -11,6 +13,8 @@ namespace XDrishti.Application.Market.Import;
 /// no in-scope rows at all, or too many unreadable rows (more than <see cref="MaxBadRows"/> or more than 1 % of the in-scope rows).
 /// Anything smaller is tolerated and reported: extra or unused columns, and individual in-scope rows that are malformed or do not fit the
 /// stored limits are skipped with a warning naming the Dhan id, and their instruments are protected from retirement.
+/// Given a non-empty list of option underlyings (spec P14-01, ADR 0175), the same single pass also collects the option rows of those underlyings
+/// (<see cref="OptionRowCollector"/>); option rows stay out of the master list and its counts exactly as before.
 /// </summary>
 internal static class DhanMasterParser
 {
@@ -42,7 +46,7 @@ internal static class DhanMasterParser
     ];
 
     public static async ValueTask<Result<MasterParse>> ParseAsync(
-        Stream content, Func<long, ValueTask>? progress, CancellationToken cancellationToken)
+        Stream content, Func<long, ValueTask>? progress, CancellationToken cancellationToken, OptionUnderlyings? options = null)
     {
         ArgumentNullException.ThrowIfNull(content);
         using var text = new StreamReader(content, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 64 * 1024, leaveOpen: true);
@@ -69,6 +73,8 @@ internal static class DhanMasterParser
         var columnCount = headerFields!.Length;
         var index = headerFields.Select((name, i) => (name: name.Trim().TrimStart('﻿'), i)).Where(x => x.name.Length > 0).ToDictionary(x => x.name, x => x.i, StringComparer.Ordinal);
         int exchangeAt = index["EXCH_ID"], segmentAt = index["SEGMENT"], instrumentAt = index["INSTRUMENT"], idAt = index["SECURITY_ID"];
+        string? optionsUnavailable = null;
+        var optionRows = options is null || options.IsEmpty ? null : OptionRowCollector.For(options, index, columnCount, out optionsUnavailable);
         var rows = new List<MasterRow>(5000);
         var skipped = new List<BrokerIdentity>();
         var rowWarnings = 0;
@@ -122,6 +128,12 @@ internal static class DhanMasterParser
                 && !InstrumentScope.MightBeInScope(FieldAt(line, exchangeAt), FieldAt(line, segmentAt), FieldAt(line, instrumentAt)))
             {
                 outOfScope++;
+                if (optionRows is not null && OptionScope.MightBeOption(FieldAt(line, exchangeAt), FieldAt(line, segmentAt), FieldAt(line, instrumentAt))
+                    && optionRows.MightList(FieldAt(line, optionRows.UnderlyingColumn)))
+                {
+                    optionRows.Accept(line.Split(','));
+                }
+
                 continue;
             }
 
@@ -157,6 +169,11 @@ internal static class DhanMasterParser
             if (type is null)
             {
                 outOfScope++;
+                if (optionRows is not null && OptionScope.MightBeOption(fields[exchangeAt].Trim(), fields[segmentAt].Trim(), fields[instrumentAt].Trim()))
+                {
+                    optionRows.Accept(fields);
+                }
+
                 continue;
             }
 
@@ -190,7 +207,8 @@ internal static class DhanMasterParser
             return Fail<MasterParse>($"Dhan's file has too many unreadable rows ({rowWarnings} of {rows.Count + rowWarnings}). Nothing was imported.");
         }
 
-        return Result.Success(new MasterParse(rows, read, outOfScope, warnings, skipped));
+        var optionParse = optionRows?.Result() ?? (optionsUnavailable is null ? null : new OptionParse([], 0, 0, optionsUnavailable));
+        return Result.Success(new MasterParse(rows, read, outOfScope, warnings, skipped, optionParse));
     }
 
     /// <summary>Null when the importer can read the header (unknown or unused columns only add warnings to <paramref name="warnings"/>); otherwise what is wrong.</summary>
@@ -341,7 +359,7 @@ internal static class DhanMasterParser
     /// <summary>"N" means not flagged.</summary>
     private static string? Flag(string value) => value.Equals("N", StringComparison.OrdinalIgnoreCase) ? null : Unavailable(value);
 
-    private static bool TryLot(string text, out int lot)
+    internal static bool TryLot(string text, out int lot)
     {
         lot = 0;
         if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var value) || value < 1 || value > int.MaxValue || value != decimal.Truncate(value))

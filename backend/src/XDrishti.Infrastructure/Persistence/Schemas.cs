@@ -30,4 +30,7 @@ public static class Schemas
 
     /// <summary>The assistant's switches (spec P9-02, ADR 0137): <c>settings</c>, insert-only for the runtime role. The views the model reads are in schema <c>aiv</c>, which no EF entity maps.</summary>
     public const string Ai = "ai";
+
+    /// <summary>The option archive's reference data (spec P14-01, ADR 0175): <c>contracts</c>, <c>lot_sizes</c> and <c>market_epochs</c>, raw SQL, no EF entity; kept for good.</summary>
+    public const string Options = "options";
 }

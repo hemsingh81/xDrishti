@@ -390,6 +390,8 @@ public static class DependencyInjection
         services.AddSingleton<IRefreshJobChannel, RefreshJobChannel>();
         services.AddScoped<IRefreshRunStore, RefreshRunStore>();
         services.AddScoped<IInstrumentCatalog, InstrumentCatalog>();
+        services.AddScoped<XDrishti.Application.Abstractions.Options.IOptionUnderlyingSetting, OptionContracts.OptionUnderlyingSetting>();
+        services.AddScoped<XDrishti.Application.Abstractions.Options.IOptionContractStore, OptionContracts.OptionContractStore>();
         services.AddScoped<IInstrumentQueries, InstrumentQueries>();
         services.AddScoped<ITrackedInstrumentStore, TrackedInstrumentStore>();
         services.AddScoped<IMarketUnitOfWork, MarketUnitOfWork>();

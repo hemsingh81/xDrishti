@@ -438,6 +438,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.live_quotes;
                 DELETE FROM market.context_daily;
                 DELETE FROM market.instrument_broker_ids;
+                DELETE FROM options.lot_sizes;
+                DELETE FROM options.contracts;
                 DELETE FROM market.instruments;
                 DELETE FROM market.master_refreshes;
                 """);

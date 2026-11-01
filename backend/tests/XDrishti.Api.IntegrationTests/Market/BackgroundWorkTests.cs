@@ -42,7 +42,7 @@ public sealed class BackgroundWorkTests(ApiFactory factory) : MarketTestBase(fac
         var status = await statusResponse.ReadAsync<RefreshStatusView>(Ct);
         status.Current.ShouldBeNull();
         status.Last!.Id.ShouldBe(started.RefreshId);
-        (status.Last.Status, status.Last.Added).ShouldBe(("succeeded", 60));
+        (status.Last.Status, status.Last.Added).ShouldBe(("succeeded", 62));
     }
 
     [Fact]

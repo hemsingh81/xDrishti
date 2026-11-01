@@ -58,10 +58,10 @@ public sealed class SearchApiTests(ApiFactory factory) : MarketTestBase(factory)
     [Theory]
     [InlineData("type=share", 30)]
     [InlineData("type=etf", 3)]
-    [InlineData("type=index", 4)]
+    [InlineData("type=index", 6)]
     [InlineData("type=future", 23)]
     [InlineData("fno=true", 8)]
-    [InlineData("fno=false", 52)]
+    [InlineData("fno=false", 54)]
     [InlineData("type=share&fno=true", 8)]
     [InlineData("sector=Information%20Technology", 2)]
     [InlineData("sector=Unclassified", 17)]
@@ -100,7 +100,7 @@ public sealed class SearchApiTests(ApiFactory factory) : MarketTestBase(factory)
 
         flagged.Items.ShouldAllBe(i => i.AsmGsm);
         clear.Items.ShouldAllBe(i => !i.AsmGsm);
-        (flagged.Total + clear.Total).ShouldBe(60);
+        (flagged.Total + clear.Total).ShouldBe(62);
         (await FacetsAsync()).AsmGsm.ShouldBe(flagged.Total);
     }
 
@@ -115,10 +115,10 @@ public sealed class SearchApiTests(ApiFactory factory) : MarketTestBase(factory)
             pages.Add(await SearchAsync($"?page={page}&pageSize=10"));
         }
 
-        pages.Select(p => p.Total).Distinct().ShouldBe([60]);
-        pages.Select(p => p.Items.Count).ShouldBe([10, 10, 10, 10, 10, 10, 0]);
+        pages.Select(p => p.Total).Distinct().ShouldBe([62]);
+        pages.Select(p => p.Items.Count).ShouldBe([10, 10, 10, 10, 10, 10, 2]);
         var all = pages.SelectMany(p => p.Items.Select(i => i.Symbol)).ToList();
-        all.Distinct().Count().ShouldBe(60);
+        all.Distinct().Count().ShouldBe(62);
         all.ShouldBe([.. all.Order(StringComparer.Ordinal)], "ordered by canonical symbol");
         (await SearchAsync("?page=2&pageSize=10")).Items.Select(i => i.Symbol).ShouldBe(pages[1].Items.Select(i => i.Symbol));
     }
@@ -147,7 +147,7 @@ public sealed class SearchApiTests(ApiFactory factory) : MarketTestBase(factory)
 
         first.Items.Select(i => i.Symbol).ShouldBe(again.Items.Select(i => i.Symbol));
         paged.ShouldBe(first.Items.Select(i => i.Symbol));
-        first.Items.Count.ShouldBe(60);
+        first.Items.Count.ShouldBe(62);
     }
 
     [Fact]
@@ -172,12 +172,12 @@ public sealed class SearchApiTests(ApiFactory factory) : MarketTestBase(factory)
         Factory.MasterData.MasterETag = "\"dhan-v2\"";
         await RefreshAsync();
 
-        (await SearchAsync("?pageSize=100")).Total.ShouldBe(59);
+        (await SearchAsync("?pageSize=100")).Total.ShouldBe(61);
         var withRetired = await SearchAsync("?pageSize=100&includeRetired=true");
-        withRetired.Total.ShouldBe(60);
+        withRetired.Total.ShouldBe(62);
         withRetired.Items.Count(i => i.Retired).ShouldBe(1);
         var facets = await FacetsAsync();
-        (facets.Total, facets.Retired).ShouldBe((59, 1));
+        (facets.Total, facets.Retired).ShouldBe((61, 1));
     }
 
     [Fact]
@@ -187,8 +187,8 @@ public sealed class SearchApiTests(ApiFactory factory) : MarketTestBase(factory)
 
         var facets = await FacetsAsync();
 
-        facets.Total.ShouldBe(60);
-        facets.Types.Select(t => (t.Value, t.Count)).ShouldBe([("share", 30), ("etf", 3), ("index", 4), ("future", 23)]);
+        facets.Total.ShouldBe(62);
+        facets.Types.Select(t => (t.Value, t.Count)).ShouldBe([("share", 30), ("etf", 3), ("index", 6), ("future", 23)]);
         facets.FnoEligible.ShouldBe(8);
         facets.Sectors[^1].ShouldBe(new FacetCount("Unclassified", 17)); // shares only: indices, futures and ETFs never get a sector
         facets.Sectors.Where(s => s.Value != "Unclassified").Sum(s => s.Count).ShouldBe(13);
@@ -267,7 +267,7 @@ public sealed class SearchApiTests(ApiFactory factory) : MarketTestBase(factory)
     {
         await ImportAsync();
 
-        (await SearchAsync("?pageSize=100")).Items.Count.ShouldBe(60);
+        (await SearchAsync("?pageSize=100")).Items.Count.ShouldBe(62);
     }
 
     [Fact]
@@ -299,7 +299,7 @@ public sealed class SearchApiTests(ApiFactory factory) : MarketTestBase(factory)
     {
         await ImportAsync();
         await AddSyntheticInstrumentsAsync(5_000);
-        (await FacetsAsync()).Total.ShouldBe(5_060);
+        (await FacetsAsync()).Total.ShouldBe(5_062);
         await SearchAsync("?q=syn&pageSize=100"); // warm-up: plans, connections
 
         var timings = new Dictionary<string, TimeSpan>();

@@ -33,6 +33,16 @@ Dhan's detailed scrip master has about 207,000 rows (35 MB, republished daily ar
 
 Skipped: exchange test symbols (`*NSETEST*`), debt, bonds, mutual-fund units, REITs/InvITs, BSE, MCX, currency, commodity and options (options come with their phase, P14). Futures past their expiry date (India date) are not kept; one that was kept and has expired is retired.
 
+**Option contracts (P14-01, [ADR 0175](../adr/0175-option-contracts-of-a-configured-underlying-list-are-kept-from-the-master-refresh-in-their-own-schema-with-a-dated-lot-history-and-dated-rule-epochs-never-in-the-master-list.md)).** Options stay out of the master list, search and baskets. The same single read of the file collects the NSE `OPTIDX`/`OPTSTK` rows whose underlying is in the app setting `options.underlyings` (default, fixed once at the first refresh: NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY and the 30 most traded F&O shares) into schema `options`:
+
+| Table | What it holds | Rule |
+|-------|---------------|------|
+| `options.contracts` | One row per Dhan security id: underlying (index or share of the master list), `OPTIDX`/`OPTSTK`, expiry, strike in paise, `CE`/`PE`, `week`/`month`, lot and tick seen, first/last seen date | Keyed on (security id, expiry): new rows inserted, `last_seen_on` advanced only for the very same contract, never deleted (expired contracts stay); a reused id is reported, never rewritten; counts in the log, run warnings only for real problems |
+| `options.lot_sizes` | The lot of an underlying's options from a date on: seeds (secondary, unconfirmed) and one `scrip_master` row per change seen (the nearest unexpired expiry's lot) | Insert-only; `confirmed` only for a value read in the circular, with its address |
+| `options.market_epochs` | Dated rule changes (one weekly index per exchange, upfront premium, Nifty expiry Tuesday, the 2025-12-30 lot revision, the 2026-04-01 STT raise) | Insert-only; seeded unconfirmed |
+
+The real file of 2026-11-01 has 81,835 NSE option rows; the list keeps about 18,500 live ones (the four indices 8,979). Lookups "in force on a date" return the value with its `confirmed` flag, or `unavailable`.
+
 **Canonical symbols** (exchange-qualified, independent of any broker; every other module uses them):
 
 | Type | Canonical symbol | Example |
