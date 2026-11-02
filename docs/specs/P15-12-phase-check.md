@@ -3,7 +3,7 @@
 - **Status:** Draft (written 2026-11-02 under the owner's delegation; the owner's Approved is needed before an agent builds it)
 - **Phase / roadmap row:** P15 — slice P15-12 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Phase check"); exit criterion of the roadmap row: "Features/filters improve OOS or are dropped".
 - **Design refs:** docs/design/18 (P15 row) · P8-00 D3 · ADR 0080 (MET / NOT MET / NOT EVALUABLE, limits always printed), ADR 0097 and spec P7-18 (stored records only, never MET on thin data, exit code 0), P12-12 (a read-only measurement) · the `/phase-done` skill.
-- **Needs:** P15-10 (`research.extension_evaluations`), P15-06 (`filings.event_filter_decisions`), P15-02/04 (coverage). Reads whatever exists; a missing table or family is NOT EVALUABLE for that family, not an error.
+- **Needs:** P15-10 (records in `research.extension_evaluations`, a P13-05 table), P15-06 (`filings.event_filter_decisions`), P15-02/04 (coverage). Reads whatever exists; a missing table or family is NOT EVALUABLE for that family, not an error.
 - **Size:** 1 agent-day (estimate).
 - **Safety:** no — read only: no setting changed, no verdict written, no model call, no order.
 

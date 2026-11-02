@@ -4,10 +4,10 @@
 - **Phase / roadmap row:** P15 — slice P15-10 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Evaluation and verdicts"); never cut.
 - **Design refs:** P15-00 "Evaluation protocols" (F, X, P, L), D8-D11 · P13-00 "Evaluation protocol" (the paired comparison, power) · P8-00 D3 (evidence block, honest states) · docs/design/09 §3, 19 §1 · ADR 0059 (ledger), 0067 (validation harness), 0069 (entry-window pattern), 0080 (phase verdict words), 0182 (fail closed; "P15-10 must report the share of entries lost to `no_upcoming_entry`"). New ADR: **next free number at build time**.
 - **Needs:**
-  - **P13-05, the shared comparison core: not built and no spec.** This slice cannot be Approved until P13-05 has an Approved spec; since P13 waits for depth recordings, the recommended order is that P13-05 is specified and built as the first step of this slice (owner decision 1). It must take the fold unit (month for P13, **quarter** here) as a parameter and create `research.extension_evaluations`.
+  - **P13-05, the shared comparison core** (spec [P13-05](P13-05-feature-set-comparison-core.md) Draft; a slice of its own, built before P15-05). It takes the fold unit as a parameter (preset `ForFilings()`: calendar quarters, season blocks), owns `research.extension_evaluations` and its store, and checks the ledger hash before computing. This slice cannot be Approved until P13-05 is Approved.
   - P15-05 (`ev-1`, `fu-1`, `research.trade_features_ext`), P15-06 (built: `EventCalendarSnapshot`, `IEventFilterVerdict`, `ApplyEventFilterAutoHandler`), P15-09 (`PEAD`), P15-08 (`llm-1`, set D), P5-03/P6-05 (ledger, walk-forward, built).
   - **History:** the CF-04 backfill (Draft; needs the owner's terms read and allow-list act) for X (≥ 6 quarterly folds) and P (20 seasons of bars). **Owner files:** the calendar rows (with intimation times) and results filings over the evaluated window. **Charge sheet** (ISS-25): default gross, labelled.
-- **Size:** 3 agent-days for this slice (estimate) plus 3 for P13-05 if built here.
+- **Size:** 3 agent-days (estimate; P13-05's 4 days are counted in P13).
 - **Safety:** no for the evaluation (read-only over stored runs, writes only its own records and ledger rows). The one path with effect is the event-filter auto option of P15-06: this slice implements `IEventFilterVerdict`, so a stored `KEEP` can turn the filter ON **only** where the owner has set `approval = auto`; that path is P15-06's (fresh-password owner act to arm it, recorded as `auto`, never as an owner approval, never on `unavailable`). No order, no size, no scoring change.
 
 ## Goal
@@ -15,15 +15,14 @@ One verb produces, for each P15 family, a stored verdict — KEEP, DROP, INCONCL
 
 ## Verified facts (read 2026-11-02)
 **Code:**
-- `MultipleTesting.Factor(N) = 1 + 0.25·log2 N`; `ITestLedger` (`AppendAsync(LedgerRow)`, `CountVariantsAsync(strategyId)`) keys families by `StrategyId` and counts distinct `StrategyHash` values; `LedgerRow` carries a Lab run id and key (P13-05 must define how a feature-set trial fills it: a trial hash in `StrategyHash`, family `ext:<id>` in `StrategyId`).
+- `MultipleTesting.Factor(N) = 1 + 0.25·log2 N`; `ITestLedger` (`AppendAsync(LedgerRow)`, `CountVariantsAsync(strategyId)`) keys families by `StrategyId` and counts distinct `StrategyHash` values; `LedgerRow` carries a Lab run id and key (P13-05 defines how a feature-set trial fills it: family `ext:<version>` in `StrategyId`, trial hash in `StrategyHash`, a deterministic run id, `Method` `extension-compare`).
 - `WalkForwardValidator`, `HoldOut`, `EligibilityRule`, `EntryWindowLearner` exist; `Wilson`, `PairedComparison` exist (Assistant evaluation).
 - `IEventFilterVerdict.NewestAsync(ruleVersion)` returns `EventFilterVerdict(State, RuleVersion, Reference)` or null; **no implementation** (null = unavailable); `EventFilterAutoDecision` and `ApplyEventFilterAutoHandler` exist; the snapshot rule version is `evf-1`; the switch holds `results_within_days` (default 2).
 - The simulator's `EventUnavailable` fate does not split the reasons; ADR 0182 says P15-10 derives `no_upcoming_entry` from the snapshot.
-- `research.extension_evaluations` does not exist.
+- `research.extension_evaluations` does not exist; P13-05 creates it (with `protocol` and `inputs` columns so F, P and L records fit).
 
 ## Scope
 **In:**
-- (If owner decision 1 says so) P13-05: the paired comparison core in `Domain/Learning` and migration `AddExtensionEvaluations`, to its own spec.
 - Domain (pure): `ProtocolF`, `ProtocolX` (adapter over P13-05 with quarterly folds and season-cluster bootstrap), `ProtocolP`, `ProtocolL` (reads an eval run), `SeasonFolds`, `VerdictTable`, `EvidenceBlock` (P8-00 D3 shape).
 - Application: `EvaluateExtensionHandler`, verb `xd learn extension-eval --family filter:results|ext:ev-1|ext:fu-1|ext:llm-1|pead`; `EventFilterVerdictReader` (implements `IEventFilterVerdict`); a call of `ApplyEventFilterAutoHandler` after each stored F verdict.
 - `GET /api/research/extensions?family=` and `/{id}` (the P13 contract, shared).
@@ -59,7 +58,7 @@ One verb produces, for each P15 family, a stored verdict — KEEP, DROP, INCONCL
 
 ## Contract
 - **API:** `GET /api/research/extensions`, `/{id}` (`ApiJsonContext`; `scripts/gen-api.sh`). The plan's `/api/research/pead` is dropped: PEAD is the family `pead` of this list.
-- **Data:** `research.extension_evaluations` (by P13-05's migration `AddExtensionEvaluations`), insert-only for `xd_app`, nothing for `xd_exec` or the read roles.
+- **Data:** `research.extension_evaluations` (by P13-05's migration `AddExtensionTables`, written through `IExtensionEvaluationStore`), insert-only for `xd_app`, nothing for `xd_exec` or the read roles. No migration in this slice.
 - **Verb:** `xd learn extension-eval --family … [--holdout]`.
 
 ## Non-functional
@@ -68,7 +67,7 @@ PEAD over 5 years ≤ 5 minutes (UNVERIFIED); X for 6 folds × 2 models over 5,0
 ## Test plan
 - **Unit:** each protocol's verdict table, season folds and purge, season-cluster bootstrap on a hand case, the 50 % rule with unavailable, the port's N rule.
 - **Property:** placebo/planted (criterion 1), determinism, ledger order.
-- **Integration (Timescale):** migration, grants, the verb on a fixture database, the endpoints, the auto path end to end with `approval = auto`.
+- **Integration (Timescale):** the verb on a fixture database (tables from P13-05), the endpoints, the auto path end to end with `approval = auto`.
 - **Architecture:** criterion 9.
 
 ## Decisions (researched)
@@ -83,12 +82,12 @@ PEAD over 5 years ≤ 5 minutes (UNVERIFIED); X for 6 folds × 2 models over 5,0
 - Seasons, not trades, are the independent units; intervals are wide.
 
 ## Open questions (owner)
-1. Specify and build P13-05 inside this slice (P13 waits for recordings)? **Default/recommended: yes, as the first step, with its own spec.**
+1. ~~Specify and build P13-05 inside this slice?~~ Resolved 2026-11-02: P13-05 is its own slice (spec Draft), built before P15-05; this slice only uses it.
 2. Use the hold-out now or wait for more seasons? **Default: wait; `--holdout` is an explicit act.**
 3. After a KEEP for `ev-1`, `fu-1` or `llm-1`, should a scoring switch be built (the P13-07 pattern: default OFF, fresh password, auto option recorded as auto)? **Default: no slice builds it; a KEEP is a record only.**
 
 ## Done when
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer (Opus): no blockers/majors (told to look for any metric computed before its ledger row, any non-value printed as a digit, any hold-out read without the flag, any auto ON without a KEEP for the switch's N)
-- [ ] Migration with `Down` (P13-05's); contract regenerated (`scripts/gen-api.sh`)
+- [ ] No migration (P13-05 owns the table); contract regenerated (`scripts/gen-api.sh`)
 - [ ] ADR written; doc 20 §D (verdicts), doc 09 updated
