@@ -82,11 +82,11 @@ public sealed partial class FilingsStoreArchitectureTests
         {
             [typeof(IFilingStore).FullName!] = ["IngestFilingsHandler"],
             [typeof(IFilingReader).FullName!] = ["GetFilingCoverageHandler", "GetFilingFactsHandler", "GetFilingHandler", "ListFilingsHandler"],
-            [typeof(IFilingFiles).FullName!] = ["IngestFilingsHandler", "ParseResultsHandler"],   // P15-03: the parse step opens the stored copy read-only
+            [typeof(IFilingFiles).FullName!] = ["IngestFilingsHandler", "LoadAnnouncementsHandler", "ParseResultsHandler"],   // P15-03: the parse step opens the stored copy read-only; P15-07: the announcement loader writes each row's text into the store
             [typeof(IResultFactsStore).FullName!] = ["ParseResultsHandler"],                    // P15-03: the only writer of result_facts and result_parses
             [typeof(IResultsXbrlReader).FullName!] = ["ParseResultsHandler"],
             [typeof(IResultFactRows).FullName!] = ["GetFilingFactsHandler", "ResultFactsAsOf"],
-            [typeof(IFilingInstruments).FullName!] = ["GetEventFilterHandler", "GetResultsCalendarHandler", "IngestFilingsHandler", "ListFilingsHandler", "LoadCalendarHandler", "LoadShareholdingHandler"],
+            [typeof(IFilingInstruments).FullName!] = ["GetEventFilterHandler", "GetResultsCalendarHandler", "IngestFilingsHandler", "ListFilingsHandler", "LoadAnnouncementsHandler", "LoadCalendarHandler", "LoadShareholdingHandler"],
         };
         foreach (var (port, names) in allowed)
         {
@@ -104,7 +104,7 @@ public sealed partial class FilingsStoreArchitectureTests
             var result = Types.InAssembly(Assembly.Load(new AssemblyName(name))).That()
                 .DoNotResideInNamespaceStartingWith("XDrishti.Domain.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Abstractions.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Filings")
                 .And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.FilingArchive")
-                .And().DoNotHaveNameMatching(EventFilterUsers.WithRoots("DependencyInjection|ApiJsonContext.*|FilingEndpoints|CalendarEndpoints"))
+                .And().DoNotHaveNameMatching(EventFilterUsers.WithRoots("DependencyInjection|ApiJsonContext.*|FilingEndpoints|CalendarEndpoints|AnnouncementsCommand"))
                 .ShouldNot().HaveDependencyOnAny(FilingsNamespaces).GetResult();
 
             result.IsSuccessful.ShouldBeTrue(name + " violations: " + string.Join(", ", result.FailingTypeNames ?? []));
@@ -139,6 +139,7 @@ public sealed partial class FilingsStoreArchitectureTests
         {
             ["CalendarStore.cs"] = ["filings.calendar"],
             ["ShareholdingStore.cs"] = ["filings.shareholding"],
+            ["AnnouncementStore.cs"] = ["filings.announcements"],   // P15-07: the announcement store, this file and nowhere else
             ["EventFilterDecisions.cs"] = ["filings.event_filter_decisions"],   // P15-06: the switch history, its own file and nowhere else
             ["ResultFactsStore.cs"] = ["filings.result_parses", "filings.result_facts"],   // P15-03: the parse rows and the facts, this file and nowhere else
         };
@@ -168,11 +169,56 @@ public sealed partial class FilingsStoreArchitectureTests
             foreach (Match write in FactTableWrite().Matches(text))
             {
                 var table = write.Groups[2].Value;
-                var allowed = (name == "CalendarStore.cs" && table == "calendar") || (name == "ShareholdingStore.cs" && table == "shareholding") || (name == "ResultFactsStore.cs" && table is "result_facts" or "result_parses");
+                var allowed = (name == "CalendarStore.cs" && table == "calendar") || (name == "ShareholdingStore.cs" && table == "shareholding") || (name == "AnnouncementStore.cs" && table == "announcements") || (name == "ResultFactsStore.cs" && table is "result_facts" or "result_parses");
 
                 allowed.ShouldBeTrue(file + " writes filings." + table + "; only ResultFactsStore (P15-03) writes result_facts and result_parses, P15-08 owns the extractions and only the two P15-04 stores write calendar and shareholding");
             }
         }
+    }
+
+    [Fact]
+    public void The_announcement_parser_the_store_the_sampler_and_the_label_files_are_named_only_by_the_loader_the_three_verbs_the_eval_and_their_implementations()
+    {
+        // P15-07: the announcements and the sampler are referenced only by the loader, the verbs (the three handlers and the command), the eval's set-D reader and the implementations.
+        var allowed = new Dictionary<string, string[]>
+        {
+            [typeof(IAnnouncementStore).FullName!] = ["LoadAnnouncementsHandler"],
+            [typeof(IAnnouncementCandidates).FullName!] = ["SampleAnnouncementsHandler"],
+            [typeof(IAnnouncementEvalFiles).FullName!] = ["ImportAnnouncementLabelsHandler", "SampleAnnouncementsHandler", "ShowAnnouncementsHandler"],
+            ["XDrishti.Domain.Filings.AnnouncementCsv"] = ["LoadAnnouncementsHandler"],
+            ["XDrishti.Domain.Filings.AnnouncementSampler"] = ["SampleAnnouncementsHandler"],
+            ["XDrishti.Domain.Filings.AnnouncementLabels"] = ["ImportAnnouncementLabelsHandler"],
+            ["XDrishti.Domain.Filings.AnnouncementCategoryBaseline"] = ["ImportAnnouncementLabelsHandler", "SampleAnnouncementsHandler", "ShowAnnouncementsHandler"],
+            ["XDrishti.Domain.Assistant.Evaluation.AnnouncementSet"] = ["AnnouncementSetLoad", "ImportAnnouncementLabelsHandler", "ShowAnnouncementsHandler"],
+        };
+        foreach (var (type, names) in allowed)
+        {
+            var found = Types.InAssembly(Application).That().HaveDependencyOn(type).GetTypes().Select(t => t.Name).Where(n => !n.StartsWith('<')).Select(n => n.Split('+')[0]).Distinct().Order().ToList();
+
+            found.ShouldBe([.. names.Order()], type);
+        }
+
+        var infrastructure = Types.InAssembly(Infrastructure).That().HaveDependencyOn(typeof(IAnnouncementEvalFiles).FullName!).GetTypes().Select(t => t.Name).Where(n => !n.StartsWith('<')).Distinct().Order().ToList();
+        var api = Types.InAssembly(Assembly.Load(new AssemblyName("XDrishti.Api"))).That().HaveDependencyOn("XDrishti.Application.Filings.SampleAnnouncementsCommand").GetTypes().Select(t => t.Name).Where(n => !n.StartsWith('<')).Distinct().Order().ToList();
+
+        infrastructure.ShouldBe(["AnnouncementEvalFiles", "DependencyInjection"]);
+        api.ShouldBe(["AnnouncementsCommand"]);
+    }
+
+    [Fact]
+    public void The_announcement_loader_and_verbs_reach_no_network_broker_or_order_type_and_the_log_names_no_text()
+    {
+        foreach (var name in new[] { "LoadAnnouncementsHandler.cs", "SampleAnnouncementsHandler.cs", "ImportAnnouncementLabelsHandler.cs", "ShowAnnouncementsHandler.cs" })
+        {
+            var text = File.ReadAllText(Src("XDrishti.Application", "Filings", name));
+            foreach (var word in new[] { "System.Net", "HttpClient", "Brokers", "Dhan", "ILogger<Sample", "LogInformation" })
+            {
+                text.ShouldNotContain(word, Case.Sensitive, name);
+            }
+        }
+
+        // the loader logs through RowLoadLog, whose messages carry counts and codes only
+        File.ReadAllText(Src("XDrishti.Application", "Filings", "LoadAnnouncementsHandler.cs")).ShouldNotMatch(@"RowLoadLog\.\w+\([^;]*(Subject|Category|\.Text)");
     }
 
     [Fact]
@@ -196,7 +242,11 @@ public sealed partial class FilingsStoreArchitectureTests
 
         Regex.Count(text, @"File\.Delete\(").ShouldBe(1);
         text.ShouldContain("File.Delete(temp)");
-        text.ShouldContain("overwrite: false");
+        // P15-07 amends this deliberately: only the rebuildable copy (the text of an announcement row) may replace a file, and only one that does not hash to its own name.
+        text.ShouldContain("overwrite: replace");
+        Regex.Count(text, @"replace = true").ShouldBe(1);
+        Regex.Count(text, @"var replace = false;").ShouldBe(1);
+        text.ShouldContain("if (durable)");
     }
 
     [Fact]

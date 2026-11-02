@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "note": "Pre-registered baseline of the announcement set (P15-07): the exchange category decides, nothing else. Committed BEFORE the first sample; its SHA-256 goes into the sample, the manifest and the eval fingerprint. A category not listed here is non_material. The category names are UNVERIFIED and are adjusted to the owner's files before the sample is drawn, never after.",
+  "categories": {
+    "Results": "material",
+    "Outcome of Board Meeting with results": "material",
+    "Credit Rating": "material",
+    "Order Win / Award of Contract": "material",
+    "Acquisition": "material",
+    "Merger or Demerger": "material",
+    "Fund Raising": "material",
+    "Change in Auditor": "material",
+    "Change of KMP at Board level": "material",
+    "Litigation or Regulatory Action": "material",
+    "Default": "material",
+    "Trading Window": "non_material",
+    "Newspaper Publication": "non_material",
+    "Certificates under the Depository Regulations": "non_material",
+    "Investor Meet Intimation": "non_material",
+    "Shareholder Meeting Notices": "non_material",
+    "Loss of Share Certificates": "non_material"
+  }
+}

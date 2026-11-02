@@ -12,4 +12,5 @@ public static class CalendarRejectReasons
     public const string InconsistentTs = "inconsistent_ts";
     public const string OutOfRange = "out_of_range";
     public const string AmbiguousOrder = "ambiguous_order";
+    public const string TooLong = "too_long";
 }

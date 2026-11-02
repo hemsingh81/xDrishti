@@ -18,6 +18,12 @@ public interface IFilingFiles
     ValueTask<Result<bool>> CopyAsync(Stream source, string sha256, long expectedBytes, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Like <see cref="CopyAsync"/> for bytes that can be rebuilt from the inbox file they came from (the text of one announcement row, P15-07): no flush to disk per file and no second read of the copy, and a file at that name that does not hash to its name (a copy the machine lost
+    /// before it reached the disk) is replaced by the right bytes. Nothing else is replaced. A rerun of the loader repairs what a crash lost, because the copy is made before the row is stored.
+    /// </summary>
+    ValueTask<Result<bool>> CopyRebuildableAsync(Stream source, string sha256, long expectedBytes, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Opens the stored copy for reading, forward only (P15-03). The hash of the stored file is checked first: a different hash is <c>content_changed</c>, a missing or unreadable file <c>unreadable</c>. Read-only; nothing is created, changed or deleted.
     /// </summary>
     ValueTask<Result<Stream>> OpenAsync(string sha256, CancellationToken cancellationToken);

@@ -92,6 +92,21 @@ public sealed class FilingSidecarTests
     }
 
     [Fact]
+    public void A_csv_of_announcements_names_all_companies_and_carries_its_times_per_row_while_a_text_or_pdf_one_is_an_ordinary_envelope()
+    {
+        var csv = Parse("""{"schema":1,"symbol":"*","kind":"announcement","broadcast_ts":"2026-08-03T11:00:00+05:30"}""", ".csv").Value;
+        var txt = Parse("""{"schema":1,"symbol":"RELIANCE","kind":"announcement","broadcast_ts":"2026-08-03T11:00:00+05:30"}""", ".txt").Value;
+        var pdf = Parse("""{"schema":1,"symbol":"*","kind":"announcement","broadcast_ts":"2026-08-03T11:00:00+05:30"}""", ".pdf");
+
+        csv.Broadcast.State.ShouldBe(BroadcastState.RowLevelTs);
+        FilingSidecar.IsRowLevel(FilingKind.Announcement, ".csv").ShouldBeTrue();
+        FilingSidecar.IsRowLevel(FilingKind.Announcement, ".txt").ShouldBeFalse();
+        FilingSidecar.IsRowLevel(FilingKind.Announcement, ".pdf").ShouldBeFalse();
+        (txt.Broadcast.State, txt.Broadcast.Instant).ShouldBe((BroadcastState.Ok, new DateTimeOffset(2026, 8, 3, 5, 30, 0, TimeSpan.Zero)));
+        pdf.Error.Code.ShouldBe("bad_symbol");
+    }
+
+    [Fact]
     public void A_csv_of_shareholding_needs_no_period_end_but_an_xml_one_does()
     {
         Parse("""{"schema":1,"symbol":"A","kind":"shareholding"}""", ".csv").IsSuccess.ShouldBeTrue();

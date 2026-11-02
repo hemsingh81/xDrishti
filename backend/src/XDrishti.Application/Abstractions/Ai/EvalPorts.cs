@@ -4,7 +4,8 @@ using XDrishti.Domain.Common;
 namespace XDrishti.Application.Abstractions.Ai;
 
 /// <summary>The files of the eval as texts (spec P9-09 Scope): the fixture, the question sets and the thresholds. Read from the repo's <c>eval/</c> folder; their hashes are part of the fingerprint.</summary>
-public sealed record EvalFileSet(string Fixture, string DataQuestions, string Plans, string Ideas, string Thresholds);
+/// <remarks>The last three are set D's files (P15-07) and are null when absent: the labelled <c>announcements.jsonl</c> (git-ignored), the committed manifest and the committed baseline. When the labelled file is there all three go into the sets hash.</remarks>
+public sealed record EvalFileSet(string Fixture, string DataQuestions, string Plans, string Ideas, string Thresholds, string? Announcements = null, string? AnnouncementManifest = null, string? AnnouncementBaseline = null);
 
 /// <summary>Reads the eval files. Fails with <c>eval.files_missing</c> when the folder or a file is not there.</summary>
 public interface IEvalFiles

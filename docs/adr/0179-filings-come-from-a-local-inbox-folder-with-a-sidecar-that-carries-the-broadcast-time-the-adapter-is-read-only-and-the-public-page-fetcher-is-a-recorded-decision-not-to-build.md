@@ -31,3 +31,7 @@ P15 needs exchange filings (results, shareholding, board meetings, announcements
 - There is a short window between the checks and the open in which a file could be swapped for a link; the open re-checks the size and the link state, and the hash proves content, but a local attacker able to write the `0700` inbox is already the owner.
 - The directory listing is taken whole before the cap applies (names only), so an inbox of millions of entries costs memory; the 20 GB and 5,000-file limits make this theoretical.
 - The exchange terms, any public endpoint's shape and the XBRL file sizes stay UNVERIFIED (P15-00).
+
+## Amendment 1 (2026-11-03, P15-07)
+A `.csv` of kind `announcement` is a third row-level drop: it has the sidecar symbol `*`, no `broadcast_ts`, and the state `row_level_ts` (decision 3 now reads "a `.csv` of `board_meeting`, `shareholding` or `announcement`"). `FilingSidecar.IsRowLevel` is true for exactly those three kinds with `.csv`. An announcement as a `.txt` or `.pdf` with one sidecar time stays an ordinary envelope (no row in `filings.announcements`, never sampled). The file format and the loader are in [ADR 0188](0188-the-announcements-csv-is-a-third-row-level-drop-the-labelling-sample-is-a-seeded-stratified-draw-the-baseline-is-fixed-before-the-labels-and-the-announcement-text-stays-out-of-git.md). Nothing else in this ADR changes: no host, path, setting or fetcher is added.
+

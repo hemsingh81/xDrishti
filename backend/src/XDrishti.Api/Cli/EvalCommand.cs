@@ -16,6 +16,11 @@ internal static class EvalCommand
 {
     public static async Task<int> RunAsync(IReadOnlyList<string> args, IServiceProvider services, SimulateConsole console, CancellationToken cancellationToken)
     {
+        if (args.Count > 0 && args[0] == "announcements")
+        {
+            return await AnnouncementsCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
+        }
+
         var (options, errors) = EvalCliOptions.Parse(args);
         if (options is null)
         {

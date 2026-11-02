@@ -59,13 +59,16 @@ internal sealed class EvalRig
         Answers = new PerfectAnswerSource(World.Data);
     }
 
+    /// <summary>Set D's files as the eval finds them (P15-07); null = the file is not there.</summary>
+    public (string? Announcements, string? Manifest, string? Baseline) SetD { get; set; }
+
     public RunEvalHandler Run()
     {
         var settings = Substitute.For<IAssistantSettingsStore>();
         settings.CurrentAsync(Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(Settings));
         var nightly = Substitute.For<INightlyRunProbe>();
         nightly.IsRunningAsync(Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(NightlyRunning));
-        return new RunEvalHandler(new DiskEvalFiles(), new FakeProbe(this), settings, new FakeEnvironment(this), new FakePrompts(this), Answers, PlanRunner(), IdeaRunner(), Store, nightly, Turn, Gate, Time, NullLogger<RunEvalHandler>.Instance);
+        return new RunEvalHandler(new DiskEvalFiles(SetD.Announcements, SetD.Manifest, SetD.Baseline), new FakeProbe(this), settings, new FakeEnvironment(this), new FakePrompts(this), Answers, PlanRunner(), IdeaRunner(), Store, nightly, Turn, Gate, Time, NullLogger<RunEvalHandler>.Instance);
     }
 
     public PlanTextRunner PlanRunner() => new(new FakeWriter(this), new BriefingOptions { UseModel = false });
@@ -121,9 +124,9 @@ internal sealed class EvalRig
 }
 
 /// <summary>Reads the repo's <c>eval/</c> folder as the application would.</summary>
-internal sealed class DiskEvalFiles : IEvalFiles
+internal sealed class DiskEvalFiles(string? announcements = null, string? manifest = null, string? baseline = null) : IEvalFiles
 {
-    public static EvalFileSet Read()
+    public static EvalFileSet Read(string? announcements = null, string? manifest = null, string? baseline = null)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "eval", "thresholds.json")))
@@ -133,10 +136,10 @@ internal sealed class DiskEvalFiles : IEvalFiles
 
         var root = Path.Combine(dir!.FullName, "eval");
         string Text(string relative) => File.ReadAllText(Path.Combine(root, relative));
-        return new EvalFileSet(Text("fixture/fixture.json"), Text("sets/data-questions.jsonl"), Text("sets/plans.jsonl"), Text("sets/ideas.jsonl"), Text("thresholds.json"));
+        return new EvalFileSet(Text("fixture/fixture.json"), Text("sets/data-questions.jsonl"), Text("sets/plans.jsonl"), Text("sets/ideas.jsonl"), Text("thresholds.json"), announcements, manifest, baseline);
     }
 
-    public ValueTask<Result<EvalFileSet>> ReadAsync(CancellationToken cancellationToken) => ValueTask.FromResult(Result.Success(Read()));
+    public ValueTask<Result<EvalFileSet>> ReadAsync(CancellationToken cancellationToken) => ValueTask.FromResult(Result.Success(Read(announcements, manifest, baseline)));
 }
 
 /// <summary>The in-memory store: insert-only like the real one, with the counters a test reads.</summary>

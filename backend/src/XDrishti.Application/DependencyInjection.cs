@@ -150,6 +150,10 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetFilingQuery, Result<FilingView>>, GetFilingHandler>(); // one envelope's metadata (P15-02): read
         services.AddScoped<ICommandHandler<LoadCalendarCommand, RowLoadSummary>, LoadCalendarHandler>(); // the board-meeting csv loader (P15-04): each row with its own intimation time; no network
         services.AddScoped<ICommandHandler<LoadShareholdingCommand, RowLoadSummary>, LoadShareholdingHandler>(); // the shareholding csv loader (P15-04): one group per (symbol, period) with its time; no network
+        services.AddScoped<ICommandHandler<LoadAnnouncementsCommand, RowLoadSummary>, LoadAnnouncementsHandler>(); // the announcements csv loader (P15-07): one envelope and one stored text per row, each its own group; no network
+        services.AddScoped<ICommandHandler<SampleAnnouncementsCommand, AnnouncementEvalReport>, SampleAnnouncementsHandler>(); // xd eval announcements sample (P15-07): the stratified 240 for labelling, files under data/eval
+        services.AddScoped<ICommandHandler<ImportAnnouncementLabelsCommand, AnnouncementEvalReport>, ImportAnnouncementLabelsHandler>(); // xd eval announcements import (P15-07): the owner's labels checked against the sample
+        services.AddScoped<IQueryHandler<ShowAnnouncementsQuery, AnnouncementEvalReport>, ShowAnnouncementsHandler>(); // xd eval announcements show (P15-07)
         services.AddScoped<IResultsCalendar, ResultsCalendar>(); // days_to_results as known at an instant (P15-04): named by PlanEventFilter and the switch view since P15-06, by no other decision code
         services.AddScoped<IEventCalendarSnapshots, EventCalendarSnapshots>(); // the results-calendar snapshot of a run that names not_event_day: one read before the walk (P15-06, ADR 0182)
         services.AddScoped<IEventFilterSwitch, EventFilterSwitch>(); // the effective event-risk switch: the newest decision row, OFF when none or unreadable (P15-06)

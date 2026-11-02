@@ -20,9 +20,9 @@ public sealed partial record FilingSidecar(string Symbol, FilingKind Kind, DateO
     [GeneratedRegex("^[A-Z0-9&-]{1,20}$", RegexOptions.CultureInvariant)]
     private static partial Regex SymbolPattern();
 
-    /// <summary>Whether a filing of this kind in a file of this extension carries its own times per row (a csv of board meetings or shareholding, P15-04).</summary>
+    /// <summary>Whether a filing of this kind in a file of this extension carries its own times per row (a csv of board meetings, shareholding or announcements, P15-04 and P15-07). An announcement as a text or pdf file is an ordinary envelope.</summary>
     public static bool IsRowLevel(FilingKind kind, string extension) =>
-        extension == ".csv" && kind is FilingKind.BoardMeeting or FilingKind.Shareholding;
+        extension == ".csv" && kind is FilingKind.BoardMeeting or FilingKind.Shareholding or FilingKind.Announcement;
 
     public static Result<FilingSidecar> Parse(ReadOnlySpan<byte> bytes, string extension, DateTimeOffset now)
     {

@@ -45,6 +45,38 @@ public sealed class FilingFilesTests : IDisposable
     }
 
     [Fact]
+    public async Task A_rebuildable_copy_is_stored_like_any_other_and_repairs_a_file_that_does_not_hash_to_its_name_while_a_durable_copy_still_refuses_to_replace()
+    {
+        var sha = Sha("<row/>");
+        var path = Path.Combine(FilesRoot, sha[..2], sha);
+
+        var first = await Files().CopyRebuildableAsync(Bytes("<row/>"), sha, 6, Ct);
+        var same = await Files().CopyRebuildableAsync(Bytes("<row/>"), sha, 6, Ct);
+        await File.WriteAllTextAsync(path, string.Empty, Ct);
+        var durable = await Files().CopyAsync(Bytes("<row/>"), sha, 6, Ct);
+        var repaired = await Files().CopyRebuildableAsync(Bytes("<row/>"), sha, 6, Ct);
+
+        (first.Value, same.Value).ShouldBe((true, false));
+        durable.Error.Code.ShouldBe("store_conflict");
+        repaired.Value.ShouldBeTrue();
+        File.ReadAllText(path).ShouldBe("<row/>");
+        Directory.GetFiles(FilesRoot, ".tmp-*", SearchOption.AllDirectories).ShouldBeEmpty();
+        if (!OperatingSystem.IsWindows())
+        {
+            File.GetUnixFileMode(path).ShouldBe(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+    }
+
+    [Fact]
+    public async Task A_rebuildable_copy_with_other_bytes_than_its_hash_is_refused_and_nothing_is_left()
+    {
+        var result = await Files().CopyRebuildableAsync(Bytes("different"), Sha("expected"), 9, Ct);
+
+        result.Error.Code.ShouldBe("content_changed");
+        Directory.GetFiles(FilesRoot, "*", SearchOption.AllDirectories).ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task The_folders_are_created_0700_and_the_file_0600_on_posix()
     {
         if (OperatingSystem.IsWindows())

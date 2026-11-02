@@ -53,7 +53,11 @@ internal sealed class FilingFiles(IOptions<FilingsOptions> options) : IFilingFil
         }
     }
 
-    public async ValueTask<Result<bool>> CopyAsync(Stream source, string sha256, long expectedBytes, CancellationToken cancellationToken)
+    public ValueTask<Result<bool>> CopyAsync(Stream source, string sha256, long expectedBytes, CancellationToken cancellationToken) => CopyCoreAsync(source, sha256, expectedBytes, true, cancellationToken);
+
+    public ValueTask<Result<bool>> CopyRebuildableAsync(Stream source, string sha256, long expectedBytes, CancellationToken cancellationToken) => CopyCoreAsync(source, sha256, expectedBytes, false, cancellationToken);
+
+    private async ValueTask<Result<bool>> CopyCoreAsync(Stream source, string sha256, long expectedBytes, bool durable, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(source);
         if (sha256.Length != 64 || !sha256.All(char.IsAsciiHexDigitLower))
@@ -65,9 +69,20 @@ internal sealed class FilingFiles(IOptions<FilingsOptions> options) : IFilingFil
         var target = Path.Combine(folder, sha256);
         EnsureFolder(Root);
         EnsureFolder(folder);
+        var replace = false;
         if (File.Exists(target))
         {
-            return await HashAsync(target, cancellationToken) == sha256 ? Result.Success(false) : Failure("store_conflict");
+            if (await HashAsync(target, cancellationToken) == sha256)
+            {
+                return Result.Success(false);
+            }
+
+            if (durable)
+            {
+                return Failure("store_conflict");
+            }
+
+            replace = true; // a rebuildable copy that does not hash to its own name was lost before it reached the disk: the right bytes take its place
         }
 
         var temp = Path.Combine(folder, ".tmp-" + Guid.NewGuid().ToString("N"));
@@ -93,7 +108,10 @@ internal sealed class FilingFiles(IOptions<FilingsOptions> options) : IFilingFil
                     }
 
                     await output.FlushAsync(cancellationToken);
-                    output.Flush(true);
+                    if (durable)
+                    {
+                        output.Flush(true);
+                    }
                     if (total != expectedBytes)
                     {
                         return Failure("content_changed");
@@ -106,14 +124,14 @@ internal sealed class FilingFiles(IOptions<FilingsOptions> options) : IFilingFil
                 }
             }
 
-            if (await HashAsync(temp, cancellationToken) != sha256)
+            if (durable && await HashAsync(temp, cancellationToken) != sha256)
             {
                 return Failure("unreadable");
             }
 
             try
             {
-                File.Move(temp, target, overwrite: false);
+                File.Move(temp, target, overwrite: replace);
             }
             catch (IOException) when (File.Exists(target))
             {

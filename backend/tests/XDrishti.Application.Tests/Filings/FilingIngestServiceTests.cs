@@ -50,6 +50,9 @@ public sealed class FilingIngestServiceTests
         shareholding.HandleAsync(Arg.Any<LoadShareholdingCommand>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Loaded("shareholding")));
         provider.GetService(typeof(ICommandHandler<LoadCalendarCommand, RowLoadSummary>)).Returns(calendar);
         provider.GetService(typeof(ICommandHandler<LoadShareholdingCommand, RowLoadSummary>)).Returns(shareholding);
+        var announcements = Substitute.For<ICommandHandler<LoadAnnouncementsCommand, RowLoadSummary>>();
+        announcements.HandleAsync(Arg.Any<LoadAnnouncementsCommand>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Loaded("announcement")));
+        provider.GetService(typeof(ICommandHandler<LoadAnnouncementsCommand, RowLoadSummary>)).Returns(announcements);
         Parser(provider, out _);
     }
 
@@ -104,8 +107,33 @@ public sealed class FilingIngestServiceTests
         outcome.Status.ShouldBe(ServiceRunStatus.Succeeded);
         outcome.Message!.ShouldContain("calendar: files 1, loaded 2");
         outcome.Message!.ShouldContain("shareholding: files 1, loaded 2");
+        outcome.Message!.ShouldContain("announcement: files 1, loaded 2");
         await calendar.Received(1).HandleAsync(Arg.Any<LoadCalendarCommand>(), Arg.Any<CancellationToken>());
         await shareholding.Received(1).HandleAsync(Arg.Any<LoadShareholdingCommand>(), Arg.Any<CancellationToken>());
+        await ((ICommandHandler<LoadAnnouncementsCommand, RowLoadSummary>)provider.GetService(typeof(ICommandHandler<LoadAnnouncementsCommand, RowLoadSummary>))!).Received(1).HandleAsync(Arg.Any<LoadAnnouncementsCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task An_announcement_loader_that_reports_a_failed_file_ends_the_run_failed_after_the_others_ran()
+    {
+        var provider = Substitute.For<IServiceProvider>();
+        var ingest = Substitute.For<ICommandHandler<IngestFilingsCommand, FilingIngestSummary>>();
+        ingest.HandleAsync(Arg.Any<IngestFilingsCommand>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Summary()));
+        provider.GetService(typeof(ICommandHandler<IngestFilingsCommand, FilingIngestSummary>)).Returns(ingest);
+        Loaders(provider, out _, out var shareholding);
+        var failing = Substitute.For<ICommandHandler<LoadAnnouncementsCommand, RowLoadSummary>>();
+        failing.HandleAsync(Arg.Any<LoadAnnouncementsCommand>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Loaded("announcement", 1)));
+        provider.GetService(typeof(ICommandHandler<LoadAnnouncementsCommand, RowLoadSummary>)).Returns(failing);
+        var scope = Substitute.For<IServiceScope>();
+        scope.ServiceProvider.Returns(provider);
+        var scopes = Substitute.For<IServiceScopeFactory>();
+        scopes.CreateScope().Returns(scope);
+
+        var outcome = await new FilingIngestService(scopes, NullLogger<FilingIngestService>.Instance).RunAsync(Context(ServiceRunTrigger.Scheduled), Ct);
+
+        outcome.Status.ShouldBe(ServiceRunStatus.Failed);
+        await shareholding.Received(1).HandleAsync(Arg.Any<LoadShareholdingCommand>(), Arg.Any<CancellationToken>());
+        await failing.Received(1).HandleAsync(Arg.Any<LoadAnnouncementsCommand>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

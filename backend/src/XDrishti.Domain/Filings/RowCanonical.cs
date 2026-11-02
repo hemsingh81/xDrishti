@@ -23,6 +23,29 @@ public static class RowCanonical
         return string.Create(CultureInfo.InvariantCulture, $"shareholding|{instrumentId:D}|{Date(group.PeriodEnd)}|{Time(group.Time, group.Broadcast.Reason)}|{lines}");
     }
 
+    /// <summary>
+    /// The stored text of an announcement (P15-07): one JSON object with a fixed key order, so the same row in two files is the same bytes. It holds the instrument id (never the symbol's spelling), the time to the microsecond (or <c>unavailable:reason</c>), the category, the
+    /// subject and the text. <see cref="AnnouncementBody.Read"/> reads it back.
+    /// </summary>
+    public static string Announcement(Guid instrumentId, AnnouncementRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        using var stream = new MemoryStream();
+        using (var json = new System.Text.Json.Utf8JsonWriter(stream))
+        {
+            json.WriteStartObject();
+            json.WriteString("kind", "announcement");
+            json.WriteString("instrument", instrumentId.ToString("D"));
+            json.WriteString("time", Time(row.Time, row.Broadcast.Reason));
+            json.WriteString("category", row.Category);
+            json.WriteString("subject", row.Subject);
+            json.WriteString("text", row.Text);
+            json.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
     public static string Sha256(string canonical)
     {
         ArgumentNullException.ThrowIfNull(canonical);

@@ -120,3 +120,66 @@ internal sealed class FakeTradingCalendar(TradingCalendar? calendar = null) : IT
     {
     }
 }
+
+/// <summary>The announcement store as an in-memory fake: idempotent on the content hash, every row its own group.</summary>
+internal sealed class FakeAnnouncementStore : IAnnouncementStore
+{
+    public List<NewAnnouncement> Rows { get; } = [];
+
+    private readonly Lock _gate = new();
+
+    public ValueTask<FilingInsertResult> InsertAsync(NewAnnouncement announcement, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            var existing = Rows.FirstOrDefault(r => r.Filing.ContentSha256 == announcement.Filing.ContentSha256);
+            if (existing is not null)
+            {
+                return ValueTask.FromResult(new FilingInsertResult(FilingInsertOutcome.Duplicate));
+            }
+
+            Rows.Add(announcement);
+            return ValueTask.FromResult(new FilingInsertResult(FilingInsertOutcome.Stored));
+        }
+    }
+}
+
+/// <summary>The sample source as a fake over a list of candidates and their bodies.</summary>
+internal sealed class FakeAnnouncementCandidates : IAnnouncementCandidates
+{
+    public List<SampleCandidate> Dated { get; } = [];
+
+    public Dictionary<Guid, AnnouncementBody> Bodies { get; } = [];
+
+    public int NoMetadata { get; set; }
+
+    public (DateTimeOffset From, DateTimeOffset To)? Range { get; private set; }
+
+    public (DateTimeOffset From, DateTimeOffset To) Candidates() => Range!.Value;
+
+    public ValueTask<AnnouncementCandidates> ListAsync(DateTimeOffset from, DateTimeOffset toExclusive, CancellationToken cancellationToken)
+    {
+        Range = (from, toExclusive);
+        return ValueTask.FromResult(new AnnouncementCandidates([.. Dated], NoMetadata));
+    }
+
+    public ValueTask<IReadOnlyDictionary<Guid, AnnouncementBody>> ReadBodiesAsync(IReadOnlyCollection<Guid> filingIds, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyDictionary<Guid, AnnouncementBody>>(Bodies.Where(b => filingIds.Contains(b.Key)).ToDictionary(b => b.Key, b => b.Value));
+}
+
+/// <summary>The announcement eval files in memory; counts the writes.</summary>
+internal sealed class FakeAnnouncementEvalFiles : IAnnouncementEvalFiles
+{
+    public Dictionary<AnnouncementFile, string> Files { get; } = [];
+
+    public List<AnnouncementFile> Writes { get; } = [];
+
+    public ValueTask<string?> ReadAsync(AnnouncementFile file, CancellationToken cancellationToken) => ValueTask.FromResult(Files.TryGetValue(file, out var text) ? text : null);
+
+    public ValueTask WriteAsync(AnnouncementFile file, string text, CancellationToken cancellationToken)
+    {
+        Files[file] = text;
+        Writes.Add(file);
+        return ValueTask.CompletedTask;
+    }
+}

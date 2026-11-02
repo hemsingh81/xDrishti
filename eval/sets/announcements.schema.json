@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "One labelled announcement of the P9-09 events set (arrives with P15; 200 rows are needed for a verdict)",
+  "title": "One labelled announcement of the P9-09 events set D (written by `xd eval announcements import`, P15-07, to data/eval/sets/announcements.jsonl; 200 rows are needed for a verdict)",
   "type": "object",
   "required": ["id", "symbol", "published_at", "source", "text", "label"],
   "additionalProperties": false,

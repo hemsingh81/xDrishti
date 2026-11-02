@@ -236,4 +236,23 @@ public sealed class PointInTimePropertyTests
             PointInTimeRule.AsOf(reingested, w.T, w.Lag).Filings.Select(f => f.Id).ShouldBe(PointInTimeRule.AsOf(w.Rows, w.T, w.Lag).Filings.Select(f => f.Id));
         }
     }
+    [Fact]
+    public void An_announcement_is_visible_only_from_its_broadcast_time_plus_the_lag_whatever_else_is_stored()
+    {
+        // P15-07 criterion 2: kind announcement, no period (each row its own group), 250 generated worlds.
+        var random = new Random(20261104);
+        for (var i = 0; i < Cases; i++)
+        {
+            var lag = TimeSpan.FromMinutes(Lags[random.Next(Lags.Length)]);
+            var t = Origin.AddMinutes(random.Next(0, 14000)).AddSeconds(random.Next(0, 60));
+            var rows = Enumerable.Range(1, random.Next(1, 25)).Select(n => FilingSamples.Ok(n, null, Origin.AddMinutes(random.Next(0, 14000)).AddSeconds(random.Next(0, 60)), kind: FilingKind.Announcement, ingested: Origin.AddMinutes(random.Next(0, 20000)))).ToList();
+            rows.Add(FilingSamples.Undated(100, null, kind: FilingKind.Announcement));
+
+            var visible = PointInTimeRule.AsOf(rows, t, lag).Filings;
+
+            visible.Select(f => f.Id).Order().ShouldBe(rows.Where(r => r.BroadcastTs is { } ts && ts + lag <= t).Select(r => r.Id).Order());
+            PointInTimeRule.AsOf(rows.Where(r => r.BroadcastTs is null || r.BroadcastTs + lag <= t), t, lag).Filings.Select(f => f.Id).Order().ShouldBe(visible.Select(f => f.Id).Order());
+            PointInTimeRule.AsOf([.. rows.AsEnumerable().Reverse()], t, lag).Filings.Select(f => f.Id).ShouldBe(visible.Select(f => f.Id));
+        }
+    }
 }

@@ -3,6 +3,7 @@
 #   scripts/xd-eval.sh prepare                      creates and seeds the fixture database and starts the eval tool server xd-mcp-eval (scripts/eval-db.sh)
 #   scripts/xd-eval.sh run [--set S]... [--repeats N]   runs the eval ONCE (the model must be running: scripts/xd-ai.sh start; the assistant's master switch must be ON in the app) and saves the report to data/eval/<run>/
 #   scripts/xd-eval.sh grade --answers FILE --target hermes   grades another assistant's answers from a file (no model)
+#   scripts/xd-eval.sh announcements sample|import|show ...   the announcement set D (P15-07): the sample for labelling, the owner's labels, the state (no model; mounts data/eval, the repo's eval/ read-write for the manifest, and the real filings store read-only; reads the real filings tables read-only)
 #   scripts/xd-eval.sh compare RUN [--baseline RUN] | accept RUN [--reason TEXT] | show RUN [--json|--md|--answers]
 #   scripts/xd-eval.sh stop                         removes xd-mcp-eval
 # The verb runs in a one-shot container on the stack's internal network (the model and the tool server are reachable nowhere else). It holds the database password of the runtime role, the model key and the eval tool token,
@@ -19,7 +20,13 @@ MCP_IMAGE="localhost/xdrishti/mcp:${XD_VERSION:-0.1.0}"
 verb="${1:-}"
 
 health() { podman inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$1" 2>/dev/null || echo none; }
-xd_eval() { "${COMPOSE[@]}" run --rm --no-deps xd-eval xd eval "$@"; }
+# set D's labelled file (git-ignored, 0600) is mounted read-only so that `run` can read it when it exists
+LABELLED_DIR="$ROOT/data/eval/sets"
+xd_eval() {
+  local mounts=()
+  [[ -d "$LABELLED_DIR" ]] && mounts=(-v "$LABELLED_DIR:/data/eval-data/sets:ro" -e Eval__DataFolder=/data/eval-data)
+  "${COMPOSE[@]}" run --rm --no-deps ${mounts[@]+"${mounts[@]}"} xd-eval xd eval "$@"
+}
 
 case "$verb" in
   prepare)
@@ -57,13 +64,23 @@ case "$verb" in
       if [[ "$1" == "--answers" && $# -ge 2 ]]; then file="$(cd "$(dirname -- "$2")" && pwd)/$(basename -- "$2")"; args+=(--answers /answers.jsonl); shift 2; else args+=("$1"); shift; fi
     done
     [[ -f "$file" ]] || { echo "usage: $0 grade --answers FILE --target hermes" >&2; exit 2; }
-    "${COMPOSE[@]}" run --rm --no-deps -v "$file:/answers.jsonl:ro" xd-eval xd eval grade "${args[@]}"
+    "${COMPOSE[@]}" run --rm --no-deps -v "$file:/answers.jsonl:ro" xd-eval xd eval grade ${args[@]+"${args[@]}"}
+    ;;
+  announcements)
+    # Writes data/eval (the sample, the labelled text; 0700/0600) and eval/sets (the committed manifest) and reads the filings store: mounted for this verb only, on other mount points than the compose file's read-only eval folder.
+    shift
+    mkdir -p -m 700 "$ROOT/data/eval/announcements" "$ROOT/data/eval/sets"
+    args=(); file=""
+    if [[ "${1:-}" == "import" && -n "${2:-}" ]]; then file="$(cd "$(dirname -- "$2")" && pwd)/$(basename -- "$2")"; args=(import /label-file.csv); shift 2; fi
+    mounts=(-v "$ROOT/data/eval:/data/eval-data" -v "$ROOT/eval:/data/eval-rw" -v "$ROOT/data/filings/files:/data/filings/files:ro")
+    [[ -n "$file" ]] && mounts+=(-v "$file:/label-file.csv:ro")
+    "${COMPOSE[@]}" run --rm --no-deps ${mounts[@]+"${mounts[@]}"} -e Eval__Folder=/data/eval-rw -e Eval__DataFolder=/data/eval-data -e Filings__FilesPath=/data/filings/files xd-eval xd eval announcements ${args[@]+"${args[@]}"} "$@"
     ;;
   compare|accept|show)
     xd_eval "$@"
     ;;
   *)
-    echo "usage: $0 prepare | run [--set S]... [--repeats N] | grade --answers FILE --target T | compare RUN | accept RUN [--reason TEXT] | show RUN | stop" >&2
+    echo "usage: $0 prepare | run [--set S]... [--repeats N] | grade --answers FILE --target T | compare RUN | accept RUN [--reason TEXT] | announcements sample|import|show | show RUN | stop" >&2
     exit 2
     ;;
 esac

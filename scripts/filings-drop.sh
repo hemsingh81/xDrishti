@@ -50,9 +50,9 @@ case "$ext" in xml|xbrl|csv|pdf|txt) ;; *) die "the extension .$ext is refused (
 case "$base" in *.meta.json) die "a sidecar name cannot be filed" ;; esac
 
 row_level=0
-if [ "$ext" = "csv" ] && { [ "$kind" = "board_meeting" ] || [ "$kind" = "shareholding" ]; }; then row_level=1; fi
+if [ "$ext" = "csv" ] && { [ "$kind" = "board_meeting" ] || [ "$kind" = "shareholding" ] || [ "$kind" = "announcement" ]; }; then row_level=1; fi
 if [ "$symbol" = "*" ]; then
-  [ "$row_level" = 1 ] || die "the symbol * is only for a csv of board meetings or shareholding"
+  [ "$row_level" = 1 ] || die "the symbol * is only for a csv of board meetings, shareholding or announcements"
   name_symbol="ALL"
 else
   [[ "$symbol" =~ ^[A-Z0-9\&-]{1,20}$ ]] || die "the symbol '$symbol' is refused (capital letters, digits, & and -; at most 20)"

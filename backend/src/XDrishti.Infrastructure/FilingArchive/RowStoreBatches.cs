@@ -87,7 +87,7 @@ internal static class RowStoreBatches
     /// Runs the write batch: true when the envelope was inserted, false when another writer stored the same bytes first, null when the database refused the revision (a second revision of one filing, <c>ux_filings_supersedes</c>): a refusal is an answer
     /// (<c>bad_supersede</c>), not an exception that would stop the rest of the file.
     /// </summary>
-    public static async ValueTask<bool?> TryWriteAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, IEnumerable<NpgsqlBatchCommand> commands, CancellationToken cancellationToken)
+    public static async ValueTask<bool?> TryWriteAsync(NpgsqlConnection connection, NpgsqlTransaction? transaction, IEnumerable<NpgsqlBatchCommand> commands, CancellationToken cancellationToken)
     {
         await using var batch = new NpgsqlBatch(connection, transaction);
         foreach (var command in commands)

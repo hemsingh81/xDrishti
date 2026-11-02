@@ -126,11 +126,21 @@ internal sealed class FakeFiles : IFilingFiles
             return Fail;
         }
 
-        await source.CopyToAsync(Stream.Null, cancellationToken);
+        using var copy = new MemoryStream();
+        await source.CopyToAsync(copy, cancellationToken);
+        Content.TryAdd(sha256, System.Text.Encoding.UTF8.GetString(copy.ToArray()));
         Events.Add("copy:" + sha256[..4]);
         var created = Stored.Add(sha256);
         Copies += created ? 1 : 0;
         return Result.Success(created);
+    }
+
+    public int RebuildableCopies { get; private set; }
+
+    public ValueTask<Result<bool>> CopyRebuildableAsync(Stream source, string sha256, long expectedBytes, CancellationToken cancellationToken)
+    {
+        RebuildableCopies++;
+        return CopyAsync(source, sha256, expectedBytes, cancellationToken);
     }
 
     public Dictionary<string, string> Content { get; } = [];

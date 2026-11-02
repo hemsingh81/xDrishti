@@ -6,6 +6,18 @@ namespace XDrishti.Domain.Assistant.Evaluation;
 /// </summary>
 public static class AnnouncementGrader
 {
+    /// <summary>The state of set D while the labelled file is present and valid but no classifier exists yet (P15-07; the model arrives with P15-08): not evaluable, and the note says so.</summary>
+    public static AnnouncementResult NoClassifierYet(int rows) =>
+        new(SetState.NotEvaluable, rows, 0, 0, 0, null, null, null, null, "not_evaluable: no classifier yet (P15-08)");
+
+    /// <summary>The state of set D when the labelled file is valid but holds fewer rows than the minimum: not evaluable, and the note names the count.</summary>
+    public static AnnouncementResult TooFewRows(int rows, int needed) =>
+        new(SetState.NotEvaluable, rows, 0, 0, 0, null, null, null, null, $"not_evaluable: the labelled file holds {rows} announcements; {needed} are needed");
+
+    /// <summary>The state of set D when the labelled file is present but invalid: the set fails and the note names the row.</summary>
+    public static AnnouncementResult InvalidFile(string note) =>
+        new(SetState.Fail, 0, 0, 0, 0, null, null, null, null, note);
+
     public static AnnouncementResult Grade(IReadOnlyList<AnnouncementRow> rows, ThresholdTable thresholds)
     {
         ArgumentNullException.ThrowIfNull(rows);

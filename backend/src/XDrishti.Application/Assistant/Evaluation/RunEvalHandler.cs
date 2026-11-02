@@ -116,12 +116,12 @@ internal sealed class RunEvalHandler(
             status = stop.Code == EvalErrors.ModelUnavailableCode ? "model_unavailable" : stop.Code.Replace("eval.", string.Empty, StringComparison.Ordinal);
         }
 
-        if (rows.Count == 0)
+        if (rows.Count == 0 && !(stop is null && status == "completed" && sets.Value.Contains("events")))
         {
             return stop is null ? Refused<EvalRunView>(EvalErrors.Invalid("Nothing was run.")) : Refused<EvalRunView>(stop);
         }
 
-        var events = sets.Value.Contains("events") ? AnnouncementGrader.Grade([], w.Thresholds) : null;
+        var events = sets.Value.Contains("events") ? w.Announcements.Result(w.Thresholds) : null;
         var summary = EvalSummarizer.Build(rows, w.Thresholds, command.Repeats, events);
         if (status != "completed")
         {

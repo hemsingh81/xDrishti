@@ -10,7 +10,7 @@ internal sealed class EvalFileReader(IOptions<EvalOptions> options) : IEvalFiles
 {
     public async ValueTask<Result<EvalFileSet>> ReadAsync(CancellationToken cancellationToken)
     {
-        var folder = Locate(options.Value.Folder);
+        var folder = EvalPaths.Locate(options.Value.Folder);
         if (folder is null)
         {
             return Result.Failure<EvalFileSet>(EvalErrors.FilesMissing("the eval folder was not found (set Eval:Folder)"));
@@ -23,7 +23,10 @@ internal sealed class EvalFileReader(IOptions<EvalOptions> options) : IEvalFiles
                 await File.ReadAllTextAsync(Path.Combine(folder, "sets", "data-questions.jsonl"), cancellationToken),
                 await File.ReadAllTextAsync(Path.Combine(folder, "sets", "plans.jsonl"), cancellationToken),
                 await File.ReadAllTextAsync(Path.Combine(folder, "sets", "ideas.jsonl"), cancellationToken),
-                await File.ReadAllTextAsync(Path.Combine(folder, "thresholds.json"), cancellationToken)));
+                await File.ReadAllTextAsync(Path.Combine(folder, "thresholds.json"), cancellationToken),
+                await ReadOptionalAsync(Path.Combine(EvalPaths.DataFolder(folder, options.Value.DataFolder), "sets", EvalPaths.LabelledName), cancellationToken),
+                await ReadOptionalAsync(Path.Combine(folder, "sets", EvalPaths.ManifestName), cancellationToken),
+                await ReadOptionalAsync(Path.Combine(folder, "sets", EvalPaths.BaselineName), cancellationToken)));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -31,25 +34,5 @@ internal sealed class EvalFileReader(IOptions<EvalOptions> options) : IEvalFiles
         }
     }
 
-    private static string? Locate(string configured)
-    {
-        if (!string.IsNullOrWhiteSpace(configured))
-        {
-            return File.Exists(Path.Combine(configured, "thresholds.json")) ? configured : null;
-        }
-
-        foreach (var start in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() })
-        {
-            for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
-            {
-                var candidate = Path.Combine(dir.FullName, "eval");
-                if (File.Exists(Path.Combine(candidate, "thresholds.json")))
-                {
-                    return candidate;
-                }
-            }
-        }
-
-        return null;
-    }
+    private static async Task<string?> ReadOptionalAsync(string path, CancellationToken cancellationToken) => File.Exists(path) ? await File.ReadAllTextAsync(path, cancellationToken) : null;
 }

@@ -10,5 +10,8 @@ public sealed class EvalOptions
 
     public string Folder { get; set; } = string.Empty;
 
+    /// <summary>The git-ignored <c>data/eval</c> folder that holds the announcement sample and the labelled set (P15-07; empty = <c>data/eval</c> beside the repo's <c>eval/</c> folder). In the eval container the script mounts it and sets this.</summary>
+    public string DataFolder { get; set; } = string.Empty;
+
     public AssistantMcpOptions Mcp { get; set; } = new();
 }

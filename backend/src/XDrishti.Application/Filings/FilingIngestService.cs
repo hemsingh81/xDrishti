@@ -7,7 +7,7 @@ using XDrishti.Domain.Platform.Services;
 namespace XDrishti.Application.Filings;
 
 /// <summary>
-/// The filing ingest as a service (<see cref="Id"/>, P15-02, ADR 0180): every trading day at 17:05 India time, and on "Run now", it stores the files the owner dropped into the filings inbox, loads the board-meeting and shareholding csv files (P15-04) and parses the stored results files (P15-03). It starts <b>paused</b>: with the service paused nothing scans the folder. It touches only
+/// The filing ingest as a service (<see cref="Id"/>, P15-02, ADR 0180): every trading day at 17:05 India time, and on "Run now", it stores the files the owner dropped into the filings inbox, loads the board-meeting, shareholding and announcement csv files (P15-04, P15-07) and parses the stored results files (P15-03). It starts <b>paused</b>: with the service paused nothing scans the folder. It touches only
 /// local files and its own tables (no network, no broker, no order), so "Run now" is allowed. Retries 1, no catch-up. It runs in the scheduler of <c>xd-api</c>, the only host that has one.
 /// </summary>
 public sealed class FilingIngestService(IServiceScopeFactory scopes, ILogger<FilingIngestService> logger) : IScheduledService
@@ -43,9 +43,10 @@ public sealed class FilingIngestService(IServiceScopeFactory scopes, ILogger<Fil
         var summary = result.Value;
         var calendar = await RunLoaderAsync<LoadCalendarCommand>(scope.ServiceProvider, LoadCalendarHandler.Kind, new LoadCalendarCommand(), cancellationToken);
         var shareholding = await RunLoaderAsync<LoadShareholdingCommand>(scope.ServiceProvider, LoadShareholdingHandler.Kind, new LoadShareholdingCommand(), cancellationToken);
+        var announcements = await RunLoaderAsync<LoadAnnouncementsCommand>(scope.ServiceProvider, LoadAnnouncementsHandler.Kind, new LoadAnnouncementsCommand(), cancellationToken);
         var parse = await RunParseAsync(scope.ServiceProvider, cancellationToken);
-        var text = string.Join("; ", new[] { summary.Text, calendar.Text, shareholding.Text, parse.Text });
-        var loaderFailures = (calendar.Failed ? 1 : 0) + (shareholding.Failed ? 1 : 0) + (parse.Failed ? 1 : 0);
+        var text = string.Join("; ", new[] { summary.Text, calendar.Text, shareholding.Text, announcements.Text, parse.Text });
+        var loaderFailures = (calendar.Failed ? 1 : 0) + (shareholding.Failed ? 1 : 0) + (announcements.Failed ? 1 : 0) + (parse.Failed ? 1 : 0);
         return summary.Stopped is not null || summary.Failures > 0 || summary.Problems.Count > 0 || loaderFailures > 0 ? ServiceOutcome.Failed(text) : ServiceOutcome.Succeeded(text);
     }
 

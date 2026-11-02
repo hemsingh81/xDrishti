@@ -16,6 +16,7 @@ internal sealed record EvalCliOptions(string Verb, IReadOnlyList<string> Sets, i
           xd eval compare RUN [--baseline RUN]    paired comparison with the accepted baseline (or the named run): counts, discordant pairs, the exact sign-test p
           xd eval accept RUN [--reason "TEXT"]    accepts a gating PASS run as the baseline (the owner's act); a set that got worse than the current baseline needs --reason
           xd eval show RUN [--json|--md|--answers]  prints the report of a run (the three files of data/eval/RUN/)
+          xd eval announcements sample|import|show  the announcement set D (P15-07): draw the labelling sample, import the owner's labels, show the state (xd eval announcements for its own usage)
           xd eval seed                              seeds the fixture into the database named by Eval__SeedConnection (a developer step of scripts/eval-db.sh; refuses anything but xdrishti_eval and an empty database)
         exit codes: 0 done (run: PASS), 1 refused, 2 wrong command line, 3 failure, 4 a run that is not PASS, 130 cancelled
 

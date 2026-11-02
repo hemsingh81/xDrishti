@@ -120,6 +120,31 @@ public sealed class FilingsDropScriptTests
         (await Listing(inbox)).Accepted.ShouldHaveSingleItem().Broadcast.ShouldBe(XDrishti.Domain.Filings.BroadcastState.Unavailable);
     }
 
+    [Fact]
+    public async Task A_csv_of_announcements_may_name_all_companies_while_a_text_file_of_announcements_may_not()
+    {
+        if (NoBash)
+        {
+            Assert.Skip("needs bash");
+            return;
+        }
+
+        using var fixture = new InboxFixture();
+        var inbox = Path.Combine(fixture.Root, "dropped");
+        var csv = Path.Combine(fixture.Root, "ann.csv");
+        var txt = Path.Combine(fixture.Root, "ann.txt");
+        await File.WriteAllTextAsync(csv, "symbol,broadcast_ts,category,subject,text\n", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(txt, "notice", TestContext.Current.CancellationToken);
+
+        var ok = await RunAsync(inbox, "--symbol * --kind announcement " + csv, TestContext.Current.CancellationToken);
+        var refused = await RunAsync(inbox, "--symbol * --kind announcement " + txt, TestContext.Current.CancellationToken);
+
+        ok.Exit.ShouldBe(0, ok.Err);
+        Path.GetFileName(ok.Out.Split('\n', StringSplitOptions.RemoveEmptyEntries)[0]).ShouldMatch("^ALL_announcement_.*\\.csv$");
+        refused.Exit.ShouldNotBe(0);
+        refused.Err.ShouldContain("only for a csv");
+    }
+
     [Theory]
     [InlineData("--symbol RELIANCE --kind results --period-end 2026-06-30 --broadcast 2026-07-24T16:12:00 FILE.xml", "with +05:30")]
     [InlineData("--symbol RELIANCE --kind results --period-end 2026-06-30 --broadcast 2026-07-24 FILE.xml", "with +05:30")]
