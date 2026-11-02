@@ -11,6 +11,7 @@ import { FixIssuesDialog } from './FixIssuesDialog';
 import { InspectDrawer } from './InspectDrawer';
 import { InstrumentsCard } from './InstrumentsCard';
 import { JobProgress } from './JobProgress';
+import { OptionsArchiveSection } from './OptionsArchiveSection';
 import { QualityHeader } from './QualityHeader';
 import { QueryAlert } from './QueryAlert';
 import { RunHistoryDrawer } from './RunHistoryDrawer';
@@ -97,6 +98,7 @@ function QualityContent() {
           }}
         />
       )}
+      <OptionsArchiveSection />
       <RunHistoryDrawer
         open={historyOpen}
         onClose={() => {

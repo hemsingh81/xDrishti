@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { PasswordReasonDialog } from '@/features/execution';
 import { formatIstDayAndTime } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
+import { BackfillProgress } from './BackfillProgress';
 import { recorderQuery, useChangeRecorder, type RecorderKind } from '../api/recordersApi';
 
 const historyShown = 5;
@@ -52,6 +53,7 @@ export function RecorderCard({ kind, title }: Props) {
               {query.data.enabled ? 'Turn off' : 'Turn on'}
             </Button>
           </Box>
+          {'progress' in query.data && <BackfillProgress view={query.data} />}
           {query.data.notRunningBecause.length === 0 ? (
             <Typography variant="body2">It is running, or waiting for its trading window.</Typography>
           ) : (

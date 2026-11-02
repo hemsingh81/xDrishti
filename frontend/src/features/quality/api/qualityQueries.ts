@@ -75,3 +75,14 @@ export const runsQuery = queryOptions({
   queryFn: async ({ signal }) =>
     unwrap(await api.GET('/api/data/quality/runs', { params: { query: { take: runsTake } }, signal })),
 });
+
+/** The index underlyings the options archive card offers (the archive also holds shares). */
+export const optionUnderlyings = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY'] as const;
+
+/** The stored verdicts of one underlying's option archive (default range: the last 30 days). Statuses only, no price, IV or Greek. */
+export const optionCoverageQuery = (underlying: string) =>
+  queryOptions({
+    queryKey: ['quality', 'options-coverage', underlying] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/options/coverage', { params: { query: { underlying } }, signal })),
+  });

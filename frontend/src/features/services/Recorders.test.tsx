@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { problemResponse, server } from '@/test/server';
 import { createServicesFake } from '@/test/servicesFake';
 import { buildServiceView } from '@/test/servicesFixtures';
+import { buildBackfillView, buildOptionRecorderView } from '@/test/optionsFixtures';
 import { renderServices } from './testing';
 
 vi.mock('./lib/polling', () => ({ servicesRunningPollMs: 25, servicesIdlePollMs: 60_000 }));
@@ -28,7 +29,12 @@ interface Put {
   body: Record<string, unknown>;
 }
 
-function mockRecorders(depth = view(), ticks = view()) {
+function mockRecorders(
+  depth = view(),
+  ticks = view(),
+  chain = buildOptionRecorderView(),
+  backfill = buildBackfillView(),
+) {
   const puts: Put[] = [];
   const reads: string[] = [];
   let refuse = false;
@@ -41,8 +47,17 @@ function mockRecorders(depth = view(), ticks = view()) {
       reads.push('ticks');
       return HttpResponse.json(ticks);
     }),
-    ...(['depth', 'ticks'] as const).map((kind) =>
-      http.put(`/api/${kind}/recorder`, async ({ request }) => {
+    http.get('/api/options/chain-recorder', () => HttpResponse.json(chain)),
+    http.get('/api/options/backfill', () => HttpResponse.json(backfill)),
+    ...(
+      [
+        ['depth', '/api/depth/recorder'],
+        ['ticks', '/api/ticks/recorder'],
+        ['chain', '/api/options/chain-recorder'],
+        ['backfill', '/api/options/backfill'],
+      ] as const
+    ).map(([kind, path]) =>
+      http.put(path, async ({ request }) => {
         puts.push({ kind, body: (await request.json()) as Record<string, unknown> });
         return refuse
           ? problemResponse(
@@ -214,5 +229,84 @@ describe('Services: the tick recorder service', () => {
     const card = await screen.findByRole('listitem', { name: 'Trade tick recorder' });
     await userEvent.click(within(card).getByRole('button', { name: 'Run now: Trade tick recorder' }));
     expect(await screen.findByText('This service is started by its own host.')).toBeInTheDocument();
+  });
+});
+
+describe('Services: the option recorders', () => {
+  it('shows the chain recorder and the backfill off, with reasons and no progress before any is reported', async () => {
+    mockRecorders();
+    renderServices();
+    await openSection();
+    const chain = await screen.findByRole('region', { name: 'Option chain recorder' });
+    const backfill = screen.getByRole('region', { name: 'Expired-options backfill' });
+    expect(await within(chain).findByText('Your switch is OFF.')).toBeInTheDocument();
+    expect(await within(backfill).findByText('The probe result has not been accepted yet.')).toBeInTheDocument();
+    expect(within(backfill).getByText('No progress reported yet.')).toBeInTheDocument();
+  });
+
+  it('shows the backfill progress and the accepted probe', async () => {
+    mockRecorders(
+      view(),
+      view(),
+      buildOptionRecorderView(),
+      buildBackfillView({
+        enabled: true,
+        switchId: 4,
+        state: 'running',
+        notRunningBecause: [],
+        history: onHistory,
+        probeAccepted: { id: 1, actor: 'owner:me@x.in', note: 'read', acceptedAt: '2026-10-30T04:00:00Z' },
+        progress: { planned: 31444, done: 1200, empty: 300, noData: 10, givenUp: 2, left: 29942, estimatedHours: 12.5 },
+      }),
+    );
+    renderServices();
+    await openSection();
+    const backfill = await screen.findByRole('region', { name: 'Expired-options backfill' });
+    const progress = await within(backfill).findByRole('list', { name: 'Backfill progress' });
+    expect(within(progress).getByText('Keys done: 1,200')).toBeInTheDocument();
+    expect(within(progress).getByText('Keys empty: 300')).toBeInTheDocument();
+    expect(within(progress).getByText('Keys with no data: 10')).toBeInTheDocument();
+    expect(within(progress).getByText('Keys given up: 2')).toBeInTheDocument();
+    expect(within(progress).getByText('Keys left: 29,942')).toBeInTheDocument();
+    expect(within(progress).getByText('Estimated finish: about 12.5 hours')).toBeInTheDocument();
+    expect(within(backfill).getByText(/Probe result accepted by owner:me@x.in/)).toBeInTheDocument();
+    expect(within(backfill).getByText('State: running')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['Option chain recorder', 'option chain recorder', 'chain'],
+    ['Expired-options backfill', 'expired-options backfill', 'backfill'],
+  ])('switches %s on with the password and a reason in one PUT', async (title, lower, kind) => {
+    const m = mockRecorders();
+    renderServices();
+    await openSection();
+    await userEvent.click(await screen.findByRole('button', { name: `Turn on ${title}` }));
+    const dialog = await screen.findByRole('dialog', { name: new RegExp(`Turn on the ${lower}`) });
+    await userEvent.type(within(dialog).getByLabelText(/Reason/), 'start');
+    await userEvent.type(within(dialog).getByLabelText(/Password/), 'secret-pw');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Turn on' }));
+    await waitFor(() => {
+      expect(m.puts).toHaveLength(1);
+    });
+    expect(m.puts[0]).toEqual({ kind, body: { enabled: true, reason: 'start', password: 'secret-pw' } });
+  });
+
+  it('turns the chain recorder off with enabled false', async () => {
+    const m = mockRecorders(
+      view(),
+      view(),
+      buildOptionRecorderView({ enabled: true, switchId: 2, notRunningBecause: [], history: onHistory }),
+    );
+    renderServices();
+    await openSection();
+    await userEvent.click(await screen.findByRole('button', { name: 'Turn off Option chain recorder' }));
+    const dialog = await screen.findByRole('dialog', { name: /Turn off the option chain recorder/ });
+    await userEvent.type(within(dialog).getByLabelText(/Reason/), 'stop');
+    await userEvent.type(within(dialog).getByLabelText(/Password/), 'secret-pw');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Turn off' }));
+    await waitFor(() => {
+      expect(m.puts).toHaveLength(1);
+    });
+    expect(m.puts[0]).toEqual({ kind: 'chain', body: { enabled: false, reason: 'stop', password: 'secret-pw' } });
   });
 });
