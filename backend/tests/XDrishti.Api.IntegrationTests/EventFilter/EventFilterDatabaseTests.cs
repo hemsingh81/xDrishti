@@ -19,15 +19,18 @@ public sealed class EventFilterDatabaseTests(ApiFactory factory) : DataTestBase(
 
     private const string AutoActor = "auto:event-filter";
 
-    private const string Insert = "INSERT INTO filings.event_filter_decisions (enabled, results_within_days, approval, decided_by, actor, reason, setting_snapshot, verdict_ref) VALUES (@e, @d, @a, @by, @actor, 'r', '{}'::jsonb, @v)";
+    private static string ConfirmedKeep(int days) => "{\"verdict.state\": \"KEEP\", \"verdict.hold_out_confirmed\": true, \"verdict.results_within_days\": " + days + "}";
 
-    private async Task<string?> TryAsync(bool enabled, int days, string approval, string decidedBy, string actor, string? verdict, string? reason = null)
+    private const string Insert = "INSERT INTO filings.event_filter_decisions (enabled, results_within_days, approval, decided_by, actor, reason, setting_snapshot, verdict_ref) VALUES (@e, @d, @a, @by, @actor, 'r', @snap::jsonb, @v)";
+
+    private async Task<string?> TryAsync(bool enabled, int days, string approval, string decidedBy, string actor, string? verdict, string? reason = null, string? snapshotOverride = null)
     {
         await using var connection = await OpenAsync();
         try
         {
             var sql = reason is null ? Insert : Insert.Replace("'r'", "@reason", StringComparison.Ordinal);
-            var parameters = new List<(string, object)> { ("e", enabled), ("d", (short)days), ("a", approval), ("by", decidedBy), ("actor", actor), ("v", (object?)verdict ?? DBNull.Value) };
+            var snapshot = snapshotOverride ?? (decidedBy == "auto" && enabled ? ConfirmedKeep(days) : "{}");
+            var parameters = new List<(string, object)> { ("e", enabled), ("d", (short)days), ("a", approval), ("by", decidedBy), ("actor", actor), ("v", (object?)verdict ?? DBNull.Value), ("snap", snapshot) };
             if (reason is not null)
             {
                 parameters.Add(("reason", reason));
@@ -122,6 +125,40 @@ public sealed class EventFilterDatabaseTests(ApiFactory factory) : DataTestBase(
         (await ScalarAsync<string>("SELECT string_agg(decided_by || ':' || enabled::text, ',' ORDER BY id) FROM filings.event_filter_decisions")).ShouldBe("owner:false,owner:false,auto:true");
     }
 
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"verdict.state\": \"KEEP\"}")]
+    [InlineData("{\"verdict.state\": \"KEEP\", \"verdict.hold_out_confirmed\": false, \"verdict.results_within_days\": 2}")]
+    [InlineData("{\"verdict.state\": \"KEEP\", \"verdict.hold_out_confirmed\": true}")]
+    [InlineData("{\"verdict.state\": \"DROP\", \"verdict.hold_out_confirmed\": true, \"verdict.results_within_days\": 2}")]
+    public async Task An_automatic_turn_on_without_a_hold_out_confirmed_keep_in_its_snapshot_is_refused_like_the_pure_rule_refuses_it(string snapshot)
+    {
+        await ResetAsync();
+        (await OwnerAsync(false, "auto")).ShouldBeNull();
+
+        var refused = await TryAsync(true, 2, "auto", "auto", AutoActor, "pf-1", snapshotOverride: snapshot);
+        var rule = EventFilterAutoDecision.Decide(new EventFilterVerdict("KEEP", "evf-1", "pf-1", false, 2), new EventFilterState(false, 2, "auto", "owner"), "evf-1");
+
+        refused.ShouldNotBeNull().ShouldStartWith("23514:");
+        refused.ShouldContain("hold-out confirmed");
+        rule.ShouldBe(new EventFilterAutoDecisionResult(EventFilterAutoAction.None, "keep_not_confirmed", null));
+        (await AutoAsync(true)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task An_automatic_turn_on_in_a_window_other_than_its_verdicts_is_refused_by_the_trigger_and_by_the_rule()
+    {
+        await ResetAsync();
+        (await OwnerAsync(false, "auto", days: 3)).ShouldBeNull();
+
+        var refused = await TryAsync(true, 3, "auto", "auto", AutoActor, "pf-1", snapshotOverride: ConfirmedKeep(2));
+        var rule = EventFilterAutoDecision.Decide(new EventFilterVerdict("KEEP", "evf-1", "pf-1", true, 2), new EventFilterState(false, 3, "auto", "owner"), "evf-1");
+
+        refused.ShouldNotBeNull().ShouldStartWith("23514:");
+        rule.Reason.ShouldBe("verdict_window_mismatch");
+        (await TryAsync(true, 3, "auto", "auto", AutoActor, "pf-1", snapshotOverride: ConfirmedKeep(3))).ShouldBeNull();
+    }
+
     [Fact]
     public async Task The_trigger_agrees_with_the_pure_rule_on_every_state_and_both_actions_and_two_mutants_of_the_rule_disagree()
     {
@@ -141,7 +178,7 @@ public sealed class EventFilterDatabaseTests(ApiFactory factory) : DataTestBase(
 
         // The pure rule's answer for "may the automatic path turn it on / off from this state": KEEP is the only verdict that turns on, DROP the one that turns off.
         static bool Real(EventFilterState s, bool turnOn) =>
-            EventFilterAutoDecision.Decide(new EventFilterVerdict(turnOn ? "KEEP" : "DROP", "evf-1", "pf-1"), s, "evf-1").Action == (turnOn ? EventFilterAutoAction.TurnOn : EventFilterAutoAction.TurnOff);
+            EventFilterAutoDecision.Decide(new EventFilterVerdict(turnOn ? "KEEP" : "DROP", "evf-1", "pf-1", true, 2), s, "evf-1").Action == (turnOn ? EventFilterAutoAction.TurnOn : EventFilterAutoAction.TurnOff);
 
         // Mutant 1 forgets the approval setting; mutant 2 lets the auto path turn off a filter the owner turned on.
         static bool NoApproval(EventFilterState s, bool turnOn) => turnOn ? !s.Enabled && !s.OwnerSwitchedOff : s.Enabled && s.DecidedBy == "auto";

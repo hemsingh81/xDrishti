@@ -11,9 +11,9 @@ using XDrishti.Domain.Selection;
 namespace XDrishti.Application.Selection;
 
 /// <summary>
-/// The auto option of the event-risk filter (CLAUDE.md "approvals have an auto option"; P15-06, ADR 0182): reads the newest protocol-F verdict for the current rule version through <see cref="IEventFilterVerdict"/> (nothing implements it before P15-10, so it answers unavailable and
+/// The auto option of the event-risk filter (CLAUDE.md "approvals have an auto option"; P15-06, ADR 0182): reads the newest protocol-F verdict for the current rule version through <see cref="IEventFilterVerdict"/> (the reader of the stored verdicts, P15-10; with none for the switch's N it answers unavailable and
 /// nothing happens), asks the pure <see cref="EventFilterAutoDecision"/> and, for an action, appends one row <c>decided_by auto</c>, actor <c>auto:event-filter</c>, with the settings snapshot, the verdict state and the verdict reference. N and the approval setting are copied unchanged. The
-/// row is never an owner approval; the account event carries the auto actor. A verdict that cannot be read is <c>unavailable</c>. It places no order and is called by nothing yet.
+/// row is never an owner approval; the account event carries the auto actor. A verdict that cannot be read is <c>unavailable</c>. It places no order; the evaluation verb runs it after each new protocol-F verdict (P15-10).
 /// </summary>
 internal sealed class ApplyEventFilterAutoHandler(
     IEventFilterDecisions decisions,

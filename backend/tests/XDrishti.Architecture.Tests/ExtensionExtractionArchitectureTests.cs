@@ -24,7 +24,7 @@ public sealed class ExtensionExtractionArchitectureTests
     private static string Src(params string[] parts) => Path.Combine([Root, "src", .. parts]);
 
     [Fact]
-    public void Nothing_but_the_wiring_and_the_handler_names_the_extractor_and_only_the_handler_names_the_port_and_the_record()
+    public void Nothing_but_the_wiring_and_the_handler_names_the_extractor_and_only_the_handler_and_the_p15_10_training_source_name_the_port_and_the_record()
     {
         List<string> Users(string name) =>
         [
@@ -33,7 +33,7 @@ public sealed class ExtensionExtractionArchitectureTests
 
         Users("XDrishti.Application.Learning.ExtensionFeatureExtractor").ShouldBe(["DependencyInjection", "ExtensionFeatureExtractor", "ExtractExtensionFeaturesHandler"]);
         Users("XDrishti.Application.Learning.ExtractExtensionFeaturesHandler").ShouldBe(["DependencyInjection", "ExtractExtensionFeaturesHandler"]);
-        Users("XDrishti.Application.Abstractions.Learning.IExtensionExtractionStore").ShouldBe(["ExtractExtensionFeaturesHandler"]);
+        Users("XDrishti.Application.Abstractions.Learning.IExtensionExtractionStore").ShouldBe(["ExtensionTrainingSource", "ExtractExtensionFeaturesHandler"]);   // P15-10: the training source reads the record per run for the evaluation gate
     }
 
     [Theory]

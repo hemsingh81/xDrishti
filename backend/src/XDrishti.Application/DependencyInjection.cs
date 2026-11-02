@@ -156,8 +156,8 @@ public static class DependencyInjection
         services.AddScoped<PlanEventFilter>(); // the plan's exclusion by event and its checklist days from the results calendar, only while the switch is ON (P15-06)
         services.AddScoped<IQueryHandler<GetEventFilterQuery, EventFilterView>, GetEventFilterHandler>(); // GET /api/selection/event-filter (P15-06): read
         services.AddScoped<ICommandHandler<ChangeEventFilterCommand, EventFilterView>, ChangeEventFilterHandler>(); // the owner's switch change: fresh password on every change, recorded as owner (P15-06)
-        services.AddScoped<ICommandHandler<ApplyEventFilterAutoCommand, EventFilterAutoResult>, ApplyEventFilterAutoHandler>(); // the auto option: a KEEP verdict only, recorded as auto; called by nothing before P15-10
-        services.TryAddScoped<IEventFilterVerdict, UnavailableEventFilterVerdict>(); // no protocol-F verdict exists before P15-10: unavailable, so the auto path cannot fire
+        services.AddScoped<ICommandHandler<ApplyEventFilterAutoCommand, EventFilterAutoResult>, ApplyEventFilterAutoHandler>(); // the auto option: a hold-out confirmed KEEP only, recorded as auto; run once at the end of each protocol-F evaluation (P15-10)
+        services.AddScoped<IEventFilterVerdict, EventFilterVerdictReader>(); // the newest stored protocol-F verdict for the switch's N; null (unavailable) when there is none (P15-10). The auto rule that reads it stays default OFF
         services.AddScoped<ILossTagEvents, LossTagEvents>(); // the results event instants for the news_results loss tag: a description of the past, never a decision input (P15-06)
         services.AddScoped<IShareholdingAsOf, ShareholdingAsOf>(); // the shareholding as known at an instant (P15-04): a port with no decision caller yet
         services.AddScoped<IQueryHandler<GetResultsCalendarQuery, Result<ResultsCalendarView>>, GetResultsCalendarHandler>(); // GET /api/calendar/results (P15-04): read
@@ -718,6 +718,18 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ExtractTradeFeaturesCommand, TradeFeaturesOutcome>, ExtractTradeFeaturesHandler>(); // decision-time features of a stored run (P6-04, ADR 0066)
         services.AddScoped<ExtensionFeatureExtractor>();
         services.AddScoped<ICommandHandler<ExtractExtensionFeaturesCommand, ExtensionFeaturesOutcome>, ExtractExtensionFeaturesHandler>(); // ev-1 and fu-1 of a stored run (P15-05, ADR 0185)
+        services.AddScoped<IFilterPopulationSource, FilterPopulationSource>(); // the unfiltered stored runs' trades with the calendar's answer, for protocol F (P15-10): read
+        services.AddScoped<IExtensionTrainingSource, ExtensionTrainingSource>(); // the joined tf-1 and extension rows of the stored runs, for protocol X (P15-10): read
+        services.TryAddScoped<IPeadEventSource, UnavailablePeadEventSource>(); // no PEAD events before the strategy of P15-09: protocol P is NOT_EVALUABLE
+        services.TryAddScoped<IFlagGradeSource, UnavailableFlagGradeSource>(); // no accepted set D eval run before P15-08: protocol L is NOT_EVALUABLE
+        services.AddScoped<EvaluationWriter>();
+        services.AddScoped<FilterEvaluation>();
+        services.AddScoped<ComparisonEvaluation>();
+        services.AddScoped<PeadEvaluation>();
+        services.AddScoped<FlagEvaluation>();
+        services.AddScoped<ICommandHandler<EvaluateExtensionCommand, ExtensionEvaluationOutcome>, EvaluateExtensionHandler>(); // xd learn extension-eval: protocols F, X, P and L, ledger first, insert-only verdicts (P15-10, ADR 0186)
+        services.AddScoped<IQueryHandler<ListExtensionEvaluationsQuery, Result<ExtensionEvaluationList>>, ListExtensionEvaluationsHandler>(); // GET /api/research/extensions (P15-10): read
+        services.AddScoped<IQueryHandler<GetExtensionEvaluationQuery, Result<ExtensionEvaluationView>>, GetExtensionEvaluationHandler>(); // GET /api/research/extensions/{id} (P15-10): read
         services.AddScoped<ICommandHandler<BuildTrainingSetCommand, TrainingSetOutcome>, BuildTrainingSetHandler>(); // the training set: labels joined to features (P6-04)
         services.AddScoped<IQueryHandler<ProposeEntryWindowsQuery, Result<EntryWindowReport>>, ProposeEntryWindowsHandler>(); // learned entry windows, proposal only (P6-14, ADR 0069)
         services.AddScoped<IQueryHandler<ReplayDriftQuery, Result<DriftReport>>, ReplayDriftHandler>(); // drift monitors over replayed history, read-only (P6-09, ADR 0074)

@@ -2,6 +2,7 @@ using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Selection;
 using XDrishti.Domain.Filings;
+using XDrishti.Domain.Selection;
 
 namespace XDrishti.Application.Selection;
 
@@ -74,7 +75,8 @@ internal sealed class GetEventFilterHandler(IEventFilterDecisions decisions, IRe
         {
             if (await verdicts.NewestAsync(EventCalendarSnapshot.RuleVersion, cancellationToken) is { } newest && !string.IsNullOrWhiteSpace(newest.State))
             {
-                verdict = newest.State;
+                // A KEEP that the hold-out has not confirmed is shown as such: the auto option does not act on it.
+                verdict = newest.State == EventFilterVerdict.Keep && !newest.HoldOutConfirmed ? "KEEP_NOT_CONFIRMED" : newest.State;
             }
         }
 #pragma warning disable CA1031 // An unreadable verdict is unavailable; cancellation is rethrown by the filter.

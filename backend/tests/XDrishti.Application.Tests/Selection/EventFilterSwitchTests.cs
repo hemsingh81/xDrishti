@@ -271,7 +271,7 @@ public sealed class EventFilterSwitchTests
     [Fact]
     public async Task After_an_owner_switch_off_a_keep_verdict_changes_nothing_while_approval_stays_auto()
     {
-        var (handler, decisions, events) = Auto(new EventFilterVerdict("KEEP", "evf-1", "pf-1"));
+        var (handler, decisions, events) = Auto(new EventFilterVerdict("KEEP", "evf-1", "pf-1", true, 2));
         decisions.Rows.Add(OwnerRow(1, true, "auto"));
         decisions.Rows.Add(OwnerRow(2, false, "auto"));
 
@@ -326,7 +326,7 @@ public sealed class EventFilterSwitchTests
     [Fact]
     public async Task A_keep_verdict_with_approval_auto_turns_the_filter_on_as_an_auto_row_with_the_snapshot_and_the_verdict_reference_never_as_the_owner()
     {
-        var (handler, decisions, events) = Auto(new EventFilterVerdict("KEEP", "evf-1", "pf-1"));
+        var (handler, decisions, events) = Auto(new EventFilterVerdict("KEEP", "evf-1", "pf-1", true, 4));
         decisions.Rows.Add(OwnerRow(1, false, "auto", 4));
 
         var result = await handler.HandleAsync(new ApplyEventFilterAutoCommand(), Ct);
@@ -346,7 +346,7 @@ public sealed class EventFilterSwitchTests
     [InlineData("NOT_EVALUABLE")]
     public async Task Any_verdict_but_keep_changes_nothing_while_the_filter_is_off(string state)
     {
-        var (handler, decisions, events) = Auto(new EventFilterVerdict(state, "evf-1", "pf-1"));
+        var (handler, decisions, events) = Auto(new EventFilterVerdict(state, "evf-1", "pf-1", true, 2));
         decisions.Rows.Add(OwnerRow(1, false, "auto"));
 
         (await handler.HandleAsync(new ApplyEventFilterAutoCommand(), Ct)).Value.Action.ShouldBe("none");
@@ -358,7 +358,7 @@ public sealed class EventFilterSwitchTests
     [Fact]
     public async Task With_approval_manual_even_a_keep_verdict_changes_nothing()
     {
-        var (handler, decisions, _) = Auto(new EventFilterVerdict("KEEP", "evf-1", "pf-1"));
+        var (handler, decisions, _) = Auto(new EventFilterVerdict("KEEP", "evf-1", "pf-1", true, 2));
         decisions.Rows.Add(OwnerRow(1, false, "manual"));
 
         (await handler.HandleAsync(new ApplyEventFilterAutoCommand(), Ct)).Value.ShouldBe(new EventFilterAutoResult("none", "approval_manual"));
@@ -366,13 +366,13 @@ public sealed class EventFilterSwitchTests
     }
 
     [Fact]
-    public async Task Until_a_verdict_exists_the_default_port_answers_unavailable_and_the_auto_path_cannot_fire_even_with_approval_auto()
+    public async Task Without_a_verdict_the_port_answers_unavailable_and_the_auto_path_cannot_fire_even_with_approval_auto()
     {
         var decisions = new FakeDecisions();
         decisions.Rows.Add(OwnerRow(1, false, "auto"));
-        var handler = new ApplyEventFilterAutoHandler(decisions, new UnavailableEventFilterVerdict(), new Events(), new Unit(), TimeProvider.System, NullLogger<ApplyEventFilterAutoHandler>.Instance);
+        var handler = new ApplyEventFilterAutoHandler(decisions, new Verdict(null), new Events(), new Unit(), TimeProvider.System, NullLogger<ApplyEventFilterAutoHandler>.Instance);
 
-        (await new UnavailableEventFilterVerdict().NewestAsync("evf-1", Ct)).ShouldBeNull();
+        (await new Verdict(null).NewestAsync("evf-1", Ct)).ShouldBeNull();
         (await handler.HandleAsync(new ApplyEventFilterAutoCommand(), Ct)).Value.ShouldBe(new EventFilterAutoResult("none", "verdict_unavailable"));
         decisions.Rows.Count.ShouldBe(1);
     }
@@ -405,7 +405,7 @@ public sealed class EventFilterSwitchTests
     [Fact]
     public async Task A_database_that_refuses_the_auto_row_changes_nothing_and_is_counted_not_applied()
     {
-        var (handler, decisions, events) = Auto(new EventFilterVerdict("KEEP", "evf-1", "pf-1"));
+        var (handler, decisions, events) = Auto(new EventFilterVerdict("KEEP", "evf-1", "pf-1", true, 2));
         decisions.Rows.Add(OwnerRow(1, false, "auto"));
         decisions.Refuse = "the filter is already on";
 

@@ -23,7 +23,7 @@ public sealed record EventFilterReasonView(string Code, int? Count);
 
 /// <summary>
 /// The effective switch (the newest row; no row, or an unreadable history, is OFF), its settings, the latest 50 rows and the reasons the filter is not acting. <see cref="InstrumentsTracked"/> and <see cref="InstrumentsWithEntry"/> are the calendar coverage now
-/// (null when the calendar could not be read). The auto option is inert until a protocol-F verdict exists (<see cref="AutoVerdict"/> is <c>unavailable</c>).
+/// (null when the calendar could not be read). The auto option acts only on a hold-out confirmed KEEP: <see cref="AutoVerdict"/> is <c>unavailable</c>, a verdict word, or <c>KEEP_NOT_CONFIRMED</c> for a development KEEP that the hold-out has not confirmed.
 /// </summary>
 public sealed record EventFilterView(
     bool Enabled,
@@ -48,5 +48,5 @@ public sealed record ChangeEventFilterCommand(string Actor, Guid SessionId, Clie
 /// <summary>What one run of the auto rule did: the action taken (<c>none</c>, <c>turn_on</c>, <c>turn_off</c>) and the closed reason.</summary>
 public sealed record EventFilterAutoResult(string Action, string Reason);
 
-/// <summary>Runs the auto rule once against the newest verdict (P15-10 schedules it). No actor: it is the system, recorded as <c>auto:event-filter</c>.</summary>
+/// <summary>Runs the auto rule once against the newest verdict (P15-10: the evaluation verb runs it after each new protocol-F verdict). No actor: it is the system, recorded as <c>auto:event-filter</c>.</summary>
 public sealed record ApplyEventFilterAutoCommand : ICommand;

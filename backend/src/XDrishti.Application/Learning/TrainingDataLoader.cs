@@ -3,6 +3,7 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
+using XDrishti.Domain.Learning.Extensions;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 
@@ -23,7 +24,7 @@ internal static class TrainingDataLoader
 {
     private static readonly string[] Styles = ["intraday", "swing"];
 
-    public static async ValueTask<Result<LoadedTrainingData>> LoadAsync(IRunStore runs, ITradeFeatureStore features, IReadOnlyList<CellSource> sources, CellStatsOptions options, IReadOnlyList<string>? required, CancellationToken cancellationToken)
+    public static async ValueTask<Result<LoadedTrainingData>> LoadAsync(IRunStore runs, ITradeFeatureStore features, IReadOnlyList<CellSource> sources, CellStatsOptions options, IReadOnlyList<string>? required, CancellationToken cancellationToken, ExtensionGroupInput? extension = null)
     {
         var read = await CellSourceReader.ReadAsync(runs, sources, cancellationToken);
         if (read.IsFailure)
@@ -46,7 +47,7 @@ internal static class TrainingDataLoader
         var provenance = string.Create(CultureInfo.InvariantCulture, $"{text};{options.RecencyHalfLifeDays:R};{options.PriorStrength:R};{options.MinTrades};{options.CredibleLevel:R}");
         var decisionOf = read.Value.Trades.ToDictionary(t => t.Trade.Key, t => t.Trade.DecisionEpochSeconds, StringComparer.Ordinal);
         var matching = stored.Where(f => decisionOf.TryGetValue(f.TradeKey, out var at) && at == f.DecisionEpochSeconds).ToList();
-        var data = TrainingDataBuilder.Build(set.Value, matching, cells, required, provenance);
+        var data = extension is null ? TrainingDataBuilder.Build(set.Value, matching, cells, required, provenance) : TrainingDataBuilder.Build(set.Value, matching, cells, extension, required, provenance);
         return data.IsFailure
             ? Result.Failure<LoadedTrainingData>(data.Error)
             : Result.Success(new LoadedTrainingData(data.Value, set.Value, text, cellOf.ToDictionary(p => p.Key, p => p.Value.CellKey, StringComparer.Ordinal)));

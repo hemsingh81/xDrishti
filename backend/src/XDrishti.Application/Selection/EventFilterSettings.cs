@@ -28,6 +28,8 @@ internal static class EventFilterSettings
         {
             values["verdict.state"] = verdict.State;
             values["verdict.rule_version"] = verdict.RuleVersion;
+            values["verdict.hold_out_confirmed"] = verdict.HoldOutConfirmed;
+            values["verdict.results_within_days"] = verdict.ResultsWithinDays ?? -1;
         }
 
         return JsonSerializer.Serialize(values);

@@ -16085,6 +16085,87 @@
         }
       }
     },
+    "/api/research/extensions": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "The stored evaluations of one family (filter:results, ext:ev-1, ext:fu-1, ext:llm-1 or pead), newest first, at most 100: the verdict (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE) with the named missing quantities, the counts, the limits and the estimates, evidence and inputs as JSON. A value that is not available is the text unavailable, never a number. 400 extensions.invalid_query for an unknown family",
+        "operationId": "ListExtensionEvaluations",
+        "parameters": [
+          {
+            "name": "family",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtensionEvaluationList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/research/extensions/{id}": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "One stored evaluation by its 64-character id, with its evidence block; 404 extensions.not_found for an unknown id",
+        "operationId": "GetExtensionEvaluation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtensionEvaluationView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/selection/event-filter": {
       "get": {
         "tags": [
@@ -32099,7 +32180,7 @@
             "format": "int32"
           }
         },
-        "description": "The effective switch (the newest row; no row, or an unreadable history, is OFF), its settings, the latest 50 rows and the reasons the filter is not acting. int? EventFilterView.InstrumentsTracked and int? EventFilterView.InstrumentsWithEntry are the calendar coverage now\n(null when the calendar could not be read). The auto option is inert until a protocol-F verdict exists (string EventFilterView.AutoVerdict is `unavailable`)."
+        "description": "The effective switch (the newest row; no row, or an unreadable history, is OFF), its settings, the latest 50 rows and the reasons the filter is not acting. int? EventFilterView.InstrumentsTracked and int? EventFilterView.InstrumentsWithEntry are the calendar coverage now\n(null when the calendar could not be read). The auto option acts only on a hold-out confirmed KEEP: string EventFilterView.AutoVerdict is `unavailable`, a verdict word, or `KEEP_NOT_CONFIRMED` for a development KEEP that the hold-out has not confirmed."
       },
       "EvidenceFigure": {
         "required": [
@@ -34443,6 +34524,131 @@
           }
         },
         "description": "The body of an export (spec P8-20). There is no password, no actor and no file name in it: the actor is the session, the name is made by the server."
+      },
+      "ExtensionEvaluationList": {
+        "required": [
+          "family",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "family": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtensionEvaluationView"
+            }
+          }
+        },
+        "description": "The newest evaluations of a family, newest first, at most 100."
+      },
+      "ExtensionEvaluationView": {
+        "required": [
+          "id",
+          "family",
+          "protocol",
+          "extensionVersion",
+          "versionKey",
+          "baseVersion",
+          "verdict",
+          "trials",
+          "factor",
+          "foldUnit",
+          "foldsTotal",
+          "foldsEvaluable",
+          "rows",
+          "flips",
+          "missing",
+          "limits",
+          "estimates",
+          "evidence",
+          "inputs",
+          "holdOutRead"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string"
+          },
+          "extensionVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "versionKey": {
+            "type": "string"
+          },
+          "baseVersion": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "trials": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "factor": {
+            "type": "number",
+            "format": "double"
+          },
+          "foldUnit": {
+            "type": "string"
+          },
+          "foldsTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "foldsEvaluable": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "flips": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "estimates": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "inputs": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "holdOutRead": {
+            "type": "boolean"
+          }
+        },
+        "description": "One stored evaluation as the API shows it (P15-10): the verdict with the named missing quantities, the counts, the stated limits and the three JSON blocks as JSON (estimates with their intervals, the evidence block, the inputs). A value that is unavailable is the text\n`unavailable` inside those blocks, never a number."
       },
       "FacetCount": {
         "required": [
@@ -57441,6 +57647,9 @@
     },
     {
       "name": "Filings"
+    },
+    {
+      "name": "Research"
     },
     {
       "name": "Selection"

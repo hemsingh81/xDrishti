@@ -85,7 +85,7 @@ public sealed partial class EventFilterArchitectureTests
     public void The_filter_the_switch_and_the_snapshot_reach_no_execution_broker_order_or_network_type()
     {
         string[] banned = ["System.Net.Http", "System.Net.Sockets", "XDrishti.Execution", "XDrishti.Infrastructure.Brokers", "XDrishti.Application.Abstractions.Brokers", "XDrishti.Application.Execution", "XDrishti.Application.LiveTrading", "XDrishti.Application.Abstractions.LiveTrading"];
-        var names = "^(" + string.Join('|', [.. EventFilterUsers.ApplicationTypes.Where(n => n is not ("RunSimulationHandler" or "RunContext" or "SelectionPlanBuilder")), "EventFilterSettings", "EventFilterSwitch", "EventFilterActRules", "UnavailableEventFilterVerdict", "EventCalendarSnapshots", "EventFilterModels"]) + ")$";
+        var names = "^(" + string.Join('|', [.. EventFilterUsers.ApplicationTypes.Where(n => n is not ("RunSimulationHandler" or "RunContext" or "SelectionPlanBuilder")), "EventFilterSettings", "EventFilterSwitch", "EventFilterActRules", "EventFilterVerdictReader", "EventCalendarSnapshots", "EventFilterModels"]) + ")$";
 
         var result = Types.InAssembly(Application).That().HaveNameMatching(names).ShouldNot().HaveDependencyOnAny(banned).GetResult();
 
@@ -177,12 +177,12 @@ public sealed partial class EventFilterArchitectureTests
     }
 
     [Fact]
-    public void The_auto_option_is_inert_without_a_verdict_implementation_and_the_default_is_unavailable()
+    public void The_only_verdict_implementation_is_the_reader_of_the_stored_protocol_f_verdicts_which_answers_unavailable_without_one()
     {
         var port = typeof(XDrishti.Application.Abstractions.Selection.IEventFilterVerdict);
         var implementations = Application.GetTypes().Concat(Assembly.Load(new AssemblyName("XDrishti.Infrastructure")).GetTypes()).Where(t => t is { IsClass: true, IsAbstract: false } && port.IsAssignableFrom(t)).Select(t => t.Name).ToList();
 
-        implementations.ShouldBe(["UnavailableEventFilterVerdict"], "P15-10 replaces it; until then nothing can answer KEEP");
+        implementations.ShouldBe(["EventFilterVerdictReader"], "P15-10: the reader of stored protocol-F verdicts is the only implementation; no verdict is unavailable (null), never KEEP");
     }
 
     [GeneratedRegex(@"\b(UPDATE\s+\w|DELETE\s+FROM|TRUNCATE\s+\w)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]

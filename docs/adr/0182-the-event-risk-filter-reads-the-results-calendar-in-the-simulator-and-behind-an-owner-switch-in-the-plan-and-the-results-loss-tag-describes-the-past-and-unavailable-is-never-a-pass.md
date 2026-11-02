@@ -29,3 +29,6 @@ Four consumers want "how many sessions until this company reports": a strategy t
 - Removing results-window trades removes the largest winners too (P15-00 risk 7); the 50 % review flag and the tail test are P15-10's. If protocol F says DROP the code stays and nothing turns it on.
 - The plan is asked at the start of its India date when built the evening before: rows are those ingested by the build, so nothing later can be in them, but a row inside the last `lag` minutes counts as known.
 - The execution service has no event check; the plan check warns the owner before the ticket exists.
+
+## Amendment (owner, 2026-11-02, with [ADR 0186](0186-the-p15-evaluation-protocols-f-x-p-and-l-count-each-trial-in-the-ledger-before-any-number-store-insert-only-verdicts-with-the-missing-quantity-named-and-feed-the-event-filter-only-through-the-verdict-port.md))
+The auto turn-ON of the event-risk filter requires a protocol-F KEEP for the switch's N and the current rule version **that the hold-out confirmed**, never a development KEEP alone (closed reason `keep_not_confirmed`). The database trigger requires the same in the row's snapshot. Turn-OFF on any explicit non-KEEP is unchanged.

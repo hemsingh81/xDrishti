@@ -40,9 +40,14 @@ public sealed class ExtensionComparisonArchitectureTests
     }
 
     [Fact]
-    public void The_exact_set_of_application_types_that_name_an_extension_type_or_port_is_the_ports_and_the_p15_05_extraction()
+    public void The_exact_set_of_application_types_that_name_an_extension_type_or_port_is_the_ports_the_p15_05_extraction_and_the_p15_10_evaluations()
     {
-        Users(Application).ShouldBe(["ExtensionFeatureExtractor", "ExtractExtensionFeaturesHandler", "IExtensionEvaluationStore", "IExtensionExtractionStore", "IExtensionFeatureStore"]);
+        Users(Application).ShouldBe(
+        [
+            "ComparisonEvaluation", "EvaluationWriter", "EventFilterVerdictReader", "ExtensionEvaluationErrors", "ExtensionEvaluationMapper", "ExtensionFeatureExtractor", "ExtensionRunSource", "ExtensionTrainingSource", "ExtractExtensionFeaturesHandler",
+            "FilterEvaluation", "FilterPopulation", "FilterPopulationSource", "FlagEvaluation", "GetExtensionEvaluationHandler", "IExtensionEvaluationStore", "IExtensionExtractionStore", "IExtensionFeatureStore", "IExtensionTrainingSource",
+            "IFlagGradeSource", "ListExtensionEvaluationsHandler", "PeadEvaluation", "PeadEventSet", "TrainingDataLoader", "UnavailableFlagGradeSource", "UnavailablePeadEventSource",
+        ]);
     }
 
     [Fact]

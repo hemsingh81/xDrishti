@@ -184,8 +184,8 @@ public sealed class FilingsGrantsTests(ResearchGrantsTests.DedicatedServer serve
         var decisions = new EventFilterDecisions(dataSource);
 
         var owner = await decisions.AppendAsync(new NewEventFilterRow(false, 2, "auto", "owner", "owner:grant@example.invalid", "arm the auto option", "{}", null), Ct);
-        var auto = await decisions.AppendAsync(new NewEventFilterRow(true, 2, "auto", "auto", "auto:event-filter", "auto: keep", "{}", "pf-1"), Ct);
-        var again = await decisions.AppendAsync(new NewEventFilterRow(true, 2, "auto", "auto", "auto:event-filter", "auto: keep", "{}", "pf-1"), Ct);
+        var auto = await decisions.AppendAsync(new NewEventFilterRow(true, 2, "auto", "auto", "auto:event-filter", "auto: keep", "{\"verdict.state\":\"KEEP\",\"verdict.hold_out_confirmed\":true,\"verdict.results_within_days\":2}", "pf-1"), Ct);
+        var again = await decisions.AppendAsync(new NewEventFilterRow(true, 2, "auto", "auto", "auto:event-filter", "auto: keep", "{\"verdict.state\":\"KEEP\",\"verdict.hold_out_confirmed\":true,\"verdict.results_within_days\":2}", "pf-1"), Ct);
         var rows = await decisions.RowsAsync(10, Ct);
 
         (owner.Id, owner.Refused).ShouldBe((owner.Id, null));

@@ -10,7 +10,7 @@ public sealed class EventFilterAutoDecisionTests
 {
     private const string Current = "evf-1";
 
-    private static EventFilterVerdict Verdict(string state, string version = Current, string? reference = "pf-2026-11-02") => new(state, version, reference);
+    private static EventFilterVerdict Verdict(string state, string version = Current, string? reference = "pf-2026-11-02", bool confirmed = true, int days = 2) => new(state, version, reference, confirmed, days);
 
     private static EventFilterState State(bool enabled, string approval = EventFilterState.AutoApproval, string? by = EventFilterState.OwnerDecision, int days = 2) => new(enabled, days, approval, by);
 
@@ -56,6 +56,27 @@ public sealed class EventFilterAutoDecisionTests
 
         Decide(verdict, State(false)).Item1.ShouldBe(EventFilterAutoAction.None);
         Decide(verdict, State(true, by: EventFilterState.AutoDecision)).Item1.ShouldBe(EventFilterAutoAction.None, "an unreadable verdict does not flip a filter");
+    }
+
+    [Fact]
+    public void A_development_keep_alone_never_turns_the_filter_on_only_a_hold_out_confirmed_keep_does()
+    {
+        Decide(Verdict("KEEP", confirmed: false), State(false)).ShouldBe((EventFilterAutoAction.None, "keep_not_confirmed"));
+        Decide(Verdict("KEEP", confirmed: false), State(true, by: EventFilterState.AutoDecision)).ShouldBe((EventFilterAutoAction.None, "keep_not_confirmed"));
+        Decide(Verdict("KEEP", confirmed: true), State(false)).ShouldBe((EventFilterAutoAction.TurnOn, "keep"));
+    }
+
+    [Fact]
+    public void A_keep_made_for_another_window_than_the_one_in_force_is_not_applied()
+    {
+        Decide(Verdict("KEEP", days: 3), State(false, days: 2)).ShouldBe((EventFilterAutoAction.None, "verdict_window_mismatch"));
+        Decide(new EventFilterVerdict("KEEP", Current, "ref", true), State(false)).ShouldBe((EventFilterAutoAction.None, "verdict_window_mismatch"));
+    }
+
+    [Fact]
+    public void A_non_keep_turns_an_automatic_filter_off_whether_or_not_it_was_confirmed()
+    {
+        Decide(Verdict("INCONCLUSIVE", confirmed: false), State(true, by: EventFilterState.AutoDecision)).ShouldBe((EventFilterAutoAction.TurnOff, "not_keep"));
     }
 
     [Fact]

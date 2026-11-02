@@ -4603,6 +4603,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/research/extensions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored evaluations of one family (filter:results, ext:ev-1, ext:fu-1, ext:llm-1 or pead), newest first, at most 100: the verdict (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE) with the named missing quantities, the counts, the limits and the estimates, evidence and inputs as JSON. A value that is not available is the text unavailable, never a number. 400 extensions.invalid_query for an unknown family */
+    get: operations['ListExtensionEvaluations'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/research/extensions/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One stored evaluation by its 64-character id, with its evidence block; 404 extensions.not_found for an unknown id */
+    get: operations['GetExtensionEvaluation'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/selection/event-filter': {
     parameters: {
       query?: never;
@@ -10047,7 +10081,7 @@ export interface components {
     };
     /**
      * @description The effective switch (the newest row; no row, or an unreadable history, is OFF), its settings, the latest 50 rows and the reasons the filter is not acting. int? EventFilterView.InstrumentsTracked and int? EventFilterView.InstrumentsWithEntry are the calendar coverage now
-     *     (null when the calendar could not be read). The auto option is inert until a protocol-F verdict exists (string EventFilterView.AutoVerdict is `unavailable`).
+     *     (null when the calendar could not be read). The auto option acts only on a hold-out confirmed KEEP: string EventFilterView.AutoVerdict is `unavailable`, a verdict word, or `KEEP_NOT_CONFIRMED` for a development KEEP that the hold-out has not confirmed.
      */
     EventFilterView: {
       enabled: boolean;
@@ -10848,6 +10882,43 @@ export interface components {
       /** @description csv (the default and the only format). */
       format: null | string;
       query: null | components['schemas']['ReportQueryInput'];
+    };
+    /** @description The newest evaluations of a family, newest first, at most 100. */
+    ExtensionEvaluationList: {
+      family: string;
+      items: components['schemas']['ExtensionEvaluationView'][];
+    };
+    /**
+     * @description One stored evaluation as the API shows it (P15-10): the verdict with the named missing quantities, the counts, the stated limits and the three JSON blocks as JSON (estimates with their intervals, the evidence block, the inputs). A value that is unavailable is the text
+     *     `unavailable` inside those blocks, never a number.
+     */
+    ExtensionEvaluationView: {
+      id: string;
+      family: string;
+      protocol: string;
+      extensionVersion: null | string;
+      versionKey: string;
+      baseVersion: string;
+      verdict: string;
+      /** Format: int32 */
+      trials: number;
+      /** Format: double */
+      factor: number;
+      foldUnit: string;
+      /** Format: int32 */
+      foldsTotal: number;
+      /** Format: int32 */
+      foldsEvaluable: number;
+      /** Format: int32 */
+      rows: number;
+      /** Format: int32 */
+      flips: null | number;
+      missing: string[];
+      limits: string[];
+      estimates: components['schemas']['JsonElement'];
+      evidence: components['schemas']['JsonElement'];
+      inputs: components['schemas']['JsonElement'];
+      holdOutRead: boolean;
     };
     /** @description A filter value and how many active instruments have it. */
     FacetCount: {
@@ -30545,6 +30616,68 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['FilingFactsView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListExtensionEvaluations: {
+    parameters: {
+      query?: {
+        family?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExtensionEvaluationList'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExtensionEvaluation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExtensionEvaluationView'];
         };
       };
       /** @description Not Found */

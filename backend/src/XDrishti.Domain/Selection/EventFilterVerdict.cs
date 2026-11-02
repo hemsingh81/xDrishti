@@ -7,7 +7,9 @@ namespace XDrishti.Domain.Selection;
 /// <param name="State">The verdict word.</param>
 /// <param name="RuleVersion">The version of the filter rules (<c>evf_version</c>) the verdict was made for.</param>
 /// <param name="Reference">The reference of the verdict and its evidence block; required for KEEP.</param>
-public sealed record EventFilterVerdict(string State, string RuleVersion, string? Reference)
+/// <param name="ResultsWithinDays">The window N the verdict was made for; a turn-on needs it to equal the window in force when the rule decides, so a switch changed in between cannot be turned on from another window's verdict (null never matches).</param>
+/// <param name="HoldOutConfirmed">True when the reserved seasons were read once for the same development population and confirmed the KEEP; only a confirmed KEEP can turn the filter on automatically.</param>
+public sealed record EventFilterVerdict(string State, string RuleVersion, string? Reference, bool HoldOutConfirmed = false, int? ResultsWithinDays = null)
 {
     public const string Keep = "KEEP";
 
