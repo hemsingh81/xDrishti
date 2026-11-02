@@ -1,0 +1,29 @@
+# 0183 — The feature-set comparison fits one recipe twice on identical rows, widens its margins for the ledger count, refuses to run before its ledger row exists, and reads the hold-out once
+
+- **Status:** Proposed (built in P13-05 from the owner-Approved spec, 2026-11-02). Becomes Accepted when the owner has read it. **Safety slice: no** — pure research code and two insert-only research tables; no order path, no live behaviour, no scoring switch, no setting.
+- **Date:** 2026-11-02.
+- **Relation to other ADRs:** [0059](0059-the-test-ledger-and-the-verdict-evaluator.md) (ledger), [0066](0066-decision-time-features-a-side-table-and-the-training-set-record.md) (no imputation), [0067](0067-validation-harness-and-baselines-purged-folds-and-an-honest-eligibility-rule.md) (purge, hold-out), [0068](0068-the-ml-net-trainer-adapter-pav-calibration-on-a-held-back-slice-and-honest-explanations.md), [0070](0070-model-registry-content-addressed-files-and-an-append-only-champion-record.md) (training-data id in the lineage), [0075](0075-meta-labelling-policy-thresholds-from-earlier-folds-and-does-not-help-as-an-answer.md) (take policy), [0080](0080-the-phase-check-exit-criteria-from-stored-records-and-never-met-on-thin-data.md) (verdict words).
+
+## Context
+P13 (`md-1`, tick and depth features) and P15 (`ev-1`, `fu-1`, `llm-1`) each ask the same question: does adding a feature group to `tf-1` improve out-of-sample net R per candidate, by more than chance and more than the number of looks allows? One comparison core answers it for both, so the answer cannot differ by who asked.
+
+## Decision
+1. **A and B differ only in columns.** Rows carry B's width; A reads `Features[..baseWidth]` of the same rows. The one `IScorerFactory` is fitted twice per fold on the same train keys in the same order. Rows are sorted by (date, decision instant, key) first, so the input order does not matter.
+2. **Net R per candidate, not per taken candidate.** `d = (take_B - take_A) x R`; the thresholds of each model come from its own earlier out-of-fold scores (`TakeThreshold.Choose`, extracted unchanged from `MetaPolicyEvaluator`). The first test fold never has a threshold, so six evaluable folds need seven test folds (P13: 11 months of history).
+3. **Own calendar folds.** `CalendarFolds`: month or calendar quarter; the embargo counts the caller's sessions; the purge is the P6-05 rule (resolved instant plus one bar). `ExitSelector.Windows` is untouched. A window the session list does not reach is dropped and counted.
+4. **Paired block bootstrap.** Whole blocks (a session, with a 5-session sensitivity; or a calendar quarter) are drawn with a seeded SplitMix64 (1337), 10,000 draws, one-sided 90 % bounds at the 1,000th and 9,000th draw; fewer than two blocks is `unavailable`. KEEP needs both block lengths.
+5. **Ledger first, structurally.** `ExtensionTrial` builds the canonical trial text, its SHA-256 and a deterministic ledger run id. The caller appends the ledger row (family `ext:<version>`) and passes the family's hashes; the core returns `extensions.trial_not_in_ledger` before fitting anything when its hash is absent. N = distinct hashes; margins are widened by `MultipleTesting.Factor(N)`.
+6. **The verdict table** (KEEP, DROP, INCONCLUSIVE, NOT_EVALUABLE, with the missing quantities named) is `ExtensionVerdictRule`; an `unavailable` input is never a pass and never supports a DROP. The record's JSON writes `"unavailable"` where a value is unavailable, never a number.
+7. **Two shared tables, insert-only.** `research.trade_features_ext` (values, NaN = unknown) and `research.extension_evaluations` (one row per evaluation, deterministic id), granted per table (`GrantTableToAppRole` + `MakeAppendOnlyForAppRole`, no schema re-grant); nothing for `xd_exec` or the read-only roles. The hold-out is read once per family and version key by a partial unique index (no trigger, no function). Ports `IExtensionFeatureStore` and `IExtensionEvaluationStore`.
+8. **`TrainingDataBuilder` gains an overload with an optional extension group**, not a changed signature: the existing call sites bind to the old overload, so the rows and the id of every `tf-1` set are byte-identical (golden test) and the champion's lineage stays valid. With a group the id text gains one line `ext:<version>:<names>`.
+9. **No decision path reads any of it.** An architecture test pins the exact set of types and files that name the extension types, the ports and the tables.
+
+## Consequences
+- Extensions are added by writing rows and a group, not by changing the core. P13-03/06 and P15-05/10 add themselves to the architecture allow-list deliberately.
+- A non-deterministic recipe breaks determinism of the record id; one ML.NET test pins that the real recipe is deterministic.
+
+## Known limits
+- "The session list covers a window" means it holds a session on or after the window's last calendar day; a list that ends on the last Friday before a month ending on a weekend drops that window (conservative).
+- Gross R unless the charge sheet makes the set net (ISS-25); survivorship (ISS-22); ten or eleven months of depth is one regime, so NOT_EVALUABLE is the likely first answer.
+- The session list must hold every row's trade date and reach back `EmbargoSessions` sessions before the first window, else the comparison is refused (`extensions.sessions`). A list that runs into the future (a forward calendar) says nothing about whether the data reach a window's end, so a window with no rows yet is used as empty or skipped, not treated as complete data; the caller must not read a future-dated list as coverage. The 5-session block grid starts at the session of the first paired row, not of the first row.
+- The hold-out reading has its own record (`ExtensionHoldOutRecords`): its verdict is the hold-out outcome (confirmed = KEEP, not confirmed = INCONCLUSIVE, unreadable = NOT_EVALUABLE), never the development verdict.

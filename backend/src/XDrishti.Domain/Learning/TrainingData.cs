@@ -35,6 +35,12 @@ public sealed record TrainingData(
     int DroppedUnknown,
     IReadOnlyDictionary<string, int> UnknownByFeature)
 {
+    /// <summary>The extension group appended to every row (P13-05), or null: then the rows are the catalog alone and the id is what it always was.</summary>
+    public TrainingDataExtension? Extension { get; init; }
+
+    /// <summary>Labelled trades dropped because the extension had no row for them (0 without an extension).</summary>
+    public int DroppedNoExtension => Extension?.DroppedNoExtension ?? 0;
+
     /// <summary>Rows with label 1.</summary>
     public int Positives => Rows.Count(r => r.Label == 1);
 

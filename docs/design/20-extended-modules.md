@@ -57,6 +57,7 @@ stateDiagram-v2
 - **Start recording in P7** so ≥ 6 months exist by P13.
 - Uses: order-book imbalance, depth pressure near trigger, aggressive volume delta, spread → meta-model
   features and realistic slippage. Kept only if OOS improves.
+- **One comparison core (P13-05, [ADR 0183](../adr/0183-the-feature-set-comparison-fits-one-recipe-twice-on-identical-rows-widens-its-margins-for-the-ledger-count-and-reads-the-hold-out-once.md)):** the depth and tick features (`md-1`) are judged by the same code as the filings features of §D — model A (`tf-1`) against model B (`tf-1` plus the group) on identical rows, monthly folds here, a paired block bootstrap, margins widened for the ledger count.
 - **HFT/latency arbitrage not pursued:** home latency vs co-located firms, order-rate limits and costs leave
   no retail edge.
 
@@ -92,3 +93,4 @@ stateDiagram-v2
   valuation percentile); `PEAD` (post-earnings drift) swing family; event-risk filter.
 - Assistant extracts structured fields from PDFs/announcements, validated against XBRL; outputs are
   features measured like any other, never trade decisions.
+- **Measured by the shared comparison core (P13-05, [ADR 0183](../adr/0183-the-feature-set-comparison-fits-one-recipe-twice-on-identical-rows-widens-its-margins-for-the-ledger-count-and-reads-the-hold-out-once.md)):** `ev-1` and `fu-1` rows go to `research.trade_features_ext` and are judged on calendar-quarter folds with season blocks, the same verdict table as §B.

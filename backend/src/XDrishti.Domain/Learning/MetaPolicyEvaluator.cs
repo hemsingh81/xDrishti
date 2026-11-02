@@ -211,38 +211,8 @@ public static class MetaPolicyEvaluator
 
     private static MetaPolicyThreshold Choose(string group, List<Scored> rows, MetaPolicyOptions options)
     {
-        var best = 0.0;
-        var bestValue = double.NegativeInfinity;
-        var bestShare = 1.0;
-        for (var k = 0; k * options.ThresholdStep < 1; k++)
-        {
-            var t = Math.Round(k * options.ThresholdStep, 10);
-            var kept = 0;
-            var sum = 0.0;
-            foreach (var s in rows)
-            {
-                if (s.Score >= t)
-                {
-                    kept++;
-                    sum += s.Row.R;
-                }
-            }
-
-            var share = kept / (double)rows.Count;
-            if (share < options.MinKeptShare)
-            {
-                continue;
-            }
-
-            if (sum > bestValue)
-            {
-                best = t;
-                bestValue = sum;
-                bestShare = share;
-            }
-        }
-
-        return new MetaPolicyThreshold(group, best, rows.Count, bestShare);
+        var (best, share) = TakeThreshold.Choose(rows.Select(s => (s.Score, s.Row.R)).ToList(), options.ThresholdStep, options.MinKeptShare);
+        return new MetaPolicyThreshold(group, best, rows.Count, share);
     }
 
     private static string GroupOf(MetaSplit split, string cellKey)

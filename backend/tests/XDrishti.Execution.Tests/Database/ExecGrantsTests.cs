@@ -244,6 +244,18 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         (await ExecDatabase.SqlStateAsync(db.Exec, "SELECT ciphertext FROM accounts.broker_secrets")).ShouldBe("42501");
     }
 
+    // P13-05: the feature-set comparison tables are research only; the execution role may not even see them, the runtime role inserts and reads them and never changes them.
+    [Fact]
+    public async Task The_execution_role_holds_nothing_on_the_feature_set_comparison_tables_and_the_runtime_role_only_inserts_and_reads()
+    {
+        foreach (var table in new[] { "research.trade_features_ext", "research.extension_evaluations" })
+        {
+            (await HeldOnAsync("xd_exec", table)).ShouldBeEmpty(table);
+            (await HeldOnAsync("xd_app", table)).ShouldBe(["INSERT", "SELECT"], table);
+            (await ExecDatabase.SqlStateAsync(db.Exec, $"SELECT count(*) FROM {table}")).ShouldBe("42501", table);
+        }
+    }
+
     private async Task<string[]> HeldOnAsync(string role, string qualifiedTable)
     {
         var held = new List<string>();

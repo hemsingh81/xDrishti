@@ -73,6 +73,10 @@ Built (P6-11, [ADR 0072](../adr/0072-experiments-same-entries-purged-folds-an-ho
 4. Update cell stats; run drift and lesson monitors (§10).
 5. Weekly: retrain, recalibrate, challenger test.
 
+**Feature extensions (P13-05, [ADR 0183](../adr/0183-the-feature-set-comparison-fits-one-recipe-twice-on-identical-rows-widens-its-margins-for-the-ledger-count-and-reads-the-hold-out-once.md)).** A new feature group (`md-1`, `ev-1`, `fu-1`, `llm-1`) never changes `tf-1`. It is stored in `research.trade_features_ext` and
+judged by one pure comparison: model A (`tf-1`) and model B (`tf-1` plus the group) are the same recipe fitted on identical rows and calendar folds; the gain is net R per candidate under the take policy, with a paired block bootstrap and margins widened for the number of looks
+recorded in the ledger (the ledger row comes first). The answer is KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE with the missing quantities named, stored in `research.extension_evaluations`; the hold-out is read once. Nothing in a decision path reads either table.
+
 ## 4. Outputs per candidate
 
 | Output | Meaning |

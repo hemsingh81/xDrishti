@@ -163,6 +163,24 @@ public sealed class ReadOnlyRolesTests(ReadOnlyDatabase db)
     }
 
     [Fact]
+    public async Task The_roles_hold_nothing_on_the_feature_set_comparison_tables()
+    {
+        // P13-05: research only. No view exposes them and no column grant reaches them.
+        foreach (var role in Roles)
+        {
+            foreach (var table in new[] { "research.trade_features_ext", "research.extension_evaluations" })
+            {
+                foreach (var privilege in new[] { "SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER" })
+                {
+                    (await HasAsync("has_table_privilege", role, table, privilege)).ShouldBeFalse($"{role} {privilege} on {table}");
+                }
+
+                (await NamesAsync($"SELECT a.attname FROM pg_attribute a WHERE a.attrelid = '{table}'::regclass AND a.attnum > 0 AND has_column_privilege('{role}', a.attrelid, a.attnum, 'SELECT')")).ShouldBeEmpty($"{role} on {table}");
+            }
+        }
+    }
+
+    [Fact]
     public async Task The_roles_have_no_right_on_any_sequence_and_execute_no_security_definer_function_but_the_switch()
     {
         var sequences = await NamesAsync("SELECT n.nspname || '.' || c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'S' AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast') AND n.nspname NOT LIKE '\\_timescaledb%' AND n.nspname NOT LIKE 'timescaledb%'");
