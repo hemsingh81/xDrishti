@@ -83,6 +83,9 @@ stateDiagram-v2
 
 - Data: exchange filings (results XBRL/PDF), shareholding (promoter holding, pledges), announcements,
   results calendar — stored **point-in-time by filing timestamp**.
+  Source (P15-01, [ADR 0179](../adr/0179-filings-come-from-a-local-inbox-folder-with-a-sidecar-that-carries-the-broadcast-time-the-adapter-is-read-only-and-the-public-page-fetcher-is-a-recorded-decision-not-to-build.md)): the owner files downloaded files into `data/filings/inbox/` with a sidecar carrying the exchange's
+  broadcast time (with an offset; never guessed); a read-only folder-drop adapter lists them. No automatic fetch is built — it needs the owner's
+  reading of the exchange terms first.
 - Uses: swing universe quality filter; features (growth, margin trend, surprise vs last 4 quarters,
   valuation percentile); `PEAD` (post-earnings drift) swing family; event-risk filter.
 - Assistant extracts structured fields from PDFs/announcements, validated against XBRL; outputs are

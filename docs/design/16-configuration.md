@@ -504,6 +504,17 @@ Options:
     MaxRunMinutes: 30         # 1-120: a run stops between two units of work after this
 ```
 
+### Filings inbox (`Filings:*`, [ADR 0179](../adr/0179-filings-come-from-a-local-inbox-folder-with-a-sidecar-that-carries-the-broadcast-time-the-adapter-is-read-only-and-the-public-page-fetcher-is-a-recorded-decision-not-to-build.md), P15-01)
+
+`appsettings.json` / environment of the host that reads the folder (`Filings__InboxPath`); bounds are checked at start-up. The inbox is created `0700` by `scripts/filings-drop.sh`; the source refuses a folder open to group or others and never changes a mode. **There is no setting that fetches anything:** the key `filings.fetch.enabled` is only *reserved* (not built, default false) for a later slice that needs the owner's reading of the exchange terms first.
+
+```yaml
+Filings:
+  InboxPath: data/filings/inbox   # relative = against the host's working directory; a host sets Filings__InboxPath explicitly (container: /data/filings/inbox)
+  MaxFileMb: 20                   # 1-200: a larger file is rejected too_large, unread
+  MaxFiles: 5000                  # 100-50000: files examined per scan; more is reported truncated
+```
+
 ## 4. Most-used settings
 
 | Setting | Meaning | Default |

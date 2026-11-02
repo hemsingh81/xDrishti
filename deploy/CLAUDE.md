@@ -25,3 +25,4 @@
   `xd-mcp-eval`. Checked by `EvalComposeRulesTests`.
 - Hermes PoC (P9-10, ADR 0144): profile `hermes` = `xd-hermes` only, never started by `xd-up.sh`, `xd-down.sh`, `xd-ai.sh` or `xd-eval.sh`; only the owner's `scripts/hermes-poc.sh up`. Network `ai-edge` is `internal` and holds only `xd-hermes`, `xd-llm`, `xd-mcp`, `xd-mcp-eval`
   (the last three also stay on `back`). Exactly two secrets (`llm_api_key`, `mcp_token_hermes`), no published port, no host mount, image `FROM` pinned by tag AND digest with no installer. Checked by `HermesComposeRulesTests`.
+- Filings inbox (P15-01, ADR 0179): `data/filings/inbox/` is created `0700` by `scripts/filings-drop.sh` (files `0600`); the filings source refuses a folder open to group or others, so never `chmod` it wider. No compose mount yet: the first host that reads the folder (P15-02) adds a read-only mount; there is no egress for filings and no fetch service.
