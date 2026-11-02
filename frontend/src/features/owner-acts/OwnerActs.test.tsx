@@ -25,6 +25,14 @@ async function fill(label: string, reason: string, password?: string) {
 }
 
 describe('Owner-act switches', () => {
+  it('links to the event filter in Settings, Selection', async () => {
+    renderPage();
+    expect(await screen.findByRole('link', { name: 'Settings, Selection' })).toHaveAttribute(
+      'href',
+      '/settings?tab=selection',
+    );
+  });
+
   it('lists all five off by default, with the words and no write control but Switch on', async () => {
     renderPage();
 

@@ -8,12 +8,15 @@ import { ActionThresholdsCard } from './ActionThresholdsCard';
 
 // The owner's confirmation of the charge sheet loads on demand: the first load of Settings does not carry it.
 const ChargeSheetCard = lazy(() => import('./ChargeSheetCard'));
+// The event-risk filter's switch card (P15-11) loads on demand too.
+const EventFilterCard = lazy(() => import('./EventFilterCard'));
 
 const settingsTabs = [
   { key: 'profiles', label: 'Risk profiles' },
   { key: 'roles', label: 'Account roles' },
   { key: 'actions', label: 'Action center' },
   { key: 'charge-sheet', label: 'Charge sheet' },
+  { key: 'selection', label: 'Selection' },
 ] as const;
 
 type SettingsTab = (typeof settingsTabs)[number]['key'];
@@ -56,6 +59,11 @@ export function SettingsPage() {
         {tab === 'charge-sheet' && (
           <Suspense fallback={<LoadingState label="Loading the confirmation" />}>
             <ChargeSheetCard />
+          </Suspense>
+        )}
+        {tab === 'selection' && (
+          <Suspense fallback={<LoadingState label="Loading the event filter" />}>
+            <EventFilterCard />
           </Suspense>
         )}
       </Box>

@@ -29,6 +29,7 @@ import { actionCenterHandlers } from './actionCenterFixtures';
 import { answerGroupHoldings, groupHandlers } from './groupFixtures';
 import { historyHandlers } from './historyFixtures';
 import { buildTimeline, sampleServicesWithQuotes } from './servicesFixtures';
+import { eventsHandlers } from './eventsFixtures';
 import { executionHandlers } from './executionFixtures';
 import { planHandlers } from './planFixtures';
 import { tradeHandlers } from './tradeFixtures';
@@ -47,6 +48,8 @@ export const handlers = [
   http.get('/api/system/status', () => HttpResponse.json(buildSystemStatus())),
   // Plans (P7-17): only the list, empty; a plan's own endpoints are never defaulted (see planFixtures).
   ...planHandlers,
+  // Results calendar and event filter (P15-11): no meetings, filter off; the tests of those screens bring their own.
+  ...eventsHandlers,
   // Execution (P12-10): off, nothing to show; the execution tests bring their own.
   ...executionHandlers,
   // Briefing and weekly review texts (P9-06): none stored by default; the briefing tests bring their own.

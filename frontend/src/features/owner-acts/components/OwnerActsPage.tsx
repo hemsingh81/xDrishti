@@ -1,5 +1,6 @@
-import { Stack, Typography } from '@mui/material';
+import { Link, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { Link as RouterLink } from 'react-router';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
 import { capabilitiesQuery } from '../api/capabilitiesRead';
 import { AutonomySection } from './AutonomySection';
@@ -23,6 +24,13 @@ export function OwnerActsPage() {
             <CapabilityCard key={item.name} item={item} />
           ))}
           <AutonomySection />
+          <Typography>
+            The event-risk filter has its own switch:{' '}
+            <Link component={RouterLink} to="/settings?tab=selection">
+              Settings, Selection
+            </Link>
+            .
+          </Typography>
           <Typography variant="h2" component="h2" sx={{ fontSize: '1.1rem' }}>
             Latest switches
           </Typography>

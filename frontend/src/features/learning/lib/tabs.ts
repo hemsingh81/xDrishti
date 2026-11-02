@@ -98,6 +98,12 @@ const entries = [
     slice: 'P8-13',
     load: () => import('../components/LossTagsTab').then((m) => ({ default: m.LossTagsTab })),
   },
+  {
+    id: 'extensions',
+    label: 'Fundamentals and events',
+    slice: 'P15-11',
+    load: () => import('../components/ExtensionsTab').then((m) => ({ default: m.ExtensionsTab })),
+  },
 ] as const satisfies readonly TabEntry[];
 
 /** The ids of the registry, checked by the compiler wherever a tab is named. */

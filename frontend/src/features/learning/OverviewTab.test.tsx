@@ -192,6 +192,7 @@ describe('Learning overview', () => {
       'Journey',
       'Smart rules',
       'Loss tags',
+      'Fundamentals and events',
     ]);
   });
 

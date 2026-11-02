@@ -1,5 +1,5 @@
 import { Alert, Box } from '@mui/material';
-import { useRef } from 'react';
+import { lazy, Suspense, useRef } from 'react';
 import { LoadingState } from '@/shared/ui';
 import { useActionsView } from '../hooks/useActionsView';
 import { useCoverageFilters } from '../hooks/useCoverageFilters';
@@ -23,6 +23,9 @@ import { QueryAlert } from './QueryAlert';
 import { RunsPanel } from './RunsPanel';
 import { StatusRibbon } from './StatusRibbon';
 import { UpdateData } from './UpdateData';
+
+// The Filings tab (P15-11) loads in its own chunk.
+const FilingsPanel = lazy(() => import('./filings/FilingsPanel'));
 
 /**
  * The Data & import screen, one screen of information: a slim header with Update data, the status ribbon (last tick,
@@ -92,6 +95,11 @@ function DataContent() {
             {tab === 'actions' && <ActionsPanel state={actionsView} pending={data.pendingCorporateActions} />}
             {tab === 'gaps' && <GapsPanel state={gapsView} counts={data.gaps} />}
             {tab === 'runs' && <RunsPanel />}
+            {tab === 'filings' && (
+              <Suspense fallback={<LoadingState label="Loading filings" />}>
+                <FilingsPanel />
+              </Suspense>
+            )}
           </DataTabPanel>
         </>
       )}

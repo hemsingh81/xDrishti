@@ -7,9 +7,12 @@ import { TicketAlerts } from './TicketAlerts';
 import { TicketActions } from './TicketActions';
 import { TicketChartPanel } from './TicketChartPanel';
 import { TicketChecklist } from './TicketChecklist';
+import { TicketEventsLine } from './TicketEventsLine';
 
 interface Props {
   planId: number;
+  /** The session the plan is for (yyyy-MM-dd). */
+  forDate: string;
   item: PlanItem;
   /** The review row of a primary or reserve ticket; absent for a rejected candidate. */
   ticket: ReviewTicket | undefined;
@@ -25,6 +28,7 @@ interface Props {
 /** One candidate: what it is, the evidence with its limits, the sizes per paper account, the checks and the actions. */
 export function TicketCard({
   planId,
+  forDate,
   item,
   ticket,
   reviewOpen,
@@ -65,6 +69,7 @@ export function TicketCard({
           {e.unavailable.length > 0 && (
             <Typography variant="body2">Unavailable inputs: {e.unavailable.join(', ')}</Typography>
           )}
+          <TicketEventsLine symbol={item.symbol} forDate={forDate} />
           {item.reasons.length > 0 && (
             <Typography variant="body2">
               {item.group === 'primary' ? 'Notes' : 'Why not primary'}: {item.reasons.join(', ')}

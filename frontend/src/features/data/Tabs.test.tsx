@@ -35,6 +35,7 @@ describe('Data tabs: the tabs and their badges', () => {
       'Corporate actions, 2 suggested',
       'Gaps, 3 open',
       'Runs',
+      'Filings',
     ]);
     expect(await selected()).toEqual(['Coverage']);
     expect(router.state.location.search).toBe('');
@@ -47,7 +48,7 @@ describe('Data tabs: the tabs and their badges', () => {
     });
     await ready();
 
-    expect(await tabNames()).toEqual(['Coverage', 'Calendar', 'Corporate actions', 'Gaps', 'Runs']);
+    expect(await tabNames()).toEqual(['Coverage', 'Calendar', 'Corporate actions', 'Gaps', 'Runs', 'Filings']);
   });
 
   it('updates the badges when the overview changes (the counts come from it)', async () => {

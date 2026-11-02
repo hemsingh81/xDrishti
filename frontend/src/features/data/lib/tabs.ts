@@ -2,7 +2,7 @@ import { isActionsView } from './actions';
 import { isGapsView } from './gaps';
 
 /** The tabs under the pipeline strip. `?tab=` names one; coverage is the default and is not written to the URL. */
-export const dataTabs = ['coverage', 'calendar', 'actions', 'gaps', 'runs'] as const;
+export const dataTabs = ['coverage', 'calendar', 'actions', 'gaps', 'runs', 'filings'] as const;
 export type DataTab = (typeof dataTabs)[number];
 
 export const defaultDataTab: DataTab = 'coverage';
@@ -13,6 +13,7 @@ export const dataTabLabels: Readonly<Record<DataTab, string>> = {
   actions: 'Corporate actions',
   gaps: 'Gaps',
   runs: 'Runs',
+  filings: 'Filings',
 };
 
 export const isDataTab = (value: string | null): value is DataTab => dataTabs.some((tab) => tab === value);

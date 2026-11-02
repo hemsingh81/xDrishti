@@ -49,6 +49,7 @@ const passwordCheckPaths = new Set<string>([
   '/api/changelog/{id}/revert',
   '/api/assistant/settings',
   '/api/live-trading/compliance',
+  '/api/selection/event-filter',
 ]);
 
 api.use({

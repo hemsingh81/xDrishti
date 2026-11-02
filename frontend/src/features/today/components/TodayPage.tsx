@@ -1,11 +1,15 @@
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import WbSunnyIcon from '@mui/icons-material/WbSunnyOutlined';
 import { Box, Button, Card, CardContent, Stack, Typography } from '@mui/material';
+import { lazy, Suspense } from 'react';
 import { Link as RouterLink } from 'react-router';
 import { LiveTile } from '@/features/live';
 import { PlanTile } from '@/features/plans';
 import { useSystemStatus } from '@/features/system-status';
-import { PageHeader, StatusChip } from '@/shared/ui';
+import { LoadingState, PageHeader, StatusChip } from '@/shared/ui';
+
+// The results tile loads in its own chunk: the first paint does not carry it.
+const ResultsTile = lazy(() => import('./ResultsTile'));
 
 /** Home page. Phase 0: shows that the foundation is running; trading content arrives in later phases. */
 export function TodayPage() {
@@ -44,6 +48,11 @@ export function TodayPage() {
       </Box>
       <Box sx={{ mt: 2 }}>
         <LiveTile />
+      </Box>
+      <Box sx={{ mt: 2 }}>
+        <Suspense fallback={<LoadingState label="Loading results calendar…" />}>
+          <ResultsTile />
+        </Suspense>
       </Box>
     </>
   );

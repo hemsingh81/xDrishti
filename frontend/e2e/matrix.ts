@@ -18,6 +18,7 @@ import { mountModes } from './executionMounts';
 import { noStudies } from './noStudies';
 import { learningEmpty, learningFull, learningThin, records, recordsEmpty } from './learningMounts';
 import { mountTrades, reportBase, reportEmpty } from './reportMounts';
+import { p15Screens } from './p15Screens';
 import { assistantScreen } from './assistantScreen';
 import { auditEntry, mountAudit } from './auditFixtures';
 import type { State } from './checks/types';
@@ -170,6 +171,7 @@ export const screens: Screen[] = [
       },
     },
   },
+  ...p15Screens,
   {
     id: 'settings-charge-sheet',
     route: '/settings?tab=charge-sheet',

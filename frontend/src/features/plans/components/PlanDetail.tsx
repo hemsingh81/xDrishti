@@ -159,6 +159,7 @@ export function PlanDetail({ planId }: { planId: number }) {
                 <TicketCard
                   key={item.id}
                   planId={planId}
+                  forDate={p.forDate}
                   item={item}
                   ticket={rv.tickets.find((t) => t.itemId === item.id)}
                   reviewOpen={rv.open}
