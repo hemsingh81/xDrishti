@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
@@ -51,6 +52,8 @@ internal sealed class RunFixture
 
     public IContextDayStore ContextDays { get; } = Substitute.For<IContextDayStore>();
 
+    public IEventCalendarSnapshots EventSnapshots { get; } = Substitute.For<IEventCalendarSnapshots>();
+
     public FakeTimeProvider Time { get; } = new();
 
     public StructuredLogger<RunSimulationHandler> Log { get; } = new();
@@ -66,7 +69,7 @@ internal sealed class RunFixture
         Store.ForbidMerge = true;
     }
 
-    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, Time, Log);
+    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, EventSnapshots, Time, Log);
 
     /// <summary>Registers an instrument with a row (the tick is in paise, as the master has it) and its stored bars.</summary>
     public Guid Add(string symbol, IEnumerable<Bar>? bars = null, decimal? tickPaise = 5m, Guid? id = null)

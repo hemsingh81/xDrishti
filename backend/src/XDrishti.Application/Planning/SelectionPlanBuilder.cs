@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Planning;
+using XDrishti.Application.Filings;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Selection;
@@ -22,7 +23,8 @@ internal sealed class SelectionPlanBuilder(
     ILogger<SelectionPlanBuilder> logger,
     SelectionRules? rules = null,
     SmartRulesOptions? smartOptions = null,
-    FillConstraints? fillConstraints = null) : IPlanBuilder
+    FillConstraints? fillConstraints = null,
+    PlanEventFilter? eventFilter = null) : IPlanBuilder
 {
     public const string BuilderId = "selection";
 
@@ -37,7 +39,10 @@ internal sealed class SelectionPlanBuilder(
     /// <summary>The cell statistics were replayed on some version of the strategy; the ticket uses the latest stored version (P7-04).</summary>
     public const string StatsVersionCaveat = "stats may belong to an older strategy version";
 
-    private static readonly string[] Always = ["basket_styles_and_sides", StatsVersionCaveat, "cost", "events", "fno_ban", "surveillance"];
+    private static readonly string[] AlwaysWithEvents = ["basket_styles_and_sides", StatsVersionCaveat, "cost", "events", "fno_ban", "surveillance"];
+
+    // "events" is listed as not applied unless the event-risk filter ran for this plan (P15-06); then its figures are in the basis and the filter outcomes are on the items.
+    private static readonly string[] AlwaysWithoutEvents = [.. AlwaysWithEvents.Where(a => a != "events")];
 
     public string Id => BuilderId;
 
@@ -65,6 +70,17 @@ internal sealed class SelectionPlanBuilder(
             }
         }
 
+        // P15-06: with the switch ON the calendar answers `ExcludedByEvent` (true inside N sessions, false outside, null unavailable); with it OFF nothing changes.
+        var events = eventFilter is null ? PlanEventFacts.Inactive : await eventFilter.ReadAsync([.. ids.Values.Where(v => v is not null).Select(v => v!.Value)], request.ForDate, request.Now, cancellationToken);
+        if (events.Active)
+        {
+            candidates = [.. candidates.Select(c => c with { ExcludedByEvent = events.ExcludedFor(ids.GetValueOrDefault(c.Symbol)) })];
+            var excluded = candidates.Count(c => c.ExcludedByEvent == true);
+            var kept = candidates.Count(c => c.ExcludedByEvent == false);
+            EventFilterLog.Excluded(logger, request.ForDate, events.Days, excluded, kept);
+        }
+
+        var always = events.Active ? AlwaysWithoutEvents : AlwaysWithEvents;
         var selection = CandidateSelector.Select(candidates, rules ?? new SelectionRules());
 
         var wanted = selection.Ranked.Select(r => r.Merged.Winner.Candidate.Symbol).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Select(s => new ContextInstrument(ids.GetValueOrDefault(s), s)).ToList();
@@ -92,11 +108,11 @@ internal sealed class SelectionPlanBuilder(
 
         var flagCodes = smart.Flags.Select(f => f.Code).Distinct(StringComparer.Ordinal).ToList();
         var items = new List<NewPlanItem>();
-        var wired = PlanWiring.Wire([.. fill.Primary.Select(d => (d.Candidate, drafts[Key(d.Candidate.Ranked.Merged.Winner.Candidate)]))], ctx, smart.RiskMultiplier);
+        var wired = PlanWiring.Wire([.. fill.Primary.Select(d => (d.Candidate, drafts[Key(d.Candidate.Ranked.Merged.Winner.Candidate)]))], ctx, smart.RiskMultiplier, events.Active ? (symbol => events.DaysFor(ids.GetValueOrDefault(symbol))) : null);
         for (var i = 0; i < fill.Primary.Count; i++)
         {
             var winner = fill.Primary[i].Candidate.Ranked.Merged.Winner;
-            items.Add(Item(items.Count + 1, TicketGroup.Primary, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, fill.Primary[i].Candidate.Ranked.Caveats, [], fill.Primary[i].Candidate.Ranked.AdvisoryPWin, Applied(flagCodes, filled: true, sized: true), [.. wired[i].Standings, PlanWiring.IndicativeEntry, .. (ctx.Book is { Count: 0 } && !ctx.BookFromLedger ? [PlanWording.OpenBookAssumedEmpty] : (string[])[])], wired[i].Allocations));
+            items.Add(Item(items.Count + 1, TicketGroup.Primary, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, fill.Primary[i].Candidate.Ranked.Caveats, [], fill.Primary[i].Candidate.Ranked.AdvisoryPWin, Applied(always, flagCodes, filled: true, sized: true), [.. wired[i].Standings, PlanWiring.IndicativeEntry, .. (ctx.Book is { Count: 0 } && !ctx.BookFromLedger ? [PlanWording.OpenBookAssumedEmpty] : (string[])[])], wired[i].Allocations));
         }
 
         var reserve = smart.Reserve.Select(r => new ReserveEntry(r.Ranked, [r.Code], false))
@@ -105,24 +121,24 @@ internal sealed class SelectionPlanBuilder(
         foreach (var (ranked, reasons, filled) in reserve)
         {
             var winner = ranked.Merged.Winner;
-            items.Add(Item(items.Count + 1, TicketGroup.Reserve, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, ranked.Caveats, reasons, ranked.AdvisoryPWin, Applied(flagCodes, filled, sized: false), [], []));
+            items.Add(Item(items.Count + 1, TicketGroup.Reserve, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, ranked.Caveats, reasons, ranked.AdvisoryPWin, Applied(always, flagCodes, filled, sized: false), [], []));
         }
 
         foreach (var d in fill.Rejected)
         {
             var winner = d.Candidate.Ranked.Merged.Winner;
-            items.Add(Item(items.Count + 1, TicketGroup.Rejected, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, d.Candidate.Ranked.Caveats, Codes(d), d.Candidate.Ranked.AdvisoryPWin, Applied(flagCodes, filled: true, sized: false), [], []));
+            items.Add(Item(items.Count + 1, TicketGroup.Rejected, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, d.Candidate.Ranked.Caveats, Codes(d), d.Candidate.Ranked.AdvisoryPWin, Applied(always, flagCodes, filled: true, sized: false), [], []));
         }
 
         foreach (var held in selection.NotEligible)
         {
             var codes = held.Reasons.Select(r => r.Code + (r.Outcome == FilterOutcome.Unavailable ? ":unavailable" : ":fail")).ToList();
-            items.Add(Item(items.Count + 1, TicketGroup.Rejected, drafts[Key(held.Candidate)], held.Candidate, held.ConservativeExpectancyR, [], codes.Count == 0 ? [held.Verdict.ToString().ToLowerInvariant()] : codes, null, NotRun(), [], []));
+            items.Add(Item(items.Count + 1, TicketGroup.Rejected, drafts[Key(held.Candidate)], held.Candidate, held.ConservativeExpectancyR, [], codes.Count == 0 ? [held.Verdict.ToString().ToLowerInvariant()] : codes, null, NotRun(always), [], []));
         }
 
         foreach (var dropped in selection.Dropped)
         {
-            items.Add(Item(items.Count + 1, TicketGroup.Rejected, drafts[Key(dropped.Candidate)], dropped.Candidate, null, [], [dropped.Code], null, NotRun(), [], []));
+            items.Add(Item(items.Count + 1, TicketGroup.Rejected, drafts[Key(dropped.Candidate)], dropped.Candidate, null, [], [dropped.Code], null, NotRun(always), [], []));
         }
 
         var primary = items.Count(i => i.Group == TicketGroup.Primary);
@@ -131,7 +147,7 @@ internal sealed class SelectionPlanBuilder(
         var allocationRows = items.Where(i => i.Group == TicketGroup.Primary).Sum(i => i.Allocations.Count);
         PlanWiringLog.Wired(logger, request.ForDate, smart.Flags.Count, ctx.Accounts.Count, allocationRows);
 
-        var basis = BasisText(smart, ctx);
+        var basis = BasisText(smart, ctx, events.Note);
         var plan = new NewPlan(NightlyRules.PlanKey(request.ForDate, BuilderId), request.ForDate, request.ReviewCutoff, 1, Hash(request, basis, items), basis, true, CreatedBy, request.Now, items)
         {
             BasisFlags = PlanBasisFlags.From(smart, ctx.Book is null ? PlanBasisFlags.OpenBookUnavailable : ctx.Book.Count == 0 && !ctx.BookFromLedger ? PlanBasisFlags.OpenBookAssumedEmpty : PlanBasisFlags.OpenBookKnown, [.. fill.Primary.Select(d => d.Candidate.Ranked)]),
@@ -157,12 +173,12 @@ internal sealed class SelectionPlanBuilder(
     }
 
     // What was not applied to an item that never reached the smart rules and the fill (rejected by the selection, or lost in the merge).
-    private static List<string> NotRun() => [.. Always, "portfolio_fill", "checklist", "smart_rules", "allocation"];
+    private static List<string> NotRun(string[] always) => [.. always, "portfolio_fill", "checklist", "smart_rules", "allocation"];
 
     // The smart-rule flags that apply to everything the rules and the fill saw, plus what was not run for the item.
-    private static List<string> Applied(List<string> flagCodes, bool filled, bool sized)
+    private static List<string> Applied(string[] always, List<string> flagCodes, bool filled, bool sized)
     {
-        var list = new List<string>(Always);
+        var list = new List<string>(always);
         list.AddRange(flagCodes);
         if (!filled)
         {
@@ -221,9 +237,14 @@ internal sealed class SelectionPlanBuilder(
     }
 
     // The proposal sentence first, then what the numbers rest on, then the banner: the gate flag first (the engine adds it first), the rest as they come, the honest-limit notes last. Cut at the column's length, never silently longer.
-    internal static string BasisText(SmartPlan smart, PlanContext ctx)
+    internal static string BasisText(SmartPlan smart, PlanContext ctx, string? eventsNote = null)
     {
         var parts = new List<string> { PlanWording.Proposed, Basis };
+        if (eventsNote is not null)
+        {
+            parts.Add(eventsNote + "."); // the event-filter figures right after the basis: N, the coverage and the unavailable count (P15-06)
+        }
+
         parts.AddRange(ctx.Notes); // the open-book sentence first: it says why the fill took nothing, or on what it rests
         parts.AddRange(smart.Banner);
         if (Math.Abs(smart.RiskMultiplier - 1.0) > 1e-9)

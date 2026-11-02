@@ -244,3 +244,19 @@ R1 (the run key). **The run key is the idempotency key of the store.** Storing t
 
 ### Consequences from the build (Amendment 9)
 - The engine port, `Prepare`, the engine version, the run record (schema 5) and `SimTrade` (schema 4) do not change: `sim-5` stands. A store of another schema is refused; a new schema is a new migration and an ADR.
+
+## Amendment 10 — the filter `not_event_day` is evaluated; engine `sim-7`, run-record schema 7 (P15-06, 2026-11-02)
+
+New decisions; nothing above is superseded. They are decisions of [P15-06](../specs/P15-06-event-risk-filter-and-loss-tag.md); the filter, its snapshot, the switch and the loss tag are [ADR 0182](0182-the-event-risk-filter-reads-the-results-calendar-in-the-simulator-and-behind-an-owner-switch-in-the-plan-and-the-results-loss-tag-describes-the-past-and-unavailable-is-never-a-pass.md).
+
+D3 (refusals, extended). **`not_event_day` leaves the unconditional refusals** (`simulation.filter_not_available`); `min_turnover` stays refused with the same code and a message that no longer mentions the results calendar. A side that names the filter needs an `EventCalendarSnapshot` and a trading calendar in `Run`; without them `Run` returns `simulation.filter_not_available`, and the run handler refuses a window with no calendar row at all before any bar is read.
+
+D4 (no-trade reasons, extended). **Two reasons are appended**, produced by the simulator before the walk and before the position gate, never by the walker: `EventBlocked` (the next results event session is 0 to H sessions away at the decision instant, H the side's `max_hold_sessions`, 0 intraday) and `EventUnavailable` (no visible entry). `WalkCounters` and `RunFates` gain `EventBlocked` and `EventUnavailable` (appended, default 0); `SkipReason` gains `event_calendar_unavailable`.
+
+R1 (the run key, extended). **The record is schema 7** and the key text starts `xd-run 7`; a run that names the filter adds the line `events=<snapshot sha256>|<lag minutes>|<evf version>` after the instruments (and after `context=`) and the record carries `EventFilterRecord`. A strategy that does not name the filter has no such line.
+
+### Consequences from the build (Amendment 10)
+- `SimulationEngine.Version` is `sim-7`. The golden files (walker, scanner, simulator, run record, costed, swing, VWAP pullback, and the export pack) were regenerated on purpose; the diff of the engine goldens is the engine label and, in the run record, the `schema=` number and the key hash, **nothing else**: the renderers print the new counters only when they are not 0, and a strategy that does not name the filter has none. The `RunAssemblyTests` table maps `sim-7` to the SHA-256 of its golden record (computed with Python `hashlib`). A differential test shows a filter-free strategy gives the same outcomes with or without a snapshot.
+- The oracle comparison is rerun in the same suite and `OracleVerifiedFor` is `sim-7` (walker, gate and costing unchanged).
+- A stored run of schema 6 keeps its label and is readable; the experiment-job baseline reader replays only the current schema.
+

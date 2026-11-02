@@ -63,7 +63,7 @@ public sealed class ProblemOrderAndFuzzTests
         var definition = Defs.Basic().WithBuy(b => b with { Setup = Defs.All("tf(\"15m\").close > 1"), Trigger = Defs.All("closee > 1", "regime() == \"UP_LOW_VOL\"") }) with
         {
             Params = [new StrategyParam("close", 1)],
-            Filters = [FilterNames.NotEventDay],
+            Filters = [FilterNames.MinTurnover],
         };
 
         var result = Located.Compile(definition);
@@ -111,7 +111,7 @@ public sealed class ProblemOrderAndFuzzTests
     [Fact]
     public void Both_caps_can_apply_at_once_and_the_errors_are_listed_before_the_warnings()
     {
-        var definition = Defs.Basic().WithBuy(b => b with { Setup = Defs.All([.. Enumerable.Repeat("closee > 1", 100)]), Trigger = Defs.All([.. Enumerable.Repeat("tf(\"15m\").close > 1", 100)]), Invalidate = Defs.All("opn > 1") }) with { Filters = [FilterNames.NotEventDay] };
+        var definition = Defs.Basic().WithBuy(b => b with { Setup = Defs.All([.. Enumerable.Repeat("closee > 1", 100)]), Trigger = Defs.All([.. Enumerable.Repeat("tf(\"15m\").close > 1", 100)]), Invalidate = Defs.All("opn > 1") }) with { Filters = [FilterNames.MinTurnover] };
 
         var result = Located.Compile(definition);
 

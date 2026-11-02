@@ -11,6 +11,9 @@ namespace XDrishti.Domain.Learning;
 /// <param name="Worst">The worst losses (lowest R first, ties by key), at most <c>ShowWorst</c>.</param>
 /// <param name="Comparisons">Cell and tag pairs the growing-tag detector compared.</param>
 /// <param name="Limits">Sentences that must be printed with the result.</param>
+/// <param name="NewsResultsUnavailable">Losses that carry no <see cref="LossTagKind.NewsResults"/> tag because their instrument's results events were not supplied (<c>news_results_unavailable</c>); never "no news".</param>
+/// <param name="NewsResultsInstrumentsWithoutData">Distinct instruments of those losses.</param>
+/// <param name="EventsSupplied">The caller supplied results events (for some or all instruments).</param>
 public sealed record LossTagReport(
     LossTagOptions Options,
     int Trades,
@@ -18,16 +21,33 @@ public sealed record LossTagReport(
     IReadOnlyList<CellLossTags> Cells,
     IReadOnlyList<TaggedLoss> Worst,
     int Comparisons,
-    IReadOnlyList<string> Limits)
+    IReadOnlyList<string> Limits,
+    int NewsResultsUnavailable = 0,
+    int NewsResultsInstrumentsWithoutData = 0,
+    bool EventsSupplied = false)
 {
-    /// <summary>Tags that the data cannot support yet and are therefore never assigned.</summary>
-    public static IReadOnlyList<string> NotBuilt { get; } =
-    [
-        "against_regime: needs the regime of each trade (P6-02)",
-        "news_results: needs an event calendar (P15)",
-        "execution_gap and decision_drag: need real fills and recorded decisions (P7, P10, P11)",
-        "wrong time of day versus the cell: the learned window is a proposal only (P6-14); LateEntry is a fixed cut-off",
-    ];
+    /// <summary>Tags that the data cannot support yet and are therefore never assigned, for a report whose results events were not supplied.</summary>
+    public static IReadOnlyList<string> NotBuilt { get; } = NotBuiltFor(false, 0);
+
+    /// <summary>
+    /// What is not built. The <c>news_results</c> line leaves only when the events were supplied and no instrument lacked data; otherwise it stays: "events not supplied" when nothing was supplied, "no filings data for N instruments" when some instruments lacked data.
+    /// </summary>
+    public static IReadOnlyList<string> NotBuiltFor(bool eventsSupplied, int instrumentsWithoutData)
+    {
+        var list = new List<string> { "against_regime: needs the regime of each trade (P6-02)" };
+        if (!eventsSupplied)
+        {
+            list.Add("news_results: events not supplied");
+        }
+        else if (instrumentsWithoutData > 0)
+        {
+            list.Add(string.Create(CultureInfo.InvariantCulture, $"news_results: no filings data for {instrumentsWithoutData} instruments"));
+        }
+
+        list.Add("execution_gap and decision_drag: need real fills and recorded decisions (P7, P10, P11)");
+        list.Add("wrong time of day versus the cell: the learned window is a proposal only (P6-14); LateEntry is a fixed cut-off");
+        return list;
+    }
 
     /// <summary>A fixed plain-text rendering; the same report gives the same text.</summary>
     public string ToText()
@@ -60,7 +80,7 @@ public sealed record LossTagReport(
             }
         }
 
-        foreach (var item in NotBuilt)
+        foreach (var item in NotBuiltFor(EventsSupplied, NewsResultsInstrumentsWithoutData))
         {
             sb.AppendLine("not built: " + item);
         }

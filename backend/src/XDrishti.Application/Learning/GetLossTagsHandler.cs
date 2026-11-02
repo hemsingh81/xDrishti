@@ -119,7 +119,7 @@ internal sealed class GetLossTagsHandler(
             [.. c.Growing.Select(g => new GrowingTagView(Snake(g.Kind), g.RecentCount, g.EarlierCount, g.Window))])).ToList();
         var worst = report.Worst.Select(w => new WorstLossView(w.Key, w.CellKey, w.R, [.. w.Tags.Select(t => new LossTagDetailView(Snake(t.Kind), t.Detail))])).ToList();
         var limits = new List<string>(report.Limits) { "Tags overlap: the R lost per tag adds to more than the total, and shares are of the cell's losses and do not add to 100 per cent." };
-        return new LossTagsView("ok", report.Trades, report.Losses, cells, worst, report.Comparisons, report.Comparisons * LossTagAnalyzer.ChanceFlagRate, LossTagReport.NotBuilt, new LossTagsEvidenceView(basis, report.Trades, runs, isDefault, skipped, Unavailable), limits);
+        return new LossTagsView("ok", report.Trades, report.Losses, cells, worst, report.Comparisons, report.Comparisons * LossTagAnalyzer.ChanceFlagRate, LossTagReport.NotBuiltFor(report.EventsSupplied, report.NewsResultsInstrumentsWithoutData), new LossTagsEvidenceView(basis, report.Trades, runs, isDefault, skipped, Unavailable), limits, report.NewsResultsUnavailable);
     }
 
     /// <summary>GapThroughStop becomes gap_through_stop.</summary>

@@ -14,7 +14,7 @@ public sealed class ReplayPlannerTests
     private static ReplayPlanner Planner(Func<ExitChoice?, bool> reproduces, string? stored = null, bool builtIn = true) =>
         new(JobFixtures.Engine(reproduces, builtIn), JobFixtures.Source(stored));
 
-    private static ValueTask<XDrishti.Domain.Common.Result<ReplayPlan>> Plan(ReplayPlanner planner, string? record = null, int schema = 6, string? fills = null) =>
+    private static ValueTask<XDrishti.Domain.Common.Result<ReplayPlan>> Plan(ReplayPlanner planner, string? record = null, int schema = SimulationRun.CurrentSchemaVersion, string? fills = null) =>
         planner.PlanAsync(JobFixtures.Header(schema: schema, fills: fills), record ?? JobFixtures.Record(), Ct);
 
     [Fact]

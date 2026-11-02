@@ -401,15 +401,16 @@ public sealed class DefinitionTests
     }
 
     [Fact]
-    public void The_two_known_filters_compile_with_a_warning_each_that_says_what_data_is_missing()
+    public void The_two_known_filters_compile_and_only_min_turnover_warns_that_data_is_missing_since_not_event_day_is_evaluated()
     {
         var result = Located.Compile(Basic() with { Filters = [FilterNames.NotEventDay, FilterNames.MinTurnover] });
 
         result.IsSuccess.ShouldBeTrue();
-        result.ShouldHave(ModelCodes.FilterNotEvaluated, "filters[0]", ProblemSeverity.Warning).Problem.Message.ShouldContain("results calendar");
+        result.At(ModelCodes.FilterNotEvaluated, "filters[0]").ShouldBeEmpty("not_event_day is evaluated by the simulator (P15-06): no warning");
         result.ShouldHave(ModelCodes.FilterNotEvaluated, "filters[1]", ProblemSeverity.Warning).Problem.Message.ShouldContain("liquidity");
         result.Compiled!.Filters.ShouldBe([FilterNames.NotEventDay, FilterNames.MinTurnover]);
-        result.Compiled.Warnings.Count.ShouldBe(2);
+        result.Compiled.NeedsEventCalendar.ShouldBeTrue();
+        result.Compiled.Warnings.Count.ShouldBe(1);
     }
 
     [Fact]

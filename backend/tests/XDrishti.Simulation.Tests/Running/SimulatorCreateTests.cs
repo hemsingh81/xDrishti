@@ -73,13 +73,14 @@ public sealed class SimulatorCreateTests
     }
 
     [Fact]
-    public void A_filter_is_refused_at_its_own_index_and_one_problem_per_filter_is_given()
+    public void A_filter_that_is_not_evaluated_is_refused_at_its_own_index_and_not_event_day_is_not_refused()
     {
         var definition = OrbV1.Create() with { Filters = ["not_event_day", "min_turnover"] };
 
         var build = Simulator.Create(definition, Timeframe.M15);
 
-        build.Problems.Where(p => p.Problem.Code == "simulation.filter_not_available").Select(p => p.Path).ShouldBe(["filters[0]", "filters[1]"]);
+        build.Problems.Where(p => p.Problem.Code == "simulation.filter_not_available").Select(p => p.Path).ShouldBe(["filters[1]"]);
+        build.Problems.Single(p => p.Problem.Code == "simulation.filter_not_available").Problem.Message.ShouldNotContain("calendar", Case.Insensitive);
     }
 
     [Fact]

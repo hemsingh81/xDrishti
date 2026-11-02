@@ -230,6 +230,8 @@ public sealed class SimulationEngineAdapterTests
 
         public bool ReadsContext => false;
 
+        public bool ReadsEvents => false;
+
         public IReadOnlyList<FieldError> Warnings => [];
     }
 }

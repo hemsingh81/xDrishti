@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
@@ -8,6 +9,7 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Filings;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
@@ -36,6 +38,7 @@ internal sealed class RunSimulationHandler(
     IStrategyStore strategies,
     ICostSheetStore costSheets,
     IContextDayStore contextDays,
+    IEventCalendarSnapshots eventSnapshots,
     TimeProvider time,
     ILogger<RunSimulationHandler> logger) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>
 {
@@ -123,6 +126,25 @@ internal sealed class RunSimulationHandler(
         }
 
         var targets = universe.Value;
+
+        // P15-06 (ADR 0182): a strategy that names `not_event_day` gets the stored results calendar, read once for the whole run, before any bar is read. No rows at all, or a failed read, refuse the run: an empty calendar would make every day look like "no event".
+        EventCalendarSnapshot? events = null;
+        if (prepared.Value.ReadsEvents)
+        {
+            var snapshot = await eventSnapshots.ReadAsync(targets.Ids, request.To, cancellationToken);
+            if (snapshot.IsFailure)
+            {
+                return Result.Failure<Executed>(SimulationErrors.EventCalendarNotAvailable(snapshot.Error.Message));
+            }
+
+            if (snapshot.Value.RowCount == 0)
+            {
+                return Result.Failure<Executed>(SimulationErrors.EventCalendarNotAvailable("no results calendar rows for the window (P15-04)"));
+            }
+
+            events = snapshot.Value;
+        }
+
         SimulationLog.RunStarted(logger, request.StrategyId, targets.Label, targets.Ids.Count, request.From, request.To, prepared.Value.Warnings.Count, request.Costs is CostChoice.SheetChoice named ? named.SheetId : "gross");
         var calendar = await calendars.GetAsync(cancellationToken);
         var csvThrough = targets.Ids.Count == 0 ? new Dictionary<Guid, DateOnly>() : await actions.ListCsvAdjustedThroughAsync(targets.Ids, cancellationToken);
@@ -132,10 +154,10 @@ internal sealed class RunSimulationHandler(
         var days = readsContext ? await contextDays.ListAsync(cancellationToken) : null;
         if (basisSink is not null)
         {
-            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough, days);
+            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough, days, events);
         }
 
-        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext, days);
+        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext, days, events);
         var readTime = time.GetElapsedTime(started);
         var replayTime = TimeSpan.Zero;
         var candidates = prepared.Value.Candidates;
@@ -186,7 +208,8 @@ internal sealed class RunSimulationHandler(
                 universeRecord,
                 calendar,
                 costContext is null ? null : CostRecord.Of(costContext),
-                days is null ? null : ContextFingerprint.Of(days, request.To));
+                days is null ? null : ContextFingerprint.Of(days, request.To),
+                events is null ? null : new EventFilterRecord(events.Sha256, events.RowCount, events.LagMinutes, EventCalendarSnapshot.RuleVersion));
             firstHeader ??= header;
             runs.Add(RunAssembler.Assemble(header, replays[k]));
         }
@@ -346,7 +369,7 @@ internal sealed class RunSimulationHandler(
 
         var request = context.Request;
         var (raw, factors) = await _reader.ReadAsync(id, request.To, cancellationToken);
-        return InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"));
+        return InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"), context.Events);
     }
 
     private sealed record Universe(UniverseKind Kind, Guid? BasketId, string? BasketName, string Label, IReadOnlyList<Guid> Ids, IReadOnlyDictionary<Guid, BarsInstrument>? Known);
@@ -358,5 +381,6 @@ internal sealed class RunSimulationHandler(
         Universe Targets,
         ReplayOptions Options,
         CostContext? Costs,
-        IReadOnlyList<ContextDayRecord>? ContextDays);
+        IReadOnlyList<ContextDayRecord>? ContextDays,
+        EventCalendarSnapshot? Events);
 }

@@ -27,7 +27,8 @@ public sealed partial class CalendarArchitectureTests
     {
         var port = typeof(IResultsCalendar).FullName!;
 
-        Named(Application, port).ShouldBe(["DependencyInjection", "GetResultsCalendarHandler", "ResultsCalendar"]);
+        // P15-06 names its callers deliberately: the plan reads the calendar through PlanEventFilter while the switch is ON, and the switch view counts the coverage.
+        Named(Application, port).ShouldBe(["DependencyInjection", "GetEventFilterHandler", "GetResultsCalendarHandler", "PlanEventFilter", "ResultsCalendar"]);
         Named(Infrastructure, port).ShouldBeEmpty();
         Named(Assembly.Load(new AssemblyName("XDrishti.Api")), port).ShouldBeEmpty();
         Named(Domain, port).ShouldBeEmpty();
@@ -44,13 +45,9 @@ public sealed partial class CalendarArchitectureTests
     }
 
     [Theory]
-    [InlineData("XDrishti.Application.Planning")]
-    [InlineData("XDrishti.Application.Learning")]
-    [InlineData("XDrishti.Application.Selection")]
     [InlineData("XDrishti.Application.Execution")]
     [InlineData("XDrishti.Application.LiveTrading")]
     [InlineData("XDrishti.Application.Portfolio")]
-    [InlineData("XDrishti.Application.Research")]
     [InlineData("XDrishti.Application.Lab")]
     [InlineData("XDrishti.Application.Paper")]
     [InlineData("XDrishti.Application.Live")]
@@ -68,10 +65,13 @@ public sealed partial class CalendarArchitectureTests
     {
         var domainChecklist = Types.InAssembly(Domain).That().ResideInNamespaceStartingWith("XDrishti.Domain.Checklist").ShouldNot().HaveDependencyOnAny("XDrishti.Domain.Filings").GetResult();
         domainChecklist.IsSuccessful.ShouldBeTrue(string.Join(", ", domainChecklist.FailingTypeNames ?? []));
-        foreach (var name in new[] { "XDrishti.Simulation", "XDrishti.Strategies", "XDrishti.Execution", "XDrishti.Indicators" })
+        foreach (var name in new[] { "XDrishti.Strategies", "XDrishti.Execution", "XDrishti.Indicators" })
         {
             Types.InAssembly(Assembly.Load(new AssemblyName(name))).ShouldNot().HaveDependencyOnAny("XDrishti.Domain.Filings", typeof(IResultsCalendar).FullName!, typeof(IShareholdingAsOf).FullName!).GetResult().IsSuccessful.ShouldBeTrue(name);
         }
+
+        // P15-06: the simulator reads the immutable snapshot and the pure filter of Domain.Filings (EventFilterArchitectureTests pins which types); it never reaches a port.
+        Types.InAssembly(Assembly.Load(new AssemblyName("XDrishti.Simulation"))).ShouldNot().HaveDependencyOnAny(typeof(IResultsCalendar).FullName!, typeof(IShareholdingAsOf).FullName!, "XDrishti.Application").GetResult().IsSuccessful.ShouldBeTrue("XDrishti.Simulation");
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed partial class CalendarArchitectureTests
             var text = File.ReadAllText(file);
             if (text.Contains("DaysToResults", StringComparison.Ordinal) && text.Contains("IResultsCalendar", StringComparison.Ordinal))
             {
-                Path.GetFileName(file).ShouldBeOneOf("IResultsCalendar.cs", "ResultsCalendar.cs", "GetResultsCalendarHandler.cs");
+                Path.GetFileName(file).ShouldBeOneOf("IResultsCalendar.cs", "ResultsCalendar.cs", "GetResultsCalendarHandler.cs", "PlanEventFilter.cs", "GetEventFilterHandler.cs");   // P15-06: the plan check gets its days from the calendar in PlanEventFilter, only while the switch is ON
             }
         }
     }

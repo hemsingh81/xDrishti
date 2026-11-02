@@ -20,7 +20,7 @@ internal static class ReplayIdentities
         r.CandidatesInWindow.ShouldBeLessThanOrEqualTo(candidates, name);
         r.TradesInWindow.ShouldBeLessThanOrEqualTo(r.CandidatesInWindow, name + ": a trade is cut by the day of its decision, so it is always among the candidates of the window (ADR 0043, D6)");
         var w = r.Walk;
-        (w.Trades + w.NoFillBar + w.AfterSquareOff + w.EntryThroughStop + w.LimitNotReached + w.PositionOpen + w.OrderPendingAtEnd).ShouldBe(w.Candidates, name + ": Candidates = Trades + every no-trade reason, the pending order included (D9)");
+        (w.Trades + w.NoFillBar + w.AfterSquareOff + w.EntryThroughStop + w.LimitNotReached + w.PositionOpen + w.OrderPendingAtEnd + w.EventBlocked + w.EventUnavailable).ShouldBe(w.Candidates, name + ": Candidates = Trades + every no-trade reason, the pending order included (D9)");
         w.OvernightEntries.ShouldBeLessThanOrEqualTo(w.Trades, name);
         if (r.Skipped is null)
         {

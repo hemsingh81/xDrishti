@@ -20,7 +20,7 @@ export xd-sim-export-4
 <li>sample: in-sample</li>
 <li>universe: instruments as listed; survivorship is bounded and disclosed, not avoided (ISS-22)</li>
 <li>data: 1 instruments; first bars 2026-02-01 to 2026-02-01, last bars 2026-05-02 to 2026-05-02; length from about 0.2 to about 0.2 years (days / 365.25, one decimal); no hold-out (ISS-19)</li>
-<li>engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-6); not checked against charts or the owner&#39;s charge sheet</li>
+<li>engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-7); not checked against charts or the owner&#39;s charge sheet</li>
 <li>tick: today&#39;s master tick; rounding to the grid is approximate</li>
 <li>opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)</li>
 </ul>
@@ -916,8 +916,8 @@ time rules: first entry 09:30, last entry 11:30, square off 15:15</pre>
 </ul>
 <h2>run</h2>
 <ul>
-<li>run key: 0caef421b01f21350c10f16f2c721421df501f5912568c714ba160bd8ce1287c</li>
-<li>strategy: ORB, engine sim-6</li>
+<li>run key: 80dd3ff38674e18d23e3e08ee178974c242a3d934ec06cb0d68bfb450a6d5469</li>
+<li>strategy: ORB, engine sim-7</li>
 <li>trade key: ORB|NSE:KESTREL|Buy|2026-03-03</li>
 </ul>
 </main>

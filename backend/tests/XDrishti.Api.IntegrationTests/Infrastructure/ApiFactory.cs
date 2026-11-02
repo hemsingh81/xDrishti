@@ -439,6 +439,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.context_daily;
                 DELETE FROM market.instrument_broker_ids;
                 TRUNCATE filings.calendar, filings.announcements, filings.shareholding, filings.result_facts, filings.filings;
+                TRUNCATE filings.event_filter_decisions RESTART IDENTITY;
+                DELETE FROM accounts.account_events WHERE event = 'EventFilterSwitched';
                 DELETE FROM options.lot_sizes;
                 DELETE FROM options.contracts;
                 DELETE FROM market.instruments;

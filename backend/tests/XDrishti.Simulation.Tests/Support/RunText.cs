@@ -83,7 +83,7 @@ internal static class RunText
     }
 
     public static string Fates(RunFates f) =>
-        string.Create(CultureInfo.InvariantCulture, $"fates suppressed={f.EntriesSuppressed} beforeWindow={f.TradesBeforeWindow} openAtEnd={f.OpenAtEnd} trades={f.Trades} noFillBar={f.NoFillBar} afterSquareOff={f.AfterSquareOff} entryThroughStop={f.EntryThroughStop} limitNotReached={f.LimitNotReached} excludedAcrossDiscontinuity={f.ExcludedAcrossDiscontinuity} positionOpen={f.PositionOpen} skippedQuantity={f.SkippedQuantity} skippedCost={f.SkippedCost} orderPendingAtEnd={f.OrderPendingAtEnd}");
+        string.Create(CultureInfo.InvariantCulture, $"fates suppressed={f.EntriesSuppressed} beforeWindow={f.TradesBeforeWindow} openAtEnd={f.OpenAtEnd} trades={f.Trades} noFillBar={f.NoFillBar} afterSquareOff={f.AfterSquareOff} entryThroughStop={f.EntryThroughStop} limitNotReached={f.LimitNotReached} excludedAcrossDiscontinuity={f.ExcludedAcrossDiscontinuity} positionOpen={f.PositionOpen} skippedQuantity={f.SkippedQuantity} skippedCost={f.SkippedCost} orderPendingAtEnd={f.OrderPendingAtEnd}") + (f.EventBlocked + f.EventUnavailable == 0 ? string.Empty : string.Create(CultureInfo.InvariantCulture, $" eventBlocked={f.EventBlocked} eventUnavailable={f.EventUnavailable}"));
 
     public static string Replay(InstrumentReplay replay)
     {
@@ -122,6 +122,11 @@ internal static class RunText
     {
         var text = new StringBuilder();
         text.Append(CultureInfo.InvariantCulture, $"run schema={run.SchemaVersion} key={run.RunKey} engine={run.EngineVersion}\n");
+        if (run.EventFilter is { } events)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"eventFilter calendarSha256={events.CalendarSha256} rows={events.CalendarRows} lagMinutes={events.LagMinutes} evf={events.EvfVersion}\n");
+        }
+
         var s = run.Strategy;
         text.Append(CultureInfo.InvariantCulture, $"strategy {s.Id} timeframe={s.EvaluationTimeframe.ToCode()} sides=[{string.Join(",", s.Sides)}] params=[{string.Join(",", s.Parameters.Select(p => p.Key + "=" + CanonicalText.Number(p.Value)))}] sha256={s.DefinitionSha256}\n");
         text.Append(CultureInfo.InvariantCulture, $"json {s.DefinitionJson}\n");

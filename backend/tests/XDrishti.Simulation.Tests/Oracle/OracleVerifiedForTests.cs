@@ -25,9 +25,9 @@ public sealed class OracleVerifiedForTests
 
     [Theory]
     [InlineData(true, "sim-5", "sim-5", true)]
-    [InlineData(true, "sim-5", "sim-6", false)]
+    [InlineData(true, "sim-5", "sim-7", false)]
     [InlineData(true, "sim-5", "", false)]
-    [InlineData(false, "sim-5", "sim-6", true)]
+    [InlineData(false, "sim-5", "sim-7", true)]
     [InlineData(false, "sim-5", "sim-5", true)]
     public void The_sentinel_a_changed_engine_version_with_the_label_still_true_is_rejected(bool verified, string verifiedFor, string engine, bool bound)
     {
@@ -41,7 +41,7 @@ public sealed class OracleVerifiedForTests
 
         field.ShouldNotBeNull();
         field.IsLiteral.ShouldBeTrue("a compile-time constant: nothing the suite does at run time can change it");
-        field.GetRawConstantValue().ShouldBe("sim-6");
+        field.GetRawConstantValue().ShouldBe("sim-7");
     }
 
     [Fact]

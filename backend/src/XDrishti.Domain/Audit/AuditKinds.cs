@@ -22,6 +22,7 @@ public static class AuditKinds
     public const string PlanState = "plan_state";
     public const string Autonomy = "autonomy";
     public const string Learning = "learning";
+    public const string Selection = "selection";
 
     public const string Ok = "ok";
     public const string Failed = "failed";
@@ -41,6 +42,7 @@ public static class AuditKinds
             AccountEventType.AccountCreated, AccountEventType.AccountArchived, AccountEventType.TradingUpdated, AccountEventType.PortfolioUpdated, AccountEventType.DataUpdated, AccountEventType.RiskProfileCreated, AccountEventType.RiskProfileUpdated, AccountEventType.RiskProfileDeleted,
             AccountEventType.CapabilityChanged, AccountEventType.BucketAdded, AccountEventType.BucketCreated, AccountEventType.BucketRenamed, AccountEventType.PortfolioRefreshSettingsChanged, AccountEventType.PortfolioBenchmarkChanged, AccountEventType.FirstImportDateChanged, AccountEventType.ComplianceRecorded,
         ]),
+        (Selection, [AccountEventType.EventFilterSwitched]),
         (Learning, [AccountEventType.ExperimentJobStarted, AccountEventType.ExperimentJobCancelled, AccountEventType.LessonMoved, AccountEventType.HypothesisMoved, AccountEventType.ChangelogReverted, AccountEventType.ReportExported]),
         (Autonomy, [AccountEventType.AutonomySettingsChanged, AccountEventType.RampStepSet, AccountEventType.LiveSettingsChanged, AccountEventType.ExecutionSettingsChanged]),
         (MarketData,
@@ -56,7 +58,7 @@ public static class AuditKinds
             AccountEventType.DividendAliasSaved, AccountEventType.CostsImported, AccountEventType.CostsUndone, AccountEventType.SecurityNamesLearned,
         ]));
 
-    public static IReadOnlyList<string> Categories { get; } = [SignIn, Security, Broker, Service, Alert, Configuration, MarketData, PortfolioData, PlanDecision, PlanState, Autonomy, Learning];
+    public static IReadOnlyList<string> Categories { get; } = [SignIn, Security, Broker, Service, Alert, Configuration, MarketData, PortfolioData, PlanDecision, PlanState, Autonomy, Learning, Selection];
 
     public static IReadOnlyList<string> Outcomes { get; } = [Ok, Failed, Refused];
 

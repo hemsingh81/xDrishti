@@ -97,6 +97,7 @@ The snapshot read for a 5-year, 214-instrument window ≤ 1 s; the per-decision 
 7. **`min_turnover` stays refused.** It needs liquidity data of the universe layer (doc 10 §2), not a calendar; touching it would widen this slice.
 
 ## Risks and honest limits
+- **Owner-accepted (Opus review, 2026-11-02): fail closed after a passed meeting.** A covered instrument whose last meeting has passed and whose next is not yet intimated stays `unavailable` (`no_upcoming_entry`), never a guess. With the filter on, entries are possible only between an intimation and its meeting. The plan basis and the GET view count these apart from `no_entry`. P15-10 must interpret protocol F with that in mind and report the share of entries lost to `no_upcoming_entry`.
 - Protocol F may return DROP: then the code stays (a filter the owner may still choose) and the verdict is shown; nothing turns it on.
 - Removing results-window trades removes the largest winners too (P15-00 risk 7); the 50 % review flag and the tail test live in P15-10.
 - Coverage is the owner's file coverage: an instrument without an entry is held back by a required selection filter (the safe default), which can empty a plan; the output prints the counts so the cause is visible.

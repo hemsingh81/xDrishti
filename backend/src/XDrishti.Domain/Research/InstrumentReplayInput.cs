@@ -1,3 +1,4 @@
+using XDrishti.Domain.Filings;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
@@ -23,6 +24,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="SkipDetail">A note on the preset skip, kept in the record.</param>
 /// <param name="ContextDays">The stored market-context days (P3-lift, ADR 0145), oldest first, shared by every instrument of a run; given only when the strategy reads the context, otherwise null. A decision reads the latest day strictly before its date.</param>
 /// <param name="ContextNote">Why there are no <paramref name="ContextDays"/> for a strategy that reads the context (<c>no_context</c>); null otherwise.</param>
+/// <param name="Events">The results-calendar snapshot of the run (P15-06, ADR 0182), shared by every instrument; given only when the strategy names <c>not_event_day</c>, otherwise null. A decision reads only the rows visible at its own instant.</param>
 /// <param name="Costs">How the trades are sized and charged after the window cut (ADR 0042, D1 and D2); null for a gross replay. The handler of P3-04a passes none: a run through it is gross until P3-03f.</param>
 public sealed record InstrumentReplayInput(
     Guid InstrumentId,
@@ -39,4 +41,5 @@ public sealed record InstrumentReplayInput(
     string? SkipDetail = null,
     CostContext? Costs = null,
     IReadOnlyList<ContextDayRecord>? ContextDays = null,
-    string? ContextNote = null);
+    string? ContextNote = null,
+    EventCalendarSnapshot? Events = null);

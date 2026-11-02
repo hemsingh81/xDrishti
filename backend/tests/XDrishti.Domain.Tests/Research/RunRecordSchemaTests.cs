@@ -14,9 +14,9 @@ public sealed class RunRecordSchemaTests
     private static string Members(Type type) => type.Name + ": " + string.Join(", ", Enum.GetNames(type));
 
     [Fact]
-    public void The_schema_version_is_six_since_the_legs_of_p4_01()
+    public void The_schema_version_is_seven_since_the_event_filter_of_p15_06()
     {
-        SimulationRun.CurrentSchemaVersion.ShouldBe(6);
+        SimulationRun.CurrentSchemaVersion.ShouldBe(7);
     }
 
     [Fact]
@@ -44,6 +44,7 @@ public sealed class RunRecordSchemaTests
             Properties(typeof(RunHeader)),
             Properties(typeof(InstrumentReplayInput)),
             Properties(typeof(CostRecord)),
+            Properties(typeof(EventFilterRecord)),
             Properties(typeof(SizingProfile)),
             Members(typeof(SkipReason)),
             Members(typeof(SessionExclusion)),
@@ -52,7 +53,7 @@ public sealed class RunRecordSchemaTests
 
         snapshot.ShouldBe(
         [
-            "SimulationRun: SchemaVersion, RunKey, EngineVersion, Strategy, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, CalendarExceptions, Instruments, Trades, OpenAtEnd, Totals, Costs",
+            "SimulationRun: SchemaVersion, RunKey, EngineVersion, Strategy, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, CalendarExceptions, Instruments, Trades, OpenAtEnd, Totals, Costs, EventFilter",
             "StrategyRecord: Id, Parameters, DefinitionJson, DefinitionSha256, EvaluationTimeframe, Sides",
             "UniverseRecord: Kind, BasketId, BasketName, Label, Members",
             "UniverseMember: Id, Symbol",
@@ -63,17 +64,18 @@ public sealed class RunRecordSchemaTests
             "SessionCounts: Ran, ClosedDay, SpecialSession, ShortSession, MissingSession, Excluded",
             "SessionNote: Date, Reason, BarsInWindow, ExpectedMinutes",
             "DiscontinuityNote: Date, Ratio, ExcludedPositions",
-            "RunFates: EntriesSuppressed, TradesBeforeWindow, OpenAtEnd, Trades, NoFillBar, AfterSquareOff, EntryThroughStop, LimitNotReached, ExcludedAcrossDiscontinuity, PositionOpen, SkippedQuantity, SkippedCost, OrderPendingAtEnd, Total, NoTrade",
+            "RunFates: EntriesSuppressed, TradesBeforeWindow, OpenAtEnd, Trades, NoFillBar, AfterSquareOff, EntryThroughStop, LimitNotReached, ExcludedAcrossDiscontinuity, PositionOpen, SkippedQuantity, SkippedCost, OrderPendingAtEnd, EventBlocked, EventUnavailable, Total, NoTrade",
             "RunCounters: Instruments, InstrumentsRun, Skipped, BarsRead, BarsFed, BarsExcluded, BarsOutsideSession, Sessions, DiscontinuitiesFlagged, Scans, Walk, Fates, CandidatesInWindow, TradesInWindow, OpenAtEnd, EntriesSuppressed",
             "SkipCount: Reason, Instruments",
             "RunTrade: Trade, BasketIds",
             "ReplayOptions: MinSessionCompleteness, DiscontinuityThreshold",
             "InstrumentReplay: Record, Trades, OpenAtEnd",
-            "RunHeader: Strategy, EngineVersion, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, Calendar, Costs, ContextSha256",
-            "InstrumentReplayInput: InstrumentId, Symbol, RawBars, Factors, CsvAdjustedThrough, Calendar, Options, From, To, Tick, PresetSkip, SkipDetail, Costs, ContextDays, ContextNote",
+            "RunHeader: Strategy, EngineVersion, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, Calendar, Costs, ContextSha256, Events",
+            "InstrumentReplayInput: InstrumentId, Symbol, RawBars, Factors, CsvAdjustedThrough, Calendar, Options, From, To, Tick, PresetSkip, SkipDetail, Costs, ContextDays, ContextNote, Events",
             "CostRecord: SheetId, RatesSha256, SheetJson, Checked, Capital, Profile, MaxCostR",
+            "EventFilterRecord: CalendarSha256, CalendarRows, LagMinutes, EvfVersion",
             "SizingProfile: Name, RiskPerTradePct, MaxCapitalPerTradePct",
-            "SkipReason: InstrumentNotFound, NoBars, CsvAdjustedTwice, TickSizeInvalid, NoRunnableSessions, NoSessionsInWindow, FeaturesNotReady, ContextUnavailable",
+            "SkipReason: InstrumentNotFound, NoBars, CsvAdjustedTwice, TickSizeInvalid, NoRunnableSessions, NoSessionsInWindow, FeaturesNotReady, ContextUnavailable, EventCalendarUnavailable",
             "SessionExclusion: ClosedDay, SpecialSession, ShortSession, MissingSession",
             "UniverseKind: InstrumentList, Basket",
         ]);
@@ -82,7 +84,7 @@ public sealed class RunRecordSchemaTests
     [Fact]
     public void The_stable_codes_of_the_skip_reasons_and_the_session_exclusions_are_the_ones_of_the_spec()
     {
-        Enum.GetValues<SkipReason>().Select(r => r.ToCode()).ShouldBe(["instrument_not_found", "no_bars", "csv_adjusted_twice", "tick_size_invalid", "no_runnable_sessions", "no_sessions_in_window", "features_not_ready", "context_unavailable"]);
+        Enum.GetValues<SkipReason>().Select(r => r.ToCode()).ShouldBe(["instrument_not_found", "no_bars", "csv_adjusted_twice", "tick_size_invalid", "no_runnable_sessions", "no_sessions_in_window", "features_not_ready", "context_unavailable", "event_calendar_unavailable"]);
         Enum.GetValues<SessionExclusion>().Select(r => r.ToCode()).ShouldBe(["closed_day", "special_session", "short_session", "missing_session"]);
         UniverseLabels.MembersAsOfToday.ShouldBe("members as of today");
         UniverseLabels.InstrumentsAsListed.ShouldBe("instruments as listed");

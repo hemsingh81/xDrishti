@@ -76,5 +76,6 @@ export const lossTags = (over: Partial<LossTags> = {}): LossTags => ({
   notBuilt: ['against_regime: needs the regime of each trade (P6-02)'],
   evidence: { basis: 'gross', n: 10, runs: [], defaultRunSet: true, skipped: [], unavailableInputs: [] },
   limits: ['Tags overlap.'],
+  newsResultsUnavailable: 0,
   ...over,
 });

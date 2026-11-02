@@ -11,6 +11,7 @@ namespace XDrishti.Application.Learning;
 /// <param name="NotBuilt">What the data cannot support yet, verbatim from the analyzer.</param>
 /// <param name="Evidence">The runs behind the numbers.</param>
 /// <param name="Limits">Sentences that must be printed with the result.</param>
+/// <param name="NewsResultsUnavailable">Losses that carry no <c>news_results</c> tag because their instrument's results events were not available (<c>news_results_unavailable</c>, P15-06); never "no news".</param>
 public sealed record LossTagsView(
     string State,
     int TradesRead,
@@ -21,7 +22,8 @@ public sealed record LossTagsView(
     double ExpectedChanceFlags,
     IReadOnlyList<string> NotBuilt,
     LossTagsEvidenceView Evidence,
-    IReadOnlyList<string> Limits);
+    IReadOnlyList<string> Limits,
+    int NewsResultsUnavailable = 0);
 
 /// <summary>One cell.</summary>
 /// <param name="CellKey">The cell.</param>

@@ -121,7 +121,21 @@ public static class PaperConfigKeys
         [nameof(SmartRulesOptions.CorrelationMax)] = ConfigDirection.LowerStricter,
         [nameof(SmartRulesOptions.HonestyFraction)] = ConfigDirection.Any,
         [nameof(SmartRulesOptions.GateMaxAgeDays)] = ConfigDirection.Any,
+
+        // The event-risk filter of the plan selection (P15-06, ADR 0182): read from its decision history, not from the options record. Turning it on removes candidates (protective); a wider window removes more; the approval setting changes who may turn it on.
+        [EventFilterEnabled] = ConfigDirection.OnIsProtective,
+        [EventFilterResultsWithinDays] = ConfigDirection.HigherStricter,
+        [EventFilterApproval] = ConfigDirection.Any,
     };
+
+    /// <summary>The field (after <see cref="SmartRulesPrefix"/>) of the event-risk switch (<c>smart_rules.event_filter.enabled</c>), so the configuration identity of a paper account changes when the owner turns it on or off.</summary>
+    public const string EventFilterEnabled = "event_filter.enabled";
+
+    /// <summary>The field of the window in sessions (<c>smart_rules.event_filter.results_within_days</c>).</summary>
+    public const string EventFilterResultsWithinDays = "event_filter.results_within_days";
+
+    /// <summary>The field of the approval setting, <c>manual</c> or <c>auto</c> (<c>smart_rules.event_filter.approval</c>).</summary>
+    public const string EventFilterApproval = "event_filter.approval";
 
     /// <summary>The direction of each <see cref="AutonomySettings"/> property that becomes a key.</summary>
     public static IReadOnlyDictionary<string, ConfigDirection> AutonomyFields { get; } = new Dictionary<string, ConfigDirection>

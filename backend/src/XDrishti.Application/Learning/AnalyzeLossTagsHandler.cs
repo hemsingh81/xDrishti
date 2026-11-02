@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
@@ -8,7 +9,7 @@ using XDrishti.Domain.Research;
 namespace XDrishti.Application.Learning;
 
 /// <summary>Tags the losses of stored runs per cell (spec P6-15, ADR 0071). Read-only: it stores nothing, opens no lesson and applies nothing.</summary>
-internal sealed class AnalyzeLossTagsHandler(IRunStore runs, TimeProvider time, ILogger<AnalyzeLossTagsHandler> logger) : IQueryHandler<AnalyzeLossTagsQuery, Result<LossTagReport>>
+internal sealed class AnalyzeLossTagsHandler(IRunStore runs, TimeProvider time, ILogger<AnalyzeLossTagsHandler> logger, ILossTagEvents? lossTagEvents = null) : IQueryHandler<AnalyzeLossTagsQuery, Result<LossTagReport>>
 {
     private static readonly string[] Styles = ["intraday", "swing"];
 
@@ -30,7 +31,11 @@ internal sealed class AnalyzeLossTagsHandler(IRunStore runs, TimeProvider time, 
         }
 
         var inputs = read.Value.Trades.Select(t => new LossTagInput(t.CellKey, t.Trade, ResultOf(t.Trade))).ToList();
-        var report = LossTagAnalyzer.Analyze(inputs, query.Options);
+
+        // P15-06: the results events of the instruments that lost, when they can be read; otherwise the tag is not assigned and is counted unavailable, never "no news".
+        var lossInstruments = inputs.Where(i => i.R < 0).Select(i => i.Trade.InstrumentId).Distinct().ToList();
+        var events = lossTagEvents is null || lossInstruments.Count == 0 ? null : await lossTagEvents.ReadAsync(lossInstruments, cancellationToken);
+        var report = LossTagAnalyzer.Analyze(inputs, query.Options, events);
         if (report.IsFailure)
         {
             return Refuse(report.Error);

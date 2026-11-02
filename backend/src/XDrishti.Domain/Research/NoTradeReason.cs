@@ -26,4 +26,15 @@ public enum NoTradeReason
     /// never <see cref="NoFillBar"/>, so that the last day of a window does not depend on how far the read goes.
     /// </summary>
     OrderPendingAtEnd,
+
+    /// <summary>
+    /// The filter <c>not_event_day</c> blocked the entry: the next results event session is 0 to H sessions away at the decision instant, H being the side's longest hold (P15-06, ADR 0182). Produced by the simulator before the walk, never by the walker; the candidate
+    /// does not open a position, so the position gate is not occupied by it.
+    /// </summary>
+    EventBlocked,
+
+    /// <summary>
+    /// The filter <c>not_event_day</c> found no visible results entry for the instrument at the decision instant (P15-06): nothing is known, so there is no entry. Never a pass.
+    /// </summary>
+    EventUnavailable,
 }

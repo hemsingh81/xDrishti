@@ -43,6 +43,9 @@ public sealed class PreparedStrategy
     /// <summary>The strategy reads the daily market context: the replay needs the stored days and skips with <c>context_unavailable</c> when there are none (P3-lift, ADR 0145).</summary>
     public bool ReadsContext => Simulator.ReadsContext;
 
+    /// <summary>The strategy names the filter <c>not_event_day</c>: the replay needs the results-calendar snapshot of the run and skips with <c>event_calendar_unavailable</c> when it has none (P15-06, ADR 0182).</summary>
+    public bool ReadsEvents => Simulator.ReadsEvents;
+
     internal Simulator Simulator { get; }
 
     /// <summary>The strategy is a swing one: its positions are held across sessions and a run gates them (a comparison does not, P4-05 D4).</summary>

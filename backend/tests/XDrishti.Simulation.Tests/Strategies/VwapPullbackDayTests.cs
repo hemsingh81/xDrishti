@@ -257,9 +257,9 @@ public sealed class VwapPullbackDayTests
     }
 
     [Fact]
-    public void The_engine_is_sim_6_and_the_strategy_creates_a_simulator_without_problems()
+    public void The_engine_is_sim_7_and_the_strategy_creates_a_simulator_without_problems()
     {
-        SimulationEngine.Version.ShouldBe("sim-6");
+        SimulationEngine.Version.ShouldBe("sim-7");
         var build = Simulator.Create(VwapPullback.Create(), Timeframe.M15);
         build.Problems.ShouldBeEmpty();
         build.Simulator.ShouldNotBeNull();

@@ -1,4 +1,5 @@
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Filings;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Research;
@@ -15,7 +16,7 @@ namespace XDrishti.Simulation.Running;
 /// the <see cref="TradeWalker"/>. The two stages share nothing but the entry candidate, which carries no exit, so the same entries can be replayed under every exit policy (P4).
 /// <para>
 /// <b>What it runs.</b> An intraday strategy, or a swing strategy evaluated inside the session (30m or 1h; ADR 0040), on an evaluation timeframe up to one day, entered at the close of the trigger bar, with a stop that is a level
-/// (<c>or_opposite</c>, <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c> or <c>bar_high</c>, no buffer, read on the evaluation timeframe), exactly one exit candidate (<c>FIXED_RR</c>, <c>PARTIAL_BE</c> or <c>PARTIAL_TRAIL</c> from P4-02, from P4-03 <c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>, or from P4-04 <c>PYRAMID</c>, whose ladders are not candidate lists) with one value in each list, at most the <c>time_stop</c> overlay, no filter and no expiry dates. A side may read the daily market context (P3-lift, ADR 0145): <see cref="Run"/> is given a <see cref="ScanContext"/> and every decision reads the latest context day strictly before its date. A swing side is held up to its
+/// (<c>or_opposite</c>, <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c> or <c>bar_high</c>, no buffer, read on the evaluation timeframe), exactly one exit candidate (<c>FIXED_RR</c>, <c>PARTIAL_BE</c> or <c>PARTIAL_TRAIL</c> from P4-02, from P4-03 <c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>, or from P4-04 <c>PYRAMID</c>, whose ladders are not candidate lists) with one value in each list, at most the <c>time_stop</c> overlay, no <c>min_turnover</c> filter (the filter <c>not_event_day</c> is evaluated from a results-calendar snapshot, P15-06) and no expiry dates. A side may read the daily market context (P3-lift, ADR 0145): <see cref="Run"/> is given a <see cref="ScanContext"/> and every decision reads the latest context day strictly before its date. A swing side is held up to its
 /// <c>max_hold_sessions</c> (the entry session counts as the first) and is gated to one open position per instrument and side (<see cref="PositionGate"/>). <see cref="Create"/> refuses everything else by name (<see cref="SimulatorCodes"/>) with a located problem, rather than
 /// ignoring it: a result must be what it says it is. A side that does not compile makes <see cref="Create"/> return no simulator; a half strategy is never run.
 /// </para>
@@ -52,6 +53,9 @@ public sealed class Simulator
 
     /// <summary>Some side reads the daily market context: <see cref="Run"/> needs one (the replay reads the stored days for such a strategy only).</summary>
     public bool ReadsContext => _sides.Any(s => s.Compiled.NeedsContext);
+
+    /// <summary>Some side names the filter <c>not_event_day</c>: <see cref="Run"/> needs a results-calendar snapshot and a trading calendar, and a run is refused with <c>simulation.filter_not_available</c> without them (P15-06, ADR 0182).</summary>
+    public bool ReadsEvents => _sides.Any(s => s.Compiled.NeedsEventCalendar);
 
     /// <summary>The sides this simulator runs, Buy first.</summary>
     public IReadOnlyList<Side> Sides => _sides.Select(s => s.Compiled.Side).ToList().AsReadOnly();
@@ -154,14 +158,20 @@ public sealed class Simulator
     /// <param name="calendar">The trading calendar, or null for the regular 09:15 to 15:30 session.</param>
     /// <param name="quantity">The full size <c>Q</c> of ADR 0042 for an exact entry and an initial risk, for a <c>PYRAMID</c> to see an add of no whole share (P4-04, D3); null in a gross run, where no add is skipped for its quantity.</param>
     /// <param name="context">The daily market context the context features read (P3-lift, ADR 0145); required when a side reads it (<see cref="ReadsContext"/>), ignored otherwise.</param>
+    /// <param name="events">The results-calendar snapshot the filter <c>not_event_day</c> reads (P15-06); required, with a <paramref name="calendar"/>, when a side names the filter (<see cref="ReadsEvents"/>), ignored otherwise.</param>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null)
+    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
         if (ReadsContext && context is null)
         {
             return Result.Failure<SimulationResult>(ContextNotGivenError());
+        }
+
+        if (ReadsEvents && (events is null || calendar is null))
+        {
+            return Result.Failure<SimulationResult>(EventsNotGivenError());
         }
 
         if (NotAscending(bars) is { } unordered)
@@ -189,7 +199,7 @@ public sealed class Simulator
             scans.Add(scanner.Counters);
 
             // D11: a swing side keeps one open position at a time, so its candidates go through the gate; an intraday trade leaves on its entry date and is not gated.
-            var walked = WalkSide(side, scanner, bars, tick, calendar, quantity, HoldsOvernight);
+            var walked = WalkSide(side, scanner, bars, tick, calendar, quantity, HoldsOvernight, events);
             if (walked.IsFailure)
             {
                 return Result.Failure<SimulationResult>(walked.Error);
@@ -209,6 +219,9 @@ public sealed class Simulator
     /// <summary>The error of a context-reading side run with no context.</summary>
     internal static Error ContextNotGivenError() => Error.Validation(SimulatorCodes.ContextNotGiven, "The strategy reads the market context and none was given; the replay skips such an instrument with `context_unavailable` before it runs.");
 
+    /// <summary>The error of a side that names <c>not_event_day</c> run with no results-calendar snapshot or no trading calendar: the replay skips such an instrument with <c>event_calendar_unavailable</c> first, and the use case refuses a run with no rows at all.</summary>
+    internal static Error EventsNotGivenError() => Error.Validation(SimulatorCodes.FilterNotAvailable, "The strategy names the filter `not_event_day` and no results calendar snapshot or trading calendar was given (P15-04).");
+
     /// <summary>The refusal for minutes that are not strictly ascending, or null.</summary>
     internal static Error? NotAscending(IReadOnlyList<Bar> bars)
     {
@@ -227,7 +240,7 @@ public sealed class Simulator
     /// Walks every candidate of a scanned side under this simulator's one exit (P4-05: the scanner may belong to another simulator of a comparison, whose tape holds the features of every candidate; the column of this exit is found by name).
     /// With <paramref name="gated"/> the candidates go through the <see cref="PositionGate"/>, else every candidate is walked.
     /// </summary>
-    internal Result<IReadOnlyList<CandidateOutcome>> WalkSide(SideRun side, EntryScanner scanner, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, bool gated)
+    internal Result<IReadOnlyList<CandidateOutcome>> WalkSide(SideRun side, EntryScanner scanner, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, bool gated, EventCalendarSnapshot? events = null)
     {
         var rules = RulesOf(side, _fills, tick, calendar);
         if (rules.IsFailure)
@@ -238,10 +251,34 @@ public sealed class Simulator
         var sideRules = rules.Value;
         var rule = side.Trail is { } trail ? TrailRules.Of(trail, scanner.TapeColumnOf(trail)) : null;
         var exitContext = rule is null && side.Policy is null ? null : new ExitContext(rule, scanner.Tape, side.Policy, quantity);
+        Func<EntryCandidate, Result<WalkOutcome>> walk = candidate => TradeWalker.Walk(candidate, bars, sideRules, exitContext);
+        if (side.Compiled.NeedsEventCalendar && (events is null || calendar is null))
+        {
+            // Never run a side that names the filter without the data it needs: that would take every entry as if the filter passed.
+            return Result.Failure<IReadOnlyList<CandidateOutcome>>(EventsNotGivenError());
+        }
+
+        if (side.Compiled.NeedsEventCalendar && events is not null && calendar is not null)
+        {
+            // P15-06: the filter decides before the walk, from the rows visible at the decision instant; a blocked or unavailable candidate opens no position, so the gate is not occupied by it.
+            var hold = side.MaxHoldSessions ?? 0;
+            var walkIt = walk;
+            walk = candidate => EventOutcome(events, calendar, candidate, hold) is { } refused ? Result.Success(refused) : walkIt(candidate);
+        }
+
         return gated
-            ? PositionGate.Apply(scanner.Candidates, candidate => TradeWalker.Walk(candidate, bars, sideRules, exitContext))
-            : WalkAll(scanner.Candidates, bars, sideRules, exitContext);
+            ? PositionGate.Apply(scanner.Candidates, walk)
+            : WalkAll(scanner.Candidates, walk);
     }
+
+    /// <summary>The no-trade of an entry the filter <c>not_event_day</c> does not let through, or null when the entry is taken. An unavailable answer is never a pass.</summary>
+    private static WalkOutcome? EventOutcome(EventCalendarSnapshot events, TradingCalendar calendar, EntryCandidate candidate, int holdSessions) =>
+        EventDayFilter.Evaluate(events, candidate.Instrument.Id, DateTimeOffset.FromUnixTimeSeconds(candidate.DecisionEpochSeconds), calendar, holdSessions) switch
+        {
+            WindowOutcome.Outside => null,
+            WindowOutcome.Inside => WalkResults.NoTrade(NoTradeReason.EventBlocked, 0, 0).Value,
+            _ => WalkResults.NoTrade(NoTradeReason.EventUnavailable, 0, 0).Value,
+        };
 
     /// <summary>The side runs of this simulator, Buy first (for a comparison, which walks them against a scanner of its own).</summary>
     internal IReadOnlyList<SideRun> SideRuns => _sides;
@@ -260,12 +297,12 @@ public sealed class Simulator
             : Result.Success(new WalkRules(side.RewardRisk, WalkRules.NoSquareOff, fills, tick, hold.Value));
     }
 
-    private static Result<IReadOnlyList<CandidateOutcome>> WalkAll(IReadOnlyList<EntryCandidate> candidates, IReadOnlyList<Bar> bars, WalkRules rules, ExitContext? exit)
+    private static Result<IReadOnlyList<CandidateOutcome>> WalkAll(IReadOnlyList<EntryCandidate> candidates, Func<EntryCandidate, Result<WalkOutcome>> walk)
     {
         var outcomes = new List<CandidateOutcome>(candidates.Count);
         foreach (var candidate in candidates)
         {
-            var walked = TradeWalker.Walk(candidate, bars, rules, exit);
+            var walked = walk(candidate);
             if (walked.IsFailure)
             {
                 return Result.Failure<IReadOnlyList<CandidateOutcome>>(walked.Error);
@@ -308,10 +345,10 @@ public sealed class Simulator
 
         RefuseExits(side, name, problems);
 
-        foreach (var filter in side.Filters)
+        foreach (var filter in side.Filters.Where(f => !CompiledSide.IsEvaluatedFilter(f)))
         {
             var at = Math.Max(0, definition.Filters.ToList().IndexOf(filter));
-            problems.Add(Refusal("filters[" + at + "]", SimulatorCodes.FilterNotAvailable, "The filter `" + filter + "` is not evaluated yet (there is no results calendar, P15, and no liquidity data of the universe layer, doc 10 §2); the simulator refuses to run a strategy that names one rather than ignore it."));
+            problems.Add(Refusal("filters[" + at + "]", SimulatorCodes.FilterNotAvailable, "The filter `" + filter + "` is not evaluated yet (there is no liquidity data of the universe layer, doc 10 §2); the simulator refuses to run a strategy that names one rather than ignore it."));
         }
 
         if (side.NeedsExpiryDays)

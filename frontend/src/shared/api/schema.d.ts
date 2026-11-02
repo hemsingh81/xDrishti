@@ -4586,6 +4586,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/selection/event-filter': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The event-risk filter switch: whether it is on (the newest decision row; no row, or an unreadable history, is off), its window in sessions (resultsWithinDays, 2 by default), the approval setting (manual by default, or auto), who decided (owner or auto), the latest 50 decision rows, the reasons the filter is not acting (switch_off, no_calendar_rows, no_entry_for_instruments with a count, history_unreadable, calendar_unreadable), the calendar coverage and the newest protocol-F verdict state (unavailable until it exists). Read only */
+    get: operations['GetEventFilter'];
+    /** The owner switches the event-risk filter or changes its window or approval, with a reason of 1 to 300 characters and the password on EVERY change (401 auth.invalid_credentials, 423 auth.locked). enabled is required; resultsWithinDays (0 to 10) and approval (manual or auto) left out keep the value in force. 400 selection.reason_invalid, 400 selection.invalid_setting, 403 selection.owner_only, 409 selection.stale when the database refused the row. Setting approval to auto is itself an owner act; the automatic path may turn the filter on only from a stored KEEP verdict and is recorded as auto, never as an owner decision */
+    put: operations['ChangeEventFilter'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/calendar/results': {
     parameters: {
       query?: never;
@@ -9979,6 +9997,55 @@ export interface components {
       at: null | string;
       detail: null | string;
     };
+    /** @description The owner's change of the event-risk filter. The password is needed for every change. The actor is never taken from the body. */
+    EventFilterChangeBody: {
+      enabled: null | boolean;
+      /** Format: int32 */
+      resultsWithinDays: null | number;
+      approval: null | string;
+      reason: null | string;
+      password: null | string;
+    };
+    /** @description Why the filter is not acting: `switch_off`, `history_unreadable`, `calendar_unreadable`, `no_calendar_rows`, or `no_entry_for_instruments` with the count of tracked instruments that have no visible results entry at all, and `no_upcoming_entry_for_instruments` with the count of those whose last meeting has passed and whose next is not yet intimated (unavailable too: fail closed, ADR 0182). */
+    EventFilterReasonView: {
+      code: string;
+      /** Format: int32 */
+      count: null | number;
+    };
+    /** @description One row of the decision history, newest first. string EventFilterRowView.SettingSnapshot is the JSON of the settings at that row. */
+    EventFilterRowView: {
+      /** Format: int64 */
+      id: number;
+      enabled: boolean;
+      /** Format: int32 */
+      resultsWithinDays: number;
+      approval: string;
+      decidedBy: string;
+      actor: string;
+      reason: string;
+      settingSnapshot: string;
+      verdictRef: null | string;
+      /** Format: date-time */
+      changedAt: string;
+    };
+    /**
+     * @description The effective switch (the newest row; no row, or an unreadable history, is OFF), its settings, the latest 50 rows and the reasons the filter is not acting. int? EventFilterView.InstrumentsTracked and int? EventFilterView.InstrumentsWithEntry are the calendar coverage now
+     *     (null when the calendar could not be read). The auto option is inert until a protocol-F verdict exists (string EventFilterView.AutoVerdict is `unavailable`).
+     */
+    EventFilterView: {
+      enabled: boolean;
+      /** Format: int32 */
+      resultsWithinDays: number;
+      approval: string;
+      decidedBy: null | string;
+      autoVerdict: string;
+      history: components['schemas']['EventFilterRowView'][];
+      notActingBecause: components['schemas']['EventFilterReasonView'][];
+      /** Format: int32 */
+      instrumentsTracked: null | number;
+      /** Format: int32 */
+      instrumentsWithEntry: null | number;
+    };
     /** @description One figure of the evidence, built by the engine (P8-00 D1). Value is empty unless State is `value`: a figure that is insufficient or unavailable shows a word and no digit. */
     EvidenceFigure: {
       label: string;
@@ -13342,6 +13409,12 @@ export interface components {
       evidence: components['schemas']['LossTagsEvidenceView'];
       /** @description Sentences that must be printed with the result. */
       limits: string[];
+      /**
+       * Format: int32
+       * @description Losses that carry no `news_results` tag because their instrument's results events were not available (`news_results_unavailable`, P15-06); never "no news".
+       * @default 0
+       */
+      newsResultsUnavailable: number;
     };
     /** @description Sets the acquisition date of a lot (between 1990-01-01 and today, India). */
     LotDateInput: {
@@ -30403,6 +30476,95 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetEventFilter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EventFilterView'];
+        };
+      };
+    };
+  };
+  ChangeEventFilter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EventFilterChangeBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EventFilterView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
         headers: {
           [name: string]: unknown;
         };

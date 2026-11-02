@@ -222,6 +222,8 @@ internal static class OracleAdapter
         AddsMissed = Int(w.AddsMissed),
         AddsSkippedRisk = Int(w.AddsSkippedRisk),
         AddsSkippedQuantity = Int(w.AddsSkippedQuantity),
+        EventBlocked = Int(w.EventBlocked),
+        EventUnavailable = Int(w.EventUnavailable),
     };
 
     private static int Int(long value) => checked((int)value);

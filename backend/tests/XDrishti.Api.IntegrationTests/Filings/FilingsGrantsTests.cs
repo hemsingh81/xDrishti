@@ -2,6 +2,7 @@ using Npgsql;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Api.IntegrationTests.Research;
 using XDrishti.Application.Abstractions.Filings;
+using XDrishti.Application.Abstractions.Selection;
 using XDrishti.Domain.Filings;
 using XDrishti.Infrastructure.FilingArchive;
 
@@ -14,7 +15,7 @@ namespace XDrishti.Api.IntegrationTests.Filings;
 [Collection(ApiTestSuite.Name)]
 public sealed class FilingsGrantsTests(ResearchGrantsTests.DedicatedServer server) : IClassFixture<ResearchGrantsTests.DedicatedServer>
 {
-    private static readonly string[] Tables = ["filings", "result_facts", "shareholding", "announcements", "calendar"];
+    private static readonly string[] Tables = ["filings", "result_facts", "shareholding", "announcements", "calendar", "event_filter_decisions"];   // the last one is the event-risk switch history (P15-06)
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -82,7 +83,7 @@ public sealed class FilingsGrantsTests(ResearchGrantsTests.DedicatedServer serve
             found.Add(reader.GetString(0));
         }
 
-        found.ShouldBe([.. Tables.Order(StringComparer.Ordinal)]); // no filings.extractions: that table waits for P15-08
+        found.ShouldBe([.. Tables.Order(StringComparer.Ordinal)]); // no filings.extractions: that table waits for P15-08; event_filter_decisions is P15-06
     }
 
     [Fact]
@@ -113,7 +114,7 @@ public sealed class FilingsGrantsTests(ResearchGrantsTests.DedicatedServer serve
         counts.Cells.Single(c => c.Kind == "results").Superseded.ShouldBe(1); // the server is shared with the P15-04 test below, which stores other kinds
         foreach (var table in Tables)
         {
-            (await SqlStateAsync(server.App, $"UPDATE filings.{table} SET filing_id = filing_id".Replace("filing_id", table == "filings" ? "id" : "filing_id", StringComparison.Ordinal))).ShouldBe("42501");
+            (await SqlStateAsync(server.App, $"UPDATE filings.{table} SET filing_id = filing_id".Replace("filing_id", table is "filings" or "event_filter_decisions" ? "id" : "filing_id", StringComparison.Ordinal))).ShouldBe("42501");
             (await SqlStateAsync(server.App, $"DELETE FROM filings.{table}")).ShouldBe("42501");
             (await SqlStateAsync(server.App, $"TRUNCATE filings.{table}")).ShouldBe("42501");
         }
@@ -142,6 +143,42 @@ public sealed class FilingsGrantsTests(ResearchGrantsTests.DedicatedServer serve
         tracked.ShouldContain(t => t.Id == instrument && t.Symbol == "GRANTB");
         (await SqlStateAsync(server.App, "UPDATE filings.calendar SET status = 'cancelled'")).ShouldBe("42501");
         (await SqlStateAsync(server.App, "UPDATE filings.shareholding SET pct = 1")).ShouldBe("42501");
+    }
+
+    [Fact]
+    public async Task The_event_filter_history_works_as_the_runtime_role_through_the_sequence_and_the_trigger_and_the_refused_statements_are_refused()
+    {
+        await using var dataSource = NpgsqlDataSource.Create(server.App);
+        var decisions = new EventFilterDecisions(dataSource);
+
+        var owner = await decisions.AppendAsync(new NewEventFilterRow(false, 2, "auto", "owner", "owner:grant@example.invalid", "arm the auto option", "{}", null), Ct);
+        var auto = await decisions.AppendAsync(new NewEventFilterRow(true, 2, "auto", "auto", "auto:event-filter", "auto: keep", "{}", "pf-1"), Ct);
+        var again = await decisions.AppendAsync(new NewEventFilterRow(true, 2, "auto", "auto", "auto:event-filter", "auto: keep", "{}", "pf-1"), Ct);
+        var rows = await decisions.RowsAsync(10, Ct);
+
+        (owner.Id, owner.Refused).ShouldBe((owner.Id, null));
+        owner.Id.ShouldNotBeNull();
+        auto.Id.ShouldBe(owner.Id + 1, "the identity sequence is granted to the runtime role");
+        again.Id.ShouldBeNull();
+        again.Refused.ShouldNotBeNull().ShouldContain("already on");
+        rows.Select(r => r.DecidedBy).ShouldBe(["auto", "owner"]);
+        (await SqlStateAsync(server.App, "UPDATE filings.event_filter_decisions SET enabled = false")).ShouldBe("42501");
+        (await SqlStateAsync(server.App, "DELETE FROM filings.event_filter_decisions")).ShouldBe("42501");
+        (await SqlStateAsync(server.App, "TRUNCATE filings.event_filter_decisions")).ShouldBe("42501");
+        (await HasAsync("xd_app", "filings.event_filter_decisions", "INSERT")).ShouldBeTrue();
+        (await ScalarBooleanAsync("SELECT has_sequence_privilege('xd_app', 'filings.event_filter_decisions_id_seq', 'USAGE')")).ShouldBeTrue();
+        foreach (var role in new[] { "xd_exec", "xd_mcp_read", "xd_mcp_sql" })
+        {
+            (await ScalarBooleanAsync($"SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN has_sequence_privilege('{role}', 'filings.event_filter_decisions_id_seq', 'USAGE') ELSE false END")).ShouldBeFalse(role);
+        }
+    }
+
+    private async Task<bool> ScalarBooleanAsync(string sql)
+    {
+        await using var connection = new NpgsqlConnection(server.Owner);
+        await connection.OpenAsync(Ct);
+        await using var command = new NpgsqlCommand(sql, connection);
+        return (bool)(await command.ExecuteScalarAsync(Ct))!;
     }
 
     private sealed class FixedSettings : IFilingSettings

@@ -18,7 +18,7 @@ public static class SimulatorCodes
     /// <summary>Exits other than exactly one of <c>FIXED_RR</c>, <c>PARTIAL_BE</c> or <c>PARTIAL_TRAIL</c> with one value in each list, or an overlay other than <c>time_stop</c> (P4-02). Path <c>buy.exits</c> or <c>buy.overlays[i]</c>.</summary>
     public const string UnsupportedExit = "simulation.unsupported_exit";
 
-    /// <summary>A filter the strategy names (nothing evaluates them yet). Path <c>filters[i]</c>.</summary>
+    /// <summary>A filter the strategy names that nothing evaluates (<c>min_turnover</c>, path <c>filters[i]</c>), or <c>not_event_day</c> run with no results-calendar snapshot or trading calendar (P15-06).</summary>
     public const string FilterNotAvailable = "simulation.filter_not_available";
 
     /// <summary>A side that reads the market context was run with none given (a programming error: the replay skips with <c>context_unavailable</c> first). Since P3-lift (ADR 0145) a strategy that reads the context is accepted; the former refusal <c>simulation.needs_context</c> is gone.</summary>

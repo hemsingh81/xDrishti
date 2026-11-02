@@ -17,6 +17,7 @@ using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Abstractions.Selection;
 using XDrishti.Application.Abstractions.Ticks;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
@@ -146,7 +147,15 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetFilingQuery, Result<FilingView>>, GetFilingHandler>(); // one envelope's metadata (P15-02): read
         services.AddScoped<ICommandHandler<LoadCalendarCommand, RowLoadSummary>, LoadCalendarHandler>(); // the board-meeting csv loader (P15-04): each row with its own intimation time; no network
         services.AddScoped<ICommandHandler<LoadShareholdingCommand, RowLoadSummary>, LoadShareholdingHandler>(); // the shareholding csv loader (P15-04): one group per (symbol, period) with its time; no network
-        services.AddScoped<IResultsCalendar, ResultsCalendar>(); // days_to_results as known at an instant (P15-04): a port with no decision caller yet (P15-06 wires it)
+        services.AddScoped<IResultsCalendar, ResultsCalendar>(); // days_to_results as known at an instant (P15-04): named by PlanEventFilter and the switch view since P15-06, by no other decision code
+        services.AddScoped<IEventCalendarSnapshots, EventCalendarSnapshots>(); // the results-calendar snapshot of a run that names not_event_day: one read before the walk (P15-06, ADR 0182)
+        services.AddScoped<IEventFilterSwitch, EventFilterSwitch>(); // the effective event-risk switch: the newest decision row, OFF when none or unreadable (P15-06)
+        services.AddScoped<PlanEventFilter>(); // the plan's exclusion by event and its checklist days from the results calendar, only while the switch is ON (P15-06)
+        services.AddScoped<IQueryHandler<GetEventFilterQuery, EventFilterView>, GetEventFilterHandler>(); // GET /api/selection/event-filter (P15-06): read
+        services.AddScoped<ICommandHandler<ChangeEventFilterCommand, EventFilterView>, ChangeEventFilterHandler>(); // the owner's switch change: fresh password on every change, recorded as owner (P15-06)
+        services.AddScoped<ICommandHandler<ApplyEventFilterAutoCommand, EventFilterAutoResult>, ApplyEventFilterAutoHandler>(); // the auto option: a KEEP verdict only, recorded as auto; called by nothing before P15-10
+        services.TryAddScoped<IEventFilterVerdict, UnavailableEventFilterVerdict>(); // no protocol-F verdict exists before P15-10: unavailable, so the auto path cannot fire
+        services.AddScoped<ILossTagEvents, LossTagEvents>(); // the results event instants for the news_results loss tag: a description of the past, never a decision input (P15-06)
         services.AddScoped<IShareholdingAsOf, ShareholdingAsOf>(); // the shareholding as known at an instant (P15-04): a port with no decision caller yet
         services.AddScoped<IQueryHandler<GetResultsCalendarQuery, Result<ResultsCalendarView>>, GetResultsCalendarHandler>(); // GET /api/calendar/results (P15-04): read
         services.AddScoped<OptionArchiveQualityRunner>(); // one run of the option-archive quality checks (P14-04): reads the archive, writes only its own result rows

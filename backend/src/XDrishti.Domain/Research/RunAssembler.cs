@@ -59,7 +59,8 @@ public static class RunAssembler
             Merge(instruments, r => r.Trades, baskets),
             Merge(instruments, r => r.OpenAtEnd, baskets),
             TotalsOf(records),
-            header.Costs);
+            header.Costs,
+            header.Events);
     }
 
     /// <summary>
@@ -76,7 +77,7 @@ public static class RunAssembler
 
     /// <summary>
     /// The text whose SHA-256 is the run key: UTF-8 lines, each ending in <c>\n</c>: <c>xd-run &lt;schema&gt;</c>, <c>engine=</c>, <c>strategy=</c> (the definition hash), <c>params=</c>, <c>timeframe=</c>, <c>window=</c>, <c>options=</c>, <c>ack=</c>,
-    /// <c>fills=</c> (the canonical JSON), <c>costs=</c> (<c>none</c>, or <c>sheet id|rates sha256|capital|profile name|risk %|max capital %|max cost R</c>), <c>universe=</c> (the label), one <c>i=</c> per instrument in run order, and <c>cal=</c>. An <c>i=</c> line is <c>id|bars hash or -|skip reason or -|ex-date:kind:numerator:denominator,…|tick or -|1 if the tick is the fallback else 0</c>.
+    /// <c>fills=</c> (the canonical JSON), <c>costs=</c> (<c>none</c>, or <c>sheet id|rates sha256|capital|profile name|risk %|max capital %|max cost R</c>), <c>universe=</c> (the label), one <c>i=</c> per instrument in run order, <c>context=</c> and <c>events=</c> (<c>snapshot sha256|lag|rule version</c>) only for a strategy that reads them, and <c>cal=</c>. An <c>i=</c> line is <c>id|bars hash or -|skip reason or -|ex-date:kind:numerator:denominator,…|tick or -|1 if the tick is the fallback else 0</c>.
     /// Numbers are written by <see cref="CanonicalText"/>, so the text does not depend on the culture, on the scale of the tick or on the sign of a zero.
     /// </summary>
     /// <param name="header">The header of the run.</param>
@@ -113,6 +114,11 @@ public static class RunAssembler
         if (header.ContextSha256 is { } context)
         {
             Line(text, "context", context);   // only a strategy that reads the market context has this line, so every other key is unchanged (ADR 0145)
+        }
+
+        if (header.Events is { } events)
+        {
+            Line(text, "events", events.CalendarSha256 + "|" + CanonicalText.Number(events.LagMinutes) + "|" + events.EvfVersion);   // only a run that names not_event_day has this line (P15-06)
         }
 
         Line(text, "cal", string.Join(',', calendarExceptions.Select(e => Date(e.Date) + ":" + (e.IsHoliday ? "holiday" : CanonicalText.Number(e.FromMinute) + "-" + CanonicalText.Number(e.ToMinute)))));

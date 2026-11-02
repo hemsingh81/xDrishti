@@ -80,6 +80,12 @@ public sealed record OracleCounters
 
     public int AddsSkippedQuantity { get; init; }
 
+    /// <summary>P15-06: candidates the simulator's event filter blocked before the walk. The oracle walks and gates; it has no event filter, so it counts 0 (a SPEC ONLY row of the dry-read table).</summary>
+    public int EventBlocked { get; init; }
+
+    /// <summary>P15-06: candidates the event filter could not answer for. Always 0 here, as <see cref="EventBlocked"/>.</summary>
+    public int EventUnavailable { get; init; }
+
     /// <summary>The sum of two counter sets, property by property.</summary>
     public OracleCounters Plus(OracleCounters other) => new()
     {
@@ -122,5 +128,7 @@ public sealed record OracleCounters
         AddsMissed = AddsMissed + other.AddsMissed,
         AddsSkippedRisk = AddsSkippedRisk + other.AddsSkippedRisk,
         AddsSkippedQuantity = AddsSkippedQuantity + other.AddsSkippedQuantity,
+        EventBlocked = EventBlocked + other.EventBlocked,
+        EventUnavailable = EventUnavailable + other.EventUnavailable,
     };
 }

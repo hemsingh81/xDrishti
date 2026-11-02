@@ -98,7 +98,7 @@ public sealed record ModelCodeExample(
             Row("max_hold_on_intraday", "time_rules.max_hold_sessions", Basic() with { TimeRules = Defs.IntradayRules with { MaxHoldSessions = 1 } }, Basic()),
             Row("max_hold_out_of_range", "time_rules.max_hold_sessions", Defs.Swing() with { TimeRules = new TimeRules(null, null, null, 6) }, Defs.Swing() with { TimeRules = new TimeRules(null, null, null, 5) }, timeframe: Timeframe.H1),
             Row("unknown_filter", "filters[0]", Basic() with { Filters = ["not_event_dy"] }, Basic() with { Filters = [] }),
-            Row("filter_not_evaluated", "filters[0]", Basic() with { Filters = [FilterNames.NotEventDay] }, Basic() with { Filters = [] }, ProblemSeverity.Warning),
+            Row("filter_not_evaluated", "filters[0]", Basic() with { Filters = [FilterNames.MinTurnover] }, Basic() with { Filters = [] }, ProblemSeverity.Warning),
             Row("duplicate_filter", "filters[1]", Basic() with { Filters = [FilterNames.NotEventDay, FilterNames.NotEventDay] }, Basic() with { Filters = [FilterNames.NotEventDay, FilterNames.MinTurnover] }),
 
             // the cap

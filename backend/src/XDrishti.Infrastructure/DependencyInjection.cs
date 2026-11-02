@@ -274,6 +274,8 @@ public static class DependencyInjection
         services.AddScoped<XDrishti.Application.Abstractions.Filings.ICalendarStore, XDrishti.Infrastructure.FilingArchive.CalendarStore>(); // filings.filings + filings.calendar, insert-only (P15-04)
         services.AddScoped<XDrishti.Application.Abstractions.Filings.IShareholdingStore, XDrishti.Infrastructure.FilingArchive.ShareholdingStore>(); // filings.filings + filings.shareholding, insert-only (P15-04)
         services.AddScoped<XDrishti.Application.Abstractions.Filings.ICalendarRows, XDrishti.Infrastructure.FilingArchive.CalendarRows>(); // stored results rows up to a cutoff (P15-04)
+        services.AddScoped<XDrishti.Application.Abstractions.Selection.IEventFilterDecisions, XDrishti.Infrastructure.FilingArchive.EventFilterDecisions>(); // filings.event_filter_decisions, insert-only: the event-risk switch history (P15-06)
+        services.AddScoped<XDrishti.Application.Abstractions.Filings.IResultsFilingTimes, XDrishti.Infrastructure.FilingArchive.ResultsFilingTimes>(); // results filings' broadcast times for the news_results loss tag (P15-06)
         services.AddScoped<XDrishti.Application.Abstractions.Filings.IShareholdingRows, XDrishti.Infrastructure.FilingArchive.ShareholdingRows>(); // stored shareholding groups up to a cutoff (P15-04)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IBrokerAllowList, BrokerAllowList>(); // the broker allow-list read only, for the P7 phase check (P7-18, ADR 0097)

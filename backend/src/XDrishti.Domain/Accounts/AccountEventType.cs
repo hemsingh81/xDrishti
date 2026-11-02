@@ -94,4 +94,5 @@ public enum AccountEventType
     OptionChainRecorderSwitched,
     OptionBackfillSwitched,
     OptionBackfillProbeAccepted,
+    EventFilterSwitched,
 }

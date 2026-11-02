@@ -103,8 +103,14 @@ public sealed class CompiledSide
     /// <summary>The time rules as minutes of the India day.</summary>
     public SessionRules TimeRules { get; }
 
-    /// <summary>The filter names of the strategy (known ones, not evaluated in P3: the simulator refuses a run whose list is not empty).</summary>
+    /// <summary>The filter names of the strategy (known ones). The simulator evaluates <c>not_event_day</c> (<see cref="NeedsEventCalendar"/>, P15-06) and refuses a run that names any other.</summary>
     public IReadOnlyList<string> Filters { get; }
+
+    /// <summary>The side names the filter <c>not_event_day</c>: a run needs the results-calendar snapshot (P15-06, ADR 0182).</summary>
+    public bool NeedsEventCalendar => Filters.Contains(FilterNames.NotEventDay);
+
+    /// <summary>Whether the simulator evaluates the filter of this name (only <c>not_event_day</c>); any other filter a strategy names is refused rather than ignored.</summary>
+    public static bool IsEvaluatedFilter(string name) => string.Equals(name, FilterNames.NotEventDay, StringComparison.Ordinal);
 
     /// <summary>The distinct features the frame is created from, in this order: the handle of each is its position.</summary>
     public IReadOnlyList<FeatureSpec> Features { get; }

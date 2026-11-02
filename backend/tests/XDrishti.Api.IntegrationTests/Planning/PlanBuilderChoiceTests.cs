@@ -1,8 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using XDrishti.Application;
+using XDrishti.Application.Abstractions.Filings;
+using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Planning;
+using XDrishti.Application.Abstractions.Selection;
 using XDrishti.Application.Planning;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Filings;
+using XDrishti.Domain.Market.Calendar;
 
 namespace XDrishti.Api.IntegrationTests.Planning;
 
@@ -16,6 +21,10 @@ public sealed class PlanBuilderChoiceTests
         services.AddApplication();
         services.AddScoped<ITicketSource, NoTickets>();
         services.AddScoped<IPlanContextSource, NoContext>();
+        services.AddScoped<IEventFilterDecisions, NoDecisions>();   // the event-risk filter of the selection builder (P15-06) needs the switch history and the calendar behind it
+        services.AddScoped<ICalendarRows, NoRows>();
+        services.AddScoped<ITradingCalendar, PlainCalendar>();
+        services.AddSingleton<IFilingSettings, NoSettings>();
         if (flag is { } value)
         {
             services.AddSingleton<IPlanBuilderSettings>(new Settings(value));
@@ -49,5 +58,35 @@ public sealed class PlanBuilderChoiceTests
     private sealed class Settings(bool useSelection) : IPlanBuilderSettings
     {
         public bool UseSelection => useSelection;
+    }
+
+    private sealed class NoDecisions : IEventFilterDecisions
+    {
+        public Task<IReadOnlyList<EventFilterRow>> RowsAsync(int take, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<EventFilterRow>>([]);
+
+        public Task<(long? Id, string? Refused)> AppendAsync(NewEventFilterRow row, CancellationToken cancellationToken) => Task.FromResult<(long?, string?)>((null, "no store in this composition"));
+    }
+
+    private sealed class NoRows : ICalendarRows
+    {
+        public ValueTask<IReadOnlyList<CalendarRow>> ResultsRowsAsync(IReadOnlyCollection<Guid>? instrumentIds, DateTimeOffset cutoff, CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<CalendarRow>>([]);
+    }
+
+    private sealed class PlainCalendar : ITradingCalendar
+    {
+        public ValueTask<TradingCalendar> GetAsync(CancellationToken cancellationToken) => ValueTask.FromResult(new TradingCalendar());
+
+        public void Invalidate()
+        {
+        }
+    }
+
+    private sealed class NoSettings : IFilingSettings
+    {
+        public int LagMinutes => 5;
+
+        public long MaxFilesBytes => 0;
+
+        public long MinFreeBytes => 0;
     }
 }

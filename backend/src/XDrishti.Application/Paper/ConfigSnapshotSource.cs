@@ -9,6 +9,7 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Abstractions.Selection;
 using XDrishti.Application.Learning;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Learning;
@@ -35,7 +36,8 @@ internal sealed class ConfigSnapshotSource(
     IModelRegistry models,
     ISimulationEngine engine,
     IGradeSettings grading,
-    ICostSheetStore costSheets) : IConfigSnapshotSource
+    ICostSheetStore costSheets,
+    IEventFilterDecisions? eventFilter = null) : IConfigSnapshotSource
 {
     private static readonly CellState[] Eligible = [CellState.Candidate, CellState.Paper, CellState.Active];
 
@@ -51,7 +53,24 @@ internal sealed class ConfigSnapshotSource(
         await Group("engine", () => EngineAsync(cancellationToken), components, unreadable);
         components.AddRange(Rules(SelectionPrefix, new SelectionRules()));
         components.AddRange(SmartRules(new SmartRulesOptions()));
+        if (eventFilter is not null)
+        {
+            // P15-06: the event-risk switch is a stored setting (its newest decision row); an unreadable history makes the snapshot partial, it is not read as OFF.
+            await Group("event_filter", () => EventFilterAsync(eventFilter, cancellationToken), components, unreadable);
+        }
+
         return new ConfigReading(components, unreadable);
+    }
+
+    private static async Task<List<ConfigComponent>> EventFilterAsync(IEventFilterDecisions decisions, CancellationToken cancellationToken)
+    {
+        var state = XDrishti.Application.Selection.EventFilterSettings.StateOf(await decisions.RowsAsync(2, cancellationToken));
+        return
+        [
+            new(PaperConfigKeys.SmartRulesPrefix + PaperConfigKeys.EventFilterEnabled, Bool(state.Enabled)),
+            new(PaperConfigKeys.SmartRulesPrefix + PaperConfigKeys.EventFilterResultsWithinDays, state.ResultsWithinDays.ToString(CultureInfo.InvariantCulture)),
+            new(PaperConfigKeys.SmartRulesPrefix + PaperConfigKeys.EventFilterApproval, state.Approval),
+        ];
     }
 
     private static string SelectionPrefix => PaperConfigKeys.SelectionPrefix;

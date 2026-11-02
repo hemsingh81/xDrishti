@@ -1,6 +1,6 @@
-engine sim-6
+engine sim-7
 == V1 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 candidate VWAP_PULLBACK TEST Buy index=7964 decision=2026-03-02 10:45 tf=M15 stop=112.5 bar=2026-03-02 10:30 O=113 H=114 L=113 C=113.75 V=15000 minutes=15 complete=True
   buy.setup[0] `tf("1h").ema(20) > tf("1h").ema(50)` True
     ema(20)@1h [110.3399878624639]
@@ -36,7 +36,7 @@ counters Sell bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outO
   sell.trigger[2] T=6 F=412 U=0 N=0
 walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=1 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=46 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=1 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == V2 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 candidate VWAP_PULLBACK TEST Buy index=7964 decision=2026-03-02 10:45 tf=M15 stop=112.5 bar=2026-03-02 10:30 O=113 H=114 L=113 C=113.75 V=15000 minutes=15 complete=True
   buy.setup[0] `tf("1h").ema(20) > tf("1h").ema(50)` True
     ema(20)@1h [110.3399878624639]
@@ -72,7 +72,7 @@ counters Sell bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outO
   sell.trigger[2] T=4 F=414 U=0 N=0
 walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=1 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=21 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=1 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == V3 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 trades 
 openAtEnd 
 counters Buy bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outOfWindow=132 window=418 fullyReady=38 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
@@ -89,7 +89,7 @@ counters Sell bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outO
   sell.trigger[2] T=6 F=412 U=0 N=0
 walk candidates=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0 limitNotReached=0 entriesAtOpen=0 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=0 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == V4 pull 0.5 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 trades 
 openAtEnd 
 counters Buy bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outOfWindow=132 window=418 fullyReady=38 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
@@ -106,7 +106,7 @@ counters Sell bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outO
   sell.trigger[2] T=4 F=414 U=0 N=0
 walk candidates=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0 limitNotReached=0 entriesAtOpen=0 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=0 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == V4 pull 2.0 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 candidate VWAP_PULLBACK TEST Buy index=8189 decision=2026-03-02 14:30 tf=M15 stop=112.5 bar=2026-03-02 14:15 O=113 H=114 L=113 C=113.75 V=15000 minutes=15 complete=True
   buy.setup[0] `tf("1h").ema(20) > tf("1h").ema(50)` True
     ema(20)@1h [110.50404145801176]
@@ -142,7 +142,7 @@ counters Sell bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outO
   sell.trigger[2] T=4 F=414 U=0 N=0
 walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=1 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=46 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=1 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == V4 one bar later pull 2.0 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 trades 
 openAtEnd 
 counters Buy bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outOfWindow=132 window=418 fullyReady=38 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
@@ -159,7 +159,7 @@ counters Sell bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outO
   sell.trigger[2] T=4 F=414 U=0 N=0
 walk candidates=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0 limitNotReached=0 entriesAtOpen=0 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=0 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == V5 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 candidate VWAP_PULLBACK TEST Sell index=7964 decision=2026-03-02 10:45 tf=M15 stop=108.5 bar=2026-03-02 10:30 O=108 H=108 L=107 C=107.25 V=15000 minutes=15 complete=True
   sell.setup[0] `tf("1h").ema(20) < tf("1h").ema(50)` True
     ema(20)@1h [110.66001213753609]
@@ -195,7 +195,7 @@ counters Sell bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outO
   sell.trigger[2] T=1 F=417 U=0 N=0
 walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=1 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=46 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=1 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == V6 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 trades 
 openAtEnd 
 counters Buy bars=2250 ignored=0 incomplete=0 decisions=150 lost=0 stale=0 outOfWindow=36 window=114 fullyReady=0 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
@@ -212,7 +212,7 @@ counters Sell bars=2250 ignored=0 incomplete=0 decisions=150 lost=0 stale=0 outO
   sell.trigger[2] T=6 F=108 U=0 N=0
 walk candidates=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0 limitNotReached=0 entriesAtOpen=0 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=0 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == V7 all day ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK_ALLDAY rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK_ALLDAY rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 candidate VWAP_PULLBACK_ALLDAY TEST Buy index=7964 decision=2026-03-02 10:45 tf=M15 stop=112.5 bar=2026-03-02 10:30 O=113 H=114 L=113 C=113.75 V=15000 minutes=15 complete=True
   buy.setup[0] `tf("1h").ema(20) > tf("1h").ema(50)` True
     ema(20)@1h [110.3399878624639]
@@ -248,7 +248,7 @@ counters Sell bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outO
   sell.trigger[2] T=27 F=521 U=0 N=2
 walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=1 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=46 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=1 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == seed 1 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 candidate VWAP_PULLBACK TEST Buy index=8054 decision=2026-03-02 12:15 tf=M15 stop=100.5 bar=2026-03-02 12:00 O=101 H=102.25 L=100.75 C=101.75 V=15589 minutes=15 complete=True
   buy.setup[0] `tf("1h").ema(20) > tf("1h").ema(50)` True
     ema(20)@1h [96.20199273132944]
@@ -303,7 +303,7 @@ counters Sell bars=8999 ignored=0 incomplete=3 decisions=600 lost=0 stale=0 outO
   sell.trigger[2] T=37 F=419 U=0 N=0
 walk candidates=2 trades=2 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=2 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=127 limitNotReached=0 entriesAtOpen=2 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=2 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == seed 2 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 candidate VWAP_PULLBACK TEST Sell index=8187 decision=2026-03-02 14:30 tf=M15 stop=86.25 bar=2026-03-02 14:15 O=85 H=85.25 L=84.25 C=84.5 V=14839 minutes=15 complete=True
   sell.setup[0] `tf("1h").ema(20) < tf("1h").ema(50)` True
     ema(20)@1h [90.35117571684711]
@@ -339,7 +339,7 @@ counters Sell bars=8247 ignored=0 incomplete=7 decisions=550 lost=0 stale=0 outO
   sell.trigger[2] T=3 F=415 U=0 N=0
 walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=1 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=45 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=1 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == seed 3 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 candidate VWAP_PULLBACK TEST Buy index=8144 decision=2026-03-02 13:45 tf=M15 stop=134 bar=2026-03-02 13:30 O=134.5 H=135.25 L=134 C=134.75 V=13994 minutes=15 complete=True
   buy.setup[0] `tf("1h").ema(20) > tf("1h").ema(50)` True
     ema(20)@1h [131.92937163645257]
@@ -375,7 +375,7 @@ counters Sell bars=8624 ignored=0 incomplete=3 decisions=575 lost=0 stale=0 outO
   sell.trigger[2] T=20 F=417 U=0 N=0
 walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=1 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=85 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=1 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == seed 4 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 candidate VWAP_PULLBACK TEST Sell index=7979 decision=2026-03-02 11:00 tf=M15 stop=103 bar=2026-03-02 10:45 O=102.75 H=103 L=101.75 C=102 V=15581 minutes=15 complete=True
   sell.setup[0] `tf("1h").ema(20) < tf("1h").ema(50)` True
     ema(20)@1h [104.7187762427546]
@@ -411,7 +411,7 @@ counters Sell bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outO
   sell.trigger[2] T=4 F=414 U=0 N=0
 walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=1 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=34 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=1 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == seed 5 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 candidate VWAP_PULLBACK TEST Buy index=7978 decision=2026-03-02 11:00 tf=M15 stop=150.25 bar=2026-03-02 10:45 O=151 H=152 L=150.75 C=151.75 V=13079 minutes=14 complete=False
   buy.setup[0] `tf("1h").ema(20) > tf("1h").ema(50)` True
     ema(20)@1h [148.98180221022758]
@@ -485,7 +485,7 @@ counters Sell bars=8996 ignored=0 incomplete=11 decisions=600 lost=0 stale=0 out
   sell.trigger[2] T=36 F=420 U=0 N=0
 walk candidates=3 trades=3 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=2 exitsSquareOff=1 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=220 limitNotReached=0 entriesAtOpen=3 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=3 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == seed 6 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 candidate VWAP_PULLBACK TEST Sell index=7979 decision=2026-03-02 11:00 tf=M15 stop=139.75 bar=2026-03-02 10:45 O=139 H=139.25 L=137.75 C=138.25 V=14121 minutes=15 complete=True
   sell.setup[0] `tf("1h").ema(20) < tf("1h").ema(50)` True
     ema(20)@1h [140.90137853099918]
@@ -540,7 +540,7 @@ counters Sell bars=8623 ignored=0 incomplete=4 decisions=575 lost=0 stale=0 outO
   sell.trigger[2] T=9 F=428 U=0 N=0
 walk candidates=2 trades=2 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=2 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=162 limitNotReached=0 entriesAtOpen=2 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=2 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == seed 7 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 candidate VWAP_PULLBACK TEST Buy index=8098 decision=2026-03-02 13:00 tf=M15 stop=144.75 bar=2026-03-02 12:45 O=145.25 H=145.75 L=145.25 C=145.5 V=15193 minutes=15 complete=True
   buy.setup[0] `tf("1h").ema(20) > tf("1h").ema(50)` True
     ema(20)@1h [144.64985844321845]
@@ -576,7 +576,7 @@ counters Sell bars=8623 ignored=0 incomplete=6 decisions=575 lost=0 stale=0 outO
   sell.trigger[2] T=24 F=413 U=0 N=0
 walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=1 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=11 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=1 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == seed 8 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 trades 
 openAtEnd 
 counters Buy bars=8247 ignored=0 incomplete=7 decisions=550 lost=0 stale=0 outOfWindow=132 window=418 fullyReady=38 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
@@ -593,7 +593,7 @@ counters Sell bars=8247 ignored=0 incomplete=7 decisions=550 lost=0 stale=0 outO
   sell.trigger[2] T=8 F=410 U=0 N=0
 walk candidates=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0 limitNotReached=0 entriesAtOpen=0 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=0 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == seed 9 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 trades 
 openAtEnd 
 counters Buy bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outOfWindow=132 window=418 fullyReady=38 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
@@ -610,7 +610,7 @@ counters Sell bars=8250 ignored=0 incomplete=0 decisions=550 lost=0 stale=0 outO
   sell.trigger[2] T=5 F=413 U=0 N=0
 walk candidates=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0 limitNotReached=0 entriesAtOpen=0 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=0 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
 == seed 10 ==
-header engine=sim-6 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
+header engine=sim-7 schema=5 strategy=VWAP_PULLBACK rules={"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"}} fills=Modelled costs=None labels=[fills: modelled | entry limit: +0.1 % | costs: none | portfolio limits: not simulated | sample: in-sample]
 trades 
 openAtEnd 
 counters Buy bars=8999 ignored=0 incomplete=3 decisions=600 lost=0 stale=0 outOfWindow=144 window=456 fullyReady=76 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0

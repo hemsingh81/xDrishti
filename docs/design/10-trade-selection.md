@@ -44,7 +44,7 @@ Filtered tickets stay on the reserve list with the reason, and are graded like e
 | Min achievable R:R before obstacle | 1.5 |
 | Min OOS sample | 30 |
 | Max costs | 0.10R |
-| Liquidity / events / F&O ban / surveillance | excluded |
+| Liquidity / events / F&O ban / surveillance | excluded (events: with results within N sessions, from the results calendar, once the owner switches the event filter on, [ADR 0182](../adr/0182-the-event-risk-filter-reads-the-results-calendar-in-the-simulator-and-behind-an-owner-switch-in-the-plan-and-the-results-loss-tag-describes-the-past-and-unavailable-is-never-a-pass.md); an instrument with no calendar entry is held, never passed) |
 
 ## 3. Merge duplicates
 

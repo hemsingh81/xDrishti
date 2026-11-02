@@ -1,5 +1,6 @@
 using System.Globalization;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Filings;
 
 namespace XDrishti.Domain.Learning;
 
@@ -14,8 +15,14 @@ public static class LossTagAnalyzer
     /// <summary>A rough share of comparisons that flag by chance alone (a rough planning figure, not a test); the report prints comparisons times this.</summary>
     public const double ChanceFlagRate = 0.05;
 
-    /// <summary>Tags the losses of <paramref name="inputs"/>; fails on bad options, no trades, a repeated trade key or a non-finite R.</summary>
-    public static Result<LossTagReport> Analyze(IReadOnlyList<LossTagInput> inputs, LossTagOptions options)
+    /// <summary>Tags the losses of <paramref name="inputs"/> with no results events supplied; see <see cref="Analyze(IReadOnlyList{LossTagInput}, LossTagOptions, IReadOnlyDictionary{Guid, IReadOnlyList{EventInstant}}?)"/>.</summary>
+    public static Result<LossTagReport> Analyze(IReadOnlyList<LossTagInput> inputs, LossTagOptions options) => Analyze(inputs, options, null);
+
+    /// <summary>
+    /// Tags the losses of <paramref name="inputs"/>; fails on bad options, no trades, a repeated trade key or a non-finite R. <paramref name="events"/> holds the results event instants by instrument (null: not supplied at all). A loss whose instrument has no entry
+    /// is untagged for <see cref="LossTagKind.NewsResults"/> and counted in <see cref="LossTagReport.NewsResultsUnavailable"/>: nothing is known, which is never "no news".
+    /// </summary>
+    public static Result<LossTagReport> Analyze(IReadOnlyList<LossTagInput> inputs, LossTagOptions options, IReadOnlyDictionary<Guid, IReadOnlyList<EventInstant>>? events)
     {
         ArgumentNullException.ThrowIfNull(inputs);
         ArgumentNullException.ThrowIfNull(options);
@@ -48,10 +55,12 @@ public static class LossTagAnalyzer
         var cells = new List<CellLossTags>();
         var allLosses = new List<TaggedLoss>();
         var comparisons = 0;
+        var newsUnavailable = 0;
+        var noData = new HashSet<Guid>();
         foreach (var group in inputs.GroupBy(i => i.CellKey, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal))
         {
             var losses = group.Where(i => i.R < 0)
-                .Select(i => new TaggedLoss(i.Trade.Key, group.Key, i.R, i.Trade.ExitEpochSeconds, LossTagger.Tag(i.Trade, options)))
+                .Select(i => new TaggedLoss(i.Trade.Key, group.Key, i.R, i.Trade.ExitEpochSeconds, LossTagger.Tag(i.Trade, options, EventsOf(events, i.Trade.InstrumentId, ref newsUnavailable, noData))))
                 .OrderBy(l => l.ExitEpochSeconds).ThenBy(l => l.Key, StringComparer.Ordinal)
                 .ToList();
             var counts = kinds.Select(k => losses.Count(l => l.Tags.Any(t => t.Kind == k))).ToList();
@@ -62,7 +71,7 @@ public static class LossTagAnalyzer
             {
                 var recent = losses.Skip(losses.Count - w).ToList();
                 var earlier = losses.Skip(losses.Count - (2 * w)).Take(w).ToList();
-                foreach (var kind in kinds.Where(k => k != LossTagKind.NormalVariance))
+                foreach (var kind in kinds.Where(k => k != LossTagKind.NormalVariance && (k != LossTagKind.NewsResults || events is not null)))
                 {
                     comparisons++;
                     var rc = recent.Count(l => l.Tags.Any(t => t.Kind == kind));
@@ -88,7 +97,23 @@ public static class LossTagAnalyzer
             string.Create(c, $"The growing-tag detector compared {comparisons} cell and tag pairs, counting only cells with at least {2 * options.GrowingWindow} losses; at an assumed 5 per cent chance per comparison about {expected:F1} flags are expected by luck alone. A flag is a question for a lesson, not a finding."),
             "Replayed history with modelled fills: slippage and gap figures are as good as the fill model.",
         };
-        return Result.Success(new LossTagReport(options, inputs.Count, allLosses.Count, cells, worst, comparisons, limits));
+        limits.Add(events is null
+            ? "Results events were not supplied: the news_results tag was not assigned to any loss (not the same as no news)."
+            : string.Create(c, $"The news_results tag rests on stored results filings and calendar meetings; {newsUnavailable} losses of {noData.Count} instruments had no such data and carry no news_results tag (not the same as no news)."));
+        return Result.Success(new LossTagReport(options, inputs.Count, allLosses.Count, cells, worst, comparisons, limits, newsUnavailable, noData.Count, events is not null));
+    }
+
+    // Null for a loss whose events were not supplied; counts it (and its instrument) as unavailable.
+    private static IReadOnlyList<EventInstant>? EventsOf(IReadOnlyDictionary<Guid, IReadOnlyList<EventInstant>>? events, Guid instrumentId, ref int unavailable, HashSet<Guid> noData)
+    {
+        if (events is not null && events.TryGetValue(instrumentId, out var found))
+        {
+            return found;
+        }
+
+        unavailable++;
+        noData.Add(instrumentId);
+        return null;
     }
 
     private static Result<LossTagReport> Fail(string message) => Result.Failure<LossTagReport>(Error.Validation(InvalidCode, message));

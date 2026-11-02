@@ -99,7 +99,7 @@ public static class ExportSpellings
     /// <summary>The code of the skip reason (<see cref="SkipReasons.ToCode"/>).</summary>
     public static string Of(SkipReason reason) => reason.ToCode();
 
-    /// <summary><c>no_fill_bar</c> · <c>after_square_off</c> · <c>entry_through_stop</c> · <c>limit_not_reached</c> · <c>position_open</c> · <c>order_pending_at_end</c>.</summary>
+    /// <summary><c>no_fill_bar</c> · <c>after_square_off</c> · <c>entry_through_stop</c> · <c>limit_not_reached</c> · <c>position_open</c> · <c>order_pending_at_end</c> · <c>event_blocked</c> · <c>event_unavailable</c>.</summary>
     public static string Of(NoTradeReason reason) => reason switch
     {
         NoTradeReason.NoFillBar => "no_fill_bar",
@@ -108,6 +108,8 @@ public static class ExportSpellings
         NoTradeReason.LimitNotReached => "limit_not_reached",
         NoTradeReason.PositionOpen => "position_open",
         NoTradeReason.OrderPendingAtEnd => "order_pending_at_end",
+        NoTradeReason.EventBlocked => "event_blocked",
+        NoTradeReason.EventUnavailable => "event_unavailable",
         _ => throw Unknown(reason),
     };
 

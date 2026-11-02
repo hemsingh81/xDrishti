@@ -1,4 +1,6 @@
 using System.Globalization;
+using XDrishti.Domain.Filings;
+using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 
@@ -11,10 +13,17 @@ namespace XDrishti.Domain.Learning;
 public static class LossTagger
 {
     /// <summary>The version of the rules; changing any rule or default raises it.</summary>
-    public const string RuleVersion = "lt-2";
+    public const string RuleVersion = "lt-3";
 
-    /// <summary>The tags of a trade, in the order of <see cref="LossTagKind"/>; the caller decides what a loss is (R below 0). A stop-out that is a loss only after costs (exact R not below 0) gets no NormalVariance and is untagged unless another rule fits.</summary>
-    public static IReadOnlyList<LossTag> Tag(SimTrade trade, LossTagOptions options)
+    /// <summary>The tags of a trade with no results events supplied (<see cref="LossTagKind.NewsResults"/> is never assigned and the caller counts it unavailable); see <see cref="Tag(SimTrade, LossTagOptions, IReadOnlyList{EventInstant}?)"/>.</summary>
+    public static IReadOnlyList<LossTag> Tag(SimTrade trade, LossTagOptions options) => Tag(trade, options, null);
+
+    /// <summary>
+    /// The tags of a trade, in the order of <see cref="LossTagKind"/>; the caller decides what a loss is (R below 0). A stop-out that is a loss only after costs (exact R not below 0) gets no NormalVariance and is untagged unless another rule fits.
+    /// <paramref name="events"/> are the results event instants of the trade's instrument (null: not supplied, no <see cref="LossTagKind.NewsResults"/> tag and never "no news"; an empty list: supplied, none): the tag is given when an instant lies in
+    /// <c>[entry, exit]</c>, both inclusive, and is decided before <see cref="LossTagKind.NormalVariance"/>.
+    /// </summary>
+    public static IReadOnlyList<LossTag> Tag(SimTrade trade, LossTagOptions options, IReadOnlyList<EventInstant>? events)
     {
         ArgumentNullException.ThrowIfNull(trade);
         ArgumentNullException.ThrowIfNull(options);
@@ -65,6 +74,11 @@ public static class LossTagger
             tags.Add(new LossTag(LossTagKind.WideStop, fraction, options.WideStopFraction, string.Create(c, $"stop {fraction:P2} of the entry price away; threshold {options.WideStopFraction:P2}")));
         }
 
+        if (events is not null && NewsResults(trade, events) is { } news)
+        {
+            tags.Add(news);
+        }
+
         if (tags.Count == 0 && stopped && trade.RExact < 0 && trade.RExact >= -options.NormalVarianceMaxLossR)
         {
             tags.Add(new LossTag(LossTagKind.NormalVariance, trade.RExact, -options.NormalVarianceMaxLossR, string.Create(c, $"stopped out at {trade.RExact:F2} R with none of the other signatures; the ordinary cost of the strategy")));
@@ -72,6 +86,26 @@ public static class LossTagger
 
         return tags;
     }
+
+    // The earliest event instant inside [entry, exit]; a broadcast wins a tie with a calendar session open (the broadcast is what hit the trade).
+    private static LossTag? NewsResults(SimTrade trade, IReadOnlyList<EventInstant> events)
+    {
+        var entry = DateTimeOffset.FromUnixTimeSeconds(trade.EntryEpochSeconds);
+        var exit = DateTimeOffset.FromUnixTimeSeconds(trade.ExitEpochSeconds);
+        var hit = events.Where(e => e.At >= entry && e.At <= exit).OrderBy(e => e.At.UtcTicks).ThenBy(e => e.FromCalendar).FirstOrDefault();
+        if (hit is null)
+        {
+            return null;
+        }
+
+        var c = CultureInfo.InvariantCulture;
+        var minutes = (hit.At - entry).TotalMinutes;
+        var what = hit.FromCalendar ? "results meeting session" : "results broadcast";
+        var detail = string.Create(c, $"{what} {Ist(hit.At)} IST while the trade was open (entry {Ist(entry)} IST, exit {Ist(exit)} IST)") + (hit.FromCalendar ? "; basis: calendar" : string.Empty);
+        return new LossTag(LossTagKind.NewsResults, minutes, 0, detail);
+    }
+
+    private static string Ist(DateTimeOffset instant) => IndiaTime.ToIst(instant).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
 
     private static string Clock(int minute) => string.Create(CultureInfo.InvariantCulture, $"{minute / 60:D2}:{minute % 60:D2}");
 }

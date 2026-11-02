@@ -1,8 +1,11 @@
+#pragma warning disable CA2012 // NSubstitute setup on ValueTask members is not awaited
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
+using XDrishti.Domain.Filings;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Research;
 using XDrishti.Tests.Shared;
@@ -53,6 +56,39 @@ public sealed class AnalyzeLossTagsHandlerTests
         var cell = result.Value.Cells.ShouldHaveSingleItem();
         cell.CellKey.ShouldBe("ORB|15m|BUY|intraday|FIXED_RR|*");
         cell.Counts[(int)LossTagKind.GapThroughStop].ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_events_of_the_instruments_that_lost_are_read_once_and_tag_the_loss_across_a_results_broadcast_and_without_a_reader_the_tag_is_counted_unavailable()
+    {
+        var trades = new[] { Stop(0, -1, 99) };
+        _runs.FindAsync(Key, Ct).Returns(Header());
+        _runs.StreamTradesAsync(Key, false, Ct).Returns(_ => Stream(trades));
+        var broadcast = DateTimeOffset.FromUnixTimeSeconds(trades[0].EntryEpochSeconds);   // the entry instant itself: inside the span, both ends included
+        var events = Substitute.For<ILossTagEvents>();
+        events.ReadAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Ct).Returns(ValueTask.FromResult<IReadOnlyDictionary<Guid, IReadOnlyList<EventInstant>>?>(new Dictionary<Guid, IReadOnlyList<EventInstant>> { [FabricatedRun.IdA] = [new EventInstant(broadcast, false)] }));
+
+        var tagged = await new AnalyzeLossTagsHandler(_runs, new FakeTimeProvider(), NullLogger<AnalyzeLossTagsHandler>.Instance, events).HandleAsync(Query(), Ct);
+        var without = await Handler().HandleAsync(Query(), Ct);
+
+        tagged.Value.Cells.Single().Counts[(int)LossTagKind.NewsResults].ShouldBe(1);
+        tagged.Value.NewsResultsUnavailable.ShouldBe(0);
+        without.Value.Cells.Single().Counts[(int)LossTagKind.NewsResults].ShouldBe(0);
+        without.Value.NewsResultsUnavailable.ShouldBe(1, "no reader: the tag is not assigned and is counted, never read as no news");
+        await events.Received(1).ReadAsync(Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.Count == 1 && ids.Contains(FabricatedRun.IdA)), Ct);
+    }
+
+    [Fact]
+    public async Task A_reader_that_answers_not_supplied_leaves_every_loss_untagged_for_news_and_counted()
+    {
+        _runs.FindAsync(Key, Ct).Returns(Header());
+        _runs.StreamTradesAsync(Key, false, Ct).Returns(_ => Stream([Stop(0, -1, 99)]));
+        var events = Substitute.For<ILossTagEvents>();
+        events.ReadAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Ct).Returns(ValueTask.FromResult<IReadOnlyDictionary<Guid, IReadOnlyList<EventInstant>>?>(null));
+
+        var result = await new AnalyzeLossTagsHandler(_runs, new FakeTimeProvider(), NullLogger<AnalyzeLossTagsHandler>.Instance, events).HandleAsync(Query(), Ct);
+
+        (result.Value.NewsResultsUnavailable, result.Value.EventsSupplied).ShouldBe((1, false));
     }
 
     [Fact]

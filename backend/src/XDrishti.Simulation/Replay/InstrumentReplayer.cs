@@ -151,6 +151,12 @@ public static class InstrumentReplayer
             return Same(new InstrumentReplay(Record(input, facts, SkipReason.ContextUnavailable, cause, Scanned.None), [], []), count);
         }
 
+        if (strategy.ReadsEvents && input.Events is null)
+        {
+            // The strategy names `not_event_day` and the replay was given no results-calendar snapshot: it cannot be evaluated here, and an empty result with no reason would look like "no signals" (P15-06, ADR 0182).
+            return Same(new InstrumentReplay(Record(input, facts, SkipReason.EventCalendarUnavailable, "no_event_calendar", Scanned.None), [], []), count);
+        }
+
         if (scan.Ran.Count == 0)
         {
             return Same(new InstrumentReplay(Record(input, facts, SkipReason.NoRunnableSessions, null, Scanned.None), [], []), count);
@@ -373,13 +379,13 @@ public static class InstrumentReplayer
         var context = strategy.ReadsContext ? ContextReader.Of(input.ContextDays) : null;   // the replay has already skipped an instrument whose strategy has no context
         if (strategy.Comparison is { } comparison)
         {
-            var many = comparison.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context);
+            var many = comparison.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events);
             return many.IsFailure
                 ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + many.Error.Code + ": " + many.Error.Message)
                 : many.Value;
         }
 
-        var run = strategy.Simulator.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context);
+        var run = strategy.Simulator.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events);
         return run.IsFailure
             ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + run.Error.Code + ": " + run.Error.Message)
             : new ComparisonResult([run.Value], run.Value.Scans);
@@ -449,6 +455,8 @@ public static class InstrumentReplayer
         NoTradeReason.LimitNotReached => RunFates.Empty with { LimitNotReached = 1 },
         NoTradeReason.PositionOpen => RunFates.Empty with { PositionOpen = 1 },
         NoTradeReason.OrderPendingAtEnd => RunFates.Empty with { OrderPendingAtEnd = 1 },
+        NoTradeReason.EventBlocked => RunFates.Empty with { EventBlocked = 1 },
+        NoTradeReason.EventUnavailable => RunFates.Empty with { EventUnavailable = 1 },
         _ => throw new InvalidOperationException("A candidate outcome of instrument " + symbol + " is neither a trade nor a known no-trade reason."),
     };
 

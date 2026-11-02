@@ -39,6 +39,9 @@ public static class SimulationErrors
     /// <summary>No stored version has the hash a run names (a located problem at path <c>strategy_hash</c>; spec P3-02d, D8).</summary>
     public const string UnknownStrategyHashCode = "simulation.unknown_strategy_hash";
 
+    /// <summary>A filter the strategy names cannot be evaluated: <c>min_turnover</c>, or <c>not_event_day</c> with no results calendar rows for the window (P15-06, ADR 0182). A located problem of the strategy at path <c>filters</c>.</summary>
+    public const string FilterNotAvailableCode = "simulation.filter_not_available";
+
     /// <summary>The most problems a <see cref="StrategyInvalid"/> error lists; the rest are counted in its message.</summary>
     public const int MaxStrategyProblems = 20;
 
@@ -118,6 +121,13 @@ public static class SimulationErrors
             ? $"The strategy cannot be run: {problems.Count} problems, the first {MaxStrategyProblems} are listed."
             : "The strategy cannot be run.";
         return Error.Validation(StrategyInvalidCode, message) with { Fields = [.. problems.Take(MaxStrategyProblems)] };
+    }
+
+    /// <summary>The strategy names <c>not_event_day</c> and the results calendar cannot be used for the window: <paramref name="reason"/> says why (no rows for the window, or the read failed). Refused before any bar is read.</summary>
+    public static Error EventCalendarNotAvailable(string reason)
+    {
+        ArgumentNullException.ThrowIfNull(reason);
+        return StrategyInvalid([new FieldError("filters", reason, null, FilterNotAvailableCode)]);
     }
 
     /// <summary>The sheet is not stored (or is a <c>test-</c> id).</summary>

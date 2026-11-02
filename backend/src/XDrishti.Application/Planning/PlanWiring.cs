@@ -28,7 +28,7 @@ internal static class PlanWiring
 
     private static readonly ChecklistLimits Limits = ChecklistLimits.Default;
 
-    public static IReadOnlyList<WiredTicket> Wire(IReadOnlyList<(FillCandidate Candidate, TicketDraft Draft)> primaries, PlanContext context, double riskMultiplier)
+    public static IReadOnlyList<WiredTicket> Wire(IReadOnlyList<(FillCandidate Candidate, TicketDraft Draft)> primaries, PlanContext context, double riskMultiplier, Func<string, int?>? daysToResults = null)
     {
         ArgumentNullException.ThrowIfNull(primaries);
         ArgumentNullException.ThrowIfNull(context);
@@ -37,13 +37,13 @@ internal static class PlanWiring
         var wired = new List<WiredTicket>(primaries.Count);
         foreach (var (candidate, draft) in primaries)
         {
-            wired.Add(WireOne(candidate, draft, context, riskMultiplier, addedRisk, addedCost));
+            wired.Add(WireOne(candidate, draft, context, riskMultiplier, addedRisk, addedCost, daysToResults));
         }
 
         return wired;
     }
 
-    private static WiredTicket WireOne(FillCandidate candidate, TicketDraft draft, PlanContext context, double riskMultiplier, Dictionary<Guid, double> addedRisk, Dictionary<Guid, double> addedCost)
+    private static WiredTicket WireOne(FillCandidate candidate, TicketDraft draft, PlanContext context, double riskMultiplier, Dictionary<Guid, double> addedRisk, Dictionary<Guid, double> addedCost, Func<string, int?>? daysToResults)
     {
         if (context.Accounts.Count == 0)
         {
@@ -71,7 +71,7 @@ internal static class PlanWiring
             var decision = result.Decisions.FirstOrDefault(d => d.AccountId == account.AccountId);
             var allocated = decision is { IsAllocated: true };
             var checklistTicket = new ChecklistTicket(symbol, candidate.Side, draft.IndicativeEntry, allocated ? decision!.Quantity : null, allocated ? decision!.RiskPct : null, facts?.Sector);
-            var review = PreTradeChecklist.Evaluate(checklistTicket, ToChecklistAccount(account, facts, context, addedRisk, addedCost), ToFacts(symbol, facts, context), Limits, ChecklistPolicy.Default);
+            var review = PreTradeChecklist.Evaluate(checklistTicket, ToChecklistAccount(account, facts, context, addedRisk, addedCost), ToFacts(symbol, facts, context, daysToResults?.Invoke(symbol)), Limits, ChecklistPolicy.Default);
             foreach (var check in review.Checks.Where(c => c.Outcome != FilterOutcome.Pass))
             {
                 standings.Add("checklist:" + check.Code + (check.Outcome == FilterOutcome.Unavailable ? ":unavailable" : ":fail"));
@@ -139,9 +139,10 @@ internal static class PlanWiring
             a.Mode == TradingMode.ManualLive ? a.LiveReady : null);
     }
 
-    // Everything without a data source is null (unavailable): validation status, results dates, ban list, surveillance, price band, average volume, correlation with the book. The two that come from stored records are the holdings and the open book.
-    private static ChecklistFacts ToFacts(string symbol, InstrumentFacts? facts, PlanContext context) => new(
+    // Everything without a data source is null (unavailable): validation status, results dates (the days come from the results calendar only when the event-risk switch is ON, P15-06), ban list, surveillance, price band, average volume, correlation with the book. The two that come from stored records are the holdings and the open book.
+    private static ChecklistFacts ToFacts(string symbol, InstrumentFacts? facts, PlanContext context, int? daysToResults) => new(
         DataQualityOk: null,
+        DaysToResults: daysToResults,
         HeldLongAnyAccount: facts?.HeldLong,
         OpenTradeExists: context.Book?.Any(b => string.Equals(b.Symbol.Trim(), symbol.Trim(), StringComparison.OrdinalIgnoreCase)));
 }

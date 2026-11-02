@@ -94,6 +94,8 @@ public readonly record struct WalkOutcome(
             AddsTaken: AddsTaken,
             AddsMissed: AddsMissed,
             AddsSkippedRisk: AddsSkippedRisk,
-            AddsSkippedQuantity: AddsSkippedQuantity);
+            AddsSkippedQuantity: AddsSkippedQuantity,
+            EventBlocked: NoTrade == NoTradeReason.EventBlocked ? 1 : 0,
+            EventUnavailable: NoTrade == NoTradeReason.EventUnavailable ? 1 : 0);
     }
 }

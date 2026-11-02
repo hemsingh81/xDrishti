@@ -25,4 +25,10 @@ public enum LossTagKind
 
     /// <summary>A stop-out of about one planned risk that shows none of the other signatures: the ordinary cost of the strategy.</summary>
     NormalVariance,
+
+    /// <summary>
+    /// A results broadcast of the instrument fell inside the span of the trade (entry to exit, both inclusive): the loss was open across a results event (P15-06, rule version <c>lt-3</c>). Appended last so that stored counts keep their order; assigned before
+    /// <see cref="NormalVariance"/> is decided, so a results loss is not called ordinary variance. Only given when the instrument's events were supplied; otherwise it is counted as unavailable, never as "no news".
+    /// </summary>
+    NewsResults,
 }

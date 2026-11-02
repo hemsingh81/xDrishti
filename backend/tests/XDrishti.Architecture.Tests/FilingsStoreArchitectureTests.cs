@@ -28,14 +28,10 @@ public sealed partial class FilingsStoreArchitectureTests
     private static string[] Files(string project, params string[] folder) => Directory.GetFiles(Src([project, .. folder]), "*.cs", SearchOption.AllDirectories);
 
     [Theory]
-    [InlineData("XDrishti.Application.Planning")]
-    [InlineData("XDrishti.Application.Learning")]
     [InlineData("XDrishti.Application.Portfolio")]
     [InlineData("XDrishti.Application.Execution")]
     [InlineData("XDrishti.Application.LiveTrading")]
     [InlineData("XDrishti.Application.Live")]
-    [InlineData("XDrishti.Application.Selection")]
-    [InlineData("XDrishti.Application.Research")]
     [InlineData("XDrishti.Application.Lab")]
     [InlineData("XDrishti.Application.Paper")]
     [InlineData("XDrishti.Application.Depth")]
@@ -54,10 +50,12 @@ public sealed partial class FilingsStoreArchitectureTests
     [Fact]
     public void The_domain_outside_the_filings_folder_the_pure_libraries_and_the_execution_service_reference_no_filings_type()
     {
-        var domain = Types.InAssembly(Domain).That().DoNotResideInNamespaceStartingWith("XDrishti.Domain.Filings").ShouldNot().HaveDependencyOnAny(FilingsNamespaces).GetResult();
+        // P15-06 amends this deliberately: three Domain types and, in the simulator, three types name the filings types the event-risk filter needs; EventFilterArchitectureTests pins the exact sets.
+        var domain = Types.InAssembly(Domain).That().DoNotResideInNamespaceStartingWith("XDrishti.Domain.Filings").And().DoNotHaveNameMatching(EventFilterUsers.Only(EventFilterUsers.DomainTypes))
+            .ShouldNot().HaveDependencyOnAny(FilingsNamespaces).GetResult();
 
         domain.IsSuccessful.ShouldBeTrue("Domain violations: " + string.Join(", ", domain.FailingTypeNames ?? []));
-        foreach (var name in new[] { "XDrishti.Simulation", "XDrishti.Strategies", "XDrishti.Strategies.File", "XDrishti.Indicators", "XDrishti.SimExport", "XDrishti.SimReader", "XDrishti.Execution", "XDrishti.Learning.MlNet", "XDrishti.Mcp", "XDrishti.Feed", "XDrishti.Worker" })
+        foreach (var name in new[] { "XDrishti.Strategies", "XDrishti.Strategies.File", "XDrishti.Indicators", "XDrishti.SimExport", "XDrishti.SimReader", "XDrishti.Execution", "XDrishti.Learning.MlNet", "XDrishti.Mcp", "XDrishti.Feed", "XDrishti.Worker" })
         {
             Types.InAssembly(Assembly.Load(new AssemblyName(name))).ShouldNot().HaveDependencyOnAny(FilingsNamespaces).GetResult().IsSuccessful.ShouldBeTrue(name);
         }
@@ -85,7 +83,7 @@ public sealed partial class FilingsStoreArchitectureTests
             [typeof(IFilingStore).FullName!] = ["IngestFilingsHandler"],
             [typeof(IFilingReader).FullName!] = ["GetFilingCoverageHandler", "GetFilingHandler", "ListFilingsHandler"],
             [typeof(IFilingFiles).FullName!] = ["IngestFilingsHandler"],
-            [typeof(IFilingInstruments).FullName!] = ["GetResultsCalendarHandler", "IngestFilingsHandler", "ListFilingsHandler", "LoadCalendarHandler", "LoadShareholdingHandler"],
+            [typeof(IFilingInstruments).FullName!] = ["GetEventFilterHandler", "GetResultsCalendarHandler", "IngestFilingsHandler", "ListFilingsHandler", "LoadCalendarHandler", "LoadShareholdingHandler"],
         };
         foreach (var (port, names) in allowed)
         {
@@ -103,7 +101,7 @@ public sealed partial class FilingsStoreArchitectureTests
             var result = Types.InAssembly(Assembly.Load(new AssemblyName(name))).That()
                 .DoNotResideInNamespaceStartingWith("XDrishti.Domain.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Abstractions.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Filings")
                 .And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.FilingArchive")
-                .And().DoNotHaveNameMatching("^(DependencyInjection|ApiJsonContext.*|FilingEndpoints|CalendarEndpoints)$")
+                .And().DoNotHaveNameMatching(EventFilterUsers.WithRoots("DependencyInjection|ApiJsonContext.*|FilingEndpoints|CalendarEndpoints"))
                 .ShouldNot().HaveDependencyOnAny(FilingsNamespaces).GetResult();
 
             result.IsSuccessful.ShouldBeTrue(name + " violations: " + string.Join(", ", result.FailingTypeNames ?? []));
@@ -134,7 +132,7 @@ public sealed partial class FilingsStoreArchitectureTests
     public void The_archive_code_never_updates_deletes_or_truncates_a_row_and_writes_only_the_envelope_table_and_the_two_fact_tables_of_P15_04()
     {
         // P15-04 amends this test deliberately: the calendar store writes filings.calendar and the shareholding store writes filings.shareholding, each in its own file and nowhere else.
-        var allowed = new Dictionary<string, string>(StringComparer.Ordinal) { ["CalendarStore.cs"] = "filings.calendar", ["ShareholdingStore.cs"] = "filings.shareholding" };
+        var allowed = new Dictionary<string, string>(StringComparer.Ordinal) { ["CalendarStore.cs"] = "filings.calendar", ["ShareholdingStore.cs"] = "filings.shareholding", ["EventFilterDecisions.cs"] = "filings.event_filter_decisions" };   // P15-06: the switch history, its own file and nowhere else
         foreach (var file in Files("XDrishti.Infrastructure", "FilingArchive"))
         {
             var text = File.ReadAllText(file);

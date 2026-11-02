@@ -88,7 +88,7 @@ public sealed class EvidenceHandlersTests
         new(Key(key), strategy, "basket", "b", "basket:" + strategy, Day, Day, sheet, style, null, exit, null, closed, 0, At);
 
     private static LossTagReport Report(int losses, int window = 30) =>
-        new(new LossTagOptions(GrowingWindow: window), losses, losses, [new CellLossTags("C", losses, losses, [0, 0, 0, 0, 0, 0, losses], 0, [], [0, 0, 0, 0, 0, 0, -1.0 * losses])], [], 0, []);
+        new(new LossTagOptions(GrowingWindow: window), losses, losses, [new CellLossTags("C", losses, losses, [0, 0, 0, 0, 0, 0, losses, 0], 0, [], [0, 0, 0, 0, 0, 0, -1.0 * losses, 0])], [], 0, []);
 
     private static (GetLossTagsHandler Handler, IQueryHandler<AnalyzeLossTagsQuery, Result<LossTagReport>> Analyze) LossTags(IReadOnlyList<XDrishti.Application.Abstractions.Reporting.ReportRunInfo> runs, Result<LossTagReport> answer)
     {
@@ -159,7 +159,7 @@ public sealed class EvidenceHandlersTests
 
         cell.GrowingState.ShouldBe(state);
         (cell.GrowingReason is null).ShouldBe(state == "evaluated");
-        cell.Tags[^1].LostR.ShouldBe(-1.0 * losses);
+        cell.Tags[(int)LossTagKind.NormalVariance].LostR.ShouldBe(-1.0 * losses);   // the tag with the figures; the last kind is news_results since lt-3
     }
 
     [Fact]

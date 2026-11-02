@@ -89,7 +89,7 @@ internal sealed class ModelChecks(ProblemSink sink)
         return new DeclaredParams(values);
     }
 
-    /// <summary>The filter names: each one of the closed set (a warning, nothing evaluates them in P3), none twice. Returns the names that are known, once each.</summary>
+    /// <summary>The filter names: each one of the closed set (a warning for `min_turnover`, which nothing evaluates; `not_event_day` is evaluated by the simulator), none twice. Returns the names that are known, once each.</summary>
     public IReadOnlyList<string> CheckFilters(StrategyDefinition definition)
     {
         var list = definition.Filters ?? [];
@@ -114,12 +114,10 @@ internal sealed class ModelChecks(ProblemSink sink)
             else
             {
                 known.Add(name);
-                sink.Warning(
-                    path,
-                    ModelCodes.FilterNotEvaluated,
-                    name == FilterNames.NotEventDay
-                        ? "The filter `not_event_day` is not evaluated: there is no results calendar yet (P15), so event days are not excluded."
-                        : "The filter `min_turnover` is not evaluated: there is no liquidity data of the universe layer yet (doc 10 §2).");
+                if (name == FilterNames.MinTurnover)
+                {
+                    sink.Warning(path, ModelCodes.FilterNotEvaluated, "The filter `min_turnover` is not evaluated: there is no liquidity data of the universe layer yet (doc 10 §2).");
+                }
             }
         }
 

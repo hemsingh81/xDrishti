@@ -1,9 +1,11 @@
 namespace XDrishti.Strategies.Model;
 
-/// <summary>The closed set of filter names of schema 1 (doc 11 §2). Both are accepted with a warning and not evaluated: nothing in P3 has the data (no results calendar, no liquidity data).</summary>
+/// <summary>
+/// The closed set of filter names of schema 1 (doc 11 §2). <c>not_event_day</c> is evaluated by the simulator from a results-calendar snapshot (P15-06, ADR 0182); <c>min_turnover</c> is accepted with a warning and not evaluated: nothing has the liquidity data of the universe layer yet.
+/// </summary>
 internal static class FilterNames
 {
-    /// <summary>Skip event days (needs the results calendar, P15).</summary>
+    /// <summary>No position is open across a results event (the simulator reads the results calendar snapshot of the run, P15-06).</summary>
     public const string NotEventDay = "not_event_day";
 
     /// <summary>Require a minimum turnover (needs the liquidity data of the universe layer, doc 10 §2).</summary>

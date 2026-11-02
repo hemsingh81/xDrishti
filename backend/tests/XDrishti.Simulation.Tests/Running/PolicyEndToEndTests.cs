@@ -55,7 +55,7 @@ public sealed class PolicyEndToEndTests
             var c = result.Walk;
             c.Trades.ShouldBe(c.ExitsStop + c.ExitsTarget + c.ExitsSquareOff + c.ExitsMaxHold + c.ExitsEndOfData + c.ExitsTimeStop, label + " " + day);
             c.LegsTotal.ShouldBe(result.Outcomes.Sum(o => o.Walk.Trade?.Legs?.Count ?? 0), label + " " + day);
-            result.Header.EngineVersion.ShouldBe("sim-6");
+            result.Header.EngineVersion.ShouldBe("sim-7");
         }
     }
 

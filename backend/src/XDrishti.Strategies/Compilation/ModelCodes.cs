@@ -151,7 +151,7 @@ public static class ModelCodes
     /// <summary>A filter name that is not <c>not_event_day</c> or <c>min_turnover</c>; the suggestion is the closest. Path <c>filters[i]</c>. Error.</summary>
     public const string UnknownFilter = Prefix + "unknown_filter";
 
-    /// <summary>A known filter that nothing in P3 evaluates (no results calendar, no liquidity data). Path <c>filters[i]</c>. Warning.</summary>
+    /// <summary>A known filter that nothing evaluates yet (`min_turnover`: no liquidity data of the universe layer; `not_event_day` is evaluated since P15-06). Path <c>filters[i]</c>. Warning.</summary>
     public const string FilterNotEvaluated = Prefix + "filter_not_evaluated";
 
     /// <summary>A filter listed twice; reported at the second. Path <c>filters[i]</c>. Error.</summary>

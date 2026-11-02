@@ -38,7 +38,7 @@ internal static class JobFixtures
     {
         var record = new
         {
-            schema_version = 6,
+            schema_version = SimulationRun.CurrentSchemaVersion,
             strategy = new { id = "ORB", parameters = new { or_min = 15, rr = 2 }, definition_json = definition ?? Definition(), definition_sha256 = sha.Length == 0 ? DefinitionSha : sha, evaluation_timeframe = timeframe, sides = new[] { "BUY" } },
             from = "2024-04-01",
             to = "2026-04-30",
@@ -53,8 +53,8 @@ internal static class JobFixtures
 
     public const string SheetCosts = """{"sheet_id":"default","rates_sha256":"x","sheet_json":"{}","checked":null,"capital":1000000,"profile":{"name":"standard","risk_per_trade_pct":0.5,"max_capital_per_trade_pct":25},"max_cost_r":0.1}""";
 
-    public static StoredRunHeader Header(string key = BaselineKey, int schema = 6, string? fills = null, string sha = "") =>
-        new(1, key, "sim-6", schema, 5, "ORB", sha.Length == 0 ? DefinitionSha : sha, new DateOnly(2024, 4, 1), new DateOnly(2026, 4, 30), "instrument_list", "x", 2, 2, 0, 0, 10, 0, false, fills ?? Fills, null, null, 100, new string('b', 64), new string('c', 64), DateTimeOffset.UnixEpoch, "cli:simulate");
+    public static StoredRunHeader Header(string key = BaselineKey, int schema = SimulationRun.CurrentSchemaVersion, string? fills = null, string sha = "") =>
+        new(1, key, "sim-7", schema, 5, "ORB", sha.Length == 0 ? DefinitionSha : sha, new DateOnly(2024, 4, 1), new DateOnly(2026, 4, 30), "instrument_list", "x", 2, 2, 0, 0, 10, 0, false, fills ?? Fills, null, null, 100, new string('b', 64), new string('c', 64), DateTimeOffset.UnixEpoch, "cli:simulate");
 
     public static IPreparedStrategy Prepared(string sha)
     {
