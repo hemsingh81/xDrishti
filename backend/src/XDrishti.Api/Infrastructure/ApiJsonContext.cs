@@ -5,6 +5,7 @@ using XDrishti.Api.Auth;
 using XDrishti.Api.Endpoints;
 using XDrishti.Api.Lab;
 using XDrishti.Application.Abstractions.Ai;
+using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Research;
@@ -24,6 +25,7 @@ using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Depth;
 using XDrishti.Application.Execution;
+using XDrishti.Application.Filings;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
@@ -119,6 +121,9 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(BackfillProbeAccepted))]
 [JsonSerializable(typeof(OptionBackfillProbeRequest))]
 [JsonSerializable(typeof(OptionCoverageView))]
+[JsonSerializable(typeof(FilingCoverageView))]
+[JsonSerializable(typeof(FilingListView))]
+[JsonSerializable(typeof(FilingView))]
 [JsonSerializable(typeof(ComplianceView))]
 [JsonSerializable(typeof(ComplianceRecordView))]
 [JsonSerializable(typeof(RecordComplianceRequest))]

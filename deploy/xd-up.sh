@@ -48,6 +48,14 @@ if [ ! -d "$XD_CSV_DIR" ]; then
   say "Created the CSV folder $XD_CSV_DIR (put the <SYMBOL>_1m.csv.gz files there)."
 fi
 
+# 1c) The filings folders (P15-01, P15-02, ADR 0179, 0180): the inbox the owner drops files into (scripts/filings-drop.sh) and the store folder of the ingested files. Both 0700 (the filings source refuses a wider inbox);
+#     never deleted by the app. Mounted into xd-api (inbox read-only).
+for dir in ../data/filings ../data/filings/inbox ../data/filings/files; do
+  if [ ! -d "$dir" ]; then
+    (umask 077; mkdir -p "$dir")
+  fi
+done
+
 # 2) Secrets: macOS Keychain is the source of truth.
 secret() { # secret <keychain-service> → prints the value, creating it on first use
   local service="$1" value

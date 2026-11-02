@@ -99,3 +99,6 @@ Results: 4,280 envelopes over five years plus shareholding (4,280), calendar (ab
 - [ ] `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any path where `ingested_at`, a period end or a file date decides visibility, any update or delete grant, and any caller of `AsOf` outside the allowed list)
 - [ ] Migration `AddFilingsStore` with `Down`; contract regenerated (`scripts/gen-api.sh`); compose mount added
 - [ ] ADR written; doc 20 §D, doc 05 (new tables) and `deploy/CLAUDE.md` updated
+
+## As built (2026-11-02)
+- ADR 0180 (Proposed). Deviations from the text above, all conservative: the service runs in the scheduler of `xd-api` (the only host with one; `xd-worker` has no scheduler) and the compose mount is on `xd-api`; the unavailable reason `absent` is the P15-01 word `missing`; `GET /api/filings/{id}` was added for the 404; `asOf` needs an instrument and a kind; the out-of-order count in the coverage is derived (extra unlinked roots of a period); an undated filing is counted in `UnavailableCount`, so criterion 8(a) holds for the listed filings and, for filings broadcast too late to be known, for the whole answer; a new setting `Filings:FilesPath` names the store folder.

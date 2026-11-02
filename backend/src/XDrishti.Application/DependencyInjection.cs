@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Capabilities;
 using XDrishti.Application.Abstractions.Depth;
+using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
@@ -33,6 +34,7 @@ using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
 using XDrishti.Application.Depth;
 using XDrishti.Application.Execution;
+using XDrishti.Application.Filings;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
@@ -138,6 +140,10 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetOptionChainRecorderQuery, OptionChainRecorderView>, GetOptionChainRecorderHandler>(); // the owner's option-chain switch (P14-02): read
         services.AddScoped<IQueryHandler<GetOptionBackfillQuery, OptionBackfillView>, GetOptionBackfillHandler>(); // the owner's backfill switch, acceptance and progress (P14-03): read
         services.AddScoped<IQueryHandler<GetOptionCoverageQuery, Result<OptionCoverageView>>, GetOptionCoverageHandler>(); // the stored quality verdicts of the option archive, aggregates only (P14-04): read
+        services.AddScoped<ICommandHandler<IngestFilingsCommand, FilingIngestSummary>, IngestFilingsHandler>(); // the filing ingest (P15-02): local inbox -> store folder + insert-only envelopes; no network
+        services.AddScoped<IQueryHandler<GetFilingCoverageQuery, Result<FilingCoverageView>>, GetFilingCoverageHandler>(); // counts of the filing store (P15-02): read
+        services.AddScoped<IQueryHandler<ListFilingsQuery, Result<FilingListView>>, ListFilingsHandler>(); // envelope metadata, optionally as of an instant (P15-02): read
+        services.AddScoped<IQueryHandler<GetFilingQuery, Result<FilingView>>, GetFilingHandler>(); // one envelope's metadata (P15-02): read
         services.AddScoped<OptionArchiveQualityRunner>(); // one run of the option-archive quality checks (P14-04): reads the archive, writes only its own result rows
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)
         services.AddScoped<IQueryHandler<GetRampQuery, Result<RampView>>>(sp => sp.GetRequiredService<GetRampHandler>());
@@ -319,6 +325,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, OptionChainRecorderService>(); // the option-chain recorder (P14-02): as the tick recorder; starts paused, "Run now" refused
         services.AddSingleton<IScheduledService, OptionBackfillService>(); // the expired-options backfill (P14-03): as the recorders; starts paused, "Run now" refused
         services.AddSingleton<IScheduledService, OptionArchiveQualityService>(); // the option-archive quality checks (P14-04): daily 16:15, on by default, reads the archive and writes only its own result rows
+        services.AddSingleton<IScheduledService, FilingIngestService>(); // the filing ingest (P15-02): daily 17:05, starts paused, reads the local inbox only
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
         services.AddSingleton<ServiceScheduler>();

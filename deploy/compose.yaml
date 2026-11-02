@@ -131,6 +131,13 @@ services:
       Live__Capture__OrderBook__Enabled: ${XD_LIVE_CAPTURE_ORDER_BOOK:-false}
       # The execution feedback (P11-02, ADR 0150): the weekly live-estimates service (slippage per liquidity bucket, capacity score) reads stored rows only and applies nothing. OFF by default: it only seeds the service paused or running at its first start.
       Live__Estimates__Enabled: ${XD_LIVE_ESTIMATES_ENABLED:-false}
+      # The filings folder (P15-01, P15-02, ADR 0179, 0180): the inbox the owner drops files into (read) and the store folder of the ingested files (written 0600 in 0700 folders, never deleted). Set explicitly because the defaults are relative.
+      # The ingest is the service filings-ingest of the scheduler in this host (paused until the owner switches it on); the lag and the disk limits are deployment settings. No network is involved.
+      Filings__InboxPath: /data/filings/inbox
+      Filings__FilesPath: /data/filings/files
+      Filings__LagMinutes: ${XD_FILINGS_LAG_MINUTES:-5}
+      Filings__MaxFilesGb: ${XD_FILINGS_MAX_FILES_GB:-5}
+      Filings__MinFreeGb: ${XD_FILINGS_MIN_FREE_GB:-20}
       # Market data (ADR 0016): the folder with the <SYMBOL>_1m.csv[.gz] files, mounted read-only below. Dhan Data API fetch: first fetch goes this many days
       # back, at most this many requests per second.
       Data__CsvFolder: /data/csv
@@ -148,6 +155,9 @@ services:
     # The 1-minute CSV files (ADR 0016): read-only, the API never writes there. deploy/xd-up.sh creates the folder when it is missing.
     volumes:
       - ${XD_CSV_DIR:-../data/Stocks_CSV}:/data/csv:ro
+      # The filings inbox (read-only: the ingest never writes, moves or deletes there) and the filings store folder (read-write). deploy/xd-up.sh creates both 0700 when missing.
+      - ../data/filings/inbox:/data/filings/inbox:ro
+      - ../data/filings/files:/data/filings/files
       - ../eval:/data/eval-files:ro
     secrets:
       - source: db_app_password

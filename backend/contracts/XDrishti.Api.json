@@ -15898,6 +15898,151 @@
         }
       }
     },
+    "/api/filings/coverage": {
+      "get": {
+        "tags": [
+          "Filings"
+        ],
+        "summary": "Counts of the stored filings between from and to (default: the last 365 days; at most 800) per kind and quarter: stored with a broadcast time, stored without one (by reason), superseded, out of order, and the tracked instruments with none. A kind with nothing stored answers unavailable. Counts only; 400 filings.invalid_query for a bad range",
+        "operationId": "GetFilingCoverage",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilingCoverageView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/filings": {
+      "get": {
+        "tags": [
+          "Filings"
+        ],
+        "summary": "Filing envelope metadata, newest broadcast first, at most 200 rows (no file content, no path). With asOf (an instant with an offset, needs instrument and kind) it is the point-in-time answer: the filings the market knew at that instant. 400 filings.invalid_query for an unknown kind or instrument or an asOf without an offset",
+        "operationId": "ListFilings",
+        "parameters": [
+          {
+            "name": "instrument",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asOf",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilingListView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/filings/{id}": {
+      "get": {
+        "tags": [
+          "Filings"
+        ],
+        "summary": "The metadata of one stored filing; 404 filings.not_found for an unknown id",
+        "operationId": "GetFiling",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilingView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ticks/recorder": {
       "get": {
         "tags": [
@@ -33958,6 +34103,221 @@
           }
         },
         "description": "The weight of one feature in a model or in one score: a path-based contribution in raw-score units (not exact, not SHAP)."
+      },
+      "FilingCoverageView": {
+        "required": [
+          "from",
+          "to",
+          "trackedInstruments",
+          "kinds"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "trackedInstruments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilingKindCoverage"
+            }
+          }
+        },
+        "description": "The coverage of the filing store between `From` and `To`: counts only."
+      },
+      "FilingKindCoverage": {
+        "required": [
+          "kind",
+          "state",
+          "instrumentsWithout",
+          "quarters"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "instrumentsWithout": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "quarters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilingQuarterCoverage"
+            }
+          }
+        },
+        "description": "One kind: `State` is `value` when anything is stored in the range, else `unavailable` (never a bare zero); `InstrumentsWithout` counts tracked instruments with no filing of the kind in the range."
+      },
+      "FilingListView": {
+        "required": [
+          "state",
+          "unavailableCount",
+          "items",
+          "truncated"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unavailableCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilingView"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "description": "Envelope metadata, at most 200 rows. With `asOf` the `State` is the point-in-time state (`value`, `none_visible`, `unavailable`) and `UnavailableCount` the filings of the instrument and kind without a broadcast time; without it both are null/0."
+      },
+      "FilingQuarterCoverage": {
+        "required": [
+          "quarterEnd",
+          "ok",
+          "unavailable",
+          "superseded",
+          "outOfOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "quarterEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "ok": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unavailable": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilingReasonCount"
+            }
+          },
+          "superseded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "outOfOrder": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Counts of one kind in one quarter (by the period end, else the broadcast or ingest date in India time): `Ok` with a time, `Unavailable` without one, `Superseded` by a later revision, `OutOfOrder` stored unlinked."
+      },
+      "FilingReasonCount": {
+        "required": [
+          "reason",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A count of stored filings without a broadcast time, by closed reason (`absent`, `date_only`, `no_offset`, `unparsable`, `before_2000`, `broadcast_in_future`)."
+      },
+      "FilingView": {
+        "required": [
+          "id",
+          "symbol",
+          "kind",
+          "periodEnd",
+          "broadcastTs",
+          "broadcastState",
+          "unavailableReason",
+          "ingestedAt",
+          "contentSha256",
+          "fileBytes",
+          "fileName",
+          "supersedes"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "periodEnd": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "broadcastTs": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "broadcastState": {
+            "type": "string"
+          },
+          "unavailableReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ingestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "contentSha256": {
+            "type": "string"
+          },
+          "fileBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "supersedes": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "Metadata of one envelope (no file content, no path, no source reference)."
       },
       "FillGrade": {
         "required": [
@@ -56500,6 +56860,9 @@
     },
     {
       "name": "Options"
+    },
+    {
+      "name": "Filings"
     },
     {
       "name": "Ticks"

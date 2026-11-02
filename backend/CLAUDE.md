@@ -24,6 +24,7 @@
   Never edit an applied migration. New schema → call `GrantSchemaUsageToAppRole(schema)` in its migration.
 - `research.sim_runs` and `research.sim_trades` are insert-only for `xd_app` (ADR 0045): a later `research` migration that re-grants the
   schema must call `MakeAppendOnlyForAppRole` for both again (or grant per table with `GrantTableToAppRole`); `ResearchGrantsTests` enforces it.
+- A table-by-table insert-only schema (`options` archive tables, `filings`, ADR 0180) deliberately does not call `GrantSchemaUsageToAppRole`: that helper grants UPDATE and DELETE on every table of the schema. Grant usage, then `GrantTableToAppRole` + `MakeAppendOnlyForAppRole` per table.
 - Reads: `AsNoTracking()`, project to DTOs, paginate. Writes: track only what changes; bulk → Npgsql `COPY`.
 - Time series (bars, ticks, valuations) → TimescaleDB hypertables + continuous aggregates (raw SQL in migration).
 - Runtime uses role `xd_app` (DML only); migrations run as `xd_owner` via `xd-api migrate`. The execution service uses a second runtime role, `xd_exec` (P12-01b, ADR 0156): it alone writes schema `execution`, which `xd_app` can only read (plus INSERT on `commands`); a new `execution` table needs an explicit grant decision in `ExecGrantsTests`.

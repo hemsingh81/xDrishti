@@ -1,0 +1,66 @@
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
+using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Filings;
+using XDrishti.Domain.Common;
+using XDrishti.Domain.Platform.Services;
+
+namespace XDrishti.Application.Tests.Filings;
+
+public sealed class FilingIngestServiceTests
+{
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public void It_is_paused_by_default_daily_at_17_05_on_trading_days_with_one_retry_no_catch_up_and_a_failure_notice()
+    {
+        var settings = FilingIngestService.Definition.Defaults;
+
+        FilingIngestService.Definition.Id.ShouldBe("filings-ingest");
+        settings.Enabled.ShouldBeFalse();
+        settings.Schedule.ShouldBe(Schedule.Daily(new TimeOnly(17, 5)));
+        settings.Schedule.TradingDaysOnly.ShouldBeTrue();
+        (settings.Retries, settings.CatchUp, settings.NotifyOnFailure).ShouldBe((1, false, true));
+        FilingIngestService.Definition.RunsAs.ShouldBe("xd-api");
+    }
+
+    private static FilingIngestService ServiceReturning(FilingIngestSummary summary, out ICommandHandler<IngestFilingsCommand, FilingIngestSummary> handler)
+    {
+        handler = Substitute.For<ICommandHandler<IngestFilingsCommand, FilingIngestSummary>>();
+        handler.HandleAsync(Arg.Any<IngestFilingsCommand>(), Arg.Any<CancellationToken>()).Returns(Result.Success(summary));
+        var provider = Substitute.For<IServiceProvider>();
+        provider.GetService(typeof(ICommandHandler<IngestFilingsCommand, FilingIngestSummary>)).Returns(handler);
+        var scope = Substitute.For<IServiceScope>();
+        scope.ServiceProvider.Returns(provider);
+        var scopes = Substitute.For<IServiceScopeFactory>();
+        scopes.CreateScope().Returns(scope);
+        return new FilingIngestService(scopes);
+    }
+
+    private static ServiceRunContext Context(ServiceRunTrigger trigger) => new(Guid.NewGuid(), trigger, 1, "system", new Dictionary<string, System.Text.Json.JsonElement>(), (_, _) => ValueTask.CompletedTask);
+
+    private static FilingIngestSummary Summary(string? stopped = null, int failures = 0, params string[] problems) =>
+        new(1, 1, 0, 0, 0, 0, 0, 0, new Dictionary<string, int>(), problems, failures, stopped);
+
+    [Theory]
+    [InlineData(ServiceRunTrigger.Manual, true)]
+    [InlineData(ServiceRunTrigger.Scheduled, false)]
+    public async Task A_run_carries_out_the_ingest_and_reports_the_counts_line(ServiceRunTrigger trigger, bool manual)
+    {
+        var service = ServiceReturning(Summary(), out var handler);
+
+        var outcome = await service.RunAsync(Context(trigger), Ct);
+
+        outcome.Status.ShouldBe(ServiceRunStatus.Succeeded);
+        await handler.Received(1).HandleAsync(Arg.Is<IngestFilingsCommand>(c => c.Manual == manual), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_disk_stop_a_failed_file_or_an_inbox_problem_ends_the_run_failed()
+    {
+        (await ServiceReturning(Summary("disk_free"), out _).RunAsync(Context(ServiceRunTrigger.Scheduled), Ct)).Status.ShouldBe(ServiceRunStatus.Failed);
+        (await ServiceReturning(Summary(failures: 1), out _).RunAsync(Context(ServiceRunTrigger.Scheduled), Ct)).Status.ShouldBe(ServiceRunStatus.Failed);
+        (await ServiceReturning(Summary(problems: "inbox_permissions"), out _).RunAsync(Context(ServiceRunTrigger.Scheduled), Ct)).Status.ShouldBe(ServiceRunStatus.Failed);
+    }
+}

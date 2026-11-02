@@ -33,4 +33,7 @@ public static class Schemas
 
     /// <summary>The option archive's reference data (spec P14-01, ADR 0175): <c>contracts</c>, <c>lot_sizes</c> and <c>market_epochs</c>, raw SQL, no EF entity; kept for good.</summary>
     public const string Options = "options";
+
+    /// <summary>The point-in-time filing store (spec P15-02, ADR 0180): <c>filings</c>, <c>result_facts</c>, <c>shareholding</c>, <c>announcements</c> and <c>calendar</c>, raw SQL, no EF entity, all insert-only for the runtime role.</summary>
+    public const string Filings = "filings";
 }

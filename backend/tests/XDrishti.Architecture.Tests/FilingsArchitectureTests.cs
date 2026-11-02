@@ -6,8 +6,8 @@ using XDrishti.Application.Abstractions.Filings;
 namespace XDrishti.Architecture.Tests;
 
 /// <summary>
-/// Spec P15-01 criteria 7 and 8 (ADR 0179): the folder-drop filings source, its port and the Domain types reach no network, write nothing into the inbox, and no fetch setting exists anywhere in the shipped source. Nothing but the filings code and the DI root references
-/// a filings type until the P15-02 ingest exists.
+/// Spec P15-01 criteria 7 and 8 (ADR 0179): the folder-drop filings source, its port and the Domain types reach no network, write nothing into the inbox, and no fetch setting exists anywhere in the shipped source. Nothing but the filings code (P15-01 source, P15-02 ingest and store), the DI roots, the JSON context and the filings route references
+/// a filings type; the decision code is pinned by FilingsStoreArchitectureTests.
 /// </summary>
 public sealed partial class FilingsArchitectureTests
 {
@@ -20,7 +20,7 @@ public sealed partial class FilingsArchitectureTests
         "System.Net.Http", "System.Net.Sockets", "System.Net.WebClient", "System.Net.WebRequest", "System.Net.WebSockets", "System.Net.Security", "XDrishti.Infrastructure.Brokers", "XDrishti.Application.Abstractions.Brokers",
     ];
 
-    private static readonly string[] FilingsNamespaces = ["XDrishti.Domain.Filings", "XDrishti.Application.Abstractions.Filings", "XDrishti.Infrastructure.Filings"];
+    private static readonly string[] FilingsNamespaces = ["XDrishti.Domain.Filings", "XDrishti.Application.Abstractions.Filings", "XDrishti.Infrastructure.Filings", "XDrishti.Application.Filings", "XDrishti.Infrastructure.FilingArchive"];
 
     private static string[] SourceFiles(string project, string folder) =>
         [.. Directory.GetFiles(Path.Combine(Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "XDrishti.slnx"))!, "src", project, folder), "*.cs", SearchOption.AllDirectories)];
@@ -108,7 +108,8 @@ public sealed partial class FilingsArchitectureTests
             var assembly = Assembly.Load(new AssemblyName(name));
             var result = Types.InAssembly(assembly).That()
                 .DoNotResideInNamespaceStartingWith("XDrishti.Domain.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Abstractions.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.Filings")
-                .And().DoNotHaveNameMatching("^(DependencyInjection)$")
+                .And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.FilingArchive")
+                .And().DoNotHaveNameMatching("^(DependencyInjection|ApiJsonContext.*|FilingEndpoints)$")
                 .ShouldNot().HaveDependencyOnAny(FilingsNamespaces).GetResult();
 
             result.IsSuccessful.ShouldBeTrue(name + " violations: " + string.Join(", ", result.FailingTypeNames ?? []));

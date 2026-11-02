@@ -513,7 +513,13 @@ Filings:
   InboxPath: data/filings/inbox   # relative = against the host's working directory; a host sets Filings__InboxPath explicitly (container: /data/filings/inbox)
   MaxFileMb: 20                   # 1-200: a larger file is rejected too_large, unread
   MaxFiles: 5000                  # 100-50000: files examined per scan; more is reported truncated
+  FilesPath: data/filings/files   # P15-02: the store folder of the ingested files (0700/0600); container: /data/filings/files, set explicitly
+  LagMinutes: 5                   # P15-02, 0-60: minutes after the broadcast until a filing counts as known (deployment setting, never owner-switchable)
+  MaxFilesGb: 5                   # 1-100: cap on the store folder; reaching it stops the ingest (disk_budget), nothing is deleted
+  MinFreeGb: 20                   # 5-500: free space the volume keeps; below it the ingest stops (disk_free)
 ```
+
+The ingest is the service `filings-ingest` of the scheduler in `xd-api` ([ADR 0180](../adr/0180-the-point-in-time-filing-store-keeps-immutable-envelopes-and-answers-what-was-known-at-an-instant-from-the-broadcast-time-plus-a-lag-and-nothing-else.md), P15-02): registered **paused**, daily 17:05 on trading days, "Run now" allowed (local files only). Compose: `XD_FILINGS_LAG_MINUTES`, `XD_FILINGS_MAX_FILES_GB`, `XD_FILINGS_MIN_FREE_GB`.
 
 ## 4. Most-used settings
 

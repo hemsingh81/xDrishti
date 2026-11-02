@@ -4535,6 +4535,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/filings/coverage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Counts of the stored filings between from and to (default: the last 365 days; at most 800) per kind and quarter: stored with a broadcast time, stored without one (by reason), superseded, out of order, and the tracked instruments with none. A kind with nothing stored answers unavailable. Counts only; 400 filings.invalid_query for a bad range */
+    get: operations['GetFilingCoverage'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/filings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Filing envelope metadata, newest broadcast first, at most 200 rows (no file content, no path). With asOf (an instant with an offset, needs instrument and kind) it is the point-in-time answer: the filings the market knew at that instant. 400 filings.invalid_query for an unknown kind or instrument or an asOf without an offset */
+    get: operations['ListFilings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/filings/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The metadata of one stored filing; 404 filings.not_found for an unknown id */
+    get: operations['GetFiling'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ticks/recorder': {
     parameters: {
       query?: never;
@@ -10712,6 +10763,71 @@ export interface components {
        * @description For a model the mean absolute contribution over its training rows; for one score the signed contribution.
        */
       meanAbsContribution: number;
+    };
+    /** @description The coverage of the filing store between `From` and `To`: counts only. */
+    FilingCoverageView: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      /** Format: int32 */
+      trackedInstruments: number;
+      kinds: components['schemas']['FilingKindCoverage'][];
+    };
+    /** @description One kind: `State` is `value` when anything is stored in the range, else `unavailable` (never a bare zero); `InstrumentsWithout` counts tracked instruments with no filing of the kind in the range. */
+    FilingKindCoverage: {
+      kind: string;
+      state: string;
+      /** Format: int32 */
+      instrumentsWithout: number;
+      quarters: components['schemas']['FilingQuarterCoverage'][];
+    };
+    /** @description Envelope metadata, at most 200 rows. With `asOf` the `State` is the point-in-time state (`value`, `none_visible`, `unavailable`) and `UnavailableCount` the filings of the instrument and kind without a broadcast time; without it both are null/0. */
+    FilingListView: {
+      state: null | string;
+      /** Format: int32 */
+      unavailableCount: number;
+      items: components['schemas']['FilingView'][];
+      truncated: boolean;
+    };
+    /** @description Counts of one kind in one quarter (by the period end, else the broadcast or ingest date in India time): `Ok` with a time, `Unavailable` without one, `Superseded` by a later revision, `OutOfOrder` stored unlinked. */
+    FilingQuarterCoverage: {
+      /** Format: date */
+      quarterEnd: string;
+      /** Format: int32 */
+      ok: number;
+      unavailable: components['schemas']['FilingReasonCount'][];
+      /** Format: int32 */
+      superseded: number;
+      /** Format: int32 */
+      outOfOrder: number;
+    };
+    /** @description A count of stored filings without a broadcast time, by closed reason (`absent`, `date_only`, `no_offset`, `unparsable`, `before_2000`, `broadcast_in_future`). */
+    FilingReasonCount: {
+      reason: string;
+      /** Format: int32 */
+      count: number;
+    };
+    /** @description Metadata of one envelope (no file content, no path, no source reference). */
+    FilingView: {
+      /** Format: uuid */
+      id: string;
+      symbol: string;
+      kind: string;
+      /** Format: date */
+      periodEnd: null | string;
+      /** Format: date-time */
+      broadcastTs: null | string;
+      broadcastState: string;
+      unavailableReason: null | string;
+      /** Format: date-time */
+      ingestedAt: string;
+      contentSha256: string;
+      /** Format: int64 */
+      fileBytes: number;
+      fileName: string;
+      /** Format: uuid */
+      supersedes: null | string;
     };
     /** @description The grade of what the owner's fills did on a ticket (P7-14, ADR 0093), stored beside the plan-price grade. A realised result, never a simulation: the label is always string FillGrade.Basis. */
     FillGrade: {
@@ -30143,6 +30259,102 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetFilingCoverage: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FilingCoverageView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  ListFilings: {
+    parameters: {
+      query?: {
+        instrument?: string;
+        kind?: string;
+        asOf?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FilingListView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetFiling: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FilingView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };
