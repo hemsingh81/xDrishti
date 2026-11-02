@@ -81,8 +81,11 @@ public sealed partial class FilingsStoreArchitectureTests
         var allowed = new Dictionary<string, string[]>
         {
             [typeof(IFilingStore).FullName!] = ["IngestFilingsHandler"],
-            [typeof(IFilingReader).FullName!] = ["GetFilingCoverageHandler", "GetFilingHandler", "ListFilingsHandler"],
-            [typeof(IFilingFiles).FullName!] = ["IngestFilingsHandler"],
+            [typeof(IFilingReader).FullName!] = ["GetFilingCoverageHandler", "GetFilingFactsHandler", "GetFilingHandler", "ListFilingsHandler"],
+            [typeof(IFilingFiles).FullName!] = ["IngestFilingsHandler", "ParseResultsHandler"],   // P15-03: the parse step opens the stored copy read-only
+            [typeof(IResultFactsStore).FullName!] = ["ParseResultsHandler"],                    // P15-03: the only writer of result_facts and result_parses
+            [typeof(IResultsXbrlReader).FullName!] = ["ParseResultsHandler"],
+            [typeof(IResultFactRows).FullName!] = ["GetFilingFactsHandler", "ResultFactsAsOf"],
             [typeof(IFilingInstruments).FullName!] = ["GetEventFilterHandler", "GetResultsCalendarHandler", "IngestFilingsHandler", "ListFilingsHandler", "LoadCalendarHandler", "LoadShareholdingHandler"],
         };
         foreach (var (port, names) in allowed)
@@ -132,7 +135,13 @@ public sealed partial class FilingsStoreArchitectureTests
     public void The_archive_code_never_updates_deletes_or_truncates_a_row_and_writes_only_the_envelope_table_and_the_two_fact_tables_of_P15_04()
     {
         // P15-04 amends this test deliberately: the calendar store writes filings.calendar and the shareholding store writes filings.shareholding, each in its own file and nowhere else.
-        var allowed = new Dictionary<string, string>(StringComparer.Ordinal) { ["CalendarStore.cs"] = "filings.calendar", ["ShareholdingStore.cs"] = "filings.shareholding", ["EventFilterDecisions.cs"] = "filings.event_filter_decisions" };   // P15-06: the switch history, its own file and nowhere else
+        var allowed = new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["CalendarStore.cs"] = ["filings.calendar"],
+            ["ShareholdingStore.cs"] = ["filings.shareholding"],
+            ["EventFilterDecisions.cs"] = ["filings.event_filter_decisions"],   // P15-06: the switch history, its own file and nowhere else
+            ["ResultFactsStore.cs"] = ["filings.result_parses", "filings.result_facts"],   // P15-03: the parse rows and the facts, this file and nowhere else
+        };
         foreach (var file in Files("XDrishti.Infrastructure", "FilingArchive"))
         {
             var text = File.ReadAllText(file);
@@ -141,7 +150,7 @@ public sealed partial class FilingsStoreArchitectureTests
             Destructive().IsMatch(text).ShouldBeFalse(name + " has an UPDATE, DELETE or TRUNCATE statement");
             foreach (Match insert in InsertInto().Matches(text))
             {
-                insert.Groups[1].Value.ShouldBeOneOf(allowed.TryGetValue(name, out var fact) ? ["filings.filings", fact] : ["filings.filings"], name);
+                insert.Groups[1].Value.ShouldBeOneOf(allowed.TryGetValue(name, out var facts) ? ["filings.filings", .. facts] : ["filings.filings"], name);
             }
         }
     }
@@ -159,9 +168,9 @@ public sealed partial class FilingsStoreArchitectureTests
             foreach (Match write in FactTableWrite().Matches(text))
             {
                 var table = write.Groups[2].Value;
-                var allowed = (name == "CalendarStore.cs" && table == "calendar") || (name == "ShareholdingStore.cs" && table == "shareholding");
+                var allowed = (name == "CalendarStore.cs" && table == "calendar") || (name == "ShareholdingStore.cs" && table == "shareholding") || (name == "ResultFactsStore.cs" && table is "result_facts" or "result_parses");
 
-                allowed.ShouldBeTrue(file + " writes filings." + table + "; P15-03 owns result_facts, P15-08 the extractions and only the two P15-04 stores write calendar and shareholding");
+                allowed.ShouldBeTrue(file + " writes filings." + table + "; only ResultFactsStore (P15-03) writes result_facts and result_parses, P15-08 owns the extractions and only the two P15-04 stores write calendar and shareholding");
             }
         }
     }
@@ -268,6 +277,6 @@ public sealed partial class FilingsStoreArchitectureTests
     [GeneratedRegex(@"INSERT\s+INTO\s+([\w.]+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex InsertInto();
 
-    [GeneratedRegex(@"(INSERT\s+INTO|COPY)\s+filings\.(result_facts|shareholding|announcements|calendar)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"(INSERT\s+INTO|COPY)\s+filings\.(result_facts|result_parses|shareholding|announcements|calendar)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex FactTableWrite();
 }

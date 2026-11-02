@@ -132,6 +132,11 @@ internal sealed class FakeFiles : IFilingFiles
         Copies += created ? 1 : 0;
         return Result.Success(created);
     }
+
+    public Dictionary<string, string> Content { get; } = [];
+
+    public ValueTask<Result<Stream>> OpenAsync(string sha256, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Content.TryGetValue(sha256, out var text) ? Result.Success<Stream>(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(text))) : Result.Failure<Stream>(Error.Validation("unreadable", "missing")));
 }
 
 internal sealed class FakeSettings : IFilingSettings

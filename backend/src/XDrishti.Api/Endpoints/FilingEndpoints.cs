@@ -30,6 +30,21 @@ internal sealed class FilingEndpoints : IEndpointModule
             .WithName("GetFiling")
             .WithSummary("The metadata of one stored filing; 404 filings.not_found for an unknown id")
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/{id:guid}/facts", GetFactsAsync)
+            .WithName("GetFilingFacts")
+            .WithSummary("The parse outcome of one stored results filing with the parser version, the stored facts (field, span, basis, state, number as filed or reason, unit) and the counts and sanity flags the parser kept. Outcome not_parsed until the parse step has run. No file content, no path; 404 filings.not_found for an unknown id")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+    }
+
+    private static async Task<Results<Ok<FilingFactsView>, ProblemHttpResult>> GetFactsAsync(
+        HttpContext http,
+        Guid id,
+        IQueryHandler<GetFilingFactsQuery, Result<FilingFactsView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetFilingFactsQuery(id), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<FilingCoverageView>, ProblemHttpResult>> GetCoverageAsync(

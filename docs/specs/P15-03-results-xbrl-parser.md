@@ -1,6 +1,6 @@
 # P15-03 — Results XBRL parser: a pure, hardened parser for stored results filings, facts per span and basis, `unavailable` for every field the file does not carry
 
-- **Status:** Draft (written 2026-11-02 under the owner's delegation; the owner's Approved is needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-02, "consider all is approved and continue in loop")
 - **Phase / roadmap row:** P15 — slice P15-03 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Results XBRL parser").
 - **Design refs:** docs/design/20 §D · 05 §10 · 19 §1 · P15-00 D3 (point in time), D4 (XBRL is the source of truth for numbers) · ADR 0179 (untrusted files), 0180 (the store, the supersede chain, "consolidated and standalone are for P15-03 to separate"), 0066 (side-table pattern). New ADR: **next free number at build time** (the fact shape, the span and basis rules, the parser version).
 - **Needs:** P15-02 (built: `filings.filings`, `filings.result_facts`, `IPointInTimeFilings`, the `filings-ingest` run). **Owner act:** five real results filings (XBRL plus the PDF of the same filing, for the hand values), at least one consolidated and one standalone, one annual (audited) and, optionally, one bank. **Needed by:** P15-05 (`fu-1`), P15-06's loss tag already reads envelope times only (unchanged).
@@ -87,3 +87,6 @@ Parse ≤ 1 s and ≤ 50 MB per 20 MB file; `IResultFactsAsOf` ≤ 10 ms per ins
 - [ ] `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any DTD or resolver path, any number stored without a unit or span, any guess for a missing field, any read of a non-visible envelope)
 - [ ] Migration `ReshapeResultFacts` with `Down`; contract regenerated (`scripts/gen-api.sh`)
 - [ ] ADR written; doc 20 §D (fact shape, span and basis rules) updated
+
+## Build deviations (2026-11-02, see ADR 0184 "Deviations from the spec")
+`basis_unknown` and the banking format are file-level (parse row `no_facts`, no fact rows); the `pat` fallback is a parse flag; `content_changed`/`unreadable` are retried and not stored; the per-basis read is per (period, span, basis); a stated rounding level gives `scale_unknown`.

@@ -16043,6 +16043,48 @@
         }
       }
     },
+    "/api/filings/{id}/facts": {
+      "get": {
+        "tags": [
+          "Filings"
+        ],
+        "summary": "The parse outcome of one stored results filing with the parser version, the stored facts (field, span, basis, state, number as filed or reason, unit) and the counts and sanity flags the parser kept. Outcome not_parsed until the parse step has run. No file content, no path; 404 filings.not_found for an unknown id",
+        "operationId": "GetFilingFacts",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilingFactsView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/selection/event-filter": {
       "get": {
         "tags": [
@@ -34467,6 +34509,97 @@
           }
         },
         "description": "The coverage of the filing store between `From` and `To`: counts only."
+      },
+      "FilingFactView": {
+        "required": [
+          "field",
+          "span",
+          "basis",
+          "state",
+          "value",
+          "unit",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "span": {
+            "type": "string"
+          },
+          "basis": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One stored fact of a filing: a field for a span and basis, its state (`value` or `unavailable`), the number as filed or the reason, and the unit."
+      },
+      "FilingFactsView": {
+        "required": [
+          "filingId",
+          "parserVersion",
+          "outcome",
+          "reason",
+          "factCount",
+          "flags",
+          "facts"
+        ],
+        "type": "object",
+        "properties": {
+          "filingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "parserVersion": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "factCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "flags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilingFactView"
+            }
+          }
+        },
+        "description": "`GET /api/filings/{id}/facts`: the parse outcome of one filing with the parser version, the stored facts and the counts the parser kept (skipped contexts, sanity flags). `Outcome` is `not_parsed` until the parse step has run. No file content, no path."
       },
       "FilingKindCoverage": {
         "required": [

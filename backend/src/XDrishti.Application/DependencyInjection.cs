@@ -142,6 +142,9 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetOptionBackfillQuery, OptionBackfillView>, GetOptionBackfillHandler>(); // the owner's backfill switch, acceptance and progress (P14-03): read
         services.AddScoped<IQueryHandler<GetOptionCoverageQuery, Result<OptionCoverageView>>, GetOptionCoverageHandler>(); // the stored quality verdicts of the option archive, aggregates only (P14-04): read
         services.AddScoped<ICommandHandler<IngestFilingsCommand, FilingIngestSummary>, IngestFilingsHandler>(); // the filing ingest (P15-02): local inbox -> store folder + insert-only envelopes; no network
+        services.AddScoped<ICommandHandler<ParseResultsCommand, ParseResultsSummary>, ParseResultsHandler>(); // the results parse step of filings-ingest (P15-03): stored results files -> insert-only facts; no network
+        services.AddScoped<IQueryHandler<GetFilingFactsQuery, Result<FilingFactsView>>, GetFilingFactsHandler>(); // one filing's parse outcome and facts (P15-03): read
+        services.AddScoped<IResultFactsAsOf, ResultFactsAsOf>(); // the result facts as known at an instant (P15-03): a port with no decision caller yet
         services.AddScoped<IQueryHandler<GetFilingCoverageQuery, Result<FilingCoverageView>>, GetFilingCoverageHandler>(); // counts of the filing store (P15-02): read
         services.AddScoped<IQueryHandler<ListFilingsQuery, Result<FilingListView>>, ListFilingsHandler>(); // envelope metadata, optionally as of an instant (P15-02): read
         services.AddScoped<IQueryHandler<GetFilingQuery, Result<FilingView>>, GetFilingHandler>(); // one envelope's metadata (P15-02): read

@@ -16,4 +16,9 @@ public interface IFilingFiles
     /// <c>store_conflict</c> (a different file sits at that name; nothing is replaced).
     /// </summary>
     ValueTask<Result<bool>> CopyAsync(Stream source, string sha256, long expectedBytes, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Opens the stored copy for reading, forward only (P15-03). The hash of the stored file is checked first: a different hash is <c>content_changed</c>, a missing or unreadable file <c>unreadable</c>. Read-only; nothing is created, changed or deleted.
+    /// </summary>
+    ValueTask<Result<Stream>> OpenAsync(string sha256, CancellationToken cancellationToken);
 }

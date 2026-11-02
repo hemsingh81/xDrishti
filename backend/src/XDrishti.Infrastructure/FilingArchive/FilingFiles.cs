@@ -132,6 +132,38 @@ internal sealed class FilingFiles(IOptions<FilingsOptions> options) : IFilingFil
         }
     }
 
+    public async ValueTask<Result<Stream>> OpenAsync(string sha256, CancellationToken cancellationToken)
+    {
+        if (sha256.Length != 64 || !sha256.All(char.IsAsciiHexDigitLower))
+        {
+            return Result.Failure<Stream>(Error.Validation("unreadable", "The stored file could not be read."));
+        }
+
+        var path = Path.Combine(Root, sha256[..2], sha256);
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return Result.Failure<Stream>(Error.Validation("unreadable", "The stored file could not be read."));
+            }
+
+            // Opened once: the hash is taken from this very stream, then it is rewound and handed out.
+            var stream = new FileStream(path, System.IO.FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
+            if (Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, cancellationToken)) != sha256)
+            {
+                await stream.DisposeAsync();
+                return Result.Failure<Stream>(Error.Validation("content_changed", "The stored file does not match its hash."));
+            }
+
+            stream.Position = 0;
+            return Result.Success<Stream>(stream);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Result.Failure<Stream>(Error.Validation("unreadable", "The stored file could not be read."));
+        }
+    }
+
     private static FileStreamOptions CreateOptions()
     {
         var create = new FileStreamOptions { Mode = System.IO.FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None, Options = FileOptions.Asynchronous };

@@ -15,7 +15,7 @@ namespace XDrishti.Api.IntegrationTests.Filings;
 [Collection(ApiTestSuite.Name)]
 public sealed class FilingsGrantsTests(ResearchGrantsTests.DedicatedServer server) : IClassFixture<ResearchGrantsTests.DedicatedServer>
 {
-    private static readonly string[] Tables = ["filings", "result_facts", "shareholding", "announcements", "calendar", "event_filter_decisions"];   // the last one is the event-risk switch history (P15-06)
+    private static readonly string[] Tables = ["filings", "result_facts", "shareholding", "announcements", "calendar", "event_filter_decisions", "result_parses"];   // event_filter_decisions is the event-risk switch history (P15-06), result_parses the parse outcomes (P15-03)
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -143,6 +143,38 @@ public sealed class FilingsGrantsTests(ResearchGrantsTests.DedicatedServer serve
         tracked.ShouldContain(t => t.Id == instrument && t.Symbol == "GRANTB");
         (await SqlStateAsync(server.App, "UPDATE filings.calendar SET status = 'cancelled'")).ShouldBe("42501");
         (await SqlStateAsync(server.App, "UPDATE filings.shareholding SET pct = 1")).ShouldBe("42501");
+    }
+
+    [Fact]
+    public async Task The_result_parse_store_works_as_the_runtime_role_and_the_refused_statements_are_refused()
+    {
+        var instrument = Guid.NewGuid();
+        await StoreKit.ExecuteAsync(
+            server.Owner,
+            $"INSERT INTO market.instruments (id, canonical_symbol, exchange, exchange_segment, type, name, display_name, lot_size, underlying_symbol, fno_eligible, first_seen_at, last_seen_at) VALUES ('{instrument}', 'NSE:GRANTC', 'NSE', 'NSE_EQ', 'share', 'Grant C Ltd', 'Grant C Ltd', 1, 'GRANTC', false, now(), now())",
+            Ct);
+        await using var dataSource = NpgsqlDataSource.Create(server.App);
+        var filing = FilingTestKit.Ok(instrument, "grant-parse", FilingTestKit.Q1, FilingTestKit.Broadcast);
+        await new FilingStore(dataSource).InsertAsync(filing, Ct);
+        var store = new ResultFactsStore(dataSource);
+        var parsed = new ParsedResults("parsed", null, [ParsedFact.Of("revenue", "q", "consolidated", 12.50m), ParsedFact.Missing("pat", "q", "consolidated", "not_in_file")], new Dictionary<string, int> { ["unknown_span"] = 1 });
+
+        var pending = await store.PendingAsync("xbrl-1-synthetic", 10, Ct);
+        var saved = await store.SaveAsync(filing.Id, "xbrl-1-synthetic", parsed, FilingTestKit.Ingested, Ct);
+        var again = await store.SaveAsync(filing.Id, "xbrl-1-synthetic", parsed, FilingTestKit.Ingested, Ct);
+        var rows = new ResultFactRows(dataSource);
+        var parse = await rows.ParseOfAsync(filing.Id, "xbrl-1-synthetic", Ct);
+        var facts = await rows.FactsOfAsync(filing.Id, "xbrl-1-synthetic", Ct);
+        var answer = ResultFactsAsOfRule.Compute(await rows.ForInstrumentAsync(instrument, FilingTestKit.Broadcast.AddDays(1), "xbrl-1-synthetic", Ct), FilingTestKit.Broadcast.AddDays(1), TimeSpan.FromMinutes(5));
+
+        pending.ShouldContain(p => p.Id == filing.Id);
+        (saved, again).ShouldBe((true, false));
+        (parse.ShouldNotBeNull().Outcome, parse.Facts, parse.Flags["unknown_span"]).ShouldBe(("parsed", 2, 1));
+        facts.Select(f => (f.Field, f.Value, f.Reason)).ShouldBe([("revenue", 12.50m, null), ("pat", null, "not_in_file")]);
+        answer.Get(FilingTestKit.Q1, "revenue", "q", "consolidated").Value.ShouldBe(12.50m);
+        (await SqlStateAsync(server.App, "UPDATE filings.result_parses SET facts = 0")).ShouldBe("42501");
+        (await SqlStateAsync(server.App, "DELETE FROM filings.result_facts")).ShouldBe("42501");
+        (await SqlStateAsync(server.App, "TRUNCATE filings.result_parses")).ShouldBe("42501");
     }
 
     [Fact]

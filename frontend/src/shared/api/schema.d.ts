@@ -4586,6 +4586,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/filings/{id}/facts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The parse outcome of one stored results filing with the parser version, the stored facts (field, span, basis, state, number as filed or reason, unit) and the counts and sanity flags the parser kept. Outcome not_parsed until the parse step has run. No file content, no path; 404 filings.not_found for an unknown id */
+    get: operations['GetFilingFacts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/selection/event-filter': {
     parameters: {
       query?: never;
@@ -10857,6 +10874,31 @@ export interface components {
       /** Format: int32 */
       trackedInstruments: number;
       kinds: components['schemas']['FilingKindCoverage'][];
+    };
+    /** @description One stored fact of a filing: a field for a span and basis, its state (`value` or `unavailable`), the number as filed or the reason, and the unit. */
+    FilingFactView: {
+      field: string;
+      span: string;
+      basis: string;
+      state: string;
+      /** Format: double */
+      value: null | number;
+      unit: string;
+      reason: null | string;
+    };
+    /** @description `GET /api/filings/{id}/facts`: the parse outcome of one filing with the parser version, the stored facts and the counts the parser kept (skipped contexts, sanity flags). `Outcome` is `not_parsed` until the parse step has run. No file content, no path. */
+    FilingFactsView: {
+      /** Format: uuid */
+      filingId: string;
+      parserVersion: string;
+      outcome: string;
+      reason: null | string;
+      /** Format: int32 */
+      factCount: number;
+      flags: {
+        [key: string]: number;
+      };
+      facts: components['schemas']['FilingFactView'][];
     };
     /** @description One kind: `State` is `value` when anything is stored in the range, else `unavailable` (never a bare zero); `InstrumentsWithout` counts tracked instruments with no filing of the kind in the range. */
     FilingKindCoverage: {
@@ -30472,6 +30514,37 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['FilingView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetFilingFacts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FilingFactsView'];
         };
       };
       /** @description Not Found */
