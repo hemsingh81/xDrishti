@@ -5,7 +5,7 @@
   const KEY = "xd-plan-v1";
   const DAY = 864e5;
   const CAL_BOUND = ["P10", "P11", "P12", "OPS"]; // calendar-bound epics: duration is waiting/reviewing time, not build effort
-  const SHORT = { P0: "Foundations", P1: "Data platform", P2: "Portfolio & live", P3: "Simulator & DSL", P4: "Exits", P5: "Strategy Lab", P6: "Learning engine", P7: "Nightly plan", P8: "Reports & UI", P9: "AI assistant", P10: "Paper trading", P11: "Small live", P12: "Execution", P13: "Tick & depth", P14: "Options", P15: "Fundamentals", OPS: "Operations" };
+  const SHORT = { P0: "Foundations", P1: "Data platform", P2: "Portfolio & live", P3: "Simulator & DSL", P4: "Exits", P5: "Strategy Lab", P6: "Learning engine", P7: "Nightly plan", P8: "Reports & UI", P9: "AI assistant", P10: "Paper trading", P11: "Small live", P12: "Execution", P13: "Tick & depth", P14: "Options", P15: "Fundamentals", BK: "System baskets", CF: "Confidence", OPS: "Operations" };
   const DOCS = ["01-overview", "02-requirements", "03-target-architecture", "04-accounts-access-and-operations", "05-data-and-brokers", "06-instruments-and-baskets", "07-strategies", "08-exits-and-risk", "09-learning-engine", "10-trade-selection", "11-strategy-lab", "12-portfolio-monitoring", "13-reports-and-ui", "14-ai-assistant", "15-smart-insights-and-automation", "16-configuration", "17-deployment-and-operations", "18-roadmap", "19-risks-and-compliance", "20-extended-modules", "21-glossary"];
   const NAV = [
     ["progress", "✓", "Progress"], ["overview", "◉", "Overview"], ["roadmap", "▤", "Roadmap"], ["flow", "⇢", "Flow"], ["backlog", "☰", "Backlog"],
@@ -42,6 +42,20 @@
   const today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
   let M = null;
 
+  /* Default story status comes from the Progress data (XDP slices), so Backlog/Board/Roadmap/Flow/Sprints follow the real build.
+     Precedence: owner override (localStorage) > slice state (exact id; else renamed ids like P11-04a/b) > XDP.storyStatus > plan-data st. */
+  const SLICE_ST = { built: "done", approved: "ready", draft: "backlog", later: "backlog", optional: "backlog", blocked: "blocked" };
+  function sliceDerived(id) {
+    const P = window.XDP;
+    if (!P || !P.phases) return null;
+    const all = P.phases.flatMap((p) => p.slices || []);
+    const ex = all.find((x) => x[0] === id);
+    if (ex) return SLICE_ST[ex[2]] || null;
+    const g = all.filter((x) => x[0].startsWith(id) && /^[a-z][a-z0-9]*$/.test(x[0].slice(id.length)));
+    if (!g.length || !g.some((x) => x[2] === "built")) return null;
+    return g.every((x) => x[2] === "built") ? "done" : "doing";
+  }
+
   function build() {
     const epics = XD.epics.map((e) => ({ ...e }));
     const byEpic = Object.fromEntries(epics.map((e) => [e.id, e]));
@@ -58,9 +72,11 @@
       e.stories.forEach((s) => {
         s.epic = e.id;
         const o = (window.XDP && window.XDP.storyStatus && window.XDP.storyStatus[s.id]) || [];
-        s.st = state.st[s.id] ?? o[0] ?? s.st;
+        const dv = sliceDerived(s.id);
+        s.base = dv ?? o[0] ?? s.st; // default status (before the owner's override)
+        s.st = state.st[s.id] ?? s.base;
         s.note = state.note[s.id] ?? o[2] ?? s.note;
-        s.done = s.st === "done" ? state.done[s.id] ?? o[1] ?? s.done ?? iso(today) : undefined;
+        s.done = s.st === "done" ? state.done[s.id] ?? o[1] ?? s.done ?? (window.XDP && window.XDP.asOf) ?? iso(today) : undefined;
         stories.push(s);
       });
     });
@@ -74,6 +90,7 @@
         if (s.st === "done") { s.sprint = 0; s.date = parse(s.done); } else {
           cum += s.pts;
           s.date = addDays(e.start, Math.max(0, Math.round((dur * cum) / tot) - 1));
+          if (s.date < today) s.date = today; // open work is never forecast in the past
           s.sprint = Math.max(1, Math.floor(days(d0, s.date) / XD.meta.sprintDays) + 1);
         }
         s.unlocks = [];
@@ -83,7 +100,9 @@
       e.remPts = e.pts - e.donePts;
       e.count = e.stories.length;
       e.doneCount = e.stories.length - open.length;
-      e.state = e.doneCount === e.count ? "done" : e.doneCount > 0 || e.stories.some((s) => s.st === "doing" || s.st === "review") ? "progress" : "planned";
+      const ph = ((window.XDP && window.XDP.phases) || []).find((p) => p.id === e.id);
+      e.phase = ph ? ph.state : "";
+      e.state = e.phase === "built" || e.doneCount === e.count ? "done" : e.phase === "building" ? "progress" : e.doneCount > 0 || e.stories.some((s) => s.st === "doing" || s.st === "review") ? "progress" : "planned";
       e.color = wave(e.wave).color;
       e.unlocks = [];
     });
@@ -136,7 +155,7 @@
     const sOwner = sDraft.filter((x) => meta(x).o);
     const sDays = sDraft.reduce((a, x) => a + (meta(x).d || 0), 0);
     const builtIds = phases.filter((p) => p.state === "built").map((p) => p.id);
-    const sPhases = [...new Set(slices.map((x) => x[0].match(/^P\d+/)[0]))];
+    const sPhases = [...new Set(slices.map((x) => x[0].match(/^(P\d+|BK|CF)/)[0]))];
     return `
     <section class="hero"><h2>Where we are — ${esc(P.asOf)}</h2><p class="lead">${esc(P.now)}</p></section>
     <div class="tiles">
@@ -177,7 +196,7 @@
         <span><b>${fmt(core.end, { year: "numeric" })}</b>core system complete (P0–P9)</span>
         <span><b>${fmt(paper.start, { year: "numeric" })}</b>paper trading starts</span>
         <span><b>${fmt(live.start, { year: "numeric" })}</b>earliest small live capital</span>
-        <span><b>${fmt(M.end, { year: "numeric" })}</b>full roadmap (P0–P15)</span>
+        <span><b>${fmt(M.end, { year: "numeric" })}</b>full roadmap (P0–P15, BK, CF)</span>
       </div>
     </section>
     <div class="tiles">
@@ -215,7 +234,7 @@
     return `<button class="epic-row" style="--wc:${e.color}" data-act="open-epic" data-id="${e.id}" type="button">
       ${epicChip(e)}<span><b>${esc(SHORT[e.id] || e.title)}</b><br><span class="dim" style="font-size:12px">${fmt(e.start)} – ${fmt(e.end)} · ${e.weeks}w</span></span>
       <span class="pbar hide-s">${bar(e.donePts, e.pts, e.color)}<span>${pct(e.donePts, e.pts)}%</span></span>
-      <span class="muted hide-s" style="font-size:12px">${e.doneCount}/${e.count} stories</span><span class="chip ${e.state === "done" ? "st-done" : e.state === "progress" ? "st-doing" : ""}">${e.state === "done" ? "Done" : e.state === "progress" ? "In progress" : "Planned"}</span></button>`;
+      <span class="muted hide-s" style="font-size:12px">${e.doneCount}/${e.count} stories</span><span class="chip ${e.state === "done" ? "st-done" : e.state === "progress" ? "st-doing" : ""}">${e.phase === "built" ? "Built" : e.state === "done" ? "Done" : e.state === "progress" ? "In progress" : "Planned"}</span></button>`;
   }
 
   views.roadmap = () => {
@@ -466,7 +485,7 @@
   function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 1800); }
   async function copy(text, msg) { try { await navigator.clipboard.writeText(text); toast(msg); } catch (e) { const ta = document.createElement("textarea"); ta.value = text; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); toast(msg); } }
   function download(name, text, mime) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
-  function setStatus(id, st) { const base = XD.epics.flatMap((e) => e.stories).find((s) => s.id === id)?.st; if (st === base) delete state.st[id]; else state.st[id] = st; if (st === "done") state.done[id] = iso(today); else delete state.done[id]; save(); render(); }
+  function setStatus(id, st) { const base = M.byId[id]?.base; if (st === base) delete state.st[id]; else state.st[id] = st; if (st === "done") state.done[id] = iso(today); else delete state.done[id]; save(); render(); }
 
   function specText(s) {
     const e = epicOf(s);

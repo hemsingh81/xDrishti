@@ -3,10 +3,10 @@
 Static page — no build step. Open `index.html`, or run the stack and visit http://localhost:8080/prototype/delivery/
 (`deploy/xd-up.sh` serves `docs/prototype` read-only through the proxy). `scripts/serve.sh` also serves it on :8766.
 
-- **Data:** `plan-data-1.js` (meta, epics P0–P6) and `plan-data-2.js` (P7–P15, operations track, success criteria,
+- **Data:** `plan-data-1.js` (meta, epics P0–P6) and `plan-data-2.js` (P7–P15, BK system baskets and CF confidence programme from `docs/specs/BK-*`/`CF-*`, operations track, success criteria,
   open questions, risks, decisions). Derived from `docs/design/18-roadmap.md` and the requirements; keep them in sync.
   P8–P15 stories use the spec ids of `docs/specs/` (index: `docs/specs/JOURNEY.md`); `-O<n>` ids are owner-only acts, `P12-B1` and the like are extra slices with no spec file yet. A story may carry `spec` (its real spec file), `safety` and `owner` flags.
-- **Progress (what is really built):** `plan-progress.js` — phases and slices with status, ADR numbers, "Needs you" and honest limits; first tab. Update it (slice status, `asOf`) whenever a slice lands. A slice row is `[id, title, state, adr, {d: agent-days, o: 1 if SAFETY or an owner security decision, s: spec file}]`. The Backlog/Board story ticks are the original product plan and are not updated per slice.
+- **Progress (what is really built):** `plan-progress.js` — phases and slices with status, ADR numbers, "Needs you" and honest limits; first tab. Update it (slice status, `asOf`) whenever a slice lands. A slice row is `[id, title, state, adr, {d: agent-days, o: 1 if SAFETY or an owner security decision, s: spec file}]`. Backlog, Board, Roadmap, Flow, Overview and Sprints take each story's default status from these slices (built -> Done, approved -> Ready, draft/later/optional -> Backlog, blocked -> Blocked; a story with no matching slice keeps `XDP.storyStatus` or its `st`), and an epic whose phase is built/building says so; your browser override still wins. Story acceptance ticks are the original plan and are not updated per slice.
 - **App:** `plan-app.js` — views Progress, Overview, Roadmap, Flow, Backlog, Board, Sprints, Risks & decisions, How we work.
 - **Your changes** (status, notes, acceptance ticks, answers, custom stories) are stored in this browser's
   localStorage; export them from the menu. To make a change permanent, edit the data files.
