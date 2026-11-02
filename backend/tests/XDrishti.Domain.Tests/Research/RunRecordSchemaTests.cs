@@ -75,7 +75,7 @@ public sealed class RunRecordSchemaTests
             "InstrumentReplayInput: InstrumentId, Symbol, RawBars, Factors, CsvAdjustedThrough, Calendar, Options, From, To, Tick, PresetSkip, SkipDetail, Costs, ContextDays, ContextNote, Events, ResultsDays",
             "CostRecord: SheetId, RatesSha256, SheetJson, Checked, Capital, Profile, MaxCostR",
             "EventFilterRecord: CalendarSha256, CalendarRows, LagMinutes, EvfVersion",
-            "ResultsDaysRecord: CalendarSha256, CalendarRows, FilingsSha256, FilingRows, LagMinutes, RdsVersion",
+            "ResultsDaysRecord: CalendarSha256, CalendarRows, FilingsSha256, FilingRows, LagMinutes, RdsVersion, SurpriseSha256, SurpriseRows, SbpVersion, SurpriseUnverified, SurpriseSeasons, SurpriseThinSeasons, MissedReactionFilings, ReactionFilings",
             "SizingProfile: Name, RiskPerTradePct, MaxCapitalPerTradePct",
             "SkipReason: InstrumentNotFound, NoBars, CsvAdjustedTwice, TickSizeInvalid, NoRunnableSessions, NoSessionsInWindow, FeaturesNotReady, ContextUnavailable, EventCalendarUnavailable",
             "SessionExclusion: ClosedDay, SpecialSession, ShortSession, MissingSession",

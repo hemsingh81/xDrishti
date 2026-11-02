@@ -240,7 +240,7 @@ public static class TradeWalker
 
         var legs = exit is null ? null : new LegState(position, exit, new AddRules(fraction, tick, rules.Hold is null ? rules.SquareOffMinute : int.MaxValue));
         return rules.Hold is { } swing
-            ? SwingWalk.Follow(position, bars, fillIndex, swing, entryDate, due, zeroMinutes, legs)
+            ? SwingWalk.Follow(position, bars, fillIndex, swing, entryDate, due, zeroMinutes, legs, swing.EventExit)
             : Follow(position, bars, fillIndex, rules.SquareOffMinute, entryDate, zeroMinutes, legs);
     }
 

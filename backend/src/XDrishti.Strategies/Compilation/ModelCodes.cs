@@ -125,6 +125,12 @@ public static class ModelCodes
     /// <summary>A candidate policy other than <c>FIXED_RR</c>, or an overlay, that no simulator runs yet (P4; for <c>event_exit</c> also the results calendar, P15): the table is checked and the strategy compiles, but a simulator refuses it. One per policy or overlay. Path <c>buy.exits[i]</c> or <c>buy.overlays[i]</c>. Warning.</summary>
     public const string ExitNotEvaluated = Prefix + "exit_not_evaluated";
 
+    /// <summary>A side that reads <c>days_since_results</c> in its entry and a strategy that names the filter <c>not_event_day</c> (P15-09): under the fail-closed rule the filter would block almost every entry, because right after a results event the next meeting is rarely intimated. Path <c>filters[i]</c>. Warning.</summary>
+    public const string EventSideWithNotEventDay = Prefix + "event_side_with_not_event_day";
+
+    /// <summary>A condition reads <c>results_sue_q</c> or <c>results_car3_q</c> on an evaluation timeframe other than 1D (P15-09): the number is known as of the close of the date (the CAR needs the close of the reaction session), so a decision before the close would read the future. Path: the condition. Error.</summary>
+    public const string ClosingFeatureOffDaily = Prefix + "closing_feature_off_daily";
+
     // ---- Time rules and filters --------------------------------------------------------------------------------------------------------------------------------
 
     /// <summary>An intraday strategy without <c>square_off</c>, or a swing strategy without <c>max_hold_sessions</c> (SESSION_EXIT and MAX_HOLD are always on, doc 08 §2). Path <c>time_rules.square_off</c> or <c>time_rules.max_hold_sessions</c>. Error.</summary>

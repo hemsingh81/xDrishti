@@ -36,6 +36,11 @@ internal readonly record struct ValueRange(double Minimum, double Maximum, bool 
             table[name] = new ValueRange(0, double.PositiveInfinity);
         }
 
+        foreach (var name in new[] { "results_sue_q", "results_car3_q" })
+        {
+            table[name] = new ValueRange(1, 5);
+        }
+
         table["gap_pct"] = new ValueRange(-100, double.PositiveInfinity, MinimumIncluded: false);
         return table.ToFrozenDictionary(StringComparer.Ordinal);
     }

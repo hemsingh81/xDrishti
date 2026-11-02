@@ -27,6 +27,11 @@ public sealed class EntryScanner
     private readonly Timeframe _timeframe;
     private readonly int _levelHandle;
 
+    // P15-09: an atr_mult stop has no level feature; its level is the close of the decision bar less (a buy) or plus (a sell) the multiple of the ATR the frame holds at that close.
+    private readonly int _atrHandle;
+    private readonly double _atrMultiple;
+    private readonly bool _atrStop;
+
     // per item, in the order of CompiledSide.Items
     private readonly int[][] _itemHandles;
     private readonly Truth[] _truths;
@@ -63,8 +68,11 @@ public sealed class EntryScanner
     private long _stopNotReady;
     private long _unknownInvalidation;
 
-    private EntryScanner(CompiledSide side, BoundSide bound, FeatureFrame frame, InstrumentRef instrument, int levelHandle)
+    private EntryScanner(CompiledSide side, BoundSide bound, FeatureFrame frame, InstrumentRef instrument, int levelHandle, int atrHandle)
     {
+        _atrHandle = atrHandle;
+        _atrStop = side.Stop.Kind == StopKind.AtrMult;
+        _atrMultiple = side.Stop.Mult ?? double.NaN;
         _side = side;
         _bound = bound;
         _frame = frame;
@@ -150,7 +158,7 @@ public sealed class EntryScanner
 
     /// <summary>
     /// Makes the scanner of a compiled side for one instrument: its own frame, created from the features of the side with the calendar (a special session then closes its last buckets at its own last minute), and the side
-    /// bound to it. The stop the scanner reads is the level feature of <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c>, <c>bar_high</c> and <c>or_opposite</c> on the evaluation timeframe with no buffer; the rest, and an
+    /// bound to it. The stop the scanner reads is the multiple of the ATR (<c>atr_mult</c>, P15-09) or the level feature of <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c>, <c>bar_high</c> and <c>or_opposite</c> on the evaluation timeframe with no buffer; the rest, and an
     /// evaluation on a week or a month, are refused by name. A side that reads the market context needs <paramref name="context"/> (P3-lift): the frame is refused without it. A side that names <c>days_to_results</c> or <c>days_since_results</c> needs <paramref name="resultsDays"/> (P15-05): the frame is refused on <c>options.resultsDays</c> without it. A 1D evaluation is accepted (ADR 0043): its decision is taken at the step of the 15:29 minute.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="side"/> is null.</exception>
@@ -175,7 +183,8 @@ public sealed class EntryScanner
 
         var frame = created.Value;
         var bound = side.Bind(frame);
-        return Result.Success(new EntryScanner(side, bound, frame, instrument, frame.HandleOf(side.Stop.Level!.Value)));
+        var atrStop = side.Stop.Kind == StopKind.AtrMult;
+        return Result.Success(new EntryScanner(side, bound, frame, instrument, atrStop ? -1 : frame.HandleOf(side.Stop.Level!.Value), atrStop ? frame.HandleOf(side.Stop.Atr!.Value) : -1));
     }
 
     /// <summary>
@@ -271,7 +280,7 @@ public sealed class EntryScanner
         {
             _unknownInvalidation++;
         }
-        else if (double.IsNaN(_frame[_levelHandle]))
+        else if (double.IsNaN(StopLevel(closed)))
         {
             _stopNotReady++;
         }
@@ -282,12 +291,28 @@ public sealed class EntryScanner
         }
     }
 
+    /// <summary>The stop level of the decision: the level feature as the frame holds it, or for <c>atr_mult</c> the close of the bar less (a buy) or plus (a sell) the multiple of the ATR. NaN while the feature is not ready.</summary>
+    private double StopLevel(ClosedBar closed)
+    {
+        if (!_atrStop)
+        {
+            return _frame[_levelHandle];
+        }
+
+        var atr = _frame[_atrHandle];
+        return double.IsNaN(atr) ? double.NaN : _side.Side == Side.Buy ? closed.Bar.Close - (_atrMultiple * atr) : closed.Bar.Close + (_atrMultiple * atr);
+    }
+
     private static string? StopProblem(StopPlan stop, Timeframe evaluation)
     {
         var name = StopName(stop.Kind);
-        if (stop.Kind is not (StopKind.SwingLow or StopKind.SwingHigh or StopKind.BarLow or StopKind.BarHigh or StopKind.OrOpposite) || stop.Level is null)
+        if (stop.Kind == StopKind.AtrMult && stop.Atr is not null && stop.Mult is not null)
         {
-            return "The scanner reads a stop that is a level (swing_low, swing_high, bar_low, bar_high, or_opposite), not `" + name + "`.";
+            // P15-09: the ATR stop is run (a multiple of the ATR of the evaluation timeframe from the close of the decision bar); no buffer applies to it.
+        }
+        else if (stop.Kind is not (StopKind.SwingLow or StopKind.SwingHigh or StopKind.BarLow or StopKind.BarHigh or StopKind.OrOpposite) || stop.Level is null)
+        {
+            return "The scanner reads a stop that is a level (swing_low, swing_high, bar_low, bar_high, or_opposite) or an atr_mult, not `" + name + "`.";
         }
 
         if (stop.BufferAtr > 0)
@@ -395,7 +420,7 @@ public sealed class EntryScanner
             closed.Bar,
             closed.Bars,
             closed.Complete,
-            _frame[_levelHandle],
+            StopLevel(closed),
             new DecisionTrace(items));
     }
 }

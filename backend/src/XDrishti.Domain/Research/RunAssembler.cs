@@ -124,7 +124,7 @@ public static class RunAssembler
 
         if (header.ResultsDays is { } days)
         {
-            Line(text, "rdays", days.CalendarSha256 + "|" + days.FilingsSha256 + "|" + CanonicalText.Number(days.LagMinutes) + "|" + days.RdsVersion);   // only a run that names a results-days feature has this line (P15-05)
+            Line(text, "rdays", days.CalendarSha256 + "|" + days.FilingsSha256 + "|" + CanonicalText.Number(days.LagMinutes) + "|" + days.RdsVersion + (days.SurpriseSha256 is { } surprise ? "|" + surprise + "|" + days.SbpVersion : string.Empty));   // only a run that names a results-days feature has this line (P15-05); the surprise part only for a quintile feature (P15-09)
         }
 
         Line(text, "cal", string.Join(',', calendarExceptions.Select(e => Date(e.Date) + ":" + (e.IsHoliday ? "holiday" : CanonicalText.Number(e.FromMinute) + "-" + CanonicalText.Number(e.ToMinute)))));

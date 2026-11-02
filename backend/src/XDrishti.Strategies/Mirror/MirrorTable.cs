@@ -15,7 +15,7 @@ public static class MirrorTable
 
     private static readonly FrozenSet<string> Refused = new[]
     {
-        "day_of_week", "is_expiry_day", "index_trend", "index_adx", "index_vol_pct", "vix", "vix_pct", "vix_chg", "breadth", "regime_trend", "regime_vol", "regime",
+        "day_of_week", "is_expiry_day", "index_trend", "index_adx", "index_vol_pct", "vix", "vix_pct", "vix_chg", "breadth", "regime_trend", "regime_vol", "regime", "results_sue_q", "results_car3_q",
         "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN",
     }.ToFrozenSet(StringComparer.Ordinal);
 

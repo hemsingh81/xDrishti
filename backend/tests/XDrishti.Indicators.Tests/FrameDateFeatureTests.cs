@@ -12,11 +12,11 @@ public sealed class FrameDateFeatureTests
     private static readonly DateOnly Monday = new(2026, 3, 2);
 
     [Fact]
-    public void A_kind_that_is_not_one_of_the_fourteen_is_refused()
+    public void A_kind_that_is_not_one_of_()
     {
         Should.Throw<ArgumentOutOfRangeException>(() => new DateFeature((DateFeatureKind)99));
         Should.Throw<ArgumentOutOfRangeException>(() => new DateFeature((DateFeatureKind)(-1)));
-        Enum.GetValues<DateFeatureKind>().Length.ShouldBe(14);
+        Enum.GetValues<DateFeatureKind>().Length.ShouldBe(16);
         foreach (var kind in Enum.GetValues<DateFeatureKind>())
         {
             new DateFeature(kind).Kind.ShouldBe(kind);

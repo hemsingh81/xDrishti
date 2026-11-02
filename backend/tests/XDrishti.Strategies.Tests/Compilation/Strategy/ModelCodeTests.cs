@@ -11,14 +11,17 @@ public sealed class ModelCodeTests
     public static TheoryData<ModelCodeExample> Examples { get; } = [.. ModelCodeExample.All];
 
     [Fact]
-    public void Every_code_of_the_model_has_exactly_one_failing_example_and_there_are_47_of_them()
+    public void Every_code_of_the_model_has_exactly_one_failing_example_and_there_are_49_of_them_of_which_one_is_retired()
     {
         var codes = typeof(ModelCodes).GetFields(BindingFlags.Public | BindingFlags.Static).Where(f => f.IsLiteral).Select(f => (string)f.GetRawConstantValue()!).ToList();
 
-        codes.Count.ShouldBe(47);
+        codes.Count.ShouldBe(49);
         codes.ShouldAllBe(c => c.StartsWith("strategy.model.", StringComparison.Ordinal));
         codes.ShouldBeUnique();
-        ModelCodeExample.All.Select(e => e.Code).Order().ShouldBe(codes.Order(), "a code without a failing example, or an example for a code that does not exist");
+
+        // P15-09: every policy and every overlay is run by the simulator now, so nothing produces exit_not_evaluated any more; the code stays in the stored contract (a code is never removed) and has no failing example.
+        var retired = new[] { ModelCodes.ExitNotEvaluated };
+        ModelCodeExample.All.Select(e => e.Code).Order().ShouldBe(codes.Except(retired).Order(), "a code without a failing example, or an example for a code that does not exist");
     }
 
     [Theory]

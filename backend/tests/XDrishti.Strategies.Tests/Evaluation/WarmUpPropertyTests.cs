@@ -206,11 +206,11 @@ public sealed class WarmUpPropertyTests
     }
 
     /// <summary>
-    /// The per-date series of the two results-day features (P15-05): unknown for the first two weeks, then numbers, so that the series has both states. The frame reads the date of the step, whatever the series is built from.
+    /// The per-date series of the four results-day features (P15-05, P15-09): unknown for the first two weeks, then numbers, so that the series has both states. The frame reads the date of the step, whatever the series is built from.
     /// </summary>
     private static readonly Dictionary<DateOnly, ResultsDayValues> ResultsDays = Enumerable.Range(0, 500).ToDictionary(
         i => Clock.Mon.AddDays(i),
-        i => i < 14 ? new ResultsDayValues(double.NaN, double.NaN) : new ResultsDayValues(i % 7, i % 11));
+        i => i < 14 ? new ResultsDayValues(double.NaN, double.NaN, double.NaN, double.NaN) : new ResultsDayValues(i % 7, i % 11, 1 + (i % 5), 1 + (i % 4)));
 
     private static int HashCode(string name, Timeframe timeframe) => name.Aggregate(17, (h, c) => h * 31 + c) + (int)timeframe * 7_919;
 }

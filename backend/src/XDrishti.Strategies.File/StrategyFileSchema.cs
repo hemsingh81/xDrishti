@@ -80,7 +80,7 @@ public static class StrategyFileSchema
                 ["first_entry"] = Ref("time"),
                 ["last_entry"] = Ref("time"),
                 ["square_off"] = Ref("time"),
-                ["max_hold_sessions"] = new JsonObject { ["type"] = "integer", ["minimum"] = 1 },
+                ["max_hold_sessions"] = new JsonObject { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = 20 },
             }),
         ["side"] = Closed(SideProperties()),
         ["strategy"] = Strategy(),

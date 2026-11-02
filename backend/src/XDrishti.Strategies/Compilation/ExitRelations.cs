@@ -41,7 +41,7 @@ internal static class ExitRelations
             }
         }
 
-        if (values.TryGetValue("swing_sessions", out var sessions) && context.MaxHoldSessions is { } hold and >= 1 and <= ExitTables.MaxSwingSessions && sessions[0] >= hold)
+        if (values.TryGetValue("swing_sessions", out var sessions) && context.MaxHoldSessions is { } hold and >= 1 && hold <= (context.EventSide ? ExitTables.MaxEventHold : ExitTables.MaxSwingSessions) && sessions[0] >= hold)
         {
             sink.Error(
                 path + ".swing_sessions",

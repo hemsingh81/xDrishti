@@ -717,10 +717,11 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>, ComputeCellStatsHandler>(); // cell statistics, Bayesian and recency (P6-01, ADR 0064)
         services.AddScoped<ICommandHandler<ExtractTradeFeaturesCommand, TradeFeaturesOutcome>, ExtractTradeFeaturesHandler>(); // decision-time features of a stored run (P6-04, ADR 0066)
         services.AddScoped<ExtensionFeatureExtractor>();
+        services.AddScoped<ISurpriseInputsReader, SurpriseInputsReader>(); // the surprise numbers of a run that reads results_sue_q or results_car3_q (P15-09)
         services.AddScoped<ICommandHandler<ExtractExtensionFeaturesCommand, ExtensionFeaturesOutcome>, ExtractExtensionFeaturesHandler>(); // ev-1 and fu-1 of a stored run (P15-05, ADR 0185)
         services.AddScoped<IFilterPopulationSource, FilterPopulationSource>(); // the unfiltered stored runs' trades with the calendar's answer, for protocol F (P15-10): read
         services.AddScoped<IExtensionTrainingSource, ExtensionTrainingSource>(); // the joined tf-1 and extension rows of the stored runs, for protocol X (P15-10): read
-        services.TryAddScoped<IPeadEventSource, UnavailablePeadEventSource>(); // no PEAD events before the strategy of P15-09: protocol P is NOT_EVALUABLE
+        services.TryAddScoped<IPeadEventSource, PeadRunEventSource>(); // the stored runs of PEAD (P15-09); with none, or too few seasons, protocol P states NOT_EVALUABLE
         services.TryAddScoped<IFlagGradeSource, UnavailableFlagGradeSource>(); // no accepted set D eval run before P15-08: protocol L is NOT_EVALUABLE
         services.AddScoped<EvaluationWriter>();
         services.AddScoped<FilterEvaluation>();

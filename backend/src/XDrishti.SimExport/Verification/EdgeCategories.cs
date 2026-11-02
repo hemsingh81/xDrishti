@@ -27,6 +27,7 @@ public static class EdgeCategories
         [ExitReason.MaxHold] = "exit_max_hold",
         [ExitReason.EmaExit] = "none: a trail policy's own exit, not a category of the pack's table",
         [ExitReason.TimeStop] = "none: not a category of the pack yet; the verification of the P4 exits is the pack of P4-06, and the trade is an ordinary card in the sample",
+        [ExitReason.EventExit] = "none: not a category of the pack; the overlay is checked by its own hand table (P15-09) and the trade is an ordinary card in the sample",
         [ExitReason.EndOfData] = "none: the position is in OpenAtEnd, gets no card, and is a spot check",
     };
 

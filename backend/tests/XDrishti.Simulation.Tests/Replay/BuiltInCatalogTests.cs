@@ -37,9 +37,9 @@ public sealed class BuiltInCatalogTests
     }
 
     [Fact]
-    public void The_ids_are_pinned_in_the_order_of_the_table_orb_then_vwap_pullback_then_base_breakout()
+    public void The_ids_are_pinned_in_the_order_of_the_table_orb_then_vwap_pullback_then_base_breakout_then_pead()
     {
-        BuiltInStrategies.Ids.ShouldBe(["ORB", "VWAP_PULLBACK", "BASE_BREAKOUT"]);
+        BuiltInStrategies.Ids.ShouldBe(["ORB", "VWAP_PULLBACK", "BASE_BREAKOUT", "PEAD"]);
     }
 
     [Fact]
@@ -54,9 +54,9 @@ public sealed class BuiltInCatalogTests
     }
 
     [Fact]
-    public void Only_pull_atr_and_the_four_base_breakout_parameters_declare_a_range()
+    public void Only_pull_atr_the_four_base_breakout_parameters_and_the_three_pead_parameters_declare_a_range()
     {
-        var declared = BuiltInStrategies.Catalog.SelectMany(c => c.Parameters.Where(p => p.HasRange).Select(p => (c.Id, p.Name, p.Min, p.Max, p.MinExclusive)));
+        var declared = BuiltInStrategies.Catalog.SelectMany(c => c.Parameters.Where(p => p.HasRange && p.Allowed is null).Select(p => (c.Id, p.Name, p.Min, p.Max, p.MinExclusive)));
 
         declared.ShouldBe(
         [

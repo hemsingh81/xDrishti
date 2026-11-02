@@ -119,7 +119,7 @@ public sealed class SimulatorComparison
             scans.Add(scanner.Counters);
             for (var k = 0; k < _members.Length; k++)
             {
-                var walked = _members[k].WalkSide(_members[k].SideRuns[s], scanner, bars, tick, calendar, quantity, gated: false, events);
+                var walked = _members[k].WalkSide(_members[k].SideRuns[s], scanner, bars, tick, calendar, quantity, gated: false, events, series);
                 if (walked.IsFailure)
                 {
                     return Result.Failure<ComparisonResult>(walked.Error);

@@ -5,7 +5,7 @@ using XDrishti.Strategies.Tests.Support;
 
 namespace XDrishti.Strategies.Tests.Binding;
 
-/// <summary>Criterion 3: every one of the 58 catalog names can be written in its DSL form with default arguments and binds to the spec the catalog's <c>DefaultSpec</c> gives.</summary>
+/// <summary>Criterion 3: every one of the 60 catalog names can be written in its DSL form with default arguments and binds to the spec the catalog's <c>DefaultSpec</c> gives.</summary>
 public sealed class AllFeatureNamesBindingTests
 {
     /// <summary>The ten names that read the daily market context (written out; not taken from the catalog's flags).</summary>
@@ -17,10 +17,10 @@ public sealed class AllFeatureNamesBindingTests
         [.. IndicatorCatalog.All.SelectMany(i => new[] { Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.D1, Timeframe.W1, Timeframe.Mo1 }.Select(t => (i.Name, t)))];
 
     [Fact]
-    public void The_table_of_forms_has_one_form_for_each_of_the_58_names_of_the_catalog()
+    public void The_table_of_forms_has_one_form_for_each_of_the_60_names_of_the_catalog()
     {
-        IndicatorCatalog.All.Count.ShouldBe(58);
-        AllFeatureForms.Forms.Count.ShouldBe(58);
+        IndicatorCatalog.All.Count.ShouldBe(60);
+        AllFeatureForms.Forms.Count.ShouldBe(60);
         AllFeatureForms.Forms.Keys.OrderBy(n => n, StringComparer.Ordinal).ShouldBe(IndicatorCatalog.All.Select(i => i.Name).OrderBy(n => n, StringComparer.Ordinal));
     }
 

@@ -46,7 +46,7 @@ public sealed class ExtensionComparisonArchitectureTests
         [
             "ComparisonEvaluation", "EvaluationWriter", "EventFilterVerdictReader", "ExtensionEvaluationErrors", "ExtensionEvaluationMapper", "ExtensionFeatureExtractor", "ExtensionRunSource", "ExtensionTrainingSource", "ExtractExtensionFeaturesHandler",
             "FilterEvaluation", "FilterPopulation", "FilterPopulationSource", "FlagEvaluation", "GetExtensionEvaluationHandler", "IExtensionEvaluationStore", "IExtensionExtractionStore", "IExtensionFeatureStore", "IExtensionTrainingSource",
-            "IFlagGradeSource", "ListExtensionEvaluationsHandler", "PeadEvaluation", "PeadEventSet", "TrainingDataLoader", "UnavailableFlagGradeSource", "UnavailablePeadEventSource",
+            "IFlagGradeSource", "ListExtensionEvaluationsHandler", "PeadEvaluation", "PeadEventSet", "PeadRunEventSource", "SurpriseInputsReader", "TrainingDataLoader", "UnavailableFlagGradeSource",
         ]);
     }
 

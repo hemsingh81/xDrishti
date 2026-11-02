@@ -135,10 +135,39 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
             "ck_trade_features_ext_extension", "ck_trade_features_ext_run_key", "ck_trade_features_ext_values", "ck_trade_features_ext_version", "ck_trade_features_shape", "ck_training_sets_shape",
         ]);
         (await ListAsync(connection, "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_sim_trades_exit_reason'")).Single().ShouldContain("'timestop'", Case.Sensitive, "AddTimeStopExitReason (P4-02) lets the store hold the reason of the time stop");
+        (await ListAsync(connection, "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_sim_trades_exit_reason'")).Single().ShouldContain("'eventexit'", Case.Sensitive, "AddEventExitExitReason (P15-09) lets the store hold the reason of the event exit");
         (await ListAsync(connection, "SELECT conname || '|' || confdeltype::text FROM pg_constraint WHERE connamespace = 'research'::regnamespace AND contype = 'f'")).Order(StringComparer.Ordinal).ShouldBe(["fk_exit_selection_folds_selection|r", "fk_exit_selections_comparison|r", "fk_experiment_jobs_baseline|r", "fk_experiment_jobs_candidate|r", "fk_experiment_jobs_experiment|r", "fk_experiments_sim_runs_baseline_run_key|r", "fk_experiments_sim_runs_candidate_run_key|r", "fk_hypotheses_experiments_experiment_id|r", "fk_hypotheses_hypotheses_hypothesis_id|r", "fk_hypotheses_seed|r", "fk_hypotheses_sim_runs_baseline_run_key|r", "fk_hypotheses_sim_runs_candidate_run_key|r", "fk_learning_changelog_learning_changelog_reverts_id|r", "fk_lessons_experiments_experiment_id|r", "fk_lessons_hypotheses_hypothesis_ref|r", "fk_lessons_lessons_lesson_id|r", "fk_lessons_seed|r", "fk_model_designations_model_versions_model_id|r", "fk_model_versions_training_sets_training_set_id|r", "fk_sim_trade_leg_charges_trade|r", "fk_sim_trade_legs_trade|r", "fk_sim_trades_run|r"]);
         (await ListAsync(connection, "SELECT attidentity::text FROM pg_attribute WHERE attrelid = 'research.sim_runs'::regclass AND attname = 'id'")).ShouldBe(["a"]);
         (await ListAsync(connection, "SELECT count(*)::text FROM timescaledb_information.hypertables WHERE hypertable_schema = 'research'")).ShouldBe(["0"]);
         db.Database.HasPendingModelChanges().ShouldBeFalse("the model snapshot agrees with the model");
+    }
+
+    private const string BeforeEventExit = "20261102164927_RequireConfirmedKeepForAutoOn";
+
+    [Fact]
+    public async Task The_P15_09_migration_adds_the_event_exit_reason_to_the_check_of_the_trades_and_Down_removes_it_and_neither_changes_a_grant()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_research_eventexit_probe", Ct, migrate: false);
+        using var scope = scratch.Host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>();
+        var migrator = db.GetService<IMigrator>();
+        await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+        await connection.OpenAsync(Ct);
+        const string Definition = "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_sim_trades_exit_reason'";
+        const string Grants = "SELECT grantee || ':' || privilege_type FROM information_schema.role_table_grants WHERE table_schema = 'research' AND table_name IN ('sim_runs', 'sim_trades') ORDER BY 1";
+
+        await migrator.MigrateAsync(BeforeEventExit, Ct);
+        var grantsBefore = await ListAsync(connection, Grants);
+        (await ListAsync(connection, Definition)).Single().ShouldNotContain("'eventexit'", Case.Sensitive);
+
+        await migrator.MigrateAsync(null, Ct);
+        (await ListAsync(connection, Definition)).Single().ShouldContain("'eventexit'", Case.Sensitive);
+        (await ListAsync(connection, Grants)).ShouldBe(grantsBefore, "a constraint is replaced; no table is added and no grant moves (insert-only for xd_app, nothing for xd_exec or the read roles)");
+
+        await migrator.MigrateAsync(BeforeEventExit, Ct);
+        (await ListAsync(connection, Definition)).Single().ShouldNotContain("'eventexit'", Case.Sensitive);
+        (await ListAsync(connection, Definition)).Single().ShouldContain("'timestop'", Case.Sensitive);
+        (await ListAsync(connection, Grants)).ShouldBe(grantsBefore);
     }
 
     private const string BeforeLegs = "20261021175309_AddEmaExitReason";

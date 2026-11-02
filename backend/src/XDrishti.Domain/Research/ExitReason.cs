@@ -25,4 +25,7 @@ public enum ExitReason
     EmaExit,
     /// <summary>The <c>time_stop</c> overlay found too little progress (P4-02, D8 and D9): the open share left at the open of the minute after the check bar (intraday) or at the close of the checked session (swing).</summary>
     TimeStop,
+
+    /// <summary>The <c>event_exit</c> overlay found a results meeting at most <c>days_before_results</c> sessions away at the start of a session, and the position left at the close of that session, as at <see cref="MaxHold"/> (P15-09).</summary>
+    EventExit,
 }

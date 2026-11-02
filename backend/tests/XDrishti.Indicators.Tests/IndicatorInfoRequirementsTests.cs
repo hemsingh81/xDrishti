@@ -23,9 +23,9 @@ public sealed class IndicatorInfoRequirementsTests
     private static FrameOptions Both() => new(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>(), ResultsDays: new Dictionary<DateOnly, ResultsDayValues>());
 
     [Fact]
-    public void There_are_fifty_eight_names_and_the_ten_context_names_are_among_them_as_date_driven_ones()
+    public void There_are_sixty_names_and_the_ten_context_names_are_among_them_as_date_driven_ones()
     {
-        IndicatorCatalog.All.Count.ShouldBe(58);
+        IndicatorCatalog.All.Count.ShouldBe(60);
         ReadContext.Distinct().Count().ShouldBe(10);
         foreach (var name in ReadContext.Append(ExpiryName))
         {
@@ -60,9 +60,9 @@ public sealed class IndicatorInfoRequirementsTests
     }
 
     [Fact]
-    public void Exactly_the_two_results_names_require_the_results_days_and_nothing_else_does()
+    public void Exactly_the_four_results_names_require_the_results_days_and_nothing_else_does()
     {
-        IndicatorCatalog.All.Where(i => i.RequiresResultsDays).Select(i => i.Name).ShouldBe(["days_to_results", "days_since_results"]);
+        IndicatorCatalog.All.Where(i => i.RequiresResultsDays).Select(i => i.Name).ShouldBe(["days_to_results", "days_since_results", "results_sue_q", "results_car3_q"]);
         IndicatorCatalog.All.Where(i => i.RequiresResultsDays).ShouldAllBe(i => i.DateDriven && !i.RequiresContext && !i.RequiresExpiryDays);
     }
 

@@ -65,13 +65,11 @@ public sealed class SwingCreateTests
     /// <summary>The refusals that stay: a definition, the code, the path of the field and a word the message names.</summary>
     public static TheoryData<string, StrategyDefinition, Timeframe, string, string> Refusals => new()
     {
-        { "an overlay event_exit", Buy(b => b with { Overlays = [new OverlaySpec(OverlayKind.EventExit, [new ExitParameter("days_before_results", [Quantity.Of(1)])])] }), Timeframe.H1, "simulation.unsupported_exit", "buy.overlays[0]" },
         { "a filter", TestStrategies.Swing1h() with { Filters = ["min_turnover"] }, Timeframe.H1, "simulation.filter_not_available", "filters[0]" },
         { "an expiry read", Buy(b => b with { Trigger = TestStrategies.All("close > or_high(60) and is_expiry_day == 0") }), Timeframe.H1, "simulation.needs_expiry_days", "buy" },
         { "entry stop_above_high", Buy(b => b with { Entry = new EntrySpec(EntryKind.StopAboveHigh) }), Timeframe.H1, "simulation.unsupported_entry", "buy.entry" },
         { "entry limit_pullback", Buy(b => b with { Entry = new EntrySpec(EntryKind.LimitPullback) }), Timeframe.H1, "simulation.unsupported_entry", "buy.entry" },
         { "stop fixed_pct", Buy(b => b with { Stop = new StopSpec(StopKind.FixedPct, Pct: Quantity.Of(2)) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop" },
-        { "stop atr_mult", Buy(b => b with { Stop = new StopSpec(StopKind.AtrMult, Mult: Quantity.Of(2)) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop" },
         { "a buffer on the swing_low stop", Buy(b => b with { Stop = new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(5), BufferAtr: Quantity.Of(0.5)) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop.buffer_atr" },
         { "a bar_low stop read on another timeframe", Buy(b => b with { Stop = new StopSpec(StopKind.BarLow, Timeframe.M30) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop.timeframe" },
         { "a buffer on the or_opposite stop", Buy(b => b with { Stop = new StopSpec(StopKind.OrOpposite, Minutes: Quantity.Of(60), BufferAtr: Quantity.Of(0.5)) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop.buffer_atr" },

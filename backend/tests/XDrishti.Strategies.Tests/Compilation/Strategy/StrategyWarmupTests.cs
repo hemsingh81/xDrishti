@@ -19,7 +19,7 @@ public sealed class StrategyWarmupTests
         ["too_many_params", "duplicate_param", "bad_param_name", "bad_param_value", "param_shadows_name", "unknown_param", "bad_quantity"],
         ["trigger_missing", "list_empty", "list_too_long", "entry_missing", "stop_missing", "exits_empty"],
         ["stop_wrong_side", "field_missing", "field_not_used", "field_shape", "value_out_of_range", "feature_invalid", "duplicate_exit", "exit_not_evaluated"],
-        ["time_rule_missing", "bad_time", "time_rules_out_of_order", "time_rule_on_daily", "square_off_on_swing", "max_hold_on_intraday", "max_hold_out_of_range", "unknown_filter", "filter_not_evaluated", "duplicate_filter"],
+        ["time_rule_missing", "bad_time", "time_rules_out_of_order", "time_rule_on_daily", "square_off_on_swing", "max_hold_on_intraday", "max_hold_out_of_range", "unknown_filter", "filter_not_evaluated", "duplicate_filter", "event_side_with_not_event_day", "closing_feature_off_daily"],
         ["too_many_problems"],
     ];
 

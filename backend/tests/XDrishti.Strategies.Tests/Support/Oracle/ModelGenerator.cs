@@ -432,6 +432,8 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
             // P15-05: only the coverage test asks for the two results-day features; the conditions it generates are read, not evaluated
             choices.Add(new Feature("days_to_results", "days_to_results", true, new FeatureSpec("days_to_results", Timeframe.M1), ReadsResultsDays: true));
             choices.Add(new Feature("days_since_results", "days_since_results", true, new FeatureSpec("days_since_results", Timeframe.M1), ReadsResultsDays: true));
+            choices.Add(new Feature("results_sue_q", "results_sue_q", true, new FeatureSpec("results_sue_q", Timeframe.M1), ReadsResultsDays: true));
+            choices.Add(new Feature("results_car3_q", "results_car3_q", true, new FeatureSpec("results_car3_q", Timeframe.M1), ReadsResultsDays: true));
         }
 
         if (allowContext)

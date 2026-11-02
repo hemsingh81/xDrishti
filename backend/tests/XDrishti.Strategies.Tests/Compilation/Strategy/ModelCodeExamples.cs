@@ -30,6 +30,10 @@ public sealed record ModelCodeExample(
     private static ModelCodeExample Row(string name, string path, StrategyDefinition bad, StrategyDefinition near, ProblemSeverity severity = ProblemSeverity.Error, Timeframe timeframe = Timeframe.M15, Side side = Side.Buy, Timeframe? nearTimeframe = null, Side? nearSide = null) =>
         new("strategy.model." + name, path, severity, bad, near, timeframe, side, nearTimeframe, nearSide);
 
+    /// <summary>A swing strategy on 1D whose entry reads <c>days_since_results</c> (an event side, P15-09) and holds <paramref name="hold"/> sessions.</summary>
+    private static StrategyDefinition EventSwing(int hold, params string[] filters) =>
+        Defs.Swing().WithBuy(b => b with { Trigger = Defs.All("days_since_results == 0") }) with { TimeRules = new TimeRules(null, null, null, hold), Filters = filters };
+
     private static StrategyDefinition WithStop(StopSpec stop) => Basic().WithBuy(b => b with { Stop = stop });
 
 
@@ -87,7 +91,6 @@ public sealed record ModelCodeExample(
             Row("feature_invalid", "buy.stop.lookback", WithStop(new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(0))), WithStop(new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(1)))),
             Row("duplicate_exit", "buy.exits[1]", WithExits(Defs.FixedRr(2), Defs.FixedRr(3)), WithExits(Defs.FixedRr(2), Defs.PartialTrail())),
 
-            Row("exit_not_evaluated", "buy.overlays[0]", Basic().WithBuy(b => b with { Overlays = [new OverlaySpec(OverlayKind.EventExit, [new ExitParameter("days_before_results", [Quantity.Of(1)])])] }), Basic(), ProblemSeverity.Warning),
 
             // time rules and filters
             Row("time_rule_missing", "time_rules.square_off", Basic() with { TimeRules = Defs.IntradayRules with { SquareOff = null } }, Basic()),
@@ -97,6 +100,8 @@ public sealed record ModelCodeExample(
             Row("square_off_on_swing", "time_rules.square_off", Defs.Swing() with { TimeRules = new TimeRules(null, null, new TimeOnly(15, 15), 5) }, Defs.Swing(), timeframe: Timeframe.H1),
             Row("max_hold_on_intraday", "time_rules.max_hold_sessions", Basic() with { TimeRules = Defs.IntradayRules with { MaxHoldSessions = 1 } }, Basic()),
             Row("max_hold_out_of_range", "time_rules.max_hold_sessions", Defs.Swing() with { TimeRules = new TimeRules(null, null, null, 6) }, Defs.Swing() with { TimeRules = new TimeRules(null, null, null, 5) }, timeframe: Timeframe.H1),
+            Row("event_side_with_not_event_day", "filters[0]", EventSwing(5, FilterNames.NotEventDay), EventSwing(5), ProblemSeverity.Warning, Timeframe.D1),
+            Row("closing_feature_off_daily", "buy.trigger[0]", Defs.Swing().WithBuy(b => b with { Trigger = Defs.All("results_sue_q == 5") }), Defs.Swing().WithBuy(b => b with { Trigger = Defs.All("results_sue_q == 5") }), timeframe: Timeframe.H1, nearTimeframe: Timeframe.D1),
             Row("unknown_filter", "filters[0]", Basic() with { Filters = ["not_event_dy"] }, Basic() with { Filters = [] }),
             Row("filter_not_evaluated", "filters[0]", Basic() with { Filters = [FilterNames.MinTurnover] }, Basic() with { Filters = [] }, ProblemSeverity.Warning),
             Row("duplicate_filter", "filters[1]", Basic() with { Filters = [FilterNames.NotEventDay, FilterNames.NotEventDay] }, Basic() with { Filters = [FilterNames.NotEventDay, FilterNames.MinTurnover] }),

@@ -77,6 +77,21 @@ public sealed class RunStoreRoundTripTests(ApiFactory factory)
         trades.Count(t => t.Trade.ExitReason == ExitReason.EmaExit).ShouldBe(run.Trades.Count(t => t.Trade.ExitReason == ExitReason.EmaExit));
     }
 
+    [Fact]
+    public async Task A_stored_run_with_EventExit_trades_reads_back_equal_to_the_one_in_memory()
+    {
+        // P15-09: the new reason is a new name in the check constraint of research.sim_trades (migration AddEventExitExitReason) and a name the store reads back
+        var run = StoredRunFixtures.Run(costed: false, to: NextTo(), eventExits: true);
+        run.Trades.Count(t => t.Trade.ExitReason == ExitReason.EventExit).ShouldBeGreaterThan(10);
+
+        var stored = await WithStore(s => s.StoreAsync(StoreKit.ToStore(run), Ct).AsTask());
+        var trades = await WithStore(async s => await s.StreamTradesAsync(run.RunKey, false, Ct).ToListAsync(Ct));
+
+        stored.IsSuccess.ShouldBeTrue(stored.IsFailure ? stored.Error.Message : string.Empty);
+        SameTrade.ShouldBeSame(trades, run.Trades, "trades");
+        trades.Count(t => t.Trade.ExitReason == ExitReason.EventExit).ShouldBe(run.Trades.Count(t => t.Trade.ExitReason == ExitReason.EventExit));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -227,7 +242,7 @@ public sealed class RunStoreRoundTripTests(ApiFactory factory)
             "record" => new RunToStore(run, new RunRecordText(good.Json + " ", StoreKit.Sha256(good.Json + " "), good.TradesSha256), "cli:simulate", StoreKit.At),
             "trades" => new RunToStore(run, new RunRecordText(good.Json, good.RecordSha256, new string('c', 64)), "cli:simulate", StoreKit.At),
             "trade_count" => new RunToStore(run with { Trades = [.. run.Trades.Skip(1)] }, good, "cli:simulate", StoreKit.At),
-            _ => new RunToStore(run with { EngineVersion = "sim-9" }, good, "cli:simulate", StoreKit.At),
+            _ => new RunToStore(run with { EngineVersion = "sim-10" }, good, "cli:simulate", StoreKit.At),
         };
 
         var result = await WithStore(s => s.StoreAsync(other, Ct).AsTask());

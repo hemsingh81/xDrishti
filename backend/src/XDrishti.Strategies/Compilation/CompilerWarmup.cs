@@ -67,6 +67,7 @@ public static class CompilerWarmup
         new("index.trend == 1 and index.adx > 20 and index_vol_pct < 50 and breadth > 50 and regime_trend > 0 and regime_vol > 0"),
         new("is_expiry_day == 1 and gap_pct > 0.5 and today.open < today.high and today.low > 0"),
         new("not (days_to_results <= 2) and days_since_results >= 1"),
+        new("days_since_results == 0 and results_sue_q == 5 and results_car3_q >= 2 and results_car3_q <= 4"),
         new("prev_day.open > 0 and prev_day.high > prev_day.low and prev_day.close > 0 and prev_day.volume > 0"),
 
         // the rest of the catalog

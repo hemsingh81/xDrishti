@@ -51,7 +51,7 @@ internal static class ModelSchemaSnapshot
         exit PYRAMID: atr_period scalar optional catalog
         overlay time_stop: min_progress_rr scalar [0,10]
         overlay time_stop: intraday_bars scalar optional whole [1,375]
-        overlay time_stop: swing_sessions scalar optional whole [1,5]
+        overlay time_stop: swing_sessions scalar optional whole [1,20]
         overlay event_exit: days_before_results scalar whole [1,10]
         exit values: at most 10 per list
         filters: not_event_day min_turnover
@@ -61,12 +61,14 @@ internal static class ModelSchemaSnapshot
         code strategy.model.bad_quantity
         code strategy.model.bad_time
         code strategy.model.bad_timeframe
+        code strategy.model.closing_feature_off_daily
         code strategy.model.duplicate_exit
         code strategy.model.duplicate_filter
         code strategy.model.duplicate_param
         code strategy.model.duplicate_side
         code strategy.model.duplicate_timeframe
         code strategy.model.entry_missing
+        code strategy.model.event_side_with_not_event_day
         code strategy.model.exit_not_evaluated
         code strategy.model.exits_empty
         code strategy.model.feature_invalid

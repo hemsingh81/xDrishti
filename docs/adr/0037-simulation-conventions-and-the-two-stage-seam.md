@@ -273,3 +273,15 @@ R1 (the run key, extended). **The record is schema 8** and the key text starts `
 - `SimulationEngine.Version` is `sim-8`. The golden files (walker, scanner, simulator, run record, costed, swing, VWAP pullback, and the export pack) were regenerated on purpose with `XD_UPDATE_GOLDEN=1`; the sim-7 files are frozen next to them (`Golden/*.sim-7.frozen.txt`) and a differential test shows the diff of the engine goldens is the engine label and, in the run record, the `schema=` number and the key hash, **nothing else**. The `RunAssemblyTests` table maps `sim-8` to the SHA-256 of its golden record (computed with Python `hashlib`).
 - The oracle comparison is rerun in the same suite and `OracleVerifiedFor` is `sim-8` (walker, gate and costing unchanged).
 - A stored run of schema 7 keeps its label and is readable.
+
+## Amendment 12 — the longer hold of an event side, the event exit, the ATR stop and the quintile features; engine `sim-9` (P15-09, 2026-11-03)
+
+New decisions; nothing above is superseded. They are decisions of [P15-09](../specs/P15-09-pead-strategy-and-the-longer-swing-hold.md) and are written in [ADR 0187](0187-an-event-side-may-hold-up-to-twenty-sessions-the-event-exit-overlay-runs-and-never-fires-on-unavailable-the-surprise-quintiles-use-the-previous-complete-season-and-pead-is-a-built-in-with-engine-sim-9.md).
+
+D4 (rules, extended). **The swing walk counts a hold up to 20 sessions** (`SwingHold.MaxEventSessions`; the model decides which side may use it), **runs the `event_exit` overlay** at the close of a session (reason `EventExit`, `MAX_HOLD` wins a tie, an unknown `days_to_results` never fires and is counted) and **the scanner runs the `atr_mult` stop** (the close of the decision bar less the multiple of the ATR). `ExitReason` gains `EventExit` (stored as `eventexit`; migration `AddEventExitExitReason` replaces the check constraint of `research.sim_trades`, no grant changes). `WalkCounters` gains `ExitsEventExit`, `EventExitUnavailable` and `EventExitUnavailableTrades` at the end.
+
+R1 (the run key, extended). The record stays schema 8. A run that reads `results_sue_q` or `results_car3_q` adds the hash of its surprise numbers and the rule version `sbp-1` to the `rdays` line; no other key gains text.
+
+### Consequences from the build (Amendment 12)
+- `SimulationEngine.Version` is `sim-9`. The golden files (walker, scanner, simulator, run record, costed, swing, VWAP pullback, and the export pack) were regenerated on purpose with `XD_UPDATE_GOLDEN=1`; the `sim-8` files are frozen next to them (`Golden/*.sim-8.frozen.txt`) and `EventHoldDifferentialTests` shows that every `sim-9` golden equals its frozen `sim-8` file but for the engine label and the key hash. The chain `sim-6` to `sim-7`, `sim-7` to `sim-8` and `sim-8` to `sim-9` is kept by its three differential tests.
+- The oracle comparison is rerun in the same suite and `OracleVerifiedFor` is `sim-9`. The oracle has no results calendar and no ATR stop, so the new rules are covered by hand tables, not by the oracle; the three new counters are SPEC ONLY rows of the dry-read table.

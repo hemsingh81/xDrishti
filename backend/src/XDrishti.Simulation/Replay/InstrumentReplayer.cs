@@ -163,6 +163,12 @@ public static class InstrumentReplayer
             return Same(new InstrumentReplay(Record(input, facts, SkipReason.EventCalendarUnavailable, "no_results_days", Scanned.None), [], []), count);
         }
 
+        if (strategy.ReadsSurprise && !input.HasSurpriseInputs())
+        {
+            // The strategy reads a surprise quintile and the replay was given no surprise numbers: every quintile would be NaN and an empty result would look like "no signals" (P15-09).
+            return Same(new InstrumentReplay(Record(input, facts, SkipReason.EventCalendarUnavailable, "no_surprise_inputs", Scanned.None), [], []), count);
+        }
+
         if (scan.Ran.Count == 0)
         {
             return Same(new InstrumentReplay(Record(input, facts, SkipReason.NoRunnableSessions, null, Scanned.None), [], []), count);

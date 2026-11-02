@@ -47,6 +47,33 @@ public sealed class ResultsDaysRunTests
     }
 
     [Fact]
+    public async Task A_strategy_that_reads_a_quintile_gets_the_surprise_numbers_once_and_records_their_hash_in_the_header_and_the_key_and_one_that_does_not_never_asks()
+    {
+        var fixture = new RunFixture();
+        var abb = fixture.Add("NSE:ABB", RunFixture.ThreeDays());
+        var snapshot = EventCalendarSnapshot.Create([], 5);
+        var filing = Filing(abb, new DateTimeOffset(RunFixture.D1.Year, RunFixture.D1.Month, RunFixture.D1.Day, 10, 0, 0, Ist));
+        Reads(fixture, snapshot, filing);
+        var surprises = SurpriseInputs.Create([new SurpriseObservation(abb, new DateOnly(2025, 12, 31), filing.BroadcastTs, 1.5, 0.02, Unverified: true)], TimeSpan.FromMinutes(5), new XDrishti.Domain.Market.Calendar.TradingCalendar());
+        fixture.SurpriseReader.ReadAsync(Arg.Any<IReadOnlyList<ResultsFilingTime>>(), Arg.Any<EventCalendarSnapshot>(), Arg.Any<XDrishti.Domain.Market.Calendar.TradingCalendar>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(surprises));
+
+        var plain = await fixture.RunAsync(RunFixture.List([abb], RunFixture.D1, RunFixture.D3), Ct);
+        await fixture.SurpriseReader.DidNotReceiveWithAnyArgs().ReadAsync(default!, default!, default!, default, default);
+        plain.Value.ResultsDays!.SurpriseSha256.ShouldBeNull("a strategy that names no quintile leaves its key line as P15-05 wrote it");
+
+        fixture.Engine.ReadsSurprise = true;
+        var result = await fixture.RunAsync(RunFixture.List([abb], RunFixture.D1, RunFixture.D3), Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        await fixture.SurpriseReader.Received(1).ReadAsync(Arg.Is<IReadOnlyList<ResultsFilingTime>>(f => f.Count == 1), snapshot, Arg.Any<XDrishti.Domain.Market.Calendar.TradingCalendar>(), TimeSpan.FromMinutes(5), Arg.Any<CancellationToken>());
+        var record = result.Value.ResultsDays.ShouldNotBeNull();
+        (record.SurpriseSha256, record.SurpriseRows, record.SbpVersion, record.SurpriseUnverified).ShouldBe((surprises.Sha256, 1, "sbp-1", 1));
+        fixture.Engine.Replays.Last().ResultsDays!.Surprises.ShouldBeSameAs(surprises);
+        var header = new RunHeader(result.Value.Strategy, result.Value.EngineVersion, result.Value.From, result.Value.To, result.Value.Options, result.Value.AcknowledgeCsvAdjusted, result.Value.Fills, result.Value.Universe, new XDrishti.Domain.Market.Calendar.TradingCalendar(), null, null, null, record);
+        RunAssembler.KeyText(header, result.Value.Instruments, result.Value.CalendarExceptions).ShouldContain("|rds-1|" + surprises.Sha256 + "|sbp-1\n");
+    }
+
+    [Fact]
     public async Task A_window_with_neither_a_calendar_row_nor_a_filing_is_refused_before_any_bar_is_read()
     {
         var fixture = new RunFixture();

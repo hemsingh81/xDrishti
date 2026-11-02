@@ -86,6 +86,15 @@ public sealed record OracleCounters
     /// <summary>P15-06: candidates the event filter could not answer for. Always 0 here, as <see cref="EventBlocked"/>.</summary>
     public int EventUnavailable { get; init; }
 
+    /// <summary>P15-09: trades that left with the <c>event_exit</c> overlay. The oracle has no results calendar, so it counts 0 (a SPEC ONLY row of the dry-read table).</summary>
+    public int ExitsEventExit { get; init; }
+
+    /// <summary>P15-09: session closes at which the overlay found no results date. Always 0 here.</summary>
+    public int EventExitUnavailable { get; init; }
+
+    /// <summary>P15-09: trades with at least one such session close. Always 0 here.</summary>
+    public int EventExitUnavailableTrades { get; init; }
+
     /// <summary>The sum of two counter sets, property by property.</summary>
     public OracleCounters Plus(OracleCounters other) => new()
     {
@@ -130,5 +139,8 @@ public sealed record OracleCounters
         AddsSkippedQuantity = AddsSkippedQuantity + other.AddsSkippedQuantity,
         EventBlocked = EventBlocked + other.EventBlocked,
         EventUnavailable = EventUnavailable + other.EventUnavailable,
+        ExitsEventExit = ExitsEventExit + other.ExitsEventExit,
+        EventExitUnavailable = EventExitUnavailable + other.EventExitUnavailable,
+        EventExitUnavailableTrades = EventExitUnavailableTrades + other.EventExitUnavailableTrades,
     };
 }

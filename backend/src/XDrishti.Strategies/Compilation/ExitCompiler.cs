@@ -97,7 +97,7 @@ internal sealed class ExitCompiler(ProblemSink sink, QuantityReader quantities)
             ExitRelations.Check(sink, overlay.Kind, values, context, at);
             if (!duplicate && !ExitTables.OverlaysRunBySimulator.Contains(overlay.Kind))
             {
-                sink.Warning(at, ModelCodes.ExitNotEvaluated, "The overlay " + name + " is checked, but nothing runs it yet (P4)" + (overlay.Kind == OverlayKind.EventExit ? " and the results calendar it needs is missing (P15)" : string.Empty) + "; a simulator refuses a strategy that uses it.");
+                sink.Warning(at, ModelCodes.ExitNotEvaluated, "The overlay " + name + " is checked, but nothing runs it yet (P4); a simulator refuses a strategy that uses it.");
             }
 
             if (!duplicate && sink.ErrorCount == before)
@@ -149,7 +149,7 @@ internal sealed class ExitCompiler(ProblemSink sink, QuantityReader quantities)
                 continue;
             }
 
-            if (ReadValues(parameter, spec, path) is { } numbers)
+            if (ReadValues(parameter, LimitedFor(spec, context), path) is { } numbers)
             {
                 values[name] = numbers;
             }
@@ -248,6 +248,10 @@ internal sealed class ExitCompiler(ProblemSink sink, QuantityReader quantities)
 
         return ok ? Array.AsReadOnly(numbers) : null;
     }
+
+    /// <summary>The bounds of a parameter for this side: the swing time stop reaches <see cref="ExitTables.MaxEventHold"/> only on an event side (P15-09); any other side keeps 1 to <see cref="ExitTables.MaxSwingSessions"/>.</summary>
+    private static ParameterSpec LimitedFor(ParameterSpec spec, ExitContext context) =>
+        spec.Name == "swing_sessions" && !context.EventSide ? spec with { Max = ExitTables.MaxSwingSessions } : spec;
 
     private static bool InRange(double value, ParameterSpec spec) =>
         (spec.MinInclusive ? value >= spec.Min : value > spec.Min) && (spec.MaxInclusive ? value <= spec.Max : value < spec.Max);

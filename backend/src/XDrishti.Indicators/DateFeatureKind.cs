@@ -48,4 +48,10 @@ public enum DateFeatureKind
 
     /// <summary>Sessions since the reaction session of the newest results filing visible at the start of the India date of the step (P15-05); NaN when unknown. Read from <see cref="FrameOptions.ResultsDays"/>.</summary>
     DaysSinceResults,
+
+    /// <summary>Quintile 1 to 5 of the <c>sue_yoy</c> of the newest results filing visible at the start of the India date of the step, by the breakpoints of the previous complete season, as of the <b>close</b> of that date (P15-09); NaN when unknown. Read from <see cref="FrameOptions.ResultsDays"/>.</summary>
+    ResultsSueQuintile,
+
+    /// <summary>Quintile 1 to 5 of the <c>results_car3</c> of the newest results filing visible at the start of the India date of the step, by the breakpoints of the previous complete season, as of the <b>close</b> of that date (P15-09); NaN when unknown. Read from <see cref="FrameOptions.ResultsDays"/>.</summary>
+    ResultsCar3Quintile,
 }

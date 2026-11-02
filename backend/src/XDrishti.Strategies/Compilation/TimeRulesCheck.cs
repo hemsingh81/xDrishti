@@ -16,9 +16,12 @@ internal sealed class TimeRulesCheck(ProblemSink sink)
 
     private const int MinMaxHold = 1;
 
-    private const int MaxMaxHold = 5;
+    private const int MaxMaxHold = ExitTables.MaxSwingSessions;
 
-    public SessionRules Check(StrategyDefinition definition, Timeframe evaluationTimeframe)
+    /// <param name="definition">The strategy.</param>
+    /// <param name="evaluationTimeframe">The timeframe the rules are evaluated on.</param>
+    /// <param name="eventSide">The compiled side reads <c>days_since_results</c> in its entry: it may hold up to <see cref="ExitTables.MaxEventHold"/> sessions (P15-09, ADR 0040 amendment).</param>
+    public SessionRules Check(StrategyDefinition definition, Timeframe evaluationTimeframe, bool eventSide = false)
     {
         var rules = definition.TimeRules;
         var styleKnown = Enum.IsDefined(definition.Style);
@@ -59,9 +62,9 @@ internal sealed class TimeRulesCheck(ProblemSink sink)
             {
                 sink.Error("time_rules.max_hold_sessions", ModelCodes.TimeRuleMissing, "A swing strategy needs `max_hold_sessions`: the longest hold is always on (doc 08 §2).");
             }
-            else if (hold is < MinMaxHold or > MaxMaxHold)
+            else if (hold < MinMaxHold || hold > (eventSide ? ExitTables.MaxEventHold : MaxMaxHold))
             {
-                sink.Error("time_rules.max_hold_sessions", ModelCodes.MaxHoldOutOfRange, "`max_hold_sessions` is " + hold + ", but it must be " + MinMaxHold + " to " + MaxMaxHold + ".");
+                sink.Error("time_rules.max_hold_sessions", ModelCodes.MaxHoldOutOfRange, "`max_hold_sessions` is " + hold + ", but it must be " + MinMaxHold + " to " + MaxMaxHold + ", or " + MinMaxHold + " to " + ExitTables.MaxEventHold + " for a side that reads days_since_results.");
             }
         }
 

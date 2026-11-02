@@ -16,7 +16,6 @@ public sealed class CreateTests
     public static TheoryData<string, StopSpec, string> Refused => new()
     {
         { "fixed_pct", new StopSpec(StopKind.FixedPct, Pct: Quantity.Of(1)), "simulation.scanner_stop_unsupported" },
-        { "atr_mult", new StopSpec(StopKind.AtrMult, Mult: Quantity.Of(2)), "simulation.scanner_stop_unsupported" },
         { "a buffer above 0", new StopSpec(StopKind.OrOpposite, Minutes: Quantity.Of(15), BufferAtr: Quantity.Of(0.5)), "simulation.scanner_stop_unsupported" },
         { "a stop timeframe other than E", new StopSpec(StopKind.SwingLow, Timeframe.H1, Lookback: Quantity.Of(3)), "simulation.scanner_stop_unsupported" },
     };

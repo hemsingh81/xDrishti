@@ -11,7 +11,7 @@ Written 2026-10-19 for [P3-08](../specs/P3-08-independent-walker-oracle-and-leak
 - `NONE`: no sentence anywhere the oracle may read. ADR 0047 adds the rule **before O starts**.
 - `PASS-THROUGH`: an echo of the input or a constant; compared for equality only.
 
-The comparison unit for `SimTrade` is its 34 positional properties (the 34th, `Legs`, added by P4-01); for counters, the 41 positional properties (from the 30th on added by P4-01 to P4-04, the last two by P15-06) of `WalkCounters`; for the cost chain (Annex C, P3-08c) the 11 properties of `TradeCosting` and the 8 of `LegCharges`; plus the gate's hold end and blocked set. The `Key` is computed and not compared.
+The comparison unit for `SimTrade` is its 34 positional properties (the 34th, `Legs`, added by P4-01); for counters, the 44 positional properties (from the 30th on added by P4-01 to P4-04, the last two by P15-06) of `WalkCounters`; for the cost chain (Annex C, P3-08c) the 11 properties of `TradeCosting` and the 8 of `LegCharges`; plus the gate's hold end and blocked set. The `Key` is computed and not compared.
 
 ## A. `SimTrade` (34 positional fields, schema 5)
 
@@ -54,7 +54,7 @@ The comparison unit for `SimTrade` is its 34 positional properties (the 34th, `L
 
 Not a field but compared with them: **the no-trade reason** (`NoTradeReason`): ADR 0038 #1 (E1, E5, E6), ADR 0040 #10 (D11, `PositionOpen`), ADR 0043 #3 (D3, `OrderPendingAtEnd`): DEFINED.
 
-## B. `WalkCounters` (41 positional properties) and `WalkOutcome`
+## B. `WalkCounters` (44 positional properties) and `WalkOutcome`
 
 | # | Counter | Defining text | Status | ADR 0047 |
 |---|---|---|---|---|
@@ -99,6 +99,9 @@ Not a field but compared with them: **the no-trade reason** (`NoTradeReason`): A
 | 39 | `AddsSkippedQuantity` | P4-04 D3, D12: adds of no whole share (a costed run only) | SPEC ONLY | ADR 0052 |
 | 40 | `EventBlocked` | P15-06: candidates the simulator's `not_event_day` filter blocked before the walk (the oracle has no filter and counts 0; the filter is tested on its own hand table) | SPEC ONLY | ADR 0182 |
 | 41 | `EventUnavailable` | P15-06: candidates for which the filter found no visible results entry (never a pass; 0 in the oracle) | SPEC ONLY | ADR 0182 |
+| 42 | `ExitsEventExit` | P15-09: trades that left with the `event_exit` overlay at the close of a session (the oracle has no results calendar and counts 0; the overlay is tested on its own hand table) | SPEC ONLY | ADR 0187 |
+| 43 | `EventExitUnavailable` | P15-09: session closes at which an open position found no results date, so the overlay could not fire and did not (never "no event"; 0 in the oracle) | SPEC ONLY | ADR 0187 |
+| 44 | `EventExitUnavailableTrades` | P15-09: trades with at least one such session close (0 in the oracle) | SPEC ONLY | ADR 0187 |
 
 `WalkOutcome.HoldEndEpochSeconds` (the gate's input, compared as a list, section D) and the booleans of `WalkOutcome` are the same facts as the counters above.
 

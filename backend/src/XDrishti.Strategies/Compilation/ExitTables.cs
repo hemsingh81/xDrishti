@@ -45,6 +45,9 @@ internal static class ExitTables
     /// <summary>The most sessions of a swing time stop (the range of <c>max_hold_sessions</c>).</summary>
     public const int MaxSwingSessions = 5;
 
+    /// <summary>The most sessions of a hold, and of a swing time stop, for an event side: a side whose entry reads <c>days_since_results</c> (P15-09, ADR 0040 amendment).</summary>
+    public const int MaxEventHold = 20;
+
     /// <summary>The policies and their parameters, in the order the parameters are reported when missing.</summary>
     public static readonly IReadOnlyDictionary<ExitPolicy, IReadOnlyList<ParameterSpec>> Checked = new Dictionary<ExitPolicy, IReadOnlyList<ParameterSpec>>
     {
@@ -88,7 +91,7 @@ internal static class ExitTables
         [
             new("min_progress_rr", ParameterShape.Scalar, true, 0, true, 10, true),
             new("intraday_bars", ParameterShape.Scalar, false, 1, true, SessionMinutes, true, false, true),
-            new("swing_sessions", ParameterShape.Scalar, false, 1, true, MaxSwingSessions, true, false, true),
+            new("swing_sessions", ParameterShape.Scalar, false, 1, true, MaxEventHold, true, false, true),
         ],
         [OverlayKind.EventExit] = [new("days_before_results", ParameterShape.Scalar, true, 1, true, 10, true, false, true)],
     }.ToFrozenDictionary();
@@ -99,8 +102,8 @@ internal static class ExitTables
     /// </summary>
     public static readonly IReadOnlySet<ExitPolicy> RunBySimulator = new HashSet<ExitPolicy> { ExitPolicy.FixedRr, ExitPolicy.PartialBe, ExitPolicy.PartialTrail, ExitPolicy.AtrTrail, ExitPolicy.StructureTrail, ExitPolicy.EmaTrail, ExitPolicy.Pyramid }.ToFrozenSet();
 
-    /// <summary>The overlays a simulator runs: <c>time_stop</c> (P4-02); <c>event_exit</c> gets the warning <c>exit_not_evaluated</c>.</summary>
-    public static readonly IReadOnlySet<OverlayKind> OverlaysRunBySimulator = new HashSet<OverlayKind> { OverlayKind.TimeStop }.ToFrozenSet();
+    /// <summary>The overlays a simulator runs: <c>time_stop</c> (P4-02) and <c>event_exit</c> (P15-09).</summary>
+    public static readonly IReadOnlySet<OverlayKind> OverlaysRunBySimulator = new HashSet<OverlayKind> { OverlayKind.TimeStop, OverlayKind.EventExit }.ToFrozenSet();
 
     /// <summary>The feature a policy reads on the evaluation timeframe and its first (period) parameter; null for a policy that reads nothing.</summary>
     public static (string Indicator, string Parameter)? Read(ExitPolicy policy, Side side) => policy switch

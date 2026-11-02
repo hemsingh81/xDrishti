@@ -2,7 +2,7 @@ namespace XDrishti.Domain.Research;
 
 /// <summary>
 /// What the trade walker did, as plain sums (ADR 0037, decision D6; ADR 0038). A rule that never fires gives zero trades and zero losses and looks safe; these counters are how it is seen.
-/// Identities: <c>Candidates = Trades + NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached + PositionOpen + OrderPendingAtEnd + EventBlocked + EventUnavailable</c>, <c>Trades = EntriesAtOpen + EntriesAtLimit</c>, and <c>Trades</c> is the sum of the seven exit counts (<c>ExitsStop + ExitsTarget + ExitsSquareOff + ExitsMaxHold + ExitsEndOfData + ExitsEmaExit + ExitsTimeStop</c>); ADR 0040, D10, ADR 0051.
+/// Identities: <c>Candidates = Trades + NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached + PositionOpen + OrderPendingAtEnd + EventBlocked + EventUnavailable</c>, <c>Trades = EntriesAtOpen + EntriesAtLimit</c>, and <c>Trades</c> is the sum of the eight exit counts (<c>ExitsStop + ExitsTarget + ExitsSquareOff + ExitsMaxHold + ExitsEndOfData + ExitsEmaExit + ExitsTimeStop + ExitsEventExit</c>, the last since P15-09); ADR 0040, D10, ADR 0051.
 /// <c>WalkOutcome.ToCounters()</c> (in <c>XDrishti.Simulation.Walking</c>) makes the counts of one walk; this type lives in Domain because the run record of P3-04 holds it.
 /// </summary>
 /// <param name="Candidates">Walks.</param>
@@ -45,6 +45,9 @@ namespace XDrishti.Domain.Research;
 /// <param name="AddsSkippedQuantity">Adds whose quantity <c>floor(Q x share)</c> is 0 (P4-04, D3); only in a costed run, which knows <c>Q</c>.</param>
 /// <param name="EventBlocked">No-trade: see <see cref="NoTradeReason.EventBlocked"/> (P15-06); 0 for a strategy that does not name <c>not_event_day</c>.</param>
 /// <param name="EventUnavailable">No-trade: see <see cref="NoTradeReason.EventUnavailable"/> (P15-06); 0 for a strategy that does not name <c>not_event_day</c>.</param>
+/// <param name="ExitsEventExit">Trades that ended with the <c>event_exit</c> overlay (P15-09).</param>
+/// <param name="EventExitUnavailable">Session closes at which an open position found no results date for the <c>event_exit</c> overlay, so it could not fire and did not (P15-09): unavailable is never "no event".</param>
+/// <param name="EventExitUnavailableTrades">Trades with at least one such session close (P15-09).</param>
 /// <param name="TimeStopAtLastClose"><c>TimeStop</c> exits of a swing trade whose checked session held no minute with a trade at its end, so the position left at the close of the last minute that did (a subset of <see cref="ExitsTimeStop"/>; P4-02, D9).</param>
 public sealed record WalkCounters(
     long Candidates,
@@ -87,10 +90,13 @@ public sealed record WalkCounters(
     long AddsSkippedRisk = 0,
     long AddsSkippedQuantity = 0,
     long EventBlocked = 0,
-    long EventUnavailable = 0)
+    long EventUnavailable = 0,
+    long ExitsEventExit = 0,
+    long EventExitUnavailable = 0,
+    long EventExitUnavailableTrades = 0)
 {
     /// <summary>All zeros: the identity of <see cref="Add"/>.</summary>
-    public static WalkCounters Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    public static WalkCounters Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     /// <summary>The field-by-field sum.</summary>
     public WalkCounters Add(WalkCounters other)
@@ -137,6 +143,9 @@ public sealed record WalkCounters(
             AddsSkippedRisk + other.AddsSkippedRisk,
             AddsSkippedQuantity + other.AddsSkippedQuantity,
             EventBlocked + other.EventBlocked,
-            EventUnavailable + other.EventUnavailable);
+            EventUnavailable + other.EventUnavailable,
+            ExitsEventExit + other.ExitsEventExit,
+            EventExitUnavailable + other.EventExitUnavailable,
+            EventExitUnavailableTrades + other.EventExitUnavailableTrades);
     }
 }

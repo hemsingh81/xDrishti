@@ -29,7 +29,6 @@ public sealed class SimulatorCreateTests
         { "entry stop_above_high", Buy(b => b with { Entry = new EntrySpec(EntryKind.StopAboveHigh) }), "simulation.unsupported_entry", "buy.entry", "stop_above_high" },
         { "entry limit_pullback on sell", Sell(s => s with { Entry = new EntrySpec(EntryKind.LimitPullback) }), "simulation.unsupported_entry", "sell.entry", "limit_pullback" },
         { "stop fixed_pct", Buy(b => b with { Stop = new StopSpec(StopKind.FixedPct, Pct: Quantity.Of(1)) }), "simulation.unsupported_stop", "buy.stop", "fixed_pct" },
-        { "stop atr_mult", Buy(b => b with { Stop = new StopSpec(StopKind.AtrMult, Mult: Quantity.Of(2)) }), "simulation.unsupported_stop", "buy.stop", "atr_mult" },
         { "stop swing_low with a buffer", Buy(b => b with { Stop = new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(3), BufferAtr: Quantity.Of(0.5)) }), "simulation.unsupported_stop", "buy.stop.buffer_atr", "swing_low" },
         { "stop bar_high on sell on another timeframe", Sell(s => s with { Stop = new StopSpec(StopKind.BarHigh, Timeframe.M5) }), "simulation.unsupported_stop", "sell.stop.timeframe", "bar_high" },
         { "stop or_opposite with a buffer", Buy(b => b with { Stop = new StopSpec(StopKind.OrOpposite, Minutes: Quantity.Of(15), BufferAtr: Quantity.Of(0.5)) }), "simulation.unsupported_stop", "buy.stop.buffer_atr", "buffer_atr" },

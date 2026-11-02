@@ -10,7 +10,18 @@ namespace XDrishti.Strategies.Tests.Mirror;
 public sealed class MirrorTableTests
 {
     // P15-05 added two rows (days_to_results, days_since_results: side-independent counts, mirrored to themselves) for names that did not exist before; no mirrored definition stored earlier can change, so the version was kept (a point for the owner in ADR 0185)
-    private const string PinnedFingerprint = "63c33e9d166f168956bb39d62520244875b60886255b09167a72885364ca77a8";
+    // P15-09 added two refused names (results_sue_q, results_car3_q: a bucket has no opposite side) that did not exist before; no stored definition can contain them, so the version was kept (a point for the owner in ADR 0187)
+    private const string PinnedFingerprint = "59f02f144d78a39a0f48536f1a199e0730dab0e3c482dcd837eef56418eaa7fa";
+
+    [Fact]
+    public void The_two_quintile_features_are_refused_like_the_regime_not_mirrored_because_a_bucket_has_no_opposite_side()
+    {
+        // P15-09: a top-quintile entry mirrored to a SELL would need the bottom quintile; the long-only research strategy names them, so no stored definition can hold a mirrored copy
+        MirrorTable.IsRefused("results_sue_q").ShouldBeTrue();
+        MirrorTable.IsRefused("results_car3_q").ShouldBeTrue();
+        MirrorTable.TryGet("results_sue_q", out _).ShouldBeFalse();
+        MirrorTable.IsRefused("days_since_results").ShouldBeFalse();
+    }
 
     private static bool Classified(string name) => MirrorTable.IsRefused(name) || MirrorTable.TryGet(name, out _);
 
@@ -20,7 +31,7 @@ public sealed class MirrorTableTests
         var missing = IndicatorCatalog.All.Select(i => i.Name).Where(n => !Classified(n)).ToList();
 
         missing.ShouldBeEmpty();
-        IndicatorCatalog.All.Count.ShouldBe(58);
+        IndicatorCatalog.All.Count.ShouldBe(60);
     }
 
     [Fact]

@@ -30,6 +30,7 @@ internal static class ReplayNames
         ExitReason.EndOfData => "end_of_data",
         ExitReason.MaxHold => "max_hold",
         ExitReason.EmaExit => "ema_exit",
+        ExitReason.EventExit => "event_exit",
         _ => "time_stop",
     };
 }

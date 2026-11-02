@@ -7,6 +7,7 @@ namespace XDrishti.SimExport.Csv;
 /// <summary>
 /// <c>comparison.csv</c> and <c>diagnostics.csv</c> of a comparison (spec P4-05, D6, D7): one row for each candidate and sample (its own trades, the common set), and one row for each figure of the MAE/MFE table. The figures are printed
 /// to a fixed precision, <see cref="ComparisonFormat"/>, which is the precision the hand tables of the tests are compared to. UTF-8 without a byte order mark, <c>\n</c> line ends, RFC 4180 quoting, like <see cref="TradesCsv"/>.
+/// <para>The table does not show the <c>event_exit</c> overlay's count (P15-09): a column or a figure would change the bytes of every comparison of a strategy without the overlay. A candidate whose trades left by the overlay is counted in the run record's <c>ExitsEventExit</c>, not here.</para>
 /// </summary>
 public static class ComparisonCsv
 {

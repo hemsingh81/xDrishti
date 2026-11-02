@@ -461,16 +461,14 @@ public sealed class ExitTablesTests
     };
 
     [Fact]
-    public void The_policies_and_the_time_stop_the_simulator_runs_have_no_such_warning_and_event_exit_has_one()
+    public void The_policies_the_time_stop_and_the_event_exit_the_simulator_runs_have_no_such_warning()
     {
         Located.Compile(Intraday()).Problems.ShouldNotContain(p => p.Problem.Code == ModelCodes.ExitNotEvaluated);
 
         var result = Located.Compile(Intraday().WithBuy(b => b with { Overlays = [new OverlaySpec(OverlayKind.TimeStop, TimeStopBase), new OverlaySpec(OverlayKind.EventExit, [P("days_before_results", 1)])] }));
 
         result.IsSuccess.ShouldBeTrue(Located.Show(result));
-        result.Problems.ShouldNotContain(p => p.Problem.Code == ModelCodes.ExitNotEvaluated && p.Path == "buy.overlays[0]");
-        var eventExit = result.ShouldHave(ModelCodes.ExitNotEvaluated, "buy.overlays[1]", ProblemSeverity.Warning);
-        eventExit.Problem.Message.ShouldContain("P15");
+        result.Problems.ShouldNotContain(p => p.Problem.Code == ModelCodes.ExitNotEvaluated, "the event exit is run by the swing walk since P15-09");
     }
 
     [Fact]
@@ -484,10 +482,10 @@ public sealed class ExitTablesTests
     }
 
     [Fact]
-    public void Every_policy_is_run_by_the_simulator_so_none_is_given_the_warning_and_only_event_exit_is()
+    public void Every_policy_and_every_overlay_is_run_by_the_simulator_so_none_is_given_the_warning()
     {
         ExitTables.RunBySimulator.ShouldBe(Enum.GetValues<ExitPolicy>(), ignoreOrder: true);
-        ExitTables.OverlaysRunBySimulator.ShouldBe([OverlayKind.TimeStop]);
+        ExitTables.OverlaysRunBySimulator.ShouldBe(Enum.GetValues<OverlayKind>(), ignoreOrder: true);
         foreach (var policy in Enum.GetValues<ExitPolicy>())
         {
             Located.Compile(Exit(policy, ValidFor(policy))).Problems.ShouldNotContain(p => p.Problem.Code == ModelCodes.ExitNotEvaluated, policy.ToString());

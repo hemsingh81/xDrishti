@@ -83,7 +83,7 @@ public sealed class ExitFlagsTests
     [InlineData("intraday_bars=6", "'min_progress_rr' is required")]
     [InlineData("min_progress_rr=0.5,intraday_bars=6,swing_sessions=2", "give 'intraday_bars'")]
     [InlineData("min_progress_rr=0.5,intraday_bars=2.5", "whole number")]
-    [InlineData("event_exit=1", "event_exit is not run yet")]
+    [InlineData("event_exit=1", "event_exit is set in the strategy, not by a flag")]
     public void A_refused_time_stop_names_the_flag_and_the_value(string text, string reason)
     {
         var (choice, errors) = Parse(text, "FIXED_RR:rr=2");

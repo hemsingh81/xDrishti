@@ -165,7 +165,7 @@ public sealed class IndicatorCatalogTests
         IndicatorCatalog.All.Count(i => !i.DateDriven).ShouldBe(19 + added.Length);
         IndicatorCatalog.All.Count(i => !i.DateDriven).ShouldBe(44);
         IndicatorCatalog.All.Count.ShouldBe(44 + TestSpecs.ContextNames.Count + TestSpecs.ResultsNames.Count);
-        IndicatorCatalog.All.Count.ShouldBe(58);
+        IndicatorCatalog.All.Count.ShouldBe(60);
         foreach (var name in added)
         {
             IndicatorCatalog.TryGet(name, out var info).ShouldBeTrue(name);

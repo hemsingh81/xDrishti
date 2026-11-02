@@ -1,4 +1,4 @@
-engine sim-8
+engine sim-9
 segment=IntradayEquity sheet=test-synthetic-1 qty=2000 riskTaken=5000 entryTurnover=201000 exitTurnover=196000 entryLeg[brokerage=20 stt=0 exchange=10.05 sebi=1.01 stamp=40.2 other=0 dp=0 gst=5.59] exitLeg[brokerage=20 stt=78.4 exchange=9.8 sebi=0.98 stamp=0 other=0 dp=0 gst=5.54] total=191.57 costR=0.038314 rNet=-1.038314
 segment=IntradayEquity sheet=test-synthetic-1 qty=2000 riskTaken=5000 entryTurnover=201000 exitTurnover=211000 entryLeg[brokerage=20 stt=0 exchange=10.05 sebi=1.01 stamp=40.2 other=0 dp=0 gst=5.59] exitLeg[brokerage=20 stt=73.85 exchange=10.55 sebi=1.06 stamp=0 other=0 dp=0 gst=5.69] total=188 costR=0.0376 rNet=1.9624
 instrument 00000000-0000-0000-0000-0000000000a1 TEST skipped=- detail=-

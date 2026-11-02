@@ -215,13 +215,15 @@ public static class IndicatorCatalog
             ("regime", DateFeatureKind.Regime, "Market regime as of the previous session: 1 (UP_LOW_VOL) to 9 (DOWN_HIGH_VOL), (1 - regime_trend) * 3 + regime_vol + 1."),
             ("days_to_results", DateFeatureKind.DaysToResults, "Trading sessions from the India date of the step to the next results event of the instrument, as known at the start of that date (0 on the event session); not ready when no calendar row says (P15-05)."),
             ("days_since_results", DateFeatureKind.DaysSinceResults, "Trading sessions from the reaction session of the newest results filing visible at the start of the India date of the step to that date (0 on the reaction session); not ready when no filing is visible (P15-05)."),
+            ("results_sue_q", DateFeatureKind.ResultsSueQuintile, "Quintile 1 to 5 of the sue_yoy of the newest visible results filing, by the breakpoints of the previous complete season; known as of the close of the date, so it is read on the 1D timeframe only; not ready when unknown (P15-09)."),
+            ("results_car3_q", DateFeatureKind.ResultsCar3Quintile, "Quintile 1 to 5 of the results_car3 of the newest visible results filing, by the breakpoints of the previous complete season; known as of the close of the date, so it is read on the 1D timeframe only; not ready when unknown (P15-09)."),
         })
         {
             var captured = kind;
             list.Add(new IndicatorInfo(
                 name, text, [], SessionBehaviour.Continuous, false, PriceSource.Close, false,
                 _ => DateFeature.WarmUpDays(captured, defaults), _ => new DateFeature(captured),
-                dateFeature: kind, requiresContext: DateFeature.ReadsContext(kind), requiresExpiryDays: kind == DateFeatureKind.ExpiryDay, requiresResultsDays: kind is DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults));
+                dateFeature: kind, requiresContext: DateFeature.ReadsContext(kind), requiresExpiryDays: kind == DateFeatureKind.ExpiryDay, requiresResultsDays: kind is DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults or DateFeatureKind.ResultsSueQuintile or DateFeatureKind.ResultsCar3Quintile));
         }
     }
 

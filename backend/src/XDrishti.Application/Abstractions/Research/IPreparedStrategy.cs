@@ -27,6 +27,9 @@ public interface IPreparedStrategy
     /// <summary>The strategy names <c>days_to_results</c> or <c>days_since_results</c> (P15-05, ADR 0185): a run gives the replay the results-calendar snapshot and the results filing times, and is refused with <c>simulation.filter_not_available</c> when the window has neither a calendar row nor a filing.</summary>
     bool ReadsResultsDays { get; }
 
+    /// <summary>The strategy names <c>results_sue_q</c> or <c>results_car3_q</c> (P15-09): a run also gives the replay the surprise numbers of the universe, from which the breakpoints of the previous complete season are made; an instrument is skipped with the reason <c>event_calendar_unavailable</c> and the cause <c>no_surprise_inputs</c> when the inputs of the replay carry none. Default: false.</summary>
+    bool ReadsSurprise => false;
+
     /// <summary>The warnings of the compile (path in <see cref="FieldError.Field"/>, code in <see cref="FieldError.Code"/>); counted in the log, not stored in the run record.</summary>
     IReadOnlyList<FieldError> Warnings { get; }
 }

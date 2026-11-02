@@ -57,6 +57,7 @@ public static class TripleBarrier
                 break;
             case ExitReason.EmaExit:
             case ExitReason.TimeStop:
+            case ExitReason.EventExit:
                 outcome = BarrierOutcome.RuleExit;
                 break;
             case ExitReason.EndOfData:

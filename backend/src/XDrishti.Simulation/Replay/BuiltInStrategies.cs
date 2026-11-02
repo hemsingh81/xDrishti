@@ -70,6 +70,17 @@ public static class BuiltInStrategies
                 new BuiltInParameterInfo(RewardRiskParam, DefaultRewardRisk, "target as a multiple of the risk", Min: 0, Max: MaxRewardRisk, MinExclusive: true),
             ],
             values => BaseBreakoutV1.Create(values[BaseBreakoutV1.BaseLenParam], values[BaseBreakoutV1.BasePctParam], values[BaseBreakoutV1.VolXParam], values[RewardRiskParam])),
+        new BuiltInEntry(
+            PeadV1.Id,
+            "Post-earnings drift (a research strategy, P15-09): on the reaction session of a results filing, a long in the chosen surprise buckets, decided at that close and filled at the next open; stop 2 ATR(14), target at ten times the risk as a practical no-target, held 5 or 20 sessions",
+            [Timeframe.D1],
+            Timeframe.D1,
+            [
+                new BuiltInParameterInfo(PeadV1.MeasureParam, PeadV1.MeasureSue, "the surprise measure: 1 is sue_yoy, 2 is results_car3", Allowed: [PeadV1.MeasureSue, PeadV1.MeasureCar3]),
+                new BuiltInParameterInfo(PeadV1.HoldParam, 20, "the longest hold in sessions: 5 or 20", Allowed: [5, 20]),
+                new BuiltInParameterInfo(PeadV1.BucketsParam, PeadV1.BucketsTop, "the buckets entered: 1 is the top quintile, 2 the middle three (the control)", Allowed: [PeadV1.BucketsTop, PeadV1.BucketsMiddle]),
+            ],
+            values => PeadV1.Create(values[PeadV1.MeasureParam], values[PeadV1.HoldParam], values[PeadV1.BucketsParam])),
     ];
 
     /// <summary>The ids of the built-in strategies, in the order of the table.</summary>

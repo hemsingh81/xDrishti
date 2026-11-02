@@ -26,6 +26,7 @@ namespace XDrishti.Simulation.Walking;
 /// <param name="AddsMissed">The adds whose open was beyond the limit (P4-04, D3).</param>
 /// <param name="AddsSkippedRisk">The adds the risk rule skipped (P4-04, D4).</param>
 /// <param name="AddsSkippedQuantity">The adds of no whole share (P4-04, D3).</param>
+/// <param name="EventExitUnavailable">The session closes at which the <c>event_exit</c> overlay found no results date and so could not fire (P15-09); 0 for a walk without the overlay.</param>
 /// <param name="HoldEndEpochSeconds">The instant the position counts as open until, for the position gate (D11): the exit instant, or the end of the due session for a <c>MaxHoldAtLastClose</c> trade; 0 when there is no trade.</param>
 public readonly record struct WalkOutcome(
     SimTrade? Trade,
@@ -49,7 +50,8 @@ public readonly record struct WalkOutcome(
     int AddsTaken = 0,
     int AddsMissed = 0,
     int AddsSkippedRisk = 0,
-    int AddsSkippedQuantity = 0)
+    int AddsSkippedQuantity = 0,
+    int EventExitUnavailable = 0)
 {
     /// <summary>The counts of this one walk, to be summed with <see cref="WalkCounters.Add"/>.</summary>
     public WalkCounters ToCounters()
@@ -96,6 +98,9 @@ public readonly record struct WalkOutcome(
             AddsSkippedRisk: AddsSkippedRisk,
             AddsSkippedQuantity: AddsSkippedQuantity,
             EventBlocked: NoTrade == NoTradeReason.EventBlocked ? 1 : 0,
-            EventUnavailable: NoTrade == NoTradeReason.EventUnavailable ? 1 : 0);
+            EventUnavailable: NoTrade == NoTradeReason.EventUnavailable ? 1 : 0,
+            ExitsEventExit: exit == ExitReason.EventExit ? 1 : 0,
+            EventExitUnavailable: EventExitUnavailable,
+            EventExitUnavailableTrades: Trade is not null && EventExitUnavailable > 0 ? 1 : 0);
     }
 }

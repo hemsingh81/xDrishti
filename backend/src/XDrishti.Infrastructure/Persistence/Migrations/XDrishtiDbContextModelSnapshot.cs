@@ -9508,7 +9508,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_sim_trades_entry_fill", "entry_fill IN ('atopen', 'atlimit')");
 
-                            t.HasCheckConstraint("ck_sim_trades_exit_reason", "exit_reason IN ('stop', 'target', 'squareoff', 'endofdata', 'maxhold', 'emaexit', 'timestop')");
+                            t.HasCheckConstraint("ck_sim_trades_exit_reason", "exit_reason IN ('stop', 'target', 'squareoff', 'endofdata', 'maxhold', 'emaexit', 'timestop', 'eventexit')");
 
                             t.HasCheckConstraint("ck_sim_trades_fills", "fills IN ('exact', 'modelled')");
 

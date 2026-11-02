@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Research;
 
@@ -15,8 +16,9 @@ public sealed class ResultsDayInputs
 
     private readonly Dictionary<Guid, IReadOnlyList<ResultsFilingTime>> _filings;
 
-    private ResultsDayInputs(EventCalendarSnapshot? calendar, Dictionary<Guid, IReadOnlyList<ResultsFilingTime>> filings, int filingCount, int lagMinutes, string filingsSha256)
+    private ResultsDayInputs(EventCalendarSnapshot? calendar, Dictionary<Guid, IReadOnlyList<ResultsFilingTime>> filings, int filingCount, int lagMinutes, string filingsSha256, SurpriseInputs? surprises)
     {
+        Surprises = surprises;
         Calendar = calendar;
         _filings = filings;
         FilingCount = filingCount;
@@ -25,6 +27,12 @@ public sealed class ResultsDayInputs
     }
 
     public EventCalendarSnapshot? Calendar { get; }
+
+    /// <summary>The surprise numbers of the run, or null when the strategy reads no quintile (P15-09).</summary>
+    public SurpriseInputs? Surprises { get; }
+
+    /// <summary>Whether the surprise numbers were given (a run that reads a quintile needs them).</summary>
+    public bool HasSurprises => Surprises is not null;
 
     public int FilingCount { get; }
 
@@ -36,7 +44,7 @@ public sealed class ResultsDayInputs
     /// <summary>True when there is no calendar row and no filing: nothing to read.</summary>
     public bool IsEmpty => (Calendar?.RowCount ?? 0) == 0 && FilingCount == 0;
 
-    public static ResultsDayInputs Create(EventCalendarSnapshot? calendar, IEnumerable<ResultsFilingTime> filings, int lagMinutes)
+    public static ResultsDayInputs Create(EventCalendarSnapshot? calendar, IEnumerable<ResultsFilingTime> filings, int lagMinutes, SurpriseInputs? surprises = null)
     {
         ArgumentNullException.ThrowIfNull(filings);
         var cut = filings
@@ -54,12 +62,38 @@ public sealed class ResultsDayInputs
         }
 
         var byInstrument = cut.GroupBy(f => f.InstrumentId).ToDictionary(g => g.Key, g => (IReadOnlyList<ResultsFilingTime>)g.ToList().AsReadOnly());
-        return new ResultsDayInputs(calendar, byInstrument, cut.Count, lagMinutes, CanonicalText.Sha256Hex(text.ToString()));
+        return new ResultsDayInputs(calendar, byInstrument, cut.Count, lagMinutes, CanonicalText.Sha256Hex(text.ToString()), surprises);
+    }
+
+    /// <summary>
+    /// Of the filings that name a period and whose reaction session lies in the window, how many were broadcast (plus the lag) after 00:00 India time of that session, and how many there are. For those the series never shows <c>days_since_results == 0</c> on the reaction session
+    /// (the filing is first visible the next date, where the count is already 1), so a rule that enters on 0 cannot take them (P15-09, the pre-open reporters).
+    /// </summary>
+    public (int Missed, int Total) CountMissedReactionDays(TradingCalendar calendar, DateOnly from, DateOnly to)
+    {
+        ArgumentNullException.ThrowIfNull(calendar);
+        var lag = TimeSpan.FromMinutes(LagMinutes);
+        int missed = 0, total = 0;
+        foreach (var filing in _filings.Values.SelectMany(f => f).Where(f => f.PeriodEnd is not null))
+        {
+            if (ReactionSession.Of(filing.BroadcastTs, lag, calendar) is not { } reaction || reaction < from || reaction > to)
+            {
+                continue;
+            }
+
+            total++;
+            if (filing.BroadcastTs + lag > new DateTimeOffset(reaction.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset))
+            {
+                missed++;
+            }
+        }
+
+        return (missed, total);
     }
 
     public IReadOnlyList<ResultsFilingTime> FilingsOf(Guid instrumentId) => _filings.GetValueOrDefault(instrumentId, NoFilings);
 
     /// <summary>The per-date series of one instrument over the dates given.</summary>
     public ResultsDaySeries SeriesFor(Guid instrumentId, TradingCalendar calendar, DateOnly from, DateOnly to) =>
-        ResultsDaySeries.Build(Calendar?.RowsOf(instrumentId) ?? [], FilingsOf(instrumentId), TimeSpan.FromMinutes(LagMinutes), calendar, from, to);
+        ResultsDaySeries.Build(Calendar?.RowsOf(instrumentId) ?? [], FilingsOf(instrumentId), TimeSpan.FromMinutes(LagMinutes), calendar, from, to, Surprises);
 }

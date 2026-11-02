@@ -28,6 +28,7 @@ public sealed class RunAssemblyTests
         ["sim-6"] = "1bb29282b634e65dfe6fcd133b4f8da62ecb69fb77ee99ded9caee349a5276a6",
         ["sim-7"] = "35841bf1d7d726bf67427e6fd043c4f5cba0d0b349690857fa47ac6d9ba838ad",
         ["sim-8"] = "7a56a92a2bc05f4e7ac6d8a23dfa84081b688e486fe414b95505408ca5810d64",
+        ["sim-9"] = "cefe732f8ff3fce9010109706f2b05201877895511f36b6f735db4955c08a9d7",
     };
 
     private static UniverseRecord Universe(params (Guid Id, string Symbol)[] members) =>

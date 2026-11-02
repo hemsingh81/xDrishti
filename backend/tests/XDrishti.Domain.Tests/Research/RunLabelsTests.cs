@@ -37,7 +37,7 @@ public sealed class RunLabelsTests
             "sample: in-sample",
             "universe: members as of today; survivorship is bounded and disclosed, not avoided (ISS-22)",
             "data: 2 instruments; first bars 2024-04-01 to 2024-12-18, last bars 2026-04-30 to 2026-04-30; length from about 1.4 to about 2.1 years (days / 365.25, one decimal); no hold-out (ISS-19)",
-            "engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-8); not checked against charts or the owner's charge sheet",
+            "engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-9); not checked against charts or the owner's charge sheet",
             "tick: today's master tick; rounding to the grid is approximate",
             "opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)",
         ]);
@@ -74,7 +74,7 @@ public sealed class RunLabelsTests
     {
         var label = RunLabels.EngineVerification;
 
-        label.ShouldBe("engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-8); not checked against charts or the owner's charge sheet");
+        label.ShouldBe("engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-9); not checked against charts or the owner's charge sheet");
         label.ShouldContain("agrees with a separately written reference implementation of the rule tables");
         label.ShouldContain("not checked against charts or the owner's charge sheet");
         label.ShouldContain(RunLabels.VerifiedFor);
@@ -86,13 +86,13 @@ public sealed class RunLabelsTests
     [Fact]
     public void A_run_of_another_engine_version_prints_the_fallback_line_and_is_not_verified()
     {
-        var run = TwoRan() with { EngineVersion = "sim-9" };
+        var run = TwoRan() with { EngineVersion = "sim-8" };
 
         var labels = RunLabels.Of(run, FillRules.Default);
 
-        labels.Lines[8].ShouldBe("engine: not yet verified for sim-9");
+        labels.Lines[8].ShouldBe("engine: not yet verified for sim-8");
         labels.Lines.ShouldNotContain(RunLabels.EngineVerification);
-        RunLabels.IsVerified("sim-9").ShouldBeFalse();
+        RunLabels.IsVerified("sim-8").ShouldBeFalse();
         RunLabels.EngineLine(RunLabels.VerifiedFor).ShouldBe(RunLabels.EngineVerification);
     }
 
@@ -191,5 +191,66 @@ public sealed class RunLabelsTests
     public void The_touch_is_fill_text_has_no_number()
     {
         FillLimits.NotModelled.Single(l => l.Code == "touch_is_fill").Text.ShouldNotContain("0.1");
+    }
+    private static SimulationRun PeadRun(int targetExits, int otherExits)
+    {
+        var universe = FabricatedRun.BasketOf((FabricatedRun.IdA, "NSE:AAA"));
+        var trades = Enumerable.Range(0, targetExits + otherExits)
+            .Select(i => FabricatedRun.Trade(FabricatedRun.IdA, "NSE:AAA", Side.Buy, new DateOnly(2025, 1, 1).AddDays(i), i < targetExits ? ExitReason.Target : ExitReason.MaxHold, strategy: "PEAD"))
+            .ToList();
+        return FabricatedRun.Assemble(universe, [FabricatedRun.Ran(FabricatedRun.IdA, "NSE:AAA", Apr2024, End)], trades, strategy: "PEAD");
+    }
+
+    [Fact]
+    public void A_pead_run_with_few_target_exits_prints_the_count_and_one_with_more_than_two_percent_is_labelled_target_not_negligible()
+    {
+        var few = RunLabels.Of(PeadRun(targetExits: 2, otherExits: 198), FillRules.Default);
+        var many = RunLabels.Of(PeadRun(targetExits: 3, otherExits: 97), FillRules.Default);
+
+        few.Lines.ShouldContain("target: FIXED_RR 10 stands in for no target; 2 of 200 trades left by the target (1.0 %)");
+        many.Lines.ShouldContain("target not negligible: FIXED_RR 10 stands in for no target, and 3 of 100 trades left by the target (3.0 %)");
+        few.Lines.Concat(many.Lines).ShouldNotContain(l => l.StartsWith("surprise:", StringComparison.Ordinal), "no surprise record, no surprise line");
+    }
+
+    [Fact]
+    public void A_run_of_another_strategy_gets_no_target_line()
+    {
+        RunLabels.Of(TwoRan(), FillRules.Default).Lines.ShouldNotContain(l => l.Contains("target", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_run_that_read_surprise_numbers_says_how_many_filings_rest_on_the_synthetic_parser_which_seasons_are_thin_and_how_many_reactions_were_missed()
+    {
+        var run = TwoRan() with { ResultsDays = new ResultsDaysRecord("c", 0, "f", 4, 5, "rds-1", new string('a', 64), 4, "sbp-1", 3, 6, 2, 1, 4) };
+        var verified = TwoRan() with { ResultsDays = new ResultsDaysRecord("c", 0, "f", 4, 5, "rds-1", new string('a', 64), 4, "sbp-1", 0, 6, 0, 0, 4) };
+
+        var lines = RunLabels.Of(run, FillRules.Default).Lines;
+
+        lines.ShouldContain("surprise: sue_yoy rests on the synthetic filing parser for 3 of 4 filings (unverified until real filings pass); breakpoints from the previous complete season");
+        lines.ShouldContain("surprise breakpoints: NaN in 2 of 6 seasons (fewer than 100 values in the run's universe)");
+        lines.ShouldContain("reaction session missed: 1 of 4 filings were broadcast before the open of their reaction session, so days_since_results == 0 never fires for them");
+        RunLabels.Of(verified, FillRules.Default).Lines.ShouldNotContain(l => l.StartsWith("surprise: sue_yoy", StringComparison.Ordinal));
+        RunLabels.Of(TwoRan(), FillRules.Default).Lines.ShouldNotContain(l => l.StartsWith("surprise", StringComparison.Ordinal) || l.StartsWith("reaction", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("{\"stop\":{\"kind\":\"atr_mult\",\"mult\":2},\"time_rules\":{\"max_hold_sessions\":5}}", "rules outside the reference: atr_mult stop (hand tables only)")]
+    [InlineData("{\"overlays\":[{\"kind\":\"event_exit\"}],\"time_rules\":{\"max_hold_sessions\":20}}", "rules outside the reference: event_exit overlay, hold over 5 sessions (hand tables only)")]
+    [InlineData("{\"stop\":{\"kind\":\"swing_low\"},\"time_rules\":{\"max_hold_sessions\":5}}", null)]
+    public void A_run_whose_definition_uses_a_rule_the_reference_does_not_model_says_so(string definition, string? line)
+    {
+        var run = TwoRan();
+        run = run with { Strategy = run.Strategy with { DefinitionJson = definition } };
+
+        var lines = RunLabels.Of(run, FillRules.Default).Lines;
+
+        if (line is null)
+        {
+            lines.ShouldNotContain(l => l.StartsWith("rules outside", StringComparison.Ordinal));
+        }
+        else
+        {
+            lines.ShouldContain(line);
+        }
     }
 }

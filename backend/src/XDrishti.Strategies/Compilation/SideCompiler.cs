@@ -38,6 +38,7 @@ internal sealed class SideCompiler(ProblemSink sink, DeclaredParams declared)
         var trigger = rules.Trigger is null ? MissingTrigger(prefix + ".trigger") : CompileList(rules.Trigger, prefix + ".trigger", context);
         var invalidate = CompileList(rules.Invalidate, prefix + ".invalidate", context);
         var entry = CheckEntry(rules.Entry, prefix + ".entry");
+        RefuseClosingFeaturesOffDaily(new[] { setup, trigger, invalidate }, evaluationTimeframe);
 
         var quantities = new QuantityReader(declared, sink);
         (StopPlan Plan, IReadOnlyList<FeatureSpec> Features)? stop = null;
@@ -51,7 +52,7 @@ internal sealed class SideCompiler(ProblemSink sink, DeclaredParams declared)
         }
 
         var exitCompiler = new ExitCompiler(sink, quantities);
-        var exitContext = new ExitContext(side, style, evaluationTimeframe, maxHoldSessions);
+        var exitContext = new ExitContext(side, style, evaluationTimeframe, maxHoldSessions, ReadsEntryFeature(setup, trigger, "days_since_results"));
         var exits = exitCompiler.CompileExits(rules.Exits, exitContext, prefix + ".exits");
         var overlays = exitCompiler.CompileOverlays(rules.Overlays, exitContext, prefix + ".overlays");
 
@@ -82,6 +83,24 @@ internal sealed class SideCompiler(ProblemSink sink, DeclaredParams declared)
         }
 
         return new Parts(setup, trigger, invalidate, entry, stop?.Plan, exits, overlays, features.AsReadOnly(), plan.HistoryDepth, plan.NeedsContext, plan.NeedsExpiryDays);
+    }
+
+    /// <summary>Whether an entry condition (setup or trigger) reads the named feature: the definition of an event side (P15-09, ADR 0040 amendment).</summary>
+    internal static bool ReadsEntryFeature(CompiledList? setup, CompiledList? trigger, string feature) =>
+        new[] { setup, trigger }.Any(list => list is not null && list.Items.Any(i => i.Condition.Features.Any(f => f.Name == feature)));
+
+    /// <summary>The quintile features of the results are known as of the close of the date: on any evaluation timeframe but 1D a decision before the close would read them early (P15-09).</summary>
+    private void RefuseClosingFeaturesOffDaily(IEnumerable<CompiledList?> lists, Timeframe evaluationTimeframe)
+    {
+        if (evaluationTimeframe == Timeframe.D1)
+        {
+            return;
+        }
+
+        foreach (var item in lists.Where(l => l is not null).SelectMany(l => l!.Items).Where(i => i.Condition.Features.Any(f => f.Name is "results_sue_q" or "results_car3_q")))
+        {
+            sink.Error(item.Path, ModelCodes.ClosingFeatureOffDaily, "`results_sue_q` and `results_car3_q` are known as of the close of the date; read them on the 1D timeframe, not on " + evaluationTimeframe.ToCode() + ".");
+        }
     }
 
     private CompiledList? MissingTrigger(string path)

@@ -66,6 +66,8 @@ internal static class AllFeatureForms
         ["gap_pct"] = "gap_pct",
         ["days_to_results"] = "days_to_results",
         ["days_since_results"] = "days_since_results",
+        ["results_sue_q"] = "results_sue_q",
+        ["results_car3_q"] = "results_car3_q",
     };
 
     /// <summary>A whole condition that reads the form: a comparison with 0 (the regime, which is compared with a name or a code, with 1).</summary>

@@ -89,9 +89,9 @@ public sealed class SwingCalendarTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(6)]
+    [InlineData(21)]
     [InlineData(-1)]
-    public void A_hold_outside_one_to_five_sessions_is_refused(int sessions)
+    public void A_hold_outside_one_to_twenty_sessions_is_refused(int sessions)
     {
         var result = SwingHold.Create(sessions, null);
 
@@ -102,7 +102,8 @@ public sealed class SwingCalendarTests
     [Theory]
     [InlineData(1)]
     [InlineData(5)]
-    public void A_hold_of_one_or_five_sessions_is_accepted_and_keeps_what_it_was_given(int sessions)
+    [InlineData(20)]
+    public void A_hold_of_one_five_or_twenty_sessions_is_accepted_and_keeps_what_it_was_given(int sessions)
     {
         var calendar = HolidayOnTuesday();
 

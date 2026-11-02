@@ -68,8 +68,13 @@ public static class StrategyCompiler
             }
         }
 
-        var sessionRules = new TimeRulesCheck(sink).Check(definition, evaluationTimeframe);
+        var eventSide = parts is not null && SideCompiler.ReadsEntryFeature(parts.Setup, parts.Trigger, "days_since_results");
+        var sessionRules = new TimeRulesCheck(sink).Check(definition, evaluationTimeframe, eventSide);
         var filters = checks.CheckFilters(definition);
+        if (eventSide && filters.Contains(FilterNames.NotEventDay))
+        {
+            sink.Warning("filters[" + Math.Max(0, definition.Filters.ToList().IndexOf(FilterNames.NotEventDay)) + "]", ModelCodes.EventSideWithNotEventDay, "The filter `not_event_day` is not combined with a side that reads `days_since_results`: right after a results event the next meeting is rarely intimated, so the filter would block almost every entry.");
+        }
 
         var problems = sink.Build();
         if (sink.HasErrors || parts is null)

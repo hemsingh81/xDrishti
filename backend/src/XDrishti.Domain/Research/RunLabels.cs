@@ -9,7 +9,7 @@ namespace XDrishti.Domain.Research;
 public static class RunLabels
 {
     /// <summary>The engine version the oracle comparison (P3-08, P3-08c, ADR 0047) was shown for. The test project that holds the comparison keeps <c>OracleVerifiedFor</c> and fails unless it equals this and the engine's version, so bumping the engine without rerunning the comparison fails the check.</summary>
-    public const string VerifiedFor = "sim-8";
+    public const string VerifiedFor = "sim-9";
 
     /// <summary>
     /// The engine line for a run of <see cref="VerifiedFor"/>: a separately written reference implementation of the walk, the position gate and the costing, written from the rule tables by a second agent (a process that is checked and not
@@ -68,6 +68,9 @@ public static class RunLabels
             FixedLabels[1],
             FixedLabels[2],
             .. SellLine(run.Strategy.DefinitionJson),
+            .. TargetLine(run),
+            .. SurpriseLine(run),
+            .. ReferenceLine(run),
             "universe: " + run.Universe.Label + SurvivorshipNote,
             DataLine(run),
             EngineLine(run.EngineVersion),
@@ -122,6 +125,74 @@ public static class RunLabels
         }
 
         return [];
+    }
+
+    /// <summary>The id of the post-earnings-drift strategy (P15-09), whose <c>FIXED_RR</c> of 10 stands in for "no target" and whose target exits a run therefore counts and prints.</summary>
+    public const string PeadStrategyId = "PEAD";
+
+    /// <summary>The share of target exits above which a PEAD run is labelled "target not negligible" (P15-09): the stand-in target is then a real exit rule and the result is not a plain hold.</summary>
+    public const double TargetNegligibleShare = 0.02;
+
+    /// <summary>The target line of a run of <see cref="PeadStrategyId"/> (the count and share of exits by target; "target not negligible" above <see cref="TargetNegligibleShare"/> of the trades); no line for any other run.</summary>
+    private static string[] TargetLine(SimulationRun run)
+    {
+        if (!string.Equals(run.Strategy.Id, PeadStrategyId, StringComparison.Ordinal))
+        {
+            return [];
+        }
+
+        var target = run.Trades.Count(t => t.Trade.ExitReason == ExitReason.Target);
+        var share = run.Trades.Count == 0 ? 0.0 : target / (double)run.Trades.Count;
+        var counts = string.Create(CultureInfo.InvariantCulture, $"{target} of {run.Trades.Count} trades left by the target ({share * 100:0.0} %)");
+        return [share > TargetNegligibleShare ? "target not negligible: FIXED_RR 10 stands in for no target, and " + counts : "target: FIXED_RR 10 stands in for no target; " + counts];
+    }
+
+    /// <summary>
+    /// The lines of a run that read a quintile feature (P15-09): the filings whose <c>sue_yoy</c> rests on the synthetic parser (none when none does), the seasons whose breakpoints are NaN for lack of 100 values in the universe of the run, and the filings broadcast before the open of their
+    /// own reaction session, which a rule on <c>days_since_results == 0</c> cannot enter. No line for any other run.
+    /// </summary>
+    private static string[] SurpriseLine(SimulationRun run)
+    {
+        if (run.ResultsDays is not { SurpriseSha256: not null } d)
+        {
+            return [];
+        }
+
+        var lines = new List<string>();
+        if (d.SurpriseUnverified > 0)
+        {
+            lines.Add(string.Create(CultureInfo.InvariantCulture, $"surprise: sue_yoy rests on the synthetic filing parser for {d.SurpriseUnverified} of {d.SurpriseRows} filings (unverified until real filings pass); breakpoints from the previous complete season"));
+        }
+
+        lines.Add(string.Create(CultureInfo.InvariantCulture, $"surprise breakpoints: NaN in {d.SurpriseThinSeasons} of {d.SurpriseSeasons} seasons (fewer than 100 values in the run's universe)"));
+        lines.Add(string.Create(CultureInfo.InvariantCulture, $"reaction session missed: {d.MissedReactionFilings} of {d.ReactionFilings} filings were broadcast before the open of their reaction session, so days_since_results == 0 never fires for them"));
+        return [.. lines];
+    }
+
+    /// <summary>
+    /// The qualifier of a run whose definition uses a rule the oracle comparison (<see cref="VerifiedFor"/>) does not model: an <c>atr_mult</c> stop, the <c>event_exit</c> overlay or a hold over five sessions. Those rules have hand tables only (P15-09); no line for any other run.
+    /// </summary>
+    private static string[] ReferenceLine(SimulationRun run)
+    {
+        var json = run.Strategy.DefinitionJson ?? string.Empty;
+        var outside = new List<string>();
+        if (json.Contains("\"kind\":\"atr_mult\"", StringComparison.Ordinal))
+        {
+            outside.Add("atr_mult stop");
+        }
+
+        if (json.Contains("\"kind\":\"event_exit\"", StringComparison.Ordinal))
+        {
+            outside.Add("event_exit overlay");
+        }
+
+        var hold = System.Text.RegularExpressions.Regex.Match(json, "\"max_hold_sessions\":(\\d+)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
+        if (hold.Success && int.Parse(hold.Groups[1].Value, CultureInfo.InvariantCulture) > 5)
+        {
+            outside.Add("hold over 5 sessions");
+        }
+
+        return outside.Count == 0 ? [] : ["rules outside the reference: " + string.Join(", ", outside) + " (hand tables only)"];
     }
 
     /// <summary>The data line from the instruments that ran: how many, the range of their first and of their last bars, and the shortest and longest length in years; <c>data: none</c> when none ran.</summary>

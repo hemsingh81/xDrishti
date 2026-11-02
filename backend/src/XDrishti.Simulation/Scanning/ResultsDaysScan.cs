@@ -3,6 +3,7 @@ using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Indicators;
 using XDrishti.Strategies.Compilation;
+using XDrishti.Strategies.Model;
 
 namespace XDrishti.Simulation.Scanning;
 
@@ -19,12 +20,25 @@ public sealed class ResultsDaysScan
 
     internal IReadOnlyDictionary<DateOnly, ResultsDayValues> Days { get; }
 
-    /// <summary>Whether the side reads either feature (asked of the features the frame will compute, so there is one answer for the compiler, the simulator and the scanner).</summary>
+    /// <summary>
+    /// Whether the side reads the series: it names one of the four results-day features (<c>days_to_results</c>, <c>days_since_results</c> and, from P15-09, <c>results_sue_q</c> and <c>results_car3_q</c>) or lists the <c>event_exit</c> overlay, which reads <c>days_to_results</c> at
+    /// the close of each session it holds a position (asked of the compiled side, so there is one answer for the compiler, the simulator and the scanner).
+    /// </summary>
     public static bool Reads(CompiledSide side)
     {
         ArgumentNullException.ThrowIfNull(side);
-        return side.Features.Any(f => f.Name is "days_to_results" or "days_since_results");
+        return side.Features.Any(f => f.Name is "days_to_results" or "days_since_results" or "results_sue_q" or "results_car3_q") || side.Overlays.Any(o => o.Kind == OverlayKind.EventExit);
     }
+
+    /// <summary>Whether the side reads a quintile feature (P15-09): the run then needs the surprise inputs.</summary>
+    public static bool ReadsSurprise(CompiledSide side)
+    {
+        ArgumentNullException.ThrowIfNull(side);
+        return side.Features.Any(f => f.Name is "results_sue_q" or "results_car3_q");
+    }
+
+    /// <summary><c>days_to_results</c> as known at the start of the date, or NaN when the series has no row for it or no meeting is visible.</summary>
+    internal double DaysToResultsAt(DateOnly date) => Days.TryGetValue(date, out var values) ? values.DaysToResults : double.NaN;
 
     /// <summary>The series of the instrument over the dates its bars cover. Empty bars give an empty series.</summary>
     public static ResultsDaysScan For(ResultsDayInputs inputs, Guid instrumentId, IReadOnlyList<Bar> bars, TradingCalendar calendar)
@@ -41,7 +55,7 @@ public sealed class ResultsDaysScan
         var map = new Dictionary<DateOnly, ResultsDayValues>(series.Points.Count);
         foreach (var (date, point) in series.Points)
         {
-            map[date] = new ResultsDayValues(point.DaysToResults, point.DaysSinceResults);
+            map[date] = new ResultsDayValues(point.DaysToResults, point.DaysSinceResults, point.SueQuintile, point.Car3Quintile);
         }
 
         return new ResultsDaysScan(map);

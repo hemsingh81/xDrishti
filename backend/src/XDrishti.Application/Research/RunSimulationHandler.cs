@@ -40,6 +40,7 @@ internal sealed class RunSimulationHandler(
     IContextDayStore contextDays,
     IEventCalendarSnapshots eventSnapshots,
     IResultsFilingTimes filingTimes,
+    ISurpriseInputsReader surpriseReader,
     TimeProvider time,
     ILogger<RunSimulationHandler> logger) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>
 {
@@ -153,11 +154,24 @@ internal sealed class RunSimulationHandler(
 
         // P15-05 (ADR 0185): a strategy that names a results-days feature gets the snapshot and the results filing times, read once before any bar. Neither a calendar row nor a filing in the window refuses the run.
         ResultsDayInputs? resultsDays = null;
+        var missed = (Missed: 0, Total: 0);
         if (prepared.Value.ReadsResultsDays)
         {
             var filings = await filingTimes.ReadAsync(targets.Ids, cancellationToken);
             var through = new DateTimeOffset(request.To.AddDays(1).ToDateTime(TimeOnly.MinValue), IndiaTime.Offset);
-            resultsDays = ResultsDayInputs.Create(snapshotRead, filings.Where(f => f.BroadcastTs < through), snapshotRead!.LagMinutes);
+            var inWindow = filings.Where(f => f.BroadcastTs < through).ToList();
+            SurpriseInputs? surprises = null;
+            if (prepared.Value.ReadsSurprise)
+            {
+                // P15-09: the breakpoints are made from the previous complete season of the universe of the run, so the numbers of every filing of it are read once, before any bar.
+                surprises = await surpriseReader.ReadAsync(inWindow, snapshotRead!, await calendars.GetAsync(cancellationToken), TimeSpan.FromMinutes(snapshotRead!.LagMinutes), cancellationToken);
+            }
+
+            resultsDays = ResultsDayInputs.Create(snapshotRead, inWindow, snapshotRead!.LagMinutes, surprises);
+            if (surprises is not null)
+            {
+                missed = resultsDays.CountMissedReactionDays(await calendars.GetAsync(cancellationToken), request.From, request.To);
+            }
             if (resultsDays.IsEmpty)
             {
                 return Result.Failure<Executed>(SimulationErrors.EventCalendarNotAvailable("no results calendar or filings for the window (P15)"));
@@ -229,7 +243,7 @@ internal sealed class RunSimulationHandler(
                 costContext is null ? null : CostRecord.Of(costContext),
                 days is null ? null : ContextFingerprint.Of(days, request.To),
                 events is null ? null : new EventFilterRecord(events.Sha256, events.RowCount, events.LagMinutes, EventCalendarSnapshot.RuleVersion),
-                resultsDays is null ? null : new ResultsDaysRecord(resultsDays.Calendar?.Sha256 ?? "-", resultsDays.Calendar?.RowCount ?? 0, resultsDays.FilingsSha256, resultsDays.FilingCount, resultsDays.LagMinutes, ResultsDaySeries.Version));
+                resultsDays is null ? null : new ResultsDaysRecord(resultsDays.Calendar?.Sha256 ?? "-", resultsDays.Calendar?.RowCount ?? 0, resultsDays.FilingsSha256, resultsDays.FilingCount, resultsDays.LagMinutes, ResultsDaySeries.Version, resultsDays.Surprises?.Sha256, resultsDays.Surprises?.Rows ?? 0, resultsDays.Surprises is null ? null : SurpriseInputs.Version, resultsDays.Surprises?.UnverifiedRows ?? 0, resultsDays.Surprises?.Seasons ?? 0, resultsDays.Surprises?.ThinSeasons ?? 0, missed.Missed, missed.Total));
             firstHeader ??= header;
             runs.Add(RunAssembler.Assemble(header, replays[k]));
         }

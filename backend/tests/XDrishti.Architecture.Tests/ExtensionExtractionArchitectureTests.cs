@@ -31,7 +31,7 @@ public sealed class ExtensionExtractionArchitectureTests
             .. Types.InAssembly(Application).That().HaveDependencyOn(name).GetTypes().Select(t => t.Name).Where(n => !n.StartsWith('<')).Distinct().Order(StringComparer.Ordinal),
         ];
 
-        Users("XDrishti.Application.Learning.ExtensionFeatureExtractor").ShouldBe(["DependencyInjection", "ExtensionFeatureExtractor", "ExtractExtensionFeaturesHandler"]);
+        Users("XDrishti.Application.Learning.ExtensionFeatureExtractor").ShouldBe(["DependencyInjection", "ExtensionFeatureExtractor", "ExtractExtensionFeaturesHandler", "SurpriseInputsReader"]);   // P15-09: the surprise reader of a run reuses the extractor at the close of each reaction session
         Users("XDrishti.Application.Learning.ExtractExtensionFeaturesHandler").ShouldBe(["DependencyInjection", "ExtractExtensionFeaturesHandler"]);
         Users("XDrishti.Application.Abstractions.Learning.IExtensionExtractionStore").ShouldBe(["ExtensionTrainingSource", "ExtractExtensionFeaturesHandler"]);   // P15-10: the training source reads the record per run for the evaluation gate
     }

@@ -16,7 +16,14 @@ namespace XDrishti.Simulation.Walking;
 /// </summary>
 internal static class SwingWalk
 {
-    public static Result<WalkOutcome> Follow(in Position position, IReadOnlyList<Bar> bars, int fillIndex, SwingHold hold, DateOnly entryDate, DateOnly due, int zeroBefore, LegState? legs)
+    public static Result<WalkOutcome> Follow(in Position position, IReadOnlyList<Bar> bars, int fillIndex, SwingHold hold, DateOnly entryDate, DateOnly due, int zeroBefore, LegState? legs, EventExitPlan? events = null)
+    {
+        var tally = events is null ? null : new int[1];
+        var walked = FollowCore(position, bars, fillIndex, hold, entryDate, due, zeroBefore, legs, events, tally);
+        return tally is { } counted && counted[0] > 0 && walked.IsSuccess ? Result.Success(walked.Value with { EventExitUnavailable = counted[0] }) : walked;
+    }
+
+    private static Result<WalkOutcome> FollowCore(in Position position, IReadOnlyList<Bar> bars, int fillIndex, SwingHold hold, DateOnly entryDate, DateOnly due, int zeroBefore, LegState? legs, EventExitPlan? events, int[]? tally)
     {
         var dueMinute = hold.DueMinute(due);
 
@@ -46,6 +53,7 @@ internal static class SwingWalk
         var seenDate = DateOnly.MinValue;
         var previousEpoch = bars[fillIndex].EpochSeconds;
         var pastDue = false;
+        var eventChecked = DateOnly.MinValue;   // P15-09: the last session whose close the event exit has looked at
         for (var i = fillIndex; i < bars.Count; i++)
         {
             var bar = bars[i];
@@ -74,6 +82,16 @@ internal static class SwingWalk
                     if (late is not null)
                     {
                         return late;
+                    }
+                }
+
+                if (events is not null && seenDate != DateOnly.MinValue && date > seenDate && seenDate != eventChecked)
+                {
+                    // P15-09: the last session that held a trade ended without a minute that held one at its end: the event exit looks at its close, which is the close of the last minute that did.
+                    eventChecked = seenDate;
+                    if (EventDue(events, seenDate, tally!))
+                    {
+                        return EventExitAtLastClose(position, bars[last], hold, entryDate, seen, low, high, examined, zeroAtLast, legs);
                     }
                 }
 
@@ -159,6 +177,22 @@ internal static class SwingWalk
                 var (dueLow, dueHigh) = MinuteRule.Raise(position.IsBuy, low, high, dueClose);
                 return Leave(position, hold, entryDate, seen, ExitReason.MaxHold, bar.EpochSeconds, dueClose, minute, dueLow, dueHigh, examined, zero, default, bar.EpochSeconds, legs);
             }
+
+            if (events is not null && minuteOfDay == hold.DueMinute(date))
+            {
+                // P15-09: the last minute of a session held a trade and neither level was reached: the event exit looks at days_to_results as known at the start of this session (the longest hold came first above).
+                eventChecked = date;
+                if (EventDue(events, date, tally!))
+                {
+                    if (!TickGrid.TryConvert(bar.Close, out var eventClose))
+                    {
+                        return WalkResults.PriceInvalid();
+                    }
+
+                    var (eventLow, eventHigh) = MinuteRule.Raise(position.IsBuy, low, high, eventClose);
+                    return Leave(position, hold, entryDate, seen, ExitReason.EventExit, bar.EpochSeconds, eventClose, minute, eventLow, eventHigh, examined, zero, default, bar.EpochSeconds, legs);
+                }
+            }
         }
 
         // X8 (second rule) or X9: the close of the last minute that holds a trade.
@@ -176,6 +210,31 @@ internal static class SwingWalk
         }
 
         return Leave(position, hold, entryDate, seen, ExitReason.EndOfData, lastBar.EpochSeconds, close, lastMinute, endLow, endHigh, examined, zeroAtLast, default, lastBar.EpochSeconds, legs);
+    }
+
+    /// <summary>Whether the event exit fires at the close of the session: a known <c>days_to_results</c> at or below the threshold. An unknown one never fires; it is counted in <paramref name="tally"/> instead.</summary>
+    private static bool EventDue(EventExitPlan events, DateOnly session, int[] tally)
+    {
+        var days = events.DaysToResultsAt(session);
+        if (double.IsNaN(days))
+        {
+            tally[0]++;
+            return false;
+        }
+
+        return days <= events.DaysBeforeResults;
+    }
+
+    private static Result<WalkOutcome> EventExitAtLastClose(
+        in Position position, Bar lastBar, SwingHold hold, DateOnly entryDate, int seen, decimal low, decimal high, int examined, int zeroAtLast, LegState? legs)
+    {
+        if (!WalkResults.TryRead(lastBar, out var lastMinute) || !TickGrid.TryConvert(lastBar.Close, out var close))
+        {
+            return WalkResults.PriceInvalid();
+        }
+
+        var (endLow, endHigh) = MinuteRule.Raise(position.IsBuy, low, high, close);
+        return Leave(position, hold, entryDate, seen, ExitReason.EventExit, lastBar.EpochSeconds, close, lastMinute, endLow, endHigh, examined, zeroAtLast, default, lastBar.EpochSeconds, legs);
     }
 
     /// <summary>The progress of the position at <paramref name="close"/> is strictly below the minimum of the time stop (D7).</summary>

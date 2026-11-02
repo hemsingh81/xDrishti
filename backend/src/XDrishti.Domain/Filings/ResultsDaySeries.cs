@@ -9,6 +9,10 @@ namespace XDrishti.Domain.Filings;
 /// <para>
 /// <c>days_to_results</c> is <see cref="ResultsDays.Upcoming"/> at that instant (NaN when there is no upcoming visible row). <c>days_since_results</c> counts the sessions from the reaction session <see cref="ReactionSession"/> of the newest visible results filing to the date
 /// (0 on the reaction session); NaN when no filing is visible or its reaction session is after the date. Computed once per instrument and run; the walk reads a dictionary.
+/// <para>
+/// With <see cref="SurpriseInputs"/> (P15-09) each point also carries the quintiles of the newest visible filing's <c>sue_yoy</c> and <c>results_car3</c> by the breakpoints of the previous complete season. They are the one place where a point is not "as known at the start of the date":
+/// the CAR of the reaction session needs its close, so on the reaction session the quintile is the one known at the close. The features that read them are therefore refused by the compiler on any evaluation timeframe but 1D, where a decision is taken at the close.
+/// </para>
 /// </para>
 /// </summary>
 public sealed class ResultsDaySeries
@@ -23,7 +27,7 @@ public sealed class ResultsDaySeries
 
     public IReadOnlyDictionary<DateOnly, ResultsDayPoint> Points { get; }
 
-    public static ResultsDaySeries Build(IReadOnlyList<CalendarRow> rows, IReadOnlyList<ResultsFilingTime> filings, TimeSpan lag, TradingCalendar calendar, DateOnly from, DateOnly to)
+    public static ResultsDaySeries Build(IReadOnlyList<CalendarRow> rows, IReadOnlyList<ResultsFilingTime> filings, TimeSpan lag, TradingCalendar calendar, DateOnly from, DateOnly to, SurpriseInputs? surprises = null)
     {
         ArgumentNullException.ThrowIfNull(rows);
         ArgumentNullException.ThrowIfNull(filings);
@@ -88,7 +92,10 @@ public sealed class ResultsDaySeries
 
             if (trading)
             {
-                points[date] = new ResultsDayPoint(session is { } s && s >= date ? calendar.TradingDaysBetween(date, s) : double.NaN, since);
+                var (sueQ, car3Q) = !double.IsNaN(since) && newest is not null && surprises?.Find(newest.InstrumentId, newest.PeriodEnd, newest.BroadcastTs) is { } surprise
+                    ? surprises.QuintilesAt(surprise, date)
+                    : (double.NaN, double.NaN);
+                points[date] = new ResultsDayPoint(session is { } s && s >= date ? calendar.TradingDaysBetween(date, s) : double.NaN, since, sueQ, car3Q);
             }
         }
 

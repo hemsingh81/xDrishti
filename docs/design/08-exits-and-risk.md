@@ -21,8 +21,8 @@
 | `PYRAMID` | Add at progress levels, trail combined position | `initial_pct`, `add_at_rr`, `add_pct`, `max_adds`, `trail_atr_mult`, optional `atr_period`: see §4 |
 | `TIME_STOP` | Exit if not ≥ +x R after N bars/sessions — an **overlay**, not a candidate | `min_progress_rr` in [0, 10]; an intraday strategy gives `intraday_bars`, a swing strategy `swing_sessions` (below `max_hold_sessions`) |
 | `SESSION_EXIT` | Intraday square-off | time |
-| `MAX_HOLD` | Swing exit at end of session N | N ≤ 5 |
-| `EVENT_EXIT` | Exit before results — an **overlay**, not a candidate | `days_before_results`, whole, 1 to 10 |
+| `MAX_HOLD` | Swing exit at end of session N | N ≤ 5, ≤ 20 for an event side (a side whose entry reads `days_since_results`; P15-09) |
+| `EVENT_EXIT` | Exit before results — an **overlay**, not a candidate; run by the swing walk since P15-09 ([ADR 0187](../adr/0187-an-event-side-may-hold-up-to-twenty-sessions-the-event-exit-overlay-runs-and-never-fires-on-unavailable-the-surprise-quintiles-use-the-previous-complete-season-and-pead-is-a-built-in-with-engine-sim-9.md)): at the close of a session whose `days_to_results` at the start is at most the value, the position leaves (as `MAX_HOLD`); an unknown number never fires and is counted | `days_before_results`, whole, 1 to 10 |
 
 `SESSION_EXIT` (intraday) and `MAX_HOLD` (swing) are always on: they come from the time rules of §5, not from the list of candidates.
 

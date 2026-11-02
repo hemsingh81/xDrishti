@@ -31,7 +31,7 @@ public sealed class ModelSnapshotTests
     {
         var lines = ModelSchemaSnapshot.Text.ReplaceLineEndings("\n").Split('\n');
 
-        lines.Count(l => l.StartsWith("code ", StringComparison.Ordinal)).ShouldBe(47);
+        lines.Count(l => l.StartsWith("code ", StringComparison.Ordinal)).ShouldBe(49);
         lines.ShouldContain("code strategy.model.exit_not_evaluated");
         lines.ShouldContain("code strategy.model.filter_not_evaluated");
         lines.ShouldContain("code strategy.model.duplicate_exit");

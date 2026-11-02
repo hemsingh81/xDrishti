@@ -12,8 +12,11 @@ namespace XDrishti.Simulation.Walking;
 /// </summary>
 public sealed record SwingHold
 {
-    /// <summary>The longest hold, in sessions: 1 to 5 (doc 08 §5).</summary>
+    /// <summary>The longest hold, in sessions, of an ordinary swing side: 1 to 5 (doc 08 §5).</summary>
     public const int MaxSessions = 5;
+
+    /// <summary>The longest hold the walk can count: 20, the limit of an event side (a side whose entry reads <c>days_since_results</c>; P15-09). The model decides which side may use it; the walk only counts.</summary>
+    public const int MaxEventSessions = 20;
 
     /// <summary>How far ahead the search for the next trading day looks: a calendar full of holidays must not loop for ever.</summary>
     internal const int SearchDays = 30;
@@ -34,11 +37,14 @@ public sealed record SwingHold
     /// <summary>The trading calendar that counts the sessions; null for the default week (every weekday is a session).</summary>
     public TradingCalendar? Calendar { get; }
 
-    /// <summary>A hold of <paramref name="maxHoldSessions"/> sessions (1 to 5) counted with <paramref name="calendar"/> (null: the default week); <c>simulation.rules_invalid</c> for any other number.</summary>
+    /// <summary>The <c>event_exit</c> overlay the walk of this hold runs (P15-09), or null for none. Internal: the simulator sets it, the walk reads it.</summary>
+    internal EventExitPlan? EventExit { get; init; }
+
+    /// <summary>A hold of <paramref name="maxHoldSessions"/> sessions (1 to 20) counted with <paramref name="calendar"/> (null: the default week); <c>simulation.rules_invalid</c> for any other number.</summary>
     public static Result<SwingHold> Create(int maxHoldSessions, TradingCalendar? calendar) =>
-        maxHoldSessions is >= 1 and <= MaxSessions
+        maxHoldSessions is >= 1 and <= MaxEventSessions
             ? Result.Success(new SwingHold(maxHoldSessions, calendar))
-            : Result.Failure<SwingHold>(Error.Validation(SimulationErrors.RulesInvalidCode, "The longest hold must be from 1 to " + MaxSessions + " sessions."));
+            : Result.Failure<SwingHold>(Error.Validation(SimulationErrors.RulesInvalidCode, "The longest hold must be from 1 to " + MaxEventSessions + " sessions."));
 
     /// <summary>The due session of a position entered on <paramref name="entryDate"/>: N − 1 trading days after it. No trading day within 30 days of a step is <c>simulation.rules_invalid</c>.</summary>
     internal Result<DateOnly> DueSession(DateOnly entryDate) => DueSession(entryDate, MaxHoldSessions);

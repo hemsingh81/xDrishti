@@ -46,8 +46,11 @@ public sealed class PreparedStrategy
     /// <summary>The strategy names the filter <c>not_event_day</c>: the replay needs the results-calendar snapshot of the run and skips with <c>event_calendar_unavailable</c> when it has none (P15-06, ADR 0182).</summary>
     public bool ReadsEvents => Simulator.ReadsEvents;
 
-    /// <summary>The strategy names <c>days_to_results</c> or <c>days_since_results</c>: the replay needs the results-days inputs of the run and skips with <c>event_calendar_unavailable</c> when it has none (P15-05, ADR 0185).</summary>
+    /// <summary>The strategy names <c>days_to_results</c>, <c>days_since_results</c> or lists <c>event_exit</c> (P15-09): the replay needs the results-days inputs of the run and skips with <c>event_calendar_unavailable</c> when it has none (P15-05, ADR 0185).</summary>
     public bool ReadsResultsDays => Simulator.ReadsResultsDays;
+
+    /// <summary>The strategy names <c>results_sue_q</c> or <c>results_car3_q</c> (P15-09): the replay needs the surprise numbers of the run and skips with <c>event_calendar_unavailable</c> when it has none.</summary>
+    public bool ReadsSurprise => Simulator.ReadsSurprise;
 
     internal Simulator Simulator { get; }
 

@@ -158,7 +158,7 @@ public static class ExitFlags
             var key = equals < 0 ? pair : pair[..equals];
             if (equals < 0 || !TimeStopNames.Contains(key, StringComparer.Ordinal))
             {
-                errors.Add(flag + ": '" + Show(key) + "' is not a parameter of the time stop; they are " + string.Join(", ", TimeStopNames) + " (event_exit is not run yet)");
+                errors.Add(flag + ": '" + Show(key) + "' is not a parameter of the time stop; they are " + string.Join(", ", TimeStopNames) + " (event_exit is set in the strategy, not by a flag)");
                 continue;
             }
 

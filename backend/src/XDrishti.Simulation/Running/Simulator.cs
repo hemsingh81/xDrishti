@@ -57,8 +57,11 @@ public sealed class Simulator
     /// <summary>Some side names the filter <c>not_event_day</c>: <see cref="Run"/> needs a results-calendar snapshot and a trading calendar, and a run is refused with <c>simulation.filter_not_available</c> without them (P15-06, ADR 0182).</summary>
     public bool ReadsEvents => _sides.Any(s => s.Compiled.NeedsEventCalendar);
 
-    /// <summary>Some side names <c>days_to_results</c> or <c>days_since_results</c>: <see cref="Run"/> needs the results-days inputs and a trading calendar, and a run is refused with <c>simulation.filter_not_available</c> without them (P15-05, ADR 0185).</summary>
+    /// <summary>Some side names <c>days_to_results</c>, <c>days_since_results</c>, <c>results_sue_q</c> or <c>results_car3_q</c>, or lists the <c>event_exit</c> overlay (P15-09): <see cref="Run"/> needs the results-days inputs and a trading calendar, and a run is refused with <c>simulation.filter_not_available</c> without them (P15-05, ADR 0185).</summary>
     public bool ReadsResultsDays => _sides.Any(s => ResultsDaysScan.Reads(s.Compiled));
+
+    /// <summary>Some side names <c>results_sue_q</c> or <c>results_car3_q</c> (P15-09): the results-days inputs must also carry the surprise numbers, or the quintiles read NaN and nothing enters (a replay skips such an instrument first).</summary>
+    public bool ReadsSurprise => _sides.Any(s => ResultsDaysScan.ReadsSurprise(s.Compiled));
 
     /// <summary>The sides this simulator runs, Buy first.</summary>
     public IReadOnlyList<Side> Sides => _sides.Select(s => s.Compiled.Side).ToList().AsReadOnly();
@@ -137,7 +140,7 @@ public sealed class Simulator
             }
             else
             {
-                problems.Add(Refusal("time_rules", SimulationErrors.RulesInvalidCode, swing ? "A swing side needs `max_hold_sessions` (1 to 5)." : "An intraday side needs a `square_off` time."));
+                problems.Add(Refusal("time_rules", SimulationErrors.RulesInvalidCode, swing ? "A swing side needs `max_hold_sessions` (1 to 5, or 1 to 20 for a side that reads days_since_results)." : "An intraday side needs a `square_off` time."));
             }
         }
 
@@ -209,7 +212,7 @@ public sealed class Simulator
             scans.Add(scanner.Counters);
 
             // D11: a swing side keeps one open position at a time, so its candidates go through the gate; an intraday trade leaves on its entry date and is not gated.
-            var walked = WalkSide(side, scanner, bars, tick, calendar, quantity, HoldsOvernight, events);
+            var walked = WalkSide(side, scanner, bars, tick, calendar, quantity, HoldsOvernight, events, series);
             if (walked.IsFailure)
             {
                 return Result.Failure<SimulationResult>(walked.Error);
@@ -253,9 +256,9 @@ public sealed class Simulator
     /// Walks every candidate of a scanned side under this simulator's one exit (P4-05: the scanner may belong to another simulator of a comparison, whose tape holds the features of every candidate; the column of this exit is found by name).
     /// With <paramref name="gated"/> the candidates go through the <see cref="PositionGate"/>, else every candidate is walked.
     /// </summary>
-    internal Result<IReadOnlyList<CandidateOutcome>> WalkSide(SideRun side, EntryScanner scanner, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, bool gated, EventCalendarSnapshot? events = null)
+    internal Result<IReadOnlyList<CandidateOutcome>> WalkSide(SideRun side, EntryScanner scanner, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, bool gated, EventCalendarSnapshot? events = null, ResultsDaysScan? series = null)
     {
-        var rules = RulesOf(side, _fills, tick, calendar);
+        var rules = RulesOf(side, _fills, tick, calendar, series);
         if (rules.IsFailure)
         {
             return Result.Failure<IReadOnlyList<CandidateOutcome>>(rules.Error);
@@ -297,7 +300,7 @@ public sealed class Simulator
     internal IReadOnlyList<SideRun> SideRuns => _sides;
 
     /// <summary>The one place the rules of a walk are built: the exit rules of the side, the fill rules, the tick of the instrument and, for a swing side, the hold counted with the calendar.</summary>
-    private static Result<WalkRules> RulesOf(SideRun side, FillRules fills, TickSpec tick, TradingCalendar? calendar)
+    private static Result<WalkRules> RulesOf(SideRun side, FillRules fills, TickSpec tick, TradingCalendar? calendar, ResultsDaysScan? series)
     {
         if (side.MaxHoldSessions is not { } sessions)
         {
@@ -305,9 +308,15 @@ public sealed class Simulator
         }
 
         var hold = SwingHold.Create(sessions, calendar);
-        return hold.IsFailure
-            ? Result.Failure<WalkRules>(hold.Error)
-            : Result.Success(new WalkRules(side.RewardRisk, WalkRules.NoSquareOff, fills, tick, hold.Value));
+        if (hold.IsFailure)
+        {
+            return Result.Failure<WalkRules>(hold.Error);
+        }
+
+        // P15-09: the event_exit overlay reads days_to_results of the instrument's series at the close of each session; a side that lists it is never run without the series (Run refuses that first).
+        var overlay = side.Compiled.Overlays.FirstOrDefault(o => o.Kind == OverlayKind.EventExit);
+        var plan = overlay is not null && series is not null ? new EventExitPlan((int)overlay.Values["days_before_results"][0], series.DaysToResultsAt) : null;
+        return Result.Success(new WalkRules(side.RewardRisk, WalkRules.NoSquareOff, fills, tick, plan is null ? hold.Value : hold.Value with { EventExit = plan }));
     }
 
     private static Result<IReadOnlyList<CandidateOutcome>> WalkAll(IReadOnlyList<EntryCandidate> candidates, Func<EntryCandidate, Result<WalkOutcome>> walk)
@@ -343,9 +352,9 @@ public sealed class Simulator
         }
 
         var stop = side.Stop;
-        if (stop.Kind is not (StopKind.OrOpposite or StopKind.SwingLow or StopKind.SwingHigh or StopKind.BarLow or StopKind.BarHigh))
+        if (stop.Kind is not (StopKind.OrOpposite or StopKind.SwingLow or StopKind.SwingHigh or StopKind.BarLow or StopKind.BarHigh or StopKind.AtrMult))
         {
-            problems.Add(Refusal(name + ".stop", SimulatorCodes.UnsupportedStop, "The stop `" + StopName(stop.Kind) + "` is not run yet: the simulator runs a level (`or_opposite`, `swing_low`, `swing_high`, `bar_low`, `bar_high`) with no buffer."));
+            problems.Add(Refusal(name + ".stop", SimulatorCodes.UnsupportedStop, "The stop `" + StopName(stop.Kind) + "` is not run yet: the simulator runs a level (`or_opposite`, `swing_low`, `swing_high`, `bar_low`, `bar_high`) with no buffer, or `atr_mult`."));
         }
         else if (stop.BufferAtr > 0)
         {
@@ -396,9 +405,13 @@ public sealed class Simulator
 
         for (var i = 0; i < side.Overlays.Count; i++)
         {
-            if (side.Overlays[i].Kind != OverlayKind.TimeStop)
+            if (side.Overlays[i].Kind is not (OverlayKind.TimeStop or OverlayKind.EventExit))
             {
                 problems.Add(Refusal(name + ".overlays[" + i + "]", SimulatorCodes.UnsupportedExit, "The overlay exit `" + OverlayName(side.Overlays[i].Kind) + "` is not run yet (P4); ignoring it would make a result look like what it is not."));
+            }
+            else if (side.Overlays[i].Kind == OverlayKind.EventExit && side.Style != Style.Swing)
+            {
+                problems.Add(Refusal(name + ".overlays[" + i + "]", SimulatorCodes.UnsupportedExit, "The overlay exit `event_exit` is run by the swing walk only; an intraday side leaves at its square-off the same day, so ignoring it would make a result look like what it is not."));
             }
         }
     }

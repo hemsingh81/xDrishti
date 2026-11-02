@@ -44,4 +44,8 @@ public sealed record InstrumentReplayInput(
     IReadOnlyList<ContextDayRecord>? ContextDays = null,
     string? ContextNote = null,
     EventCalendarSnapshot? Events = null,
-    ResultsDayInputs? ResultsDays = null);
+    ResultsDayInputs? ResultsDays = null)
+{
+    /// <summary>The results-days inputs carry the surprise numbers a quintile feature needs (P15-09).</summary>
+    public bool HasSurpriseInputs() => ResultsDays?.HasSurprises ?? false;
+}

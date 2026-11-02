@@ -53,7 +53,7 @@ public sealed class SwingReplayTests
         Q(trade.MaeR).ShouldBe(0.0000m);
         Q(trade.MfeR).ShouldBe(0.0857m);
         (trade.SessionsHeld, trade.SessionsUnseen).ShouldBe((3, 0));
-        result.Header.EngineVersion.ShouldBe("sim-8");
+        result.Header.EngineVersion.ShouldBe("sim-9");
         result.Header.SchemaVersion.ShouldBe(5);
         result.Walk.PositionOpen.ShouldBe(0);
     }
