@@ -64,6 +64,8 @@ internal sealed class FakeSource : IFilingsSource
 
     public Dictionary<string, string> Content { get; } = [];
 
+    public Dictionary<string, byte[]> Raw { get; } = [];
+
     public int Opened { get; set; }
 
     public int Listed { get; private set; }
@@ -77,7 +79,7 @@ internal sealed class FakeSource : IFilingsSource
     public ValueTask<Result<Stream>> OpenAsync(FilingRef filing, CancellationToken cancellationToken)
     {
         Opened++;
-        return ValueTask.FromResult(Result.Success<Stream>(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(Content[filing.Sha256]))));
+        return ValueTask.FromResult(Result.Success<Stream>(new MemoryStream(Raw.TryGetValue(filing.Sha256, out var raw) ? raw : System.Text.Encoding.UTF8.GetBytes(Content[filing.Sha256]))));
     }
 }
 
@@ -85,7 +87,11 @@ internal sealed class FakeInstruments : IFilingInstruments
 {
     public Dictionary<string, InstrumentMatch> Map { get; } = new(StringComparer.Ordinal);
 
+    public List<TrackedInstrument> Tracked { get; } = [];
+
     public ValueTask<InstrumentMatch> ResolveAsync(string symbol, CancellationToken cancellationToken) => ValueTask.FromResult(Map.GetValueOrDefault(symbol, InstrumentMatch.Unknown));
+
+    public ValueTask<IReadOnlyList<TrackedInstrument>> TrackedAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<TrackedInstrument>>([.. Tracked]);
 }
 
 internal sealed class FakeFiles : IFilingFiles

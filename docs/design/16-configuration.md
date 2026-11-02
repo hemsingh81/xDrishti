@@ -521,6 +521,8 @@ Filings:
 
 The ingest is the service `filings-ingest` of the scheduler in `xd-api` ([ADR 0180](../adr/0180-the-point-in-time-filing-store-keeps-immutable-envelopes-and-answers-what-was-known-at-an-instant-from-the-broadcast-time-plus-a-lag-and-nothing-else.md), P15-02): registered **paused**, daily 17:05 on trading days, "Run now" allowed (local files only). Compose: `XD_FILINGS_LAG_MINUTES`, `XD_FILINGS_MAX_FILES_GB`, `XD_FILINGS_MIN_FREE_GB`.
 
+`exclude.results_within_days` (and the same word in the alerts and the pre-trade checks) is read **in trading sessions** counted to the event session of the next results meeting as known at the decision instant ([ADR 0181](../adr/0181-the-results-calendar-keeps-each-meeting-row-with-its-own-intimation-time-counts-days-in-trading-sessions-to-an-event-session-and-answers-unavailable-for-an-instrument-with-no-entry.md), P15-04): a Saturday or holiday meeting counts on the next session, a meeting published after the instant is not known, and an instrument with no entry is `unavailable`, not "far away". The same `filings-ingest` run loads the board-meeting and shareholding csv files (counts per file and per run, no new setting). Wiring the number into the checks is P15-06 and sits behind its own default-off setting.
+
 ## 4. Most-used settings
 
 | Setting | Meaning | Default |

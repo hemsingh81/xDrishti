@@ -144,6 +144,11 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetFilingCoverageQuery, Result<FilingCoverageView>>, GetFilingCoverageHandler>(); // counts of the filing store (P15-02): read
         services.AddScoped<IQueryHandler<ListFilingsQuery, Result<FilingListView>>, ListFilingsHandler>(); // envelope metadata, optionally as of an instant (P15-02): read
         services.AddScoped<IQueryHandler<GetFilingQuery, Result<FilingView>>, GetFilingHandler>(); // one envelope's metadata (P15-02): read
+        services.AddScoped<ICommandHandler<LoadCalendarCommand, RowLoadSummary>, LoadCalendarHandler>(); // the board-meeting csv loader (P15-04): each row with its own intimation time; no network
+        services.AddScoped<ICommandHandler<LoadShareholdingCommand, RowLoadSummary>, LoadShareholdingHandler>(); // the shareholding csv loader (P15-04): one group per (symbol, period) with its time; no network
+        services.AddScoped<IResultsCalendar, ResultsCalendar>(); // days_to_results as known at an instant (P15-04): a port with no decision caller yet (P15-06 wires it)
+        services.AddScoped<IShareholdingAsOf, ShareholdingAsOf>(); // the shareholding as known at an instant (P15-04): a port with no decision caller yet
+        services.AddScoped<IQueryHandler<GetResultsCalendarQuery, Result<ResultsCalendarView>>, GetResultsCalendarHandler>(); // GET /api/calendar/results (P15-04): read
         services.AddScoped<OptionArchiveQualityRunner>(); // one run of the option-archive quality checks (P14-04): reads the archive, writes only its own result rows
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)
         services.AddScoped<IQueryHandler<GetRampQuery, Result<RampView>>>(sp => sp.GetRequiredService<GetRampHandler>());

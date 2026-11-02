@@ -4586,6 +4586,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/calendar/results': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The results meetings known at asOf (default now; an instant with an offset) whose event session (the first trading day on or after the meeting date) lies between from and to (default: today in India and the next 59 days; at most 120 days): symbol, period end, meeting date, event session, trading days from the India date of asOf, when the exchange published the row, revision (1, then 2 and up for reschedules), plus the count and the first 300 symbols of the tracked instruments without an entry. A meeting published after asOf is not shown. An empty list is not an error; 400 calendar.invalid_query for a bad range, an asOf without an offset or an unknown parameter */
+    get: operations['GetResultsCalendar'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ticks/recorder': {
     parameters: {
       query?: never;
@@ -11955,6 +11972,12 @@ export interface components {
       swingBuy: string[];
       swingSell: string[];
     };
+    /** @description The tracked instruments that have no visible upcoming results meeting at the question (the count and the first 300 symbols). Their `days_to_results` is unavailable, never a default. */
+    InstrumentsWithoutEntryView: {
+      /** Format: int32 */
+      count: number;
+      symbols: string[];
+    };
     /** @description The owner's attestation of the static IP. The actor is never taken from the body. */
     IpAttestationRequest: {
       /** Format: uuid */
@@ -16940,6 +16963,36 @@ export interface components {
       isin: null | string;
       retired: boolean;
       tracked: boolean;
+    };
+    /** @description The visible upcoming results meetings with an event session between `From` and `To` as known at `AsOf`, earliest first; `Truncated` when more than the cap exist. No file content and no estimate. */
+    ResultsCalendarView: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      /** Format: date-time */
+      asOf: string;
+      meetings: components['schemas']['ResultsMeetingView'][];
+      truncated: boolean;
+      instrumentsWithoutEntry: components['schemas']['InstrumentsWithoutEntryView'];
+    };
+    /** @description One visible upcoming results meeting: `Days` trading sessions from the India date of the question to its `EventSession` (the first session on or after `MeetingDate`); `IntimatedAt` is when the exchange published the row; `Revision` is 1 for the first row and 2 and up for reschedules. */
+    ResultsMeetingView: {
+      symbol: string;
+      /** Format: uuid */
+      instrumentId: string;
+      /** Format: date */
+      periodEnd: string;
+      /** Format: date */
+      meetingDate: string;
+      /** Format: date */
+      eventSession: string;
+      /** Format: int32 */
+      days: number;
+      /** Format: date-time */
+      intimatedAt: string;
+      /** Format: int32 */
+      revision: number;
     };
     /** @description The profit/loss figures that every holding row, lot row and summary carries. */
     ReturnsView: {
@@ -30355,6 +30408,39 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetResultsCalendar: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+        asOf?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResultsCalendarView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
         };
       };
     };

@@ -85,7 +85,7 @@ public sealed partial class FilingsStoreArchitectureTests
             [typeof(IFilingStore).FullName!] = ["IngestFilingsHandler"],
             [typeof(IFilingReader).FullName!] = ["GetFilingCoverageHandler", "GetFilingHandler", "ListFilingsHandler"],
             [typeof(IFilingFiles).FullName!] = ["IngestFilingsHandler"],
-            [typeof(IFilingInstruments).FullName!] = ["IngestFilingsHandler", "ListFilingsHandler"],
+            [typeof(IFilingInstruments).FullName!] = ["GetResultsCalendarHandler", "IngestFilingsHandler", "ListFilingsHandler", "LoadCalendarHandler", "LoadShareholdingHandler"],
         };
         foreach (var (port, names) in allowed)
         {
@@ -103,7 +103,7 @@ public sealed partial class FilingsStoreArchitectureTests
             var result = Types.InAssembly(Assembly.Load(new AssemblyName(name))).That()
                 .DoNotResideInNamespaceStartingWith("XDrishti.Domain.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Abstractions.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Filings")
                 .And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.FilingArchive")
-                .And().DoNotHaveNameMatching("^(DependencyInjection|ApiJsonContext.*|FilingEndpoints)$")
+                .And().DoNotHaveNameMatching("^(DependencyInjection|ApiJsonContext.*|FilingEndpoints|CalendarEndpoints)$")
                 .ShouldNot().HaveDependencyOnAny(FilingsNamespaces).GetResult();
 
             result.IsSuccessful.ShouldBeTrue(name + " violations: " + string.Join(", ", result.FailingTypeNames ?? []));
@@ -131,29 +131,40 @@ public sealed partial class FilingsStoreArchitectureTests
     }
 
     [Fact]
-    public void The_archive_code_never_updates_deletes_or_truncates_a_row_and_writes_only_the_envelope_table()
+    public void The_archive_code_never_updates_deletes_or_truncates_a_row_and_writes_only_the_envelope_table_and_the_two_fact_tables_of_P15_04()
     {
+        // P15-04 amends this test deliberately: the calendar store writes filings.calendar and the shareholding store writes filings.shareholding, each in its own file and nowhere else.
+        var allowed = new Dictionary<string, string>(StringComparer.Ordinal) { ["CalendarStore.cs"] = "filings.calendar", ["ShareholdingStore.cs"] = "filings.shareholding" };
         foreach (var file in Files("XDrishti.Infrastructure", "FilingArchive"))
         {
             var text = File.ReadAllText(file);
+            var name = Path.GetFileName(file);
 
-            Destructive().IsMatch(text).ShouldBeFalse(Path.GetFileName(file) + " has an UPDATE, DELETE or TRUNCATE statement");
+            Destructive().IsMatch(text).ShouldBeFalse(name + " has an UPDATE, DELETE or TRUNCATE statement");
             foreach (Match insert in InsertInto().Matches(text))
             {
-                insert.Groups[1].Value.ShouldBe("filings.filings", Path.GetFileName(file));
+                insert.Groups[1].Value.ShouldBeOneOf(allowed.TryGetValue(name, out var fact) ? ["filings.filings", fact] : ["filings.filings"], name);
             }
         }
     }
 
     [Fact]
-    public void Nothing_in_the_shipped_source_writes_the_four_fact_tables()
+    public void Nothing_in_the_shipped_source_writes_the_fact_tables_except_the_two_stores_of_P15_04()
     {
         var files = Directory.EnumerateFiles(Src(), "*.cs", SearchOption.AllDirectories).Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal)).ToList();
         files.ShouldNotBeEmpty();
 
         foreach (var file in files)
         {
-            FactTableWrite().IsMatch(File.ReadAllText(file)).ShouldBeFalse(file + " writes a filings fact table; P15-03 and P15-04 own those writers");
+            var text = File.ReadAllText(file);
+            var name = Path.GetFileName(file);
+            foreach (Match write in FactTableWrite().Matches(text))
+            {
+                var table = write.Groups[2].Value;
+                var allowed = (name == "CalendarStore.cs" && table == "calendar") || (name == "ShareholdingStore.cs" && table == "shareholding");
+
+                allowed.ShouldBeTrue(file + " writes filings." + table + "; P15-03 owns result_facts, P15-08 the extractions and only the two P15-04 stores write calendar and shareholding");
+            }
         }
     }
 

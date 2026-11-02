@@ -109,7 +109,7 @@ public sealed partial class FilingsArchitectureTests
             var result = Types.InAssembly(assembly).That()
                 .DoNotResideInNamespaceStartingWith("XDrishti.Domain.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Abstractions.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.Filings")
                 .And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.FilingArchive")
-                .And().DoNotHaveNameMatching("^(DependencyInjection|ApiJsonContext.*|FilingEndpoints)$")
+                .And().DoNotHaveNameMatching("^(DependencyInjection|ApiJsonContext.*|FilingEndpoints|CalendarEndpoints)$")
                 .ShouldNot().HaveDependencyOnAny(FilingsNamespaces).GetResult();
 
             result.IsSuccessful.ShouldBeTrue(name + " violations: " + string.Join(", ", result.FailingTypeNames ?? []));

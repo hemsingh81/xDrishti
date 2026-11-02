@@ -16043,6 +16043,60 @@
         }
       }
     },
+    "/api/calendar/results": {
+      "get": {
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "The results meetings known at asOf (default now; an instant with an offset) whose event session (the first trading day on or after the meeting date) lies between from and to (default: today in India and the next 59 days; at most 120 days): symbol, period end, meeting date, event session, trading days from the India date of asOf, when the exchange published the row, revision (1, then 2 and up for reschedules), plus the count and the first 300 symbols of the tracked instruments without an entry. A meeting published after asOf is not shown. An empty list is not an error; 400 calendar.invalid_query for a bad range, an asOf without an offset or an unknown parameter",
+        "operationId": "GetResultsCalendar",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "asOf",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultsCalendarView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ticks/recorder": {
       "get": {
         "tags": [
@@ -37472,6 +37526,26 @@
           }
         }
       },
+      "InstrumentsWithoutEntryView": {
+        "required": [
+          "count",
+          "symbols"
+        ],
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The tracked instruments that have no visible upcoming results meeting at the question (the count and the first 300 symbols). Their `days_to_results` is unavailable, never a default."
+      },
       "IpAttestationRequest": {
         "required": [
           "accountId",
@@ -50845,6 +50919,91 @@
         },
         "description": "An entry that named an instrument. `term` is the entry as typed (the first one when several name the same instrument); `tracked` = tracked now; `retired` = cannot be newly tracked."
       },
+      "ResultsCalendarView": {
+        "required": [
+          "from",
+          "to",
+          "asOf",
+          "meetings",
+          "truncated",
+          "instrumentsWithoutEntry"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "meetings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResultsMeetingView"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "instrumentsWithoutEntry": {
+            "$ref": "#/components/schemas/InstrumentsWithoutEntryView"
+          }
+        },
+        "description": "The visible upcoming results meetings with an event session between `From` and `To` as known at `AsOf`, earliest first; `Truncated` when more than the cap exist. No file content and no estimate."
+      },
+      "ResultsMeetingView": {
+        "required": [
+          "symbol",
+          "instrumentId",
+          "periodEnd",
+          "meetingDate",
+          "eventSession",
+          "days",
+          "intimatedAt",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "meetingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "eventSession": {
+            "type": "string",
+            "format": "date"
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "intimatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One visible upcoming results meeting: `Days` trading sessions from the India date of the question to its `EventSession` (the first session on or after `MeetingDate`); `IntimatedAt` is when the exchange published the row; `Revision` is 1 for the first row and 2 and up for reschedules."
+      },
       "ReturnsView": {
         "required": [
           "invested",
@@ -56863,6 +57022,9 @@
     },
     {
       "name": "Filings"
+    },
+    {
+      "name": "Calendar"
     },
     {
       "name": "Ticks"

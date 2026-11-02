@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
@@ -31,11 +32,24 @@ public sealed class FilingIngestServiceTests
         handler.HandleAsync(Arg.Any<IngestFilingsCommand>(), Arg.Any<CancellationToken>()).Returns(Result.Success(summary));
         var provider = Substitute.For<IServiceProvider>();
         provider.GetService(typeof(ICommandHandler<IngestFilingsCommand, FilingIngestSummary>)).Returns(handler);
+        Loaders(provider, out _, out _);
         var scope = Substitute.For<IServiceScope>();
         scope.ServiceProvider.Returns(provider);
         var scopes = Substitute.For<IServiceScopeFactory>();
         scopes.CreateScope().Returns(scope);
-        return new FilingIngestService(scopes);
+        return new FilingIngestService(scopes, NullLogger<FilingIngestService>.Instance);
+    }
+
+    private static RowLoadSummary Loaded(string kind, int failures = 0) => new(kind, 1, 2, 0, 0, 0, 0, 0, new Dictionary<string, int>(), failures, []);
+
+    private static void Loaders(IServiceProvider provider, out ICommandHandler<LoadCalendarCommand, RowLoadSummary> calendar, out ICommandHandler<LoadShareholdingCommand, RowLoadSummary> shareholding, int failures = 0)
+    {
+        calendar = Substitute.For<ICommandHandler<LoadCalendarCommand, RowLoadSummary>>();
+        calendar.HandleAsync(Arg.Any<LoadCalendarCommand>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Loaded("calendar", failures)));
+        shareholding = Substitute.For<ICommandHandler<LoadShareholdingCommand, RowLoadSummary>>();
+        shareholding.HandleAsync(Arg.Any<LoadShareholdingCommand>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Loaded("shareholding")));
+        provider.GetService(typeof(ICommandHandler<LoadCalendarCommand, RowLoadSummary>)).Returns(calendar);
+        provider.GetService(typeof(ICommandHandler<LoadShareholdingCommand, RowLoadSummary>)).Returns(shareholding);
     }
 
     private static ServiceRunContext Context(ServiceRunTrigger trigger) => new(Guid.NewGuid(), trigger, 1, "system", new Dictionary<string, System.Text.Json.JsonElement>(), (_, _) => ValueTask.CompletedTask);
@@ -62,5 +76,91 @@ public sealed class FilingIngestServiceTests
         (await ServiceReturning(Summary("disk_free"), out _).RunAsync(Context(ServiceRunTrigger.Scheduled), Ct)).Status.ShouldBe(ServiceRunStatus.Failed);
         (await ServiceReturning(Summary(failures: 1), out _).RunAsync(Context(ServiceRunTrigger.Scheduled), Ct)).Status.ShouldBe(ServiceRunStatus.Failed);
         (await ServiceReturning(Summary(problems: "inbox_permissions"), out _).RunAsync(Context(ServiceRunTrigger.Scheduled), Ct)).Status.ShouldBe(ServiceRunStatus.Failed);
+    }
+
+    [Fact]
+    public async Task A_run_also_loads_the_calendar_and_the_shareholding_csv_files_and_puts_their_counts_in_the_line()
+    {
+        var provider = Substitute.For<IServiceProvider>();
+        var ingest = Substitute.For<ICommandHandler<IngestFilingsCommand, FilingIngestSummary>>();
+        ingest.HandleAsync(Arg.Any<IngestFilingsCommand>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Summary()));
+        provider.GetService(typeof(ICommandHandler<IngestFilingsCommand, FilingIngestSummary>)).Returns(ingest);
+        Loaders(provider, out var calendar, out var shareholding);
+        var scope = Substitute.For<IServiceScope>();
+        scope.ServiceProvider.Returns(provider);
+        var scopes = Substitute.For<IServiceScopeFactory>();
+        scopes.CreateScope().Returns(scope);
+
+        var outcome = await new FilingIngestService(scopes, NullLogger<FilingIngestService>.Instance).RunAsync(Context(ServiceRunTrigger.Scheduled), Ct);
+
+        outcome.Status.ShouldBe(ServiceRunStatus.Succeeded);
+        outcome.Message!.ShouldContain("calendar: files 1, loaded 2");
+        outcome.Message!.ShouldContain("shareholding: files 1, loaded 2");
+        await calendar.Received(1).HandleAsync(Arg.Any<LoadCalendarCommand>(), Arg.Any<CancellationToken>());
+        await shareholding.Received(1).HandleAsync(Arg.Any<LoadShareholdingCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_loader_that_fails_ends_the_run_failed_after_both_loaders_ran()
+    {
+        var provider = Substitute.For<IServiceProvider>();
+        var ingest = Substitute.For<ICommandHandler<IngestFilingsCommand, FilingIngestSummary>>();
+        ingest.HandleAsync(Arg.Any<IngestFilingsCommand>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Summary()));
+        provider.GetService(typeof(ICommandHandler<IngestFilingsCommand, FilingIngestSummary>)).Returns(ingest);
+        Loaders(provider, out _, out var shareholding, failures: 1);
+        var scope = Substitute.For<IServiceScope>();
+        scope.ServiceProvider.Returns(provider);
+        var scopes = Substitute.For<IServiceScopeFactory>();
+        scopes.CreateScope().Returns(scope);
+
+        var outcome = await new FilingIngestService(scopes, NullLogger<FilingIngestService>.Instance).RunAsync(Context(ServiceRunTrigger.Scheduled), Ct);
+
+        outcome.Status.ShouldBe(ServiceRunStatus.Failed);
+        await shareholding.Received(1).HandleAsync(Arg.Any<LoadShareholdingCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_loader_that_throws_marks_the_run_failed_by_type_and_the_other_loader_still_runs(bool calendarThrows)
+    {
+        var provider = Substitute.For<IServiceProvider>();
+        var ingest = Substitute.For<ICommandHandler<IngestFilingsCommand, FilingIngestSummary>>();
+        ingest.HandleAsync(Arg.Any<IngestFilingsCommand>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Summary()));
+        provider.GetService(typeof(ICommandHandler<IngestFilingsCommand, FilingIngestSummary>)).Returns(ingest);
+        Loaders(provider, out var calendar, out var shareholding);
+        if (calendarThrows)
+        {
+            provider.GetService(typeof(ICommandHandler<LoadCalendarCommand, RowLoadSummary>)).Returns(new ThrowingHandler<LoadCalendarCommand>());
+        }
+        else
+        {
+            provider.GetService(typeof(ICommandHandler<LoadShareholdingCommand, RowLoadSummary>)).Returns(new ThrowingHandler<LoadShareholdingCommand>());
+        }
+
+        var scope = Substitute.For<IServiceScope>();
+        scope.ServiceProvider.Returns(provider);
+        var scopes = Substitute.For<IServiceScopeFactory>();
+        scopes.CreateScope().Returns(scope);
+
+        var outcome = await new FilingIngestService(scopes, NullLogger<FilingIngestService>.Instance).RunAsync(Context(ServiceRunTrigger.Scheduled), Ct);
+
+        outcome.Status.ShouldBe(ServiceRunStatus.Failed);
+        outcome.Message!.ShouldContain("loader failed (InvalidOperationException)");
+        outcome.Message!.ShouldNotContain("secret detail");
+        if (calendarThrows)
+        {
+            await shareholding.Received(1).HandleAsync(Arg.Any<LoadShareholdingCommand>(), Arg.Any<CancellationToken>());
+        }
+        else
+        {
+            await calendar.Received(1).HandleAsync(Arg.Any<LoadCalendarCommand>(), Arg.Any<CancellationToken>());
+        }
+    }
+
+    private sealed class ThrowingHandler<TCommand> : ICommandHandler<TCommand, RowLoadSummary>
+        where TCommand : ICommand
+    {
+        public ValueTask<Result<RowLoadSummary>> HandleAsync(TCommand command, CancellationToken cancellationToken) => throw new InvalidOperationException("secret detail");
     }
 }

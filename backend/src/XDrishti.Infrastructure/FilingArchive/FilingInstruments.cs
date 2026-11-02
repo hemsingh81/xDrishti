@@ -34,4 +34,18 @@ internal sealed class FilingInstruments(NpgsqlDataSource dataSource) : IFilingIn
             _ => InstrumentMatch.Many,
         };
     }
+
+    public async ValueTask<IReadOnlyList<TrackedInstrument>> TrackedAsync(CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand($"SELECT id, canonical_symbol FROM market.instruments WHERE {Tracked} ORDER BY canonical_symbol, id");
+        var list = new List<TrackedInstrument>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var symbol = reader.GetString(1);
+            list.Add(new TrackedInstrument(reader.GetGuid(0), symbol[(symbol.IndexOf(':', StringComparison.Ordinal) + 1)..]));
+        }
+
+        return list;
+    }
 }

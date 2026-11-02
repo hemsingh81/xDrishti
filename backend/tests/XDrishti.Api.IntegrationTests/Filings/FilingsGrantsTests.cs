@@ -110,13 +110,38 @@ public sealed class FilingsGrantsTests(ResearchGrantsTests.DedicatedServer serve
         found.ShouldNotBeNull().Id.ShouldBe(original.Id);
         answer.Filings.ShouldHaveSingleItem().Id.ShouldBe(restated.Id);
         instruments.Id.ShouldBe(instrument);
-        counts.Cells.ShouldHaveSingleItem().Superseded.ShouldBe(1);
+        counts.Cells.Single(c => c.Kind == "results").Superseded.ShouldBe(1); // the server is shared with the P15-04 test below, which stores other kinds
         foreach (var table in Tables)
         {
             (await SqlStateAsync(server.App, $"UPDATE filings.{table} SET filing_id = filing_id".Replace("filing_id", table == "filings" ? "id" : "filing_id", StringComparison.Ordinal))).ShouldBe("42501");
             (await SqlStateAsync(server.App, $"DELETE FROM filings.{table}")).ShouldBe("42501");
             (await SqlStateAsync(server.App, $"TRUNCATE filings.{table}")).ShouldBe("42501");
         }
+    }
+
+    [Fact]
+    public async Task The_calendar_and_shareholding_stores_work_as_the_runtime_role_and_read_back_through_the_ports()
+    {
+        var instrument = Guid.NewGuid();
+        await StoreKit.ExecuteAsync(
+            server.Owner,
+            $"INSERT INTO market.instruments (id, canonical_symbol, exchange, exchange_segment, type, name, display_name, lot_size, underlying_symbol, fno_eligible, first_seen_at, last_seen_at) VALUES ('{instrument}', 'NSE:GRANTB', 'NSE', 'NSE_EQ', 'share', 'Grant B Ltd', 'Grant B Ltd', 1, 'GRANTB', false, now(), now())",
+            Ct);
+        await using var dataSource = NpgsqlDataSource.Create(server.App);
+        var ts = new DateTimeOffset(2026, 8, 3, 5, 30, 0, TimeSpan.Zero);
+
+        var meeting = await new CalendarStore(dataSource).InsertAsync(CalendarTestKit.Meeting(instrument, "grant-m", new DateOnly(2026, 8, 12), ts), Ct);
+        var holding = await new ShareholdingStore(dataSource).InsertAsync(CalendarTestKit.Holding(instrument, "grant-h", CalendarTestKit.Q1, ts, 50m), Ct);
+        var rows = await new CalendarRows(dataSource).ResultsRowsAsync([instrument], ts.AddDays(1), Ct);
+        var groups = await new ShareholdingRows(dataSource).GroupsAsync(instrument, ts.AddDays(1), Ct);
+        var tracked = await new FilingInstruments(dataSource).TrackedAsync(Ct);
+
+        (meeting.Outcome, holding.Outcome).ShouldBe((FilingInsertOutcome.Stored, FilingInsertOutcome.Stored));
+        rows.ShouldHaveSingleItem().MeetingDate.ShouldBe(new DateOnly(2026, 8, 12));
+        groups.ShouldHaveSingleItem().Lines.Count.ShouldBe(3);
+        tracked.ShouldContain(t => t.Id == instrument && t.Symbol == "GRANTB");
+        (await SqlStateAsync(server.App, "UPDATE filings.calendar SET status = 'cancelled'")).ShouldBe("42501");
+        (await SqlStateAsync(server.App, "UPDATE filings.shareholding SET pct = 1")).ShouldBe("42501");
     }
 
     private sealed class FixedSettings : IFilingSettings

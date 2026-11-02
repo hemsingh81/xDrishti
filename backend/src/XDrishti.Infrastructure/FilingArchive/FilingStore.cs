@@ -8,7 +8,7 @@ namespace XDrishti.Infrastructure.FilingArchive;
 
 /// <summary>
 /// <c>filings.filings</c> (P15-02, ADR 0180). Insert-only for the runtime role. One insert is one transaction at READ COMMITTED: the group of (instrument, kind, period) is locked with a transaction advisory lock, the stored envelope of the same bytes is looked up
-/// (after the lock, so a second host sees the first one's commit), the group's latest filing is read and <see cref="PointInTimeRule.Decide"/> picks the outcome, then the row is inserted <c>ON CONFLICT (content_sha256) DO NOTHING</c>. Nothing here reads a file.
+/// (after the lock, so a second host sees the first one's commit), the group's latest filing is read (the group is the FILE envelopes only: a row envelope made from a csv by the P15-04 stores, which has a calendar or shareholding row, is another group, ADR 0181) and <see cref="PointInTimeRule.Decide"/> picks the outcome, then the row is inserted <c>ON CONFLICT (content_sha256) DO NOTHING</c>. Nothing here reads a file.
 /// </summary>
 internal sealed class FilingStore(NpgsqlDataSource dataSource) : IFilingStore
 {
@@ -29,7 +29,7 @@ internal sealed class FilingStore(NpgsqlDataSource dataSource) : IFilingStore
         if (grouped)
         {
             await using var @lock = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtextextended(@key, 0))", connection, transaction);
-            @lock.Parameters.AddWithValue("key", $"filings:{filing.InstrumentId:D}:{FilingKinds.Code(filing.Kind)}:{filing.PeriodEnd:yyyy-MM-dd}");
+            @lock.Parameters.AddWithValue("key", GroupLockKey(filing));
             await @lock.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -61,10 +61,13 @@ internal sealed class FilingStore(NpgsqlDataSource dataSource) : IFilingStore
         return new FilingInsertResult(decision.Outcome == RevisionOutcome.StoreOutOfOrder ? FilingInsertOutcome.StoredOutOfOrder : FilingInsertOutcome.Stored, null, decision.Supersedes);
     }
 
-    private static FilingInsertResult Existing(NewFiling filing, StoredFiling stored) =>
+    /// <summary>The advisory lock key of the (instrument, kind, period) group. Every writer of a group (this store and the calendar and shareholding stores) takes the same key, so they are serialised.</summary>
+    internal static string GroupLockKey(NewFiling filing) => $"filings:{filing.InstrumentId:D}:{FilingKinds.Code(filing.Kind)}:{filing.PeriodEnd:yyyy-MM-dd}";
+
+    internal static FilingInsertResult Existing(NewFiling filing, StoredFiling stored) =>
         new(filing.SameSidecar(stored) ? FilingInsertOutcome.Duplicate : FilingInsertOutcome.SidecarConflict, stored);
 
-    private static async ValueTask<StoredFiling?> ByHashAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string hash, CancellationToken cancellationToken)
+    internal static async ValueTask<StoredFiling?> ByHashAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string hash, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand($"SELECT {FilingRows.Columns} FROM filings.filings WHERE content_sha256 = @h", connection, transaction);
         command.Parameters.AddWithValue("h", hash);
@@ -75,7 +78,11 @@ internal sealed class FilingStore(NpgsqlDataSource dataSource) : IFilingStore
     private static async ValueTask<IReadOnlyCollection<StoredFiling>> GroupAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, NewFiling filing, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
-            $"SELECT {FilingRows.Columns} FROM filings.filings WHERE instrument_id = @i AND kind = @k AND period_end = @p AND broadcast_state = 'ok'", connection, transaction);
+            $"""
+            SELECT {FilingRows.Qualified("f")} FROM filings.filings f
+            WHERE f.instrument_id = @i AND f.kind = @k AND f.period_end = @p AND f.broadcast_state = 'ok'
+              AND NOT EXISTS (SELECT 1 FROM filings.calendar c WHERE c.filing_id = f.id) AND NOT EXISTS (SELECT 1 FROM filings.shareholding s WHERE s.filing_id = f.id)
+            """, connection, transaction);
         command.Parameters.AddWithValue("i", filing.InstrumentId);
         command.Parameters.AddWithValue("k", FilingKinds.Code(filing.Kind));
         command.Parameters.AddWithValue("p", filing.PeriodEnd!.Value);

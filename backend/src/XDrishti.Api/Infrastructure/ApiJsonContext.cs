@@ -124,6 +124,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(FilingCoverageView))]
 [JsonSerializable(typeof(FilingListView))]
 [JsonSerializable(typeof(FilingView))]
+[JsonSerializable(typeof(ResultsCalendarView))]
 [JsonSerializable(typeof(ComplianceView))]
 [JsonSerializable(typeof(ComplianceRecordView))]
 [JsonSerializable(typeof(RecordComplianceRequest))]
