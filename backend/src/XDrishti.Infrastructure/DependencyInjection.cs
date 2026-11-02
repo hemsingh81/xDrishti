@@ -177,6 +177,7 @@ public static class DependencyInjection
         services.AddScoped<ICellStatsStore, CellStatsStore>(); // the cell statistics snapshots (spec P6-01)
         services.AddScoped<ITradeFeatureStore, TradeFeatureStore>(); // the decision-time features of trades (spec P6-04)
         services.AddScoped<IExtensionFeatureStore, ExtensionFeatureStore>(); // the values of feature extensions, insert-only; no decision path reads it (spec P13-05)
+        services.AddScoped<IExtensionExtractionStore, ExtensionExtractionStore>(); // what an extension extraction was built from, insert-only; no decision path reads it (spec P15-05)
         services.AddScoped<IExtensionEvaluationStore, ExtensionEvaluationStore>(); // the evaluations of feature extensions, insert-only; the hold-out is read once (spec P13-05)
         services.AddScoped<ITrainingSetStore, TrainingSetStore>(); // the training-set records (spec P6-04)
         services.AddOptions<ReportBenchmarkOptions>().Bind(configuration.GetSection(ReportBenchmarkOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // basket benchmarks (spec P8-07)

@@ -9,7 +9,7 @@ namespace XDrishti.Strategies.Tests.Evaluation;
 /// <summary>
 /// The oracle and the look-ahead property are only as good as the conditions they are given, so the generator is checked on its own: every condition it writes is accepted by the compiler on every evaluation timeframe,
 /// every construct of the language occurs in what it writes (every builtin, the lagged forms, <c>tf(…)</c>, the parameters, the dotted spellings, <c>time</c> in both orders, <c>regime()</c> by name and by code,
-/// <c>day_of_week</c> with the weekday names, the defaults left out, <c>source=</c>, a division by zero, equality of truth values), all 56 catalog names are read, and a generator told to leave the context out
+/// <c>day_of_week</c> with the weekday names, the defaults left out, <c>source=</c>, a division by zero, equality of truth values), all 58 catalog names are read, and a generator told to leave the context out
 /// never reads it.
 /// </summary>
 public sealed class ModelGeneratorTests
@@ -196,12 +196,12 @@ public sealed class ModelGeneratorTests
     }
 
     [Fact]
-    public void All_56_catalog_names_are_read_by_the_generated_conditions()
+    public void All_58_catalog_names_are_read_by_the_generated_conditions()
     {
         var names = new HashSet<string>();
         foreach (var evaluation in Timeframes.All)
         {
-            var generator = new ModelGenerator(9_000 + (int)evaluation, evaluation, true, true);
+            var generator = new ModelGenerator(9_000 + (int)evaluation, evaluation, true, true, allowResultsDays: true);
             for (var i = 0; i < 1_500; i++)
             {
                 foreach (var spec in ModelFacts.Of(generator.Next()).Features)
@@ -213,7 +213,7 @@ public sealed class ModelGeneratorTests
 
         var missing = IndicatorCatalog.All.Select(i => i.Name).Where(n => !names.Contains(n)).ToList();
 
-        IndicatorCatalog.All.Count.ShouldBe(56);
+        IndicatorCatalog.All.Count.ShouldBe(58);
         missing.ShouldBeEmpty("never read: " + string.Join(", ", missing));
     }
 

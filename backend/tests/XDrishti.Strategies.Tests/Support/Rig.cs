@@ -27,8 +27,8 @@ internal sealed class Rig
 
     public IReadOnlyList<BoundCondition> Bound => _bound;
 
-    public static Rig Of(Timeframe timeframe, string source, MarketContext? context = null, IReadOnlySet<DateOnly>? expiryDays = null, IReadOnlyList<FeatureSpec>? extra = null, IReadOnlyDictionary<string, double>? parameters = null, TradingCalendar? calendar = null, int minimumDepth = 1) =>
-        Of(timeframe, [source], context, expiryDays, extra, parameters, calendar, minimumDepth);
+    public static Rig Of(Timeframe timeframe, string source, MarketContext? context = null, IReadOnlySet<DateOnly>? expiryDays = null, IReadOnlyList<FeatureSpec>? extra = null, IReadOnlyDictionary<string, double>? parameters = null, TradingCalendar? calendar = null, int minimumDepth = 1, IReadOnlyDictionary<DateOnly, ResultsDayValues>? resultsDays = null) =>
+        Of(timeframe, [source], context, expiryDays, extra, parameters, calendar, minimumDepth, resultsDays);
 
     public static Rig Of(
         Timeframe timeframe,
@@ -38,7 +38,8 @@ internal sealed class Rig
         IReadOnlyList<FeatureSpec>? extra = null,
         IReadOnlyDictionary<string, double>? parameters = null,
         TradingCalendar? calendar = null,
-        int minimumDepth = 1)
+        int minimumDepth = 1,
+        IReadOnlyDictionary<DateOnly, ResultsDayValues>? resultsDays = null)
     {
         var conditions = sources.Select(s => Compiling.Condition(s, timeframe, parameters)).ToList();
         var plan = ConditionSet.Merge(conditions);
@@ -49,7 +50,7 @@ internal sealed class Rig
             specs.Add(Specs.Close(timeframe));
         }
 
-        var options = new FrameOptions(calendar, Math.Max(plan.HistoryDepth, minimumDepth), plan.NeedsContext ? context ?? throw new InvalidOperationException("The conditions need a market context.") : context, plan.NeedsExpiryDays ? expiryDays ?? throw new InvalidOperationException("The conditions need expiry dates.") : expiryDays);
+        var options = new FrameOptions(calendar, Math.Max(plan.HistoryDepth, minimumDepth), plan.NeedsContext ? context ?? throw new InvalidOperationException("The conditions need a market context.") : context, plan.NeedsExpiryDays ? expiryDays ?? throw new InvalidOperationException("The conditions need expiry dates.") : expiryDays, resultsDays);
         var created = FeatureFrame.Create(specs, options);
         created.IsSuccess.ShouldBeTrue(created.IsFailure ? created.Error.Message + " " + string.Join("; ", created.Error.Fields?.Select(f => f.Field + ": " + f.Message) ?? []) : string.Empty);
         var bound = plan.BindAll(created.Value);

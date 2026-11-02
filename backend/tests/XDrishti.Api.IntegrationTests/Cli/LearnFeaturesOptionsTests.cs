@@ -28,6 +28,39 @@ public sealed class LearnFeaturesOptionsTests
         errors.ShouldNotBeEmpty();
     }
 
+    [Theory]
+    [InlineData("ev-1")]
+    [InlineData("fu-1")]
+    public void Features_takes_an_extension_of_p15_05_and_without_it_behaves_as_before(string extension)
+    {
+        var (with, errors) = LearnFeaturesOptions.Parse(["--run", Key, "--extension", extension]);
+        var (without, _) = LearnFeaturesOptions.Parse(["--run", Key]);
+
+        errors.ShouldBeEmpty();
+        with!.Extension.ShouldBe(extension);
+        without!.Extension.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("--extension", "tf-1")]
+    [InlineData("--extension", "md-1")]
+    [InlineData("--extension", "")]
+    public void Features_refuses_an_extension_other_than_ev_1_or_fu_1(string flag, string value)
+    {
+        var (options, errors) = LearnFeaturesOptions.Parse(["--run", Key, flag, value]);
+
+        options.ShouldBeNull();
+        errors.ShouldContain(e => e.Contains("ev-1 or fu-1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Features_refuses_an_extension_given_twice_or_without_a_value()
+    {
+        LearnFeaturesOptions.Parse(["--run", Key, "--extension", "ev-1", "--extension", "fu-1"]).Options.ShouldBeNull();
+        LearnFeaturesOptions.Parse(["--run", Key, "--extension"]).Options.ShouldBeNull();
+        LearnFeaturesOptions.Parse(["--extension", "ev-1"]).Options.ShouldBeNull();
+    }
+
     [Fact]
     public void The_training_set_line_takes_runs_a_required_list_and_the_cell_knobs()
     {

@@ -39,6 +39,7 @@ internal sealed class RunSimulationHandler(
     ICostSheetStore costSheets,
     IContextDayStore contextDays,
     IEventCalendarSnapshots eventSnapshots,
+    IResultsFilingTimes filingTimes,
     TimeProvider time,
     ILogger<RunSimulationHandler> logger) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>
 {
@@ -129,7 +130,8 @@ internal sealed class RunSimulationHandler(
 
         // P15-06 (ADR 0182): a strategy that names `not_event_day` gets the stored results calendar, read once for the whole run, before any bar is read. No rows at all, or a failed read, refuse the run: an empty calendar would make every day look like "no event".
         EventCalendarSnapshot? events = null;
-        if (prepared.Value.ReadsEvents)
+        EventCalendarSnapshot? snapshotRead = null;
+        if (prepared.Value.ReadsEvents || prepared.Value.ReadsResultsDays)
         {
             var snapshot = await eventSnapshots.ReadAsync(targets.Ids, request.To, cancellationToken);
             if (snapshot.IsFailure)
@@ -137,12 +139,29 @@ internal sealed class RunSimulationHandler(
                 return Result.Failure<Executed>(SimulationErrors.EventCalendarNotAvailable(snapshot.Error.Message));
             }
 
-            if (snapshot.Value.RowCount == 0)
+            snapshotRead = snapshot.Value;
+            if (prepared.Value.ReadsEvents)
             {
-                return Result.Failure<Executed>(SimulationErrors.EventCalendarNotAvailable("no results calendar rows for the window (P15-04)"));
-            }
+                if (snapshot.Value.RowCount == 0)
+                {
+                    return Result.Failure<Executed>(SimulationErrors.EventCalendarNotAvailable("no results calendar rows for the window (P15-04)"));
+                }
 
-            events = snapshot.Value;
+                events = snapshot.Value;
+            }
+        }
+
+        // P15-05 (ADR 0185): a strategy that names a results-days feature gets the snapshot and the results filing times, read once before any bar. Neither a calendar row nor a filing in the window refuses the run.
+        ResultsDayInputs? resultsDays = null;
+        if (prepared.Value.ReadsResultsDays)
+        {
+            var filings = await filingTimes.ReadAsync(targets.Ids, cancellationToken);
+            var through = new DateTimeOffset(request.To.AddDays(1).ToDateTime(TimeOnly.MinValue), IndiaTime.Offset);
+            resultsDays = ResultsDayInputs.Create(snapshotRead, filings.Where(f => f.BroadcastTs < through), snapshotRead!.LagMinutes);
+            if (resultsDays.IsEmpty)
+            {
+                return Result.Failure<Executed>(SimulationErrors.EventCalendarNotAvailable("no results calendar or filings for the window (P15)"));
+            }
         }
 
         SimulationLog.RunStarted(logger, request.StrategyId, targets.Label, targets.Ids.Count, request.From, request.To, prepared.Value.Warnings.Count, request.Costs is CostChoice.SheetChoice named ? named.SheetId : "gross");
@@ -154,10 +173,10 @@ internal sealed class RunSimulationHandler(
         var days = readsContext ? await contextDays.ListAsync(cancellationToken) : null;
         if (basisSink is not null)
         {
-            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough, days, events);
+            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough, days, events, resultsDays);
         }
 
-        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext, days, events);
+        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext, days, events, resultsDays);
         var readTime = time.GetElapsedTime(started);
         var replayTime = TimeSpan.Zero;
         var candidates = prepared.Value.Candidates;
@@ -209,7 +228,8 @@ internal sealed class RunSimulationHandler(
                 calendar,
                 costContext is null ? null : CostRecord.Of(costContext),
                 days is null ? null : ContextFingerprint.Of(days, request.To),
-                events is null ? null : new EventFilterRecord(events.Sha256, events.RowCount, events.LagMinutes, EventCalendarSnapshot.RuleVersion));
+                events is null ? null : new EventFilterRecord(events.Sha256, events.RowCount, events.LagMinutes, EventCalendarSnapshot.RuleVersion),
+                resultsDays is null ? null : new ResultsDaysRecord(resultsDays.Calendar?.Sha256 ?? "-", resultsDays.Calendar?.RowCount ?? 0, resultsDays.FilingsSha256, resultsDays.FilingCount, resultsDays.LagMinutes, ResultsDaySeries.Version));
             firstHeader ??= header;
             runs.Add(RunAssembler.Assemble(header, replays[k]));
         }
@@ -369,7 +389,7 @@ internal sealed class RunSimulationHandler(
 
         var request = context.Request;
         var (raw, factors) = await _reader.ReadAsync(id, request.To, cancellationToken);
-        return InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"), context.Events);
+        return InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"), context.Events, context.ResultsDays);
     }
 
     private sealed record Universe(UniverseKind Kind, Guid? BasketId, string? BasketName, string Label, IReadOnlyList<Guid> Ids, IReadOnlyDictionary<Guid, BarsInstrument>? Known);
@@ -382,5 +402,6 @@ internal sealed class RunSimulationHandler(
         ReplayOptions Options,
         CostContext? Costs,
         IReadOnlyList<ContextDayRecord>? ContextDays,
-        EventCalendarSnapshot? Events);
+        EventCalendarSnapshot? Events,
+        ResultsDayInputs? ResultsDays = null);
 }

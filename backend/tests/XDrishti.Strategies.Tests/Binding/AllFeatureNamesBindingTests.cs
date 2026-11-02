@@ -5,7 +5,7 @@ using XDrishti.Strategies.Tests.Support;
 
 namespace XDrishti.Strategies.Tests.Binding;
 
-/// <summary>Criterion 3: every one of the 56 catalog names can be written in its DSL form with default arguments and binds to the spec the catalog's <c>DefaultSpec</c> gives.</summary>
+/// <summary>Criterion 3: every one of the 58 catalog names can be written in its DSL form with default arguments and binds to the spec the catalog's <c>DefaultSpec</c> gives.</summary>
 public sealed class AllFeatureNamesBindingTests
 {
     /// <summary>The ten names that read the daily market context (written out; not taken from the catalog's flags).</summary>
@@ -17,10 +17,10 @@ public sealed class AllFeatureNamesBindingTests
         [.. IndicatorCatalog.All.SelectMany(i => new[] { Timeframe.M5, Timeframe.M15, Timeframe.H1, Timeframe.D1, Timeframe.W1, Timeframe.Mo1 }.Select(t => (i.Name, t)))];
 
     [Fact]
-    public void The_table_of_forms_has_one_form_for_each_of_the_56_names_of_the_catalog()
+    public void The_table_of_forms_has_one_form_for_each_of_the_58_names_of_the_catalog()
     {
-        IndicatorCatalog.All.Count.ShouldBe(56);
-        AllFeatureForms.Forms.Count.ShouldBe(56);
+        IndicatorCatalog.All.Count.ShouldBe(58);
+        AllFeatureForms.Forms.Count.ShouldBe(58);
         AllFeatureForms.Forms.Keys.OrderBy(n => n, StringComparer.Ordinal).ShouldBe(IndicatorCatalog.All.Select(i => i.Name).OrderBy(n => n, StringComparer.Ordinal));
     }
 
@@ -55,7 +55,7 @@ public sealed class AllFeatureNamesBindingTests
             error.Message.ShouldContain("'" + name + "'", Case.Sensitive, "names the feature");
             error.Message.ShouldContain(timeframe.ToCode(), Case.Sensitive, "names the timeframe");
         }
-        else if (FeatureFrame.Create([expected], new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>())).IsFailure)
+        else if (FeatureFrame.Create([expected], new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>(), ResultsDays: new Dictionary<DateOnly, ResultsDayValues>())).IsFailure)
         {
             // the default of a parameter can be refused on a longer timeframe (an opening range of 15 minutes is not a whole number of 30m or 1h bars)
             result.Errors.ShouldHaveSingleItem().Code.ShouldBe(LintCodes.BadArguments);

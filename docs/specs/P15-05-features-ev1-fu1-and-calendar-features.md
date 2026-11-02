@@ -1,6 +1,6 @@
 # P15-05 — Features `ev-1` and `fu-1` and the frame event features: point-in-time extension rows per trade, `days_to_results` and `days_since_results` readable by rules, NaN for every unknown
 
-- **Status:** Draft (written 2026-11-02 under the owner's delegation; the owner's Approved is needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-02, "consider all is approved and continue in loop")
 - **Phase / roadmap row:** P15 — slice P15-05 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Features `ev-1` and `fu-1`").
 - **Design refs:** docs/design/20 §D · 09 §3 (features), 11 §2 (the frame) · 07 §1 · ADR 0033 (date features come from the caller), 0066 (side tables, no imputation), 0037 (engine version, run key), 0180 (store the lag), 0181 (`days_to_results`), 0182 (the snapshot) · P13-00 D5 (extension side table, not `tf-2`) · [P13-05](P13-05-feature-set-comparison-core.md) (owner of `research.trade_features_ext` and its store). New ADR: **next free number at build time**, plus an ADR 0037 amendment (engine `sim-8`) and a doc 11 change (two frame features).
 - **Needs:** P15-03 (facts; for `fu-1` only), P15-04 and P15-06 (built: `IResultsCalendar`, `IShareholdingAsOf`, `IResultsFilingTimes`, `EventCalendarSnapshot`), P1-10a (adjusted prices, applied corporate actions), the stored market context (NIFTY 50 daily close). **P13-05** (spec Draft; built before this slice): it creates `research.trade_features_ext` and `IExtensionFeatureStore`, which this slice only uses (Decision 1). **Needed by:** P15-09 (rules read `days_since_results`), P15-10 (protocol X).
@@ -89,6 +89,8 @@ Extraction ≤ 20 ms per trade (batched reads per instrument); the per-date seri
 3. **`results_car3` is the three sessions ending at the close of `R`.** It is known at that close; the plan's "announcement window" did not say which sessions, and a window reaching past `R` would leak into an entry at `R`'s close.
 4. **Frame features by start-of-date visibility.** Cheap (a dictionary per date), never earlier than the instant rule, consistent with the context features.
 5. **EPS adjusted for splits and bonuses known by `t`.** An unadjusted year-ago EPS would make every split a huge surprise.
+   - **Deliberate deviation (review, 2026-11-02):** a quarter's EPS is adjusted only for splits and bonuses with ex-date after that quarter's **broadcast** (and at or before `t`), not after its period end. Under Ind AS 33 a quarter published after an action already reports EPS on the new share count; adjusting it again would count the action twice. Recorded in ADR 0185. The `fu-1` feature table above says "after that quarter's period end"; the code and tests follow this note.
+   - **Also (review):** daily closes come from the 1D aggregate (complete days only), never the minute bars; the record is written in the same transaction as the rows; a missing or empty parser version counts as unverified; a standard deviation at or below 1e-9 of the largest earlier difference is degenerate.
 
 ## Risks and honest limits
 - `pe_pctile_5y` needs 1,000 sessions of prices before `t`: with bars from 2024 it is NaN until about 2028, unless CF-04 Part A (daily history) lands.

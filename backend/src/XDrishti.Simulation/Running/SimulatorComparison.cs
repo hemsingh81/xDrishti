@@ -73,13 +73,19 @@ public sealed class SimulatorComparison
 
     /// <summary>Scans the minutes of one instrument once per side and walks every entry candidate under every member. Same arguments and same refusals as <see cref="Simulator.Run"/>.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<ComparisonResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null)
+    public Result<ComparisonResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
         if (_union.Any(s => s.NeedsContext) && context is null)
         {
             return Result.Failure<ComparisonResult>(Simulator.ContextNotGivenError());
+        }
+
+        var readsDays = _members.Any(m => m.ReadsResultsDays);
+        if (readsDays && (resultsDays is null || calendar is null))
+        {
+            return Result.Failure<ComparisonResult>(Simulator.ResultsDaysNotGivenError());
         }
 
         if (_members.Any(m => m.ReadsEvents) && (events is null || calendar is null))
@@ -95,9 +101,10 @@ public sealed class SimulatorComparison
         var outcomes = _members.Select(_ => new List<CandidateOutcome>()).ToArray();
         var walks = _members.Select(_ => WalkCounters.Empty).ToArray();
         var scans = new List<ScanCounters>(_union.Length);
+        var series = readsDays ? ResultsDaysScan.For(resultsDays!, instrument.Id, bars, calendar!) : null;
         for (var s = 0; s < _union.Length; s++)
         {
-            var created = EntryScanner.Create(_union[s], instrument, calendar, context);
+            var created = EntryScanner.Create(_union[s], instrument, calendar, context, series);
             if (created.IsFailure)
             {
                 return Result.Failure<ComparisonResult>(created.Error);

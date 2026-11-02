@@ -253,7 +253,7 @@ public sealed class FeatureFrameTests
             var specs = IndicatorCatalog.All.Where(i => i.Supports(timeframe)).Select(i => i.DefaultSpec(timeframe)).ToList();
             var specsWithMinutes = specs.Select(s => s.Name.StartsWith("or_", StringComparison.Ordinal) ? s with { P1 = Math.Max(30, timeframe.Minutes()) } : s).ToList();
 
-            FeatureFrame.Create(specsWithMinutes, new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>())).IsSuccess.ShouldBeTrue(timeframe.ToCode());
+            FeatureFrame.Create(specsWithMinutes, new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>(), ResultsDays: new Dictionary<DateOnly, ResultsDayValues>())).IsSuccess.ShouldBeTrue(timeframe.ToCode());
         }
     }
 

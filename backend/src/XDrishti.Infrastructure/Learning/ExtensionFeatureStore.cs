@@ -18,6 +18,41 @@ internal sealed class ExtensionFeatureStore(NpgsqlDataSource dataSource) : IExte
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var added = await InsertRowsAsync(connection, transaction, rows, createdAt, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return added;
+    }
+
+    public async ValueTask<(int Stored, bool RecordIsNew)> AppendWithRecordAsync(IReadOnlyList<ExtensionFeatureRow> rows, ExtensionExtractionRecord record, DateTimeOffset createdAt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        ArgumentNullException.ThrowIfNull(record);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var added = await InsertRowsAsync(connection, transaction, rows, createdAt, cancellationToken);
+        await using var insert = new NpgsqlCommand("""
+            INSERT INTO research.extension_extractions (run_key, extension, version, lag_minutes, parser_version, calendar_sha256, filings_watermark, rows, nan_counts, extracted_at)
+            VALUES (@run_key, @extension, @version, @lag, @parser, @calendar, @watermark, @rows, @nan, @extracted_at)
+            ON CONFLICT (run_key, extension, version) DO NOTHING
+            """, connection, transaction);
+        var p = insert.Parameters;
+        p.AddWithValue("run_key", NpgsqlDbType.Char, record.RunKey);
+        p.AddWithValue("extension", NpgsqlDbType.Varchar, record.Extension);
+        p.AddWithValue("version", NpgsqlDbType.Varchar, record.Version);
+        p.AddWithValue("lag", NpgsqlDbType.Integer, record.LagMinutes);
+        p.AddWithValue("parser", NpgsqlDbType.Varchar, (object?)record.ParserVersion ?? DBNull.Value);
+        p.AddWithValue("calendar", NpgsqlDbType.Char, record.CalendarSha256);
+        p.AddWithValue("watermark", NpgsqlDbType.TimestampTz, (object?)record.FilingsWatermark ?? DBNull.Value);
+        p.AddWithValue("rows", NpgsqlDbType.Integer, record.Rows);
+        p.AddWithValue("nan", NpgsqlDbType.Jsonb, record.NanCountsJson);
+        p.AddWithValue("extracted_at", NpgsqlDbType.TimestampTz, createdAt);
+        var recordIsNew = await insert.ExecuteNonQueryAsync(cancellationToken) > 0;
+        await transaction.CommitAsync(cancellationToken);
+        return (added, recordIsNew);
+    }
+
+    private static async ValueTask<int> InsertRowsAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, IReadOnlyList<ExtensionFeatureRow> rows, DateTimeOffset createdAt, CancellationToken cancellationToken)
+    {
         var added = 0;
         // Shortcut: one INSERT per row in a single transaction is fine below ~100k rows; beyond that COPY into a temp table and INSERT .. SELECT .. ON CONFLICT DO NOTHING.
         foreach (var row in rows)
@@ -38,7 +73,6 @@ internal sealed class ExtensionFeatureStore(NpgsqlDataSource dataSource) : IExte
             added += await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        await transaction.CommitAsync(cancellationToken);
         return added;
     }
 

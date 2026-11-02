@@ -8,6 +8,9 @@ public static class ResultsParser
 {
     public const string Version = "xbrl-1-synthetic";
 
+    /// <summary>Whether facts of this parser version have passed real filings: only a known, non-synthetic version is verified. A missing or empty version is not, so a consumer labels what it builds on it.</summary>
+    public static bool IsVerified(string? version) => !string.IsNullOrWhiteSpace(version) && !version.EndsWith("-synthetic", StringComparison.Ordinal);
+
     public const int MaxDepth = 64;
 
     public const int MaxElements = 200_000;

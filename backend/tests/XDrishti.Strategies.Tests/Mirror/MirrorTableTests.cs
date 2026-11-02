@@ -9,7 +9,8 @@ namespace XDrishti.Strategies.Tests.Mirror;
 /// <summary>Spec P3-02e criterion 5 and D8: every catalog name, builtin, dotted spelling and constant has a row, and a silent edit of the table fails.</summary>
 public sealed class MirrorTableTests
 {
-    private const string PinnedFingerprint = "c4174abb45953af373f3d06e2107c2e6c72bce26e79bb4209811c521d7172ca7";
+    // P15-05 added two rows (days_to_results, days_since_results: side-independent counts, mirrored to themselves) for names that did not exist before; no mirrored definition stored earlier can change, so the version was kept (a point for the owner in ADR 0185)
+    private const string PinnedFingerprint = "63c33e9d166f168956bb39d62520244875b60886255b09167a72885364ca77a8";
 
     private static bool Classified(string name) => MirrorTable.IsRefused(name) || MirrorTable.TryGet(name, out _);
 
@@ -19,7 +20,7 @@ public sealed class MirrorTableTests
         var missing = IndicatorCatalog.All.Select(i => i.Name).Where(n => !Classified(n)).ToList();
 
         missing.ShouldBeEmpty();
-        IndicatorCatalog.All.Count.ShouldBe(56);
+        IndicatorCatalog.All.Count.ShouldBe(58);
     }
 
     [Fact]

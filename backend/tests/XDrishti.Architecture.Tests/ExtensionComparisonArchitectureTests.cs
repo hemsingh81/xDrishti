@@ -11,7 +11,7 @@ public sealed class ExtensionComparisonArchitectureTests
 {
     private const string ExtensionNamespace = "XDrishti.Domain.Learning.Extensions";
 
-    private static readonly string[] Ports = ["XDrishti.Application.Abstractions.Learning.IExtensionFeatureStore", "XDrishti.Application.Abstractions.Learning.IExtensionEvaluationStore"];
+    private static readonly string[] Ports = ["XDrishti.Application.Abstractions.Learning.IExtensionFeatureStore", "XDrishti.Application.Abstractions.Learning.IExtensionEvaluationStore", "XDrishti.Application.Abstractions.Learning.IExtensionExtractionStore"];
 
     private static readonly string[] Dependencies = [ExtensionNamespace, .. Ports];
 
@@ -40,15 +40,15 @@ public sealed class ExtensionComparisonArchitectureTests
     }
 
     [Fact]
-    public void The_exact_set_of_application_types_that_name_an_extension_type_or_port_is_the_two_ports()
+    public void The_exact_set_of_application_types_that_name_an_extension_type_or_port_is_the_ports_and_the_p15_05_extraction()
     {
-        Users(Application).ShouldBe(["IExtensionEvaluationStore", "IExtensionFeatureStore"]);
+        Users(Application).ShouldBe(["ExtensionFeatureExtractor", "ExtractExtensionFeaturesHandler", "IExtensionEvaluationStore", "IExtensionExtractionStore", "IExtensionFeatureStore"]);
     }
 
     [Fact]
-    public void The_exact_set_of_infrastructure_types_that_name_an_extension_type_or_port_is_the_two_stores_and_the_wiring()
+    public void The_exact_set_of_infrastructure_types_that_name_an_extension_type_or_port_is_the_three_stores_and_the_wiring()
     {
-        Users(Infrastructure).ShouldBe(["DependencyInjection", "ExtensionEvaluationStore", "ExtensionFeatureStore"]);
+        Users(Infrastructure).ShouldBe(["DependencyInjection", "ExtensionEvaluationStore", "ExtensionExtractionStore", "ExtensionFeatureStore"]);
     }
 
     [Theory]

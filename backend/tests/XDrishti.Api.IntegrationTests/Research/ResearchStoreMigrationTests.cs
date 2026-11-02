@@ -111,7 +111,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
             "ix_extension_evaluations_family_created", "ix_hypotheses_experiment_id", "ix_hypotheses_hypothesis_id_id", "ix_learning_changelog_created_at", "ix_learning_changelog_subject_id", "ix_learning_reports_kind_created",
             "ix_lessons_lesson_id_id", "ix_model_designations_model_id_id", "ix_model_versions_sha256", "ix_model_versions_training_set_id", "ix_sim_comparisons_entries_key", "ix_sim_runs_strategy_created",
             "ix_trade_features_ext_version_run", "ix_training_sets_created_at", "pk_cell_stats", "pk_digests", "pk_exit_selection_folds", "pk_exit_selections",
-            "pk_experiment_jobs", "pk_experiments", "pk_extension_evaluations", "pk_hypotheses", "pk_learning_changelog", "pk_learning_reports",
+            "pk_experiment_jobs", "pk_experiments", "pk_extension_evaluations", "pk_extension_extractions", "pk_hypotheses", "pk_learning_changelog", "pk_learning_reports",
             "pk_lessons", "pk_model_designations", "pk_model_versions", "pk_sim_comparisons", "pk_sim_runs", "pk_sim_trade_leg_charges",
             "pk_sim_trade_legs", "pk_sim_trades", "pk_trade_features", "pk_trade_features_ext", "pk_training_sets", "uq_cell_stats_snapshot_cell_window",
             "uq_digests_iso_week", "uq_exit_selections_selection_key", "uq_experiment_jobs_one_active", "uq_experiments_experiment_key", "uq_hypotheses_id_is_seed", "uq_learning_changelog_reverts_id",
@@ -125,7 +125,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
         [
             "ck_cell_stats_shape", "ck_digests_shape", "ck_exit_selection_folds_counts", "ck_exit_selections_keys", "ck_experiment_jobs_progress", "ck_experiment_jobs_shape",
             "ck_experiment_jobs_state", "ck_experiments_shape", "ck_extension_evaluations_counts", "ck_extension_evaluations_data", "ck_extension_evaluations_fold_unit", "ck_extension_evaluations_id",
-            "ck_extension_evaluations_recipe", "ck_extension_evaluations_trial", "ck_extension_evaluations_trials", "ck_extension_evaluations_verdict", "ck_hypotheses_links", "ck_hypotheses_shape",
+            "ck_extension_evaluations_recipe", "ck_extension_evaluations_trial", "ck_extension_evaluations_trials", "ck_extension_evaluations_verdict", "ck_extension_extractions_calendar", "ck_extension_extractions_counts", "ck_extension_extractions_extension", "ck_extension_extractions_run_key", "ck_extension_extractions_version", "ck_hypotheses_links", "ck_hypotheses_shape",
             "ck_hypotheses_state", "ck_learning_changelog_evidence", "ck_learning_changelog_kind", "ck_learning_changelog_revert", "ck_learning_changelog_states", "ck_learning_reports_shape",
             "ck_lessons_closed", "ck_lessons_links", "ck_lessons_result", "ck_lessons_shape", "ck_lessons_state", "ck_model_designations_role",
             "ck_model_versions_shape", "ck_sim_comparisons_counts", "ck_sim_comparisons_keys", "ck_sim_comparisons_members", "ck_sim_comparisons_unit", "ck_sim_runs_costs",
@@ -182,7 +182,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "extension_evaluations", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
     }
 
     private const string BeforeExitSelections = "20261022055710_AddSimComparisons";
@@ -237,7 +237,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "extension_evaluations", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
     }
 
     [Fact]
@@ -259,6 +259,6 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
         await migrator.MigrateAsync(Before, Ct);
         (await ListAsync(connection, "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'research'")).ShouldBeEmpty();
         await migrator.MigrateAsync(null, Ct);
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "extension_evaluations", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
     }
 }

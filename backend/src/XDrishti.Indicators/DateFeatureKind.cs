@@ -42,4 +42,10 @@ public enum DateFeatureKind
 
     /// <summary><see cref="ContextValues.Regime"/>.</summary>
     Regime,
+
+    /// <summary>Sessions to the next results event of the instrument as known at the start of the India date of the step (P15-05); NaN when unknown. Read from <see cref="FrameOptions.ResultsDays"/>.</summary>
+    DaysToResults,
+
+    /// <summary>Sessions since the reaction session of the newest results filing visible at the start of the India date of the step (P15-05); NaN when unknown. Read from <see cref="FrameOptions.ResultsDays"/>.</summary>
+    DaysSinceResults,
 }

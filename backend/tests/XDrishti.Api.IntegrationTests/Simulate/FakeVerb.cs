@@ -165,6 +165,8 @@ internal sealed class FakeVerb : IDisposable
 
         public bool ReadsEvents => false;
 
+        public bool ReadsResultsDays => false;
+
         public IReadOnlyList<FieldError> Warnings { get; } = [];
     }
 

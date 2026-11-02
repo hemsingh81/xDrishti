@@ -57,6 +57,9 @@ public sealed class Simulator
     /// <summary>Some side names the filter <c>not_event_day</c>: <see cref="Run"/> needs a results-calendar snapshot and a trading calendar, and a run is refused with <c>simulation.filter_not_available</c> without them (P15-06, ADR 0182).</summary>
     public bool ReadsEvents => _sides.Any(s => s.Compiled.NeedsEventCalendar);
 
+    /// <summary>Some side names <c>days_to_results</c> or <c>days_since_results</c>: <see cref="Run"/> needs the results-days inputs and a trading calendar, and a run is refused with <c>simulation.filter_not_available</c> without them (P15-05, ADR 0185).</summary>
+    public bool ReadsResultsDays => _sides.Any(s => ResultsDaysScan.Reads(s.Compiled));
+
     /// <summary>The sides this simulator runs, Buy first.</summary>
     public IReadOnlyList<Side> Sides => _sides.Select(s => s.Compiled.Side).ToList().AsReadOnly();
 
@@ -159,11 +162,17 @@ public sealed class Simulator
     /// <param name="quantity">The full size <c>Q</c> of ADR 0042 for an exact entry and an initial risk, for a <c>PYRAMID</c> to see an add of no whole share (P4-04, D3); null in a gross run, where no add is skipped for its quantity.</param>
     /// <param name="context">The daily market context the context features read (P3-lift, ADR 0145); required when a side reads it (<see cref="ReadsContext"/>), ignored otherwise.</param>
     /// <param name="events">The results-calendar snapshot the filter <c>not_event_day</c> reads (P15-06); required, with a <paramref name="calendar"/>, when a side names the filter (<see cref="ReadsEvents"/>), ignored otherwise.</param>
+    /// <param name="resultsDays">What the features <c>days_to_results</c> and <c>days_since_results</c> read (P15-05); required, with a <paramref name="calendar"/>, when a side names either (<see cref="ReadsResultsDays"/>), ignored otherwise.</param>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null)
+    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
+        if (ReadsResultsDays && (resultsDays is null || calendar is null))
+        {
+            return Result.Failure<SimulationResult>(ResultsDaysNotGivenError());
+        }
+
         if (ReadsContext && context is null)
         {
             return Result.Failure<SimulationResult>(ContextNotGivenError());
@@ -182,9 +191,10 @@ public sealed class Simulator
         var outcomes = new List<CandidateOutcome>();
         var scans = new List<ScanCounters>(_sides.Length);
         var walk = WalkCounters.Empty;
+        var series = ReadsResultsDays ? ResultsDaysScan.For(resultsDays!, instrument.Id, bars, calendar!) : null;
         foreach (var side in _sides)
         {
-            var created = EntryScanner.Create(side.Compiled, instrument, calendar, context);
+            var created = EntryScanner.Create(side.Compiled, instrument, calendar, context, series);
             if (created.IsFailure)
             {
                 return Result.Failure<SimulationResult>(created.Error);
@@ -221,6 +231,9 @@ public sealed class Simulator
 
     /// <summary>The error of a side that names <c>not_event_day</c> run with no results-calendar snapshot or no trading calendar: the replay skips such an instrument with <c>event_calendar_unavailable</c> first, and the use case refuses a run with no rows at all.</summary>
     internal static Error EventsNotGivenError() => Error.Validation(SimulatorCodes.FilterNotAvailable, "The strategy names the filter `not_event_day` and no results calendar snapshot or trading calendar was given (P15-04).");
+
+    /// <summary>The error of a side that names <c>days_to_results</c> or <c>days_since_results</c> run with no results-days inputs or no trading calendar: the replay skips such an instrument first, and the use case refuses a run with neither a calendar row nor a filing.</summary>
+    internal static Error ResultsDaysNotGivenError() => Error.Validation(SimulatorCodes.FilterNotAvailable, "no results calendar or filings for the window (P15)");
 
     /// <summary>The refusal for minutes that are not strictly ascending, or null.</summary>
     internal static Error? NotAscending(IReadOnlyList<Bar> bars)

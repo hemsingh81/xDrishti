@@ -12,14 +12,16 @@ namespace XDrishti.Indicators;
 /// once it is complete, and the frames see it from the next date on). A context that nobody extends makes the frames keep the values of its last day for ever (see <see cref="MarketContext"/>). <see cref="ExpiryDays"/> are the India
 /// dates on which <c>is_expiry_day</c> is 1: the library does not guess them (NSE has changed its expiry weekdays more than once), the caller passes them from the instrument master; the frame takes a copy when it is
 /// created (a <see cref="System.Collections.Frozen.FrozenSet{T}"/> is used as given, so one can be shared by many frames). A frame asked for a context feature without <see cref="Context"/>, or for <c>is_expiry_day</c> without <see cref="ExpiryDays"/>, is refused at <see cref="FeatureFrame.Create(IReadOnlyList{FeatureSpec}, FrameOptions?)"/>
-/// (<c>options.context</c>, <c>options.expiryDays</c>); an empty set is valid. Neither is needed for <c>day_of_week</c>.
+/// (<c>options.context</c>, <c>options.expiryDays</c>); an empty set is valid. Neither is needed for <c>day_of_week</c>. <see cref="ResultsDays"/> (P15-05) is the per-date series of <c>days_to_results</c> and <c>days_since_results</c> of one instrument, built by the caller as of the start of each date; a date it does not hold reads NaN,
+/// and a frame asked for either feature without it is refused on <c>options.resultsDays</c>. Neutral numbers only: this library knows nothing of filings.
 /// </para>
 /// </summary>
 public sealed record FrameOptions(
     TradingCalendar? Calendar = null,
     int HistoryDepth = FrameOptions.DefaultHistoryDepth,
     MarketContext? Context = null,
-    IReadOnlySet<DateOnly>? ExpiryDays = null)
+    IReadOnlySet<DateOnly>? ExpiryDays = null,
+    IReadOnlyDictionary<DateOnly, ResultsDayValues>? ResultsDays = null)
 {
     public const int DefaultHistoryDepth = 8;
 

@@ -40,6 +40,8 @@ public sealed class DateFeature : IIndicator
 
     private readonly IReadOnlySet<DateOnly>? _expiryDays;
 
+    private readonly IReadOnlyDictionary<DateOnly, ResultsDayValues>? _resultsDays;
+
     private readonly int _warmUp;
 
     private int _cursor;
@@ -54,7 +56,8 @@ public sealed class DateFeature : IIndicator
     /// <param name="context">The daily context the features that read it use; none gives a feature that is never ready (the weekday and the expiry day do not need it).</param>
     /// <param name="expiryDays">The India dates that are expiry days, for <see cref="DateFeatureKind.ExpiryDay"/>; none gives a feature that is never ready. The set is read as given, so it must not change while the
     /// feature is in use (<see cref="FeatureFrame"/> takes its own copy).</param>
-    public DateFeature(DateFeatureKind kind, MarketContext? context = null, IReadOnlySet<DateOnly>? expiryDays = null)
+    /// <param name="resultsDays">The per-date results numbers of the instrument, for <see cref="DateFeatureKind.DaysToResults"/> and <see cref="DateFeatureKind.DaysSinceResults"/>; none, or a date it lacks, reads NaN.</param>
+    public DateFeature(DateFeatureKind kind, MarketContext? context = null, IReadOnlySet<DateOnly>? expiryDays = null, IReadOnlyDictionary<DateOnly, ResultsDayValues>? resultsDays = null)
     {
         if (!Enum.IsDefined(kind))
         {
@@ -64,6 +67,7 @@ public sealed class DateFeature : IIndicator
         _kind = kind;
         _context = context;
         _expiryDays = expiryDays;
+        _resultsDays = resultsDays;
         _warmUp = WarmUpDays(kind, context?.Options ?? DefaultOptions);
     }
 
@@ -99,7 +103,7 @@ public sealed class DateFeature : IIndicator
     }
 
     /// <summary>Whether the feature reads the <see cref="MarketContext"/> (everything but the two calendar features): the catalog sets <see cref="IndicatorInfo.RequiresContext"/> from it.</summary>
-    internal static bool ReadsContext(DateFeatureKind kind) => kind is not (DateFeatureKind.Weekday or DateFeatureKind.ExpiryDay);
+    internal static bool ReadsContext(DateFeatureKind kind) => kind is not (DateFeatureKind.Weekday or DateFeatureKind.ExpiryDay or DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults);
 
     /// <summary>
     /// The context days that must precede the date for the feature to be ready, for a context with no gaps: the average, its slope and the ADX for the trend (the later of the two), the ATR and a full window of its
@@ -111,7 +115,7 @@ public sealed class DateFeature : IIndicator
         var volatility = options.AtrPeriod + options.PercentileWindow - 1;
         return kind switch
         {
-            DateFeatureKind.Weekday or DateFeatureKind.ExpiryDay or DateFeatureKind.Vix or DateFeatureKind.Breadth => 1,
+            DateFeatureKind.Weekday or DateFeatureKind.ExpiryDay or DateFeatureKind.Vix or DateFeatureKind.Breadth or DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults => 1,
             DateFeatureKind.VixChg => 2,
             DateFeatureKind.VixPct => options.PercentileWindow,
             DateFeatureKind.IndexAdx => 2 * options.AdxPeriod,
@@ -140,6 +144,13 @@ public sealed class DateFeature : IIndicator
         if (_kind == DateFeatureKind.ExpiryDay)
         {
             return _expiryDays is null ? double.NaN : _expiryDays.Contains(date) ? 1.0 : 0.0;
+        }
+
+        if (_kind is DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults)
+        {
+            return _resultsDays is not null && _resultsDays.TryGetValue(date, out var results)
+                ? (_kind == DateFeatureKind.DaysToResults ? results.DaysToResults : results.DaysSinceResults)
+                : double.NaN;
         }
 
         if (_context is null || !_context.TryAsOf(date, ref _cursor, out var values))

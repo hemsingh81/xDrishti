@@ -118,7 +118,7 @@ public sealed class DailyAndCalendarAdversarialTests
         }
 
         restarts.ShouldBeEmpty();
-        IndicatorCatalog.All.Count.ShouldBe(56);
+        IndicatorCatalog.All.Count.ShouldBe(58);
         AdversarialFrames.Twelve.Count(name => IndicatorCatalog.TryGet(name, out var _)).ShouldBe(12);
     }
 

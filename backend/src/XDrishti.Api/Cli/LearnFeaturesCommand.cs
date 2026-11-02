@@ -27,6 +27,21 @@ internal static class LearnFeaturesCommand
             foreach (var runKey in options.RunKeys)
             {
                 await using var scope = services.CreateAsyncScope();
+                if (options.Extension is { } extension)
+                {
+                    var extracted = await scope.ServiceProvider.GetRequiredService<ICommandHandler<ExtractExtensionFeaturesCommand, ExtensionFeaturesOutcome>>()
+                        .HandleAsync(new ExtractExtensionFeaturesCommand(runKey, extension), cancellationToken);
+                    if (extracted.IsFailure)
+                    {
+                        await console.Error.WriteLineAsync(SimulateOptions.Show(extracted.Error.Code + ": " + extracted.Error.Message));
+                        return XdCommand.Refused;
+                    }
+
+                    var e = extracted.Value;
+                    await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"{e.Version} of run {runKey[..Math.Min(12, runKey.Length)]}: {e.Trades} trades, {e.Stored} new rows, {e.UnknownValues} unknown values") + (e.AlreadyExtracted ? " (already extracted; nothing stored)" : string.Empty));
+                    continue;
+                }
+
                 var result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<ExtractTradeFeaturesCommand, TradeFeaturesOutcome>>()
                     .HandleAsync(new ExtractTradeFeaturesCommand(runKey), cancellationToken);
                 if (result.IsFailure)

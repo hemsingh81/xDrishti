@@ -57,7 +57,7 @@ public sealed class IndicatorInfoRestartTests
     [Fact]
     public void The_twelve_names_are_written_out_once_and_are_exactly_the_per_session_ones_of_the_catalog()
     {
-        IndicatorCatalog.All.Count.ShouldBe(56);
+        IndicatorCatalog.All.Count.ShouldBe(58);
         Restarting.Distinct().Count().ShouldBe(12);
         IndicatorCatalog.All.Where(i => i.SessionBehaviour == SessionBehaviour.PerSession).Select(i => i.Name).ShouldBe(Restarting, ignoreOrder: true);
         IndicatorCatalog.All.Where(i => Intraday.Any(t => i.RestartsEachSession(i.DefaultSpec(t)))).Select(i => i.Name).ShouldBe(Restarting, ignoreOrder: true);

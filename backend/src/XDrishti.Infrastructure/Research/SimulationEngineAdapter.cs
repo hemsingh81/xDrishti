@@ -116,6 +116,8 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine
 
         public bool ReadsEvents => Strategy.ReadsEvents;
 
+        public bool ReadsResultsDays => Strategy.ReadsResultsDays;
+
         public IReadOnlyList<FieldError> Warnings { get; } = warnings;
     }
 }

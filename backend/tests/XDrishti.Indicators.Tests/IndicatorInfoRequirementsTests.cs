@@ -20,12 +20,12 @@ public sealed class IndicatorInfoRequirementsTests
         return info;
     }
 
-    private static FrameOptions Both() => new(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>());
+    private static FrameOptions Both() => new(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>(), ResultsDays: new Dictionary<DateOnly, ResultsDayValues>());
 
     [Fact]
-    public void There_are_fifty_six_names_and_the_ten_context_names_are_among_them_as_date_driven_ones()
+    public void There_are_fifty_eight_names_and_the_ten_context_names_are_among_them_as_date_driven_ones()
     {
-        IndicatorCatalog.All.Count.ShouldBe(56);
+        IndicatorCatalog.All.Count.ShouldBe(58);
         ReadContext.Distinct().Count().ShouldBe(10);
         foreach (var name in ReadContext.Append(ExpiryName))
         {
@@ -59,6 +59,13 @@ public sealed class IndicatorInfoRequirementsTests
         Info("regime").RequiresExpiryDays.ShouldBeFalse();
     }
 
+    [Fact]
+    public void Exactly_the_two_results_names_require_the_results_days_and_nothing_else_does()
+    {
+        IndicatorCatalog.All.Where(i => i.RequiresResultsDays).Select(i => i.Name).ShouldBe(["days_to_results", "days_since_results"]);
+        IndicatorCatalog.All.Where(i => i.RequiresResultsDays).ShouldAllBe(i => i.DateDriven && !i.RequiresContext && !i.RequiresExpiryDays);
+    }
+
     [Theory]
     [MemberData(nameof(AllNames))]
     public void A_frame_asked_for_the_feature_without_options_agrees_with_the_flags(string name)
@@ -81,6 +88,13 @@ public sealed class IndicatorInfoRequirementsTests
             field.Field.ShouldBe("options.expiryDays", name);
             field.Message.ShouldBe($"The expiry dates are needed by '{name}'; give FrameOptions.ExpiryDays (an empty set is allowed).");
         }
+        else if (info.RequiresResultsDays)
+        {
+            result.IsFailure.ShouldBeTrue(name);
+            var field = result.Error.Fields.ShouldNotBeNull().Single();
+            field.Field.ShouldBe("options.resultsDays", name);
+            field.Message.ShouldBe($"The results-event days are needed by '{name}'; give FrameOptions.ResultsDays (an empty series is allowed).");
+        }
         else
         {
             result.IsSuccess.ShouldBeTrue(name);
@@ -94,9 +108,11 @@ public sealed class IndicatorInfoRequirementsTests
         var info = Info(name);
         var context = new FrameOptions(Context: MarketContext.Create([]).Value);
         var expiryDays = new FrameOptions(ExpiryDays: new HashSet<DateOnly>());
+        var resultsDays = new FrameOptions(ResultsDays: new Dictionary<DateOnly, ResultsDayValues>());
 
         FeatureFrame.Create([info.DefaultSpec()], Both()).IsSuccess.ShouldBeTrue(name);
-        FeatureFrame.Create([info.DefaultSpec()], context).IsSuccess.ShouldBe(!info.RequiresExpiryDays, name + " with the context only");
-        FeatureFrame.Create([info.DefaultSpec()], expiryDays).IsSuccess.ShouldBe(!info.RequiresContext, name + " with the expiry dates only");
+        FeatureFrame.Create([info.DefaultSpec()], context).IsSuccess.ShouldBe(!info.RequiresExpiryDays && !info.RequiresResultsDays, name + " with the context only");
+        FeatureFrame.Create([info.DefaultSpec()], expiryDays).IsSuccess.ShouldBe(!info.RequiresContext && !info.RequiresResultsDays, name + " with the expiry dates only");
+        FeatureFrame.Create([info.DefaultSpec()], resultsDays).IsSuccess.ShouldBe(!info.RequiresContext && !info.RequiresExpiryDays, name + " with the results days only");
     }
 }

@@ -85,7 +85,7 @@ public sealed class PyramidSimulatorTests
         c.AddsSkippedRisk.ShouldBe(0, day);
         c.AddsSkippedQuantity.ShouldBe(0, day + ": a gross run does not know the full size");
         reference.Walk.AddsTaken.ShouldBe(0);
-        result.Header.EngineVersion.ShouldBe("sim-7");
+        result.Header.EngineVersion.ShouldBe("sim-8");
     }
 
     [Fact]

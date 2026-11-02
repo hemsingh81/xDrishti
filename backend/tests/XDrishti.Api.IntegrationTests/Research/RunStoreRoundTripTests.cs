@@ -49,7 +49,7 @@ public sealed class RunStoreRoundTripTests(ApiFactory factory)
         record.ShouldBe(Encoding.UTF8.GetString(sink.WrittenSpan));
         StoreKit.Sha256(record!).ShouldBe(header!.RecordSha256);
         header.RunKey.ShouldBe(run.RunKey);
-        (header.EngineVersion, header.RecordSchemaVersion, header.TradeSchemaVersion).ShouldBe((run.EngineVersion, 7, 5));
+        (header.EngineVersion, header.RecordSchemaVersion, header.TradeSchemaVersion).ShouldBe((run.EngineVersion, 8, 5));
         (header.From, header.To, header.StrategyId, header.DefinitionSha256).ShouldBe((run.From, run.To, run.Strategy.Id, run.Strategy.DefinitionSha256));
         (header.UniverseKind, header.UniverseLabel).ShouldBe(("instrumentlist", run.Universe.Label));
         (header.Instruments, header.InstrumentsRun, header.TradesInWindow, header.CandidatesInWindow).ShouldBe((run.Totals.Instruments, run.Totals.InstrumentsRun, run.Totals.TradesInWindow, run.Totals.CandidatesInWindow));

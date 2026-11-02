@@ -8,6 +8,9 @@ public interface IExtensionFeatureStore
     /// <summary>Writes the rows in one transaction and returns how many were new.</summary>
     ValueTask<int> AppendAsync(IReadOnlyList<ExtensionFeatureRow> rows, DateTimeOffset createdAt, CancellationToken cancellationToken);
 
+    /// <summary>Writes the rows and the extraction record of P15-05 in one transaction, so the record always describes the stored rows. Returns how many rows were new and whether the record was new; a record stored already is kept and the rows are still written (a no-op when they exist).</summary>
+    ValueTask<(int Stored, bool RecordIsNew)> AppendWithRecordAsync(IReadOnlyList<ExtensionFeatureRow> rows, ExtensionExtractionRecord record, DateTimeOffset createdAt, CancellationToken cancellationToken);
+
     /// <summary>The rows of the runs for the extension version, ordered by run key then trade key.</summary>
     ValueTask<IReadOnlyList<ExtensionFeatureRow>> ReadAsync(IReadOnlyList<string> runKeys, string version, CancellationToken cancellationToken);
 }

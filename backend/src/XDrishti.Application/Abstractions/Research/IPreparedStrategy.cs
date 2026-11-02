@@ -24,6 +24,9 @@ public interface IPreparedStrategy
     /// <summary>The strategy names the filter <c>not_event_day</c> (P15-06): a run gives the replay a results-calendar snapshot, is refused with <c>simulation.filter_not_available</c> when the window has no calendar row at all, and an instrument is skipped with <c>event_calendar_unavailable</c> when it is given none.</summary>
     bool ReadsEvents { get; }
 
+    /// <summary>The strategy names <c>days_to_results</c> or <c>days_since_results</c> (P15-05, ADR 0185): a run gives the replay the results-calendar snapshot and the results filing times, and is refused with <c>simulation.filter_not_available</c> when the window has neither a calendar row nor a filing.</summary>
+    bool ReadsResultsDays { get; }
+
     /// <summary>The warnings of the compile (path in <see cref="FieldError.Field"/>, code in <see cref="FieldError.Code"/>); counted in the log, not stored in the run record.</summary>
     IReadOnlyList<FieldError> Warnings { get; }
 }

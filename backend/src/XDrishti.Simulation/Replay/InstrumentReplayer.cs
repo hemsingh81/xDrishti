@@ -157,6 +157,12 @@ public static class InstrumentReplayer
             return Same(new InstrumentReplay(Record(input, facts, SkipReason.EventCalendarUnavailable, "no_event_calendar", Scanned.None), [], []), count);
         }
 
+        if (strategy.ReadsResultsDays && input.ResultsDays is null)
+        {
+            // The strategy names a results-days feature and the replay was given nothing to read it from: an empty result with no reason would look like "no signals" (P15-05, ADR 0185).
+            return Same(new InstrumentReplay(Record(input, facts, SkipReason.EventCalendarUnavailable, "no_results_days", Scanned.None), [], []), count);
+        }
+
         if (scan.Ran.Count == 0)
         {
             return Same(new InstrumentReplay(Record(input, facts, SkipReason.NoRunnableSessions, null, Scanned.None), [], []), count);
@@ -379,13 +385,13 @@ public static class InstrumentReplayer
         var context = strategy.ReadsContext ? ContextReader.Of(input.ContextDays) : null;   // the replay has already skipped an instrument whose strategy has no context
         if (strategy.Comparison is { } comparison)
         {
-            var many = comparison.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events);
+            var many = comparison.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays);
             return many.IsFailure
                 ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + many.Error.Code + ": " + many.Error.Message)
                 : many.Value;
         }
 
-        var run = strategy.Simulator.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events);
+        var run = strategy.Simulator.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays);
         return run.IsFailure
             ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + run.Error.Code + ": " + run.Error.Message)
             : new ComparisonResult([run.Value], run.Value.Scans);

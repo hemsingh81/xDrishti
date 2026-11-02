@@ -27,7 +27,7 @@ internal sealed record BoolLit(bool Value) : Node;
 /// A catalog feature as the DSL writes it: <see cref="Text"/> unqualified, <see cref="QualifiedText"/> after <c>tf("…").</c> (the flat catalog name for a dotted spelling), whether it is a reference that can take a subscript
 /// (<c>close</c>) or a call (<c>rsi(14)</c>) that cannot, and the <see cref="Spec"/> on 1m (the timeframe is replaced by the leaf's).
 /// </summary>
-internal sealed record Feature(string Text, string QualifiedText, bool IsReference, FeatureSpec Spec, bool ReadsContext = false, bool ReadsExpiryDays = false);
+internal sealed record Feature(string Text, string QualifiedText, bool IsReference, FeatureSpec Spec, bool ReadsContext = false, bool ReadsExpiryDays = false, bool ReadsResultsDays = false);
 
 /// <summary>A feature read on <see cref="Frame"/>, <see cref="Lag"/> closed bars back (the subscript), written with <c>tf(…)</c> when <see cref="Qualified"/>.</summary>
 internal sealed record Leaf(Feature Feature, Timeframe Frame, bool Qualified, int Lag) : Node

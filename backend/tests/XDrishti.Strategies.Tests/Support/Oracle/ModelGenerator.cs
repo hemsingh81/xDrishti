@@ -16,7 +16,7 @@ namespace XDrishti.Strategies.Tests.Support.Oracle;
 /// features (<c>vwap</c>, single and multi-bar <c>or_high</c> and <c>or_low</c>, <c>today.*</c>, <c>prev_day.*</c>, <c>gap_pct</c>) on any of the six intraday timeframes, now and then on 1D where the catalog runs them, with
 /// subscripts, crossings and runs, so that the rule of ADR 0035 is exercised at every date change; the default draws are not touched (the seeds of the main corpus give the same conditions as before).
 /// </summary>
-internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowContext, bool allowExpiryDays, bool sessionBound = false)
+internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowContext, bool allowExpiryDays, bool sessionBound = false, bool allowResultsDays = false)
 {
     /// <summary>The strategy parameters the conditions use.</summary>
     public static readonly IReadOnlyDictionary<string, double> Parameters = new Dictionary<string, double> { ["fast_len"] = 9, ["slow_len"] = 21, ["level"] = 55 };
@@ -425,6 +425,13 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
         if (allowExpiryDays)
         {
             choices.Add(DateFeature("is_expiry_day", "is_expiry_day", false, true));
+        }
+
+        if (allowResultsDays)
+        {
+            // P15-05: only the coverage test asks for the two results-day features; the conditions it generates are read, not evaluated
+            choices.Add(new Feature("days_to_results", "days_to_results", true, new FeatureSpec("days_to_results", Timeframe.M1), ReadsResultsDays: true));
+            choices.Add(new Feature("days_since_results", "days_since_results", true, new FeatureSpec("days_since_results", Timeframe.M1), ReadsResultsDays: true));
         }
 
         if (allowContext)

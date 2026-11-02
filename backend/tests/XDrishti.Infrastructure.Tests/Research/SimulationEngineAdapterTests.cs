@@ -232,6 +232,8 @@ public sealed class SimulationEngineAdapterTests
 
         public bool ReadsEvents => false;
 
+        public bool ReadsResultsDays => false;
+
         public IReadOnlyList<FieldError> Warnings => [];
     }
 }

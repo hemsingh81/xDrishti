@@ -260,3 +260,16 @@ R1 (the run key, extended). **The record is schema 7** and the key text starts `
 - The oracle comparison is rerun in the same suite and `OracleVerifiedFor` is `sim-7` (walker, gate and costing unchanged).
 - A stored run of schema 6 keeps its label and is readable; the experiment-job baseline reader replays only the current schema.
 
+
+## Amendment 11 — two results-day frame features; engine `sim-8`, run-record schema 8 (P15-05, 2026-11-02)
+
+New decisions; nothing above is superseded. They are decisions of [P15-05](../specs/P15-05-features-ev1-fu1-and-calendar-features.md); the features are [ADR 0185](0185-the-event-and-fundamental-feature-sets-read-only-what-was-public-at-the-decision-instant-store-nan-with-a-closed-reason-for-every-unknown-and-the-frame-gets-two-results-day-features-with-engine-sim-8.md).
+
+D3 (refusals, extended). **A side that names `days_to_results` or `days_since_results` needs the results-days inputs of the run** (the calendar snapshot, the results filing times, the lag) and a trading calendar in `Run`; without them `Run` returns `simulation.filter_not_available` ("no results calendar or filings for the window (P15)"), and the run handler refuses a window with neither a calendar row nor a filing before any bar is read. The replay skips an instrument given none with `event_calendar_unavailable`.
+
+R1 (the run key, extended). **The record is schema 8** and the key text starts `xd-run 8`; a run that names either feature adds the line `rdays=<snapshot sha256 or ->|<filings sha256>|<lag minutes>|<series version>` after the instruments (and after `events=`) and the record carries `ResultsDaysRecord`. A strategy that names neither has no such line.
+
+### Consequences from the build (Amendment 11)
+- `SimulationEngine.Version` is `sim-8`. The golden files (walker, scanner, simulator, run record, costed, swing, VWAP pullback, and the export pack) were regenerated on purpose with `XD_UPDATE_GOLDEN=1`; the sim-7 files are frozen next to them (`Golden/*.sim-7.frozen.txt`) and a differential test shows the diff of the engine goldens is the engine label and, in the run record, the `schema=` number and the key hash, **nothing else**. The `RunAssemblyTests` table maps `sim-8` to the SHA-256 of its golden record (computed with Python `hashlib`).
+- The oracle comparison is rerun in the same suite and `OracleVerifiedFor` is `sim-8` (walker, gate and costing unchanged).
+- A stored run of schema 7 keeps its label and is readable.

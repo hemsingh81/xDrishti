@@ -18,4 +18,5 @@ public sealed record RunHeader(
     TradingCalendar Calendar,
     CostRecord? Costs = null,
     string? ContextSha256 = null,
-    EventFilterRecord? Events = null);
+    EventFilterRecord? Events = null,
+    ResultsDaysRecord? ResultsDays = null);

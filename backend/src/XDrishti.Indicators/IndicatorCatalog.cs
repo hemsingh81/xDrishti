@@ -213,13 +213,15 @@ public static class IndicatorCatalog
             ("regime_trend", DateFeatureKind.RegimeTrend, "Trend part of the market regime as of the previous session: +1 up, 0 range, -1 down (the same as index_trend)."),
             ("regime_vol", DateFeatureKind.RegimeVol, "Volatility part of the market regime as of the previous session: 0 low, 1 normal, 2 high (terciles of the mean of the VIX and index percentiles)."),
             ("regime", DateFeatureKind.Regime, "Market regime as of the previous session: 1 (UP_LOW_VOL) to 9 (DOWN_HIGH_VOL), (1 - regime_trend) * 3 + regime_vol + 1."),
+            ("days_to_results", DateFeatureKind.DaysToResults, "Trading sessions from the India date of the step to the next results event of the instrument, as known at the start of that date (0 on the event session); not ready when no calendar row says (P15-05)."),
+            ("days_since_results", DateFeatureKind.DaysSinceResults, "Trading sessions from the reaction session of the newest results filing visible at the start of the India date of the step to that date (0 on the reaction session); not ready when no filing is visible (P15-05)."),
         })
         {
             var captured = kind;
             list.Add(new IndicatorInfo(
                 name, text, [], SessionBehaviour.Continuous, false, PriceSource.Close, false,
                 _ => DateFeature.WarmUpDays(captured, defaults), _ => new DateFeature(captured),
-                dateFeature: kind, requiresContext: DateFeature.ReadsContext(kind), requiresExpiryDays: kind == DateFeatureKind.ExpiryDay));
+                dateFeature: kind, requiresContext: DateFeature.ReadsContext(kind), requiresExpiryDays: kind == DateFeatureKind.ExpiryDay, requiresResultsDays: kind is DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults));
         }
     }
 

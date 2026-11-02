@@ -154,6 +154,7 @@ public sealed class FeatureFrame
         var infos = new IndicatorInfo?[specs.Count];
         List<string>? needContext = null;
         List<string>? needExpiryDays = null;
+        List<string>? needResultsDays = null;
         for (var i = 0; i < specs.Count; i++)
         {
             var spec = specs[i];
@@ -175,6 +176,11 @@ public sealed class FeatureFrame
             {
                 Note(ref needExpiryDays, info.Name);
             }
+
+            if (info.RequiresResultsDays && options.ResultsDays is null)
+            {
+                Note(ref needResultsDays, info.Name);
+            }
         }
 
         if (needContext is not null)
@@ -185,6 +191,11 @@ public sealed class FeatureFrame
         if (needExpiryDays is not null)
         {
             errors.Add("options.expiryDays", "The expiry dates are needed by " + NamesText(needExpiryDays) + "; give FrameOptions.ExpiryDays (an empty set is allowed).");
+        }
+
+        if (needResultsDays is not null)
+        {
+            errors.Add("options.resultsDays", "The results-event days are needed by " + NamesText(needResultsDays) + "; give FrameOptions.ResultsDays (an empty series is allowed).");
         }
 
         if (errors.HasErrors)
@@ -223,7 +234,7 @@ public sealed class FeatureFrame
                 }
 
                 placed = (canonical.Timeframe, list.Count);
-                list.Add(info.CreateWith(canonical, options.Context, expiryDays));
+                list.Add(info.CreateWith(canonical, options.Context, expiryDays, options.ResultsDays));
                 shared.Add(canonical, placed);
                 if (!info.DateDriven && info.RestartsEachSession(canonical))
                 {

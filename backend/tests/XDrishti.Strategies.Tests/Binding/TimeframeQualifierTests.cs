@@ -87,7 +87,7 @@ public sealed class TimeframeQualifierTests
                 error.Message.ShouldContain(supported.ToCode(), Case.Sensitive, "lists the timeframes it runs on");
             }
         }
-        else if (FeatureFrame.Create([spec], new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>())).IsFailure)
+        else if (FeatureFrame.Create([spec], new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>(), ResultsDays: new Dictionary<DateOnly, ResultsDayValues>())).IsFailure)
         {
             result.Errors.ShouldHaveSingleItem(source).Code.ShouldBe(LintCodes.BadArguments);
         }

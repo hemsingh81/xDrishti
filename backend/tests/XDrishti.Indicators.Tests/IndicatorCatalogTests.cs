@@ -164,8 +164,8 @@ public sealed class IndicatorCatalogTests
 
         IndicatorCatalog.All.Count(i => !i.DateDriven).ShouldBe(19 + added.Length);
         IndicatorCatalog.All.Count(i => !i.DateDriven).ShouldBe(44);
-        IndicatorCatalog.All.Count.ShouldBe(44 + TestSpecs.ContextNames.Count);
-        IndicatorCatalog.All.Count.ShouldBe(56);
+        IndicatorCatalog.All.Count.ShouldBe(44 + TestSpecs.ContextNames.Count + TestSpecs.ResultsNames.Count);
+        IndicatorCatalog.All.Count.ShouldBe(58);
         foreach (var name in added)
         {
             IndicatorCatalog.TryGet(name, out var info).ShouldBeTrue(name);
@@ -262,7 +262,7 @@ public sealed class IndicatorCatalogTests
     public void Default_specs_of_the_catalog_are_valid_where_the_timeframe_allows()
     {
         // the date-driven names need the context and the expiry dates in the options; an empty context and an empty set are enough for the frame to be valid
-        var options = new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>());
+        var options = new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>(), ResultsDays: new Dictionary<DateOnly, ResultsDayValues>());
         foreach (var info in IndicatorCatalog.All.Where(i => !i.Name.StartsWith("or_", StringComparison.Ordinal)))
         {
             FeatureFrame.Create([info.DefaultSpec()], options).IsSuccess.ShouldBeTrue(info.Name);
@@ -288,7 +288,7 @@ public sealed class IndicatorCatalogTests
             var refused = IndicatorCatalog.All.Where(i => !i.Supports(timeframe)).Select(i => i.Name).ToList();
             var accepted = IndicatorCatalog.All.Where(i => i.Supports(timeframe)).ToList();
 
-            refused.Order().ShouldBe(SessionBound.Concat(TestSpecs.ContextNames).Order(), timeframe.ToCode() + ": the session-bound ones and the date-driven ones (1m only)");
+            refused.Order().ShouldBe(SessionBound.Concat(TestSpecs.ContextNames).Concat(TestSpecs.ResultsNames).Order(), timeframe.ToCode() + ": the session-bound ones and the date-driven ones (1m only)");
             accepted.Count.ShouldBe(44 - SessionBound.Length, timeframe.ToCode());
             accepted.ShouldAllBe(i => i.SessionBehaviour == SessionBehaviour.Continuous && !i.IntradayOnly && !i.DateDriven);
         }
@@ -297,11 +297,11 @@ public sealed class IndicatorCatalogTests
     [Fact]
     public void Daily_bars_refuse_the_intraday_indicators_and_the_date_driven_ones_and_the_intraday_timeframes_refuse_only_the_date_driven_ones()
     {
-        IndicatorCatalog.All.Where(i => !i.Supports(Timeframe.D1)).Select(i => i.Name).Order().ShouldBe(IntradayOnlyNames.Concat(TestSpecs.ContextNames).Order());
+        IndicatorCatalog.All.Where(i => !i.Supports(Timeframe.D1)).Select(i => i.Name).Order().ShouldBe(IntradayOnlyNames.Concat(TestSpecs.ContextNames).Concat(TestSpecs.ResultsNames).Order());
         IndicatorCatalog.All.ShouldAllBe(i => i.Supports(Timeframe.M1), "1m takes everything");
         foreach (var timeframe in new[] { Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1 })
         {
-            IndicatorCatalog.All.Where(i => !i.Supports(timeframe)).Select(i => i.Name).Order().ShouldBe(TestSpecs.ContextNames.Order(), timeframe.ToCode());
+            IndicatorCatalog.All.Where(i => !i.Supports(timeframe)).Select(i => i.Name).Order().ShouldBe(TestSpecs.ContextNames.Concat(TestSpecs.ResultsNames).Order(), timeframe.ToCode());
         }
 
         IndicatorCatalog.All.ShouldAllBe(i => !i.Supports((Timeframe)99) && !i.Supports((Timeframe)(-1)));

@@ -14,9 +14,9 @@ public sealed class RunRecordSchemaTests
     private static string Members(Type type) => type.Name + ": " + string.Join(", ", Enum.GetNames(type));
 
     [Fact]
-    public void The_schema_version_is_seven_since_the_event_filter_of_p15_06()
+    public void The_schema_version_is_eight_since_the_results_days_of_p15_05()
     {
-        SimulationRun.CurrentSchemaVersion.ShouldBe(7);
+        SimulationRun.CurrentSchemaVersion.ShouldBe(8);
     }
 
     [Fact]
@@ -45,6 +45,7 @@ public sealed class RunRecordSchemaTests
             Properties(typeof(InstrumentReplayInput)),
             Properties(typeof(CostRecord)),
             Properties(typeof(EventFilterRecord)),
+            Properties(typeof(ResultsDaysRecord)),
             Properties(typeof(SizingProfile)),
             Members(typeof(SkipReason)),
             Members(typeof(SessionExclusion)),
@@ -53,7 +54,7 @@ public sealed class RunRecordSchemaTests
 
         snapshot.ShouldBe(
         [
-            "SimulationRun: SchemaVersion, RunKey, EngineVersion, Strategy, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, CalendarExceptions, Instruments, Trades, OpenAtEnd, Totals, Costs, EventFilter",
+            "SimulationRun: SchemaVersion, RunKey, EngineVersion, Strategy, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, CalendarExceptions, Instruments, Trades, OpenAtEnd, Totals, Costs, EventFilter, ResultsDays",
             "StrategyRecord: Id, Parameters, DefinitionJson, DefinitionSha256, EvaluationTimeframe, Sides",
             "UniverseRecord: Kind, BasketId, BasketName, Label, Members",
             "UniverseMember: Id, Symbol",
@@ -70,10 +71,11 @@ public sealed class RunRecordSchemaTests
             "RunTrade: Trade, BasketIds",
             "ReplayOptions: MinSessionCompleteness, DiscontinuityThreshold",
             "InstrumentReplay: Record, Trades, OpenAtEnd",
-            "RunHeader: Strategy, EngineVersion, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, Calendar, Costs, ContextSha256, Events",
-            "InstrumentReplayInput: InstrumentId, Symbol, RawBars, Factors, CsvAdjustedThrough, Calendar, Options, From, To, Tick, PresetSkip, SkipDetail, Costs, ContextDays, ContextNote, Events",
+            "RunHeader: Strategy, EngineVersion, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, Calendar, Costs, ContextSha256, Events, ResultsDays",
+            "InstrumentReplayInput: InstrumentId, Symbol, RawBars, Factors, CsvAdjustedThrough, Calendar, Options, From, To, Tick, PresetSkip, SkipDetail, Costs, ContextDays, ContextNote, Events, ResultsDays",
             "CostRecord: SheetId, RatesSha256, SheetJson, Checked, Capital, Profile, MaxCostR",
             "EventFilterRecord: CalendarSha256, CalendarRows, LagMinutes, EvfVersion",
+            "ResultsDaysRecord: CalendarSha256, CalendarRows, FilingsSha256, FilingRows, LagMinutes, RdsVersion",
             "SizingProfile: Name, RiskPerTradePct, MaxCapitalPerTradePct",
             "SkipReason: InstrumentNotFound, NoBars, CsvAdjustedTwice, TickSizeInvalid, NoRunnableSessions, NoSessionsInWindow, FeaturesNotReady, ContextUnavailable, EventCalendarUnavailable",
             "SessionExclusion: ClosedDay, SpecialSession, ShortSession, MissingSession",

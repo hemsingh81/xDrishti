@@ -55,6 +55,7 @@ One verb produces, for each P15 family, a stored verdict — KEEP, DROP, INCONCL
 7. **Determinism.** Same stored inputs in any order → identical records and ids.
 8. **API.** `GET /api/research/extensions?family=` lists records (newest first, at most 100); `/{id}` returns the record with its evidence block; 404 `extensions.not_found`; 400 `extensions.invalid_query` for an unknown family.
 9. **No decision use beyond the port.** Architecture test: the protocol code and records are referenced by the verb, the endpoints, `EventFilterVerdictReader` and tests; nothing in selection, planning, the scorer or `XDrishti.Execution` reads them. No-order tripwire green.
+10. **Unverified parser gates the verdict (review of P15-05).** For `fu-1`, the protocol reads the extraction record of each run (`research.extension_extractions.parser_version` and `nan_counts`, written by P15-05). A record whose `parser_version` is missing, empty or ends in `-synthetic`, or any `fu-1` feature with `parser_unverified` > 0 in `nan_counts`, makes the verdict NOT_EVALUABLE with the reason `parser_unverified` named, whatever the numbers; never KEEP and never DROP. Test: planted effect with a synthetic record gives NOT_EVALUABLE; the same with a verified version gives KEEP.
 
 ## Contract
 - **API:** `GET /api/research/extensions`, `/{id}` (`ApiJsonContext`; `scripts/gen-api.sh`). The plan's `/api/research/pead` is dropped: PEAD is the family `pead` of this list.

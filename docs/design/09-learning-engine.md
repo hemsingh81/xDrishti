@@ -77,6 +77,8 @@ Built (P6-11, [ADR 0072](../adr/0072-experiments-same-entries-purged-folds-an-ho
 judged by one pure comparison: model A (`tf-1`) and model B (`tf-1` plus the group) are the same recipe fitted on identical rows and calendar folds; the gain is net R per candidate under the take policy, with a paired block bootstrap and margins widened for the number of looks
 recorded in the ledger (the ledger row comes first). The answer is KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE with the missing quantities named, stored in `research.extension_evaluations`; the hold-out is read once. Nothing in a decision path reads either table.
 
+**`ev-1` and `fu-1` (P15-05, [ADR 0185](../adr/0185-the-event-and-fundamental-feature-sets-read-only-what-was-public-at-the-decision-instant-store-nan-with-a-closed-reason-for-every-unknown-and-the-frame-gets-two-results-day-features-with-engine-sim-8.md)).** `xd learn features --extension ev-1|fu-1 --run <key>` extracts, per trade and only from what was public at its decision instant, the event features (`days_to_results`, `days_since_results`, `results_car3`) and the fundamental features (`sue_yoy`, `sue_ttm`, `rev_growth_yoy`, `margin_chg_yoy`, `promoter_pledge_pct`, `promoter_chg_qoq`, `pe_pctile_5y`) into `research.trade_features_ext`, and one record per run in `research.extension_extractions` (lag, parser version, calendar hash, newest broadcast time read, NaN counts per feature and closed reason). Every unknown is NaN with a reason, never imputed; values built on the synthetic parser are labelled and counted.
+
 ## 4. Outputs per candidate
 
 | Output | Meaning |

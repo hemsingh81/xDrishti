@@ -90,7 +90,7 @@ public sealed partial class ResultsParserArchitectureTests
         var infrastructure = Types.InAssembly(Infrastructure).That().HaveDependencyOn(port).GetTypes().Select(t => t.Name).Where(n => !n.StartsWith('<')).Distinct().ToList();
         var api = Types.InAssembly(Assembly.Load(new AssemblyName("XDrishti.Api"))).That().HaveDependencyOn(port).GetTypes().Select(t => t.Name).Distinct().ToList();
 
-        application.ShouldBe(["DependencyInjection", "ResultFactsAsOf"]);
+        application.ShouldBe(["DependencyInjection", "ExtensionFeatureExtractor", "ResultFactsAsOf"]);
         infrastructure.ShouldBeEmpty();
         api.ShouldBeEmpty();
         foreach (var name in new[] { "XDrishti.Execution", "XDrishti.Strategies", "XDrishti.Simulation", "XDrishti.Worker", "XDrishti.Feed" })

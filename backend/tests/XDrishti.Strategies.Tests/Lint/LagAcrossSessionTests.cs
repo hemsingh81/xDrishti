@@ -71,9 +71,9 @@ public sealed class LagAcrossSessionTests
     }
 
     [Fact]
-    public void The_names_written_out_here_are_twelve_of_the_catalogs_fifty_six()
+    public void The_names_written_out_here_are_twelve_of_the_catalogs_fifty_eight()
     {
-        AllFeatureForms.Forms.Count.ShouldBe(56);
+        AllFeatureForms.Forms.Count.ShouldBe(58);
         Restarting.Distinct().Count().ShouldBe(12);
         Restarting.ShouldAllBe(n => AllFeatureForms.Forms.ContainsKey(n));
     }

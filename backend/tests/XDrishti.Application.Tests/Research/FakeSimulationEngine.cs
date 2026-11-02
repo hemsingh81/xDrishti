@@ -35,6 +35,9 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
     /// <summary>Whether the prepared strategies name the filter <c>not_event_day</c> (P15-06).</summary>
     public bool ReadsEvents { get; set; }
 
+    /// <summary>Whether the prepared strategies name <c>days_to_results</c> or <c>days_since_results</c> (P15-05).</summary>
+    public bool ReadsResultsDays { get; set; }
+
     /// <summary>The replay to return; null means the default.</summary>
     public Func<InstrumentReplayInput, InstrumentReplay>? Script { get; set; }
 
@@ -50,7 +53,8 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
             Warnings,
             exits,
             ReadsContext,
-            ReadsEvents));
+            ReadsEvents,
+            ReadsResultsDays));
     }
 
     /// <summary>What <see cref="PrepareStored"/> was asked, in order: the text, the hash the store held for it and the parameters.</summary>
@@ -67,7 +71,8 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
             Warnings,
             exits,
             ReadsContext,
-            ReadsEvents));
+            ReadsEvents,
+            ReadsResultsDays));
     }
 
     public Result<StrategyDescription> Describe(string sourceText) => throw new NotSupportedException("the handler tests do not describe a text");
@@ -135,7 +140,7 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
             2.0, 0, 100.5, 105.5, EntryFill.AtLimit, false, 1, 0);
     }
 
-    private sealed class FakePrepared(StrategyRecord record, IReadOnlyList<FieldError> warnings, ExitChoice? exits, bool readsContext = false, bool readsEvents = false) : IPreparedStrategy
+    private sealed class FakePrepared(StrategyRecord record, IReadOnlyList<FieldError> warnings, ExitChoice? exits, bool readsContext = false, bool readsEvents = false, bool readsResultsDays = false) : IPreparedStrategy
     {
         public StrategyRecord Record => record;
 
@@ -148,6 +153,8 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
         public bool ReadsContext => readsContext;
 
         public bool ReadsEvents => readsEvents;
+
+        public bool ReadsResultsDays => readsResultsDays;
 
         public IReadOnlyList<FieldError> Warnings => warnings;
     }

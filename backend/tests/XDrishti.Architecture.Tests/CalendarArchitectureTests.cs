@@ -39,7 +39,7 @@ public sealed partial class CalendarArchitectureTests
     {
         var port = typeof(IShareholdingAsOf).FullName!;
 
-        Named(Application, port).ShouldBe(["DependencyInjection", "ShareholdingAsOf"]);
+        Named(Application, port).ShouldBe(["DependencyInjection", "ExtensionFeatureExtractor", "ShareholdingAsOf"]);
         Named(Infrastructure, port).ShouldBeEmpty();
         Named(Assembly.Load(new AssemblyName("XDrishti.Api")), port).ShouldBeEmpty();
     }

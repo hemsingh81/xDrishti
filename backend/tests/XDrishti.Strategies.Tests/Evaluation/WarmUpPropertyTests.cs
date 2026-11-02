@@ -152,7 +152,7 @@ public sealed class WarmUpPropertyTests
         var bars = BarsFor(timeframe, info.DateDriven, HashCode(name, timeframe));
         var context = Contexts.Covering(Clock.Mon, DateOnly.FromDateTime(bars[^1].Start.UtcDateTime), 3, daysBefore: 12);
         var expiry = new HashSet<DateOnly>(Enumerable.Range(0, 400).Select(i => Clock.Mon.AddDays(i)).Where(d => d.DayOfWeek == DayOfWeek.Tuesday));
-        var rig = Rig.Of(timeframe, [.. checks.Select(c => c.Source)], context, expiry, minimumDepth: 3);
+        var rig = Rig.Of(timeframe, [.. checks.Select(c => c.Source)], context, expiry, minimumDepth: 3, resultsDays: ResultsDays);
         var feature = Compiling.Condition(checks[0].Source, timeframe).Features.Single(f => f.Name == name);
         var handle = rig.Frame.HandleOf(feature);
         handle.ShouldBeGreaterThanOrEqualTo(0);
@@ -204,6 +204,13 @@ public sealed class WarmUpPropertyTests
         sawFalse.ShouldBeTrue();
         info.Name.ShouldBe(name);
     }
+
+    /// <summary>
+    /// The per-date series of the two results-day features (P15-05): unknown for the first two weeks, then numbers, so that the series has both states. The frame reads the date of the step, whatever the series is built from.
+    /// </summary>
+    private static readonly Dictionary<DateOnly, ResultsDayValues> ResultsDays = Enumerable.Range(0, 500).ToDictionary(
+        i => Clock.Mon.AddDays(i),
+        i => i < 14 ? new ResultsDayValues(double.NaN, double.NaN) : new ResultsDayValues(i % 7, i % 11));
 
     private static int HashCode(string name, Timeframe timeframe) => name.Aggregate(17, (h, c) => h * 31 + c) + (int)timeframe * 7_919;
 }

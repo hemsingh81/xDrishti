@@ -32,7 +32,8 @@ public sealed class IndicatorInfo
         Func<FeatureSpec, SpecProblem?>? extraCheck = null,
         DateFeatureKind? dateFeature = null,
         bool requiresContext = false,
-        bool requiresExpiryDays = false)
+        bool requiresExpiryDays = false,
+        bool requiresResultsDays = false)
     {
         Name = name;
         Summary = summary;
@@ -47,6 +48,7 @@ public sealed class IndicatorInfo
         _dateFeature = dateFeature;
         RequiresContext = requiresContext;
         RequiresExpiryDays = requiresExpiryDays;
+        RequiresResultsDays = requiresResultsDays;
 
         // Built here, once, from the fixed order of the timeframes: the catalog is shared by the whole process, so nothing in it may be filled in lazily by whichever thread reads first.
         var supported = new List<Timeframe>(IndicatorCatalog.Timeframes.Length);
@@ -111,6 +113,9 @@ public sealed class IndicatorInfo
     /// </summary>
     public bool RequiresExpiryDays { get; }
 
+    /// <summary>Whether a frame that computes this feature must be given <see cref="FrameOptions.ResultsDays"/>: true for <c>days_to_results</c> and <c>days_since_results</c> only (P15-05). <see cref="FeatureFrame.Create(IReadOnlyList{FeatureSpec}, FrameOptions?)"/> refuses a spec of either without it.</summary>
+    public bool RequiresResultsDays { get; }
+
     /// <summary>
     /// The timeframes a feature of this indicator may be asked for on, shortest first: every one of <see cref="IndicatorCatalog.SupportedTimeframes"/> for which <see cref="Supports"/> is true (nine for the continuous
     /// indicators; six for the intraday-only ones, seven for the other session-bound ones and only 1m for the date-driven ones). A read-only view, built once with the indicator (immutable, so any thread may read it).
@@ -144,8 +149,8 @@ public sealed class IndicatorInfo
     public IIndicator Create(in FeatureSpec spec) => _factory(Canonical(spec));
 
     /// <summary>A fresh instance for the spec, given the context and the expiry dates of the frame: a date-driven feature reads them, any other indicator is created as by <see cref="Create(in FeatureSpec)"/>.</summary>
-    internal IIndicator CreateWith(in FeatureSpec spec, MarketContext? context, IReadOnlySet<DateOnly>? expiryDays) =>
-        _dateFeature is { } kind ? new DateFeature(kind, context, expiryDays) : _factory(Canonical(spec));
+    internal IIndicator CreateWith(in FeatureSpec spec, MarketContext? context, IReadOnlySet<DateOnly>? expiryDays, IReadOnlyDictionary<DateOnly, ResultsDayValues>? resultsDays = null) =>
+        _dateFeature is { } kind ? new DateFeature(kind, context, expiryDays, resultsDays) : _factory(Canonical(spec));
 
     /// <summary>A spec of this indicator with the default parameters and source on the timeframe. The defaults are those of 1-minute bars: an opening range on a longer timeframe needs a whole number of bars, so its default may be refused there.</summary>
     public FeatureSpec DefaultSpec(Timeframe timeframe = Timeframe.M1) => new(

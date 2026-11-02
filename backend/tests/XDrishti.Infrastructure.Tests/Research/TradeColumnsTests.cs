@@ -61,7 +61,7 @@ public sealed partial class TradeColumnsTests
     public void The_schema_versions_the_table_is_built_for_are_pinned()
     {
         SimTrade.CurrentSchemaVersion.ShouldBe(5, "schema 5 (P4-01, ADR 0049) only appends the legs, which the child tables of P4-05 hold; a trade without legs equals its schema-4 form, so the columns stay (any later change needs new columns, a migration and an ADR)");
-        SimulationRun.CurrentSchemaVersion.ShouldBe(7);
+        SimulationRun.CurrentSchemaVersion.ShouldBe(8);
     }
 
     [Fact]
