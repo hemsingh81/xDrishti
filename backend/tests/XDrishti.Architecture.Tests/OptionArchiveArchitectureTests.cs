@@ -83,8 +83,8 @@ public sealed class OptionArchiveArchitectureTests
             .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN)\\s+options\\.(contracts|lot_sizes|market_epochs)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)))
             .Select(Path.GetFileName).Order().ToList();
 
-        // P14-04 (ADR 0178) added exactly one reader of these reference tables, the quality checks' OptionReference (strike step, lot history, rule epochs). A third file here is a failure.
-        named.ShouldBe(["OptionContractStore.cs", "OptionReference.cs"]);
+        // P14-04 (ADR 0178) added exactly one reader of these reference tables, the quality checks' OptionReference (strike step, lot history, rule epochs); P14-08 (ADR 0197) added exactly one more, the re-mark's ContractExpiryReader (the expiry dates of one underlying in a date range). A further file here is a failure.
+        named.ShouldBe(["ContractExpiryReader.cs", "OptionContractStore.cs", "OptionReference.cs"]);
         Directory.GetFiles(Path.Combine(Root, "src", "XDrishti.Api"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && File.ReadAllText(f).Contains("XDrishti.Application.Abstractions.Options", StringComparison.Ordinal)).ShouldBeEmpty();
     }

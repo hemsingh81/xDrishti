@@ -40,6 +40,7 @@ internal sealed record XdOptions(
           xd learn cells --as-of YYYY-MM-DD --run RUNKEY:STYLE:EXIT [--run ...] [--half-life-days N] [--prior-strength N] [--min-trades N]
           xd filings extract --from YYYY-MM-DD --to YYYY-MM-DD [--limit N]   classify stored announcements with the local model (needs the assistant switch on; no tool, schema-checked)
           xd options spread-model build [--underlying SYMBOL]   build the option half-spread model from usable chain sessions (fewer than the setting: no model, the reason is printed)
+          xd options remark --run RUNKEY --profile HASH   re-mark each trade of a stored cash run as a single long option under a registered option_buy profile (every trade gets one row, paired or unpaired with its reason; research only)
           xd pairs run --from YYYY-MM-DD --to YYYY-MM-DD [--variant E,L]   same-sector cash pairs: form each quarter's pairs on 252 daily closes (every candidate counted in the ledger first), walk them intraday (research only; gross unless Pairs:CostSheetId is set)
           xd pairs eval --family pairs:intraday-1 [--holdout]   protocol S verdict over the stored pair trades (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE with the missing quantities named)
           xd data eod-probe|eod-load|eod-actions|eod-universe|eod-check ...   NSE daily files (CF-04 Part A; off by default, see ADR 0195): run xd data eod-probe with no dates for its usage

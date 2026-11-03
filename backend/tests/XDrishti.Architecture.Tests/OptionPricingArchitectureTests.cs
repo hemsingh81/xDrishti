@@ -90,7 +90,8 @@ public sealed class OptionPricingArchitectureTests
     [Fact]
     public void No_other_domain_area_references_the_pricing_core_yet()
     {
-        var result = Types.InAssembly(Domain).That().DoNotResideInNamespace(Pricing).ShouldNot().HaveDependencyOn(Pricing).GetResult();
+        // P14-08 (ADR 0197): the option re-mark is the first Domain code to price an option; the exact allow-list is that one namespace.
+        var result = Types.InAssembly(Domain).That().DoNotResideInNamespace(Pricing).And().DoNotResideInNamespace("XDrishti.Domain.Options.Remark").ShouldNot().HaveDependencyOn(Pricing).GetResult();
 
         result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
     }

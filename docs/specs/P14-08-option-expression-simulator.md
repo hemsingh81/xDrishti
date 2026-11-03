@@ -86,5 +86,5 @@ For a stored cash run and a pre-registered option profile, one verb produces a p
 ## Done when
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any dropped trade, any premium read across the window edge, any fill before the cash fill, any fallback without an observed IV, any change to `sim-9`)
-- [ ] Migration `AddExpressionTrades` with `Down`
-- [ ] ADR written (with the expiry weekday table and its sources); doc 20 §C updated
+- [x] Migration `AddExpressionTrades` with `Down` (built 2026-11-04; two columns of the table are nullable and one word is wider than the text above, see ADR 0197 decision 13)
+- [x] ADR written (with the expiry weekday table and its sources; [ADR 0197](../adr/0197-the-option-expression-simulator-re-marks-each-stored-cash-trade-as-one-long-option-on-a-fixed-strike-read-from-the-offsets-with-an-expiry-calendar-of-labelled-derived-dates-a-counted-model-price-fallback-and-every-unpaired-trade-counted-by-reason.md)); doc 20 §C updated

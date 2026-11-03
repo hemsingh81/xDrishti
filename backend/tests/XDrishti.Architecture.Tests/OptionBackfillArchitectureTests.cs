@@ -147,9 +147,9 @@ public sealed class OptionBackfillArchitectureTests
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal)).ToList();
         string[] Naming(string table) => [.. files.Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN)\\s+options\\." + table, System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5))).Select(f => Path.GetFileName(f)).Order()];
 
-        // P14-04 (ADR 0178) added exactly one reader: the quality checks' OptionArchiveReader. A third name here is a failure.
-        Naming("rolling_bars").ShouldBe(["OptionArchiveReader.cs", "RollingBarStore.cs"]);
-        Naming("fetch_log").ShouldBe(["BackfillFetchLog.cs", "OptionArchiveReader.cs", "RollingBarStore.cs"]);
+        // P14-04 (ADR 0178) added exactly one reader: the quality checks' OptionArchiveReader; P14-08 (ADR 0197) added exactly one more, the re-mark's RollingBarReader (one series over one time range, and the fetch-log watermark). A further name here is a failure.
+        Naming("rolling_bars").ShouldBe(["OptionArchiveReader.cs", "RollingBarReader.cs", "RollingBarStore.cs"]);
+        Naming("fetch_log").ShouldBe(["BackfillFetchLog.cs", "OptionArchiveReader.cs", "RollingBarReader.cs", "RollingBarStore.cs"]);
     }
 
     [Fact]

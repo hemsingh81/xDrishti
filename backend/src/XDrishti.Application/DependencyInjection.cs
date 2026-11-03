@@ -59,6 +59,7 @@ using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.OptionBackfill;
 using XDrishti.Application.OptionChain;
 using XDrishti.Application.OptionCosts;
+using XDrishti.Application.OptionExpression;
 using XDrishti.Application.OptionQuality;
 using XDrishti.Application.OwnerActs;
 using XDrishti.Application.Pairs;
@@ -177,6 +178,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetResultsCalendarQuery, Result<ResultsCalendarView>>, GetResultsCalendarHandler>(); // GET /api/calendar/results (P15-04): read
         services.AddScoped<OptionArchiveQualityRunner>(); // one run of the option-archive quality checks (P14-04): reads the archive, writes only its own result rows
         services.AddScoped<ICommandHandler<BuildSpreadModelCommand, SpreadModelBuildSummary>, BuildSpreadModelHandler>(); // xd options spread-model build (P14-07): usable chain sessions -> the half-spread model, insert-only, content-addressed; nothing reads it for a decision
+        services.AddScoped<ICommandHandler<RemarkRunCommand, RemarkRunSummary>, RemarkRunHandler>(); // xd options remark (P14-08): a stored cash run re-marked as single long options under a registered profile; insert-only, nothing reads it for a decision
         services.AddScoped<ICommandHandler<RunPairsCommand, PairsRunSummary>, RunPairsHandler>(); // xd pairs run (P14-13): candidates appended to the ledger, then formation, then the pair walker; insert-only, nothing reads it for a decision
         services.AddScoped<ICommandHandler<EvaluatePairsCommand, ExtensionEvaluationOutcome>, EvaluatePairsHandler>(); // xd pairs eval (P14-13): protocol S over the stored pair trades; the shared extension record, hold-out once
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)

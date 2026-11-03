@@ -51,9 +51,9 @@ public sealed class OptionQualityArchitectureTests
 
     /// <summary>
     /// The simple names of the only types outside the quality namespaces that may name a quality type: the DI roots, the one route, the JSON context and (P14-07, ADR 0194, deliberately and by name) <c>BuildSpreadModelHandler</c>, which asks the quality
-    /// results which chain sessions are usable before it reads any of them.
+    /// results which chain sessions are usable before it reads any of them, and (P14-08, ADR 0197, by name) <c>RemarkRunHandler</c>, which asks the stored verdicts which rolling key-sessions are usable before it reads a bar as a price.
     /// </summary>
-    private const string MayReference = "^(DependencyInjection|ApiJsonContext.*|OptionCoverageEndpoints|BuildSpreadModelHandler)$";
+    private const string MayReference = "^(DependencyInjection|ApiJsonContext.*|OptionCoverageEndpoints|BuildSpreadModelHandler|RemarkRunHandler)$";
 
     [Fact]
     public void Only_the_quality_code_its_wiring_and_its_route_reference_a_quality_type_in_any_assembly_of_the_solution()
@@ -168,8 +168,8 @@ public sealed class OptionQualityArchitectureTests
         Naming("chain_snapshots").ShouldBe(["ChainSpreadReader.cs", "OptionArchiveReader.cs", "OptionChainStore.cs"]);
         Naming("chain_requests").ShouldBe(["OptionArchiveReader.cs", "OptionChainStore.cs"]);
         Naming("chain_sessions").ShouldBe(["OptionChainStore.cs"]);
-        Naming("rolling_bars").ShouldBe(["OptionArchiveReader.cs", "RollingBarStore.cs"]);
-        Naming("fetch_log").ShouldBe(["BackfillFetchLog.cs", "OptionArchiveReader.cs", "RollingBarStore.cs"]);
+        Naming("rolling_bars").ShouldBe(["OptionArchiveReader.cs", "RollingBarReader.cs", "RollingBarStore.cs"]); // P14-08 (ADR 0197) added the re-mark's RollingBarReader
+        Naming("fetch_log").ShouldBe(["BackfillFetchLog.cs", "OptionArchiveReader.cs", "RollingBarReader.cs", "RollingBarStore.cs"]);
         Naming("quality_results").ShouldBe(["OptionArchiveReader.cs", "OptionQualityStore.cs"]);
         Naming("quality_runs").ShouldBe(["OptionQualityStore.cs"]);
     }

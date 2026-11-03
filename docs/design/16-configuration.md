@@ -519,6 +519,16 @@ Options:
     MinBarTurnoverLakh: 25      # 0-10000: the entry bar's volume x spot, in lakh of rupees, at least (UNVERIFIED starting value)
 ```
 
+### Option re-mark (`Options:Remark:*`, [ADR 0197](../adr/0197-the-option-expression-simulator-re-marks-each-stored-cash-trade-as-one-long-option-on-a-fixed-strike-read-from-the-offsets-with-an-expiry-calendar-of-labelled-derived-dates-a-counted-model-price-fallback-and-every-unpaired-trade-counted-by-reason.md), P14-08)
+
+`appsettings.json` / environment of the host that runs `xd options remark` (`Options__Remark__MaxIvAgeMinutes`); bounds are checked at start-up. Research only: nothing here places or plans an order. The charge basis is not a setting: the re-mark follows the stored cash run (a charged run is re-marked net on the same stored sheet, a gross run gross).
+
+```yaml
+Options:
+  Remark:
+    MaxIvAgeMinutes: 60       # 5-390: the oldest vendor IV, in minutes before a bar, the Black-76 fallback may use for a bar the archive lacks (no such IV: the trade is strike_left_window)
+```
+
 ### Pairs study (`Pairs:*`, [ADR 0196](../adr/0196-the-pairs-study-counts-every-candidate-in-the-ledger-before-any-test-walks-pairs-in-a-separate-pair-1-walker-on-the-simulators-fills-and-judges-them-by-protocol-s-where-a-gross-drop-is-valid-and-a-gross-keep-impossible.md), P14-13)
 
 `appsettings.json` / environment of the host that runs `xd pairs run` or `xd pairs eval` (`Pairs__PairNotional`); bounds are checked at start-up. Research only: nothing here places or plans an order. A run and an evaluation must use the same settings (the stored trades carry a hash of the notional, the charge basis and the fill rules; trades of other settings are counted and not judged).

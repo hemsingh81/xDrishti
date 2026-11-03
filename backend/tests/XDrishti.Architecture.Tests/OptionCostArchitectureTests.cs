@@ -22,8 +22,8 @@ public sealed class OptionCostArchitectureTests
         "XDrishti.Strategies.File", "XDrishti.Indicators", "XDrishti.SimExport", "XDrishti.SimReader",
     ];
 
-    /// <summary>The only types outside the cost namespaces that name a cost type: the DI roots and the one verb.</summary>
-    private const string MayReference = "^(DependencyInjection|OptionsSpreadModelCommand)$";
+    /// <summary>The only types outside the cost namespaces that name a cost type: the DI roots, the one verb and (P14-08, ADR 0197, by name) the re-mark use case, which asks for the spread model, the liquidity thresholds and the assumption; the re-mark's Domain types are exempted by namespace below.</summary>
+    private const string MayReference = "^(DependencyInjection|OptionsSpreadModelCommand|RemarkRunHandler)$";
 
     private static readonly Assembly Domain = typeof(XDrishti.Domain.Common.Result).Assembly;
     private static readonly Assembly Application = typeof(XDrishti.Application.DependencyInjection).Assembly;
@@ -49,6 +49,7 @@ public sealed class OptionCostArchitectureTests
             var result = Types.InAssembly(Assembly.Load(new AssemblyName(name))).That()
                 .DoNotResideInNamespaceStartingWith("XDrishti.Domain.Options.Costs").And().DoNotResideInNamespaceStartingWith("XDrishti.Application.OptionCosts")
                 .And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Abstractions.OptionCosts").And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.OptionCosts")
+                .And().DoNotResideInNamespaceStartingWith("XDrishti.Domain.Options.Remark") // P14-08 (ADR 0197): the option re-mark is the one Domain area that costs a leg, by exact namespace
                 .And().DoNotHaveNameMatching(MayReference)
                 .ShouldNot().HaveDependencyOnAny(CostNamespaces).GetResult();
 
