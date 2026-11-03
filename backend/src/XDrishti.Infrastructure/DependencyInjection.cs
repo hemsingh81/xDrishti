@@ -472,6 +472,25 @@ public static class DependencyInjection
             .ConfigurePrimaryHttpMessageHandler(MasterDataHttp.CreatePrimaryHandler)
             .AddHttpMessageHandler<MasterDataEndpointGuard>()
             .RemoveAllLoggers();
+        // CF-04 Part A: the NSE daily-file history. OFF by default (Data:History:Nse:Enabled). The client goes through the same allow-list guard; its pattern list is empty until the owner adds entries (ADR 0193).
+        services.AddOptions<XDrishti.Infrastructure.Market.Eod.HistoryOptions>().Bind(configuration.GetSection(XDrishti.Infrastructure.Market.Eod.HistoryOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
+        services.AddSingleton<XDrishti.Application.Abstractions.Market.Eod.IEodSettings, XDrishti.Infrastructure.Market.Eod.EodSettings>();
+        services.AddHttpClient(MasterDataHttpClientNames.NseHistory, (sp, client) =>
+            {
+                MasterDataHttp.ConfigureNse(client);
+                var agent = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<XDrishti.Infrastructure.Market.Eod.HistoryOptions>>().Value.Nse.UserAgent;
+                if (!string.IsNullOrWhiteSpace(agent))
+                {
+                    client.DefaultRequestHeaders.UserAgent.Clear();
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd(agent);
+                }
+            })
+            .ConfigurePrimaryHttpMessageHandler(MasterDataHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<MasterDataEndpointGuard>()
+            .RemoveAllLoggers();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Eod.IEodSource, XDrishti.Infrastructure.Market.Eod.NseEodSource>();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Eod.IEodStore, XDrishti.Infrastructure.Market.Eod.EodStore>();
+        services.AddSingleton<XDrishti.Application.Abstractions.Market.Eod.IEodRawFiles, XDrishti.Infrastructure.Market.Eod.EodRawFiles>();
         services.AddScoped<HttpInstrumentSource>();
         services.AddScoped<IInstrumentSource>(sp => sp.GetRequiredService<HttpInstrumentSource>());
         services.AddScoped<IHolidaySource>(sp => sp.GetRequiredService<HttpInstrumentSource>());

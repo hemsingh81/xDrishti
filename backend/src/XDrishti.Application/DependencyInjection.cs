@@ -145,6 +145,11 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetOptionCoverageQuery, Result<OptionCoverageView>>, GetOptionCoverageHandler>(); // the stored quality verdicts of the option archive, aggregates only (P14-04): read
         services.AddScoped<ICommandHandler<IngestFilingsCommand, FilingIngestSummary>, IngestFilingsHandler>(); // the filing ingest (P15-02): local inbox -> store folder + insert-only envelopes; no network
         services.AddScoped<ICommandHandler<ParseResultsCommand, ParseResultsSummary>, ParseResultsHandler>(); // the results parse step of filings-ingest (P15-03): stored results files -> insert-only facts; no network
+        services.AddScoped<ICommandHandler<XDrishti.Application.Market.Eod.LoadEodCommand, XDrishti.Application.Market.Eod.EodLoadSummary>, XDrishti.Application.Market.Eod.LoadEodHandler>(); // CF-04 Part A: one NSE file per trading day, OFF by default (zero requests while off)
+        services.AddScoped<ICommandHandler<XDrishti.Application.Market.Eod.EodProbeCommand, XDrishti.Application.Market.Eod.EodProbeReport>, XDrishti.Application.Market.Eod.EodProbeHandler>(); // xd data eod-probe: raw files to data/, header lines only
+        services.AddScoped<ICommandHandler<XDrishti.Application.Market.Eod.PreviewNseActionsCommand, XDrishti.Application.Market.Eod.NseActionsPreview>, XDrishti.Application.Market.Eod.PreviewNseActionsHandler>(); // NSE actions file -> the existing import PREVIEW, never applied
+        services.AddScoped<IQueryHandler<XDrishti.Application.Market.Eod.ShowEodUniverseQuery, IReadOnlyList<XDrishti.Application.Abstractions.Market.Eod.EodUniverseRow>>, XDrishti.Application.Market.Eod.ShowEodUniverseHandler>(); // market.eod_universe(asOf): read
+        services.AddScoped<IQueryHandler<XDrishti.Application.Market.Eod.CheckDailyAgainstMinuteQuery, Result<IReadOnlyList<XDrishti.Application.Market.Eod.DailyMinuteFinding>>>, XDrishti.Application.Market.Eod.CheckDailyAgainstMinuteHandler>(); // daily vs minute findings: read
         services.AddScoped<IQueryHandler<GetFilingFactsQuery, Result<FilingFactsView>>, GetFilingFactsHandler>(); // one filing's parse outcome and facts (P15-03): read
         services.AddScoped<IResultFactsAsOf, ResultFactsAsOf>(); // the result facts as known at an instant (P15-03): a port with no decision caller yet
         services.AddScoped<IQueryHandler<GetFilingCoverageQuery, Result<FilingCoverageView>>, GetFilingCoverageHandler>(); // counts of the filing store (P15-02): read
@@ -352,6 +357,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, OptionBackfillService>(); // the expired-options backfill (P14-03): as the recorders; starts paused, "Run now" refused
         services.AddSingleton<IScheduledService, OptionArchiveQualityService>(); // the option-archive quality checks (P14-04): daily 16:15, on by default, reads the archive and writes only its own result rows
         services.AddSingleton<IScheduledService, FilingIngestService>(); // the filing ingest (P15-02): daily 17:05, starts paused, reads the local inbox only
+        services.AddSingleton<IScheduledService, XDrishti.Application.Market.Eod.HistoryEodService>(); // CF-04 Part A: the NSE daily-file history; starts paused and with Data:History:Nse:Enabled off a run makes no request
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
         services.AddSingleton<ServiceScheduler>();

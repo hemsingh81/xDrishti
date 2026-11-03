@@ -9,4 +9,7 @@ public static class MasterDataHttpClientNames
 
     /// <summary>NSE's public JSON API (the trading-holiday list), which expects a browser-like client.</summary>
     public const string NseApi = "xd-master-nse-api";
+
+    /// <summary>NSE's archive host for the daily history files (CF-04 Part A). Its patterns are on the allow-list only when the owner has added them.</summary>
+    public const string NseHistory = "xd-history-nse";
 }
