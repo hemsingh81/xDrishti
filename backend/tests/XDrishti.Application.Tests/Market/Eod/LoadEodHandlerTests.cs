@@ -31,7 +31,8 @@ public sealed class LoadEodHandlerTests
         _settings.MaxPerDay.Returns(2000);
         _settings.Delay.Returns(TimeSpan.Zero);
         _settings.Years.Returns(10);
-        _store.ListDoneDatesAsync(default, default, Ct).ReturnsForAnyArgs(new HashSet<DateOnly>());
+        _store.ListDoneDatesAsync(default, default, default, Ct).ReturnsForAnyArgs(new HashSet<DateOnly>());
+        _store.ListSpecialSessionDatesAsync(default, default, Ct).ReturnsForAnyArgs(new HashSet<DateOnly>());
         return new LoadEodHandler(_settings, _source, _store, _clock);
     }
 
@@ -45,7 +46,7 @@ public sealed class LoadEodHandlerTests
 
         result.Error.Code.ShouldBe("history.disabled");
         await _source.DidNotReceiveWithAnyArgs().FetchAsync(default, default, Ct);
-        await _store.DidNotReceiveWithAnyArgs().ListDoneDatesAsync(default, default, Ct);
+        await _store.DidNotReceiveWithAnyArgs().ListDoneDatesAsync(default, default, default, Ct);
         await _store.DidNotReceiveWithAnyArgs().WriteDayAsync(default, default!, default!, default, Ct);
     }
 
@@ -82,7 +83,7 @@ public sealed class LoadEodHandlerTests
     public async Task Days_already_in_the_ledger_are_not_requested_again()
     {
         var handler = Handler();
-        _store.ListDoneDatesAsync(default, default, Ct).ReturnsForAnyArgs(new HashSet<DateOnly> { Friday, Monday });
+        _store.ListDoneDatesAsync(default, default, default, Ct).ReturnsForAnyArgs(new HashSet<DateOnly> { Friday, Monday });
 
         var result = await handler.HandleAsync(new LoadEodCommand(Friday, Monday), Ct);
 
@@ -148,9 +149,62 @@ public sealed class LoadEodHandlerTests
         _settings.MaxPerDay.Returns(2);
         _source.FetchAsync(default, default, Ct).ReturnsForAnyArgs(EodFetch.Absent());
 
-        var result = await handler.HandleAsync(new LoadEodCommand(Friday, new DateOnly(2024, 7, 12)), Ct);
+        var result = await handler.HandleAsync(new LoadEodCommand(new DateOnly(2024, 6, 24), Monday), Ct);
 
         result.Value.Stopped.ShouldBe("max_per_day");
         result.Value.Requests.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task To_is_clamped_to_yesterday_so_a_day_that_is_not_over_is_never_asked_for()
+    {
+        var handler = Handler();
+        _source.FetchAsync(default, default, Ct).ReturnsForAnyArgs(EodFetch.Absent());
+
+        await handler.HandleAsync(new LoadEodCommand(Monday, new DateOnly(2024, 7, 12)), Ct);
+
+        await _store.Received(1).ListDoneDatesAsync(Monday, Monday, false, Ct); // the clock is 2024-07-09: yesterday is Monday 2024-07-08
+        await _source.DidNotReceive().FetchAsync(Arg.Any<EodFileKind>(), new DateOnly(2024, 7, 9), Ct);
+    }
+
+    [Fact]
+    public async Task A_404_on_a_confirmed_special_session_is_a_retryable_failure_and_is_not_recorded_as_absent()
+    {
+        var handler = Handler();
+        _store.ListSpecialSessionDatesAsync(default, default, Ct).ReturnsForAnyArgs(new HashSet<DateOnly> { Friday });
+        _source.FetchAsync(default, default, Ct).ReturnsForAnyArgs(EodFetch.Absent());
+
+        var result = await handler.HandleAsync(new LoadEodCommand(Friday, Friday), Ct);
+
+        result.Value.ShouldSatisfyAllConditions(s => s.Stopped.ShouldBe("fetch_failed"), s => s.DaysAbsent.ShouldBe(0));
+        await _store.DidNotReceiveWithAnyArgs().MarkAbsentAsync(default, Ct);
+    }
+
+    [Fact]
+    public async Task Recheck_absent_asks_the_ledger_for_the_days_that_are_not_loaded()
+    {
+        var handler = Handler();
+        _source.FetchAsync(default, default, Ct).ReturnsForAnyArgs(EodFetch.Absent());
+
+        await handler.HandleAsync(new LoadEodCommand(Friday, Friday, RecheckAbsent: true), Ct);
+
+        await _store.Received(1).ListDoneDatesAsync(Friday, Friday, true, Ct);
+        await _source.Received(1).FetchAsync(EodFileKind.Bhavcopy, Friday, Ct);
+    }
+
+    [Fact]
+    public async Task A_weekend_day_the_calendar_confirms_as_a_special_session_is_loaded()
+    {
+        var handler = Handler();
+        var sunday = new DateOnly(2024, 7, 7);
+        _store.ListSpecialSessionDatesAsync(default, default, Ct).ReturnsForAnyArgs(new HashSet<DateOnly> { sunday });
+        _source.FetchAsync(EodFileKind.Bhavcopy, sunday, Ct).Returns(EodFetch.Ok(EodFixtures.Legacy(EodFixtures.LegacyRow("ABC", "EQ", date: "07-JUL-2024"))));
+        _source.FetchAsync(EodFileKind.Delivery, sunday, Ct).Returns(EodFetch.Absent());
+
+        var result = await handler.HandleAsync(new LoadEodCommand(sunday, sunday), Ct);
+
+        result.Value.DaysLoaded.ShouldBe(1);
+        LoadEodHandler.Weekdays(new DateOnly(2024, 7, 6), new DateOnly(2024, 7, 8), new HashSet<DateOnly> { sunday }).ShouldBe([sunday, Monday]);
+        LoadEodHandler.Weekdays(new DateOnly(2024, 7, 6), new DateOnly(2024, 7, 8), new HashSet<DateOnly>()).ShouldBe([Monday]);
     }
 }

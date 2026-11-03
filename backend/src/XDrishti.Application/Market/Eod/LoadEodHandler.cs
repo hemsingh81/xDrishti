@@ -6,8 +6,11 @@ using XDrishti.Domain.Market;
 
 namespace XDrishti.Application.Market.Eod;
 
-/// <summary>Loads the daily files of the weekdays in [From, To] that are not in the ledger yet (CF-04 Part A). Both default from the settings: <c>Years</c> back to yesterday.</summary>
-public sealed record LoadEodCommand(DateOnly? From = null, DateOnly? To = null) : ICommand;
+/// <summary>
+/// Loads the daily files of the weekdays (and the confirmed special sessions on weekends, e.g. Muhurat) in [From, To] that are not in the ledger yet (CF-04 Part A). Both default from the settings: <c>Years</c> back to yesterday; <c>To</c> is never later than
+/// yesterday (India). <paramref name="RecheckAbsent"/> asks again for the days recorded as absent (a 404 once may have been a wrong path or a late file).
+/// </summary>
+public sealed record LoadEodCommand(DateOnly? From = null, DateOnly? To = null, bool RecheckAbsent = false) : ICommand;
 
 /// <summary>What one run did. <see cref="Stopped"/> is null when the range was finished; otherwise the closed reason the run stopped early (<c>max_per_day</c>, <c>fetch_failed</c>).</summary>
 public sealed record EodLoadSummary(int DaysLoaded, int DaysAbsent, int DaysAlreadyDone, int Rows, int RowsRejected, int DeliveryRejected, int Requests, string? Stopped)
@@ -17,7 +20,8 @@ public sealed record EodLoadSummary(int DaysLoaded, int DaysAbsent, int DaysAlre
 
 /// <summary>
 /// One file per trading day, throttled by <see cref="IEodSettings.Delay"/>, newest first, resumable (the ledger skips days done), idempotent (a day is written again by upsert). With the setting off nothing is requested at all (<c>history.disabled</c>).
-/// An unknown header, a wrong date or a refused endpoint stops the run and writes nothing for that day; a network failure stops the run too (the next run continues from there). A day NSE has no file for is recorded as absent, not as an error.
+/// An unknown header, a wrong date or a refused endpoint stops the run and writes nothing for that day; a network failure stops the run too (the next run continues from there). A day NSE has no file for is recorded as absent, not as an error, unless the trading calendar (confirmed special sessions
+/// in <c>market.trading_days</c>) says it was a session: then it is a retryable failure (<c>fetch_failed</c>) and nothing is recorded. An ordinary weekday that is not in the calendar and has no file is read as a holiday; <see cref="LoadEodCommand.RecheckAbsent"/> asks again.
 /// </summary>
 internal sealed class LoadEodHandler(IEodSettings settings, IEodSource source, IEodStore store, TimeProvider clock) : ICommandHandler<LoadEodCommand, EodLoadSummary>
 {
@@ -30,11 +34,14 @@ internal sealed class LoadEodHandler(IEodSettings settings, IEodSource source, I
         }
 
         var today = IndiaTime.Today(clock.GetUtcNow());
-        var to = command.To ?? today.AddDays(-1);
+        var yesterday = today.AddDays(-1);
+        var to = command.To is { } requested && requested < yesterday ? requested : yesterday;
         var from = command.From ?? today.AddYears(-settings.Years);
-        var done = await store.ListDoneDatesAsync(from, to, cancellationToken);
-        var days = Weekdays(from, to).Where(d => !done.Contains(d)).Reverse().ToList();
-        var state = new State { AlreadyDone = Weekdays(from, to).Count(done.Contains) };
+        var done = await store.ListDoneDatesAsync(from, to, command.RecheckAbsent, cancellationToken);
+        var sessions = await store.ListSpecialSessionDatesAsync(from, to, cancellationToken);
+        var all = Weekdays(from, to, sessions).ToList();
+        var days = all.Where(d => !done.Contains(d)).Reverse().ToList();
+        var state = new State { AlreadyDone = all.Count(done.Contains), Sessions = sessions };
         foreach (var day in days)
         {
             if (state.Requests >= settings.MaxPerDay)
@@ -58,11 +65,11 @@ internal sealed class LoadEodHandler(IEodSettings settings, IEodSource source, I
         return Result.Success(new EodLoadSummary(state.Loaded, state.Absent, state.AlreadyDone, state.Rows, state.Rejected, state.DeliveryRejected, state.Requests, state.Stopped));
     }
 
-    internal static IEnumerable<DateOnly> Weekdays(DateOnly from, DateOnly to)
+    internal static IEnumerable<DateOnly> Weekdays(DateOnly from, DateOnly to, IReadOnlySet<DateOnly> sessions)
     {
         for (var d = from; d <= to; d = d.AddDays(1))
         {
-            if (d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
+            if (d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday) || sessions.Contains(d))
             {
                 yield return d;
             }
@@ -74,6 +81,12 @@ internal sealed class LoadEodHandler(IEodSettings settings, IEodSource source, I
         var bhav = await FetchAsync(EodFileKind.Bhavcopy, day, state, cancellationToken);
         if (bhav.Status == EodFetchStatus.Absent)
         {
+            if (state.Sessions.Contains(day))
+            {
+                state.Stopped = "fetch_failed"; // a day the calendar confirms as a session has no file: retryable, never recorded as absent
+                return Result.Success();
+            }
+
             await store.MarkAbsentAsync(day, cancellationToken);
             state.Absent++;
             return Result.Success();
@@ -149,6 +162,8 @@ internal sealed class LoadEodHandler(IEodSettings settings, IEodSource source, I
 
     private sealed class State
     {
+        public IReadOnlySet<DateOnly> Sessions { get; init; } = new HashSet<DateOnly>();
+
         public int Loaded { get; set; }
 
         public int Absent { get; set; }

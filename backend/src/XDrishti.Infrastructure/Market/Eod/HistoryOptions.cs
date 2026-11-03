@@ -8,6 +8,12 @@ internal sealed class HistoryOptions
 {
     public const string SectionName = "Data:History";
 
+    /// <summary>Where the probe writes the raw files (<c>Data:History:ProbeFolder</c>). The default is relative to the working folder; a container sets an absolute, mounted, 0700 folder (<c>/app</c> is read-only).</summary>
+    [Required]
+    [MinLength(1)]
+    [MaxLength(300)]
+    public string ProbeFolder { get; set; } = "data/history-probe";
+
     [Required]
     [ValidateObjectMembers]
     public NseOptions Nse { get; set; } = new();

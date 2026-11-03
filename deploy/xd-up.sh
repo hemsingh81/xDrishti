@@ -56,6 +56,11 @@ for dir in ../data/filings ../data/filings/inbox ../data/filings/files; do
   fi
 done
 
+# 1d) The NSE daily-history probe folder (CF-04, ADR 0195): raw probe files, 0700 like the filings folders; mounted into xd-api (Data__History__ProbeFolder).
+if [ ! -d ../data/history-probe ]; then
+  (umask 077; mkdir -p ../data/history-probe)
+fi
+
 # 2) Secrets: macOS Keychain is the source of truth.
 secret() { # secret <keychain-service> → prints the value, creating it on first use
   local service="$1" value

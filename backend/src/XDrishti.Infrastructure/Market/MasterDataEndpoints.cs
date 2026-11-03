@@ -16,7 +16,7 @@ internal static class MasterDataEndpoints
     private static readonly Uri[] Allowed = [DhanScripMaster, NseTotalMarketList, NseHolidayMaster];
 
     /// <summary>
-    /// Dated archive paths (CF-04 Part A): a host plus a full-match path regular expression, GET, no query. <b>Deliberately empty</b>: this list is the owner's security act (ADR 0097, 0195). The app reads it and never edits it; until the owner
+    /// Dated archive paths (CF-04 Part A): a host plus a full-match path regular expression, GET, no query. <b>Deliberately empty</b>: this list is the owner's security act (ADR 0010, 0017, 0195). The app reads it and never edits it; until the owner
     /// adds the entries named in ADR 0195 (after reading NSE's terms), the history fetch is refused before anything is sent.
     /// </summary>
     public static readonly IReadOnlyList<AllowedPattern> Patterns = [];
@@ -41,6 +41,13 @@ internal static class MasterDataEndpoints
             string.Equals(uri.Host, a.Host, StringComparison.OrdinalIgnoreCase)
             && string.Equals(uri.AbsolutePath, a.AbsolutePath, StringComparison.Ordinal)
             && string.Equals(uri.Query, a.Query, StringComparison.Ordinal))
-            || (uri.Query.Length == 0 && patterns.Any(p => string.Equals(uri.Host, p.Host, StringComparison.OrdinalIgnoreCase) && p.Path.IsMatch(uri.AbsolutePath)));
+            || (uri.Query.Length == 0 && patterns.Any(p => string.Equals(uri.Host, p.Host, StringComparison.OrdinalIgnoreCase) && MatchesWhole(p.Path, uri.AbsolutePath)));
+    }
+
+    /// <summary>The pattern must match the whole path, not a part of it: a pattern the owner forgot to anchor with <c>^</c> and <c>$</c> is still held to the full path (fail closed).</summary>
+    private static bool MatchesWhole(System.Text.RegularExpressions.Regex pattern, string path)
+    {
+        var match = pattern.Match(path);
+        return match.Success && match.Index == 0 && match.Length == path.Length;
     }
 }

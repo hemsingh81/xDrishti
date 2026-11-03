@@ -14,6 +14,9 @@ internal static class EodParser
 {
     public const decimal PercentTolerance = 0.01m;
 
+    /// <summary>A bhavcopy whose unreadable rows are more than this share of the rows of the wanted series is refused whole (<c>history.unknown_format</c>): a column that moved reads as "every number unreadable", not as a few bad rows.</summary>
+    public const decimal MaxRejectedShare = 0.05m;
+
     private static readonly string[] DateFormats = ["dd-MMM-yyyy", "d-MMM-yyyy", "yyyy-MM-dd", "ddMMyyyy"];
 
     public static async ValueTask<Result<BhavParse>> ParseBhavcopyAsync(byte[] content, DateOnly expected, IReadOnlyCollection<string> series, CancellationToken cancellationToken)
@@ -41,6 +44,7 @@ internal static class EodParser
         var rows = new List<EodRow>();
         var other = 0;
         var rejected = 0;
+        var seen = new HashSet<(string, string)>();
         while (await NextAsync(reader, cancellationToken) is { } line)
         {
             var f = await reader.SplitAsync(line, cancellationToken);
@@ -71,10 +75,19 @@ internal static class EodParser
             {
                 rejected++;
             }
+            else if (!seen.Add((row.Symbol, row.Series)))
+            {
+                return Result.Failure<BhavParse>(EodErrors.DuplicateRow("bhavcopy", row.Symbol, row.Series));
+            }
             else
             {
                 rows.Add(row);
             }
+        }
+
+        if (rejected > 0 && (rows.Count == 0 || (decimal)rejected / (rows.Count + rejected) > MaxRejectedShare))
+        {
+            return Result.Failure<BhavParse>(EodErrors.UnknownFormat("bhavcopy", $"{rejected} of {rows.Count + rejected} rows could not be read"));
         }
 
         return Result.Success(new BhavParse(rows, other, rejected, layout.Name));
@@ -144,6 +157,12 @@ internal static class EodParser
             }
 
             var percent = Percent(d.Quantity, row.TradedQty);
+            if (percent is null && d.Quantity == 0)
+            {
+                result.Add(row); // nothing traded: both delivery fields stay null (the table needs them both set or both null)
+                continue;
+            }
+
             if (d.Quantity > row.TradedQty || (percent is { } computed && d.FilePercent is { } own && Math.Abs(computed - own) > PercentTolerance))
             {
                 rejected++;

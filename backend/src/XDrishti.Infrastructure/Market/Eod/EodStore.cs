@@ -25,11 +25,25 @@ internal sealed class EodStore(NpgsqlDataSource dataSource) : IEodStore
               (EXCLUDED.isin, EXCLUDED.open, EXCLUDED.high, EXCLUDED.low, EXCLUDED.close, EXCLUDED.prev_close, EXCLUDED.traded_qty, EXCLUDED.turnover, EXCLUDED.trades, EXCLUDED.delivery_qty, EXCLUDED.delivery_pct)
         """;
 
-    public async ValueTask<IReadOnlySet<DateOnly>> ListDoneDatesAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    public async ValueTask<IReadOnlySet<DateOnly>> ListDoneDatesAsync(DateOnly from, DateOnly to, bool recheckAbsent, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("SELECT trade_date FROM market.eod_files WHERE kind = 'bhav' AND trade_date BETWEEN @from AND @to");
+        await using var command = dataSource.CreateCommand("SELECT trade_date FROM market.eod_files WHERE kind = 'bhav' AND trade_date BETWEEN @from AND @to AND (NOT @recheck OR status = 'loaded')");
         command.Parameters.AddWithValue("from", from);
         command.Parameters.AddWithValue("to", to);
+        command.Parameters.AddWithValue("recheck", recheckAbsent);
+        return await ReadDatesAsync(command, cancellationToken);
+    }
+
+    public async ValueTask<IReadOnlySet<DateOnly>> ListSpecialSessionDatesAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT date FROM market.trading_days WHERE kind = 'special' AND status = 'confirmed' AND date BETWEEN @from AND @to");
+        command.Parameters.AddWithValue("from", from);
+        command.Parameters.AddWithValue("to", to);
+        return await ReadDatesAsync(command, cancellationToken);
+    }
+
+    private static async ValueTask<IReadOnlySet<DateOnly>> ReadDatesAsync(NpgsqlCommand command, CancellationToken cancellationToken)
+    {
         var dates = new HashSet<DateOnly>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
@@ -99,7 +113,7 @@ internal sealed class EodStore(NpgsqlDataSource dataSource) : IEodStore
     public async ValueTask<IReadOnlyList<DailyMinuteRow>> DailyAgainstMinuteAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand("""
-            SELECT d.symbol, d.trade_date, d.traded_qty, m.volume, d.high, m.high, COALESCE(i.tick_size, 0.05)
+            SELECT d.symbol, d.trade_date, d.traded_qty, m.volume, d.high, m.high::numeric, COALESCE(i.tick_size, 0.05)::numeric
             FROM market.daily_eod d
             JOIN market.instruments i ON i.isin = d.isin AND i.type = 'share'
             CROSS JOIN LATERAL (
@@ -109,6 +123,11 @@ internal sealed class EodStore(NpgsqlDataSource dataSource) : IEodStore
                   AND b.ts >= (d.trade_date::timestamp AT TIME ZONE 'Asia/Kolkata')
                   AND b.ts < ((d.trade_date + 1)::timestamp AT TIME ZONE 'Asia/Kolkata')) m
             WHERE d.trade_date BETWEEN @from AND @to AND d.series = 'EQ' AND m.volume IS NOT NULL
+              -- The loaded CSV minute bars are split-adjusted at source through their last bar: a session before an applied split or bonus whose ex-date is within that range is not comparable with the raw daily row.
+              AND NOT EXISTS (
+                  SELECT 1 FROM market.corporate_actions a
+                  WHERE a.instrument_id = i.id AND a.status = 'applied' AND a.ex_date > d.trade_date
+                    AND a.ex_date <= (SELECT (max(f.last_bar) AT TIME ZONE 'Asia/Kolkata')::date FROM market.csv_files f WHERE f.instrument_id = i.id AND f.undone_at IS NULL AND f.last_bar IS NOT NULL))
             ORDER BY d.trade_date, d.symbol
             LIMIT 200000
             """);

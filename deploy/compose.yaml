@@ -135,6 +135,8 @@ services:
       # The ingest is the service filings-ingest of the scheduler in this host (paused until the owner switches it on); the lag and the disk limits are deployment settings. No network is involved.
       Filings__InboxPath: /data/filings/inbox
       Filings__FilesPath: /data/filings/files
+      # The NSE daily-history probe's raw files (CF-04, ADR 0195): a mounted 0700 folder (xd-api's /app is read-only). The fetch itself stays OFF (Data:History:Nse:Enabled) until the owner acts.
+      Data__History__ProbeFolder: /data/history-probe
       Filings__LagMinutes: ${XD_FILINGS_LAG_MINUTES:-5}
       Filings__MaxFilesGb: ${XD_FILINGS_MAX_FILES_GB:-5}
       Filings__MinFreeGb: ${XD_FILINGS_MIN_FREE_GB:-20}
@@ -158,6 +160,8 @@ services:
       # The filings inbox (read-only: the ingest never writes, moves or deletes there) and the filings store folder (read-write). deploy/xd-up.sh creates both 0700 when missing.
       - ../data/filings/inbox:/data/filings/inbox:ro
       - ../data/filings/files:/data/filings/files
+      # The history probe folder (CF-04, ADR 0195), read-write. deploy/xd-up.sh creates it 0700 when missing.
+      - ../data/history-probe:/data/history-probe
       - ../eval:/data/eval-files:ro
     secrets:
       - source: db_app_password

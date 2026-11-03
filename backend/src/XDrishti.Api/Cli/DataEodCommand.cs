@@ -17,7 +17,7 @@ internal static class DataEodCommand
     public const string Usage = """
         usage:
           xd data eod-probe --dates YYYY-MM-DD[,YYYY-MM-DD...]   fetch those days' raw files once into data/history-probe and print their header lines (needs Data:History:Nse:Enabled and the allow-list entries of ADR 0195)
-          xd data eod-load [--from YYYY-MM-DD] [--to YYYY-MM-DD]   load the daily files of the days not yet loaded (same switch); resumable
+          xd data eod-load [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--recheck-absent]   load the daily files of the days not yet loaded (same switch); resumable; --to is never later than yesterday; --recheck-absent asks again for days recorded as without a file
           xd data eod-actions FILE.csv                             read NSE's corporate-actions file into the import PREVIEW (applies nothing)
           xd data eod-universe --as-of YYYY-MM-DD                  the securities of the daily table on that date
           xd data eod-check --from YYYY-MM-DD --to YYYY-MM-DD      daily-versus-minute findings (a finding, never a gate)
@@ -51,7 +51,7 @@ internal static class DataEodCommand
                 case "eod-probe":
                     return await Report(await sp.GetRequiredService<ICommandHandler<EodProbeCommand, EodProbeReport>>().HandleAsync(new EodProbeCommand(parsed.Dates), cancellationToken), r => r.Lines, console);
                 case "eod-load":
-                    return await Report(await sp.GetRequiredService<ICommandHandler<LoadEodCommand, EodLoadSummary>>().HandleAsync(new LoadEodCommand(parsed.From, parsed.To), cancellationToken), r => [r.Text], console);
+                    return await Report(await sp.GetRequiredService<ICommandHandler<LoadEodCommand, EodLoadSummary>>().HandleAsync(new LoadEodCommand(parsed.From, parsed.To, parsed.Recheck), cancellationToken), r => [r.Text], console);
                 case "eod-actions":
                     string text;
                     try
@@ -105,6 +105,7 @@ internal static class DataEodCommand
         List<DateOnly> dates = [];
         DateOnly? from = null, to = null;
         string? file = null;
+        var recheck = false;
         for (var i = 1; i < args.Count; i++)
         {
             switch (args[i])
@@ -117,6 +118,9 @@ internal static class DataEodCommand
                     break;
                 case "--to" when verb is "eod-load" or "eod-check" && i + 1 < args.Count:
                     to = Date(args[++i], "--to", errors);
+                    break;
+                case "--recheck-absent" when verb == "eod-load":
+                    recheck = true;
                     break;
                 case "--as-of" when verb == "eod-universe" && i + 1 < args.Count:
                     from = Date(args[++i], "--as-of", errors);
@@ -155,7 +159,7 @@ internal static class DataEodCommand
             }
         }
 
-        return errors.Count > 0 ? (null, errors) : (new Parsed(verb, dates, from, to, file), errors);
+        return errors.Count > 0 ? (null, errors) : (new Parsed(verb, dates, from, to, file, recheck), errors);
     }
 
     private static IReadOnlyList<string> Describe(NseActionsPreview p) =>
@@ -191,5 +195,5 @@ internal static class DataEodCommand
         return null;
     }
 
-    internal sealed record Parsed(string Verb, IReadOnlyList<DateOnly> Dates, DateOnly? From, DateOnly? To, string? File);
+    internal sealed record Parsed(string Verb, IReadOnlyList<DateOnly> Dates, DateOnly? From, DateOnly? To, string? File, bool Recheck = false);
 }

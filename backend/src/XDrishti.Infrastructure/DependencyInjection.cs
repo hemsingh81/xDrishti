@@ -472,7 +472,7 @@ public static class DependencyInjection
             .ConfigurePrimaryHttpMessageHandler(MasterDataHttp.CreatePrimaryHandler)
             .AddHttpMessageHandler<MasterDataEndpointGuard>()
             .RemoveAllLoggers();
-        // CF-04 Part A: the NSE daily-file history. OFF by default (Data:History:Nse:Enabled). The client goes through the same allow-list guard; its pattern list is empty until the owner adds entries (ADR 0193).
+        // CF-04 Part A: the NSE daily-file history. OFF by default (Data:History:Nse:Enabled). The client goes through the same allow-list guard; its pattern list is empty until the owner adds entries (ADR 0195).
         services.AddOptions<XDrishti.Infrastructure.Market.Eod.HistoryOptions>().Bind(configuration.GetSection(XDrishti.Infrastructure.Market.Eod.HistoryOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
         services.AddSingleton<XDrishti.Application.Abstractions.Market.Eod.IEodSettings, XDrishti.Infrastructure.Market.Eod.EodSettings>();
         services.AddHttpClient(MasterDataHttpClientNames.NseHistory, (sp, client) =>

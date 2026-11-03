@@ -15,7 +15,7 @@ namespace XDrishti.Api.IntegrationTests.Market;
 [Collection(ApiTestSuite.Name)]
 public sealed class DailyEodDatabaseTests(ApiFactory factory)
 {
-    private const string Before = "20261102234713_AddFilingExtractions";
+    private const string Before = "20261103114330_AddOptionSpreadModels";
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -44,7 +44,7 @@ public sealed class DailyEodDatabaseTests(ApiFactory factory)
         (await CountAsync(source, "SELECT count(*) FROM market.daily_eod")).ShouldBe(1);
         (await CountAsync(source, "SELECT count(*) FROM market.eod_files WHERE status = 'loaded'")).ShouldBe(2);
         (await CountAsync(source, "SELECT extract(epoch FROM loaded_at)::bigint * 1000000 + extract(microseconds FROM loaded_at)::bigint FROM market.daily_eod")).ShouldBe(firstLoad, "an identical row is not rewritten");
-        (await store.ListDoneDatesAsync(day, day, Ct)).ShouldBe([day]);
+        (await store.ListDoneDatesAsync(day, day, false, Ct)).ShouldBe([day]);
 
         await store.WriteDayAsync(day, [Row("ABC", "INE000A01010", "2024-07-05", close: 105m)], new string('c', 64), null, Ct);
         (await CountAsync(source, "SELECT close::bigint FROM market.daily_eod")).ShouldBe(105);
@@ -64,7 +64,7 @@ public sealed class DailyEodDatabaseTests(ApiFactory factory)
         await store.MarkAbsentAsync(holiday, Ct);
         await store.MarkAbsentAsync(loaded, Ct);
 
-        (await store.ListDoneDatesAsync(loaded, holiday, Ct)).Order().ShouldBe([loaded, holiday]);
+        (await store.ListDoneDatesAsync(loaded, holiday, false, Ct)).Order().ShouldBe([loaded, holiday]);
         (await CountAsync(source, "SELECT count(*) FROM market.eod_files WHERE status = 'absent'")).ShouldBe(1);
     }
 
@@ -96,6 +96,68 @@ public sealed class DailyEodDatabaseTests(ApiFactory factory)
         june2023.Select(r => r.Symbol).ShouldBe(["LIVE"]);
         farAway.ShouldBeEmpty("an unloaded range answers empty, not stale");
         (await CountAsync(source, "SELECT count(*) FROM market.instruments")).ShouldBe(instrumentsBefore);
+    }
+
+    [Fact]
+    public async Task The_daily_against_minute_read_leaves_out_sessions_before_a_split_that_the_csv_minute_bars_are_already_adjusted_for()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_eod_minute_probe", Ct);
+        await using var source = NpgsqlDataSource.Create(scratch.ConnectionString);
+        var store = new EodStore(source);
+        await store.WriteDayAsync(new DateOnly(2024, 7, 1), [Row("ABC", "INE333A01013", "2024-07-01")], new string('a', 64), null, Ct);
+        await store.WriteDayAsync(new DateOnly(2024, 7, 10), [Row("ABC", "INE333A01013", "2024-07-10")], new string('b', 64), null, Ct);
+        const string setup = """
+            INSERT INTO market.instruments (id, canonical_symbol, exchange, exchange_segment, type, name, display_name, isin, lot_size, underlying_symbol, fno_eligible, first_seen_at, last_seen_at)
+            VALUES ('00000000-0000-0000-0000-0000000000a1', 'NSE:ABC', 'NSE', 'NSE_EQ', 'share', 'Abc', 'Abc', 'INE333A01013', 1, 'ABC', false, now(), now());
+            INSERT INTO market.bars_1m (instrument_id, ts, open, high, low, close, volume, source) VALUES
+              ('00000000-0000-0000-0000-0000000000a1', '2024-07-01 04:00:00+00', 100, 101, 99, 100, 1000, 'csv'),
+              ('00000000-0000-0000-0000-0000000000a1', '2024-07-10 04:00:00+00', 100, 101, 99, 100, 1000, 'csv');
+            INSERT INTO market.csv_files (file_name, instrument_id, rows, inserted, updated, repaired, rejected, size_bytes, first_bar, last_bar, loaded_at, modified_at)
+            VALUES ('ABC_1m.csv.gz', '00000000-0000-0000-0000-0000000000a1', 2, 2, 0, 0, 0, 1, '2024-07-01 04:00:00+00', '2024-07-10 04:00:00+00', now(), now());
+            """;
+        await using (var insert = source.CreateCommand(setup))
+        {
+            await insert.ExecuteNonQueryAsync(Ct);
+        }
+
+        (await store.DailyAgainstMinuteAsync(new DateOnly(2024, 7, 1), new DateOnly(2024, 7, 31), Ct)).Select(r => r.TradeDate).Order().ShouldBe([new DateOnly(2024, 7, 1), new DateOnly(2024, 7, 10)]);
+
+        await using (var action = source.CreateCommand("""
+            INSERT INTO market.corporate_actions (id, instrument_id, ex_date, kind, numerator, denominator, factor, status, source, created_at, decided_at, decided_by)
+            VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000a1', '2024-07-05', 'split', 1, 5, 0.2, 'applied', 'manual', now(), now(), 'owner')
+            """))
+        {
+            await action.ExecuteNonQueryAsync(Ct);
+        }
+
+        (await store.DailyAgainstMinuteAsync(new DateOnly(2024, 7, 1), new DateOnly(2024, 7, 31), Ct)).Select(r => r.TradeDate).ShouldBe([new DateOnly(2024, 7, 10)], "July 1 is before the split the CSV is adjusted for; July 10 is after it");
+    }
+
+    [Fact]
+    public async Task Special_sessions_come_from_confirmed_special_rows_only_and_recheck_returns_the_absent_days()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_eod_calendar_probe", Ct);
+        await using var source = NpgsqlDataSource.Create(scratch.ConnectionString);
+        var store = new EodStore(source);
+        await using (var insert = source.CreateCommand("""
+            INSERT INTO market.trading_days (date, kind, session_from, session_to, source, status, note, updated_at) VALUES
+              ('2024-11-03', 'special', '18:00', '19:00', 'manual', 'confirmed', 'Muhurat', now()),
+              ('2024-11-09', 'special', '18:00', '19:00', 'observed', 'proposed', NULL, now()),
+              ('2024-08-15', 'holiday', NULL, NULL, 'manual', 'confirmed', NULL, now())
+            """))
+        {
+            await insert.ExecuteNonQueryAsync(Ct);
+        }
+
+        (await store.ListSpecialSessionDatesAsync(new DateOnly(2024, 1, 1), new DateOnly(2024, 12, 31), Ct)).ShouldBe([new DateOnly(2024, 11, 3)]);
+
+        await store.MarkAbsentAsync(new DateOnly(2024, 8, 15), Ct);
+        await store.WriteDayAsync(new DateOnly(2024, 7, 5), [Row("ABC", "INE000A01010", "2024-07-05")], new string('a', 64), null, Ct);
+        (await store.ListDoneDatesAsync(new DateOnly(2024, 7, 1), new DateOnly(2024, 8, 31), false, Ct)).Order().ShouldBe([new DateOnly(2024, 7, 5), new DateOnly(2024, 8, 15)]);
+        (await store.ListDoneDatesAsync(new DateOnly(2024, 7, 1), new DateOnly(2024, 8, 31), true, Ct)).ShouldBe([new DateOnly(2024, 7, 5)]);
+
+        await store.WriteDayAsync(new DateOnly(2024, 8, 15), [Row("ABC", "INE000A01010", "2024-08-15")], new string('c', 64), null, Ct);
+        (await CountAsync(source, "SELECT count(*) FROM market.eod_files WHERE trade_date = '2024-08-15' AND status = 'loaded'")).ShouldBe(1, "a day found on a recheck is written over the absent record");
     }
 
     [Fact]

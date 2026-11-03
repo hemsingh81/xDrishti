@@ -12,7 +12,7 @@ using XDrishti.Infrastructure.Persistence;
 namespace XDrishti.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(XDrishtiDbContext))]
-    [Migration("20261103065436_AddDailyEod")]
+    [Migration("20261103120000_AddDailyEod")]
     partial class AddDailyEod
     {
         /// <inheritdoc />
@@ -3798,8 +3798,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnName("candidate_value");
 
                     b.Property<string>("CellKey")
-                        .HasMaxLength(400)
-                        .HasColumnType("character varying(400)")
+                        .HasMaxLength(600)
+                        .HasColumnType("character varying(600)")
                         .HasColumnName("cell_key");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -9501,7 +9501,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("sim_trades", "research", t =>
                         {
-                            t.HasCheckConstraint("ck_sim_trades_cost_segment", "cost_segment IS NULL OR cost_segment IN ('intradayequity', 'delivery')");
+                            t.HasCheckConstraint("ck_sim_trades_cost_segment", "cost_segment IS NULL OR cost_segment IN ('intradayequity', 'delivery', 'options', 'futures')");
 
                             t.HasCheckConstraint("ck_sim_trades_costing_all_or_nothing", "num_nonnulls(cost_segment, cost_quantity, cost_risk_taken, cost_entry_turnover, cost_exit_turnover, entry_brokerage, entry_stt, entry_exchange_txn, entry_sebi_fee, entry_stamp_duty, entry_other_charges, entry_dp_charge, entry_gst, exit_brokerage, exit_stt, exit_exchange_txn, exit_sebi_fee, exit_stamp_duty, exit_other_charges, exit_dp_charge, exit_gst, cost_total, cost_r, r_net) IN (0, 24)");
 

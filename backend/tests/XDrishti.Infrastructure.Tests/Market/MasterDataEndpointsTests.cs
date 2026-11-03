@@ -60,6 +60,16 @@ public sealed class MasterDataEndpointsTests
     }
 
     [Fact]
+    public void A_pattern_that_is_not_anchored_still_has_to_match_the_whole_path()
+    {
+        AllowedPattern[] loose = [new("nsearchives.nseindia.com", new System.Text.RegularExpressions.Regex(@"/content/hist/\d{4}", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)))];
+
+        MasterDataEndpoints.IsAllowed(HttpMethod.Get, new Uri("https://nsearchives.nseindia.com/content/hist/2024"), loose).ShouldBeTrue();
+        MasterDataEndpoints.IsAllowed(HttpMethod.Get, new Uri("https://nsearchives.nseindia.com/content/hist/2024/extra"), loose).ShouldBeFalse("a prefix match is not a match");
+        MasterDataEndpoints.IsAllowed(HttpMethod.Get, new Uri("https://nsearchives.nseindia.com/evil/content/hist/2024"), loose).ShouldBeFalse("a match in the middle is not a match");
+    }
+
+    [Fact]
     public void Nothing_and_relative_addresses_are_refused()
     {
         MasterDataEndpoints.IsAllowed(null, MasterDataEndpoints.DhanScripMaster).ShouldBeFalse();

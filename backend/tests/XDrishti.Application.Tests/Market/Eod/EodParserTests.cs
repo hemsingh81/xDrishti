@@ -42,10 +42,48 @@ public sealed class EodParserTests
     [Fact]
     public async Task A_row_with_an_unreadable_number_is_counted_and_skipped()
     {
-        var result = await EodParser.ParseBhavcopyAsync(EodFixtures.Legacy(EodFixtures.LegacyRow("ABC", "EQ"), EodFixtures.LegacyRow("BAD", "EQ", close: "n/a")), EodFixtures.Day, Eq, Ct);
+        var good = Enumerable.Range(0, 20).Select(i => EodFixtures.LegacyRow("S" + i, "EQ"));
+        var result = await EodParser.ParseBhavcopyAsync(EodFixtures.Legacy([.. good, EodFixtures.LegacyRow("BAD", "EQ", close: "n/a")]), EodFixtures.Day, Eq, Ct);
 
-        result.Value.Rows.Count.ShouldBe(1);
+        result.Value.Rows.Count.ShouldBe(20);
         result.Value.Rejected.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_known_header_where_no_row_can_be_read_is_refused_not_loaded_as_an_empty_day()
+    {
+        var result = await EodParser.ParseBhavcopyAsync(EodFixtures.Legacy(EodFixtures.LegacyRow("A", "EQ", close: "n/a"), EodFixtures.LegacyRow("B", "EQ", close: "n/a")), EodFixtures.Day, Eq, Ct);
+
+        result.Error.Code.ShouldBe("history.unknown_format");
+    }
+
+    [Fact]
+    public async Task A_file_with_too_many_unreadable_rows_is_refused_whole()
+    {
+        var good = Enumerable.Range(0, 10).Select(i => EodFixtures.LegacyRow("S" + i, "EQ"));
+        var result = await EodParser.ParseBhavcopyAsync(EodFixtures.Legacy([.. good, EodFixtures.LegacyRow("BAD", "EQ", close: "n/a")]), EodFixtures.Day, Eq, Ct); // 1 of 11 is above the 5 % share
+
+        result.Error.Code.ShouldBe("history.unknown_format");
+    }
+
+    [Fact]
+    public async Task The_same_symbol_and_series_twice_in_one_file_refuses_the_file_with_a_named_code()
+    {
+        var result = await EodParser.ParseBhavcopyAsync(EodFixtures.Legacy(EodFixtures.LegacyRow("ABC", "EQ"), EodFixtures.LegacyRow("ABC", "EQ", close: "101.00")), EodFixtures.Day, Eq, Ct);
+
+        result.Error.Code.ShouldBe("history.duplicate_row");
+    }
+
+    [Fact]
+    public async Task A_delivery_figure_on_a_day_of_nothing_traded_leaves_both_delivery_fields_null()
+    {
+        var bhav = await EodParser.ParseBhavcopyAsync(EodFixtures.Legacy(EodFixtures.LegacyRow("ABC", "EQ", traded: 0)), EodFixtures.Day, Eq, Ct);
+        var delivery = await EodParser.ParseDeliveryAsync(EodFixtures.Delivery("ABC,EQ,0,0,0.00"), Ct);
+
+        var merged = EodParser.Merge(bhav.Value.Rows, delivery.Value);
+
+        merged.Rows.Single().ShouldSatisfyAllConditions(r => r.DeliveryQty.ShouldBeNull(), r => r.DeliveryPct.ShouldBeNull());
+        merged.Rejected.ShouldBe(0);
     }
 
     [Theory]

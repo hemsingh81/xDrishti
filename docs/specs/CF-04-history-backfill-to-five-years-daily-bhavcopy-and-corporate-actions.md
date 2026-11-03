@@ -64,7 +64,7 @@ Numbers recomputed on 2026-10-27.
 - **Allow-list entries the owner may add (this slice never does):** the NSE archive host(s) found by the probe, in `MasterDataEndpoints` (GET only, fixed path patterns), recorded with a reason and a date in the ADR. For Part B **no entry is needed** (`/v2/charts/intraday` is already allowed); enabling the setting is the owner's act.
 - **API:** `GET /api/data/history` → per instrument `{ historyFrom, firstCsvBar, backfillStatus (none|planned|partial|done|seam_unresolved|seam_jump), chunks {done, failed, total}, dailyFrom, dailyTo }` and totals; `POST /api/data/history/backfill` (owner act, step-up, starts the job, 409 when a run is active, 422 `history.disk_low` / `history.calendar_missing` / `history.disabled`); `POST /api/data/history/probe` (owner act). Audit entries record counts only.
 - **Data:** `market.daily_eod` (see decision 2; unique `(instrument_id or isin, trade_date, series)`; a plain table or a yearly hypertable by the volume: about 5 M rows for the whole market over 10 years, UNVERIFIED); `market.backfill_chunks` (decision 7); a per-instrument seam record (first CSV bar, probe result and time, seam jump flag) as columns on an existing tracked-instrument info table or its own small table (UNVERIFIED which).
-- **Verbs:** `xd data probe-nse`, `xd data backfill [--instrument ...] [--dry-run]`, `xd data history`; exit codes as the other `xd` commands.
+- **Verbs:** Part A as built: `xd data eod-probe`, `eod-load [--from --to --recheck-absent]`, `eod-actions FILE`, `eod-universe --as-of`, `eod-check --from --to` (see "Part A as built" below); Part B: `xd data probe-nse`, `xd data backfill [--instrument ...] [--dry-run]`, `xd data history`; exit codes as the other `xd` commands.
 - **UI:** the existing Data and Services pages gain a "History" card (depth per instrument, status, a disabled-by-default switch that is an owner act) and the run record text of AC 12. No new route. Match the prototype's data screens.
 - **Events/jobs:** `history-eod` (daily, after the EOD run) once Part A is enabled; `history-backfill` is on demand, resumable, cancellable, off-hours by default; failure of one chunk never fails the run.
 
@@ -111,7 +111,7 @@ Unit: planner (AC 3), estimator and disk (AC 4, 5), source-aware factors (AC 8),
 ## Done when
 - [ ] All acceptance criteria have evidence (Part A, B, C each separately closable)
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] Contract regenerated (`scripts/gen-api.sh`); migrations added
+- [ ] Contract regenerated (`scripts/gen-api.sh`); migrations added. Part A adds no API route, so its `gen-api` output is unchanged (the Part B routes above are not built)
 - [ ] ADR recording the NSE terms decision and the allow-list act (owner's); ADR for the source-aware adjustment; doc 05 §4.2 and §6.1 updated; ISS-19 and ISS-22 text updated when depth is real; `scripts/build-docs.sh`
 
 ## Review fixes 2026-10-27
@@ -122,3 +122,10 @@ Status stays Draft; size 9.5 -> **10.5 agent-days** (+1: seam from stored bars, 
 4. **Calendar (AC 17).** `trading_days` for the backfilled range is derived from Part A's `daily_eod` (a date with any cash-series rows is a trading day). **Part A is a prerequisite of Part B.**
 5. **Allow-list guard change.** `MasterDataEndpoints.IsAllowed` matches exact paths, so dated bhavcopy paths need a code change (pattern-aware guard) that lands with an **empty entry list**; the owner then adds hosts and patterns as the security act.
 6. **Times are minimums.** The 10.7 and 42.8 minute figures (and 25 minutes for 500 instruments) are "at least": retries, DH-904 back-off and the off-hours window add to them.
+
+## Part A as built (2026-11-03)
+Amends the Contract and Done-when above for Part A only; the status is unchanged. ADR 0195 holds the reasons.
+1. **Verbs** are `xd data eod-probe --dates`, `eod-load [--from] [--to] [--recheck-absent]`, `eod-actions FILE`, `eod-universe --as-of`, `eod-check --from --to` (not `probe-nse`). `--to` is never later than yesterday (India); `--recheck-absent` asks again for the days recorded as without a file. A 404 on a day that `market.trading_days` confirms as a special session is a retryable failure, never recorded as absent; confirmed special sessions on weekends (Muhurat) are loaded.
+2. **Settings added to the Contract:** `Data:History:Nse:Years` (default 10, 1..30), `Data:History:Nse:DelayMs` (default 1,500, 250..60,000) and `Data:History:ProbeFolder` (default `data/history-probe`; the deployment mounts a 0700 folder and sets `/data/history-probe`).
+3. **No API route** and no UI card in Part A (so no `gen-api` change); the verbs and the Services screen's `history-eod` service are the surface.
+4. **Recorded deviations.** (a) AC 13: the fixtures are synthetic, written from the best-known layouts and marked "to be verified by the probe" (the research pages could not be read); they are replaced by the captured header lines when the owner has run the probe. (b) AC 15: the daily-versus-minute finding is printed by `eod-check`; the card in the Data quality screen is deferred (that screen stores its checks as JSON per instrument). (c) The universe is the span `[first, last]` of a security's rows, not "traded on that day" (ADR 0195 §8). (d) The corporate-actions file is read from a local file, not fetched.
