@@ -147,14 +147,14 @@ public sealed partial class EventFilterArchitectureTests
                 continue;
             }
 
-            Path.GetFileName(file).ShouldBeOneOf("EventFilterDecisions.cs", "IEventFilterDecisions.cs", "IEventFilterSwitch.cs", "DependencyInjection.cs");
+            Path.GetFileName(file).ShouldBeOneOf("EventFilterDecisions.cs", "IEventFilterDecisions.cs", "IEventFilterHistory.cs", "IEventFilterSwitch.cs", "DependencyInjection.cs");
             if (Path.GetFileName(file) == "DependencyInjection.cs")
             {
                 continue;   // the registration line only names the table in a comment
             }
 
             EventFilterDestructive().IsMatch(text).ShouldBeFalse(Path.GetFileName(file));
-            if (Path.GetFileName(file) is not ("EventFilterDecisions.cs" or "IEventFilterDecisions.cs"))
+            if (Path.GetFileName(file) is not ("EventFilterDecisions.cs" or "IEventFilterDecisions.cs" or "IEventFilterHistory.cs"))
             {
                 text.ShouldNotContain("INSERT", Case.Sensitive, Path.GetFileName(file));
             }

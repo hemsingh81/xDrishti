@@ -39,6 +39,7 @@ using XDrishti.Application.Filings;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
+using XDrishti.Application.LearningPhase;
 using XDrishti.Application.Live;
 using XDrishti.Application.Live.Push;
 using XDrishti.Application.LiveTrading;
@@ -862,6 +863,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<GenerateSuggestionsCommand, SuggestionsOutcome>, GenerateSuggestionsHandler>(); // deterministic suggestions into the append-only inbox (P7-09, ADR 0092)
         services.AddScoped<IQueryHandler<ListPlanRunsQuery, Result<IReadOnlyList<PlanRunView>>>, ListPlanRunsHandler>();
         services.AddScoped<IQueryHandler<GetPlanNoticesQuery, PlanNotices>, GetPlanNoticesHandler>(); // the plan items of the bell, derived on read, read only (P8-15, ADR 0101)
+        services.AddScoped<IQueryHandler<EventsPhaseCheckQuery, Result<EventsPhaseCheckView>>, GetEventsPhaseCheckHandler>(); // the P15 exit judged from stored verdicts through read ports only; never MET on thin, stale or unreadable evidence (P15-12)
         services.AddScoped<IQueryHandler<EvaluatePlanPhaseCheckQuery, Result<PlanPhaseCheckView>>, EvaluatePlanPhaseCheckHandler>(); // the P7 exit criteria from stored records, read only (P7-18, ADR 0097)
         services.AddScoped<ICommandHandler<GradePlansCommand, GradeOutcome>, GradePlansHandler>(); // grading (P7-13, ADR 0090): insert-only grades on stored bars, no order
         services.AddScoped<IQueryHandler<GetPlanGradeQuery, Result<PlanGradeView>>, GetPlanGradeHandler>();

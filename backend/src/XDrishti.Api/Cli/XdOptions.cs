@@ -45,6 +45,7 @@ internal sealed record XdOptions(
           xd plan run [--date YYYY-MM-DD] [--dry-run]
           xd plan phase-check [--through YYYY-MM-DD]
           xd exec phase-check [--account ID] [--through YYYY-MM-DD]
+          xd events phase-check [--cut FAMILY[,FAMILY...]] [--json]
           xd plan digest [--week YYYY-Www] [--store]
           xd learn training-set --run RUNKEY:STYLE:EXIT [--run ...] [--require NAME,NAME,...] [--half-life-days N] [--prior-strength N] [--min-trades N]
           xd live compliance show [--kind static_ip|sebi_recheck|dhan_ip_read_policy] [--limit 1..200]

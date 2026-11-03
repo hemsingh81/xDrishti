@@ -18,7 +18,7 @@ internal static class EventFilterUsers
     /// <summary>Application types outside the filings namespaces that name a filings type or port, by area: the run, the plan, the switch, the loss tag; P15-08: the set-D reader and runner of the eval (they hold the category baseline and the sample file).</summary>
     public static readonly string[] ApplicationTypes =
     [
-        "ApplyEventFilterAutoHandler", "ChangeEventFilterHandler", "GetEventFilterHandler", "ExplainBasis", "InstrumentInputReader", "RunSimulationHandler", "RunContext", "PlanEventFacts", "PlanEventFilter", "SelectionPlanBuilder", "AnalyzeLossTagsHandler", "LossTagEvents", "ILossTagEvents", "ExtractExtensionFeaturesHandler", "ExtensionFeatureExtractor", "ExtensionSources", "FilterPopulationSource", "ComparisonEvaluation", "SurpriseInputsReader", "ISurpriseInputsReader", "AnnouncementSetLoad", "AnnouncementSetRunner",
+        "ApplyEventFilterAutoHandler", "ChangeEventFilterHandler", "GetEventFilterHandler", "ExplainBasis", "InstrumentInputReader", "RunSimulationHandler", "RunContext", "PlanEventFacts", "PlanEventFilter", "SelectionPlanBuilder", "AnalyzeLossTagsHandler", "LossTagEvents", "ILossTagEvents", "ExtractExtensionFeaturesHandler", "ExtensionFeatureExtractor", "ExtensionSources", "FilterPopulationSource", "ComparisonEvaluation", "SurpriseInputsReader", "ISurpriseInputsReader", "AnnouncementSetLoad", "AnnouncementSetRunner", "GetEventsPhaseCheckHandler",
     ];
 
     /// <summary>A name pattern that matches the given roots, the compiler-generated types (<c>&lt;...&gt;</c>) and every user above.</summary>

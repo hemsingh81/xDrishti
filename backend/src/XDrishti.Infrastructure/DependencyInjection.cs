@@ -178,6 +178,7 @@ public static class DependencyInjection
         services.AddScoped<ITradeFeatureStore, TradeFeatureStore>(); // the decision-time features of trades (spec P6-04)
         services.AddScoped<IExtensionFeatureStore, ExtensionFeatureStore>(); // the values of feature extensions, insert-only; no decision path reads it (spec P13-05)
         services.AddScoped<IExtensionExtractionStore, ExtensionExtractionStore>(); // what an extension extraction was built from, insert-only; no decision path reads it (spec P15-05)
+        services.AddScoped<IExtensionEvaluationReader>(sp => sp.GetRequiredService<IExtensionEvaluationStore>()); // the read side alone, for the P15 phase check (P15-12)
         services.AddScoped<IExtensionEvaluationStore, ExtensionEvaluationStore>(); // the evaluations of feature extensions, insert-only; the hold-out is read once (spec P13-05)
         services.AddScoped<ITrainingSetStore, TrainingSetStore>(); // the training-set records (spec P6-04)
         services.AddOptions<ReportBenchmarkOptions>().Bind(configuration.GetSection(ReportBenchmarkOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // basket benchmarks (spec P8-07)
@@ -283,6 +284,7 @@ public static class DependencyInjection
         services.AddScoped<XDrishti.Application.Abstractions.Filings.IAnnouncementFlagger, XDrishti.Infrastructure.FilingArchive.AnnouncementFlagger>(); // the announcement flag (P15-08): one request over IChatModel (the P9-01 client), no tool, schema-checked answer; the model is asked only when a verb or an eval run calls it
         services.AddSingleton<XDrishti.Application.Abstractions.Filings.IAnnouncementEvalFiles, XDrishti.Infrastructure.FilingArchive.AnnouncementEvalFiles>(); // the sample and labelled files under data/eval (0600) and the committed manifest (P15-07)
         services.AddScoped<XDrishti.Application.Abstractions.Filings.ICalendarRows, XDrishti.Infrastructure.FilingArchive.CalendarRows>(); // stored results rows up to a cutoff (P15-04)
+        services.AddScoped<XDrishti.Application.Abstractions.Selection.IEventFilterHistory>(sp => sp.GetRequiredService<XDrishti.Application.Abstractions.Selection.IEventFilterDecisions>()); // the read side alone (P15-12)
         services.AddScoped<XDrishti.Application.Abstractions.Selection.IEventFilterDecisions, XDrishti.Infrastructure.FilingArchive.EventFilterDecisions>(); // filings.event_filter_decisions, insert-only: the event-risk switch history (P15-06)
         services.AddScoped<XDrishti.Application.Abstractions.Filings.IResultsFilingTimes, XDrishti.Infrastructure.FilingArchive.ResultsFilingTimes>(); // results filings' broadcast times for the news_results loss tag (P15-06)
         services.AddSingleton<XDrishti.Application.Abstractions.Filings.IResultsXbrlReader, XDrishti.Infrastructure.FilingArchive.XbrlFileReader>(); // the hardened XML reader + the pure results parser: no DTD, no resolver, no network (P15-03)
@@ -304,6 +306,7 @@ public static class DependencyInjection
         services.AddScoped<ILabRunStore, LabRunStore>(); // the Lab runs and their queue (spec P5-02)
         services.AddSingleton<IStrategyChecker, StrategyChecker>(); // the strategy file library behind its port for the Lab (spec P5-01): stateless, no I/O
         services.AddScoped<StrategySeeder>(); // the built-ins as text, written by `xd-api migrate`
+        services.AddSingleton<ISimulationEngineVersion>(sp => new EngineVersionOf(sp.GetRequiredService<ISimulationEngine>().EngineVersion)); // the engine version alone, for read-only checks (P15-12)
         services.AddSingleton<ISimulationEngine, SimulationEngineAdapter>(); // the simulation library behind its port (ADR 0039): stateless, no I/O
 
         services.AddHealthChecks()

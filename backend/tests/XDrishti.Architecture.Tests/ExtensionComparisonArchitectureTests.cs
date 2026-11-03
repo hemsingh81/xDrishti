@@ -44,8 +44,8 @@ public sealed class ExtensionComparisonArchitectureTests
     {
         Users(Application).ShouldBe(
         [
-            "ComparisonEvaluation", "EvalFlagGradeSource", "EvaluationWriter", "EventFilterVerdictReader", "ExtensionEvaluationErrors", "ExtensionEvaluationMapper", "ExtensionFeatureExtractor", "ExtensionRunSource", "ExtensionTrainingSource", "ExtractExtensionFeaturesHandler",
-            "FilterEvaluation", "FilterPopulation", "FilterPopulationSource", "FlagEvaluation", "GetExtensionEvaluationHandler", "IExtensionEvaluationStore", "IExtensionExtractionStore", "IExtensionFeatureStore", "IExtensionTrainingSource",
+            "ComparisonEvaluation", "EvalFlagGradeSource", "EvaluationWriter", "EventFilterVerdictReader", "EventsPhaseCheckView", "ExtensionEvaluationErrors", "ExtensionEvaluationMapper", "ExtensionFeatureExtractor", "ExtensionRunSource", "ExtensionTrainingSource", "ExtractExtensionFeaturesHandler",
+            "FilterEvaluation", "FilterPopulation", "FilterPopulationSource", "FlagEvaluation", "GetEventsPhaseCheckHandler", "GetExtensionEvaluationHandler", "IExtensionEvaluationReader", "IExtensionEvaluationStore", "IExtensionExtractionStore", "IExtensionFeatureStore", "IExtensionTrainingSource",
             "IFlagGradeSource", "ListExtensionEvaluationsHandler", "PeadEvaluation", "PeadEventSet", "PeadRunEventSource", "SurpriseInputsReader", "TrainingDataLoader",
         ]);
     }

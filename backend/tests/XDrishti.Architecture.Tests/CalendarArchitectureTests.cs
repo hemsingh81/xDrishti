@@ -28,7 +28,7 @@ public sealed partial class CalendarArchitectureTests
         var port = typeof(IResultsCalendar).FullName!;
 
         // P15-06 names its callers deliberately: the plan reads the calendar through PlanEventFilter while the switch is ON, and the switch view counts the coverage.
-        Named(Application, port).ShouldBe(["DependencyInjection", "GetEventFilterHandler", "GetResultsCalendarHandler", "PlanEventFilter", "ResultsCalendar"]);
+        Named(Application, port).ShouldBe(["DependencyInjection", "GetEventFilterHandler", "GetEventsPhaseCheckHandler", "GetResultsCalendarHandler", "PlanEventFilter", "ResultsCalendar"]);
         Named(Infrastructure, port).ShouldBeEmpty();
         Named(Assembly.Load(new AssemblyName("XDrishti.Api")), port).ShouldBeEmpty();
         Named(Domain, port).ShouldBeEmpty();
@@ -82,7 +82,7 @@ public sealed partial class CalendarArchitectureTests
             var text = File.ReadAllText(file);
             if (text.Contains("DaysToResults", StringComparison.Ordinal) && text.Contains("IResultsCalendar", StringComparison.Ordinal))
             {
-                Path.GetFileName(file).ShouldBeOneOf("IResultsCalendar.cs", "ResultsCalendar.cs", "GetResultsCalendarHandler.cs", "PlanEventFilter.cs", "GetEventFilterHandler.cs");   // P15-06: the plan check gets its days from the calendar in PlanEventFilter, only while the switch is ON
+                Path.GetFileName(file).ShouldBeOneOf("IResultsCalendar.cs", "ResultsCalendar.cs", "GetResultsCalendarHandler.cs", "PlanEventFilter.cs", "GetEventFilterHandler.cs", "GetEventsPhaseCheckHandler.cs");   // P15-06: the plan check gets its days from the calendar in PlanEventFilter, only while the switch is ON
             }
         }
     }

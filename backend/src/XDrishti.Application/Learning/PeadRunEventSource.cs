@@ -39,7 +39,7 @@ internal sealed class PeadRunEventSource(IRunStore runs, ISimulationEngine engin
 
         if (hashes.Count == 0)
         {
-            return new PeadEventSet([], "no PEAD events: the engine does not know the strategy PEAD");
+            return new PeadEventSet([], "no PEAD events: the engine does not know the strategy PEAD", engine.EngineVersion);
         }
 
         // newest first. A set is the eight runs (four variants, top and middle) that share the window, the universe, the fills and the costs; the newest run of each (variant, bucket) within a set is read.
@@ -52,7 +52,7 @@ internal sealed class PeadRunEventSource(IRunStore runs, ISimulationEngine engin
             var page = await runs.ListAsync(new RunListFilter(Strategy, engine.EngineVersion), new PageRequest(PageSize, cursor), cancellationToken);
             if (page.IsFailure)
             {
-                return new PeadEventSet([], "no PEAD events: the stored runs could not be listed (" + page.Error.Code + ")");
+                return new PeadEventSet([], "no PEAD events: the stored runs could not be listed (" + page.Error.Code + ")", engine.EngineVersion);
             }
 
             foreach (var header in page.Value.Items)
@@ -76,13 +76,13 @@ internal sealed class PeadRunEventSource(IRunStore runs, ISimulationEngine engin
 
         if (sets.Count == 0)
         {
-            return new PeadEventSet([], "no PEAD events: no stored run of PEAD for engine " + engine.EngineVersion + " (run the four variants and the control, then evaluate)");
+            return new PeadEventSet([], "no PEAD events: no stored run of PEAD for engine " + engine.EngineVersion + " (run the four variants and the control, then evaluate)", engine.EngineVersion);
         }
 
         var complete = sets.Values.Where(m => m.Count == hashes.Count).OrderBy(m => m.Values.Min(v => v.Order)).FirstOrDefault();
         if (complete is null)
         {
-            return new PeadEventSet([], "no coherent set of the eight PEAD runs: no group of runs shares the window, universe, fills and costs for all four variants and both buckets");
+            return new PeadEventSet([], "no coherent set of the eight PEAD runs: no group of runs shares the window, universe, fills and costs for all four variants and both buckets", engine.EngineVersion);
         }
 
         var chosen = complete.ToDictionary(c => c.Key, c => c.Value.Header);
@@ -125,6 +125,6 @@ internal sealed class PeadRunEventSource(IRunStore runs, ISimulationEngine engin
         }
 
         var note = string.Create(CultureInfo.InvariantCulture, $"{chosen.Count} stored runs of PEAD for engine {engine.EngineVersion}: {string.Join(", ", chosen.OrderBy(c => c.Key.Item1, StringComparer.Ordinal).ThenBy(c => c.Key.Item2).Select(c => c.Key.Item1 + "/" + c.Key.Item2 + "=" + c.Value.RunKey[..12]))}");
-        return new PeadEventSet(events, note);
+        return new PeadEventSet(events, note, engine.EngineVersion);
     }
 }

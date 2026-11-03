@@ -107,6 +107,7 @@ internal sealed class PeadEvaluation(IPeadEventSource events, EvaluationWriter w
         "quarter",
         new SortedDictionary<string, string>(StringComparer.Ordinal)
         {
+            ["engine"] = set.Engine ?? "none",
             ["events"] = set.Events.Count.ToString(CultureInfo.InvariantCulture),
             ["events_sha256"] = ExtensionFamilies.Sha256Hex(string.Join(',', set.Events.Select(e => e.Key).Order(StringComparer.Ordinal))),
             ["frozen_variant"] = chosen ?? "none",

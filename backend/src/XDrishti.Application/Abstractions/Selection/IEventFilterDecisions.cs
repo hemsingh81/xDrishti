@@ -9,10 +9,7 @@ public sealed record NewEventFilterRow(bool Enabled, int ResultsWithinDays, stri
 /// <summary>
 /// The decision history as the runtime role has it: SELECT and INSERT on <c>filings.event_filter_decisions</c> (nothing else). The database judges every row again (owner or auto shape, reason, range, an automatic row's limits). An insert answers the new id or the database's refusal.
 /// </summary>
-public interface IEventFilterDecisions
+public interface IEventFilterDecisions : IEventFilterHistory
 {
-    /// <summary>The newest rows, newest first.</summary>
-    Task<IReadOnlyList<EventFilterRow>> RowsAsync(int take, CancellationToken cancellationToken);
-
     Task<(long? Id, string? Refused)> AppendAsync(NewEventFilterRow row, CancellationToken cancellationToken);
 }

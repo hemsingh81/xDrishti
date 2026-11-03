@@ -1,6 +1,6 @@
 # P15-12 — The phase check: "features and filters improve OOS or are dropped", read from stored verdicts only
 
-- **Status:** Draft (written 2026-11-02 under the owner's delegation; the owner's Approved is needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, blanket approval of all stories)
 - **Phase / roadmap row:** P15 — slice P15-12 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Phase check"); exit criterion of the roadmap row: "Features/filters improve OOS or are dropped".
 - **Design refs:** docs/design/18 (P15 row) · P8-00 D3 · ADR 0080 (MET / NOT MET / NOT EVALUABLE, limits always printed), ADR 0097 and spec P7-18 (stored records only, never MET on thin data, exit code 0), P12-12 (a read-only measurement) · the `/phase-done` skill.
 - **Needs:** P15-10 (records in `research.extension_evaluations`, a P13-05 table), P15-06 (`filings.event_filter_decisions`), P15-02/04 (coverage). Reads whatever exists; a missing table or family is NOT EVALUABLE for that family, not an error.
@@ -27,12 +27,12 @@ Families (the cut ones are listed as cut, not counted): `filter:results`, `ext:e
 ## Acceptance criteria
 1. **Verdict table.** Fixtures: all five KEEP/DROP and filter OFF → MET; one NOT_EVALUABLE → NOT EVALUABLE naming it and its missing quantity; filter ON with newest F = DROP → NOT MET (violation printed with the decision row id and who made it, `owner` or `auto`); a KEEP of an older catalog version → `stale`, NOT EVALUABLE; no records at all → NOT EVALUABLE "no P15 evaluation stored".
 2. **Cut families.** `--cut ext:llm-1,pead` lists them as cut and leaves them out of the overall; the cut list is printed; without the flag nothing is cut.
-3. **Read only.** Architecture test: the handler uses only read ports; a test database role with SELECT only runs it; no setting, ledger or record is written.
+3. **Read only.** Architecture test: the handler uses only read ports; the two stores it reads (`research.extension_evaluations`, `filings.event_filter_decisions`) run through a test database role with SELECT only, and the other ports (filings, calendar, bars) are read-only by signature (pinned by the architecture test); no setting, ledger or record is written.
 4. **Honest output.** No digit for a non-value; the limits block is always printed; `--json` has the same fields (snapshot test).
 5. **Determinism.** Same stored rows → identical output.
 
 ## Contract
-- **Verb:** `xd events phase-check [--cut …] [--json]`, exit code 0. No API, no data change.
+- **Verb:** `xd events phase-check [--cut …] [--json]`, exit code 0 whatever the verdict (1 for an unknown family in `--cut`, 2 for a bad line). No API, no data change.
 
 ## Non-functional
 ≤ 2 s on the owner's database.

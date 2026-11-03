@@ -27,6 +27,7 @@ internal sealed class FlagEvaluation(IFlagGradeSource grades, EvaluationWriter w
             ["prompt_hash"] = grade?.PromptHash ?? "none",
         };
         var recipe = ExtensionFamilies.Sha256Hex("protocol-l/1;min_labels=" + ProtocolL.MinLabels);
+        // The two records are stored one after the other. A crash between them leaves a grade without its comparison; the P15 phase check reads that as open ("the comparison (protocol X) is not stored"), never as a resolved family (ADR 0190).
         var records = new List<EvaluatedRecord>();
         foreach (var (identity, outcome) in new[]
         {

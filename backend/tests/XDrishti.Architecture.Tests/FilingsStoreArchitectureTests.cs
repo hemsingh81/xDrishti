@@ -81,12 +81,12 @@ public sealed partial class FilingsStoreArchitectureTests
         var allowed = new Dictionary<string, string[]>
         {
             [typeof(IFilingStore).FullName!] = ["IngestFilingsHandler"],
-            [typeof(IFilingReader).FullName!] = ["GetFilingCoverageHandler", "GetFilingFactsHandler", "GetFilingHandler", "ListFilingsHandler"],
+            [typeof(IFilingReader).FullName!] = ["GetEventsPhaseCheckHandler", "GetFilingCoverageHandler", "GetFilingFactsHandler", "GetFilingHandler", "ListFilingsHandler"],   // P15-12: the phase check reads the coverage counts
             [typeof(IFilingFiles).FullName!] = ["IngestFilingsHandler", "LoadAnnouncementsHandler", "ParseResultsHandler"],   // P15-03: the parse step opens the stored copy read-only; P15-07: the announcement loader writes each row's text into the store
             [typeof(IResultFactsStore).FullName!] = ["ParseResultsHandler"],                    // P15-03: the only writer of result_facts and result_parses
             [typeof(IResultsXbrlReader).FullName!] = ["ParseResultsHandler"],
             [typeof(IResultFactRows).FullName!] = ["GetFilingFactsHandler", "ResultFactsAsOf"],
-            [typeof(IFilingInstruments).FullName!] = ["GetEventFilterHandler", "GetResultsCalendarHandler", "IngestFilingsHandler", "ListFilingsHandler", "LoadAnnouncementsHandler", "LoadCalendarHandler", "LoadShareholdingHandler"],
+            [typeof(IFilingInstruments).FullName!] = ["GetEventFilterHandler", "GetEventsPhaseCheckHandler", "GetResultsCalendarHandler", "IngestFilingsHandler", "ListFilingsHandler", "LoadAnnouncementsHandler", "LoadCalendarHandler", "LoadShareholdingHandler"],
         };
         foreach (var (port, names) in allowed)
         {
