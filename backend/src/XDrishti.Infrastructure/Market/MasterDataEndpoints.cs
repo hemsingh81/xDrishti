@@ -16,7 +16,7 @@ internal static class MasterDataEndpoints
     private static readonly Uri[] Allowed = [DhanScripMaster, NseTotalMarketList, NseHolidayMaster];
 
     /// <summary>
-    /// Dated archive paths (CF-04 Part A): a host plus a full-match path regular expression, GET, no query. <b>Deliberately empty</b>: this list is the owner's security act (ADR 0097, 0193). The app reads it and never edits it; until the owner
+    /// Dated archive paths (CF-04 Part A): a host plus a full-match path regular expression, GET, no query. <b>Deliberately empty</b>: this list is the owner's security act (ADR 0097, 0195). The app reads it and never edits it; until the owner
     /// adds the entries named in ADR 0195 (after reading NSE's terms), the history fetch is refused before anything is sent.
     /// </summary>
     public static readonly IReadOnlyList<AllowedPattern> Patterns = [];

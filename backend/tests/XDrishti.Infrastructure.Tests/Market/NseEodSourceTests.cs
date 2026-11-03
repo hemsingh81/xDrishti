@@ -12,7 +12,7 @@ using XDrishti.Infrastructure.Market.Eod;
 namespace XDrishti.Infrastructure.Tests.Market;
 
 /// <summary>
-/// CF-04 criteria 1 and 2 (Part A): the NSE archive fetch goes through the allow-list guard, which ships with an EMPTY pattern list (the owner's security act, ADR 0097 and 0193): until the owner adds entries a request is refused before
+/// CF-04 criteria 1 and 2 (Part A): the NSE archive fetch goes through the allow-list guard, which ships with an EMPTY pattern list (the owner's security act, ADR 0097 and 0195): until the owner adds entries a request is refused before
 /// anything is sent. With the owner's entries (given here by the test) the file is fetched with a plain GET, a zip is unpacked and a 404 is "no such file".
 /// </summary>
 public sealed class NseEodSourceTests : HttpMessageHandler, IHttpClientFactory
