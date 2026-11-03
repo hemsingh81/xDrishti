@@ -5,14 +5,14 @@ using XDrishti.Domain.Common;
 namespace XDrishti.Domain.Assistant.Evaluation;
 
 /// <summary>
-/// The thresholds of <c>eval/thresholds.json</c> (spec P9-09 AC 9, D1): data about 27 of 30, plans 8 and 9 of 10 with no escape and every symbol covered, ideas 8 and 9 of 10 with intent 0.85 and no idea below 0.60, both declines right, events precision 0.80 once 200 rows exist.
+/// The thresholds of <c>eval/thresholds.json</c> (spec P9-09 AC 9, D1): data about 27 of 30, plans 8 and 9 of 10 with no escape and every symbol covered, ideas 8 and 9 of 10 with intent 0.85 and no idea below 0.60, both declines right, events precision 0.80 once 200 rows exist, with at least 30 predicted material and a better-than-baseline sign test at p 0.05 (P15-08).
 /// Read from the file, never from code, so a change is reviewed. Pure: the text in, the table or a typed failure out.
 /// </summary>
 public sealed record ThresholdTable(
     int DataCases, int DataPassMin,
     int PlanCases, int PlanRawMin, int PlanRepairedMin, int PlanEscapeMax, bool PlanCoveredAll,
     int IdeaCases, int IdeaFirstShotMin, int IdeaRepairedMin, double IdeaIntentMin, double IdeaIntentFloor, int IdeaDeclineMin,
-    decimal EventsPrecisionMin, int EventsMinRows)
+    decimal EventsPrecisionMin, int EventsMinRows, int EventsMinPredictedMaterial, decimal EventsBaselineSignP)
 {
     public const string InvalidCode = "eval.invalid_thresholds";
 
@@ -31,7 +31,8 @@ public sealed record ThresholdTable(
                 data.GetProperty("of").GetInt32(), data.GetProperty("pass_min").GetInt32(),
                 plans.GetProperty("of").GetInt32(), plans.GetProperty("raw_pass_min").GetInt32(), plans.GetProperty("repaired_pass_min").GetInt32(), plans.GetProperty("escape_max").GetInt32(), plans.GetProperty("covered_all").GetBoolean(),
                 ideas.GetProperty("of").GetInt32(), ideas.GetProperty("first_shot_valid_min").GetInt32(), ideas.GetProperty("repaired_valid_min").GetInt32(), ideas.GetProperty("intent_min").GetDouble(), ideas.GetProperty("intent_floor").GetDouble(), ideas.GetProperty("decline_correct_min").GetInt32(),
-                decimal.Parse(events.GetProperty("precision_material_min").GetRawText(), NumberStyles.Float, CultureInfo.InvariantCulture), events.GetProperty("min_rows").GetInt32());
+                decimal.Parse(events.GetProperty("precision_material_min").GetRawText(), NumberStyles.Float, CultureInfo.InvariantCulture), events.GetProperty("min_rows").GetInt32(),
+                events.GetProperty("min_predicted_material").GetInt32(), decimal.Parse(events.GetProperty("baseline_sign_p").GetRawText(), NumberStyles.Float, CultureInfo.InvariantCulture));
             return table.Sane() ? Result.Success(table) : Fail();
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException or FormatException)
@@ -115,7 +116,7 @@ public sealed record ThresholdTable(
         DataCases > 0 && DataPassMin is > 0 && DataPassMin <= DataCases
         && PlanCases > 0 && PlanRawMin <= PlanRepairedMin && PlanRepairedMin <= PlanCases && PlanEscapeMax >= 0
         && IdeaCases > 0 && IdeaFirstShotMin <= IdeaRepairedMin && IdeaRepairedMin <= IdeaCases && IdeaIntentMin is >= 0 and <= 1 && IdeaIntentFloor is >= 0 and <= 1
-        && EventsPrecisionMin is > 0 and <= 1 && EventsMinRows > 0;
+        && EventsPrecisionMin is > 0 and <= 1 && EventsMinRows > 0 && EventsMinPredictedMaterial > 0 && EventsMinPredictedMaterial <= EventsMinRows && EventsBaselineSignP is > 0 and < 1;
 
     private static Result<ThresholdTable> Fail() => Result.Failure<ThresholdTable>(new Error(InvalidCode, "thresholds.json is not a valid threshold table", ErrorKind.Validation));
 }

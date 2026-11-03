@@ -104,7 +104,7 @@ public sealed partial class FilingsStoreArchitectureTests
             var result = Types.InAssembly(Assembly.Load(new AssemblyName(name))).That()
                 .DoNotResideInNamespaceStartingWith("XDrishti.Domain.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Abstractions.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Application.Filings")
                 .And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.Filings").And().DoNotResideInNamespaceStartingWith("XDrishti.Infrastructure.FilingArchive")
-                .And().DoNotHaveNameMatching(EventFilterUsers.WithRoots("DependencyInjection|ApiJsonContext.*|FilingEndpoints|CalendarEndpoints|AnnouncementsCommand"))
+                .And().DoNotHaveNameMatching(EventFilterUsers.WithRoots("DependencyInjection|ApiJsonContext.*|FilingEndpoints|CalendarEndpoints|AnnouncementsCommand|FilingsExtractCommand"))
                 .ShouldNot().HaveDependencyOnAny(FilingsNamespaces).GetResult();
 
             result.IsSuccessful.ShouldBeTrue(name + " violations: " + string.Join(", ", result.FailingTypeNames ?? []));
@@ -142,6 +142,7 @@ public sealed partial class FilingsStoreArchitectureTests
             ["AnnouncementStore.cs"] = ["filings.announcements"],   // P15-07: the announcement store, this file and nowhere else
             ["EventFilterDecisions.cs"] = ["filings.event_filter_decisions"],   // P15-06: the switch history, its own file and nowhere else
             ["ResultFactsStore.cs"] = ["filings.result_parses", "filings.result_facts"],   // P15-03: the parse rows and the facts, this file and nowhere else
+            ["AnnouncementExtractionStore.cs"] = ["filings.extractions"],   // P15-08: the LLM extractions, insert-only, this file and nowhere else
         };
         foreach (var file in Files("XDrishti.Infrastructure", "FilingArchive"))
         {
@@ -183,12 +184,12 @@ public sealed partial class FilingsStoreArchitectureTests
         var allowed = new Dictionary<string, string[]>
         {
             [typeof(IAnnouncementStore).FullName!] = ["LoadAnnouncementsHandler"],
-            [typeof(IAnnouncementCandidates).FullName!] = ["SampleAnnouncementsHandler"],
-            [typeof(IAnnouncementEvalFiles).FullName!] = ["ImportAnnouncementLabelsHandler", "SampleAnnouncementsHandler", "ShowAnnouncementsHandler"],
+            [typeof(IAnnouncementCandidates).FullName!] = ["ExtractAnnouncementsHandler", "SampleAnnouncementsHandler"],   // P15-08: the extraction verb reads each announcement's stored text
+            [typeof(IAnnouncementEvalFiles).FullName!] = ["AnnouncementSetRunner", "ImportAnnouncementLabelsHandler", "SampleAnnouncementsHandler", "ShowAnnouncementsHandler"],   // P15-08: the set-D runner reads sample.json for the weights
             ["XDrishti.Domain.Filings.AnnouncementCsv"] = ["LoadAnnouncementsHandler"],
             ["XDrishti.Domain.Filings.AnnouncementSampler"] = ["SampleAnnouncementsHandler"],
             ["XDrishti.Domain.Filings.AnnouncementLabels"] = ["ImportAnnouncementLabelsHandler"],
-            ["XDrishti.Domain.Filings.AnnouncementCategoryBaseline"] = ["ImportAnnouncementLabelsHandler", "SampleAnnouncementsHandler", "ShowAnnouncementsHandler"],
+            ["XDrishti.Domain.Filings.AnnouncementCategoryBaseline"] = ["AnnouncementSetLoad", "AnnouncementSetRunner", "ImportAnnouncementLabelsHandler", "SampleAnnouncementsHandler", "ShowAnnouncementsHandler"],   // P15-08: the set-D reader holds it and the runner compares the model with it
             ["XDrishti.Domain.Assistant.Evaluation.AnnouncementSet"] = ["AnnouncementSetLoad", "ImportAnnouncementLabelsHandler", "ShowAnnouncementsHandler"],
         };
         foreach (var (type, names) in allowed)

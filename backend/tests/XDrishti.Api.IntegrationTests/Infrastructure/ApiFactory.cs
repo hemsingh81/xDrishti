@@ -438,7 +438,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.live_quotes;
                 DELETE FROM market.context_daily;
                 DELETE FROM market.instrument_broker_ids;
-                TRUNCATE filings.calendar, filings.announcements, filings.shareholding, filings.result_facts, filings.result_parses, filings.filings;
+                TRUNCATE filings.extractions, filings.calendar, filings.announcements, filings.shareholding, filings.result_facts, filings.result_parses, filings.filings;
                 TRUNCATE filings.event_filter_decisions RESTART IDENTITY;
                 TRUNCATE research.extension_evaluations;
                 DELETE FROM lab.test_ledger WHERE strategy_id LIKE '%:%' OR strategy_id = 'pead';

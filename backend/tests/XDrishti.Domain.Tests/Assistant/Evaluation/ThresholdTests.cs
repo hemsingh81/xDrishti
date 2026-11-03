@@ -8,7 +8,7 @@ public sealed class ThresholdTests
     [Fact]
     public void The_file_holds_the_thresholds_of_doc_14()
     {
-        Table.ShouldBe(new ThresholdTable(30, 27, 10, 8, 9, 0, true, 10, 8, 9, 0.85, 0.60, 2, 0.80m, 200));
+        Table.ShouldBe(new ThresholdTable(30, 27, 10, 8, 9, 0, true, 10, 8, 9, 0.85, 0.60, 2, 0.80m, 200, 30, 0.05m));
     }
 
     [Theory]
@@ -68,7 +68,7 @@ public sealed class ThresholdTests
         rows.AddRange(Enumerable.Range(0, falsePositive).Select(i => new AnnouncementRow($"fp{i}", false, true)));
         rows.AddRange(Enumerable.Range(0, falseNegative).Select(i => new AnnouncementRow($"fn{i}", true, false)));
         rows.AddRange(Enumerable.Range(0, trueNegative).Select(i => new AnnouncementRow($"tn{i}", false, false)));
-        return rows;
+        return [.. rows.Select(r => r with { BaselineMaterial = false })]; // the weakest baseline: nothing is material
     }
 
     [Fact]

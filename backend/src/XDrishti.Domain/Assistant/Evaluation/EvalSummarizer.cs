@@ -22,7 +22,14 @@ public static class EvalSummarizer
 
         if (events is not null)
         {
-            sets.Add(new SetSummary("events", new SetOutcome("events", events.State, events.Note is null ? [] : [events.Note]), Events(events), events.Rows, 1, null, null, null));
+            var reasons = new List<string>();
+            if (events.Note is not null)
+            {
+                reasons.Add(events.Note);
+            }
+
+            reasons.AddRange(events.Detail?.Lines() ?? []);
+            sets.Add(new SetSummary("events", new SetOutcome("events", events.State, reasons), Events(events), events.Rows, events.Detail is null ? 1 : repeats, events.Detail is null || events.Rows == 0 ? null : 1.0 - ((double)events.Detail.Unstable / events.Rows), null, null));
         }
 
         var outcomes = sets.Select(s => s.Outcome).ToList();
@@ -84,6 +91,19 @@ public static class EvalSummarizer
         if (e.TruePositive + e.FalseNegative > 0)
         {
             lines.Add(RateLine.Of("recall_material", e.TruePositive, e.TruePositive + e.FalseNegative));
+        }
+
+        if (e.Detail is { } d)
+        {
+            if (d.BaselineTruePositive + d.BaselineFalsePositive > 0)
+            {
+                lines.Add(RateLine.Of("baseline_precision_material", d.BaselineTruePositive, d.BaselineTruePositive + d.BaselineFalsePositive));
+            }
+
+            if (d.BaselineTruePositive + d.BaselineFalseNegative > 0)
+            {
+                lines.Add(RateLine.Of("baseline_recall_material", d.BaselineTruePositive, d.BaselineTruePositive + d.BaselineFalseNegative));
+            }
         }
 
         return lines;

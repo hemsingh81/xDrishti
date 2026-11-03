@@ -154,6 +154,8 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<SampleAnnouncementsCommand, AnnouncementEvalReport>, SampleAnnouncementsHandler>(); // xd eval announcements sample (P15-07): the stratified 240 for labelling, files under data/eval
         services.AddScoped<ICommandHandler<ImportAnnouncementLabelsCommand, AnnouncementEvalReport>, ImportAnnouncementLabelsHandler>(); // xd eval announcements import (P15-07): the owner's labels checked against the sample
         services.AddScoped<IQueryHandler<ShowAnnouncementsQuery, AnnouncementEvalReport>, ShowAnnouncementsHandler>(); // xd eval announcements show (P15-07)
+        services.AddScoped<ICommandHandler<ExtractAnnouncementsCommand, ExtractionSummary>, ExtractAnnouncementsHandler>(); // xd filings extract (P15-08): the owner's act; one request at a time through the announcement flagger (no tool), insert-only rows; nothing reads them for a decision
+        services.AddScoped<IQueryHandler<GetExtractionCoverageQuery, ExtractionCoverageView>, GetExtractionCoverageHandler>(); // GET /api/filings/extractions/coverage (P15-08): counts only
         services.AddScoped<IResultsCalendar, ResultsCalendar>(); // days_to_results as known at an instant (P15-04): named by PlanEventFilter and the switch view since P15-06, by no other decision code
         services.AddScoped<IEventCalendarSnapshots, EventCalendarSnapshots>(); // the results-calendar snapshot of a run that names not_event_day: one read before the walk (P15-06, ADR 0182)
         services.AddScoped<IEventFilterSwitch, EventFilterSwitch>(); // the effective event-risk switch: the newest decision row, OFF when none or unreadable (P15-06)
@@ -726,7 +728,7 @@ public static class DependencyInjection
         services.AddScoped<IFilterPopulationSource, FilterPopulationSource>(); // the unfiltered stored runs' trades with the calendar's answer, for protocol F (P15-10): read
         services.AddScoped<IExtensionTrainingSource, ExtensionTrainingSource>(); // the joined tf-1 and extension rows of the stored runs, for protocol X (P15-10): read
         services.TryAddScoped<IPeadEventSource, PeadRunEventSource>(); // the stored runs of PEAD (P15-09); with none, or too few seasons, protocol P states NOT_EVALUABLE
-        services.TryAddScoped<IFlagGradeSource, UnavailableFlagGradeSource>(); // no accepted set D eval run before P15-08: protocol L is NOT_EVALUABLE
+        services.TryAddScoped<IFlagGradeSource, EvalFlagGradeSource>(); // the set D grade of the newest ACCEPTED eval run with its stored model and prompt hashes (P15-08); none = NOT_EVALUABLE, never a pass
         services.AddScoped<EvaluationWriter>();
         services.AddScoped<FilterEvaluation>();
         services.AddScoped<ComparisonEvaluation>();
@@ -909,6 +911,7 @@ public static class DependencyInjection
         services.AddScoped<PlanTextRunner>();
         services.AddScoped<IdeaDraftRunner>();
         services.AddScoped<IEvalAnswerSource>(sp => new EvalTurnAnswerSource(EvalTurnRunnerFactory.Create(sp), sp.GetRequiredService<IConversationReader>()));
+        services.AddScoped<AnnouncementSetRunner>(); // set D's classifier run over the labelled rows (P15-08)
         services.AddScoped<ICommandHandler<RunEvalCommand, EvalRunView>, RunEvalHandler>(); // started by the owner's verb only: never by an endpoint, service or job
         services.AddScoped<ICommandHandler<GradeEvalAnswersCommand, EvalRunView>, GradeEvalAnswersHandler>();
         services.AddScoped<ICommandHandler<AcceptEvalCommand, EvalRunView>, AcceptEvalHandler>(); // the baseline: the owner's verb, a gating PASS, no auto option

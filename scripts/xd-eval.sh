@@ -3,6 +3,7 @@
 #   scripts/xd-eval.sh prepare                      creates and seeds the fixture database and starts the eval tool server xd-mcp-eval (scripts/eval-db.sh)
 #   scripts/xd-eval.sh run [--set S]... [--repeats N]   runs the eval ONCE (the model must be running: scripts/xd-ai.sh start; the assistant's master switch must be ON in the app) and saves the report to data/eval/<run>/
 #   scripts/xd-eval.sh grade --answers FILE --target hermes   grades another assistant's answers from a file (no model)
+#   scripts/xd-eval.sh filings-extract --from YYYY-MM-DD --to YYYY-MM-DD [--limit N]   classifies stored announcements with the local model (P15-08: one request at a time, no tool; the model must be running and the assistant's master switch ON in the app; reads the filings store read-only, writes only filings.extractions)
 #   scripts/xd-eval.sh announcements sample|import|show ...   the announcement set D (P15-07): the sample for labelling, the owner's labels, the state (no model; mounts data/eval, the repo's eval/ read-write for the manifest, and the real filings store read-only; reads the real filings tables read-only)
 #   scripts/xd-eval.sh compare RUN [--baseline RUN] | accept RUN [--reason TEXT] | show RUN [--json|--md|--answers]
 #   scripts/xd-eval.sh stop                         removes xd-mcp-eval
@@ -25,6 +26,8 @@ LABELLED_DIR="$ROOT/data/eval/sets"
 xd_eval() {
   local mounts=()
   [[ -d "$LABELLED_DIR" ]] && mounts=(-v "$LABELLED_DIR:/data/eval-data/sets:ro" -e Eval__DataFolder=/data/eval-data)
+  # sample.json (no text) gives the inclusion weights that set D recomputes from the labelled rows (P15-08)
+  [[ -d "$LABELLED_DIR" && -d "$ROOT/data/eval/announcements" ]] && mounts+=(-v "$ROOT/data/eval/announcements:/data/eval-data/announcements:ro")
   "${COMPOSE[@]}" run --rm --no-deps ${mounts[@]+"${mounts[@]}"} xd-eval xd eval "$@"
 }
 
@@ -76,11 +79,17 @@ case "$verb" in
     [[ -n "$file" ]] && mounts+=(-v "$file:/label-file.csv:ro")
     "${COMPOSE[@]}" run --rm --no-deps ${mounts[@]+"${mounts[@]}"} -e Eval__Folder=/data/eval-rw -e Eval__DataFolder=/data/eval-data -e Filings__FilesPath=/data/filings/files xd-eval xd eval announcements ${args[@]+"${args[@]}"} "$@"
     ;;
+  filings-extract)
+    # The verb of P15-08: the model and the real filings store, nothing else. The text files are mounted read-only; the only write is the insert-only table filings.extractions.
+    shift
+    [[ "$(health xdrishti-xd-llm-1)" == "healthy" ]] || { echo "The model server is not running: scripts/xd-ai.sh start" >&2; exit 1; }
+    "${COMPOSE[@]}" run --rm --no-deps -v "$ROOT/data/filings/files:/data/filings/files:ro" -e Filings__FilesPath=/data/filings/files xd-eval xd filings extract "$@"
+    ;;
   compare|accept|show)
     xd_eval "$@"
     ;;
   *)
-    echo "usage: $0 prepare | run [--set S]... [--repeats N] | grade --answers FILE --target T | compare RUN | accept RUN [--reason TEXT] | announcements sample|import|show | show RUN | stop" >&2
+    echo "usage: $0 prepare | run [--set S]... [--repeats N] | grade --answers FILE --target T | compare RUN | accept RUN [--reason TEXT] | announcements sample|import|show | filings-extract --from D --to D [--limit N] | show RUN | stop" >&2
     exit 2
     ;;
 esac

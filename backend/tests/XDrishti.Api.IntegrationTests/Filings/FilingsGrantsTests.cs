@@ -4,6 +4,7 @@ using XDrishti.Api.IntegrationTests.Research;
 using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Selection;
 using XDrishti.Domain.Filings;
+using XDrishti.Domain.Filings.Extraction;
 using XDrishti.Infrastructure.FilingArchive;
 
 namespace XDrishti.Api.IntegrationTests.Filings;
@@ -15,7 +16,7 @@ namespace XDrishti.Api.IntegrationTests.Filings;
 [Collection(ApiTestSuite.Name)]
 public sealed class FilingsGrantsTests(ResearchGrantsTests.DedicatedServer server) : IClassFixture<ResearchGrantsTests.DedicatedServer>
 {
-    private static readonly string[] Tables = ["filings", "result_facts", "shareholding", "announcements", "calendar", "event_filter_decisions", "result_parses"];   // event_filter_decisions is the event-risk switch history (P15-06), result_parses the parse outcomes (P15-03)
+    private static readonly string[] Tables = ["filings", "result_facts", "shareholding", "announcements", "calendar", "event_filter_decisions", "result_parses", "extractions"];   // event_filter_decisions is the event-risk switch history (P15-06), result_parses the parse outcomes (P15-03), extractions the LLM announcement flags (P15-08)
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -83,7 +84,7 @@ public sealed class FilingsGrantsTests(ResearchGrantsTests.DedicatedServer serve
             found.Add(reader.GetString(0));
         }
 
-        found.ShouldBe([.. Tables.Order(StringComparer.Ordinal)]); // no filings.extractions: that table waits for P15-08; event_filter_decisions is P15-06
+        found.ShouldBe([.. Tables.Order(StringComparer.Ordinal)]); // event_filter_decisions is P15-06, extractions P15-08
     }
 
     [Fact]
@@ -202,6 +203,41 @@ public sealed class FilingsGrantsTests(ResearchGrantsTests.DedicatedServer serve
         foreach (var role in new[] { "xd_exec", "xd_mcp_read", "xd_mcp_sql" })
         {
             (await ScalarBooleanAsync($"SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN has_sequence_privilege('{role}', 'filings.event_filter_decisions_id_seq', 'USAGE') ELSE false END")).ShouldBeFalse(role);
+        }
+    }
+
+    [Fact]
+    public async Task The_extraction_store_works_as_the_runtime_role_and_the_refused_statements_are_refused_and_no_other_role_reads_it()
+    {
+        var instrument = Guid.NewGuid();
+        await StoreKit.ExecuteAsync(
+            server.Owner,
+            $"INSERT INTO market.instruments (id, canonical_symbol, exchange, exchange_segment, type, name, display_name, lot_size, underlying_symbol, fno_eligible, first_seen_at, last_seen_at) VALUES ('{instrument}', 'NSE:GRANTD', 'NSE', 'NSE_EQ', 'share', 'Grant D Ltd', 'Grant D Ltd', 1, 'GRANTD', false, now(), now())",
+            Ct);
+        await using var dataSource = NpgsqlDataSource.Create(server.App);
+        var filing = FilingTestKit.Ok(instrument, "grant-ann", null, FilingTestKit.Broadcast, FilingKind.Announcement);
+        (await new AnnouncementStore(dataSource).InsertAsync(new NewAnnouncement(filing, "Order", "Headline"), Ct)).Outcome.ShouldBe(FilingInsertOutcome.Stored);
+        var store = new AnnouncementExtractionStore(dataSource);
+        var key = new ExtractionKey(new string('a', 64), "announcement-flag", "v1", new string('b', 64), "1");
+        var from = FilingTestKit.Broadcast.AddDays(-1);
+
+        var pending = await store.PendingAsync(from, from.AddDays(3), key, 0, 10, Ct);
+        var saved = await store.InsertAsync(new NewExtraction(filing.Id, key, "ok", null, new AnnouncementAnswer(true, "order_win", "r", 100m, "none", "none"), false, 12, 1, 1, FilingTestKit.Ingested), Ct);
+        var again = await store.InsertAsync(new NewExtraction(filing.Id, key, "ok", null, new AnnouncementAnswer(true, "order_win", "r", 100m, "none", "none"), false, 12, 1, 1, FilingTestKit.Ingested), Ct);
+        var coverage = await store.CoverageAsync(Ct);
+
+        pending.ShouldBe([filing.Id]);
+        (saved, again).ShouldBe((true, false));
+        coverage.ShouldContain(c => c.State == "ok" && c.Count >= 1);
+        (await SqlStateAsync(server.App, "UPDATE filings.extractions SET latency_ms = 0")).ShouldBe("42501");
+        (await SqlStateAsync(server.App, "DELETE FROM filings.extractions")).ShouldBe("42501");
+        (await SqlStateAsync(server.App, "TRUNCATE filings.extractions")).ShouldBe("42501");
+        foreach (var role in new[] { "xd_exec", "xd_mcp_read", "xd_mcp_sql" })
+        {
+            foreach (var privilege in new[] { "SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE" })
+            {
+                (await HasAsync(role, "filings.extractions", privilege)).ShouldBeFalse(role + " " + privilege);
+            }
         }
     }
 

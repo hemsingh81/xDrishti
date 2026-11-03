@@ -11,7 +11,7 @@ namespace XDrishti.Application.Assistant.Evaluation;
 
 /// <summary>
 /// Runs the eval once (spec P9-09 AC 8, 13, ADR 0143). It is the owner's act and nothing else starts it. Before any model call it reads the eval files, checks that the master switch is on (it never sets it), that the model is ready, that the nightly run is not going and that the
-/// database behind the eval tool endpoint is the fixture database (the marker). It then asks each case <c>repeats</c> times as <c>Origin: eval</c>, grades by code, and stores the run with its cases in one insert-only write. It reads only the fixture; the only rows written
+/// database behind the eval tool endpoint is the fixture database (the marker). It then asks each case <c>repeats</c> times as <c>Origin: eval</c> (set D: each labelled announcement through the announcement flagger, P15-08), grades by code, and stores the run with its cases in one insert-only write. It reads only the fixture; the only rows written
 /// outside the eval tables are the assistant's own audit rows of the eval conversations (fixture data). A model that goes down stops the run: the partial run is stored as <c>model_unavailable</c> and is never a pass.
 /// </summary>
 internal sealed class RunEvalHandler(
@@ -23,6 +23,7 @@ internal sealed class RunEvalHandler(
     IEvalAnswerSource answers,
     PlanTextRunner plansRunner,
     IdeaDraftRunner ideasRunner,
+    AnnouncementSetRunner announcementsRunner,
     IEvalStore store,
     INightlyRunProbe nightly,
     TurnOptions turn,
@@ -90,6 +91,7 @@ internal sealed class RunEvalHandler(
 
         var status = "completed";
         Error? stop = null;
+        AnnouncementResult? events = null;
         try
         {
             foreach (var set in sets.Value.Where(s => s != "events"))
@@ -103,6 +105,18 @@ internal sealed class RunEvalHandler(
                 if (stop is not null)
                 {
                     break;
+                }
+            }
+
+            if (stop is null && sets.Value.Contains("events"))
+            {
+                // Set D (P15-08): graded when the labelled file is valid with enough rows and the baseline is there; otherwise the old not-graded state, which is never a pass.
+                events = w.Announcements.NotGraded(w.Thresholds);
+                if (events is null)
+                {
+                    var graded = await announcementsRunner.RunAsync(w.Announcements.Rows!, w.Announcements.Baseline!, w.Thresholds, command.Repeats, cancellationToken);
+                    stop = graded.IsFailure ? graded.Error : null;
+                    events = graded.IsSuccess ? graded.Value : null;
                 }
             }
         }
@@ -121,7 +135,6 @@ internal sealed class RunEvalHandler(
             return stop is null ? Refused<EvalRunView>(EvalErrors.Invalid("Nothing was run.")) : Refused<EvalRunView>(stop);
         }
 
-        var events = sets.Value.Contains("events") ? w.Announcements.Result(w.Thresholds) : null;
         var summary = EvalSummarizer.Build(rows, w.Thresholds, command.Repeats, events);
         if (status != "completed")
         {

@@ -4552,6 +4552,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/filings/extractions/coverage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Counts of the stored LLM announcement extractions (P15-08) per month of the announcement, model file hash, prompt version, schema version and state (ok, invalid_output, model_unavailable, too_long), with the number of order values dropped as ungrounded. Counts only: no announcement text, no reason, no answer. Nothing on a decision path reads these rows */
+    get: operations['GetFilingExtractionCoverage'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/filings': {
     parameters: {
       query?: never;
@@ -10919,6 +10936,25 @@ export interface components {
       evidence: components['schemas']['JsonElement'];
       inputs: components['schemas']['JsonElement'];
       holdOutRead: boolean;
+    };
+    /** @description Counts of stored extractions for the coverage view (no text): by month of the announcement, model, prompt, schema and state. */
+    ExtractionCoverageRow: {
+      month: string;
+      modelSha256: string;
+      promptName: string;
+      promptVersion: string;
+      schemaVersion: string;
+      state: string;
+      /** Format: int32 */
+      count: number;
+      /** Format: int32 */
+      ungrounded: number;
+    };
+    /** @description The coverage of the LLM announcement flag (P15-08): counts per month of the announcement, model file hash, prompt version, schema version and state. No text, no reason, no answer; the model hash is a file hash, not a path. */
+    ExtractionCoverageView: {
+      /** Format: int32 */
+      total: number;
+      rows: components['schemas']['ExtractionCoverageRow'][];
     };
     /** @description A filter value and how many active instruments have it. */
     FacetCount: {
@@ -30530,6 +30566,26 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetFilingExtractionCoverage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExtractionCoverageView'];
         };
       };
     };

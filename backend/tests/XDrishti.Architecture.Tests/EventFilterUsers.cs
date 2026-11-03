@@ -15,10 +15,10 @@ internal static class EventFilterUsers
     /// <summary>Simulation types that read the snapshot and call the pure filter: the simulator and its comparison (the replay only hands the input's snapshot on); <c>ResultsDaysScan</c> turns the results-days inputs into the frame's per-date series (P15-05).</summary>
     public static readonly string[] SimulationTypes = ["ResultsDaysScan", "Simulator", "SimulatorComparison"];
 
-    /// <summary>Application types outside the filings namespaces that name a filings type or port, by area: the run, the plan, the switch, the loss tag.</summary>
+    /// <summary>Application types outside the filings namespaces that name a filings type or port, by area: the run, the plan, the switch, the loss tag; P15-08: the set-D reader and runner of the eval (they hold the category baseline and the sample file).</summary>
     public static readonly string[] ApplicationTypes =
     [
-        "ApplyEventFilterAutoHandler", "ChangeEventFilterHandler", "GetEventFilterHandler", "ExplainBasis", "InstrumentInputReader", "RunSimulationHandler", "RunContext", "PlanEventFacts", "PlanEventFilter", "SelectionPlanBuilder", "AnalyzeLossTagsHandler", "LossTagEvents", "ILossTagEvents", "ExtractExtensionFeaturesHandler", "ExtensionFeatureExtractor", "ExtensionSources", "FilterPopulationSource", "ComparisonEvaluation", "SurpriseInputsReader", "ISurpriseInputsReader",
+        "ApplyEventFilterAutoHandler", "ChangeEventFilterHandler", "GetEventFilterHandler", "ExplainBasis", "InstrumentInputReader", "RunSimulationHandler", "RunContext", "PlanEventFacts", "PlanEventFilter", "SelectionPlanBuilder", "AnalyzeLossTagsHandler", "LossTagEvents", "ILossTagEvents", "ExtractExtensionFeaturesHandler", "ExtensionFeatureExtractor", "ExtensionSources", "FilterPopulationSource", "ComparisonEvaluation", "SurpriseInputsReader", "ISurpriseInputsReader", "AnnouncementSetLoad", "AnnouncementSetRunner",
     ];
 
     /// <summary>A name pattern that matches the given roots, the compiler-generated types (<c>&lt;...&gt;</c>) and every user above.</summary>

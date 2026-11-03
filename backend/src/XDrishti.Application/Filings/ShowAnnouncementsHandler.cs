@@ -8,7 +8,7 @@ namespace XDrishti.Application.Filings;
 
 /// <summary>
 /// <c>xd eval announcements show</c> (spec P15-07 criterion 9): the sample, the class counts, the label distribution per half and the baseline's precision on the labelled rows, with the plain statement that precision on this sample is a stratified estimate and the formula of the
-/// population-weighted precision that P15-08 prints. Without labels it says it is waiting for them. Read only; counts and ids, never text.
+/// population-weighted precision that the set D report prints (P15-08). Without labels it says it is waiting for them. Read only; counts and ids, never text.
 /// </summary>
 internal sealed class ShowAnnouncementsHandler(IAnnouncementEvalFiles files) : IQueryHandler<ShowAnnouncementsQuery, AnnouncementEvalReport>
 {
@@ -57,11 +57,12 @@ internal sealed class ShowAnnouncementsHandler(IAnnouncementEvalFiles files) : I
         {
             var predicted = rows.Where(r => baseline.Value.IsMaterial(r.Category)).ToList();
             var hits = predicted.Count(r => r.Material);
-            double Weight(LabelledAnnouncement r) => byId.TryGetValue(r.Id, out var row) ? row.Weight : 1.0;
+            // The weights are recomputed from the labelled rows per stratum (P15-08), so a reserve row that replaced an "unsure" one does not carry the weight of the drawn sample.
+            var weights = AnnouncementWeights.Recompute(sample, rows);
+            double Weight(LabelledAnnouncement r) => weights.GetValueOrDefault(r.Id, 1.0);
             var weightedPredicted = predicted.Sum(Weight);
             var weightedHits = predicted.Where(r => r.Material).Sum(Weight);
-            // The weights are those of the drawn rows. A row that replaced an "unsure" one keeps the weight of its own stratum, which is not exactly the inclusion weight of the final 200, so the weighted figure is approximate; P15-08 must recompute weights from the labelled rows per stratum.
-            lines.Add($"category baseline: predicts material for {predicted.Count} rows, {hits} of them labelled material (precision {Ratio(hits, predicted.Count)} on the sample); population-weighted (approximate: replaced rows keep their own stratum weight) {(weightedPredicted > 0 ? (weightedHits / weightedPredicted).ToString("0.000", CultureInfo.InvariantCulture) : "n/a")}");
+            lines.Add($"category baseline: predicts material for {predicted.Count} rows, {hits} of them labelled material (precision {Ratio(hits, predicted.Count)} on the sample); population-weighted (weights recomputed from the labelled rows per stratum) {(weightedPredicted > 0 ? (weightedHits / weightedPredicted).ToString("0.000", CultureInfo.InvariantCulture) : "n/a")}");
         }
 
         lines.Add("precision on this sample is a stratified estimate (half of the rows come from the baseline-material categories), not the precision on all announcements.");

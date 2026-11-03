@@ -15947,6 +15947,27 @@
         }
       }
     },
+    "/api/filings/extractions/coverage": {
+      "get": {
+        "tags": [
+          "Filings"
+        ],
+        "summary": "Counts of the stored LLM announcement extractions (P15-08) per month of the announcement, model file hash, prompt version, schema version and state (ok, invalid_output, model_unavailable, too_long), with the number of order values dropped as ungrounded. Counts only: no announcement text, no reason, no answer. Nothing on a decision path reads these rows",
+        "operationId": "GetFilingExtractionCoverage",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractionCoverageView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/filings": {
       "get": {
         "tags": [
@@ -34649,6 +34670,68 @@
           }
         },
         "description": "One stored evaluation as the API shows it (P15-10): the verdict with the named missing quantities, the counts, the stated limits and the three JSON blocks as JSON (estimates with their intervals, the evidence block, the inputs). A value that is unavailable is the text\n`unavailable` inside those blocks, never a number."
+      },
+      "ExtractionCoverageRow": {
+        "required": [
+          "month",
+          "modelSha256",
+          "promptName",
+          "promptVersion",
+          "schemaVersion",
+          "state",
+          "count",
+          "ungrounded"
+        ],
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string"
+          },
+          "modelSha256": {
+            "type": "string"
+          },
+          "promptName": {
+            "type": "string"
+          },
+          "promptVersion": {
+            "type": "string"
+          },
+          "schemaVersion": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ungrounded": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Counts of stored extractions for the coverage view (no text): by month of the announcement, model, prompt, schema and state."
+      },
+      "ExtractionCoverageView": {
+        "required": [
+          "total",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtractionCoverageRow"
+            }
+          }
+        },
+        "description": "The coverage of the LLM announcement flag (P15-08): counts per month of the announcement, model file hash, prompt version, schema version and state. No text, no reason, no answer; the model hash is a file hash, not a path."
       },
       "FacetCount": {
         "required": [

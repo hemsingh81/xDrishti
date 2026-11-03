@@ -68,6 +68,6 @@ public sealed class EventFilterMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'filings' ORDER BY 1")).ShouldBe(["announcements", "calendar", "event_filter_decisions", "filings", "result_facts", "result_parses", "shareholding"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'filings' ORDER BY 1")).ShouldBe(["announcements", "calendar", "event_filter_decisions", "extractions", "filings", "result_facts", "result_parses", "shareholding"]);   // extractions: P15-08
     }
 }

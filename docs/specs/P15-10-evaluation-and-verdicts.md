@@ -71,6 +71,10 @@ PEAD over 5 years ≤ 5 minutes (UNVERIFIED); X for 6 folds × 2 models over 5,0
 - **Integration (Timescale):** the verb on a fixture database (tables from P13-05), the endpoints, the auto path end to end with `approval = auto`.
 - **Architecture:** criterion 9.
 
+## Requirements carried over from P15-08 (review, 2026-11-03)
+- **Missing is not "not material".** When `llm_material_5d` (llm-1) is built from `filings.extractions`, an announcement whose extraction is `model_unavailable`, `invalid_output` or `too_long`, or that has no extraction for the accepted model and prompt, is **missing** (NaN with a closed reason), never counted as `non_material`. Only `ok` rows count.
+- **Equal hashes.** The llm-1 extraction may read only `filings.extractions` rows whose model file hash and `announcement-flag` prompt hash equal those stored with the newest ACCEPTED eval run (`FlagGrade.ModelHash`, `FlagGrade.PromptHash`); a different model or prompt gives NOT_EVALUABLE (`protocol_L_not_passed`), not a silent reuse (resolves open question 1 of P15-08).
+
 ## Decisions (researched)
 1. **F counts unavailable as removed.** The filter fails closed (ADR 0182); a removal rule that ignored it would approve a filter that empties most of the book.
 2. **F classifies unfiltered trades instead of comparing two runs.** One population, no second selection effect from the filter's own unavailable rule.

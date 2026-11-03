@@ -21,6 +21,10 @@ internal sealed class FilingEndpoints : IEndpointModule
             .WithSummary("Counts of the stored filings between from and to (default: the last 365 days; at most 800) per kind and quarter: stored with a broadcast time, stored without one (by reason), superseded, out of order, and the tracked instruments with none. A kind with nothing stored answers unavailable. Counts only; 400 filings.invalid_query for a bad range")
             .ProducesValidationProblem();
 
+        group.MapGet("/extractions/coverage", GetExtractionCoverageAsync)
+            .WithName("GetFilingExtractionCoverage")
+            .WithSummary("Counts of the stored LLM announcement extractions (P15-08) per month of the announcement, model file hash, prompt version, schema version and state (ok, invalid_output, model_unavailable, too_long), with the number of order values dropped as ungrounded. Counts only: no announcement text, no reason, no answer. Nothing on a decision path reads these rows");
+
         group.MapGet("", ListAsync)
             .WithName("ListFilings")
             .WithSummary("Filing envelope metadata, newest broadcast first, at most 200 rows (no file content, no path). With asOf (an instant with an offset, needs instrument and kind) it is the point-in-time answer: the filings the market knew at that instant. 400 filings.invalid_query for an unknown kind or instrument or an asOf without an offset")
@@ -36,6 +40,11 @@ internal sealed class FilingEndpoints : IEndpointModule
             .WithSummary("The parse outcome of one stored results filing with the parser version, the stored facts (field, span, basis, state, number as filed or reason, unit) and the counts and sanity flags the parser kept. Outcome not_parsed until the parse step has run. No file content, no path; 404 filings.not_found for an unknown id")
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
+
+    private static async Task<Ok<ExtractionCoverageView>> GetExtractionCoverageAsync(
+        IQueryHandler<GetExtractionCoverageQuery, ExtractionCoverageView> handler,
+        CancellationToken cancellationToken) =>
+        TypedResults.Ok(await handler.HandleAsync(new GetExtractionCoverageQuery(), cancellationToken));
 
     private static async Task<Results<Ok<FilingFactsView>, ProblemHttpResult>> GetFactsAsync(
         HttpContext http,

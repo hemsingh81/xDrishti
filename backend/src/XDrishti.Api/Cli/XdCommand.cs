@@ -204,6 +204,11 @@ internal static class XdCommand
             return await AssistantProposeCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "filings" && args[1] == "extract")
+        {
+            return await FilingsExtractCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 1 && args[0] == "eval")
         {
             return await EvalCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);

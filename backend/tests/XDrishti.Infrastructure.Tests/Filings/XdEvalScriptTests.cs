@@ -78,6 +78,8 @@ public sealed class XdEvalScriptTests : IDisposable
     [InlineData(false, "announcements", "show")]
     [InlineData(false, "announcements", "sample", "--from", "2024-01-01", "--to", "2024-12-31")]
     [InlineData(true, "announcements", "show")]
+    [InlineData(false, "filings-extract", "--from", "2026-07-01", "--to", "2026-07-31", "--limit", "5")]
+    [InlineData(true, "run", "--set", "events")]
     public async Task Every_verb_path_runs_without_an_unbound_variable(bool withSets, params string[] args)
     {
         if (OperatingSystem.IsWindows() || !File.Exists("/bin/bash"))

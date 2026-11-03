@@ -9,6 +9,7 @@ using XDrishti.Application.Ai;
 using XDrishti.Application.Ai.Briefing;
 using XDrishti.Application.Ai.Drafting;
 using XDrishti.Application.Assistant.Evaluation;
+using XDrishti.Application.Tests.Filings;
 using XDrishti.Domain.Assistant;
 using XDrishti.Domain.Assistant.Drafting;
 using XDrishti.Domain.Assistant.Evaluation;
@@ -45,6 +46,10 @@ internal sealed class EvalRig
 
     public PerfectAnswerSource Answers { get; }
 
+    public FakeFlagger Flagger { get; } = new();
+
+    public FakeAnnouncementEvalFiles AnnouncementFiles { get; } = new();
+
     public int WriterCalls { get; private set; }
 
     public int DrafterCalls { get; private set; }
@@ -68,7 +73,7 @@ internal sealed class EvalRig
         settings.CurrentAsync(Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(Settings));
         var nightly = Substitute.For<INightlyRunProbe>();
         nightly.IsRunningAsync(Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(NightlyRunning));
-        return new RunEvalHandler(new DiskEvalFiles(SetD.Announcements, SetD.Manifest, SetD.Baseline), new FakeProbe(this), settings, new FakeEnvironment(this), new FakePrompts(this), Answers, PlanRunner(), IdeaRunner(), Store, nightly, Turn, Gate, Time, NullLogger<RunEvalHandler>.Instance);
+        return new RunEvalHandler(new DiskEvalFiles(SetD.Announcements, SetD.Manifest, SetD.Baseline), new FakeProbe(this), settings, new FakeEnvironment(this), new FakePrompts(this), Answers, PlanRunner(), IdeaRunner(), new AnnouncementSetRunner(Flagger, AnnouncementFiles, Gate, NullLogger<AnnouncementSetRunner>.Instance), Store, nightly, Turn, Gate, Time, NullLogger<RunEvalHandler>.Instance);
     }
 
     public PlanTextRunner PlanRunner() => new(new FakeWriter(this), new BriefingOptions { UseModel = false });

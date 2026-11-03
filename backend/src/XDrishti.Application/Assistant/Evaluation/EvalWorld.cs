@@ -45,7 +45,7 @@ internal sealed record EvalWorld(
 
         return Result.Success(new EvalWorld(
             data.Value, plans.Value, ideas.Value, thresholds.Value, EvalFixture.HashOf(files.Fixture),
-            Sha(files.DataQuestions + "\n--\n" + files.Plans + "\n--\n" + files.Ideas + SetD(files)), Sha(files.Thresholds), AnnouncementSetLoad.Of(files.Announcements)));
+            Sha(files.DataQuestions + "\n--\n" + files.Plans + "\n--\n" + files.Ideas + SetD(files)), Sha(files.Thresholds), AnnouncementSetLoad.Of(files.Announcements, files.AnnouncementBaseline)));
     }
 
     // Set D enters the sets hash only while its labelled file exists: the manifest, the label file's hash and the baseline file (so a baseline changed after the labels changes the fingerprint). With no file the hash is what it was before P15-07.

@@ -15,6 +15,7 @@ public static class PromptRegistry
     private const string BriefingResource = "XDrishti.Application.Ai.Prompts.briefing.v1.txt";
     private const string DraftResource = "XDrishti.Application.Ai.Prompts.draft.v1.txt";
     private const string ProposalResource = "XDrishti.Application.Ai.Prompts.proposal.v1.txt";
+    private const string AnnouncementFlagResource = "XDrishti.Application.Ai.Prompts.announcement-flag.v1.txt";
 
     /// <summary>The system prompt of a chat turn.</summary>
     public static PromptVersion Chat { get; } = Load("chat", "v1", ChatResource);
@@ -28,8 +29,11 @@ public static class PromptRegistry
     /// <summary>The system prompt of hypothesis and basket proposals (spec P9-08): the pack is added to the user message at run time.</summary>
     public static PromptVersion Proposal { get; } = Load("proposal", "v1", ProposalResource);
 
+    /// <summary>The system prompt of the announcement flag (spec P15-08): the announcement is placed between nonce fences in the user message and declared data; the model has no tool.</summary>
+    public static PromptVersion AnnouncementFlag { get; } = Load("announcement-flag", "v1", AnnouncementFlagResource);
+
     /// <summary>Every registered prompt.</summary>
-    public static IReadOnlyList<PromptVersion> All { get; } = [Chat, Briefing, Draft, Proposal];
+    public static IReadOnlyList<PromptVersion> All { get; } = [Chat, Briefing, Draft, Proposal, AnnouncementFlag];
 
     private static PromptVersion Load(string name, string version, string resource)
     {

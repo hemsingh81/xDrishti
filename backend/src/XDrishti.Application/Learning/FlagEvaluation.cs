@@ -8,7 +8,7 @@ namespace XDrishti.Application.Learning;
 
 /// <summary>
 /// The family <c>ext:llm-1</c> (P15-10): protocol L reads the grade of the newest accepted eval run (set D) and stores it as a verdict that links the run; protocol X for <c>llm-1</c> is then NOT_EVALUABLE, with <c>protocol_L_not_passed</c> named when the flag has not passed and with the rows
-/// that P15-08 has not built named when it has. The grade is read, never recomputed.
+/// that P15-10 has not built named when it has. The grade is read, never recomputed.
 /// </summary>
 internal sealed class FlagEvaluation(IFlagGradeSource grades, EvaluationWriter writer, ILogger<FlagEvaluation> logger)
 {
@@ -49,6 +49,6 @@ internal sealed class FlagEvaluation(IFlagGradeSource grades, EvaluationWriter w
     }
 
     private static string[] Gate(ProtocolOutcome flag) => flag.Verdict == ExtensionVerdict.Keep
-        ? ["no_extraction: the llm-1 feature rows are not built (P15-08)"]
+        ? ["no_extraction: the llm-1 feature rows are not built (P15-10)"]
         : [ProtocolL.NotPassed + ": " + (flag.Missing.Count > 0 ? string.Join("; ", flag.Missing) : "set D failed")];
 }
