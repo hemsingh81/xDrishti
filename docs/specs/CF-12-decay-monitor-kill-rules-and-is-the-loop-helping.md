@@ -1,6 +1,6 @@
 # CF-12 — Decay monitor, kill rules and "is the learning loop helping?"
 
-- **Status:** Draft (written 2026-10-27; the decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** CF — Confidence programme (row added by CF-00; UNVERIFIED). Extends P6-09 (drift), P6-12 (frozen counterfactual), P6-08 (lifecycle) and P10.
 - **Design refs:** docs/design/09-learning-engine.md §1 layer 4, §7, §9, §10, §13 · 16-configuration.md (`drift`, `autonomy`) · docs/research/confidence-edge-realism.md §3 rows 8 and 9 · confidence-learning-and-validation-speed.md §4 · P6-09, P6-12, P6-13, P10-00 D6, P10-04 · ADRs 0073, 0074, 0077
 - **Needs:** CF-08 (the edge series and stored features / scores), CF-05 (stress formula for kill rule a), CF-09 (failure boundary, input), CF-10c (paired bootstrap) and CF-10d (rollback executor, ECE), CF-01 (design effect), P6-08 lifecycle. Feeds CF-11 (stability, active-kill hard fail).

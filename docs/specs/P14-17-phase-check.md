@@ -1,6 +1,6 @@
 # P14-17 — The phase check: "an option expression beats cash/futures OOS after costs, else stays disabled", read from stored verdicts only
 
-- **Status:** Draft (written 2026-11-03; the owner's Approved is needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-11-03, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** P14 — slice P14-17 of [P14-00](P14-00-options-and-stat-arb-plan.md) ("Phase check"); exit criterion of the roadmap row: "An option expression beats cash/futures OOS after costs, else stays disabled".
 - **Design refs:** docs/design/18 (P14 row) · P8-00 D3 · ADR 0080 (MET / NOT MET / NOT EVALUABLE, limits always printed), 0097 and P7-18 (stored records only, never MET on thin data, exit code 0), 0190 (the P15 phase check: current versions only, violations reported, cut families listed) · the `/phase-done` skill.
 - **Needs:** P14-09 (and P14-10, P14-11, P14-13, P14-15 when built) for records in `research.extension_evaluations`; P14-06 (cash-only rule); P14-02/03 switches (read only). Reads whatever exists; a missing family is NOT EVALUABLE for that family, not an error.

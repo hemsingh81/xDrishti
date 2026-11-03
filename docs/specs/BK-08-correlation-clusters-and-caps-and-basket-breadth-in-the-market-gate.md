@@ -1,6 +1,6 @@
 # BK-08 — Correlation clusters and caps, and basket breadth in the market gate
 
-- **Status:** Draft (written 2026-10-25; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** P7 extension (selection) and P3-01e follow-up (context) — uses U8 and U6 of `docs/research/basket-leverage-uses.md`
 - **Design refs:** docs/design/10-selection-and-portfolio.md §4 (smart rules: gate, correlation), §5 (limits), §11 (as built, ADR 0085) · docs/design/09-learning-engine.md §14 (market gate) · docs/design/05-data-and-brokers.md · P7-02, P7-05, P7-06, P7-09 · P3-01e · ADR 0085, 0091
 - **Needs:** [BK-06](BK-06-basket-index-and-profile-metrics-engine-pure.md) (`BasketBreadth`, `Dispersion`, `PairwiseCorrelation` kernels); built P7-06 (`CorrelationTable`, `ReturnSeries`, `MarketGate`, `MarketGateInput`, `SmartRulesEngine`, VERIFIED in `Domain/Selection`) and P7-02 (`PortfolioFiller`, `FillConstraints`, `FillCodes`, VERIFIED); P3-01d (`market.context_daily`); BK-01..BK-05 for a gate basket with dated membership (Nifty 50 or the liquid-100 derived basket; without one the gate keeps the tracked-set breadth and this slice's context table has only manual baskets).

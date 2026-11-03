@@ -1,6 +1,6 @@
 # BK-05 — Broker flag and F&O baskets
 
-- **Status:** Draft (written 2026-10-25 under the owner's delegation; decisions below researched; owner's Approved needed before build)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** BK — system baskets, slice BK-05 of [BK-00](BK-00-system-baskets-plan.md)
 - **Design refs:** docs/design/06-instruments-and-baskets.md §2.1, §2.3 (flags: F&O eligible, ASM/GSM, MTF leverage, lot size, freeze quantity, retired) · docs/design/05 (Dhan instrument master) · research [system-baskets-nse](../research/system-baskets-nse.md) §1.3, §1.4 · [basket-leverage-uses](../research/basket-leverage-uses.md) §3 · [ADR 0014](../adr/0014-portfolio-buckets-appear-as-system-baskets.md)
 - **Needs:** [BK-01](BK-01-index-basket-catalogue-fetcher-and-versioned-membership.md) (columns, protection, fetcher, guards), the instrument-master service (VERIFIED `InstrumentMasterService`, daily 08:45 IST).

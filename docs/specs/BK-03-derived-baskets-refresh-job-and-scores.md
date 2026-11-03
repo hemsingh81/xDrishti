@@ -1,6 +1,6 @@
 # BK-03 — Derived baskets refresh job and scores
 
-- **Status:** Draft (written 2026-10-25 under the owner's delegation; decisions below researched; owner's Approved needed before build)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** BK — system baskets, slice BK-03 of [BK-00](BK-00-system-baskets-plan.md)
 - **Design refs:** docs/design/06-instruments-and-baskets.md §3.1, §3.4 · docs/design/05 (EOD aggregation, calendar) · ISS-22 · research [system-baskets-nse](../research/system-baskets-nse.md) §2, §3.2, §3.3
 - **Needs:** [BK-01](BK-01-index-basket-catalogue-fetcher-and-versioned-membership.md) (columns `kind`, `system`, `provenance`, protection), [BK-02](BK-02-derived-baskets-engine-pure.md) (the engine); built: `bars_agg` daily bars, the trading calendar, the services framework.

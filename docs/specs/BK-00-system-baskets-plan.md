@@ -1,6 +1,6 @@
 # BK-00 — System baskets programme: plan
 
-- **Status:** Draft (written 2026-10-25 under the owner's delegation; every decision below was researched and is answered under "Decisions (researched)"; the owner's Approved is still needed before an agent builds a slice)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** BK — system baskets (index, derived, list), the base of the basket-leverage uses in [basket-leverage-uses](../research/basket-leverage-uses.md); not yet a roadmap row (the roadmap is not edited by this spec set)
 - **Design refs:** docs/design/06-instruments-and-baskets.md §2.1, §2.3, §3.1, §3.4 · [ADR 0014](../adr/0014-portfolio-buckets-appear-as-system-baskets.md) · ISS-22 (docs/design/19-risks-and-compliance.md) · research [system-baskets-nse](../research/system-baskets-nse.md), [basket-leverage-uses](../research/basket-leverage-uses.md) · P8-07 / ADR 0102, P8-09 / ADR 0105
 - **Needs:** built P1-15 / P1-15a (baskets, dated members, system protection), the instrument-master service, the services framework (`IScheduledService`), `bars_agg` daily bars.

@@ -1,6 +1,6 @@
 # BK-02 — Derived baskets engine (pure)
 
-- **Status:** Draft (written 2026-10-25 under the owner's delegation; decisions below researched; owner's Approved needed before build)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** BK — system baskets, slice BK-02 of [BK-00](BK-00-system-baskets-plan.md)
 - **Design refs:** docs/design/06-instruments-and-baskets.md §3.1 (rule-based baskets) · ISS-22 · research [system-baskets-nse](../research/system-baskets-nse.md) §2 · [basket-leverage-uses](../research/basket-leverage-uses.md) U1, §4 · ADR 0102 ("every exclusion named")
 - **Needs:** nothing built beyond the Domain project and daily bars as values (the engine takes arrays). Can run in parallel with BK-01 (no shared files).

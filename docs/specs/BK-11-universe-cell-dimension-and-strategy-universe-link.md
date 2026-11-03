@@ -1,6 +1,6 @@
 # BK-11 — Universe cell dimension and strategy-universe link
 
-- **Status:** Draft (written 2026-10-25; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** P6/P9 follow-up — U3 (and the labelling half of U2) of `docs/research/basket-leverage-uses.md`
 - **Design refs:** docs/design/09-learning-engine.md §3 layer 1 (cell statistics, ADR 0064), §14 · docs/design/07-strategies.md (scan scope) · docs/design/10-selection-and-portfolio.md §1 · P6-00, P6-01, P6-02, P14-00 (the optional seventh cell part `expression`) · ADR 0064 · ADR 0069 · research note §4 item 4 ("no cell explosion")
 - **Needs:** built P6-01 (cell statistics: `CellId` six parts, Bayesian shrinkage with strength 20, 5 % quantile, `research.cell_stats`, VERIFIED in `Domain/Learning`), P6-02 if it is built before this (regime tags; UNVERIFIED state, `Regime` is `*` until then), `MultipleTesting.Factor(variants)` (VERIFIED in `Domain/Lab`); BK-01..BK-05 for a dated liquidity basket from which the tier is read (assumed; without it BK-11 can only be built as a stub returning `*`).

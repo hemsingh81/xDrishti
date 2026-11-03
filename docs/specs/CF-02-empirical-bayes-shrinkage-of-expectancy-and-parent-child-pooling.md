@@ -1,6 +1,6 @@
 # CF-02 — Empirical-Bayes shrinkage of expectancy, and parent-child pooling
 
-- **Status:** Draft (written 2026-10-27 under the owner's delegation; decisions below researched; the owner's Approved is needed before build)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** CF programme ([CF-00](CF-00-confidence-programme-plan.md)), slice 2; extends P6 layer 1 (cell statistics)
 - **Design refs:** docs/design/09-learning-engine.md layer 1 · 16-configuration.md `bayes_prior` · [P6-01](P6-01-cell-statistics-bayesian-and-recency.md) (assumption 1: strength 20, parent includes the cell; limits) · ADR 0064 · research [confidence-data-and-small-sample](../research/confidence-data-and-small-sample.md) §2.1, §2.2
 - **Needs:** [CF-01](CF-01-effective-sample-size-power-and-minimum-track-record.md) (`EffectiveSampleSize`, the `CellTrade` cluster key). Built: `BetaShrinkage`, `CellStatsCalculator`, `research.cell_stats`.

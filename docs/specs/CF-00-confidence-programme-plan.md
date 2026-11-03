@@ -1,6 +1,6 @@
 # CF-00 — The confidence programme: plan and slice map
 
-- **Status:** Draft (written 2026-10-27 under the owner's delegation; decisions below researched; the owner's Approved is needed before any slice is built)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** cross-cutting programme on P5 (Lab), P6 (learning engine), P8 (reports), P10 (paper) and the data layer (P1). Not a roadmap phase; it raises the odds that the verdicts of existing phases are honest.
 - **Design refs:** docs/design/09-learning-engine.md · 11-strategy-lab.md §4 · 05-data-and-brokers.md §4.2, §6.1 · 16-configuration.md · ISS-19, ISS-22, ISS-25 in 18-roadmap.md · research notes [confidence-data-and-small-sample](../research/confidence-data-and-small-sample.md) (primary), [confidence-edge-realism](../research/confidence-edge-realism.md), [confidence-learning-and-validation-speed](../research/confidence-learning-and-validation-speed.md)
 - **Size:** this plan 0.5 agent-day; slices CF-01..CF-12 below

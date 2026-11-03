@@ -1,6 +1,6 @@
 # P14-16 — Reports: read-only summaries of the option archive, the expression runs, the pair formations and every P14 verdict, in the P8 honest states, as API and CLI first; the screen only when there is something to show
 
-- **Status:** Draft (written 2026-11-03; the owner's Approved is needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-11-03, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** P14 — slice P14-16 of [P14-00](P14-00-options-and-stat-arb-plan.md) ("Reports: coverage, expression comparison, pairs, with P8 states and evidence").
 - **Design refs:** docs/design/13 (reports and UI) · P8-00 D3 (evidence block, six honest states, no digit for a non-value) · ADR 0099 (report engine core), 0178 (coverage route), 0183/0186 (records and the shared route) · P15-11 (the pattern for verdict cards) · prototype: **no screen in `docs/prototype/` shows options, expressions or pairs** (to be confirmed at build by a search; P15-11 found the same for filings).
 - **Needs:** P14-04 (built: `GET /api/options/coverage`), P14-08, P14-09, P14-10, P14-13 (their tables and records); the shared `GET /api/research/extensions` (built). Each part works with what exists when it is built; a missing table is a hidden section, never a fake value.

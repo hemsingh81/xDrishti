@@ -1,6 +1,6 @@
 # BK-06 — Basket index and profile metrics engine (pure)
 
-- **Status:** Draft (written 2026-10-25; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** P8 follow-up — basket performance insight, kernel slice of [BK-07](BK-07-basket-profile-endpoints-and-screen.md); research note `docs/research/basket-leverage-uses.md` §2 (m1b to m16)
 - **Design refs:** docs/design/06-instruments-and-baskets.md §3, §4 · docs/design/13-reports-and-ui.md §1c · ISS-22 (survivorship) · ADR 0102 (basket benchmarks) · ADR 0105 · P8-07 · P8-09
 - **Needs:** P8-07 built (`BuyAndHold`, `DailyClose`, `InstrumentSeries`, `Metric`, `MetricState` in `Domain/Reporting`, VERIFIED present). Nothing from BK-01..BK-05 is needed to compile or test: the engine takes membership and bars as arguments. BK-01..BK-05 (system baskets with dated membership) only decide how much real history it will be fed.

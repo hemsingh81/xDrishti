@@ -1,6 +1,6 @@
 # CF-06 — Pre-registration, the trial ledger and a locked hold-out in the Lab
 
-- **Status:** Draft (written 2026-10-27; the decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** CF — Confidence programme (row added by CF-00; UNVERIFIED). Touches P5 (Lab runs, ledger, verdict) and P6-05 (the ML hold-out).
 - **Design refs:** docs/design/11-strategy-lab.md §4-§6 · 09-learning-engine.md §1 · 16-configuration.md · docs/research/confidence-edge-realism.md §2.2, §3 (rows 1 to 3), §4 (rows 1 and 12) · ADRs 0059 (ledger, gates), 0062 (robustness), 0067 (ML hold-out)
 - **Needs:** P5-02/03/04/05/06 (built), P6-05 (built), CF-00 (settings home, report-only rule), CF-04 (5-year history; without it the hold-out makes every verdict inconclusive). Used by CF-07, CF-10, CF-11.
