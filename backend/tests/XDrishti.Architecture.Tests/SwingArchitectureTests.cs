@@ -23,9 +23,9 @@ public sealed class SwingArchitectureTests
     }
 
     [Fact]
-    public void The_public_surface_of_the_walking_stage_is_the_walker_its_rules_and_outcome_and_the_hold()
+    public void The_public_surface_of_the_walking_stage_is_the_walker_its_rules_and_outcome_the_hold_and_the_pair_walker()
     {
-        Simulation.GetExportedTypes().Where(t => t.Namespace == "XDrishti.Simulation.Walking").Select(t => t.Name).Order().ShouldBe(["SwingHold", "TradeWalker", "WalkOutcome", "WalkRules"]);
+        Simulation.GetExportedTypes().Where(t => t.Namespace == "XDrishti.Simulation.Walking").Select(t => t.Name).Order().ShouldBe(["PairWalker", "SwingHold", "TradeWalker", "WalkOutcome", "WalkRules"]);
     }
 
     [Theory]

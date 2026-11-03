@@ -4627,7 +4627,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The stored evaluations of one family (filter:results, ext:ev-1, ext:fu-1, ext:llm-1 or pead), newest first, at most 100: the verdict (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE) with the named missing quantities, the counts, the limits and the estimates, evidence and inputs as JSON. A value that is not available is the text unavailable, never a number. 400 extensions.invalid_query for an unknown family */
+    /** The stored evaluations of one family (filter:results, ext:ev-1, ext:fu-1, ext:llm-1, pead or pairs:intraday-1), newest first, at most 100: the verdict (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE) with the named missing quantities, the counts, the limits and the estimates, evidence and inputs as JSON. A value that is not available is the text unavailable, never a number. 400 extensions.invalid_query for an unknown family */
     get: operations['ListExtensionEvaluations'];
     put?: never;
     post?: never;

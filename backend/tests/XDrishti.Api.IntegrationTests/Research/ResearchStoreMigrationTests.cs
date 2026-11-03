@@ -109,10 +109,10 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
         [
             "ix_cell_stats_as_of_created", "ix_cell_stats_cell_key", "ix_exit_selections_comparison_id", "ix_experiment_jobs_job_key", "ix_experiment_jobs_queued", "ix_experiments_created_at",
             "ix_extension_evaluations_family_created", "ix_hypotheses_experiment_id", "ix_hypotheses_hypothesis_id_id", "ix_learning_changelog_created_at", "ix_learning_changelog_subject_id", "ix_learning_reports_kind_created",
-            "ix_lessons_lesson_id_id", "ix_model_designations_model_id_id", "ix_model_versions_sha256", "ix_model_versions_training_set_id", "ix_sim_comparisons_entries_key", "ix_sim_runs_strategy_created",
+            "ix_lessons_lesson_id_id", "ix_model_designations_model_id_id", "ix_model_versions_sha256", "ix_model_versions_training_set_id", "ix_pair_formations_family_quarter", "ix_pair_trades_entry", "ix_sim_comparisons_entries_key", "ix_sim_runs_strategy_created",
             "ix_trade_features_ext_version_run", "ix_training_sets_created_at", "pk_cell_stats", "pk_digests", "pk_exit_selection_folds", "pk_exit_selections",
             "pk_experiment_jobs", "pk_experiments", "pk_extension_evaluations", "pk_extension_extractions", "pk_hypotheses", "pk_learning_changelog", "pk_learning_reports",
-            "pk_lessons", "pk_model_designations", "pk_model_versions", "pk_option_spread_buckets", "pk_option_spread_models", "pk_sim_comparisons", "pk_sim_runs", "pk_sim_trade_leg_charges",
+            "pk_lessons", "pk_model_designations", "pk_model_versions", "pk_option_spread_buckets", "pk_option_spread_models", "pk_pair_formations", "pk_pair_trades", "pk_sim_comparisons", "pk_sim_runs", "pk_sim_trade_leg_charges",
             "pk_sim_trade_legs", "pk_sim_trades", "pk_trade_features", "pk_trade_features_ext", "pk_training_sets", "uq_cell_stats_snapshot_cell_window",
             "uq_digests_iso_week", "uq_exit_selections_selection_key", "uq_experiment_jobs_one_active", "uq_experiments_experiment_key", "uq_hypotheses_id_is_seed", "uq_learning_changelog_reverts_id",
             "uq_learning_reports_kind_hash", "uq_lessons_finding", "uq_lessons_id_is_seed", "uq_model_versions_version_key", "uq_sim_comparisons_comparison_key", "uq_sim_runs_run_key",
@@ -128,7 +128,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
             "ck_extension_evaluations_recipe", "ck_extension_evaluations_trial", "ck_extension_evaluations_trials", "ck_extension_evaluations_verdict", "ck_extension_extractions_calendar", "ck_extension_extractions_counts", "ck_extension_extractions_extension", "ck_extension_extractions_run_key", "ck_extension_extractions_version", "ck_hypotheses_links", "ck_hypotheses_shape",
             "ck_hypotheses_state", "ck_learning_changelog_evidence", "ck_learning_changelog_kind", "ck_learning_changelog_revert", "ck_learning_changelog_states", "ck_learning_reports_shape",
             "ck_lessons_closed", "ck_lessons_links", "ck_lessons_result", "ck_lessons_shape", "ck_lessons_state", "ck_model_designations_role",
-            "ck_model_versions_shape", "ck_option_spread_buckets_n", "ck_option_spread_buckets_pct", "ck_option_spread_models_id", "ck_option_spread_models_sessions", "ck_option_spread_models_settings", "ck_sim_comparisons_counts", "ck_sim_comparisons_keys", "ck_sim_comparisons_members", "ck_sim_comparisons_unit", "ck_sim_runs_costs",
+            "ck_model_versions_shape", "ck_option_spread_buckets_n", "ck_option_spread_buckets_pct", "ck_option_spread_models_id", "ck_option_spread_models_sessions", "ck_option_spread_models_settings", "ck_pair_formations_counts", "ck_pair_formations_detail", "ck_pair_formations_id", "ck_pair_formations_window", "ck_pair_trades_numbers", "ck_pair_trades_ordinal", "ck_pair_trades_qty", "ck_pair_trades_reason", "ck_pair_trades_run", "ck_pair_trades_side", "ck_pair_trades_times", "ck_sim_comparisons_counts", "ck_sim_comparisons_keys", "ck_sim_comparisons_members", "ck_sim_comparisons_unit", "ck_sim_runs_costs",
             "ck_sim_runs_counts", "ck_sim_runs_run_key", "ck_sim_runs_universe_kind", "ck_sim_trade_leg_charges_ordinals", "ck_sim_trade_leg_charges_quantity", "ck_sim_trade_legs_kind",
             "ck_sim_trade_legs_ordinals", "ck_sim_trade_legs_share", "ck_sim_trades_cost_segment", "ck_sim_trades_costing_all_or_nothing", "ck_sim_trades_costs", "ck_sim_trades_costs_charged",
             "ck_sim_trades_entry_fill", "ck_sim_trades_exit_reason", "ck_sim_trades_fills", "ck_sim_trades_ordinal", "ck_sim_trades_side", "ck_sim_trades_trigger_timeframe",
@@ -211,7 +211,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
     }
 
     private const string BeforeExitSelections = "20261022055710_AddSimComparisons";
@@ -266,7 +266,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
     }
 
     [Fact]
@@ -288,6 +288,6 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
         await migrator.MigrateAsync(Before, Ct);
         (await ListAsync(connection, "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'research'")).ShouldBeEmpty();
         await migrator.MigrateAsync(null, Ct);
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
     }
 }

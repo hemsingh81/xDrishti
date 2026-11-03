@@ -519,6 +519,17 @@ Options:
     MinBarTurnoverLakh: 25      # 0-10000: the entry bar's volume x spot, in lakh of rupees, at least (UNVERIFIED starting value)
 ```
 
+### Pairs study (`Pairs:*`, [ADR 0196](../adr/0196-the-pairs-study-counts-every-candidate-in-the-ledger-before-any-test-walks-pairs-in-a-separate-pair-1-walker-on-the-simulators-fills-and-judges-them-by-protocol-s-where-a-gross-drop-is-valid-and-a-gross-keep-impossible.md), P14-13)
+
+`appsettings.json` / environment of the host that runs `xd pairs run` or `xd pairs eval` (`Pairs__PairNotional`); bounds are checked at start-up. Research only: nothing here places or plans an order. A run and an evaluation must use the same settings (the stored trades carry a hash of the notional, the charge basis and the fill rules; trades of other settings are counted and not judged).
+
+```yaml
+Pairs:
+  PairNotional: 100000      # 10,000-10,000,000: the Y-leg notional in rupees; the X leg is beta times it; whole shares
+  MaxCandidates: 2000       # 100-25,000: the most correlated candidate pairs one formation keeps (every candidate is a trial in the test ledger)
+  CostSheetId: ""           # a stored cost sheet (cost-sheet load) with the intraday equity lines; empty: gross, every trade labelled gross (a gross KEEP is impossible, a gross DROP is valid)
+```
+
 ### Filings inbox (`Filings:*`, [ADR 0179](../adr/0179-filings-come-from-a-local-inbox-folder-with-a-sidecar-that-carries-the-broadcast-time-the-adapter-is-read-only-and-the-public-page-fetcher-is-a-recorded-decision-not-to-build.md), P15-01)
 
 `appsettings.json` / environment of the host that reads the folder (`Filings__InboxPath`); bounds are checked at start-up. The inbox is created `0700` by `scripts/filings-drop.sh`; the source refuses a folder open to group or others and never changes a mode. **There is no setting that fetches anything:** the key `filings.fetch.enabled` is only *reserved* (not built, default false) for a later slice that needs the owner's reading of the exchange terms first.

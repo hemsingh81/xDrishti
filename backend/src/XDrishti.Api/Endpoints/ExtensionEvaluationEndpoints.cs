@@ -7,7 +7,7 @@ using XDrishti.Domain.Common;
 namespace XDrishti.Api.Endpoints;
 
 /// <summary>
-/// The stored verdicts of the P15 evaluation protocols F, X, P and L (spec P15-10): the records of a family, newest first, and one record with its evidence block. Read only: the records are written by <c>xd learn extension-eval</c> and nothing here changes a setting or places an order.
+/// The stored verdicts of the evaluation protocols F, X, P and L (spec P15-10) and S (the pairs study, spec P14-13): the records of a family, newest first, and one record with its evidence block. Read only: the records are written by <c>xd learn extension-eval</c> and nothing here changes a setting or places an order.
 /// </summary>
 internal sealed class ExtensionEvaluationEndpoints : IEndpointModule
 {
@@ -17,7 +17,7 @@ internal sealed class ExtensionEvaluationEndpoints : IEndpointModule
 
         group.MapGet("", ListAsync)
             .WithName("ListExtensionEvaluations")
-            .WithSummary("The stored evaluations of one family (filter:results, ext:ev-1, ext:fu-1, ext:llm-1 or pead), newest first, at most 100: the verdict (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE) with the named missing quantities, the counts, the limits and the estimates, evidence and inputs as JSON. A value that is not available is the text unavailable, never a number. 400 extensions.invalid_query for an unknown family")
+            .WithSummary("The stored evaluations of one family (filter:results, ext:ev-1, ext:fu-1, ext:llm-1, pead or pairs:intraday-1), newest first, at most 100: the verdict (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE) with the named missing quantities, the counts, the limits and the estimates, evidence and inputs as JSON. A value that is not available is the text unavailable, never a number. 400 extensions.invalid_query for an unknown family")
             .ProducesValidationProblem();
 
         group.MapGet("/{id}", GetAsync)

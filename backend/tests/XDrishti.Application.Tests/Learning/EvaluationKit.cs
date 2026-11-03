@@ -74,6 +74,8 @@ internal static class EvaluationKit
 
         public ValueTask<int> CountVariantsAsync(string strategyId, CancellationToken cancellationToken) => ValueTask.FromResult(Rows.Where(r => r.StrategyId == strategyId).Select(r => r.StrategyHash).Distinct().Count());
 
+        public ValueTask<bool> HasHashAsync(string strategyId, string strategyHash, CancellationToken cancellationToken) => ValueTask.FromResult(Rows.Any(r => r.StrategyId == strategyId && r.StrategyHash == strategyHash));
+
         public ValueTask<IReadOnlyList<LedgerRow>> ListAsync(string strategyId, CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<LedgerRow>>([.. Rows.Where(r => r.StrategyId == strategyId)]);
     }
 

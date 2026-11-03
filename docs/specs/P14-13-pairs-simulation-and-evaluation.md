@@ -43,7 +43,7 @@ The Lab can say, with every look counted, whether slow statistical arbitrage on 
 | Verdict | When |
 |---|---|
 | NOT_EVALUABLE | evaluable quarters < 6; pooled OOS pair trades < 300; a bound unavailable; names each (`quarters 2 of 6`). |
-| KEEP | all: ≥ 6 quarters; ≥ 300 trades; lower bound of mean R ≥ `0.05 R × F` at both block lengths; mean R > 0 in ≥ 2/3 of quarters; the Lab gates through `VerdictEvaluator` with N; no pair contributes ≥ 25 % of the net profit; **net** costs. |
+| KEEP | all: ≥ 6 quarters; ≥ 300 trades; lower bound of mean R ≥ `0.05 R × F` at both block lengths; mean R > 0 in ≥ 2/3 of quarters; the Lab gates (`QualificationGates.Default`, scaled by F: the Lab's minimums then exceed the protocol's own 300 trades and 0.05 R, which stay a separate rule; whether the Lab bar suits pairs is an owner question) through `VerdictEvaluator` with N; no pair contributes ≥ 25 % of the net profit; **net** costs. |
 | DROP | not KEEP, minima met, upper bound of mean R < 0.05 R (unwidened). **A gross DROP is valid**: costs only lower an absolute R (there is no comparator here). |
 | INCONCLUSIVE | otherwise, including a gross result that would otherwise be KEEP. |
 
@@ -90,6 +90,7 @@ One quarter's formation over 2,000 candidates ≤ 2 s; trading a quarter for 50 
 - Four fills of intraday cash per trade make costs large against a small spread reversion.
 
 ## Open questions (owner)
+0. The Lab's own gates, scaled by F, are used for the KEEP rule, and the hold-out pass rule (>= 100 net trades, mean above 0, day-block lower bound above 0) is the implementer's conservative choice: keep or change? (ADR 0196.)
 1. `PairNotional` ₹1,00,000? **Default: as drafted.**
 2. An F&O ban-list source (files dropped by the owner)? **Default: none; `unavailable` is printed as a limit.**
 

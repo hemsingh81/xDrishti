@@ -22,11 +22,11 @@ public sealed class ExtensionEvaluationArchitectureTests
     private static string Src(params string[] parts) => Path.Combine([Root, "src", .. parts]);
 
     [Fact]
-    public void Only_the_four_evaluations_name_the_protocols()
+    public void Only_the_four_evaluations_and_the_pairs_evaluation_name_the_protocols()
     {
         var users = Types.InAssembly(Application).That().HaveDependencyOnAny(Protocols).GetTypes().Select(t => t.Name).Where(n => !n.StartsWith('<')).Distinct().Order(StringComparer.Ordinal).ToList();
 
-        users.ShouldBe(["ComparisonEvaluation", "FilterEvaluation", "FlagEvaluation", "PeadEvaluation"]);
+        users.ShouldBe(["ComparisonEvaluation", "EvaluatePairsHandler", "FilterEvaluation", "FlagEvaluation", "PeadEvaluation"]); // EvaluatePairsHandler: protocol S (P14-13) stores its record as a ProtocolIdentity
     }
 
     [Theory]

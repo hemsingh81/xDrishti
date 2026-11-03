@@ -165,10 +165,10 @@ public sealed class ReadOnlyRolesTests(ReadOnlyDatabase db)
     [Fact]
     public async Task The_roles_hold_nothing_on_the_feature_set_comparison_tables_the_expression_profiles_and_the_option_spread_models()
     {
-        // P13-05, P14-06 and P14-07: research only. No view exposes them and no column grant reaches them.
+        // P13-05, P14-06, P14-07 and P14-13: research only. No view exposes them and no column grant reaches them.
         foreach (var role in Roles)
         {
-            foreach (var table in new[] { "research.trade_features_ext", "research.extension_evaluations", "lab.expression_profiles", "research.option_spread_models", "research.option_spread_buckets", "market.daily_eod", "market.eod_files" })
+            foreach (var table in new[] { "research.trade_features_ext", "research.extension_evaluations", "lab.expression_profiles", "research.option_spread_models", "research.option_spread_buckets", "market.daily_eod", "market.eod_files", "research.pair_formations", "research.pair_trades" })
             {
                 foreach (var privilege in new[] { "SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER" })
                 {

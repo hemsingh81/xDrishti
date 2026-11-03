@@ -25,6 +25,9 @@ public interface ITestLedger
     /// <summary>The distinct strategy hashes recorded for the family: its variant count.</summary>
     ValueTask<int> CountVariantsAsync(string strategyId, CancellationToken cancellationToken);
 
+    /// <summary>Whether the family has a row with this strategy hash (an existence query: nothing is listed).</summary>
+    ValueTask<bool> HasHashAsync(string strategyId, string strategyHash, CancellationToken cancellationToken);
+
     /// <summary>The rows of the family, newest first.</summary>
     ValueTask<IReadOnlyList<LedgerRow>> ListAsync(string strategyId, CancellationToken cancellationToken);
 }

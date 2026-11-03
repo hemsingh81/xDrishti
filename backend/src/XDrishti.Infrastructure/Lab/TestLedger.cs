@@ -36,6 +36,14 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger
         return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
     }
 
+    public async ValueTask<bool> HasHashAsync(string strategyId, string strategyHash, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT 1 FROM lab.test_ledger WHERE strategy_id = @id AND strategy_hash = @hash LIMIT 1");
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
+        command.Parameters.AddWithValue("hash", NpgsqlDbType.Char, strategyHash);
+        return await command.ExecuteScalarAsync(cancellationToken) is not null;
+    }
+
     public async ValueTask<IReadOnlyList<LedgerRow>> ListAsync(string strategyId, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand("""

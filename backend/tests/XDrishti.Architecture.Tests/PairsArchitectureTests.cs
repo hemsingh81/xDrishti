@@ -6,7 +6,7 @@ namespace XDrishti.Architecture.Tests;
 
 /// <summary>
 /// Spec P14-12 criterion 8 (ADR 0192): the pairs core is pure. <c>Domain/Pairs</c> depends on <c>System</c>, <c>Domain/Common</c> and <c>Domain/Lab</c> only (no I/O, no clock, no random source, no other Domain area),
-/// its types are public and sealed or static or an enum and one per file, and nothing outside research code references it in this slice (P14-13 loosens this with an exact allow-list).
+/// its types are public and sealed or static or an enum and one per file, and nothing outside research code references it. P14-13 loosens this with an exact allow-list: the study namespace <c>Domain/PairResearch</c> (outside the core's namespace on purpose, since it needs the extension protocols, the cost model and the simulator's value types) and the one type of the simulator, <c>PairWalker</c>.
 /// </summary>
 public sealed class PairsArchitectureTests
 {
@@ -80,18 +80,19 @@ public sealed class PairsArchitectureTests
     }
 
     [Fact]
-    public void The_hosts_the_simulator_and_the_execution_service_reference_no_pairs_type()
+    public void The_hosts_and_the_execution_service_reference_no_pairs_type_and_the_simulator_only_in_the_pair_walker()
     {
-        foreach (var name in new[] { "XDrishti.Api", "XDrishti.Feed", "XDrishti.Worker", "XDrishti.Mcp", "XDrishti.Execution", "XDrishti.Simulation", "XDrishti.Strategies", "XDrishti.Strategies.File", "XDrishti.Indicators", "XDrishti.SimExport", "XDrishti.SimReader", "XDrishti.Learning.MlNet", "XDrishti.Hosting" })
+        Types.InAssembly(Assembly.Load(new AssemblyName("XDrishti.Simulation"))).That().HaveDependencyOn(Pairs).GetTypes().Select(t => (t.DeclaringType ?? t).Name).Distinct().Order(StringComparer.Ordinal).ShouldBe(["PairWalker"]);
+        foreach (var name in new[] { "XDrishti.Api", "XDrishti.Feed", "XDrishti.Worker", "XDrishti.Mcp", "XDrishti.Execution", "XDrishti.Strategies", "XDrishti.Strategies.File", "XDrishti.Indicators", "XDrishti.SimExport", "XDrishti.SimReader", "XDrishti.Learning.MlNet", "XDrishti.Hosting" })
         {
             Types.InAssembly(Assembly.Load(new AssemblyName(name))).ShouldNot().HaveDependencyOn(Pairs).GetResult().IsSuccessful.ShouldBeTrue(name);
         }
     }
 
     [Fact]
-    public void No_other_domain_area_references_the_pairs_core_yet()
+    public void No_other_domain_area_references_the_pairs_core_but_the_study_namespace()
     {
-        var result = Types.InAssembly(Domain).That().DoNotResideInNamespace(Pairs).ShouldNot().HaveDependencyOn(Pairs).GetResult();
+        var result = Types.InAssembly(Domain).That().DoNotResideInNamespace(Pairs).And().DoNotResideInNamespace("XDrishti.Domain.PairResearch").ShouldNot().HaveDependencyOn(Pairs).GetResult();
 
         result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
     }

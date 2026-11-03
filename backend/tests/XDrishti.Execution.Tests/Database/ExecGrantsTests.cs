@@ -277,6 +277,18 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         }
     }
 
+    // P14-13: the pair formations and trades are research only; the execution role may not even see the tables, the runtime role inserts and reads them and never changes them.
+    [Fact]
+    public async Task The_execution_role_holds_nothing_on_the_pair_research_tables_and_the_runtime_role_only_inserts_and_reads()
+    {
+        foreach (var table in new[] { "research.pair_formations", "research.pair_trades" })
+        {
+            (await HeldOnAsync("xd_exec", table)).ShouldBeEmpty(table);
+            (await HeldOnAsync("xd_app", table)).ShouldBe(["INSERT", "SELECT"], table);
+            (await ExecDatabase.SqlStateAsync(db.Exec, "SELECT count(*) FROM " + table)).ShouldBe("42501", table);
+        }
+    }
+
     // CF-04 Part A: NSE's daily rows and their file ledger are research data; the execution role may not even see them, the runtime role reads, inserts and updates them and never deletes.
     [Fact]
     public async Task The_execution_role_holds_nothing_on_the_daily_history_tables_and_the_runtime_role_never_deletes()

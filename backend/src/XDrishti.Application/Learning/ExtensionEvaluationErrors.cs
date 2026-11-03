@@ -12,7 +12,7 @@ public static class ExtensionEvaluationErrors
 
     public const string HoldOutUsed = "extensions.holdout_used";
 
-    public static Error InvalidFamily(string? family) => Error.Validation(InvalidQuery, "The family is one of " + string.Join(", ", ExtensionFamilies.All) + (family is null ? "." : ", not '" + Truncate(family) + "'."));
+    public static Error InvalidFamily(string? family) => Error.Validation(InvalidQuery, "The family is one of " + string.Join(", ", ExtensionFamilies.All.Concat(PairFamilies.All)) + (family is null ? "." : ", not '" + Truncate(family) + "'."));
 
     public static Error Missing(string id) => Error.NotFound(NotFound, "No extension evaluation with id '" + Truncate(id) + "' is stored.");
 
