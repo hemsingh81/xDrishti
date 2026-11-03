@@ -1,6 +1,7 @@
 using Npgsql;
 using NpgsqlTypes;
 using XDrishti.Application.Abstractions.OptionExpression;
+using XDrishti.Domain.Options.Iv;
 using XDrishti.Domain.Options.Remark;
 
 namespace XDrishti.Infrastructure.OptionExpression;
@@ -11,7 +12,57 @@ namespace XDrishti.Infrastructure.OptionExpression;
 /// </summary>
 internal sealed class RollingBarReader(NpgsqlDataSource dataSource) : IRollingBarReader
 {
-    public async ValueTask<IReadOnlyList<OptionBar>> BarsAsync(Guid underlyingId, char expiryFlag, int expiryCode, string side, int intervalMinutes, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    public ValueTask<IReadOnlyList<OptionBar>> BarsAsync(Guid underlyingId, char expiryFlag, int expiryCode, string side, int intervalMinutes, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) =>
+        ReadAsync(underlyingId, expiryFlag, expiryCode, side, intervalMinutes, null, from, to, cancellationToken);
+
+    public ValueTask<IReadOnlyList<OptionBar>> BarsAsync(Guid underlyingId, char expiryFlag, int expiryCode, string side, int intervalMinutes, IReadOnlyCollection<int> offsets, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(offsets);
+        return ReadAsync(underlyingId, expiryFlag, expiryCode, side, intervalMinutes, offsets, from, to, cancellationToken);
+    }
+
+    public async ValueTask<IReadOnlyList<DailySideIv>> DailyLastBarsAsync(Guid underlyingId, char expiryFlag, IReadOnlyCollection<int> expiryCodes, int intervalMinutes, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(expiryCodes);
+        if (to <= from || (to - from).TotalDays > IRollingBarReader.MaxDailyRangeDays)
+        {
+            throw new ArgumentOutOfRangeException(nameof(to), "A daily read covers a range of at least a moment and at most " + IRollingBarReader.MaxDailyRangeDays + " days.");
+        }
+
+        // One grouped query: the last bar of each India session, side and code at offset 0 (the DISTINCT ON picks the newest ts of each group). Bounded by the whole leading primary key and the range.
+        await using var command = dataSource.CreateCommand(
+            """
+            SELECT DISTINCT ON (day, expiry_code, side) day, expiry_code, side, iv
+            FROM (
+                SELECT (ts AT TIME ZONE 'Asia/Kolkata')::date AS day, ts, expiry_code, side, iv
+                FROM options.rolling_bars
+                WHERE underlying_id = @u AND expiry_flag = @flag AND expiry_code = ANY(@codes) AND interval_minutes = @interval AND atm_offset = 0 AND ts >= @from AND ts < @to) x
+            ORDER BY day, expiry_code, side, ts DESC
+            """);
+        command.Parameters.AddWithValue("u", underlyingId);
+        command.Parameters.Add(new NpgsqlParameter("flag", NpgsqlDbType.Char) { Value = expiryFlag.ToString() });
+        command.Parameters.Add(new NpgsqlParameter("codes", NpgsqlDbType.Array | NpgsqlDbType.Smallint) { Value = expiryCodes.Select(c => (short)c).ToArray() });
+        command.Parameters.AddWithValue("interval", (short)intervalMinutes);
+        command.Parameters.AddWithValue("from", from.UtcDateTime);
+        command.Parameters.AddWithValue("to", to.UtcDateTime);
+        var rows = new List<DailySideIv>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new DailySideIv(reader.GetFieldValue<DateOnly>(0), reader.GetInt16(1), reader.GetString(2).Trim(), reader.IsDBNull(3) ? null : reader.GetFloat(3), false));
+        }
+
+        return rows;
+    }
+
+    public async ValueTask<bool> HasSeriesAsync(Guid underlyingId, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT EXISTS (SELECT 1 FROM options.rolling_bars WHERE underlying_id = @u)");
+        command.Parameters.AddWithValue("u", underlyingId);
+        return await command.ExecuteScalarAsync(cancellationToken) is true;
+    }
+
+    private async ValueTask<IReadOnlyList<OptionBar>> ReadAsync(Guid underlyingId, char expiryFlag, int expiryCode, string side, int intervalMinutes, IReadOnlyCollection<int>? offsets, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(side);
         if (to <= from || (to - from).TotalDays > IRollingBarReader.MaxRangeDays)
@@ -24,6 +75,7 @@ internal sealed class RollingBarReader(NpgsqlDataSource dataSource) : IRollingBa
             SELECT ts, atm_offset, strike_px, spot_px, open_px, high_px, low_px, close_px, volume, oi, iv, flags
             FROM options.rolling_bars
             WHERE underlying_id = @u AND expiry_flag = @flag AND expiry_code = @code AND side = @side AND interval_minutes = @interval AND ts >= @from AND ts < @to
+              AND (@offsets::smallint[] IS NULL OR atm_offset = ANY(@offsets))
             ORDER BY ts, atm_offset
             """);
         command.Parameters.AddWithValue("u", underlyingId);
@@ -31,6 +83,7 @@ internal sealed class RollingBarReader(NpgsqlDataSource dataSource) : IRollingBa
         command.Parameters.AddWithValue("code", (short)expiryCode);
         command.Parameters.Add(new NpgsqlParameter("side", NpgsqlDbType.Char) { Value = side });
         command.Parameters.AddWithValue("interval", (short)intervalMinutes);
+        command.Parameters.Add(new NpgsqlParameter("offsets", NpgsqlDbType.Array | NpgsqlDbType.Smallint) { Value = offsets is null ? DBNull.Value : offsets.Select(o => (short)o).ToArray() });
         command.Parameters.AddWithValue("from", from.UtcDateTime);
         command.Parameters.AddWithValue("to", to.UtcDateTime);
         var bars = new List<OptionBar>();

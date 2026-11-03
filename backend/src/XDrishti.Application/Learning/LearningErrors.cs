@@ -11,6 +11,8 @@ public static class LearningErrors
     /// <summary>A named run is not stored.</summary>
     public const string RunNotFoundCode = "learning.run_not_found";
 
+    public const string IvArchiveEmptyCode = "learning.iv_archive_empty";
+
     /// <summary>Two sources made the same cell.</summary>
     public const string CellDuplicateCode = "learning.cell_duplicate";
 
@@ -34,6 +36,8 @@ public static class LearningErrors
     }
 
     /// <summary>A named run is not in the result store.</summary>
+    public static Error IvArchiveEmpty() => Error.Validation(IvArchiveEmptyCode, "The option archive holds no bars for these trades or no NIFTY series: an iv-1 extraction would freeze all-unknown rows. Run the backfill first; nothing was stored.");
+
     public static Error RunNotFound(string runKey) => Error.NotFound(RunNotFoundCode, $"No run {runKey[..Math.Min(12, runKey.Length)]} is stored.");
 
     /// <summary>Two runs gave the same cell; their trades would be counted twice.</summary>

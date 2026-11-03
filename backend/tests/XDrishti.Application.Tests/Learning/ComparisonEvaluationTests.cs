@@ -12,6 +12,7 @@ public sealed class ComparisonEvaluationTests
 
     private static readonly ExtensionGroup Ev = EventFeatureCatalog.Group;
     private static readonly ExtensionGroup Fu = FundamentalFeatureCatalog.Group;
+    private static readonly ExtensionGroup Iv = IvFeatureCatalog.Group;
 
     [Fact]
     public async Task Today_with_no_extraction_record_the_answer_is_not_evaluable_and_names_it_and_no_trial_is_counted()
@@ -152,6 +153,112 @@ public sealed class ComparisonEvaluationTests
         var outcome = (await Evaluation(rig, source).RunAsync("ext:ev-1", false, Ct)).Value;
 
         outcome.Records.Single().Missing.Single().ShouldStartWith("seasons 4 of 5");
+        rig.Ledger.Rows.ShouldBeEmpty();
+    }
+
+    private const string IvCounts = "{\"nan\":{},\"parser_unverified\":{},\"sources\":{\"archive_watermark\":\"42\",\"iv_unit\":\"percent_assumed\",\"quality_run_ids\":\"3,5\"}}";
+
+    [Fact]
+    public async Task The_iv_family_runs_protocol_x_on_the_options_preset_with_the_ledger_first_and_names_the_archive_sources_in_the_record()
+    {
+        var rig = NewRig();
+        var data = Rows(Iv, true, 1);
+        var source = new TrainingSource([Run(Iv, data.Rows.Count, null, IvCounts, lag: 0)], data);
+
+        var outcome = (await Evaluation(rig, source).RunAsync("ext:iv-1", false, Ct)).Value;
+
+        var record = outcome.Records.Single();
+        record.Verdict.ShouldNotBe("NOT_EVALUABLE", string.Join("; ", record.Missing));
+        rig.Log.IndexOf("ledger.append").ShouldBeLessThan(rig.Log.IndexOf("store.append"));
+        rig.Ledger.Rows.Single().StrategyId.ShouldBe("ext:iv-1");
+        var stored = rig.Store.Records.Single();
+        stored.VersionKey.ShouldStartWith("iv-1:iv_atm,iv_rank_252");
+        stored.InputsJson.ShouldContain("\"extension_version\":\"iv-1\"");
+        stored.InputsJson.ShouldContain("\"archive_watermark\":\"42\"");
+        stored.InputsJson.ShouldContain("\"quality_run_ids\":\"3,5\"");
+        stored.InputsJson.ShouldContain("\"iv_unit\":\"percent_assumed\"");
+        stored.InputsJson.ShouldContain("\"calendar_sha256\":\"" + new string('c', 64) + "\"");
+        stored.EvidenceJson.ShouldNotContain("\"blocks_sensitivity\":0", Case.Sensitive, "the options preset runs the 5-session sensitivity that the filings preset does not");
+        stored.FoldUnit.ShouldBe("quarter");
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(5, true)]
+    [InlineData(30, true)]
+    public async Task An_iv_extraction_must_have_lag_zero_whatever_the_calendar_lag_in_force_is(int lag, bool stale)
+    {
+        var rig = NewRig();
+        var data = Rows(Iv, true, 1);
+        var source = new TrainingSource([Run(Iv, data.Rows.Count, null, IvCounts, lag: lag)], data);
+
+        var outcome = (await Evaluation(rig, source).RunAsync("ext:iv-1", false, Ct)).Value;
+
+        if (stale)
+        {
+            outcome.Records.Single().Missing.Single().ShouldStartWith("features_stale");
+            source.Loads.ShouldBe(0);
+        }
+        else
+        {
+            outcome.Records.Single().Missing.ShouldNotContain(m => m.StartsWith("features_stale", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public async Task Today_with_no_iv_extraction_the_answer_is_not_evaluable_and_names_the_verb_and_no_trial_is_counted()
+    {
+        var rig = NewRig();
+        var source = new TrainingSource([new ExtensionRunSource(RunKey, "S", 10, null)], null);
+
+        var outcome = (await Evaluation(rig, source).RunAsync("ext:iv-1", false, Ct)).Value;
+
+        outcome.Records.Single().Verdict.ShouldBe("NOT_EVALUABLE");
+        outcome.Records.Single().Missing.Single().ShouldContain("--extension iv-1");
+        rig.Ledger.Rows.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_iv_hold_out_is_read_once_after_a_development_keep_and_never_for_the_other_families_key()
+    {
+        var rig = NewRig();
+        var data = Rows(Iv, true, 1);
+        var source = new TrainingSource([Run(Iv, data.Rows.Count, null, IvCounts, lag: 0)], data);
+        var evaluation = Evaluation(rig, source);
+
+        var development = (await evaluation.RunAsync("ext:iv-1", false, Ct)).Value;
+        rig.Store.Records.ShouldAllBe(r => !r.HoldOutRead);
+        if (development.Records.Single().Verdict != "KEEP")
+        {
+            var refused = (await evaluation.RunAsync("ext:iv-1", true, Ct)).Value;
+            refused.Note.ShouldNotBeNull().ShouldContain("not read");
+            rig.Store.Records.ShouldAllBe(r => !r.HoldOutRead, "no development KEEP: the hold-out is not read");
+            return;
+        }
+
+        var read = (await evaluation.RunAsync("ext:iv-1", true, Ct)).Value;
+        var again = await evaluation.RunAsync("ext:iv-1", true, Ct);
+
+        read.Records.Select(r => r.HoldOutRead).ShouldBe([false, true]);
+        again.Error.Code.ShouldBe("extensions.holdout_used");
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("unavailable")]
+    public async Task Rows_extracted_from_an_empty_archive_are_stale_and_no_trial_is_counted(string watermark)
+    {
+        var rig = NewRig();
+        var data = Rows(Iv, true, 1);
+        var counts = "{\"nan\":{},\"parser_unverified\":{},\"sources\":{\"archive_watermark\":\"" + watermark + "\",\"iv_unit\":\"percent_assumed\",\"quality_run_ids\":\"none\"}}";
+        var source = new TrainingSource([Run(Iv, data.Rows.Count, null, watermark == "unavailable" ? Clean : counts, lag: 0)], data);
+
+        var outcome = (await Evaluation(rig, source).RunAsync("ext:iv-1", false, Ct)).Value;
+
+        outcome.Records.Single().Verdict.ShouldBe("NOT_EVALUABLE");
+        outcome.Records.Single().Missing.Single().ShouldContain("features_stale: run ");
+        outcome.Records.Single().Missing.Single().ShouldContain("extracted from an empty archive");
+        source.Loads.ShouldBe(0);
         rig.Ledger.Rows.ShouldBeEmpty();
     }
 }

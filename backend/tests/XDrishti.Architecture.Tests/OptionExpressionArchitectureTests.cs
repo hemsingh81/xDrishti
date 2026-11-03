@@ -66,7 +66,7 @@ public sealed class OptionExpressionArchitectureTests
     [Fact]
     public void The_exact_set_of_types_that_name_a_remark_type_is_the_use_case_its_ports_and_the_adapters()
     {
-        TopLevelUsers(Application, [Remark]).ShouldBe(["IContractExpiryReader", "IExpressionTradeStore", "IRollingBarReader", "RemarkRunHandler"]);
+        TopLevelUsers(Application, [Remark]).ShouldBe(["IContractExpiryReader", "IExpressionTradeStore", "IRollingBarReader", "IvFeatureExtractor", "RemarkRunHandler"]); // IvFeatureExtractor: the iv-1 extraction (P14-11) reads the bars through the same port
         TopLevelUsers(Infrastructure, [Remark]).ShouldBe(["ContractExpiryReader", "ExpressionTradeStore", "RollingBarReader"]);
         TopLevelUsers(Assembly.Load(new AssemblyName("XDrishti.Api")), [Remark]).ShouldBeEmpty();
     }
@@ -74,7 +74,7 @@ public sealed class OptionExpressionArchitectureTests
     [Fact]
     public void Only_the_wiring_the_verb_and_the_use_case_name_the_application_or_infrastructure_remark_namespaces()
     {
-        TopLevelUsers(Application, AppNamespaces, AppNamespaces).ShouldBe(["DependencyInjection"]);
+        TopLevelUsers(Application, AppNamespaces, AppNamespaces).ShouldBe(["DependencyInjection", "IvFeatureExtractor"]); // IvFeatureExtractor: the iv-1 extraction (P14-11) reads the rolling bars and the contract expiries through their ports
         TopLevelUsers(Infrastructure, AppNamespaces).ShouldBe(["ContractExpiryReader", "DependencyInjection", "ExpressionReader", "ExpressionTradeStore", "RemarkSettings", "RollingBarReader"]);
         TopLevelUsers(Assembly.Load(new AssemblyName("XDrishti.Api")), AppNamespaces).ShouldBe(["OptionsExpressionEvalCommand", "OptionsRemarkCommand"]);
     }
@@ -122,14 +122,17 @@ public sealed class OptionExpressionArchitectureTests
     }
 
     [Fact]
-    public void The_rolling_bar_reader_has_two_bounded_reads_and_selects_one_series_over_one_time_range()
+    public void The_rolling_bar_reader_has_bounded_reads_selects_one_series_over_one_time_range_and_adds_the_iv_reads_of_p14_11()
     {
-        typeof(IRollingBarReader).GetMethods().Select(m => m.Name).Order(StringComparer.Ordinal).ShouldBe(["BarsAsync", "WatermarkAsync"]);
+        typeof(IRollingBarReader).GetMethods().Select(m => m.Name).Order(StringComparer.Ordinal).ShouldBe(["BarsAsync", "BarsAsync", "DailyLastBarsAsync", "HasSeriesAsync", "WatermarkAsync"]); // P14-11: the offset-filtered overload, the grouped daily read and the existence query for the iv-1 extraction
         typeof(IRollingBarReader).GetProperties().ShouldBeEmpty();
         var sql = File.ReadAllText(Src("XDrishti.Infrastructure", "OptionExpression", "RollingBarReader.cs"));
 
         sql.ShouldContain("underlying_id = @u AND expiry_flag = @flag AND expiry_code = @code AND side = @side AND interval_minutes = @interval AND ts >= @from AND ts < @to");
         sql.ShouldContain("MaxRangeDays");
+        sql.ShouldContain("MaxDailyRangeDays");
+        sql.ShouldContain("atm_offset = 0 AND ts >= @from AND ts < @to");
+        sql.ShouldContain("SELECT EXISTS (SELECT 1 FROM options.rolling_bars WHERE underlying_id = @u)");
         Regex.Matches(sql, @"FROM options\.(\w+)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).Select(m => m.Groups[1].Value).Distinct().Order(StringComparer.Ordinal).ShouldBe(["fetch_log", "rolling_bars"]);
         foreach (var banned in new[] { "INSERT", "UPDATE ", "DELETE", "TRUNCATE", "DROP " })
         {

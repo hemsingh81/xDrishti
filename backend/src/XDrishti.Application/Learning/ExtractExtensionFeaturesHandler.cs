@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.OptionIv;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Filings;
@@ -24,6 +25,7 @@ internal sealed class ExtractExtensionFeaturesHandler(
     IContextDayStore contextDays,
     IFilingSettings settings,
     ExtensionFeatureExtractor extractor,
+    IIvFeatureExtractor ivExtractor,
     IExtensionFeatureStore rowsStore,
     IExtensionExtractionStore records,
     TimeProvider time,
@@ -41,7 +43,7 @@ internal sealed class ExtractExtensionFeaturesHandler(
 
         if (group is null)
         {
-            problems.Add(new FieldError("extension", "The extension is ev-1 or fu-1."));
+            problems.Add(new FieldError("extension", "The extension is ev-1, fu-1 or iv-1."));
         }
 
         if (problems.Count > 0 || group is null)
@@ -78,42 +80,69 @@ internal sealed class ExtractExtensionFeaturesHandler(
             return Result.Failure<ExtensionFeaturesOutcome>(snapshot.Error);
         }
 
-        var filings = (await filingTimes.ReadAsync(ids, cancellationToken)).GroupBy(f => f.InstrumentId).ToDictionary(g => g.Key, g => (IReadOnlyList<ResultsFilingTime>)g.ToList());
-        IReadOnlyDictionary<DateOnly, double>? index = null;
-        if (group.Version == EventFeatureCatalog.Version)
-        {
-            var days = await contextDays.ListAsync(cancellationToken);
-            index = days.Count == 0 ? null : days.ToDictionary(d => d.Date, d => d.IndexClose);
-        }
-
-        var sources = new ExtensionSources(await calendars.GetAsync(cancellationToken), TimeSpan.FromMinutes(settings.LagMinutes), snapshot.Value, filings, index);
         var cells = new List<IReadOnlyList<FeatureCell>>(trades.Count);
         var rows = new List<ExtensionFeatureRow>(trades.Count);
-        foreach (var instrument in trades.GroupBy(t => t.Instrument).OrderBy(g => g.Key))
+        IReadOnlyDictionary<string, string>? notes = null;
+        DateTimeOffset? watermark = null;
+        if (group.Version == IvFeatureCatalog.Version)
         {
-            var decisions = instrument.Select(t => t.Decision).ToList();
-            var values = await extractor.ExtractAsync(group.Version, instrument.Key, decisions, sources, cancellationToken);
-            foreach (var decision in decisions.OrderBy(d => d.At).ThenBy(d => d.TradeKey, StringComparer.Ordinal))
+            // iv-1 (P14-11): the archive and the results calendar only; no filings and no index closes. The lag is 0: the features read no filing time, and a calendar row counts from its intimation.
+            var calendar = await calendars.GetAsync(cancellationToken);
+            var extraction = await ivExtractor.ExtractAsync([.. trades.Select(t => new IvTrade(t.Instrument, t.Decision.TradeKey, t.Decision.At))], snapshot.Value, calendar, cancellationToken);
+            foreach (var trade in trades.OrderBy(t => t.Decision.At).ThenBy(t => t.Decision.TradeKey, StringComparer.Ordinal))
             {
-                var row = values[decision.TradeKey];
+                var row = extraction.Cells[trade.Decision.TradeKey];
                 cells.Add(row);
-                rows.Add(new ExtensionFeatureRow(command.RunKey, decision.TradeKey, group.Id, group.Version, decision.At, [.. row.Select(c => c.Value)]));
+                rows.Add(new ExtensionFeatureRow(command.RunKey, trade.Decision.TradeKey, group.Id, group.Version, trade.Decision.At, [.. row.Select(c => c.Value)]));
             }
+
+            if (extraction.Sources.ArchiveWatermark == 0 || !extraction.Sources.NiftyPresent)
+            {
+                // An extraction of an empty archive would freeze all-NaN rows (the rows are insert-only and the record is kept): refuse it and store nothing.
+                ExtensionFeatureLog.Refused(logger, LearningErrors.IvArchiveEmptyCode);
+                return Result.Failure<ExtensionFeaturesOutcome>(LearningErrors.IvArchiveEmpty());
+            }
+
+            notes = IvSourceNotes.Of(extraction.Sources.ArchiveWatermark, extraction.Sources.QualityRunIds, extraction.Sources.IvUnit);
+        }
+        else
+        {
+            var filings = (await filingTimes.ReadAsync(ids, cancellationToken)).GroupBy(f => f.InstrumentId).ToDictionary(g => g.Key, g => (IReadOnlyList<ResultsFilingTime>)g.ToList());
+            IReadOnlyDictionary<DateOnly, double>? index = null;
+            if (group.Version == EventFeatureCatalog.Version)
+            {
+                var days = await contextDays.ListAsync(cancellationToken);
+                index = days.Count == 0 ? null : days.ToDictionary(d => d.Date, d => d.IndexClose);
+            }
+
+            var sources = new ExtensionSources(await calendars.GetAsync(cancellationToken), TimeSpan.FromMinutes(settings.LagMinutes), snapshot.Value, filings, index);
+            foreach (var instrument in trades.GroupBy(t => t.Instrument).OrderBy(g => g.Key))
+            {
+                var decisions = instrument.Select(t => t.Decision).ToList();
+                var values = await extractor.ExtractAsync(group.Version, instrument.Key, decisions, sources, cancellationToken);
+                foreach (var decision in decisions.OrderBy(d => d.At).ThenBy(d => d.TradeKey, StringComparer.Ordinal))
+                {
+                    var row = values[decision.TradeKey];
+                    cells.Add(row);
+                    rows.Add(new ExtensionFeatureRow(command.RunKey, decision.TradeKey, group.Id, group.Version, decision.At, [.. row.Select(c => c.Value)]));
+                }
+            }
+
+            watermark = filings.Values.SelectMany(f => f).Select(f => (DateTimeOffset?)f.BroadcastTs).Max();
         }
 
         var now = time.GetUtcNow();
-        var watermark = filings.Values.SelectMany(f => f).Select(f => (DateTimeOffset?)f.BroadcastTs).Max();
         var unknown = cells.Sum(r => r.Count(c => !c.IsKnown));
         var record = new ExtensionExtractionRecord(
             command.RunKey,
             group.Id,
             group.Version,
-            settings.LagMinutes,
+            group.Version == IvFeatureCatalog.Version ? 0 : settings.LagMinutes,
             group.Version == FundamentalFeatureCatalog.Version ? ResultsParser.Version : null,
             snapshot.Value.Sha256,
             watermark,
             rows.Count,
-            ExtensionNanCounts.Json(group.Names, cells),
+            ExtensionNanCounts.Json(group.Names, cells, notes),
             now);
         var (stored, _) = await rowsStore.AppendWithRecordAsync(rows, record, now, cancellationToken);
         var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;

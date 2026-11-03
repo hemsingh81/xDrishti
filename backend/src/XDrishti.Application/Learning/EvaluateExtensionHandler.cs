@@ -19,6 +19,7 @@ internal sealed class EvaluateExtensionHandler(FilterEvaluation filter, Comparis
             ExtensionFamilies.EventFeatures or ExtensionFamilies.FundamentalFeatures => await comparison.RunAsync(command.Family, command.HoldOut, cancellationToken),
             ExtensionFamilies.Pead => await pead.RunAsync(command.HoldOut, cancellationToken),
             ExtensionFamilies.Flag => await flag.RunAsync(cancellationToken),
+            _ when OptionFeatureFamilies.IsKnown(command.Family) => await comparison.RunAsync(command.Family, command.HoldOut, cancellationToken),
             _ => Result.Failure<ExtensionEvaluationOutcome>(ExtensionEvaluationErrors.InvalidFamily(command.Family)),
         };
     }

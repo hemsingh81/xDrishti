@@ -105,12 +105,13 @@ public sealed class GetEventsPhaseCheckHandlerTests
     }
 
     [Fact]
-    public async Task Stored_expression_and_pairs_records_never_reach_the_phase_check_which_stays_byte_identical_and_never_asks_for_their_families()
+    public async Task Stored_expression_pairs_and_iv_records_never_reach_the_phase_check_which_stays_byte_identical_and_never_asks_for_their_families()
     {
         StoreAllCurrent();
         var before = (await Handler().HandleAsync(new EventsPhaseCheckQuery([]), TestContext.Current.CancellationToken)).Value;
         Add(Record("x1", ExpressionFamilies.OptionBuy, "O", "KEEP", "expr-1"));
         Add(Record("s1", PairFamilies.Intraday, "S", "KEEP", "pairs-1"));
+        Add(Record("i1", IvFeatureCatalog.Family, "X", "KEEP", "iv-1"));
 
         var after = (await Handler().HandleAsync(new EventsPhaseCheckQuery([]), TestContext.Current.CancellationToken)).Value;
 
@@ -118,6 +119,8 @@ public sealed class GetEventsPhaseCheckHandlerTests
         after.Json.ShouldBe(before.Json);
         await _evaluations.DidNotReceive().ListAsync(ExpressionFamilies.OptionBuy, Arg.Any<int>(), Arg.Any<CancellationToken>());
         await _evaluations.DidNotReceive().ListAsync(PairFamilies.Intraday, Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await _evaluations.DidNotReceive().ListAsync(IvFeatureCatalog.Family, Arg.Any<int>(), Arg.Any<CancellationToken>());
+        ExtensionFamilies.All.ShouldNotContain(IvFeatureCatalog.Family);
         ExtensionFamilies.All.ShouldNotContain(ExpressionFamilies.OptionBuy);
     }
 

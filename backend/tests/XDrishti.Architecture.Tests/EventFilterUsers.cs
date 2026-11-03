@@ -9,8 +9,8 @@ namespace XDrishti.Architecture.Tests;
 /// </summary>
 internal static class EventFilterUsers
 {
-    /// <summary>Domain types outside <c>XDrishti.Domain.Filings</c> that name a filings type: the replay input carries the snapshot and the results-days inputs; the loss tagger takes the event instants; the two feature sets of P15-05 (and their inputs) read the filings visible at an instant; the filter observation of P15-10 carries the calendar's answer and classifies it with the one window rule.</summary>
-    public static readonly string[] DomainTypes = ["EventFeatureInput", "EventFeatures", "FilterObservation", "FundamentalFeatureInput", "FundamentalFeatures", "InstrumentReplayInput", "LossTagAnalyzer", "LossTagger"];
+    /// <summary>Domain types outside <c>XDrishti.Domain.Filings</c> that name a filings type: the replay input carries the snapshot and the results-days inputs; the loss tagger takes the event instants; the two feature sets of P15-05 (and their inputs) read the filings visible at an instant; the filter observation of P15-10 carries the calendar's answer and classifies it with the one window rule; the <c>iv-1</c> features of P14-11 read the results rows visible at an instant for <c>results_before_expiry</c>.</summary>
+    public static readonly string[] DomainTypes = ["EventFeatureInput", "EventFeatures", "FilterObservation", "FundamentalFeatureInput", "FundamentalFeatures", "InstrumentReplayInput", "IvFeatureInput", "IvFeatures", "LossTagAnalyzer", "LossTagger"];
 
     /// <summary>Simulation types that read the snapshot and call the pure filter: the simulator and its comparison (the replay only hands the input's snapshot on); <c>ResultsDaysScan</c> turns the results-days inputs into the frame's per-date series (P15-05).</summary>
     public static readonly string[] SimulationTypes = ["ResultsDaysScan", "Simulator", "SimulatorComparison"];
@@ -18,7 +18,7 @@ internal static class EventFilterUsers
     /// <summary>Application types outside the filings namespaces that name a filings type or port, by area: the run, the plan, the switch, the loss tag; P15-08: the set-D reader and runner of the eval (they hold the category baseline and the sample file).</summary>
     public static readonly string[] ApplicationTypes =
     [
-        "ApplyEventFilterAutoHandler", "ChangeEventFilterHandler", "GetEventFilterHandler", "ExplainBasis", "InstrumentInputReader", "RunSimulationHandler", "RunContext", "PlanEventFacts", "PlanEventFilter", "SelectionPlanBuilder", "AnalyzeLossTagsHandler", "LossTagEvents", "ILossTagEvents", "ExtractExtensionFeaturesHandler", "ExtensionFeatureExtractor", "ExtensionSources", "FilterPopulationSource", "ComparisonEvaluation", "SurpriseInputsReader", "ISurpriseInputsReader", "AnnouncementSetLoad", "AnnouncementSetRunner", "GetEventsPhaseCheckHandler",
+        "ApplyEventFilterAutoHandler", "ChangeEventFilterHandler", "GetEventFilterHandler", "ExplainBasis", "InstrumentInputReader", "RunSimulationHandler", "RunContext", "PlanEventFacts", "PlanEventFilter", "SelectionPlanBuilder", "AnalyzeLossTagsHandler", "LossTagEvents", "ILossTagEvents", "ExtractExtensionFeaturesHandler", "ExtensionFeatureExtractor", "IvFeatureExtractor", "IIvFeatureExtractor", "ExtensionSources", "FilterPopulationSource", "ComparisonEvaluation", "SurpriseInputsReader", "ISurpriseInputsReader", "AnnouncementSetLoad", "AnnouncementSetRunner", "GetEventsPhaseCheckHandler",
     ];
 
     /// <summary>A name pattern that matches the given roots, the compiler-generated types (<c>&lt;...&gt;</c>) and every user above.</summary>

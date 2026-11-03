@@ -5,13 +5,13 @@ namespace XDrishti.Api.Cli;
 /// <summary>The parsed command line of <c>xd learn extension-eval</c> (spec P15-10). Nothing here reads a file or the database.</summary>
 internal sealed record LearnExtensionEvalOptions(string Family, bool HoldOut)
 {
-    /// <summary>The families of the evaluation; a test pins this list to the domain's.</summary>
-    public static readonly IReadOnlyList<string> Families = ["filter:results", "ext:ev-1", "ext:fu-1", "ext:llm-1", "pead"];
+    /// <summary>The families of the evaluation; a test pins this list to the domain's (the five of P15 and, from P14-11, <c>ext:iv-1</c>, which the P15 phase check never iterates).</summary>
+    public static readonly IReadOnlyList<string> Families = ["filter:results", "ext:ev-1", "ext:fu-1", "ext:llm-1", "pead", "ext:iv-1"];
 
     public const string Usage = """
         usage:
-          xd learn extension-eval --family filter:results|ext:ev-1|ext:fu-1|ext:llm-1|pead [--holdout]
-            evaluates one family by its pre-registered protocol (F, X, P or L), counts each trial in the test ledger before any number is computed and stores
+          xd learn extension-eval --family filter:results|ext:ev-1|ext:fu-1|ext:llm-1|pead|ext:iv-1 [--holdout]
+            evaluates one family by its pre-registered protocol (F, X, P or L; ext:iv-1 is protocol X on the options preset: quarterly folds, day blocks), counts each trial in the test ledger before any number is computed and stores
             the verdict (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE, with the missing quantity named) as an insert-only record; a second run stores nothing new
             --holdout reads the reserved last four seasons, once per family and version, only after a stored development KEEP; a second --holdout is refused (extensions.holdout_used)
             a KEEP is a record: it switches nothing on; only the owner's auto option of the event-risk filter reads a filter verdict

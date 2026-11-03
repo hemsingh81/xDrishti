@@ -8,6 +8,7 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Context;
+using XDrishti.Application.Abstractions.OptionIv;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Market.Actions;
@@ -56,6 +57,8 @@ public sealed class ExtractExtensionFeaturesHandlerTests
 
     private readonly IShareholdingAsOf _holdings = Substitute.For<IShareholdingAsOf>();
 
+    private readonly IIvFeatureExtractor _iv = Substitute.For<IIvFeatureExtractor>();
+
     private readonly IExtensionFeatureStore _rows = Substitute.For<IExtensionFeatureStore>();
 
     private readonly IExtensionExtractionStore _records = Substitute.For<IExtensionExtractionStore>();
@@ -80,7 +83,7 @@ public sealed class ExtractExtensionFeaturesHandlerTests
         _rows.AppendWithRecordAsync(Arg.Do<IReadOnlyList<ExtensionFeatureRow>>(r => _written = r), Arg.Do<ExtensionExtractionRecord>(r => _record = r), Arg.Any<DateTimeOffset>(), Ct)
             .Returns(ci => ValueTask.FromResult((ci.ArgAt<IReadOnlyList<ExtensionFeatureRow>>(0).Count, true)));
         var extractor = new ExtensionFeatureExtractor(_bars, _factors, _facts, _holdings);
-        return new ExtractExtensionFeaturesHandler(_runs, _calendar, _snapshots, _filingTimes, _context, _settings, extractor, _rows, _records, new FakeTimeProvider(new DateTimeOffset(2026, 11, 2, 0, 0, 0, TimeSpan.Zero)), NullLogger<ExtractExtensionFeaturesHandler>.Instance);
+        return new ExtractExtensionFeaturesHandler(_runs, _calendar, _snapshots, _filingTimes, _context, _settings, extractor, _iv, _rows, _records, new FakeTimeProvider(new DateTimeOffset(2026, 11, 2, 0, 0, 0, TimeSpan.Zero)), NullLogger<ExtractExtensionFeaturesHandler>.Instance);
     }
 
     private static StoredRunHeader Header() =>
@@ -236,6 +239,54 @@ public sealed class ExtractExtensionFeaturesHandlerTests
         var second = string.Join(";", _written.ShouldNotBeNull().Select(Show)) + "#" + _record.ShouldNotBeNull().NanCountsJson;
 
         second.ShouldBe(first);
+    }
+
+    [Fact]
+    public async Task The_iv_features_are_stored_with_lag_zero_no_parser_and_the_archive_sources_in_the_record_and_read_no_filing()
+    {
+        var trade = Trade(FabricatedRun.IdA);
+        Run(trade);
+        IReadOnlyList<IvTrade>? asked = null;
+        _iv.ExtractAsync(Arg.Do<IReadOnlyList<IvTrade>>(t => asked = t), Arg.Any<EventCalendarSnapshot>(), Arg.Any<TradingCalendar>(), Ct).Returns(ci => ValueTask.FromResult(new IvExtraction(
+            new Dictionary<string, FeatureCell[]>
+            {
+                [trade.Key] = [FeatureCell.Known(0.16), .. IvFeatureCatalog.Names.Skip(1).Select(_ => FeatureCell.Unknown(IvReasons.NoOptions))],
+            },
+            new IvSources(42, [3, 1, 2], "percent_assumed"))));
+
+        var result = await Handler().HandleAsync(new ExtractExtensionFeaturesCommand(Key, "iv-1"), Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldBe(new ExtensionFeaturesOutcome("iv-1", 1, 1, 7, false));
+        asked.ShouldNotBeNull().Single().ShouldBe(new IvTrade(FabricatedRun.IdA, trade.Key, DateTimeOffset.FromUnixTimeSeconds(trade.DecisionEpochSeconds)));
+        var row = _written.ShouldNotBeNull().Single();
+        (row.Extension, row.Version, row.Values.Count).ShouldBe(("iv", "iv-1", 8));
+        row.Values[0].ShouldBe(0.16);
+        double.IsNaN(row.Values[1]).ShouldBeTrue("an unknown is NaN, never zero");
+        var record = _record.ShouldNotBeNull();
+        (record.Extension, record.Version, record.LagMinutes, record.ParserVersion, record.FilingsWatermark).ShouldBe(("iv", "iv-1", 0, null, null));
+        record.NanCountsJson.ShouldContain("\"iv_rank_252\":{\"no_options\":1}");
+        record.NanCountsJson.ShouldContain("\"sources\":{\"archive_watermark\":\"42\",\"iv_unit\":\"percent_assumed\",\"quality_run_ids\":\"1,2,3\"}");
+        await _filingTimes.DidNotReceiveWithAnyArgs().ReadAsync(default!, Ct);
+        await _context.DidNotReceiveWithAnyArgs().ListAsync(Ct);
+    }
+
+    [Theory]
+    [InlineData(0L, true)]
+    [InlineData(42L, false)]
+    public async Task An_iv_extraction_of_an_empty_archive_or_without_a_nifty_series_is_refused_and_stores_nothing(long watermark, bool nifty)
+    {
+        var trade = Trade(FabricatedRun.IdA);
+        Run(trade);
+        _iv.ExtractAsync(Arg.Any<IReadOnlyList<IvTrade>>(), Arg.Any<EventCalendarSnapshot>(), Arg.Any<TradingCalendar>(), Ct).Returns(ValueTask.FromResult(new IvExtraction(
+            new Dictionary<string, FeatureCell[]> { [trade.Key] = [.. IvFeatureCatalog.Names.Select(_ => FeatureCell.Unknown(IvReasons.NoOptions))] },
+            new IvSources(watermark, [], "percent_assumed", nifty))));
+
+        var result = await Handler().HandleAsync(new ExtractExtensionFeaturesCommand(Key, "iv-1"), Ct);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(LearningErrors.IvArchiveEmptyCode);
+        await _rows.DidNotReceiveWithAnyArgs().AppendWithRecordAsync(default!, default!, default, Ct);
     }
 
     private static string Show(ExtensionFeatureRow row) => row.TradeKey + "@" + row.DecisionAt.ToUnixTimeSeconds() + ":" + string.Join(",", row.Values.Select(v => BitConverter.DoubleToInt64Bits(v)));

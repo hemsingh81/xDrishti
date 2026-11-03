@@ -11,7 +11,7 @@ using XDrishti.Domain.Learning.Extensions;
 namespace XDrishti.Application.Learning;
 
 /// <summary>
-/// Protocol X for <c>ev-1</c> or <c>fu-1</c> (P15-10): the extraction records of the stored runs gate the verdict first (an unverified parser or stale rows are NOT_EVALUABLE with the reason named, before any number is computed and without counting a trial); then the development rows (all but the
+/// Protocol X for <c>ev-1</c>, <c>fu-1</c> or <c>iv-1</c> (P15-10; P14-11 adds the options preset and its sources): the extraction records of the stored runs gate the verdict first (an unverified parser or stale rows are NOT_EVALUABLE with the reason named, before any number is computed and without counting a trial); then the development rows (all but the
 /// reserved last four seasons, purged) are compared by the P13-05 core with quarterly folds and season resampling, after the trial's ledger row is appended. The hold-out is read only by the explicit act, after a stored KEEP, once.
 /// </summary>
 internal sealed class ComparisonEvaluation(
@@ -58,7 +58,17 @@ internal sealed class ComparisonEvaluation(
         }
 
         // Every run with closed trades goes to the gate: a run whose extraction was never made is stale rows, not a run to leave out quietly.
-        var problems = ExtensionGate.Problems(version, [.. runs.Select(r => (r.RunKey, r.ClosedTrades, r.Record))], settings.LagMinutes, currentParserVersion ?? ResultsParser.Version);   // the parser version in force: the constant, unless a test names another
+        IReadOnlyList<string> problems = ExtensionGate.Problems(version, [.. runs.Select(r => (r.RunKey, r.ClosedTrades, r.Record))], version == IvFeatureCatalog.Version ? 0 : settings.LagMinutes, currentParserVersion ?? ResultsParser.Version);   // the parser version in force: the constant, unless a test names another
+        if (version == IvFeatureCatalog.Version)
+        {
+            // Rows extracted from an empty archive are all unknown: never judged, and no trial is counted for them.
+            var archive = IvSourceNotes.Merge(extracted.Select(r => IvSourceNotes.Read(r.Record!.NanCountsJson)))[IvSourceNotes.ArchiveWatermark];
+            if (archive is "0" or IvSourceNotes.Unavailable)
+            {
+                problems = [.. problems, ExtensionGate.FeaturesStale + ": run " + extracted[0].RunKey[..12] + " extracted from an empty archive (archive_watermark " + archive + ")"];
+            }
+        }
+
         if (problems.Count > 0)
         {
             return await NotEvaluableAsync(family, Identity(await writer.CountAsync(family, cancellationToken), null, null), ProtocolX.NotEvaluable(problems, runs.Sum(r => r.ClosedTrades)), cancellationToken);
@@ -86,7 +96,7 @@ internal sealed class ComparisonEvaluation(
             return await NotEvaluableAsync(family, Identity(await writer.CountAsync(family, cancellationToken), null, data.TrainingDataId), ProtocolX.NotEvaluable(["development rows 0 (after the hold-out purge)"], 0), cancellationToken);
         }
 
-        var options = ProtocolX.Options(ExtensionFamilies.Sha256Hex(trainer.Parameters), data.LabelRuleVersion, holdOutStart);
+        var options = ProtocolX.OptionsFor(version, ExtensionFamilies.Sha256Hex(trainer.Parameters), data.LabelRuleVersion, holdOutStart);
         var from = development.Min(r => r.TradeDate);
         var to = development.Max(r => r.TradeDate);
         var calendar = await calendars.GetAsync(cancellationToken);
@@ -170,7 +180,7 @@ internal sealed class ComparisonEvaluation(
     private static SortedDictionary<string, string> Sources(string version, ExtensionRunSource[] runs, ExtensionRunSource[] extracted)
     {
         var records = extracted.Select(r => r.Record!).ToArray();
-        return new SortedDictionary<string, string>(StringComparer.Ordinal)
+        var sources = new SortedDictionary<string, string>(StringComparer.Ordinal)
         {
             ["extension_version"] = version,
             ["lag_minutes"] = string.Join(',', records.Select(r => r.LagMinutes).Distinct().Order().Select(m => m.ToString(CultureInfo.InvariantCulture))),
@@ -180,6 +190,17 @@ internal sealed class ComparisonEvaluation(
             ["run_keys_sha256"] = ExtensionFamilies.Sha256Hex(string.Join(',', extracted.Select(r => r.RunKey).Order(StringComparer.Ordinal))),
             ["runs_extracted"] = extracted.Length.ToString(CultureInfo.InvariantCulture) + " of " + runs.Length.ToString(CultureInfo.InvariantCulture),
         };
+
+        // iv-1 (P14-11): the archive watermark, the quality run ids and the IV unit the rows were built from, as the extraction records stored them.
+        if (version == IvFeatureCatalog.Version)
+        {
+            foreach (var pair in IvSourceNotes.Merge(records.Select(r => IvSourceNotes.Read(r.NanCountsJson))))
+            {
+                sources[pair.Key] = pair.Value;
+            }
+        }
+
+        return sources;
     }
 
     private async ValueTask<Result<ExtensionEvaluationOutcome>> NotEvaluableAsync(string family, ProtocolIdentity identity, ProtocolOutcome outcome, CancellationToken cancellationToken)

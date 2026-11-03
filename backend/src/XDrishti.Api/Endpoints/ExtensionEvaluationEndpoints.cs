@@ -17,7 +17,7 @@ internal sealed class ExtensionEvaluationEndpoints : IEndpointModule
 
         group.MapGet("", ListAsync)
             .WithName("ListExtensionEvaluations")
-            .WithSummary("The stored evaluations of one family (filter:results, ext:ev-1, ext:fu-1, ext:llm-1, pead, pairs:intraday-1 or expr:option_buy), newest first, at most 100: the verdict (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE) with the named missing quantities, the counts, the limits and the estimates, evidence and inputs as JSON. A value that is not available is the text unavailable, never a number. 400 extensions.invalid_query for an unknown family")
+            .WithSummary("The stored evaluations of one family (filter:results, ext:ev-1, ext:fu-1, ext:llm-1, ext:iv-1, pead, pairs:intraday-1 or expr:option_buy), newest first, at most 100: the verdict (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE) with the named missing quantities, the counts, the limits and the estimates, evidence and inputs as JSON. A value that is not available is the text unavailable, never a number. 400 extensions.invalid_query for an unknown family")
             .ProducesValidationProblem();
 
         group.MapGet("/{id}", GetAsync)

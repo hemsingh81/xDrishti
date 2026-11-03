@@ -99,6 +99,46 @@ public sealed class ExtensionEvaluationApiTests(ApiFactory factory) : DataTestBa
     }
 
     [Fact]
+    public async Task The_shared_route_lists_the_iv_family_and_its_record_and_the_p15_families_stay_apart()
+    {
+        var record = new ExtensionEvaluationRecord(
+            "e2".PadRight(64, '0'), "ext:iv-1", "X", "iv-1", "iv-1:iv_atm,iv_rank_252", "tf-1", new string('a', 64), null, new string('b', 64), 1, 1.0, "quarter", 0, 0, 0, null, "{\"delta_r\":\"unavailable\"}", "NOT_EVALUABLE", ["no_extraction: extraction records 0 of 1 runs (xd learn features --extension iv-1)"], [],
+            "{\"verdict\":\"NOT_EVALUABLE\"}", "{\"sources\":{\"archive_watermark\":\"none\"}}", false);
+        await StoreAsync(record);
+
+        var body = await Client.GetFromJsonAsync<JsonElement>(new Uri(List + "?family=ext:iv-1", UriKind.Relative), Ct);
+        var one = await Client.GetFromJsonAsync<JsonElement>(new Uri(List + "/" + record.EvaluationId, UriKind.Relative), Ct);
+        var ev = await Client.GetFromJsonAsync<JsonElement>(new Uri(List + "?family=ext:ev-1", UriKind.Relative), Ct);
+
+        body.GetProperty("items").GetArrayLength().ShouldBe(1);
+        body.GetProperty("items")[0].GetProperty("extensionVersion").GetString().ShouldBe("iv-1");
+        one.GetProperty("family").GetString().ShouldBe("ext:iv-1");
+        one.GetProperty("missing")[0].GetString().ShouldStartWith("no_extraction");
+        ev.GetProperty("items").GetArrayLength().ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Today_the_iv_family_is_not_evaluable_with_the_missing_extraction_named_the_ledger_is_untouched_and_a_rerun_stores_nothing()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<EvaluateExtensionCommand, ExtensionEvaluationOutcome>>();
+
+        var first = (await handler.HandleAsync(new EvaluateExtensionCommand("ext:iv-1", false), Ct)).Value;
+        var second = (await handler.HandleAsync(new EvaluateExtensionCommand("ext:iv-1", false), Ct)).Value;
+
+        var runsStored = await ScalarAsync<long>("SELECT count(*) FROM research.sim_runs") > 0;
+        first.Records.ShouldAllBe(r => r.Verdict == "NOT_EVALUABLE" && r.Missing.Count > 0);
+        if (!runsStored)
+        {
+            first.Records.Single().Missing.Single().ShouldStartWith("no_extraction");
+        }
+
+        second.Records.ShouldAllBe(r => !r.Stored);
+        second.Records.Select(r => r.EvaluationId).ShouldBe(first.Records.Select(r => r.EvaluationId));
+        (await ScalarAsync<long>("SELECT count(*) FROM lab.test_ledger WHERE strategy_id = 'ext:iv-1'")).ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Stored_records_come_back_newest_first_and_one_by_id_with_its_evidence_and_an_unknown_id_is_404()
     {
         await StoreAsync(Filter(1, "DROP", "a1"));

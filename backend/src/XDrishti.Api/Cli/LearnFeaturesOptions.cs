@@ -7,9 +7,9 @@ internal sealed record LearnFeaturesOptions(IReadOnlyList<string> RunKeys, strin
 {
     public const string Usage = """
         usage:
-          xd learn features --run RUNKEY [--run ...] [--extension ev-1|fu-1]
+          xd learn features --run RUNKEY [--run ...] [--extension ev-1|fu-1|iv-1]
             RUNKEY is the 64-hex key of a stored run; its closed trades get their decision-time features (tf-1)
-            --extension ev-1|fu-1 extracts the event or the fundamental features of the trades instead (P15-05); a second call stores nothing
+            --extension ev-1|fu-1|iv-1 extracts the event, the fundamental or the option-implied (IV) features of the trades instead (P15-05, P14-11); a second call stores nothing
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
         """;
@@ -43,9 +43,9 @@ internal sealed record LearnFeaturesOptions(IReadOnlyList<string> RunKeys, strin
             else
             {
                 extension = args[++i];
-                if (extension is not ("ev-1" or "fu-1"))
+                if (extension is not ("ev-1" or "fu-1" or "iv-1"))
                 {
-                    errors.Add($"the extension is ev-1 or fu-1, not '{SimulateOptions.Show(extension)}'");
+                    errors.Add($"the extension is ev-1, fu-1 or iv-1, not '{SimulateOptions.Show(extension)}'");
                 }
             }
         }

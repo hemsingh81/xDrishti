@@ -14,7 +14,7 @@ internal sealed class ListExtensionEvaluationsHandler(IExtensionEvaluationStore 
     public async ValueTask<Result<ExtensionEvaluationList>> HandleAsync(ListExtensionEvaluationsQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        if (!ExtensionFamilies.IsKnown(query.Family) && !PairFamilies.IsKnown(query.Family) && !ExpressionFamilies.IsKnown(query.Family))
+        if (!ExtensionFamilies.IsKnown(query.Family) && !OptionFeatureFamilies.IsKnown(query.Family) && !PairFamilies.IsKnown(query.Family) && !ExpressionFamilies.IsKnown(query.Family))
         {
             return Result.Failure<ExtensionEvaluationList>(ExtensionEvaluationErrors.InvalidFamily(query.Family));
         }

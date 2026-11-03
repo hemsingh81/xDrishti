@@ -93,6 +93,14 @@ public sealed record ExtensionComparisonOptions
         MaxDeltaBrier = null,
     };
 
+    /// <summary>The P14-11 preset (<c>iv-1</c>): the P13 depth preset (day blocks with the 5-session sensitivity, 2,000 paired candidates, 300 flips, log loss and Brier required) on calendar-quarter folds with a 12-month first train window and a 5-session embargo, because five years of option IV fit quarterly folds.</summary>
+    public static ExtensionComparisonOptions ForOptions() => ForDepth() with
+    {
+        Unit = FoldUnit.Quarter,
+        MinTrainMonths = 12,
+        EmbargoSessions = 5,
+    };
+
     /// <summary>The problems of the values, empty when they are usable.</summary>
     public IReadOnlyList<string> Problems()
     {

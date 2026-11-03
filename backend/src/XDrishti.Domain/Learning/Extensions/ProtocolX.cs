@@ -15,6 +15,15 @@ public static class ProtocolX
     public static ExtensionComparisonOptions Options(string recipeOptionsHash, string labelRuleVersion, DateOnly? holdOutStart) =>
         ExtensionComparisonOptions.ForFilings() with { RecipeOptionsHash = recipeOptionsHash, LabelRuleVersion = labelRuleVersion, HoldOutStart = holdOutStart };
 
+    /// <summary>The options of the version's preset: <see cref="ExtensionComparisonOptions.ForOptions"/> for <c>iv-1</c> (P14-11), else the filings preset.</summary>
+    public static ExtensionComparisonOptions OptionsFor(string version, string recipeOptionsHash, string labelRuleVersion, DateOnly? holdOutStart)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+        return version == IvFeatureCatalog.Version
+            ? ExtensionComparisonOptions.ForOptions() with { RecipeOptionsHash = recipeOptionsHash, LabelRuleVersion = labelRuleVersion, HoldOutStart = holdOutStart }
+            : Options(recipeOptionsHash, labelRuleVersion, holdOutStart);
+    }
+
     /// <summary>The comparison, after the caller has appended the trial's ledger row and read the family's hashes.</summary>
     public static Result<ExtensionReport> Compare(IReadOnlyList<ValidationRow> rows, int baseWidth, ExtensionGroup group, IScorerFactory recipe, IReadOnlyCollection<string> ledgerHashes, IReadOnlyList<DateOnly> sessions, ExtensionComparisonOptions options) =>
         ExtensionComparison.Compare(rows, baseWidth, group, recipe, ledgerHashes, sessions, options);

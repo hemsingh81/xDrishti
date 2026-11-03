@@ -7,9 +7,9 @@ namespace XDrishti.Api.IntegrationTests.Cli;
 public sealed class LearnExtensionEvalOptionsTests
 {
     [Fact]
-    public void The_family_list_of_the_verb_is_the_domain_list()
+    public void The_family_list_of_the_verb_is_the_domain_list_and_the_iv_family_of_p14_11()
     {
-        LearnExtensionEvalOptions.Families.ShouldBe(ExtensionFamilies.All);
+        LearnExtensionEvalOptions.Families.ShouldBe([.. ExtensionFamilies.All, IvFeatureCatalog.Family]);
     }
 
     [Theory]
@@ -18,6 +18,7 @@ public sealed class LearnExtensionEvalOptionsTests
     [InlineData("ext:fu-1")]
     [InlineData("ext:llm-1")]
     [InlineData("pead")]
+    [InlineData("ext:iv-1")]
     public void Each_family_parses_and_the_hold_out_is_off_unless_named(string family)
     {
         var (options, errors) = LearnExtensionEvalOptions.Parse(["--family", family]);

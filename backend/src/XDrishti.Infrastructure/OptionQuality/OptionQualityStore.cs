@@ -9,7 +9,7 @@ namespace XDrishti.Infrastructure.OptionQuality;
 /// <c>options.quality_runs</c> and <c>options.quality_results</c> (P14-04, ADR 0178). Insert-only for the runtime role: a run's id is taken from the sequence when it starts, its results are copied in per session, and the run row is inserted when it ends. A re-run writes new
 /// rows; the reads take the newest run per session and check. Nothing here reads or writes an archive table.
 /// </summary>
-internal sealed class OptionQualityStore(NpgsqlDataSource dataSource) : IOptionQualityStore
+internal sealed class OptionQualityStore(NpgsqlDataSource dataSource) : IOptionQualityStore, IRollingQualityRuns
 {
     private const string Columns = "session_date, underlying_id, source, expiry, fetch_key, check_code, status, reason, value, threshold, n, detail::text";
 
@@ -96,6 +96,37 @@ internal sealed class OptionQualityStore(NpgsqlDataSource dataSource) : IOptionQ
         command.Parameters.AddWithValue("to", to);
         command.Parameters.AddWithValue("limit", limit);
         return await ReadAsync(command, cancellationToken);
+    }
+
+    public async ValueTask<IReadOnlyList<RunQualityRow>> RollingResultsForKeysAsync(Guid underlyingId, IReadOnlyCollection<string> fetchKeys, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(fetchKeys);
+        if (fetchKeys.Count == 0)
+        {
+            return [];
+        }
+
+        await using var command = dataSource.CreateCommand(
+            $"""
+            SELECT DISTINCT ON (session_date, fetch_key, check_code) {Columns}, run_id
+            FROM options.quality_results
+            WHERE underlying_id = @u AND source = 'rolling' AND fetch_key = ANY(@keys) AND session_date BETWEEN @from AND @to
+            ORDER BY session_date, fetch_key, check_code, run_id DESC
+            """);
+        command.Parameters.AddWithValue("u", underlyingId);
+        command.Parameters.Add(new NpgsqlParameter("keys", NpgsqlDbType.Array | NpgsqlDbType.Varchar) { Value = fetchKeys.ToArray() });
+        command.Parameters.AddWithValue("from", NpgsqlDbType.Date, from);
+        command.Parameters.AddWithValue("to", NpgsqlDbType.Date, to);
+        var rows = new List<RunQualityRow>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var status = QualityStatuses.TryParse(reader.GetString(6), out var parsed) ? parsed : QualityStatus.Unavailable;
+            var check = new QualityCheck(reader.GetString(5), status, reader.IsDBNull(8) ? null : (double)reader.GetDecimal(8), reader.IsDBNull(9) ? null : (double)reader.GetDecimal(9), reader.IsDBNull(7) ? null : reader.GetString(7), reader.GetInt32(10), reader.IsDBNull(11) ? null : reader.GetString(11));
+            rows.Add(new RunQualityRow(new OptionQualityRow(reader.GetFieldValue<DateOnly>(0), reader.GetGuid(1), reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetFieldValue<DateOnly>(3), reader.IsDBNull(4) ? null : reader.GetString(4), check), reader.GetInt64(12)));
+        }
+
+        return rows;
     }
 
     private static async ValueTask<IReadOnlyList<OptionQualityRow>> ReadAsync(NpgsqlCommand command, CancellationToken cancellationToken)

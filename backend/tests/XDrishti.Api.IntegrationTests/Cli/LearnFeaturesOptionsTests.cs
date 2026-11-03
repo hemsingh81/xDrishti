@@ -31,7 +31,8 @@ public sealed class LearnFeaturesOptionsTests
     [Theory]
     [InlineData("ev-1")]
     [InlineData("fu-1")]
-    public void Features_takes_an_extension_of_p15_05_and_without_it_behaves_as_before(string extension)
+    [InlineData("iv-1")]
+    public void Features_takes_an_extension_of_p15_05_and_p14_11_and_without_it_behaves_as_before(string extension)
     {
         var (with, errors) = LearnFeaturesOptions.Parse(["--run", Key, "--extension", extension]);
         var (without, _) = LearnFeaturesOptions.Parse(["--run", Key]);
@@ -45,12 +46,12 @@ public sealed class LearnFeaturesOptionsTests
     [InlineData("--extension", "tf-1")]
     [InlineData("--extension", "md-1")]
     [InlineData("--extension", "")]
-    public void Features_refuses_an_extension_other_than_ev_1_or_fu_1(string flag, string value)
+    public void Features_refuses_an_extension_other_than_ev_1_fu_1_or_iv_1(string flag, string value)
     {
         var (options, errors) = LearnFeaturesOptions.Parse(["--run", Key, flag, value]);
 
         options.ShouldBeNull();
-        errors.ShouldContain(e => e.Contains("ev-1 or fu-1", StringComparison.Ordinal));
+        errors.ShouldContain(e => e.Contains("ev-1, fu-1 or iv-1", StringComparison.Ordinal));
     }
 
     [Fact]
