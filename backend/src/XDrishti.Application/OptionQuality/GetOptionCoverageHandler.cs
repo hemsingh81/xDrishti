@@ -2,6 +2,7 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.OptionQuality;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
+using XDrishti.Domain.Options;
 using XDrishti.Domain.Options.Quality;
 
 namespace XDrishti.Application.OptionQuality;
@@ -21,7 +22,7 @@ internal sealed class GetOptionCoverageHandler(IOptionReference reference, IOpti
     public async ValueTask<Result<OptionCoverageView>> HandleAsync(GetOptionCoverageQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var symbol = Normalize(query.Underlying);
+        var symbol = UnderlyingSymbol.Normalize(query.Underlying);
         if (symbol is null)
         {
             return Result.Failure<OptionCoverageView>(OptionQualityErrors.InvalidQuery("underlying is required, a symbol such as NSE:NIFTY."));
@@ -53,17 +54,6 @@ internal sealed class GetOptionCoverageHandler(IOptionReference reference, IOpti
         var rollingSessions = rollingGroups.Take(MaxRollingSessions).Select(g => Session(g.Key.SessionDate, QualityCodes.Rolling, g.Key.FetchKey, [.. g])).ToList();
         var listed = chainSessions.Where(s => s.Date >= from).Concat(rollingSessions).OrderBy(s => s.Date).ThenBy(s => s.Source, StringComparer.Ordinal).ThenBy(s => s.FetchKey, StringComparer.Ordinal).ToList();
         return Result.Success(new OptionCoverageView(symbol, listed, chainSessions.Count(s => s.Usable), truncated));
-    }
-
-    private static string? Normalize(string? underlying)
-    {
-        var text = underlying?.Trim().ToUpperInvariant();
-        if (string.IsNullOrEmpty(text) || text.Length > 60)
-        {
-            return null;
-        }
-
-        return text.Contains(':', StringComparison.Ordinal) ? text : "NSE:" + text;
     }
 
     private static OptionCoverageSessionView Session(DateOnly date, string source, string? fetchKey, IReadOnlyList<OptionQualityRow> rows)

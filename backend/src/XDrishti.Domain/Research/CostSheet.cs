@@ -237,6 +237,18 @@ public sealed record CostSheet : IEquatable<CostSheet>
             Rates(text, s.IntradayEquity);
             text.Append(",\"delivery_equity\":");
             Rates(text, s.Delivery);
+            if (s.Options is { } options)
+            {
+                text.Append(",\"options\":");
+                Rates(text, options);
+            }
+
+            if (s.Futures is { } futures)
+            {
+                text.Append(",\"futures\":");
+                Rates(text, futures);
+            }
+
             text.Append('}');
         }
 

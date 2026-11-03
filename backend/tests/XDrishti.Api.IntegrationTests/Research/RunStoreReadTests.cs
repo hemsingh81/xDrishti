@@ -45,7 +45,7 @@ public sealed class RunStoreReadTests(ApiFactory factory)
     [InlineData("UPDATE research.sim_trades SET costs = 'maybe' WHERE run_id = @id", "ck_sim_trades_costs", false)]
     [InlineData("UPDATE research.sim_trades SET entry_fill = 'late' WHERE run_id = @id", "ck_sim_trades_entry_fill", false)]
     [InlineData("UPDATE research.sim_trades SET trigger_timeframe = '7m' WHERE run_id = @id", "ck_sim_trades_trigger_timeframe", false)]
-    [InlineData("UPDATE research.sim_trades SET cost_segment = 'futures' WHERE run_id = @id AND costs = 'charged'", "ck_sim_trades_cost_segment", true)]
+    [InlineData("UPDATE research.sim_trades SET cost_segment = 'swing' WHERE run_id = @id AND costs = 'charged'", "ck_sim_trades_cost_segment", true)]
     [InlineData("UPDATE research.sim_trades SET costs = 'charged' WHERE run_id = @id AND costs = 'none'", "ck_sim_trades_costs_charged", false)]
     [InlineData("UPDATE research.sim_trades SET cost_total = 1 WHERE run_id = @id AND costs = 'none'", "ck_sim_trades_costing_all_or_nothing", false)]
     [InlineData("UPDATE research.sim_trades SET exit_gst = NULL WHERE run_id = @id AND costs = 'charged'", "ck_sim_trades_costing_all_or_nothing", true)]

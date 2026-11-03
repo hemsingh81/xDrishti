@@ -85,7 +85,7 @@ public sealed class SimTradeSchemaTests
         Enum.GetNames<FillBasis>().ShouldBe(["Exact", "Modelled"]);
         Enum.GetNames<EntryFill>().ShouldBe(["AtOpen", "AtLimit"]);
         Enum.GetNames<CostBasis>().ShouldBe(["None", "Charged"]);
-        Enum.GetNames<CostSegment>().ShouldBe(["IntradayEquity", "Delivery"]);
+        Enum.GetNames<CostSegment>().ShouldBe(["IntradayEquity", "Delivery", "Options", "Futures"]); // Options and Futures are P14-07 (optional rates, ADR 0194)
         Enum.GetNames<ChargeRounding>().ShouldBe(["HalfAwayFromZero", "HalfEven", "Down"]);
         Enum.GetNames<TradeSkip>().ShouldBe(["QuantityBelowOne", "CostAboveMax"]);
         Enum.GetNames<Side>().ShouldBe(["Buy", "Sell"]);

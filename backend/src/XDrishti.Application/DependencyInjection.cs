@@ -58,6 +58,7 @@ using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.OptionBackfill;
 using XDrishti.Application.OptionChain;
+using XDrishti.Application.OptionCosts;
 using XDrishti.Application.OptionQuality;
 using XDrishti.Application.OwnerActs;
 using XDrishti.Application.Paper;
@@ -169,6 +170,7 @@ public static class DependencyInjection
         services.AddScoped<IShareholdingAsOf, ShareholdingAsOf>(); // the shareholding as known at an instant (P15-04): a port with no decision caller yet
         services.AddScoped<IQueryHandler<GetResultsCalendarQuery, Result<ResultsCalendarView>>, GetResultsCalendarHandler>(); // GET /api/calendar/results (P15-04): read
         services.AddScoped<OptionArchiveQualityRunner>(); // one run of the option-archive quality checks (P14-04): reads the archive, writes only its own result rows
+        services.AddScoped<ICommandHandler<BuildSpreadModelCommand, SpreadModelBuildSummary>, BuildSpreadModelHandler>(); // xd options spread-model build (P14-07): usable chain sessions -> the half-spread model, insert-only, content-addressed; nothing reads it for a decision
         services.AddScoped<GetRampHandler>(); // the ramp of a live account and its owner moves (P11-04a, ADR 0148)
         services.AddScoped<IQueryHandler<GetRampQuery, Result<RampView>>>(sp => sp.GetRequiredService<GetRampHandler>());
         services.AddScoped<ICommandHandler<SetRampStepCommand, RampView>, SetRampStepHandler>();

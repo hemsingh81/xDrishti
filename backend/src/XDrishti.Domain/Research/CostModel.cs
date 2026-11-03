@@ -11,7 +11,8 @@ public static class CostModel
     private const decimal Crore = 10_000_000m;
 
     /// <summary>
-    /// Charges one leg. <paramref name="legSide"/> is the side of the order itself (the entry of a SELL trade is a sell order). <c>costs.no_rates_for_date</c> when the date is before the first schedule.
+    /// Charges one leg. <paramref name="legSide"/> is the side of the order itself (the entry of a SELL trade is a sell order). <c>costs.no_rates_for_date</c> when the date is before the first schedule; <c>costs.costs_unavailable</c> when the schedule in
+    /// force has no rates for an option or futures segment (the caller then runs the trade gross and says so; the answer is never a zero line).
     /// </summary>
     /// <exception cref="ArgumentNullException">The sheet is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">The turnover is negative, or the segment or side is unknown.</exception>
@@ -31,7 +32,12 @@ public static class CostModel
         }
 
         var rounding = schedule.Value.Rounding;
-        var rates = schedule.Value.RatesOf(segment);
+        var rates = schedule.Value.TryRatesOf(segment);
+        if (rates is null)
+        {
+            return Result.Failure<LegCharges>(CostErrors.CostsUnavailable(sheet.Id, segment, date));
+        }
+
         var buy = legSide == Side.Buy;
 
         var brokerage = rates.BrokerageCap == 0m ? 0m : Round(Math.Min(rates.BrokerageCap, Math.Max(rates.BrokerageMin, turnover * rates.BrokeragePct / 100m)), rounding);

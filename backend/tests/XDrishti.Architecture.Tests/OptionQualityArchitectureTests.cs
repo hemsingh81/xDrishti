@@ -49,8 +49,11 @@ public sealed class OptionQualityArchitectureTests
         result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
 
-    /// <summary>The simple names of the only types outside the quality namespaces that may name a quality type: the DI roots, the one route and the JSON context.</summary>
-    private const string MayReference = "^(DependencyInjection|ApiJsonContext.*|OptionCoverageEndpoints)$";
+    /// <summary>
+    /// The simple names of the only types outside the quality namespaces that may name a quality type: the DI roots, the one route, the JSON context and (P14-07, ADR 0194, deliberately and by name) <c>BuildSpreadModelHandler</c>, which asks the quality
+    /// results which chain sessions are usable before it reads any of them.
+    /// </summary>
+    private const string MayReference = "^(DependencyInjection|ApiJsonContext.*|OptionCoverageEndpoints|BuildSpreadModelHandler)$";
 
     [Fact]
     public void Only_the_quality_code_its_wiring_and_its_route_reference_a_quality_type_in_any_assembly_of_the_solution()
@@ -161,7 +164,8 @@ public sealed class OptionQualityArchitectureTests
         string[] Naming(string table) => [.. files.Where(f => Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN)\\s+options\\." + table + "\\b", RegexOptions.None, TimeSpan.FromSeconds(5))).Select(Path.GetFileName).Order(StringComparer.Ordinal)!];
 
         // Pinned per table: the recorder's own store and the quality reader, nothing else. The positive control is that each list names the quality reader (or, for chain_sessions, that it does not).
-        Naming("chain_snapshots").ShouldBe(["OptionArchiveReader.cs", "OptionChainStore.cs"]);
+        // P14-07 (ADR 0194) adds exactly one file to chain_snapshots: ChainSpreadReader, the half-spread model's read of bid, ask and bucket keys of usable sessions.
+        Naming("chain_snapshots").ShouldBe(["ChainSpreadReader.cs", "OptionArchiveReader.cs", "OptionChainStore.cs"]);
         Naming("chain_requests").ShouldBe(["OptionArchiveReader.cs", "OptionChainStore.cs"]);
         Naming("chain_sessions").ShouldBe(["OptionChainStore.cs"]);
         Naming("rolling_bars").ShouldBe(["OptionArchiveReader.cs", "RollingBarStore.cs"]);

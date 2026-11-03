@@ -136,15 +136,15 @@ public sealed class OptionChainRecordingArchitectureTests
     }
 
     [Fact]
-    public void Only_the_chain_store_and_the_quality_reader_name_the_snapshot_table_in_the_whole_source()
+    public void Only_the_chain_store_the_quality_reader_and_the_spread_reader_name_the_snapshot_table_in_the_whole_source()
     {
         var named = Directory.GetFiles(Path.Combine(Root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "\"[^\"\\n]*chain_snapshots|(FROM|INTO|UPDATE|JOIN)\\s+options\\.chain_snapshots", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)))
             .Select(Path.GetFileName).Order().ToList();
 
-        // P14-04 (ADR 0178) added exactly one reader, the quality checks' OptionArchiveReader (the pattern now also catches a name inside a multi-line SQL string). A third file here is a failure.
-        named.ShouldBe(["OptionArchiveReader.cs", "OptionChainStore.cs"]);
+        // P14-04 (ADR 0178) added exactly one reader, the quality checks' OptionArchiveReader (the pattern now also catches a name inside a multi-line SQL string); P14-07 (ADR 0194) added exactly one more, the half-spread model's ChainSpreadReader. A further file here is a failure.
+        named.ShouldBe(["ChainSpreadReader.cs", "OptionArchiveReader.cs", "OptionChainStore.cs"]);
     }
 
     [Fact]

@@ -338,6 +338,36 @@ public sealed class CostSheetDatabaseTests(ApiFactory factory) : DataTestBase(fa
     }
 
     [Fact]
+    public async Task A_sheet_with_option_and_futures_lines_loads_and_shows_them_with_a_hash_of_its_own_and_the_sheet_without_them_keeps_its_hash()
+    {
+        var options = TestCostSheet.Rates(0m, 20m, 20m, 0m, 0.10m, 0.03m, 10m, 0.003m, 0m, 0m);
+        var futures = TestCostSheet.Rates(0m, 20m, 20m, 0m, 0.02m, 0.002m, 10m, 0.002m, 0m, 0m);
+        var sheet = CostSheet.Create(
+            "fixture-options", "FIXTURE sheet with option lines (invented numbers)", "invented for tests; not a broker's sheet", null,
+            [ChargeSchedule.Create(TestCostSheet.ScheduleA, 18m, ChargeRounding.HalfAwayFromZero, TestCostSheet.IntradayA, TestCostSheet.DeliveryA, options, futures).Value]).Value;
+        using var temp = new TempFolder();
+        var path = WriteFile(temp, "options-sheet.json", sheet.ToCanonicalJson());
+
+        var loaded = await VerbAsync(["load", path]);
+        var shown = await VerbAsync(["show", "fixture-options"]);
+
+        loaded.Exit.ShouldBe(0, loaded.Error);
+        loaded.Out.ShouldContain("rates hash: " + sheet.RatesSha256);
+        shown.Exit.ShouldBe(0, shown.Error);
+        shown.Out.ShouldBe(sheet.ToCanonicalJson() + "\nrates hash: " + sheet.RatesSha256 + "\nlabel: costs: sheet fixture-options (not checked against bills)\n");
+        shown.Out.ShouldContain(",\"options\":{");
+        shown.Out.ShouldContain(",\"futures\":{");
+        sheet.RatesSha256.ShouldNotBe(FixtureSheet.Sheet.RatesSha256);
+        using var scope = Factory.Services.CreateScope();
+        var found = await scope.ServiceProvider.GetRequiredService<ICostSheetStore>().FindAsync("fixture-options", Ct);
+        found.Value.ShouldBe(sheet);
+        found.Value.Schedules[0].Options.ShouldBe(options);
+        found.Value.Schedules[0].Futures.ShouldBe(futures);
+        await StoreAsync(FixtureSheet.Sheet);
+        (await scope.ServiceProvider.GetRequiredService<ICostSheetStore>().FindAsync(FixtureSheet.Id, Ct)).Value.RatesSha256.ShouldBe(FixtureSheet.Sheet.RatesSha256);
+    }
+
+    [Fact]
     public async Task A_wrong_command_line_is_exit_2_with_the_usage_text_and_touches_nothing()
     {
         foreach (var args in new[] { Array.Empty<string>(), ["load"], ["load", "a", "b"], ["show"], ["check", "x"], ["show", "x", "--replace"], ["load", "a", "--bogus"], ["nope"] })

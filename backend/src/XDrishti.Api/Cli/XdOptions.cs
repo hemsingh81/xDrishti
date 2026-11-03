@@ -39,6 +39,7 @@ internal sealed record XdOptions(
           xd strategy test FILE.yaml (--symbols 'A,B' | --basket-id GUID) [--method quick|full] [--from YYYY-MM-DD --to YYYY-MM-DD] [--note TEXT] [--timeout-minutes N]
           xd learn cells --as-of YYYY-MM-DD --run RUNKEY:STYLE:EXIT [--run ...] [--half-life-days N] [--prior-strength N] [--min-trades N]
           xd filings extract --from YYYY-MM-DD --to YYYY-MM-DD [--limit N]   classify stored announcements with the local model (needs the assistant switch on; no tool, schema-checked)
+          xd options spread-model build [--underlying SYMBOL]   build the option half-spread model from usable chain sessions (fewer than the setting: no model, the reason is printed)
           xd learn features --run RUNKEY [--run ...]
           xd learn phase-check [--replay-seconds X]
           xd select cells --date YYYY-MM-DD [--min-state candidate|paper|active]

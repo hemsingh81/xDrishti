@@ -184,7 +184,7 @@ exits:                             # the strategy model (P3-02b, P3-02b2) checks
   per_trade_fit: { scale_by_atr: true, snap_to_structure: true, obstacle_check: true,
                    late_entry_target_reduction: { after: "13:30", factor: 0.7 } }
 
-costs:                             # the broker's charge sheet: effective-dated schedules, every rate present (a zero is written 0, never null); built in P3-03c (ADR 0042); stored since P3-03f (ADR 0044) as one row of `platform.app_settings`, key `research.cost_sheet.<id>` (a new set of rates is a new id), loaded with `scripts/cost-sheet.sh load <file.json>` (`show`, `check` against your original report files; `--replace` overwrites an id), and chosen by every run: `--gross` or `--costs <id> [--capital] [--profile] [--max-cost-r]`; a report or the paper comparison prints figures as net only while **you have confirmed that stored sheet at its current rates** (Settings, tab Charge sheet; ADR 0127: a fresh password per act, switched off until you switch it on, a change of the sheet's rates makes the confirmation stale)
+costs:                             # the broker's charge sheet: effective-dated schedules, every rate present (a zero is written 0, never null); since P14-07 (ADR 0194) a schedule may also carry optional `options` and `futures` objects of the same ten fields, left out when the owner has none (an option leg is then gross and labelled, never charged zero); `shortcut:` the stored sheet text is bounded at 8,000 characters, so a sheet whose schedules carry both new segments holds about seven schedules, not twelve); built in P3-03c (ADR 0042); stored since P3-03f (ADR 0044) as one row of `platform.app_settings`, key `research.cost_sheet.<id>` (a new set of rates is a new id), loaded with `scripts/cost-sheet.sh load <file.json>` (`show`, `check` against your original report files; `--replace` overwrites an id), and chosen by every run: `--gross` or `--costs <id> [--capital] [--profile] [--max-cost-r]`; a report or the paper comparison prints figures as net only while **you have confirmed that stored sheet at its current rates** (Settings, tab Charge sheet; ADR 0127: a fresh password per act, switched off until you switch it on, a change of the sheet's rates makes the confirmation stale)
   id: "?"                          # lower case [a-z0-9][a-z0-9._-]{0,39}; an id starting "test-" is a synthetic sheet for tests and is never stored
   label: "?"
   source: "? where you read the figures, and when"
@@ -502,6 +502,21 @@ Options:
     MaxChainSessionsPerRun: 20    # 1-400
     MaxRollingWindowsPerRun: 5000  # 1-5000: ceiling of fetch windows checked in one run, oldest first (MaxRunMinutes is the real bound)
     MaxRunMinutes: 30         # 1-120: a run stops between two units of work after this
+```
+
+### Option costs and liquidity (`Options:Costs:*`, `Options:Liquidity:*`, [ADR 0194](../adr/0194-the-option-cost-model-takes-optional-option-and-futures-lines-on-the-owners-sheet-a-half-spread-from-usable-chain-sessions-else-his-labelled-assumption-else-unavailable-rupee-liquidity-filters-and-a-lot-feasibility-count-apart-from-the-unit.md), P14-07)
+
+`appsettings.json` / environment of the host that builds or reads the model (`Options__Costs__MinUsableSessions`); bounds are checked at start-up. Nothing here sends anything or switches anything; the charge lines themselves are the owner's, entered with `cost-sheet load` (see `costs` above), and `xd options spread-model build [--underlying SYMBOL]` builds the measured half-spread model (exit 0 with the reason when there is nothing to build; 2 for a bad line).
+
+```yaml
+Options:
+  Costs:
+    MinUsableSessions: 60       # 20-250: usable chain sessions (coverage pass, parity pass or warn) an underlying needs before the half-spread is measured
+    MinQuotesPerBucket: 200     # 50-5000: quotes a bucket needs before its own median is used (else the time-merged, then the moneyness-merged pool)
+    AssumedHalfSpreadPct: {}    # per short symbol (NIFTY), 0.01-20: the OWNER's assumed half-spread in percent of the mid for the time before 60 usable sessions. Empty by default and never filled by the repository; without it the spread is unavailable (spread_unavailable)
+  Liquidity:
+    MinOiNotionalCr: 5          # 0-1000: open interest x spot, in crore of rupees, at least (UNVERIFIED starting value)
+    MinBarTurnoverLakh: 25      # 0-10000: the entry bar's volume x spot, in lakh of rupees, at least (UNVERIFIED starting value)
 ```
 
 ### Filings inbox (`Filings:*`, [ADR 0179](../adr/0179-filings-come-from-a-local-inbox-folder-with-a-sidecar-that-carries-the-broadcast-time-the-adapter-is-read-only-and-the-public-page-fetcher-is-a-recorded-decision-not-to-build.md), P15-01)

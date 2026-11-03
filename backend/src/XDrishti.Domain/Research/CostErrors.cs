@@ -14,6 +14,15 @@ public static class CostErrors
     /// <summary>A date before the first schedule of the sheet: the sheet has no rates for it. A caller error in the replay.</summary>
     public const string NoRatesForDateCode = "costs.no_rates_for_date";
 
+    /// <summary>The schedule in force on the date has no rates for the option or futures segment (P14-07): the leg is gross, labelled, never charged zero.</summary>
+    public const string CostsUnavailableCode = "costs.costs_unavailable";
+
+    /// <summary>The label of a trade whose option or futures legs could not be charged (P14-07).</summary>
+    public const string NoOptionLinesLabel = "costs: none (no option lines)";
+
+    /// <summary>The label of an option or futures leg dated before the first schedule of a sheet that does have option lines (P14-07).</summary>
+    public const string NoRatesForDateLabel = "costs: none (no schedule in force on the leg's date)";
+
     /// <summary>A capital, entry or risk that is not above 0.</summary>
     public const string SizingInputInvalidCode = "costs.sizing_input_invalid";
 
@@ -107,6 +116,10 @@ public static class CostErrors
     /// <summary>The date is before the first schedule.</summary>
     public static Error NoRatesForDate(string sheetId, DateOnly date) =>
         Error.Validation(NoRatesForDateCode, $"The charge sheet '{sheetId}' has no rates for {date:yyyy-MM-dd}: its first schedule starts later.");
+
+    /// <summary>The sheet has no rates for the segment on the date.</summary>
+    public static Error CostsUnavailable(string sheetId, CostSegment segment, DateOnly date) =>
+        Error.Validation(CostsUnavailableCode, $"The charge sheet '{sheetId}' has no {segment} rates for {date:yyyy-MM-dd}: the leg is gross.");
 
     /// <summary>A sizing input that is not above 0.</summary>
     public static Error SizingInputInvalid(string field) =>

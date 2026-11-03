@@ -78,7 +78,7 @@ Building one underlying's model from 250 sessions ≤ 2 minutes (bounded reads, 
 3. The liquidity thresholds (₹5 crore OI notional, ₹25 lakh bar turnover)? **Default: as drafted.**
 
 ## Done when
-- [ ] All acceptance criteria have evidence
+- [x] All acceptance criteria have evidence (test map in the build report; criterion 1 has the recorded deviation in ADR 0194 decision 2b)
 - [ ] `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any invented rate, any unavailable spread or cost read as zero, any changed hash of an existing sheet, any unusable session read)
-- [ ] Migration `AddOptionSpreadModels` with `Down`; no API change
-- [ ] ADR written; docs 08 §8, 16 §2, 20 §C updated
+- [x] Migration `AddOptionSpreadModels` with `Down`; no API change
+- [x] ADR written (0194, Proposed); docs 08 §8, 16 §2, 20 §C updated

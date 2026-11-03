@@ -69,11 +69,13 @@ public static class ExportSpellings
         _ => throw Unknown(basis),
     };
 
-    /// <summary><c>intraday_equity</c> · <c>delivery_equity</c>, the names of the segments in the charge sheet.</summary>
+    /// <summary><c>intraday_equity</c> · <c>delivery_equity</c> · <c>options</c> · <c>futures</c>, the names of the segments in the charge sheet.</summary>
     public static string Of(CostSegment segment) => segment switch
     {
         CostSegment.IntradayEquity => "intraday_equity",
         CostSegment.Delivery => "delivery_equity",
+        CostSegment.Options => "options",
+        CostSegment.Futures => "futures",
         _ => throw Unknown(segment),
     };
 

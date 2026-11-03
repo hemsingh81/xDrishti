@@ -207,7 +207,7 @@ public sealed class CostModelTests
     public void Every_line_and_the_total_are_not_negative_the_total_never_falls_as_the_turnover_grows_and_the_cap_does_not_double()
     {
         var sheet = TestCostSheet.Sheet;
-        foreach (var segment in Enum.GetValues<CostSegment>())
+        foreach (var segment in Enum.GetValues<CostSegment>().Where(s => s is CostSegment.IntradayEquity or CostSegment.Delivery)) // the option and futures segments (P14-07) have no lines on the TEST sheet
         {
             foreach (var side in Enum.GetValues<Side>())
             {

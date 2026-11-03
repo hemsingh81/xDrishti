@@ -112,6 +112,8 @@ public sealed class ExecSettingsDatabaseTests(ExecDatabase db)
     [Fact]
     public async Task A_temporary_table_named_pg_class_cannot_make_the_runtime_role_look_like_the_owner()
     {
+        // Arrange the state the assertions assume: the switch is OFF, so an immediate switch-on is the refused case whatever test ran before (the fixture database is shared).
+        await ExecDatabase.ExecuteAsync(db.App, $"INSERT INTO execution.settings (execution_enabled, actor, reason) VALUES (false, '{Owner}', 'precondition: off')");
         await using var c = new NpgsqlConnection(db.App);
         await c.OpenAsync(Ct);
         await RunAsync(c, "CREATE TEMP TABLE pg_class (oid oid, relowner oid); INSERT INTO pg_class VALUES ('execution.settings'::regclass::oid, (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = session_user))");

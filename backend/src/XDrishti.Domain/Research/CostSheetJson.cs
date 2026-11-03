@@ -14,7 +14,7 @@ public static class CostSheetJson
 
     private static readonly string[] SheetFields = ["id", "label", "source", "checked", "schedules"];
 
-    private static readonly string[] ScheduleFields = ["effective_from", "gst_pct", "rounding", "intraday_equity", "delivery_equity"];
+    private static readonly string[] ScheduleFields = ["effective_from", "gst_pct", "rounding", "intraday_equity", "delivery_equity", "options", "futures"];
 
     /// <summary>Reads the sheet. <c>costs.sheet_too_long</c> for a text over the bound, <c>costs.sheet_invalid</c> with the fields otherwise.</summary>
     /// <exception cref="ArgumentNullException">The text is null.</exception>
@@ -136,12 +136,14 @@ public static class CostSheetJson
 
         var intraday = Rates(fields, "intraday_equity", path, errors);
         var delivery = Rates(fields, "delivery_equity", path, errors);
+        var options = OptionalRates(fields, "options", path, errors);
+        var futures = OptionalRates(fields, "futures", path, errors);
         if (errors.Count > before || from is null || gst is null || rounding is null || intraday is null || delivery is null)
         {
             return null;
         }
 
-        var built = ChargeSchedule.Create(from.Value, gst.Value, rounding.Value, intraday, delivery);
+        var built = ChargeSchedule.Create(from.Value, gst.Value, rounding.Value, intraday, delivery, options, futures);
         if (built.IsFailure)
         {
             errors.AddRange(Prefixed(built.Error, path).Fields ?? []);
@@ -149,6 +151,23 @@ public static class CostSheetJson
         }
 
         return built.Value;
+    }
+
+    /// <summary>The optional segments: left out means absent (the leg is gross); a JSON null is refused, never read as "no rates" or as zero rates.</summary>
+    private static ChargeRates? OptionalRates(Dictionary<string, MiniJson.Node> parent, string name, string parentPath, List<FieldError> errors)
+    {
+        if (!parent.TryGetValue(name, out var node))
+        {
+            return null;
+        }
+
+        if (node.Kind == MiniJson.Kind.Null)
+        {
+            errors.Add(new FieldError(parentPath + "." + name, "must be an object with the ten rates, or left out (never null).", null, CostErrors.InvalidValue));
+            return null;
+        }
+
+        return Rates(parent, name, parentPath, errors);
     }
 
     private static ChargeRates? Rates(Dictionary<string, MiniJson.Node> parent, string name, string parentPath, List<FieldError> errors)
