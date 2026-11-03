@@ -72,6 +72,18 @@ stateDiagram-v2
   `options.contracts` (the contracts of the listed underlyings from the daily master refresh, never deleted),
   `options.lot_sizes` (dated lot history) and `options.market_epochs` (dated rule changes); every seed is unconfirmed
   until the owner checks it against the circular; the list is the app setting `options.underlyings` (doc 06 §2.1).
+- Option pricing core (built, P14-05, [ADR 0191](../adr/0191-the-option-pricing-core-is-a-pure-black-76-library-with-fixed-units-a-closed-list-of-unavailable-reasons-and-no-reader-yet.md)): pure Black-76 on a forward (Black-Scholes as its spot form), an implied-volatility solver, Greeks, the parity forward and a closed list of unavailable reasons; no reader yet.
+
+  | Quantity | Unit |
+  |---|---|
+  | Prices | rupees (`double`); paise only at the caller's edge, rounded half away from zero |
+  | sigma | fraction per year |
+  | `T` | (expiry date 15:30 India time minus now) / (365 x 86,400) |
+  | Delta, gamma | per rupee of spot (`F = S e^((r-q)T)`) |
+  | Vega | per 1 volatility point (sigma + 0.01) |
+  | Theta | per calendar day (annual / 365) |
+  | Vendor IV | read as percent / 100, label `percent_assumed` (UNVERIFIED until the P14-02 pilot) |
+  | Model price | labelled `bs_fallback` by its caller |
 - Families: directional expression (ITM/ATM options for our signals), defined-risk debit spreads (swing),
   index credit spreads / iron condors in range regimes, event/IV-aware positioning.
 - New learning dimension **instrument expression** (cash / future / option_buy / debit_spread …).
