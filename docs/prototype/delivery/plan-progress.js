@@ -5,7 +5,7 @@
    are the original product-level plan and are not updated per slice. */
 (function () {
   window.XDP = {
-    asOf: "2026-11-02",
+    asOf: "2026-11-03",
     now: "P0–P11 are built (P9 assistant, P10 paper trading and P11 small-live tooling all behind switches that stay OFF). The one open P8 item is the P8-16 browser matrix (C14 load time and some layout-shift cells still fail); P8-17 reads MET only after your stopwatch. P10 has nothing running yet: the nightly and paper services are paused, and the P7 and paper phase checks read NOT MET or NOT EVALUABLE until real evidence and your charge-sheet confirmation. P12 (xd-exec) is built in reduced form: only paper, manual_live and assisted modes are composed, semi_auto and auto_live are not values and nothing places a live order. P13 is untouched. P14 (option contracts, chain recorder, expired-options backfill, quality checks) and P15 (folder-drop filing source, point-in-time filing store) are partly built, recorders paused or gated OFF with no reader. Long poles are wall-clock, not code: Dhan and ISP replies, 12+ weeks of paper evidence, 30 semi-auto sessions, recorded data. Nothing places an order. The BK (system baskets) and CF (confidence programme) specs exist and are Draft, awaiting your Approved.",
     owner: [
       "Switch the nightly, review-cutoff, pre-open, expiry, weekly, paper-capture and paper-review services on in Settings: this starts the clocks (P7's ten unattended sessions and P10's 12 weeks and 60 counted trades count only from then). Auto-approval stays OFF.",
@@ -684,7 +684,7 @@ null,
         ],
       },
       {
-        id: "P15", t: "Fundamentals & events", state: "building", note: "Partly built: P15-01 (folder-drop filing source) and P15-02 (point-in-time store), reduced and read-only; the public fetcher is not built. P15-04 and P15-06 specs are Approved; the rest is plan only. Needs the 5-year backfill (ISS-19) and your 200 labelled announcements.",
+        id: "P15", t: "Fundamentals & events", state: "built", note: "All twelve slices are built and deployed (2026-11-03); the phase check (xd events phase-check) reads NOT EVALUABLE until you supply real filings, the announcement labels and the 5-year history (CF-04). Every switch stays OFF.",
         slices: [
           ["P15-01", "Filing sources and the terms gate (built 2026-11-01, reduced: folder drop only, read-only adapter with a strict sidecar; the public fetcher is recorded as not built, no network code)", "built", "0179", {"d": 3, "o": 1, "s": "P15-00-fundamentals-and-events-plan"}],
           ["P15-02", "Point-in-time filing store (built 2026-11-01, insert-only schema filings; visible once broadcast time plus lag has passed; undated is unavailable; ingest service registered paused; metadata endpoints only, no reader in any decision code)", "built", "0180", {"d": 3, "s": "P15-00-fundamentals-and-events-plan"}],
@@ -692,12 +692,12 @@ null,
           ["P15-04", "Calendar and shareholding", "built", "0181", {"d": 2, "s": "P15-00-fundamentals-and-events-plan"}],
           ["P15-05", "Features ev-1 and fu-1", "built", "0185", {"d": 3, "s": "P15-00-fundamentals-and-events-plan"}],
           ["P15-06", "Event-risk filter and loss tag", "built", "0182", {"d": 2, "o": 1, "s": "P15-00-fundamentals-and-events-plan"}],
-          ["P15-07", "Announcement eval set and labelling (you label about 200 announcements)", "draft", "", {"d": 2, "s": "P15-00-fundamentals-and-events-plan"}],
-          ["P15-08", "LLM announcement flags and field extraction (schema-checked, never decides trades)", "draft", "", {"d": 3, "o": 1, "s": "P15-00-fundamentals-and-events-plan"}],
-          ["P15-09", "PEAD strategy and the longer swing hold (max_hold up to 20)", "draft", "", {"d": 3, "s": "P15-00-fundamentals-and-events-plan"}],
+          ["P15-07", "Announcement eval set and labelling (you label about 200 announcements)", "built", "0188", {"d": 2, "s": "P15-00-fundamentals-and-events-plan"}],
+          ["P15-08", "LLM announcement flags and field extraction (schema-checked, never decides trades)", "built", "0189", {"d": 3, "o": 1, "s": "P15-00-fundamentals-and-events-plan"}],
+          ["P15-09", "PEAD strategy and the longer swing hold (max_hold up to 20)", "built", "0187", {"d": 3, "s": "P15-00-fundamentals-and-events-plan"}],
           ["P15-10", "Evaluation and verdicts", "built", "0186", {"d": 3, "s": "P15-00-fundamentals-and-events-plan"}],
-          ["P15-11", "Screens", "draft", "", {"d": 2, "s": "P15-00-fundamentals-and-events-plan"}],
-          ["P15-12", "P15 phase check", "draft", "", {"d": 1, "s": "P15-00-fundamentals-and-events-plan"}],
+          ["P15-11", "Screens", "built", "", {"d": 2, "s": "P15-00-fundamentals-and-events-plan"}],
+          ["P15-12", "P15 phase check", "built", "0190", {"d": 1, "s": "P15-00-fundamentals-and-events-plan"}],
         ],
       },
       {
