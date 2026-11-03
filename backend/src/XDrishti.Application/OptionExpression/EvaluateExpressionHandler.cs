@@ -1,0 +1,207 @@
+using System.Globalization;
+using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Learning;
+using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.OptionExpression;
+using XDrishti.Application.Abstractions.OptionQuality;
+using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Learning;
+using XDrishti.Domain.Common;
+using XDrishti.Domain.Learning.Extensions;
+using XDrishti.Domain.Options.Evaluation;
+
+namespace XDrishti.Application.OptionExpression;
+
+/// <summary>
+/// <c>xd options expression-eval</c> (P14-09, ADR 0198): protocol O over an expression run (P14-08) of a stored full-test cash run. <b>Order, enforced here and pinned by a test:</b> a spent hold-out is refused, then the run and the profile are looked up, then the trial (profile on this population) is appended to the test ledger and its hash is read back,
+/// and only then is any date, count or figure read. The development windows are read with the hold-out cut off in the query; the hold-out is read once, after a development KEEP, by the explicit flag. A re-run appends nothing to the ledger and stores nothing new (the same evaluation id).
+/// Research only: nothing selects, plans or orders; the expression stays cash.
+/// </summary>
+internal sealed class EvaluateExpressionHandler(
+    IRunStore runs,
+    IExpressionProfileStore profiles,
+    IExpressionReader reader,
+    IOptionReference reference,
+    ITestLedger ledger,
+    IExtensionEvaluationStore evaluations,
+    EvaluationWriter writer,
+    ILogger<EvaluateExpressionHandler> logger) : ICommandHandler<EvaluateExpressionCommand, ExtensionEvaluationOutcome>
+{
+    public const string TrialNotInLedgerCode = "extensions.trial_not_in_ledger";
+    public const string RunNotFullCode = "expression.run_not_full";
+    public const string HoldOutPrimaryOnlyCode = "expression.holdout_primary_only";
+    public const string RemarkNotFoundCode = "expression.remark_not_found";
+    private const string FullTestOrigin = "lab:full";
+
+    public async ValueTask<Result<ExtensionEvaluationOutcome>> HandleAsync(EvaluateExpressionCommand command, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        if (!ExpressionFamilies.IsKnown(command.Family))
+        {
+            return Result.Failure<ExtensionEvaluationOutcome>(Error.Validation(ExtensionEvaluationErrors.InvalidQuery, "The family is " + string.Join(", ", ExpressionFamilies.All) + "."));
+        }
+
+        var options = ExpressionStudyOptions.Default;
+
+        // A spent hold-out refuses before anything is looked up, counted or read.
+        if (command.HoldOut && await evaluations.HoldOutUsedAsync(command.Family, ExpressionFamilies.VersionKey, cancellationToken))
+        {
+            ExpressionEvalLog.Refused(logger, command.Family, ExtensionEvaluationErrors.HoldOutUsed);
+            return Result.Failure<ExtensionEvaluationOutcome>(Error.Conflict(ExtensionEvaluationErrors.HoldOutUsed, "The hold-out of " + command.Family + " for " + ExpressionFamilies.VersionKey + " has been read already; it is read once."));
+        }
+
+        var primary = ExpressionProfiles.PrimaryHash;
+        var profileHash = command.ProfileHash ?? primary;
+        if (command.HoldOut && profileHash != primary)
+        {
+            return Refused(command.Family, HoldOutPrimaryOnlyCode, Error.Validation(HoldOutPrimaryOnlyCode, "The hold-out is read once for the whole family: only the pre-registered primary profile may read it."));
+        }
+
+        if (await profiles.GetAsync(profileHash, cancellationToken) is null)
+        {
+            return Refused(command.Family, RemarkRunHandler.ProfileNotFoundCode, Error.NotFound(RemarkRunHandler.ProfileNotFoundCode, "No expression profile has that hash."));
+        }
+
+        var header = await runs.FindAsync(command.RunKey, cancellationToken);
+        if (header is null)
+        {
+            return Refused(command.Family, RemarkRunHandler.RunNotFoundCode, Error.NotFound(RemarkRunHandler.RunNotFoundCode, "No stored run has that key."));
+        }
+
+        if (!string.Equals(header.CreatedBy, FullTestOrigin, StringComparison.Ordinal))
+        {
+            return Refused(command.Family, RunNotFullCode, Error.Validation(RunNotFullCode, "Only the runs of a full Lab test are judged: their out-of-sample windows are the population (re-marking in-sample trades would flatter both sides)."));
+        }
+
+        var remarked = await reader.FindRunAsync(command.RunKey, profileHash, cancellationToken);
+        if (remarked is null)
+        {
+            return Refused(command.Family, RemarkNotFoundCode, Error.NotFound(RemarkNotFoundCode, "That run has not been re-marked under that profile: run 'xd options remark' first."));
+        }
+
+        // Ledger first: the trial is a counted look before a date, a count or a figure of the run is read.
+        var trial = ExpressionTrial.Of(command.Family, profileHash, command.RunKey, header.From, header.To);
+        var trials = await writer.AppendTrialAsync(trial, command.RunKey, header.From, header.To, "expression-trial", cancellationToken);
+        if (!await ledger.HasHashAsync(command.Family, trial.Hash, cancellationToken))
+        {
+            return Refused(command.Family, TrialNotInLedgerCode, Error.Validation(TrialNotInLedgerCode, "The trial is not in the test ledger of " + command.Family + ": nothing was computed."));
+        }
+
+        var epochFrom = ExpressionEpochs.LatestFrom(await reference.EpochsAsync(cancellationToken));
+        var dates = await reader.DatesAsync(remarked.RunId, cancellationToken);
+        var windows = ExpressionWindows.Of(dates.Sides);
+
+        // The hold-out is cut first, from dates only: everything printed or stored for the development verdict is built from the development windows.
+        DateOnly? holdStart = null;
+        if (dates.Sides.Count > 0 && windows.Count > 0)
+        {
+            // the cut depends on the closed trades' dates and the windows only, never on which trades were paired
+            holdStart = ProtocolO.HoldOutStartOf(DateOnly.FromDayNumber(Math.Min(dates.Sides.Max(s => s.Last).DayNumber, windows.Max(w => w.End).DayNumber)), options);
+        }
+
+        var devWindows = ExpressionWindows.Before(windows, holdStart);
+        var rows = await reader.PairedAsync(remarked.RunId, devWindows, cancellationToken);
+        var unpaired = await reader.UnpairedAsync(remarked.RunId, devWindows, cancellationToken);
+        var pairs = rows.Select(ToPair).ToList();
+
+        var evaluated = ProtocolO.Evaluate(new ProtocolOInput(pairs, unpaired, trials, epochFrom, holdStart, options, dates.LastPaired));
+        if (evaluated.IsFailure)
+        {
+            return Result.Failure<ExtensionEvaluationOutcome>(evaluated.Error);
+        }
+
+        var result = evaluated.Value;
+        var (development, _) = ProtocolO.Cut(pairs, options, holdStart);
+        var record = Identity(options, trial.Hash, trials, command, profileHash, primary, remarked.RunId, development, devWindows, unpaired, holdStart, epochFrom, false, null).ToRecord(result.Outcome);
+        ExtensionEvaluationRecord? holdRecord = null;
+        string? note = null;
+        if (command.HoldOut)
+        {
+            if (result.Outcome.Verdict != ExtensionVerdict.Keep || holdStart is not { } start)
+            {
+                note = "The hold-out was not read: the development verdict is not KEEP.";
+            }
+            else
+            {
+                var holdRows = await reader.PairedAsync(remarked.RunId, ExpressionWindows.From(windows, start), cancellationToken);
+                var hold = ProtocolO.HoldOut([.. holdRows.Select(ToPair)], options, start);
+                if (hold.IsFailure)
+                {
+                    return Result.Failure<ExtensionEvaluationOutcome>(hold.Error);
+                }
+
+                holdRecord = Identity(options, trial.Hash, trials, command, profileHash, primary, remarked.RunId, development, devWindows, unpaired, holdStart, epochFrom, true, record.EvaluationId).ToRecord(hold.Value);
+            }
+        }
+
+        var stored = new List<EvaluatedRecord>();
+        foreach (var item in holdRecord is null ? [record] : new[] { record, holdRecord })
+        {
+            var written = await writer.StoreAsync(item, cancellationToken);
+            if (written.IsFailure)
+            {
+                return Result.Failure<ExtensionEvaluationOutcome>(written.Error);
+            }
+
+            ExpressionEvalLog.Evaluated(logger, item.Family, item.VersionKey, item.Verdict, item.Rows, written.Value.Stored);
+            stored.Add(written.Value);
+        }
+
+        var lines = new List<string>(result.Lines)
+        {
+            string.Create(CultureInfo.InvariantCulture, $"out-of-sample windows {devWindows.Count} (hold-out starts {(holdStart is { } h ? h.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "unavailable")}); profile {profileHash[..12]}{(profileHash == primary ? " (primary)" : " (secondary)")}"),
+        };
+        if (note is not null)
+        {
+            lines.Insert(0, note);
+        }
+
+        return Result.Success(new ExtensionEvaluationOutcome(command.Family, stored, string.Join('\n', lines)));
+    }
+
+    private Result<ExtensionEvaluationOutcome> Refused(string family, string code, Error error)
+    {
+        ExpressionEvalLog.Refused(logger, family, code);
+        return Result.Failure<ExtensionEvaluationOutcome>(error);
+    }
+
+    private static ExpressionPair ToPair(ExpressionPairRow r) => ExpressionPair.Of(r.TradeKey, r.EntryTs, r.ExitTs, r.OptionR, r.CashR, r.Net, r.ExpirySource, r.Sizable, r.Labels);
+
+    private static ProtocolIdentity Identity(
+        ExpressionStudyOptions options, string trialHash, int trials, EvaluateExpressionCommand command, string profileHash, string primary, string expressionRun, IReadOnlyList<ExpressionPair> development, IReadOnlyList<ExpressionWindow> windows,
+        IReadOnlyDictionary<string, int> unpaired, DateOnly? holdStart, DateOnly epochFrom, bool holdOut, string? developmentRecord)
+    {
+        var c = CultureInfo.InvariantCulture;
+        var tradesHash = ExtensionFamilies.Sha256Hex(string.Join('\n', development.Select(p => string.Create(c, $"{p.EntryEpochSeconds}|{p.TradeKey}|{p.OptionR:R}|{p.CashR:R}|{p.Net}")).Order(StringComparer.Ordinal)));
+        var windowsHash = ExtensionFamilies.Sha256Hex(string.Join('\n', windows.Select(w => string.Create(c, $"{w.Side}|{w.Start:yyyy-MM-dd}|{w.End:yyyy-MM-dd}"))));
+        var basis = development.Count == 0 ? "none" : development.All(p => p.Net) ? "net" : development.Any(p => p.Net) ? "mixed" : "gross";
+        return new ProtocolIdentity(
+            command.Family,
+            ExpressionFamilies.Protocol,
+            null,
+            ExpressionFamilies.VersionKey,
+            "none",
+            ExtensionFamilies.Sha256Hex(options.Canonical()),
+            null,
+            trialHash,
+            trials,
+            "quarter",
+            new SortedDictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["cash_run"] = command.RunKey,
+                ["charge_basis"] = basis,
+                ["development_record"] = developmentRecord ?? "none",
+                ["expression_run"] = expressionRun,
+                ["hold_out_start"] = holdStart?.ToString("yyyy-MM-dd", c) ?? "none",
+                ["latest_epoch_from"] = epochFrom.ToString("yyyy-MM-dd", c),
+                ["oos_windows_sha256"] = windowsHash,
+                ["paired"] = development.Count.ToString(c),
+                ["primary_profile"] = profileHash == primary ? "true" : "false",
+                ["profile"] = profileHash,
+                ["trades_sha256"] = tradesHash,
+                ["unpaired"] = string.Join(',', unpaired.OrderBy(u => u.Key, StringComparer.Ordinal).Select(u => u.Key + "=" + u.Value.ToString(c))),
+            },
+            holdOut);
+    }
+}

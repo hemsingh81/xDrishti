@@ -22,11 +22,19 @@ internal sealed class FakeLedger(Journal journal) : ITestLedger
 
     public int Appended => _rows.Count;
 
+    /// <summary>When true an append is recorded in the journal but not kept (a ledger that lost the row).</summary>
+    public bool DropAppends { get; set; }
+
     public IReadOnlyList<LedgerRow> Rows => _rows;
 
     public ValueTask<bool> AppendAsync(LedgerRow row, CancellationToken cancellationToken)
     {
         journal.Events.Add("ledger");
+        if (DropAppends)
+        {
+            return ValueTask.FromResult(false);
+        }
+
         if (!_ids.Add(row.RunId))
         {
             return ValueTask.FromResult(false);

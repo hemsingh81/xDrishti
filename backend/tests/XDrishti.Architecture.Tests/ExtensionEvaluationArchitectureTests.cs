@@ -26,7 +26,7 @@ public sealed class ExtensionEvaluationArchitectureTests
     {
         var users = Types.InAssembly(Application).That().HaveDependencyOnAny(Protocols).GetTypes().Select(t => t.Name).Where(n => !n.StartsWith('<')).Distinct().Order(StringComparer.Ordinal).ToList();
 
-        users.ShouldBe(["ComparisonEvaluation", "EvaluatePairsHandler", "FilterEvaluation", "FlagEvaluation", "PeadEvaluation"]); // EvaluatePairsHandler: protocol S (P14-13) stores its record as a ProtocolIdentity
+        users.ShouldBe(["ComparisonEvaluation", "EvaluateExpressionHandler", "EvaluatePairsHandler", "FilterEvaluation", "FlagEvaluation", "PeadEvaluation"]); // EvaluatePairsHandler and EvaluateExpressionHandler: protocols S (P14-13) and O (P14-09) store their record as a ProtocolIdentity
     }
 
     [Theory]

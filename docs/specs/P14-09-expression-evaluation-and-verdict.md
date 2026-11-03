@@ -85,7 +85,7 @@ One evaluation over 10,000 paired trades with two block lengths ≤ 30 s (UNVERI
 2. Load the option and cash charge lines (ISS-25, P14-07)? **Default if not: every result is INCONCLUSIVE at best, so the family stays disabled (`expression` stays `cash`) — the kill criterion's default.**
 
 ## Done when
-- [ ] All acceptance criteria have evidence
+- [x] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer (Opus): no blockers/majors (told to look for any number before its ledger row, any unavailable read as a pass, any hold-out read without the flag, any P14 family in the P15 phase check, any decision-path reader)
-- [ ] No migration; contract regenerated if the route summary changed
-- [ ] ADR written; doc 20 §C updated
+- [x] No migration; contract regenerated (the route summary names the family; built 2026-11-04)
+- [x] ADR written ([ADR 0198](0198-protocol-o-judges-the-option-expression-against-cash-on-paired-out-of-sample-trades-after-counting-each-profile-in-the-ledger-first-with-the-hold-out-cut-before-any-number-and-no-gross-result-ever-a-keep-or-a-drop.md)); doc 20 §C updated

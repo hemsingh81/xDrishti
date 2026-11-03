@@ -53,7 +53,7 @@ public sealed class OptionQualityArchitectureTests
     /// The simple names of the only types outside the quality namespaces that may name a quality type: the DI roots, the one route, the JSON context and (P14-07, ADR 0194, deliberately and by name) <c>BuildSpreadModelHandler</c>, which asks the quality
     /// results which chain sessions are usable before it reads any of them, and (P14-08, ADR 0197, by name) <c>RemarkRunHandler</c>, which asks the stored verdicts which rolling key-sessions are usable before it reads a bar as a price.
     /// </summary>
-    private const string MayReference = "^(DependencyInjection|ApiJsonContext.*|OptionCoverageEndpoints|BuildSpreadModelHandler|RemarkRunHandler)$";
+    private const string MayReference = "^(DependencyInjection|ApiJsonContext.*|OptionCoverageEndpoints|BuildSpreadModelHandler|RemarkRunHandler|EvaluateExpressionHandler)$";
 
     [Fact]
     public void Only_the_quality_code_its_wiring_and_its_route_reference_a_quality_type_in_any_assembly_of_the_solution()

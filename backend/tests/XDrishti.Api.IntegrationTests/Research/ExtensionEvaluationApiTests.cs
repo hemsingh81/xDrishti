@@ -80,6 +80,25 @@ public sealed class ExtensionEvaluationApiTests(ApiFactory factory) : DataTestBa
     }
 
     [Fact]
+    public async Task The_shared_route_lists_the_expression_family_and_its_record_by_id_and_the_p15_families_stay_apart()
+    {
+        var record = new ExtensionEvaluationRecord(
+            "e1".PadRight(64, '0'), "expr:option_buy", "O", null, "expr-1", "none", new string('a', 64), null, new string('b', 64), 3, 1.4, "quarter", 0, 0, 0, null, "{\"mean_d\":\"unavailable\"}", "NOT_EVALUABLE", ["folds 0 of 6"], ["future baseline: NOT_EVALUABLE no_futures_bars"],
+            "{\"verdict\":\"NOT_EVALUABLE\"}", "{}", false);
+        await StoreAsync(record);
+
+        var body = await Client.GetFromJsonAsync<JsonElement>(new Uri(List + "?family=expr:option_buy", UriKind.Relative), Ct);
+        var one = await Client.GetFromJsonAsync<JsonElement>(new Uri(List + "/" + record.EvaluationId, UriKind.Relative), Ct);
+        var pead = await Client.GetFromJsonAsync<JsonElement>(new Uri(List + "?family=pead", UriKind.Relative), Ct);
+
+        body.GetProperty("items").GetArrayLength().ShouldBe(1);
+        body.GetProperty("items")[0].GetProperty("protocol").GetString().ShouldBe("O");
+        one.GetProperty("missing")[0].GetString().ShouldBe("folds 0 of 6");
+        one.GetProperty("estimates").GetProperty("mean_d").GetString().ShouldBe("unavailable");
+        pead.GetProperty("items").GetArrayLength().ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Stored_records_come_back_newest_first_and_one_by_id_with_its_evidence_and_an_unknown_id_is_404()
     {
         await StoreAsync(Filter(1, "DROP", "a1"));

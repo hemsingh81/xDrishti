@@ -16111,7 +16111,7 @@
         "tags": [
           "Research"
         ],
-        "summary": "The stored evaluations of one family (filter:results, ext:ev-1, ext:fu-1, ext:llm-1, pead or pairs:intraday-1), newest first, at most 100: the verdict (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE) with the named missing quantities, the counts, the limits and the estimates, evidence and inputs as JSON. A value that is not available is the text unavailable, never a number. 400 extensions.invalid_query for an unknown family",
+        "summary": "The stored evaluations of one family (filter:results, ext:ev-1, ext:fu-1, ext:llm-1, pead, pairs:intraday-1 or expr:option_buy), newest first, at most 100: the verdict (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE) with the named missing quantities, the counts, the limits and the estimates, evidence and inputs as JSON. A value that is not available is the text unavailable, never a number. 400 extensions.invalid_query for an unknown family",
         "operationId": "ListExtensionEvaluations",
         "parameters": [
           {

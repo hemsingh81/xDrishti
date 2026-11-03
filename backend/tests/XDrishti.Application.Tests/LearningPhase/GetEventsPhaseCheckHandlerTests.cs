@@ -105,6 +105,23 @@ public sealed class GetEventsPhaseCheckHandlerTests
     }
 
     [Fact]
+    public async Task Stored_expression_and_pairs_records_never_reach_the_phase_check_which_stays_byte_identical_and_never_asks_for_their_families()
+    {
+        StoreAllCurrent();
+        var before = (await Handler().HandleAsync(new EventsPhaseCheckQuery([]), TestContext.Current.CancellationToken)).Value;
+        Add(Record("x1", ExpressionFamilies.OptionBuy, "O", "KEEP", "expr-1"));
+        Add(Record("s1", PairFamilies.Intraday, "S", "KEEP", "pairs-1"));
+
+        var after = (await Handler().HandleAsync(new EventsPhaseCheckQuery([]), TestContext.Current.CancellationToken)).Value;
+
+        after.Text.ShouldBe(before.Text);
+        after.Json.ShouldBe(before.Json);
+        await _evaluations.DidNotReceive().ListAsync(ExpressionFamilies.OptionBuy, Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await _evaluations.DidNotReceive().ListAsync(PairFamilies.Intraday, Arg.Any<int>(), Arg.Any<CancellationToken>());
+        ExtensionFamilies.All.ShouldNotContain(ExpressionFamilies.OptionBuy);
+    }
+
+    [Fact]
     public async Task The_filter_on_with_a_drop_for_its_window_is_not_met_and_names_the_row_and_who_decided()
     {
         StoreAllCurrent("DROP");
