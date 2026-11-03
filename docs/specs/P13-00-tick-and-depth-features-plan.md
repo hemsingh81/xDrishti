@@ -1,6 +1,6 @@
 # P13-00 — Tick and depth features: the plan, the split, the evaluation protocol and the kill criterion
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-24, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** P13 — Tick/depth features (5 weeks, "after P12" in the Gantt). Row: "Microstructure features from ≥ 6 months recorded data; depth-based slippage"; exit criterion "Kept only if OOS intraday expectancy improves".
 - **Design refs:** docs/design/20-extended-modules.md §B · 05-data-and-brokers.md §5 (live feed), §6 · 09-learning-engine.md §3 (meta-model), §14 · 17-deployment-and-operations.md (disk) · 19-risks-and-compliance.md §1 (multiple testing, ML leakage), §5 · ADR 0024 (live feed), 0038 (fill realism), 0059 (ledger), 0066 (features), 0067 (validation harness), 0070 (registry), 0075 (meta-labelling policy)
 - **Needs:** P7-16 (depth recording, spec on disk 2026-10-24; SAFETY, waits for the owner, not started), P6-04/05/06/07 (built), P5-03 (ledger, built), P10 (paper trades give the live check of the verdict). P12 is needed only by P13-08.

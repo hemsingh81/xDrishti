@@ -1,6 +1,6 @@
 # BK-10 — Volatility-targeted sizing and basket risk budgets
 
-- **Status:** Draft (written 2026-10-25; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** P7 extension / P10 prerequisite — U7 of `docs/research/basket-leverage-uses.md`, with the safe reading of "more leverage" in its §3
 - **Design refs:** docs/design/08-exits-and-risk.md (risk profile, sizing) · docs/design/10-selection-and-portfolio.md §4 (market gate risk × 0.75), §5 (limits) · P7-00 (Q on autonomy), P7-04, P7-07, P7-12, ADR 0042 (sizing), ADR 0085, ADR 0091 · P6-10/P10-05 (hypothesis loop for any change in risk)
 - **Needs:** built `Sizing.Quantity` (`Domain/Research`, VERIFIED: `floor(min(riskAmount / risk, maxCapital / entry))`), `RiskProfile`, `PortfolioFiller`/`FillConstraints` (VERIFIED), `MarketGate` (reduced mode = risk × 0.75, VERIFIED in doc 10), the owner-act settings pattern of P7-12 (`AutonomyChange.Create` refusing non-owner actors, fresh password per change); [BK-06](BK-06-basket-index-and-profile-metrics-engine-pure.md) (`Capacity`/ADV20 only, for the capacity cap); [BK-08](BK-08-correlation-clusters-and-caps-and-basket-breadth-in-the-market-gate.md) soft (shared owner-act settings path). BK-01..BK-05 for baskets to attach budgets to.

@@ -1,6 +1,6 @@
 # BK-01 — Index basket catalogue, fetcher and versioned membership
 
-- **Status:** Draft (written 2026-10-25 under the owner's delegation; decisions below researched; owner's Approved needed before build)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** BK — system baskets, slice BK-01 of [BK-00](BK-00-system-baskets-plan.md)
 - **Design refs:** docs/design/06-instruments-and-baskets.md §2.1, §3.1, §3.4 · [ADR 0014](../adr/0014-portfolio-buckets-appear-as-system-baskets.md) · ISS-22 · research [system-baskets-nse](../research/system-baskets-nse.md) §1, §3
 - **Needs:** built P1-15 / P1-15a; instrument master (ISIN, symbol, retired flag); services framework. Nothing else.

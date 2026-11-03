@@ -1,6 +1,6 @@
 # P14-06 — Instrument-expression dimension: an `Expression` type, expression profiles as content-addressed research rows, and an optional eighth cell-key part that leaves every stored key and every decision path unchanged
 
-- **Status:** Approved (owner, 2026-11-03, blanket approval of all stories)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-11-03, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** P14 — slice P14-06 of [P14-00](P14-00-options-and-stat-arb-plan.md) ("Instrument-expression dimension"); phase acceptance criterion 8.
 - **Design refs:** docs/design/09 §3 layer 1 (cells), §14 · 07 (expression) · 20 §C · P14-00 D4 (the expression is not a strategy-file field), D7 · [BK-11](BK-11-universe-cell-dimension-and-strategy-universe-link.md) decision 5 (`universe` is the 7th part, `expression` the 8th) · ADR 0058 (run identity), 0064 (cells), 0045 (insert-only research rows). New ADR: **next free number at build time** (design change of doc 09: the eighth part and its canonical form).
 - **Needs:** P6-01 (built: `CellId`, `research.cell_stats`). BK-11 is **not needed** (Draft, not built): this slice reserves its seventh position with the single value `*` and BK-11 later widens the allowed values. **Needed by:** P14-08 (profiles, the expression of a re-marked trade), P14-09, P14-10, P14-13, P14-15 (cells and families per expression), P14-16 (reports).

@@ -1,6 +1,6 @@
 # BK-07 — Basket profile endpoints and screen
 
-- **Status:** Draft (written 2026-10-25; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** P8 follow-up — basket performance insight (research note `docs/research/basket-leverage-uses.md` §2, views 1 to 7)
 - **Design refs:** docs/design/13-reports-and-ui.md §1c · docs/design/06-instruments-and-baskets.md §3, §4 · docs/prototype/ (baskets and reports views) · ADR 0100, 0102, 0104, 0105 · ISS-22
 - **Needs:** [BK-06](BK-06-basket-index-and-profile-metrics-engine-pure.md) (the kernels); P8-06 (built: `MetricView`, `Evidence`, run default set, 422/404 problem codes); P8-07 (built: benchmarks); P8-09 (built: comparison, pivot, `HeatGrid` in `shared/analytics`, `lensToQuery`); the members-as-of query (`members?asOf`, BK-01), `IBarQueries.ReadDailyBarsAsync`, `IPortfolioBenchmark` (existing ports). Soft: BK-01..BK-05 (system baskets with dated membership and `basket_versions`/`params_hash`; without them the screen works on manual baskets with `single_snapshot` membership), BK-08 (cluster ids for the correlation view; without them the matrix is sector-ordered), `market.context_daily` regimes (P3-01c/d).

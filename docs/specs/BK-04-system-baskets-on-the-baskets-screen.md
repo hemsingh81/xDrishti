@@ -1,6 +1,6 @@
 # BK-04 — System baskets on the Baskets screen
 
-- **Status:** Draft (written 2026-10-25 under the owner's delegation; decisions below researched; owner's Approved needed before build)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** BK — system baskets, slice BK-04 of [BK-00](BK-00-system-baskets-plan.md)
 - **Design refs:** docs/design/06-instruments-and-baskets.md §3.1, §3.4 · [ADR 0014](../adr/0014-portfolio-buckets-appear-as-system-baskets.md) · [P1-15a](P1-15a-portfolio-baskets-the-account-buckets-on-the-baskets-page-protected.md) · ISS-22 · frontend rules `frontend/CLAUDE.md` · prototype `docs/prototype/` (Baskets page, match its look)
 - **Needs:** [BK-01](BK-01-index-basket-catalogue-fetcher-and-versioned-membership.md) (API fields `kind`, `system`, `membersKnownSince`, `source`), [BK-03](BK-03-derived-baskets-refresh-job-and-scores.md) for derived cards and versions (without it only index cards appear); [BK-05](BK-05-broker-flag-and-fo-baskets.md) for list cards (cards simply do not appear until their kind exists). Built: the Baskets feature in `frontend/src/features/baskets` (page, members grid, history drawer, copy-out).

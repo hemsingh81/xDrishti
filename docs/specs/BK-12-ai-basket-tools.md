@@ -1,6 +1,6 @@
 # BK-12 — AI basket tools
 
-- **Status:** Draft (written 2026-10-25; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** P9 — AI assistant, an addendum slice on P9-05 (U13 of `docs/research/basket-leverage-uses.md`)
 - **Design refs:** docs/design/14-ai-assistant.md §3 (tool list), §4(2) · P9-00 (envelope, D10 to D12, "numbers only from tools, no trade decisions") · P9-02 (runner, `aiv` views, manifest) · P9-05 (the eleven tools, the 2,200-token schema budget) · P9-09 (eval set) · BK-07 (handlers)
 - **Needs:** P9-02, P9-03, P9-05 (all Draft at writing; none built, UNVERIFIED), [BK-07](BK-07-basket-profile-endpoints-and-screen.md) handlers (`GetBasketProfile`, `GetBasketRanking`), BK-08's `market.basket_context_daily` for the context report, P8-06/P8-09 reports (built). Without BK-07 the new reports answer `tool.unavailable` and the rest of the assistant is unaffected.

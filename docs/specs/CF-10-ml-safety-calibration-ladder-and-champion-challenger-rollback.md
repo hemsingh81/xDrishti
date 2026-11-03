@@ -1,6 +1,6 @@
 # CF-10 — ML safety: calibration by sample size, a complexity ladder, the MlMayInfluence predicate and champion / challenger with rollback
 
-- **Status:** Draft (written 2026-10-27; the decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** CF — Confidence programme (row added by CF-00; UNVERIFIED). Extends P6 (validation harness, trainer, registry, lifecycle, drift).
 - **Design refs:** docs/design/09-learning-engine.md §1 to §8, §10 · 16-configuration.md (`drift`, `max_calibration_error_pp`) · docs/research/confidence-learning-and-validation-speed.md §1 · P6-05, P6-06, P6-07, P6-08, P6-09, P6-12, P6-13, P7-00 Q8 · ADRs 0067, 0068, 0070, 0073, 0074, 0077
 - **Needs:** P6-03..P6-13 (built), CF-00, CF-01 (n_eff), CF-06 (the shared locked hold-out), CF-08 (forward scored candidates). Feeds CF-11 (calibration sub-score).

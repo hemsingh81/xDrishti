@@ -1,6 +1,6 @@
 # CF-07 — Random-entry null, placebo / mirror runs and the plateau gate
 
-- **Status:** Draft (written 2026-10-27; the decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** CF — Confidence programme (row added by CF-00; UNVERIFIED). Extends P5-05 (robustness) and P5-06 (verdict and report).
 - **Design refs:** docs/design/11-strategy-lab.md §3, §4 · 08-exits-and-risk.md §3 (plateau preference in exit selection) · docs/research/confidence-edge-realism.md §3 rows 4 to 7, §4 rows 7 to 9 · ADRs 0060, 0062, 0063
 - **Needs:** P5-04/05/06 (built), CF-00 (report-only rule, settings home), CF-06 (trial ledger: these runs are looks and are counted). Feeds CF-11 rows 7, 8, 9.

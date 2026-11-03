@@ -1,6 +1,6 @@
 # BK-09 — Relative-strength features and sector strength
 
-- **Status:** Draft (written 2026-10-25; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** P8-P9 window feature slice — U4, U9 (stock side), U5 and the `RS_ROTATION` test of `docs/research/basket-leverage-uses.md`
 - **Design refs:** docs/design/11-strategy-lab.md §2 (context features; `sector_rs(n)` "not planned until a strategy needs it") · docs/design/07-strategies.md (`RS_ROTATION`) · P3-01e D8 · P3-01b/c · P6-04 · P6-17b · ADR 0081
 - **Needs:** [BK-06](BK-06-basket-index-and-profile-metrics-engine-pure.md) (`EqualWeightIndex`, `RelativeStrength`); P3-01c/d (index series incl. Nifty 50 in `market.context_daily`); the strategy DSL and Lab (built P3-02/P3-04); BK-01..BK-05 for the pre-registered baskets the rank is taken within (Nifty 50, Nifty 100, F&O, liquid-100 and the sector baskets); `instruments.sector` (the master's `industry`, per P3-01e D8).

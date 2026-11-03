@@ -1,6 +1,6 @@
 # CF-01 — Effective sample size, power and minimum track record
 
-- **Status:** Draft (written 2026-10-27 under the owner's delegation; decisions below researched; the owner's Approved is needed before build)
+- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** CF programme ([CF-00](CF-00-confidence-programme-plan.md)), slice 1; touches P5 (Lab verdict) and P6 (cell statistics)
 - **Design refs:** docs/design/09-learning-engine.md layer 1 · 11-strategy-lab.md §4 · 16-configuration.md (`learning.min_trades`, `qualification_gates`) · [P6-01](P6-01-cell-statistics-bayesian-and-recency.md) (its "credible interval treats trades as independent" limit) · [P5-03](P5-03-test-ledger-and-the-gates.md) · research [confidence-data-and-small-sample](../research/confidence-data-and-small-sample.md) §2.2, §2.3, §2.9
 - **Needs:** nothing unbuilt. Built: `CellStatsCalculator`, `VerdictEvaluator`, `OosEvidenceBuilder`, `research.cell_stats`, `lab.lab_results`.
