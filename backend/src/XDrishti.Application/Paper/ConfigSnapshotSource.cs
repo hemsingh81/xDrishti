@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Learning;
@@ -37,7 +38,8 @@ internal sealed class ConfigSnapshotSource(
     ISimulationEngine engine,
     IGradeSettings grading,
     ICostSheetStore costSheets,
-    IEventFilterDecisions? eventFilter = null) : IConfigSnapshotSource
+    IEventFilterDecisions? eventFilter = null,
+    ILogger<ConfigSnapshotSource>? logger = null) : IConfigSnapshotSource
 {
     private static readonly CellState[] Eligible = [CellState.Candidate, CellState.Paper, CellState.Active];
 
@@ -159,7 +161,7 @@ internal sealed class ConfigSnapshotSource(
         foreach (var subject in grouped.Keys.Order(StringComparer.Ordinal))
         {
             var replay = CellHistory.Replay(complete ? grouped[subject] : await changelog.HistoryAsync(subject, cancellationToken));
-            if (!Eligible.Contains(replay.State) || replay.State < minimum || CellId.TryParse(subject) is not { } cell)
+            if (!Eligible.Contains(replay.State) || replay.State < minimum || CellId.TryParse(subject) is not { IsCash: true } cell)
             {
                 continue;
             }
@@ -173,7 +175,7 @@ internal sealed class ConfigSnapshotSource(
             result.Add(new ConfigComponent(PaperConfigKeys.CellsEligible + subject, hash));
         }
 
-        var keys = (await cellStats.ListLatestAsync(null, null, cancellationToken)).Select(s => s.SnapshotKey).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
+        var keys = CashCells.Only(await cellStats.ListLatestCashAsync(null, null, cancellationToken), "paper_config", logger).Select(s => s.SnapshotKey).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
         result.Add(new ConfigComponent(PaperConfigKeys.CellsSnapshot, string.Join(',', keys) is { Length: > 0 } joined ? joined : "none"));
         return result;
     }

@@ -66,7 +66,7 @@ internal sealed class RecordCellTransitionHandler(ILearningChangelog changelog, 
         var problems = new List<FieldError>();
         if (CellId.TryParse(command.Cell) is null)
         {
-            problems.Add(new FieldError("cell", "The cell is strategy|timeframe|side|style|exit|regime."));
+            problems.Add(new FieldError("cell", "The cell is strategy|timeframe|side|style|exit|regime, or those six parts then | and a universe (*) and an expression."));
         }
 
         if (!Enum.IsDefined(command.To))

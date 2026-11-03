@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Learning;
 using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
@@ -24,7 +26,7 @@ internal sealed record TicketReplay(TicketGrade? Grade, SimTrade? Trade, string?
 /// The one path that walks a ticket through the stored bars (spec P7-13, ADR 0090; reused by the paper capture of P10-01, ADR 0116): it asks the simulation use case for the decision day of the ticket and turns the record into a grade with the
 /// pure <see cref="TicketGrader"/>. Grading and paper capture both call it and nothing else builds a <see cref="RunSimulationQuery"/> for a ticket, so a paper trade cannot drift from the grade. Reads only.
 /// </summary>
-internal sealed class TicketReplayer(IStrategyStore strategies, IBasketQueries baskets, IQueryHandler<RunSimulationQuery, Result<SimulationRun>> simulation)
+internal sealed class TicketReplayer(IStrategyStore strategies, IBasketQueries baskets, IQueryHandler<RunSimulationQuery, Result<SimulationRun>> simulation, ILogger<TicketReplayer>? logger = null)
 {
     private Dictionary<string, Guid>? _instruments;
 
@@ -36,6 +38,12 @@ internal sealed class TicketReplayer(IStrategyStore strategies, IBasketQueries b
         if (CellId.TryParse(item.Evidence.CellKey) is not { } cell || (item.Side != "BUY" && item.Side != "SELL"))
         {
             return Final(TicketGrader.NotGradable("the ticket's cell key or side cannot be read"));
+        }
+
+        if (!cell.IsCash)
+        {
+            CashCells.LeftOut(logger, "ticket_replay");
+            return Final(TicketGrader.NotGradable("the ticket's cell is not a cash cell")); // ADR 0193: replay, like planning, reads cash cells only
         }
 
         if (!ExitLabel.TryRead(cell.Exit, out var exit, out var exitReason))

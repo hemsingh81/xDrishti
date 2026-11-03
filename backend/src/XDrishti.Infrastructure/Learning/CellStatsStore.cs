@@ -14,6 +14,11 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
         win_rate_posterior, win_rate_lower, win_rate_upper, avg_win_r, avg_loss_r, expectancy_r, profit_factor, max_drawdown_r, mae_p50, mae_p90, mfe_p50, mfe_p90, enough
         """;
 
+    // P14-06 (ADR 0193): a cash key has exactly five separators (the six-part text every stored key has). The decision reads choose their snapshot among cash keys only, so a later snapshot that holds only option or pair cells cannot hide the cash snapshot.
+    private const string CashKey = "(length(cell_key) - length(replace(cell_key, '|', '')) = 5)";
+
+    private const string NewestCash = $"(SELECT snapshot_key FROM research.cell_stats WHERE {CashKey} ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)";
+
     private const string Newest = "(SELECT snapshot_key FROM research.cell_stats ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)";
 
     public async ValueTask<bool> StoreAsync(CellSnapshotToStore snapshot, CancellationToken cancellationToken)
@@ -103,6 +108,18 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
         return await ReadAsync(command, cancellationToken);
     }
 
+    public async ValueTask<IReadOnlyList<StoredCellStats>> ListLatestCashAsync(string? strategy, string? window, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand($"""
+            SELECT {Columns}, cell_key FROM research.cell_stats
+            WHERE snapshot_key = {NewestCash} AND {CashKey} AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
+            ORDER BY cell_key, window_code
+            """);
+        command.Parameters.AddWithValue("strategy", NpgsqlDbType.Text, (object?)strategy ?? DBNull.Value);
+        command.Parameters.AddWithValue("window", NpgsqlDbType.Text, (object?)window ?? DBNull.Value);
+        return await ReadAsync(command, cancellationToken);
+    }
+
     public async ValueTask<IReadOnlyList<StoredCellStats>> ListRegimeLatestAsync(string? strategy, string? window, CancellationToken cancellationToken)
     {
         // P6-02 (ADR 0146): the newest snapshot that holds any regime row; the rows carry their own as-of date and snapshot key, so an older snapshot is visible as older
@@ -119,7 +136,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
 
     public async ValueTask<DateOnly?> NewestAsOfAsync(CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("SELECT max(as_of) FROM research.cell_stats");
+        await using var command = dataSource.CreateCommand($"SELECT max(as_of) FROM research.cell_stats WHERE {CashKey}");
         return await command.ExecuteScalarAsync(cancellationToken) is DateOnly date ? date : null;
     }
 
@@ -127,7 +144,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     {
         await using var command = dataSource.CreateCommand($"""
             SELECT {Columns}, cell_key FROM research.cell_stats
-            WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE as_of < @before ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)
+            WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE as_of < @before AND {CashKey} ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)
               AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
@@ -161,6 +178,19 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
         {
             var options = new CellStatsOptions(reader.GetDouble(2), reader.GetDouble(3), reader.GetInt32(4), reader.GetDouble(5));
             var cell = new CellId(reader.GetString(8), reader.GetString(9), reader.GetString(10), reader.GetString(11), reader.GetString(12), reader.GetString(13));
+            var key = reader.GetString(34);
+            if (key.Count(c => c == '|') > 5)
+            {
+                // P14-06: the columns hold six parts; the seventh and eighth are read from the key. A longer key that does not parse, or whose first six parts differ from the columns, is a corrupt row: never read as cash. A six-part key is untouched.
+                var longer = CellId.TryParse(key);
+                if (longer is null || longer.Strategy != cell.Strategy || longer.Timeframe != cell.Timeframe || longer.Side != cell.Side || longer.Style != cell.Style || longer.Exit != cell.Exit || longer.Regime != cell.Regime)
+                {
+                    throw new InvalidDataException("A stored cell row has a cell key that is not a valid key of its columns.");
+                }
+
+                cell = cell with { Universe = longer.Universe, Expression = longer.Expression };
+            }
+
             var window = CellWindowExtensions.Parse(reader.GetString(14)) ?? throw new InvalidDataException("A stored cell row has an unknown window.");
             var row = new CellStatsRow(
                 cell, window, reader.GetFieldValue<DateOnly>(7), reader.GetBoolean(15), reader.GetInt32(16), reader.GetInt32(17), reader.GetDouble(18), Opt(reader, 19), reader.GetDouble(20), reader.GetDouble(21), reader.GetDouble(22),

@@ -32,7 +32,7 @@ internal sealed class ShowSelectionHandler(ICellStatsStore stats, ILearningChang
         }
 
         // As of the decision date: the newest snapshot with an as-of date before it, and each cell's state from the changelog rows written before that day began (India time).
-        var rows = await stats.ListLatestBeforeAsync(query.Date, null, CellWindow.All.Code(), cancellationToken);
+        var rows = CashCells.Only(await stats.ListLatestBeforeAsync(query.Date, null, CellWindow.All.Code(), cancellationToken), "selection", logger);
         var cut = new DateTimeOffset(query.Date.ToDateTime(TimeOnly.MinValue), IndiaOffset);
         var evaluated = new List<Eligibility>(rows.Count);
         foreach (var stored in rows)

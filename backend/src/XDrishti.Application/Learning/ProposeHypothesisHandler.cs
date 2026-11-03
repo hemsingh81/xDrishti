@@ -111,7 +111,7 @@ internal sealed class ProposeHypothesisHandler(IRunStore runs, IHypothesisLog lo
 
         if (c.CellKey is not null && CellId.TryParse(c.CellKey) is null)
         {
-            problems.Add(new FieldError("cell", "A cell key is strategy|timeframe|side|style|exit|regime."));
+            problems.Add(new FieldError("cell", "A cell key is strategy|timeframe|side|style|exit|regime, with an optional universe and expression after it."));
         }
 
         if (!HypothesisRows.ValidActor(c.Actor))

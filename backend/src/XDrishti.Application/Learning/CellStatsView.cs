@@ -11,6 +11,8 @@ public sealed record CellStatsView(
     string Style,
     string Exit,
     string Regime,
+    string Universe,
+    string Expression,
     string Window,
     DateOnly AsOf,
     string Basis,
@@ -54,7 +56,7 @@ public sealed record CellStatsView(
     {
         var r = s.Row;
         return new CellStatsView(
-            r.Cell.Key, r.Cell.Strategy, r.Cell.Timeframe, r.Cell.Side, r.Cell.Style, r.Cell.Exit, r.Cell.Regime, Domain.Learning.CellWindowExtensions.Code(r.Window), r.AsOf,
+            r.Cell.Key, r.Cell.Strategy, r.Cell.Timeframe, r.Cell.Side, r.Cell.Style, r.Cell.Exit, r.Cell.Regime, r.Cell.Universe, Domain.Learning.ExpressionNames.Code(r.Cell.Expression), Domain.Learning.CellWindowExtensions.Code(r.Window), r.AsOf,
             r.Costed ? "net R (after charges)" : "gross R (before charges)",
             r.N, r.Wins, r.EffectiveN, r.WinRateRaw, r.PriorRate, r.WinRatePosterior, r.WinRateLower, r.WinRateUpper, r.AvgWinR, r.AvgLossR, r.ExpectancyR, r.ProfitFactor, r.MaxDrawdownR, r.MaeP50, r.MaeP90, r.MfeP50, r.MfeP90,
             r.Enough, r.Enough ? "enough" : "not enough evidence (fewer trades than the minimum)",

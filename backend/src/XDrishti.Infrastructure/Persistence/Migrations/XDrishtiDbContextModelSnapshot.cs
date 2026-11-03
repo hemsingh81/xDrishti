@@ -3795,8 +3795,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnName("candidate_value");
 
                     b.Property<string>("CellKey")
-                        .HasMaxLength(400)
-                        .HasColumnType("character varying(400)")
+                        .HasMaxLength(600)
+                        .HasColumnType("character varying(600)")
                         .HasColumnName("cell_key");
 
                     b.Property<DateTimeOffset>("CreatedAt")

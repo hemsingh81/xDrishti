@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Learning;
 using XDrishti.Application.Planning;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
@@ -165,6 +166,11 @@ internal sealed class CapturePaperFillsHandler(
                     }
 
                     replay ??= await replayer.ReplayAsync(session, lastClosed, calendar, item.Item, costs.Choice, cancellationToken);
+                    if (CellId.TryParse(item.Item.Evidence.CellKey) is { IsCash: false })
+                    {
+                        CashCells.LeftOut(logger, "paper_capture"); // ADR 0193: counted; Step skips it
+                    }
+
                     var step = Step(plan.Id, item, allocation, qty, approval!, armed.At, replay, pair, costs.Sheet);
                     pending += step.Pending ? 1 : 0;
                     integrity += step.Integrity ? 1 : 0;
@@ -278,6 +284,11 @@ internal sealed class CapturePaperFillsHandler(
         }
 
         var cell = CellId.TryParse(item.Item.Evidence.CellKey);
+        if (cell is { IsCash: false })
+        {
+            return new StepResult { Skip = Skip(SkipCodes.NotGradable, "The ticket's cell is not a cash cell; paper takes cash cells only.") }; // ADR 0193
+        }
+
         var entry = new PaperEntry(
             planId, item.Id, allocation.AccountId, item.Item.Symbol, item.Item.Side, item.Item.StrategyId, item.Item.StrategyVersionHash, item.Item.Evidence.CellKey, item.Item.Group.Code(), approval.Id, approval.Kind,
             allocation.Quantity, qty, armedAt, entryAt, entryPrice, PaperPnl.Price(trade.EntryPrice), PaperPnl.Price(trade.StopPrice), trade.TargetPrice is { } t ? PaperPnl.Price(t) : null,

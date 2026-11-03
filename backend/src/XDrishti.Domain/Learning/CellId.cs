@@ -1,7 +1,8 @@
 namespace XDrishti.Domain.Learning;
 
 /// <summary>
-/// Who a cell is (doc 09 layer 1): strategy, timeframe, side, style, exit policy and regime (<c>*</c> until P6-02). <see cref="Key"/> is the text <c>strategy|tf|side|style|exit|regime</c> that the table and the API use.
+/// Who a cell is (doc 09 layer 1): strategy, timeframe, side, style, exit policy, regime (<c>*</c> until P6-02), universe (<c>*</c> until BK-11) and expression (<c>cash</c> until P14-08). <see cref="Key"/> is the text
+/// <c>strategy|tf|side|style|exit|regime[|universe[|expression]]</c> that the table and the API use, written with the fewest trailing parts (ADR 0193): a cash cell with universe <c>*</c> reads as the six-part text it always had.
 /// </summary>
 /// <param name="Strategy">The strategy id.</param>
 /// <param name="Timeframe">The evaluation timeframe code, for example <c>15m</c>.</param>
@@ -9,24 +10,62 @@ namespace XDrishti.Domain.Learning;
 /// <param name="Style">The style, <c>intraday</c> or <c>swing</c>.</param>
 /// <param name="Exit">The label of the exit policy.</param>
 /// <param name="Regime"><c>*</c> for all regimes, or the regime code.</param>
-public sealed record CellId(string Strategy, string Timeframe, string Side, string Style, string Exit, string Regime = "*")
+/// <param name="Universe">The seventh part, reserved for BK-11: only <c>*</c> is allowed in this slice.</param>
+/// <param name="Expression">The eighth part: how the signal is expressed; <see cref="Learning.Expression.Cash"/> for every cell that has no eighth part.</param>
+public sealed record CellId(string Strategy, string Timeframe, string Side, string Style, string Exit, string Regime = "*", string Universe = CellId.AllUniverses, Expression Expression = Expression.Cash)
 {
     /// <summary>The longest part, in characters; the table columns are this long or longer.</summary>
     public const int MaxPartLength = 64;
 
-    /// <summary><c>strategy|tf|side|style|exit|regime</c>.</summary>
-    public string Key => string.Join('|', Strategy, Timeframe, Side, Style, Exit, Regime);
+    /// <summary>The universe of every cell until BK-11 widens the list.</summary>
+    public const string AllUniverses = "*";
 
-    /// <summary>Reads <c>strategy|tf|side|style|exit|regime</c> back; null when it is not six valid parts.</summary>
+    /// <summary>The universes a key may name. Only <c>*</c> now; BK-11 adds <c>liq_high</c>, <c>liq_mid</c> and <c>liq_low</c>.</summary>
+    private static readonly string[] KnownUniverses = [AllUniverses];
+
+    /// <summary>True for a cash cell: the only kind that selection, planning, paper, live and execution may read (ADR 0193).</summary>
+    public bool IsCash => Expression == Expression.Cash;
+
+    /// <summary>The key with the fewest trailing parts: six for universe <c>*</c> and cash, seven for another universe and cash, eight for any other expression.</summary>
+    public string Key =>
+        Expression != Expression.Cash ? string.Join('|', Strategy, Timeframe, Side, Style, Exit, Regime, Universe, Expression.Code())
+        : Universe != AllUniverses ? string.Join('|', Strategy, Timeframe, Side, Style, Exit, Regime, Universe)
+        : string.Join('|', Strategy, Timeframe, Side, Style, Exit, Regime);
+
+    /// <summary>
+    /// Reads a key back; null when it is not 6, 7 or 8 valid parts, or not canonical. A seventh part must be a known universe other than <c>*</c> (none yet), an eighth part a known expression other than <c>cash</c>: so two texts never name
+    /// one cell.
+    /// </summary>
     public static CellId? TryParse(string? key)
     {
         var parts = key?.Split('|');
-        if (parts is not { Length: 6 })
+        if (parts is null || parts.Length is < 6 or > 8)
         {
             return null;
         }
 
-        var id = new CellId(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]);
+        var universe = AllUniverses;
+        var expression = Expression.Cash;
+        if (parts.Length >= 7)
+        {
+            universe = parts[6];
+            if (Array.IndexOf(KnownUniverses, universe) < 0 || (parts.Length == 7 && universe == AllUniverses))
+            {
+                return null;
+            }
+        }
+
+        if (parts.Length == 8)
+        {
+            if (Learning.ExpressionNames.Parse(parts[7]) is not { } parsed || parsed == Expression.Cash)
+            {
+                return null;
+            }
+
+            expression = parsed;
+        }
+
+        var id = new CellId(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5], universe, expression);
         return id.Problems().Count == 0 ? id : null;
     }
 
@@ -40,6 +79,16 @@ public sealed record CellId(string Strategy, string Timeframe, string Side, stri
         Check(problems, "style", Style);
         Check(problems, "exit", Exit);
         Check(problems, "regime", Regime);
+        if (Array.IndexOf(KnownUniverses, Universe) < 0)
+        {
+            problems.Add("universe is not a known universe (only * is allowed)");
+        }
+
+        if (!Enum.IsDefined(Expression))
+        {
+            problems.Add("expression is not a known expression");
+        }
+
         return problems.AsReadOnly();
     }
 

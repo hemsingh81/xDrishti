@@ -169,6 +169,8 @@ export const buildCell = (over: Partial<Cell> = {}): Cell => {
   return {
     cellKey: cellKeyOf(base),
     regime: '*',
+    universe: '*',
+    expression: 'cash',
     window: 'all',
     asOf: '2026-10-20',
     basis: 'gross R (before charges)',
@@ -261,6 +263,8 @@ export const buildEntry = (over: Partial<Entry> = {}): Entry => ({
 
 export const buildCellState = (over: Partial<State> = {}): State => ({
   cell: 'orb|15m|BUY|intraday|fixed_r|*',
+  universe: '*',
+  expression: 'cash',
   state: 'research',
   legalNext: ['candidate', 'retired'],
   rows: 0,

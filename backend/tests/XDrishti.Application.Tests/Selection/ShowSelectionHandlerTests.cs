@@ -53,6 +53,23 @@ public sealed class ShowSelectionHandlerTests
     }
 
     [Fact]
+    public async Task A_stored_option_cell_that_beats_the_cash_cell_changes_nothing()
+    {
+        // P14-06 criterion 6: the text, the counts and the changelog reads are those of the run without the option cell.
+        var cash = Row("A", new DateOnly(2026, 10, 23));
+        var option = Learning.CashCellsTests.Row(Expression.OptionBuy, 0.95);
+        _log.HistoryAsync(Arg.Any<string>(), Ct).Returns([ToCandidate(cash.Row.Cell.Key)]);
+        _stats.ListLatestBeforeAsync(Date, null, "all", Ct).Returns([cash]);
+        var without = await Handler().HandleAsync(new ShowSelectionQuery(Date, CellState.Candidate), Ct);
+        _stats.ListLatestBeforeAsync(Date, null, "all", Ct).Returns([cash, option]);
+
+        var with = await Handler().HandleAsync(new ShowSelectionQuery(Date, CellState.Candidate), Ct);
+
+        with.Value.ShouldBe(without.Value);
+        await _log.DidNotReceive().HistoryAsync(option.Row.Cell.Key, Ct);
+    }
+
+    [Fact]
     public async Task Statistics_from_the_decision_date_are_not_used()
     {
         var a = Row("A", Date);

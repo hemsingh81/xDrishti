@@ -281,6 +281,21 @@ public sealed class CapturePaperFillsHandlerTests
     }
 
     [Fact]
+    public async Task A_ticket_of_a_non_cash_cell_is_never_captured_as_an_entry()
+    {
+        // P14-06, ADR 0193: even if a plan item ever named a non-cash cell, paper takes cash cells only.
+        var cash = Item(11);
+        var option = cash with { Item = cash.Item with { Evidence = cash.Item.Evidence with { CellKey = Cell + "|*|option_buy" } } };
+        _plans.ItemsAsync(1, Ct).Returns([option]);
+        Replay([PaperFixture.Trade(Instrument)]);
+
+        await Handler().HandleAsync(new CapturePaperFillsCommand(F, true), Ct);
+
+        _written!.Entries.ShouldBeEmpty();
+        _written.Skips.Single().Code.ShouldBe(SkipCodes.NotGradable);
+    }
+
+    [Fact]
     public async Task A_trade_with_legs_is_a_legs_not_supported_skip()
     {
         _plans.ItemsAsync(1, Ct).Returns([Item(11)]);

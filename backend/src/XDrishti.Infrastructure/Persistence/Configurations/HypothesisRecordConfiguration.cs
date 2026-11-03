@@ -25,7 +25,7 @@ internal sealed class HypothesisRecordConfiguration : IEntityTypeConfiguration<H
         builder.Property(x => x.State).HasMaxLength(16).IsRequired();
         builder.Property(x => x.FromState).HasMaxLength(16);
         builder.Property(x => x.Source).HasMaxLength(8).IsRequired();
-        builder.Property(x => x.CellKey).HasMaxLength(400);
+        builder.Property(x => x.CellKey).HasMaxLength(600);
         builder.Property(x => x.KnobName).HasMaxLength(64).IsRequired();
         builder.Property(x => x.KnobKind).HasMaxLength(16).IsRequired();
         builder.Property(x => x.BaselineValue).HasMaxLength(64).IsRequired();

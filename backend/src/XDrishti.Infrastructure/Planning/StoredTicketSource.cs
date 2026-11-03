@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
@@ -24,7 +25,8 @@ internal sealed class StoredTicketSource(
     IStrategyStore strategies,
     IBasketQueries baskets,
     IBarStore bars,
-    ITradingCalendar tradingCalendar) : ITicketSource
+    ITradingCalendar tradingCalendar,
+    ILogger<StoredTicketSource>? logger = null) : ITicketSource
 {
     /// <summary>Calendar days of bars read before the close: about 270 sessions, enough for a 200-day average.</summary>
     public const int LookbackDays = 400;
@@ -35,7 +37,7 @@ internal sealed class StoredTicketSource(
 
     public async ValueTask<Result<TicketSourceResult>> ReadAsync(DateOnly session, DateOnly forDate, CancellationToken cancellationToken)
     {
-        var rows = await stats.ListLatestBeforeAsync(forDate, null, CellWindow.All.Code(), cancellationToken);
+        var rows = CashCells.Only(await stats.ListLatestBeforeAsync(forDate, null, CellWindow.All.Code(), cancellationToken), "plan", logger);
         if (rows.Count == 0)
         {
             return Result.Success(new TicketSourceResult([], 0, 0, []));

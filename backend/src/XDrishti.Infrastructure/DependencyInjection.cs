@@ -175,6 +175,7 @@ public static class DependencyInjection
         services.AddScoped<IStrategyStore, StrategyStore>(); // the stored strategies of the lab schema (spec P3-02d)
         services.AddScoped<ILabResultStore, LabResultStore>(); // the results of full tests (spec P5-04)
         services.AddScoped<ICellStatsStore, CellStatsStore>(); // the cell statistics snapshots (spec P6-01)
+        services.AddScoped<IExpressionProfileStore, ExpressionProfileStore>(); // the expression profiles of P14, insert-only research rows; no decision path reads them (spec P14-06)
         services.AddScoped<ITradeFeatureStore, TradeFeatureStore>(); // the decision-time features of trades (spec P6-04)
         services.AddScoped<IExtensionFeatureStore, ExtensionFeatureStore>(); // the values of feature extensions, insert-only; no decision path reads it (spec P13-05)
         services.AddScoped<IExtensionExtractionStore, ExtensionExtractionStore>(); // what an extension extraction was built from, insert-only; no decision path reads it (spec P15-05)

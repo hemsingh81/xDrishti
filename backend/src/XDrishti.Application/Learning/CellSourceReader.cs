@@ -34,7 +34,7 @@ internal static class CellSourceReader
             await foreach (var runTrade in runs.StreamTradesAsync(source.RunKey, false, cancellationToken))
             {
                 var t = runTrade.Trade;
-                var id = new CellId(t.StrategyId, t.TriggerTimeframe.ToCode(), t.Side.ToString().ToUpperInvariant(), source.Style, source.Exit);
+                var id = new CellId(t.StrategyId, t.TriggerTimeframe.ToCode(), t.Side.ToString().ToUpperInvariant(), source.Style, source.Exit, Expression: Expression.Cash); // every simulator trade is a cash trade (ADR 0193)
                 var costed = t.Costs == CostBasis.Charged && t.Costing is not null;
                 var r = costed ? t.Costing!.RNet : t.RFilled;
                 if (!inputs.TryGetValue(id.Key, out var cell))

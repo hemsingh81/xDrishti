@@ -24015,6 +24015,8 @@
       "CellStateView": {
         "required": [
           "cell",
+          "universe",
+          "expression",
           "state",
           "legalNext",
           "rows",
@@ -24027,6 +24029,14 @@
           "cell": {
             "type": "string",
             "description": "The cell key."
+          },
+          "universe": {
+            "type": "string",
+            "description": "The universe part of the key, `*` until BK-11."
+          },
+          "expression": {
+            "type": "string",
+            "description": "The expression part of the key, `cash` unless the key has an eighth part (P14-06)."
           },
           "state": {
             "type": "string",
@@ -24072,6 +24082,8 @@
           "style",
           "exit",
           "regime",
+          "universe",
+          "expression",
           "window",
           "asOf",
           "basis",
@@ -24123,6 +24135,12 @@
             "type": "string"
           },
           "regime": {
+            "type": "string"
+          },
+          "universe": {
+            "type": "string"
+          },
+          "expression": {
             "type": "string"
           },
           "window": {

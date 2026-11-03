@@ -256,6 +256,15 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         }
     }
 
+    // P14-06: the expression profiles are research only; the execution role may not even see the table, the runtime role inserts and reads it and never changes it.
+    [Fact]
+    public async Task The_execution_role_holds_nothing_on_the_expression_profiles_and_the_runtime_role_only_inserts_and_reads()
+    {
+        (await HeldOnAsync("xd_exec", "lab.expression_profiles")).ShouldBeEmpty();
+        (await HeldOnAsync("xd_app", "lab.expression_profiles")).ShouldBe(["INSERT", "SELECT"]);
+        (await ExecDatabase.SqlStateAsync(db.Exec, "SELECT count(*) FROM lab.expression_profiles")).ShouldBe("42501");
+    }
+
     private async Task<string[]> HeldOnAsync(string role, string qualifiedTable)
     {
         var held = new List<string>();

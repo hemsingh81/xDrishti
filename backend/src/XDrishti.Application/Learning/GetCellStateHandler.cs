@@ -11,15 +11,17 @@ internal sealed class GetCellStateHandler(ILearningChangelog changelog) : IQuery
     public async ValueTask<Result<CellStateView>> HandleAsync(GetCellStateQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        if (CellId.TryParse(query.Cell) is null)
+        if (CellId.TryParse(query.Cell) is not { } id)
         {
-            return Result.Failure<CellStateView>(LearningErrors.Invalid([new FieldError("cell", "The cell is strategy|timeframe|side|style|exit|regime.")]));
+            return Result.Failure<CellStateView>(LearningErrors.Invalid([new FieldError("cell", "The cell is strategy|timeframe|side|style|exit|regime, with an optional universe and expression after it.")]));
         }
 
         var history = await changelog.HistoryAsync(query.Cell, cancellationToken);
         var replay = CellHistory.Replay(history);
         return Result.Success(new CellStateView(
             query.Cell,
+            id.Universe,
+            id.Expression.Code(),
             replay.State.Code(),
             [.. CellLifecycle.Next(replay.State).Select(s => s.Code())],
             history.Count,

@@ -80,7 +80,7 @@ internal sealed record LearnLifecycleOptions(string? Cell, CellState? To, long? 
         {
             if (!values.TryGetValue("--cell", out cell) || CellId.TryParse(cell) is null)
             {
-                errors.Add("--cell is strategy|timeframe|side|style|exit|regime");
+                errors.Add("--cell is strategy|timeframe|side|style|exit|regime (six parts), or those then |*|expression (eight parts)");
             }
 
             to = values.TryGetValue("--to", out var toText) ? CellStateExtensions.Parse(toText) : null;

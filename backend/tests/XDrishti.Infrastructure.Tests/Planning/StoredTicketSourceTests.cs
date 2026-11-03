@@ -71,6 +71,41 @@ public sealed class StoredTicketSourceTests
     }
 
     [Fact]
+    public async Task A_stored_option_cell_is_left_out_like_no_cell_at_all_and_its_strategy_is_never_read()
+    {
+        // P14-06 criterion 6 (ADR 0193): the plan reads cash cells only; the other cell is skipped, not an unavailable reason and not a candidate.
+        var cash = Cell("MISSING");
+        var option = cash with { Row = cash.Row with { Cell = cash.Row.Cell with { Expression = Expression.OptionBuy } } };
+        Given(option);
+
+        var result = await Source().ReadAsync(Session, ForDate, Ct);
+
+        result.Value.Candidates.ShouldBeEmpty();
+        result.Value.Unavailable.ShouldBe(0);
+        result.Value.UnavailableReasons.ShouldBeEmpty();
+        await _strategies.DidNotReceiveWithAnyArgs().GetVersionAsync(default!, default, Ct);
+        await _changelog.DidNotReceiveWithAnyArgs().HistoryAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task A_cash_row_with_an_option_row_gives_the_result_of_the_cash_row_alone()
+    {
+        var cash = Cell("MISSING");
+        var option = cash with { Row = cash.Row with { Cell = cash.Row.Cell with { Expression = Expression.OptionBuy } } };
+        Given(cash);
+        var alone = (await Source().ReadAsync(Session, ForDate, Ct)).Value;
+        Given(cash, option);
+
+        var both = (await Source().ReadAsync(Session, ForDate, Ct)).Value;
+
+        alone.Unavailable.ShouldBe(1, "the cash cell is read: the comparison is not vacuous");
+        both.Candidates.ShouldBe(alone.Candidates);
+        both.UnavailableReasons.ShouldBe(alone.UnavailableReasons);
+        (both.Rejected, both.Unavailable).ShouldBe((alone.Rejected, alone.Unavailable));
+        await _changelog.DidNotReceive().HistoryAsync(option.Row.Cell.Key, Ct);
+    }
+
+    [Fact]
     public async Task A_cell_whose_strategy_is_not_stored_is_unavailable_and_grouped_by_strategy()
     {
         Given(Cell("MISSING"), Cell("MISSING", "SELL"));

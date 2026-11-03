@@ -7170,6 +7170,10 @@ export interface components {
     CellStateView: {
       /** @description The cell key. */
       cell: string;
+      /** @description The universe part of the key, `*` until BK-11. */
+      universe: string;
+      /** @description The expression part of the key, `cash` unless the key has an eighth part (P14-06). */
+      expression: string;
       /** @description The state after the last row (research without rows). */
       state: string;
       /** @description The states it may move to. */
@@ -7198,6 +7202,8 @@ export interface components {
       style: string;
       exit: string;
       regime: string;
+      universe: string;
+      expression: string;
       window: string;
       /** Format: date */
       asOf: string;
