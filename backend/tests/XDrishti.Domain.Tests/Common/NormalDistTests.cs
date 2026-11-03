@@ -1,6 +1,6 @@
-using XDrishti.Domain.Options.Pricing;
+using XDrishti.Domain.Common;
 
-namespace XDrishti.Domain.Tests.Options.Pricing;
+namespace XDrishti.Domain.Tests.CommonTypes;
 
 public sealed class NormalDistTests
 {

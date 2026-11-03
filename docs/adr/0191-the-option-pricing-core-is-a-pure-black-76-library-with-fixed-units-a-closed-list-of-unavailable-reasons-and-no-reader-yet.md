@@ -1,6 +1,6 @@
 # 0191 — The option pricing core is a pure Black-76 library with fixed units, a closed list of unavailable reasons and no reader yet
 
-- **Status:** Proposed (built in P14-05 from the owner-Approved spec, 2026-11-03). Becomes Accepted when the owner has read it. **Safety slice: no** (pure functions: no I/O, no setting, no table, no route, no order).
+- **Status:** Proposed (built in P14-05 from the owner-Approved spec, 2026-11-03). Becomes Accepted when the owner has read it. **Amended by [0192](0192-the-pairs-core-is-a-pure-engle-granger-library-with-pinned-mackinnon-tables-a-benjamini-hochberg-rule-that-counts-unavailable-tests-and-a-signal-state-machine-that-never-trades-on-an-unavailable-z-and-no-reader-yet.md): `NormalDist` moved to `Domain/Common`.** **Safety slice: no** (pure functions: no I/O, no setting, no table, no route, no order).
 - **Date:** 2026-11-03.
 - **Relation to other ADRs:** [0178](0178-the-option-archive-quality-checks-read-the-recorded-chains-and-rolling-bars-in-bounded-ranges-and-store-insert-only-verdicts-with-an-honest-unavailable-and-no-trading-use.md) (parity forward, `r` = `Options:Quality:Rate`, `T` = calendar days / 365, European style).
 

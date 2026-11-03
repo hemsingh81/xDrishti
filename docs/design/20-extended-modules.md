@@ -84,6 +84,7 @@ stateDiagram-v2
   | Theta | per calendar day (annual / 365) |
   | Vendor IV | read as percent / 100, label `percent_assumed` (UNVERIFIED until the P14-02 pilot) |
   | Model price | labelled `bs_fallback` by its caller |
+- Pairs core (built, P14-12, [ADR 0192](../adr/0192-the-pairs-core-is-a-pure-engle-granger-library-with-pinned-mackinnon-tables-a-benjamini-hochberg-rule-that-counts-unavailable-tests-and-a-signal-state-machine-that-never-trades-on-an-unavailable-z-and-no-reader-yet.md)): pure `Domain/Pairs` - log-price spread, OLS hedge ratio, the Engle-Granger residual test with one pre-registered lag (default 1), MacKinnon (2010) finite-sample critical values and the MacKinnon (1994) asymptotic p-value (labelled `asymptotic`), half-life, return correlation, z-score, Benjamini-Hochberg (an unavailable test counts in `m` with `p = 1`) and the entry/exit/stop state machine (an unavailable z holds); closed reasons, no reader yet (P14-13 is the first).
 - Families: directional expression (ITM/ATM options for our signals), defined-risk debit spreads (swing),
   index credit spreads / iron condors in range regimes, event/IV-aware positioning.
 - New learning dimension **instrument expression** (cash / future / option_buy / debit_spread …).

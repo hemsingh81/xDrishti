@@ -1,4 +1,4 @@
-namespace XDrishti.Domain.Options.Pricing;
+namespace XDrishti.Domain.Common;
 
 /// <summary>
 /// The standard normal distribution. <see cref="Cdf"/> is accurate to an absolute error of 1e-14 or better on [-38, 38] and is exactly 0 or 1 outside it.
