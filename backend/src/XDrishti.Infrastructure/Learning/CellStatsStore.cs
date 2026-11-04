@@ -18,6 +18,9 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     // CF-01 (ADR 0203): the dependence columns, read after cell_key (ordinals 35 to 45); all null in a row written before the migration
     private const string DependenceColumns = "n_eff, design_effect, n_eff_method, needed_trades, min_detectable_edge_r, min_trl, enough_by_n_eff, span_years, n_eff_mode, n_eff_note, target_edge_r";
 
+    // CF-02 (ADR 0204): the shrinkage columns, read after the dependence ones (ordinals 46 to 58); all null in a row written before the migration
+    private const string ShrinkageColumns = "parent_level, parent_mean_r, tau_squared, blend, shrunk_mean_r, shrunk_lower_r, estimated_strength, shrunk_win_rate, tau_source, strength_source, shrink_n, shrink_mode, shrink_note";
+
     // P14-06 (ADR 0193): a cash key has exactly five separators (the six-part text every stored key has). The decision reads choose their snapshot among cash keys only, so a later snapshot that holds only option or pair cells cannot hide the cash snapshot.
     private const string CashKey = "(length(cell_key) - length(replace(cell_key, '|', '')) = 5)";
 
@@ -50,10 +53,12 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
             await using var insert = new NpgsqlCommand("""
                 INSERT INTO research.cell_stats (snapshot_key, as_of, cell_key, strategy, timeframe, side, style, exit_policy, regime, window_code, costed, n, wins, effective_n, win_rate_raw, prior_rate, win_rate_posterior,
                     win_rate_lower, win_rate_upper, avg_win_r, avg_loss_r, expectancy_r, profit_factor, max_drawdown_r, mae_p50, mae_p90, mfe_p50, mfe_p90, enough, half_life_days, prior_strength, min_trades, credible_level,
-                    sources, created_at, created_by, n_eff, design_effect, n_eff_method, needed_trades, min_detectable_edge_r, min_trl, enough_by_n_eff, span_years, n_eff_mode, n_eff_note, target_edge_r)
+                    sources, created_at, created_by, n_eff, design_effect, n_eff_method, needed_trades, min_detectable_edge_r, min_trl, enough_by_n_eff, span_years, n_eff_mode, n_eff_note, target_edge_r,
+                    parent_level, parent_mean_r, tau_squared, blend, shrunk_mean_r, shrunk_lower_r, estimated_strength, shrunk_win_rate, tau_source, strength_source, shrink_n, shrink_mode, shrink_note)
                 VALUES (@snapshot_key, @as_of, @cell_key, @strategy, @timeframe, @side, @style, @exit, @regime, @window, @costed, @n, @wins, @effective_n, @raw, @prior, @posterior,
                     @lower, @upper, @avg_win, @avg_loss, @expectancy, @pf, @dd, @mae50, @mae90, @mfe50, @mfe90, @enough, @half_life, @strength, @min_trades, @level,
-                    @sources, @created_at, @created_by, @n_eff, @design_effect, @n_eff_method, @needed_trades, @min_detectable_edge_r, @min_trl, @enough_by_n_eff, @span_years, @n_eff_mode, @n_eff_note, @target_edge_r)
+                    @sources, @created_at, @created_by, @n_eff, @design_effect, @n_eff_method, @needed_trades, @min_detectable_edge_r, @min_trl, @enough_by_n_eff, @span_years, @n_eff_mode, @n_eff_note, @target_edge_r,
+                    @parent_level, @parent_mean_r, @tau_squared, @blend, @shrunk_mean_r, @shrunk_lower_r, @estimated_strength, @shrunk_win_rate, @tau_source, @strength_source, @shrink_n, @shrink_mode, @shrink_note)
                 ON CONFLICT (snapshot_key, cell_key, window_code) DO NOTHING
                 """, connection, transaction);
             var p = insert.Parameters;
@@ -105,6 +110,20 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
             p.AddWithValue("n_eff_mode", NpgsqlDbType.Text, d is null ? DBNull.Value : (object)d.Mode.ToString());
             Nullable(p, "target_edge_r", d?.TargetEdgeR);
             p.AddWithValue("n_eff_note", NpgsqlDbType.Text, d is null ? DBNull.Value : (object)d.Note);
+            var sh = row.Shrinkage;
+            Text(p, "parent_level", sh?.ParentLevel);
+            Nullable(p, "parent_mean_r", sh?.ParentMeanR);
+            Nullable(p, "tau_squared", sh?.TauSquared);
+            Nullable(p, "blend", sh?.Blend);
+            Nullable(p, "shrunk_mean_r", sh?.ShrunkMeanR);
+            Nullable(p, "shrunk_lower_r", sh?.ShrunkLowerR);
+            Nullable(p, "estimated_strength", sh?.EstimatedStrength);
+            Nullable(p, "shrunk_win_rate", sh?.ShrunkWinRate);
+            Text(p, "tau_source", sh?.TauSource);
+            Text(p, "strength_source", sh?.StrengthSource);
+            Nullable(p, "shrink_n", sh?.NUsed);
+            Text(p, "shrink_mode", sh?.Mode.ToString());
+            Text(p, "shrink_note", sh?.Note);
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -115,7 +134,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     public async ValueTask<IReadOnlyList<StoredCellStats>> ListLatestAsync(string? strategy, string? window, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand($"""
-            SELECT {Columns}, cell_key, {DependenceColumns} FROM research.cell_stats
+            SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
             WHERE snapshot_key = {Newest} AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
@@ -127,7 +146,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     public async ValueTask<IReadOnlyList<StoredCellStats>> ListLatestCashAsync(string? strategy, string? window, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand($"""
-            SELECT {Columns}, cell_key, {DependenceColumns} FROM research.cell_stats
+            SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
             WHERE snapshot_key = {NewestCash} AND {CashKey} AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
@@ -140,7 +159,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     {
         // P6-02 (ADR 0146): the newest snapshot that holds any regime row; the rows carry their own as-of date and snapshot key, so an older snapshot is visible as older
         await using var command = dataSource.CreateCommand($"""
-            SELECT {Columns}, cell_key, {DependenceColumns} FROM research.cell_stats
+            SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
             WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE regime <> '*' ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)
               AND regime <> '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
@@ -159,7 +178,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     public async ValueTask<IReadOnlyList<StoredCellStats>> ListLatestBeforeAsync(DateOnly before, string? strategy, string? window, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand($"""
-            SELECT {Columns}, cell_key, {DependenceColumns} FROM research.cell_stats
+            SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
             WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE as_of < @before AND {CashKey} ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)
               AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
@@ -173,12 +192,39 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     public async ValueTask<IReadOnlyList<StoredCellStats>> FindLatestAsync(string cellKey, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand($"""
-            SELECT {Columns}, cell_key, {DependenceColumns} FROM research.cell_stats
+            SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
             WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE cell_key = @key ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1) AND cell_key = @key
             ORDER BY window_code
             """);
         command.Parameters.AddWithValue("key", NpgsqlDbType.Text, cellKey);
         return await ReadAsync(command, cancellationToken);
+    }
+
+    private static void Text(NpgsqlParameterCollection parameters, string name, string? value) =>
+        parameters.AddWithValue(name, NpgsqlDbType.Text, value is null ? DBNull.Value : value);
+
+    // a row written before CF-02 has no mode: "not computed" (null), never a number
+    private static ShrinkageAssessment? ShrinkageOf(DbDataReader reader)
+    {
+        if (reader.IsDBNull(57) || !Enum.TryParse<ConfidenceMode>(reader.GetString(57), out var mode))
+        {
+            return null;
+        }
+
+        return new ShrinkageAssessment(
+            mode,
+            reader.IsDBNull(46) ? null : reader.GetString(46),
+            Opt(reader, 47),
+            Opt(reader, 48),
+            reader.IsDBNull(54) ? null : reader.GetString(54),
+            Opt(reader, 49),
+            Opt(reader, 50),
+            Opt(reader, 51),
+            Opt(reader, 52),
+            reader.IsDBNull(55) ? null : reader.GetString(55),
+            Opt(reader, 53),
+            Opt(reader, 56),
+            reader.IsDBNull(58) ? string.Empty : reader.GetString(58));
     }
 
     private static void Nullable(NpgsqlParameterCollection parameters, string name, double? value) =>
@@ -242,7 +288,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
             var row = new CellStatsRow(
                 cell, window, reader.GetFieldValue<DateOnly>(7), reader.GetBoolean(15), reader.GetInt32(16), reader.GetInt32(17), reader.GetDouble(18), Opt(reader, 19), reader.GetDouble(20), reader.GetDouble(21), reader.GetDouble(22),
                 reader.GetDouble(23), Opt(reader, 24), Opt(reader, 25), Opt(reader, 26), Opt(reader, 27), reader.GetDouble(28), Opt(reader, 29), Opt(reader, 30), Opt(reader, 31), Opt(reader, 32), reader.GetBoolean(33),
-                DependenceOf(reader, reader.GetInt32(16)));
+                DependenceOf(reader, reader.GetInt32(16)), ShrinkageOf(reader));
             list.Add(new StoredCellStats(reader.GetString(0), reader.GetFieldValue<DateTimeOffset>(1), options, reader.GetString(6), row));
         }
 

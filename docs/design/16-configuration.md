@@ -293,6 +293,7 @@ strategy_lab:
   # P5-04 reads StrategyLab:FullExits (array of --exit flags, default ["FIXED_RR:rr=2|1.5|2.5|3"]; must expand to 2 to 16 candidates, the first is the default exit) for the candidate exits of a full test.
   # P5-05 reads StrategyLab:Robustness (SweepParams 1 to 4, SweepSteps 1 to 4 positive factors, default [0.8, 0.9, 1.1, 1.2]; McDraws 100 to 20000, default 1000) for the robust method; the values are in the run key.
   # CF-01 (ADR 0203) reads the configuration section Confidence: EffectiveN:Mode (Off | ReportOnly | Gate, default ReportOnly; Gate is the owner's switch), EffectiveN:MinSessionsForAutocorr 20 (5..250), EffectiveN:MinTradesForEstimate 5 (3..50), EffectiveN:MinClusters 5 (3..50), Power:Alpha 0.05 (0.001..0.2), Power:Power 0.80 (0.5..0.99), Power:SigmaFloorR 0.5 (0.1..5), Power:TargetEdgeR (unset = the gate's MinExpectancyR; 0.01..5), MinTrl:Confidence 0.95 (0.5..0.999), MinTrl:BenchmarkSr 0 (-1..1); a value out of range stops the host at start
+  # CF-02 (ADR 0204) reads Confidence:Shrinkage: Mode (Off | ReportOnly, default ReportOnly; Gate is refused until the lower bound is validated), TauSquaredFloor 0.01 (0.0001..1), MinTradesForSibling 5 (3..30), MinParentTrades 30 (10..200), StrengthMin 5 and StrengthMax 200 (1..1000), QuantileLevel 0.05 (0.01..0.25), SigmaPoolStrength 30 (1..1000); the existing bayes_prior strength stays the fallback
   assistant_can_run_tests: true
   assistant_can_promote: false
 
@@ -586,4 +587,5 @@ The ingest is the service `filings-ingest` of the scheduler in `xd-api` ([ADR 01
 | `selection.min_p_win` / `min_exp_R_lower` | Trade quality bar | 0.45 / +0.10R |
 | `learning.min_trades` | Evidence needed per cell | 30 |
 | `Confidence:EffectiveN:Mode` | How effective n is used: `Off`, `ReportOnly` (shown, decides nothing), `Gate` (the owner's switch: `Enough` and gate 1 compare effective n) (CF-01, ADR 0203) | ReportOnly |
+| `Confidence:Shrinkage:Mode` | Whether the shrunk expectancy is computed and shown beside the raw one: `Off`, `ReportOnly` (shown, decides nothing). `Gate` is refused until the lower bound is validated (CF-02, ADR 0204) | ReportOnly |
 | `goals.max_drawdown_pct` | Halt-and-review threshold | 8% |

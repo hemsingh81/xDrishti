@@ -702,6 +702,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetLabReportQuery, Result<LabReportView>>, GetLabReportHandler>(); // the report of a full or robust run (P5-06, ADR 0063)
         services.AddScoped<IQueryHandler<GetLedgerQuery, Result<LedgerView>>, GetLedgerHandler>(); // the test ledger (P5-03, ADR 0059)
         services.TryAddSingleton(LabSettings.Default); // the host replaces it with its configuration
+        services.TryAddSingleton(new ShrinkageOptions()); // shrinkage of expectancy toward the parent (CF-02, ADR 0204): ReportOnly; the host replaces it with its configuration (section Confidence:Shrinkage)
         services.TryAddSingleton(new ConfidenceOptions()); // effective n, power, minimum track record (CF-01, ADR 0203): ReportOnly; the host replaces it with its configuration (section Confidence)
         services.TryAddSingleton<ILabProgress, NullLabProgress>(); // the host that sends events replaces it
 

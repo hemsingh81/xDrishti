@@ -43,12 +43,13 @@ public sealed record CellStatsView(
     string SnapshotKey,
     DateTimeOffset CreatedAt,
     string Limits,
-    DependenceView? Dependence = null)
+    DependenceView? Dependence = null,
+    ShrinkageView? Shrinkage = null)
 {
     /// <summary>Printed on every row (doc 09, P6-00 honest limits).</summary>
     public const string LimitsText = "Replayed history with modelled fills, about 2 years, in-sample on the data shown: a description of the past, not a forecast. The prior's parent group includes the cell's own trades. The credible interval treats trades as independent, which overlapping trades are not, so it is too narrow. One run per strategy feeds a snapshot, else signals would be counted twice.";
 
-    /// <summary>CF-01 <c>IndependentN</c>: trades after same-session and serial correction; null when not computed. Three different numbers: <see cref="EffectiveN"/> is the recency-weight sum, <c>KishWeightN</c> (CF-02) is (sum w)^2 / sum w^2, this is the independence count.</summary>
+    /// <summary>CF-01 <c>IndependentN</c>: trades after same-session and serial correction; null when not computed. Three different numbers: <see cref="EffectiveN"/> is the recency-weight sum, <c>shrinkage.nUsed</c> (CF-02) is the smaller of this and the Kish weight n (sum w)^2 / sum w^2.</summary>
     public double? IndependentN => Dependence?.NEff;
 
     /// <summary>The regime name of a regime cell (P6-02), null for a <c>*</c> cell.</summary>
@@ -56,6 +57,9 @@ public sealed record CellStatsView(
 
     /// <summary>What the regime of the cell was built from: <c>index_and_vix</c> or <c>index_only</c>, or <c>all</c> for a <c>*</c> cell. A cell never mixes the two.</summary>
     public string RegimeBasis => Domain.Market.Context.RegimeNames.ParsePart(Regime)?.Basis ?? "all";
+
+    private static string LimitsOf(Domain.Learning.CellStatsRow r) =>
+        LimitsText + (r.Dependence is { Mode: not Domain.Confidence.ConfidenceMode.Off } ? " " + DependenceView.LimitsText : string.Empty) + (r.Shrinkage is { Mode: not Domain.Confidence.ConfidenceMode.Off } ? " " + ShrinkageView.LimitsText : string.Empty);
 
     internal static CellStatsView Of(StoredCellStats s)
     {
@@ -65,6 +69,6 @@ public sealed record CellStatsView(
             r.Costed ? "net R (after charges)" : "gross R (before charges)",
             r.N, r.Wins, r.EffectiveN, r.WinRateRaw, r.PriorRate, r.WinRatePosterior, r.WinRateLower, r.WinRateUpper, r.AvgWinR, r.AvgLossR, r.ExpectancyR, r.ProfitFactor, r.MaxDrawdownR, r.MaeP50, r.MaeP90, r.MfeP50, r.MfeP90,
             r.Enough, r.Enough ? "enough" : r.Dependence?.Mode == Domain.Confidence.ConfidenceMode.Gate ? "not enough evidence (fewer effective trades than the minimum, or effective n unavailable)" : "not enough evidence (fewer trades than the minimum)",
-            s.Options.RecencyHalfLifeDays, s.Options.PriorStrength, s.Options.MinTrades, s.Options.CredibleLevel, s.SnapshotKey, s.CreatedAt, r.Dependence is { Mode: not Domain.Confidence.ConfidenceMode.Off } ? LimitsText + " " + DependenceView.LimitsText : LimitsText, DependenceView.Of(r.Dependence));
+            s.Options.RecencyHalfLifeDays, s.Options.PriorStrength, s.Options.MinTrades, s.Options.CredibleLevel, s.SnapshotKey, s.CreatedAt, LimitsOf(r), DependenceView.Of(r.Dependence), ShrinkageView.Of(r.Shrinkage));
     }
 }

@@ -17,6 +17,19 @@ internal sealed class ConfidenceSettings
 
     public MinTrlSection MinTrl { get; set; } = new();
 
+    public ShrinkageSection Shrinkage { get; set; } = new();
+
+    /// <summary>The <c>Confidence:Shrinkage</c> subsection as the options of CF-02 (ADR 0204).</summary>
+    internal ShrinkageOptions ToShrinkageOptions() => new(
+        Shrinkage.Mode,
+        Shrinkage.TauSquaredFloor,
+        Shrinkage.MinTradesForSibling,
+        Shrinkage.MinParentTrades,
+        Shrinkage.StrengthMin,
+        Shrinkage.StrengthMax,
+        Shrinkage.QuantileLevel,
+        Shrinkage.SigmaPoolStrength);
+
     internal ConfidenceOptions ToOptions() => new(
         EffectiveN.Mode,
         EffectiveN.MinSessionsForAutocorr,
@@ -56,5 +69,24 @@ internal sealed class ConfidenceSettings
         public double Confidence { get; set; } = 0.95;
 
         public double BenchmarkSr { get; set; }
+    }
+
+    internal sealed class ShrinkageSection
+    {
+        public ConfidenceMode Mode { get; set; } = ConfidenceMode.ReportOnly;
+
+        public double TauSquaredFloor { get; set; } = 0.01;
+
+        public int MinTradesForSibling { get; set; } = 5;
+
+        public int MinParentTrades { get; set; } = 30;
+
+        public double StrengthMin { get; set; } = 5;
+
+        public double StrengthMax { get; set; } = 200;
+
+        public double QuantileLevel { get; set; } = 0.05;
+
+        public double SigmaPoolStrength { get; set; } = 30;
     }
 }

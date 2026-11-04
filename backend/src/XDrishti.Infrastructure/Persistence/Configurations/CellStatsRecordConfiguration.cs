@@ -16,6 +16,7 @@ internal sealed class CellStatsRecordConfiguration : IEntityTypeConfiguration<Ce
         {
             t.HasCheckConstraint("ck_cell_stats_shape", "snapshot_key ~ '^[0-9a-f]{64}$' AND window_code IN ('all','250d','60d') AND n >= 0 AND wins >= 0 AND wins <= n");
             t.HasCheckConstraint("ck_cell_stats_n_eff_method", "n_eff_method IS NULL OR n_eff_method IN ('cluster','serial','none')");
+            t.HasCheckConstraint("ck_cell_stats_shrinkage", "(parent_level IS NULL OR parent_level IN ('regime','star','strategy','system')) AND (tau_source IS NULL OR tau_source IN ('estimated','floor')) AND (strength_source IS NULL OR strength_source IN ('estimated','default')) AND (shrink_mode IS NULL OR shrink_mode IN ('ReportOnly','Gate'))");
         });
         builder.HasKey(x => x.Id).HasName("pk_cell_stats");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
@@ -35,6 +36,11 @@ internal sealed class CellStatsRecordConfiguration : IEntityTypeConfiguration<Ce
         builder.Property(x => x.NEffMethod).HasColumnType("text");
         builder.Property(x => x.NEffMode).HasColumnType("text");
         builder.Property(x => x.NEffNote).HasColumnType("text");
+        builder.Property(x => x.ParentLevel).HasColumnType("text");
+        builder.Property(x => x.TauSource).HasColumnType("text");
+        builder.Property(x => x.StrengthSource).HasColumnType("text");
+        builder.Property(x => x.ShrinkMode).HasColumnType("text");
+        builder.Property(x => x.ShrinkNote).HasColumnType("text");
         builder.HasIndex(x => new { x.SnapshotKey, x.CellKey, x.Window }).IsUnique().HasDatabaseName("uq_cell_stats_snapshot_cell_window");
         builder.HasIndex(x => new { x.AsOf, x.CreatedAt }).HasDatabaseName("ix_cell_stats_as_of_created");
         builder.HasIndex(x => x.CellKey).HasDatabaseName("ix_cell_stats_cell_key");

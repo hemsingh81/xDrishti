@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using XDrishti.Domain.Confidence;
 
 namespace XDrishti.Domain.Learning;
@@ -18,8 +19,9 @@ public static class CellStatsCalculator
     /// The rows, for every cell and every window, in the order of the input then the windows. The options must be usable (<see cref="CellStatsOptions.Problems"/>). With <paramref name="regimeCells"/> (P6-02, ADR 0146) the rows of those cells follow,
     /// shrunk toward the same strategy rate; the system and strategy rates are taken from <paramref name="cells"/> alone, so a trade is never counted twice and the rows of <paramref name="cells"/> are the same with and without them.
     /// With <paramref name="confidence"/> (CF-01, ADR 0203) each row also carries its <see cref="CellStatsRow.Dependence"/> (null or Off: no such member and every other field exactly as before); only in the <see cref="ConfidenceMode.Gate"/> mode does <see cref="CellStatsRow.Enough"/> change.
+    /// With <paramref name="shrinkage"/> (CF-02, ADR 0204) each row also carries its <see cref="CellStatsRow.Shrinkage"/> (null or Off: no such member); no other field of any row changes.
     /// </summary>
-    public static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, DateOnly asOf, CellStatsOptions options, IReadOnlyList<CellInput>? regimeCells = null, ConfidenceOptions? confidence = null)
+    public static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, DateOnly asOf, CellStatsOptions options, IReadOnlyList<CellInput>? regimeCells = null, ConfidenceOptions? confidence = null, ShrinkageOptions? shrinkage = null)
     {
         ArgumentNullException.ThrowIfNull(cells);
         ArgumentNullException.ThrowIfNull(options);
@@ -47,13 +49,20 @@ public static class CellStatsCalculator
                 StringComparer.Ordinal);
         }
 
+        if (shrinkage is { IsOn: true } && shrinkage.Problems().Count > 0)
+        {
+            throw new ArgumentException("The shrinkage options are not usable.", nameof(shrinkage));
+        }
+
         var rows = new List<CellStatsRow>(cells.Count * Windows.Length);
+        var traded = new List<List<CellTrade>>(rows.Capacity);
         for (var i = 0; i < cells.Count; i++)
         {
             foreach (var window in Windows)
             {
                 var (input, trades) = slices[window][i];
                 rows.Add(Row(input, window, trades, asOf, strategyRates[window][input.Cell.Strategy], options, confidence));
+                traded.Add(trades);
             }
         }
 
@@ -68,12 +77,33 @@ public static class CellStatsCalculator
                         throw new ArgumentException($"The regime cell {input.Cell.Key} has no cell of its strategy among the cells.", nameof(regimeCells));
                     }
 
-                    rows.Add(Row(input, window, InWindow(input.Trades, asOf, window), asOf, prior, options, confidence));
+                    var inWindow = InWindow(input.Trades, asOf, window);
+                    rows.Add(Row(input, window, inWindow, asOf, prior, options, confidence));
+                    traded.Add(inWindow);
                 }
             }
         }
 
-        return rows.AsReadOnly();
+        return shrinkage is { IsOn: true } ? WithShrinkage(rows, traded, asOf, options, confidence, shrinkage) : rows.AsReadOnly();
+    }
+
+    // CF-02: the second pass. Per window, every cell (the * cells and the regime cells) is shrunk toward its leave-one-out parent; the raw fields of the row are left as they are.
+    private static ReadOnlyCollection<CellStatsRow> WithShrinkage(List<CellStatsRow> rows, List<List<CellTrade>> traded, DateOnly asOf, CellStatsOptions options, ConfidenceOptions? confidence, ShrinkageOptions shrinkage)
+    {
+        var floor = (confidence ?? new ConfidenceOptions()).SigmaFloorR;
+        var result = rows.ToArray();
+        foreach (var window in Windows)
+        {
+            var index = Enumerable.Range(0, rows.Count).Where(i => rows[i].Window == window).ToList();
+            var subjects = index.Select(i => new ShrinkSubject(rows[i].Cell, traded[i], rows[i].Dependence?.NEff)).ToList();
+            var assessed = CellShrinker.Assess(subjects, asOf, options, shrinkage, floor);
+            for (var k = 0; k < index.Count; k++)
+            {
+                result[index[k]] = rows[index[k]] with { Shrinkage = assessed[k] };
+            }
+        }
+
+        return result.AsReadOnly();
     }
 
     // Trades are ordered by exit date only (stable sort): the order within one day is the order of the input, i.e. by source run then by that run's trade ordinal.
@@ -84,7 +114,7 @@ public static class CellStatsCalculator
             .OrderBy(t => t.ExitDate)];
     }
 
-    private static double Weight(CellTrade trade, DateOnly asOf, CellStatsOptions options) => Math.Pow(0.5, (asOf.DayNumber - trade.ExitDate.DayNumber) / options.RecencyHalfLifeDays);
+    internal static double Weight(CellTrade trade, DateOnly asOf, CellStatsOptions options) => Math.Pow(0.5, (asOf.DayNumber - trade.ExitDate.DayNumber) / options.RecencyHalfLifeDays);
 
     private static (double Wins, double Weight) Sum(IEnumerable<CellTrade> trades, DateOnly asOf, CellStatsOptions options)
     {

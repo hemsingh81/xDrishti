@@ -43,6 +43,11 @@ internal static class LearnCellsCommand
                 await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"regime split: {o.RegimeCells} regime cells; {regime.Labelled} of {regime.Total} trades have a regime ({regime.IndexAndVix} from the index and the VIX, {regime.IndexOnly} from the index alone); no regime: {reasons}"));
             }
 
+            if (o.TauFloorShare is { } share)
+            {
+                await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"shrinkage: {o.ShrunkRows} rows shrunk, {o.TauFloorRows} ({share:P0}) with the between-cell variance at its floor"));
+            }
+
             return XdCommand.Done;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

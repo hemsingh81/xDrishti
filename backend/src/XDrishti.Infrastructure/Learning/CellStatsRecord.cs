@@ -99,4 +99,31 @@ internal sealed class CellStatsRecord
     public string? NEffNote { get; set; }
 
     public double? TargetEdgeR { get; set; }
+
+    // CF-02 (ADR 0204): the shrunk figures of the row; all null in a row written before the migration ("not computed")
+    public string? ParentLevel { get; set; }
+
+    public double? ParentMeanR { get; set; }
+
+    public double? TauSquared { get; set; }
+
+    public double? Blend { get; set; }
+
+    public double? ShrunkMeanR { get; set; }
+
+    public double? ShrunkLowerR { get; set; }
+
+    public double? EstimatedStrength { get; set; }
+
+    public double? ShrunkWinRate { get; set; }
+
+    public string? TauSource { get; set; }
+
+    public string? StrengthSource { get; set; }
+
+    public double? ShrinkN { get; set; }
+
+    public string? ShrinkMode { get; set; }
+
+    public string? ShrinkNote { get; set; }
 }

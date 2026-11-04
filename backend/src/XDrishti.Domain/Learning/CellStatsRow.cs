@@ -29,6 +29,7 @@ namespace XDrishti.Domain.Learning;
 /// <param name="MfeP90">90th percentile MFE in R.</param>
 /// <param name="Enough">N is at least the options' minimum trades; false reads "not enough evidence". In the <c>Gate</c> mode of CF-01 it is judged on effective n instead.</param>
 /// <param name="Dependence">CF-01: effective n, power and minimum track record of the window's trades; null when not computed (mode Off, or an older row).</param>
+/// <param name="Shrinkage">CF-02: the shrunk mean R, its lower bound and the estimated-strength win rate, beside the raw figures; null when not computed (mode Off, or an older row).</param>
 public sealed record CellStatsRow(
     CellId Cell,
     CellWindow Window,
@@ -52,7 +53,8 @@ public sealed record CellStatsRow(
     double? MfeP50,
     double? MfeP90,
     bool Enough,
-    DependenceAssessment? Dependence = null)
+    DependenceAssessment? Dependence = null,
+    ShrinkageAssessment? Shrinkage = null)
 {
     /// <summary>CF-01 <c>IndependentN</c>: trades after clustering and serial correction; null when unavailable. Not <see cref="EffectiveN"/> (the recency-weight sum).</summary>
     public double? IndependentN => Dependence?.NEff;

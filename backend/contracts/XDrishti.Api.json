@@ -24500,12 +24500,22 @@
               }
             ]
           },
+          "shrinkage": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ShrinkageView"
+              }
+            ]
+          },
           "independentN": {
             "type": [
               "null",
               "number"
             ],
-            "description": "CF-01 `IndependentN`: trades after same-session and serial correction; null when not computed. Three different numbers: double CellStatsView.EffectiveN is the recency-weight sum, `KishWeightN` (CF-02) is (sum w)^2 / sum w^2, this is the independence count.",
+            "description": "CF-01 `IndependentN`: trades after same-session and serial correction; null when not computed. Three different numbers: double CellStatsView.EffectiveN is the recency-weight sum, `shrinkage.nUsed` (CF-02) is the smaller of this and the Kish weight n (sum w)^2 / sum w^2.",
             "format": "double"
           },
           "regimeName": {
@@ -54555,6 +54565,120 @@
           }
         },
         "description": "The summary of one set: its outcome, its rates with intervals, and the repeat figures (`pass@1` and `stability` where they apply)."
+      },
+      "ShrinkageView": {
+        "required": [
+          "mode",
+          "parentLevel",
+          "parentMeanR",
+          "tauSquared",
+          "tauSource",
+          "blend",
+          "shrunkMeanR",
+          "shrunkLowerR",
+          "estimatedStrength",
+          "strengthSource",
+          "shrunkWinRate",
+          "nUsed",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "`ReportOnly` (the only mode offered), the mode when it was computed."
+          },
+          "parentLevel": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`star`, `strategy` or `system`: the group the cell is pulled toward, itself excluded."
+          },
+          "parentMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The mean R of that group without the cell.",
+            "format": "double"
+          },
+          "tauSquared": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The between-cell variance used, in R squared (never below the floor).",
+            "format": "double"
+          },
+          "tauSource": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`estimated` or `floor`."
+          },
+          "blend": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "How far, 0 to 1, from the parent toward the cell's own mean.",
+            "format": "double"
+          },
+          "shrunkMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The shrunk mean R.",
+            "format": "double"
+          },
+          "shrunkLowerR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The 5 % quantile of the posterior: ignores the uncertainty in the pooling parameters, so it is optimistic.",
+            "format": "double"
+          },
+          "estimatedStrength": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The Beta strength the shrunk win rate used.",
+            "format": "double"
+          },
+          "strengthSource": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`estimated` or `default`."
+          },
+          "shrunkWinRate": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The win rate shrunk toward the group's with that strength (the P6-01 posterior stays on the row).",
+            "format": "double"
+          },
+          "nUsed": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The trades the precision rests on: the smaller of effective n and the weight n.",
+            "format": "double"
+          },
+          "note": {
+            "type": "string",
+            "description": "Remarks and the unavailable reason."
+          }
+        },
+        "description": "The shrunk figures of a cell row (CF-02, ADR 0204), as the API shows them beside the raw ones: \"an estimate of the past edge, pulled toward its group\", not a forecast. Every figure is null when it could not be computed and string ShrinkageView.Note then\nsays `unavailable: &lt;reason&gt;`. It changes no other figure of the row."
       },
       "SignFlipBaselineView": {
         "required": [

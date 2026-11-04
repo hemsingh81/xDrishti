@@ -18,6 +18,9 @@ const finiteCount = (value: number): MetricState => ({ kind: 'value', value });
 /** Why an independent-n figure is missing: the server's reason, or that the row predates the figure. */
 const whyNot = (cell: CellStats) => cell.dependence?.note ?? 'Not computed';
 
+/** Why a shrunk figure is missing: the server's reason, or that the row predates the figure. */
+const whyNotShrunk = (cell: CellStats) => cell.shrinkage?.note ?? 'Not computed';
+
 interface Line {
   id: string;
   label: string;
@@ -78,6 +81,21 @@ const lines: readonly Line[] = [
     id: 'exp',
     label: 'Expectancy',
     state: (c) => statState(c, c.expectancyR, 'Not stored'),
+    format: formatR,
+    tone: 'gain-loss',
+  },
+  // CF-02: shown beside the raw expectancy, never in place of it; an estimate of the past edge pulled toward its group, not a forecast.
+  {
+    id: 'shrunk',
+    label: 'Shrunk R (past edge pulled toward its group)',
+    state: (c) => metricOf(c.shrinkage?.shrunkMeanR, whyNotShrunk(c)),
+    format: formatR,
+    tone: 'gain-loss',
+  },
+  {
+    id: 'shrunkLow',
+    label: 'Shrunk R, lower bound (ignores uncertainty in the pooling)',
+    state: (c) => metricOf(c.shrinkage?.shrunkLowerR, whyNotShrunk(c)),
     format: formatR,
     tone: 'gain-loss',
   },

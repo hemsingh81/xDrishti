@@ -3210,6 +3210,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("double precision")
                         .HasColumnName("avg_win_r");
 
+                    b.Property<double?>("Blend")
+                        .HasColumnType("double precision")
+                        .HasColumnName("blend");
+
                     b.Property<string>("CellKey")
                         .IsRequired()
                         .HasColumnType("text")
@@ -3248,6 +3252,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.Property<bool?>("EnoughByNEff")
                         .HasColumnType("boolean")
                         .HasColumnName("enough_by_n_eff");
+
+                    b.Property<double?>("EstimatedStrength")
+                        .HasColumnType("double precision")
+                        .HasColumnName("estimated_strength");
 
                     b.Property<string>("ExitPolicy")
                         .IsRequired()
@@ -3319,6 +3327,14 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("needed_trades");
 
+                    b.Property<string>("ParentLevel")
+                        .HasColumnType("text")
+                        .HasColumnName("parent_level");
+
+                    b.Property<double?>("ParentMeanR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("parent_mean_r");
+
                     b.Property<double>("PriorRate")
                         .HasColumnType("double precision")
                         .HasColumnName("prior_rate");
@@ -3336,6 +3352,30 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("regime");
+
+                    b.Property<string>("ShrinkMode")
+                        .HasColumnType("text")
+                        .HasColumnName("shrink_mode");
+
+                    b.Property<double?>("ShrinkN")
+                        .HasColumnType("double precision")
+                        .HasColumnName("shrink_n");
+
+                    b.Property<string>("ShrinkNote")
+                        .HasColumnType("text")
+                        .HasColumnName("shrink_note");
+
+                    b.Property<double?>("ShrunkLowerR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("shrunk_lower_r");
+
+                    b.Property<double?>("ShrunkMeanR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("shrunk_mean_r");
+
+                    b.Property<double?>("ShrunkWinRate")
+                        .HasColumnType("double precision")
+                        .HasColumnName("shrunk_win_rate");
 
                     b.Property<string>("Side")
                         .IsRequired()
@@ -3363,6 +3403,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("strategy");
 
+                    b.Property<string>("StrengthSource")
+                        .HasColumnType("text")
+                        .HasColumnName("strength_source");
+
                     b.Property<string>("Style")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -3372,6 +3416,14 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.Property<double?>("TargetEdgeR")
                         .HasColumnType("double precision")
                         .HasColumnName("target_edge_r");
+
+                    b.Property<string>("TauSource")
+                        .HasColumnType("text")
+                        .HasColumnName("tau_source");
+
+                    b.Property<double?>("TauSquared")
+                        .HasColumnType("double precision")
+                        .HasColumnName("tau_squared");
 
                     b.Property<string>("Timeframe")
                         .IsRequired()
@@ -3423,6 +3475,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_cell_stats_n_eff_method", "n_eff_method IS NULL OR n_eff_method IN ('cluster','serial','none')");
 
                             t.HasCheckConstraint("ck_cell_stats_shape", "snapshot_key ~ '^[0-9a-f]{64}$' AND window_code IN ('all','250d','60d') AND n >= 0 AND wins >= 0 AND wins <= n");
+
+                            t.HasCheckConstraint("ck_cell_stats_shrinkage", "(parent_level IS NULL OR parent_level IN ('regime','star','strategy','system')) AND (tau_source IS NULL OR tau_source IN ('estimated','floor')) AND (strength_source IS NULL OR strength_source IN ('estimated','default')) AND (shrink_mode IS NULL OR shrink_mode IN ('ReportOnly','Gate'))");
                         });
                 });
 

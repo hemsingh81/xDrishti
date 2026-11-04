@@ -182,8 +182,10 @@ internal static class ApiSetup
         services.AddOptions<ConfidenceSettings>()
             .BindConfiguration(ConfidenceSettings.SectionName)
             .Validate(s => s.ToOptions().Problems().Count == 0, "Confidence: a value is out of range (EffectiveN:MinSessionsForAutocorr 5..250, MinTradesForEstimate 3..50, MinClusters 3..50, Power:Alpha 0.001..0.2, Power 0.5..0.99, SigmaFloorR 0.1..5, TargetEdgeR 0.01..5, MinTrl:Confidence 0.5..0.999, BenchmarkSr -1..1).")
+            .Validate(s => s.ToShrinkageOptions().Problems().Count == 0, "Confidence:Shrinkage: a value is out of range or the mode is not offered (Mode Off or ReportOnly, TauSquaredFloor 0.0001..1, MinTradesForSibling 3..30, MinParentTrades 10..200, StrengthMin and StrengthMax 1..1000 with Min not above Max, QuantileLevel 0.01..0.25, SigmaPoolStrength 1..1000).")
             .ValidateOnStart();
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToOptions()));
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToShrinkageOptions()));
     }
 
     /// <summary>

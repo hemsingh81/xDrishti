@@ -7338,9 +7338,10 @@ export interface components {
       createdAt: string;
       limits: string;
       dependence?: null | components['schemas']['DependenceView'];
+      shrinkage?: null | components['schemas']['ShrinkageView'];
       /**
        * Format: double
-       * @description CF-01 `IndependentN`: trades after same-session and serial correction; null when not computed. Three different numbers: double CellStatsView.EffectiveN is the recency-weight sum, `KishWeightN` (CF-02) is (sum w)^2 / sum w^2, this is the independence count.
+       * @description CF-01 `IndependentN`: trades after same-session and serial correction; null when not computed. Three different numbers: double CellStatsView.EffectiveN is the recency-weight sum, `shrinkage.nUsed` (CF-02) is the smaller of this and the Kish weight n (sum w)^2 / sum w^2.
        */
       independentN?: null | number;
       /** @description The regime name of a regime cell (P6-02), null for a `*` cell. */
@@ -18189,6 +18190,62 @@ export interface components {
       intentMean: null | number;
       /** Format: double */
       intentLowest: null | number;
+    };
+    /**
+     * @description The shrunk figures of a cell row (CF-02, ADR 0204), as the API shows them beside the raw ones: "an estimate of the past edge, pulled toward its group", not a forecast. Every figure is null when it could not be computed and string ShrinkageView.Note then
+     *     says `unavailable: &lt;reason&gt;`. It changes no other figure of the row.
+     */
+    ShrinkageView: {
+      /** @description `ReportOnly` (the only mode offered), the mode when it was computed. */
+      mode: string;
+      /** @description `star`, `strategy` or `system`: the group the cell is pulled toward, itself excluded. */
+      parentLevel: null | string;
+      /**
+       * Format: double
+       * @description The mean R of that group without the cell.
+       */
+      parentMeanR: null | number;
+      /**
+       * Format: double
+       * @description The between-cell variance used, in R squared (never below the floor).
+       */
+      tauSquared: null | number;
+      /** @description `estimated` or `floor`. */
+      tauSource: null | string;
+      /**
+       * Format: double
+       * @description How far, 0 to 1, from the parent toward the cell's own mean.
+       */
+      blend: null | number;
+      /**
+       * Format: double
+       * @description The shrunk mean R.
+       */
+      shrunkMeanR: null | number;
+      /**
+       * Format: double
+       * @description The 5 % quantile of the posterior: ignores the uncertainty in the pooling parameters, so it is optimistic.
+       */
+      shrunkLowerR: null | number;
+      /**
+       * Format: double
+       * @description The Beta strength the shrunk win rate used.
+       */
+      estimatedStrength: null | number;
+      /** @description `estimated` or `default`. */
+      strengthSource: null | string;
+      /**
+       * Format: double
+       * @description The win rate shrunk toward the group's with that strength (the P6-01 posterior stays on the row).
+       */
+      shrunkWinRate: null | number;
+      /**
+       * Format: double
+       * @description The trades the precision rests on: the smaller of effective n and the weight n.
+       */
+      nUsed: null | number;
+      /** @description Remarks and the unavailable reason. */
+      note: string;
     };
     /** @description The sign-flip baseline: lenient (mean R against 0 given the trade sizes), not a re-run with random entries. */
     SignFlipBaselineView: {
