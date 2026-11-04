@@ -248,6 +248,21 @@ public sealed class WalkForwardValidatorTests
         result.Error.Code.ShouldBe("validation.bad_probability");
     }
 
+    // CF-06: the hold-out start is one shared date; given, the cut is at that date and the default rule is untouched
+    [Fact]
+    public void A_shared_hold_out_start_replaces_the_months_rule_and_none_keeps_it()
+    {
+        var rows = Data();
+        var shared = rows.Max(r => r.TradeDate).AddMonths(-3).AddDays(1);
+
+        var split = HoldOut.Reserve(rows, 6, shared).Value;
+
+        split.Start.ShouldBe(shared);
+        split.Reserved.ShouldAllBe(r => r.TradeDate >= shared);
+        split.Development.ShouldAllBe(r => r.TradeDate < shared);
+        HoldOut.Reserve(rows, 6, null).Value.Start.ShouldBe(HoldOut.Reserve(rows).Value.Start);
+    }
+
     [Fact]
     public void The_hold_out_is_the_last_six_months_and_development_may_not_read_it()
     {

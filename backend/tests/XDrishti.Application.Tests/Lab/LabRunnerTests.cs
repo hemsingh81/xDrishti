@@ -67,6 +67,7 @@ public sealed class LabRunnerTests
 
     public LabRunnerTests()
     {
+        _ledger.CountTrialsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new XDrishti.Domain.Lab.TrialCounts(0, 0, 0, 0, 0));
         _strategies.GetByHashAsync(Hash, Arg.Any<CancellationToken>()).Returns(new StoredVersion("LAB_TEST", 1, 1, Hash, "the text", "{}", null, null, DateTimeOffset.UnixEpoch));
         _checker.Check("the text").Returns(new StrategyCheck(new StrategyDescription("LAB_TEST", "intraday", Hash, "{}", [Timeframe.M15], [Side.Buy], []), 1, [Issue("warning", "strategy.lint.note")]));
         _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(_run));
@@ -649,5 +650,188 @@ public sealed class LabRunnerTests
         var note = verdicts.Single().DeflatedSharpe!.Note;
         note.ShouldStartWith("unavailable: trial statistics stored for only");
         note.ShouldContain("of 5 variants");
+    }
+
+    // CF-06: the count of looks beside the verdict, and the honest one only when the owner switches it on
+
+    private LabRunner RunnerWithTrials(RegistrationOptions registration, XDrishti.Domain.Lab.TrialCounts? parts, int distinct, LabSettings? settings = null, HoldOutOptions? holdOut = null, XDrishti.Application.Abstractions.Lab.IHoldOutStore? store = null, XDrishti.Application.Abstractions.Market.Bars.IBarQueries? bars = null, XDrishti.Application.Lab.HoldOutUnlocker? unlocker = null)
+    {
+        _ledger.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _ledger.CountVariantsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(distinct);
+        _ledger.CountTrialsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(parts ?? new XDrishti.Domain.Lab.TrialCounts(distinct, 0, 0, 0, 0));
+        var s = settings ?? LabSettings.Default;
+        var guard = holdOut is null ? null : new XDrishti.Application.Lab.LabHoldOutGuard(store!, bars!, holdOut, _time);
+        return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, s, new ConfidenceOptions(), registration), new LabRobustness(_simulation, s), _ledger, _results, _progress, s, _time, NullLogger<LabRunner>.Instance,
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, null, holdOut, guard, unlocker);
+    }
+
+    [Fact]
+    public async Task The_verdict_carries_the_parts_of_the_count_and_is_judged_with_the_old_count_until_the_honest_one_is_switched_on()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+        var parts = new XDrishti.Domain.Lab.TrialCounts(3, 16, 9, 0, 0);
+
+        await RunnerWithTrials(new RegistrationOptions(), parts, 19).ExecuteAsync(FullRun(), Ct);
+        await RunnerWithTrials(new RegistrationOptions(CountInFactor: true), parts, 19).ExecuteAsync(FullRun(), Ct);
+
+        verdicts[0].VariantCount.ShouldBe(19);
+        verdicts[0].AdjustmentFactor.ShouldBe(2.0620, 1e-4);
+        var off = verdicts[0].Trials.ShouldNotBeNull();
+        (off.RunHashes, off.SweepPoints, off.ExtraExits, off.Replans, off.NullRows, off.Total).ShouldBe((3, 16, 9, 0, 0, 28));
+        off.HonestFactor.ShouldBe(2.2018, 1e-4);
+        off.FactorUsed.ShouldBe(2.0620, 1e-4);
+        off.HonestCountApplied.ShouldBeFalse();
+        verdicts[1].VariantCount.ShouldBe(28);
+        verdicts[1].AdjustmentFactor.ShouldBe(2.2018, 1e-4);
+        verdicts[1].Trials!.HonestCountApplied.ShouldBeTrue();
+        verdicts[1].Gates.Single(g => g.Name.Contains("expectancy", StringComparison.OrdinalIgnoreCase)).Adjusted.ShouldBeGreaterThan(verdicts[0].Gates.Single(g => g.Name.Contains("expectancy", StringComparison.OrdinalIgnoreCase)).Adjusted, "the honest count tightens the gate");
+    }
+
+    [Fact]
+    public async Task With_the_switch_off_everything_but_the_new_member_is_byte_for_byte_what_a_verdict_without_it_was()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithTrials(new RegistrationOptions(), null, 4).ExecuteAsync(FullRun(), Ct);
+        await RunnerWithTrials(new RegistrationOptions(), new XDrishti.Domain.Lab.TrialCounts(4, 0, 3, 1, 0), 4).ExecuteAsync(FullRun(), Ct);
+
+        verdicts[0].Trials.ShouldNotBeNull().HonestCountApplied.ShouldBeFalse();
+        verdicts[1].Trials.ShouldNotBeNull().HonestCountApplied.ShouldBeFalse();
+        System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { Trials = null }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0] with { Trials = null }));
+    }
+
+    [Fact]
+    public async Task A_count_below_the_ledger_total_at_judgement_time_tightens_the_gates_when_rows_are_added_between_two_judgements()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithTrials(new RegistrationOptions(CountInFactor: true), new XDrishti.Domain.Lab.TrialCounts(2, 0, 3, 0, 0), 2).ExecuteAsync(FullRun(), Ct);
+        await RunnerWithTrials(new RegistrationOptions(CountInFactor: true), new XDrishti.Domain.Lab.TrialCounts(2, 0, 3, 2, 0), 2).ExecuteAsync(FullRun(), Ct);
+
+        (verdicts[0].VariantCount, verdicts[1].VariantCount).ShouldBe((5, 7));
+        verdicts[1].AdjustmentFactor.ShouldBeGreaterThan(verdicts[0].AdjustmentFactor);
+    }
+
+    [Fact]
+    public async Task With_hold_out_enforcement_on_a_pass_without_a_kept_hold_out_is_capped_at_marginal_and_with_it_off_nothing_changes()
+    {
+        ArrangeFullTest();
+        var easy = LabSettings.Default with { Gates = new XDrishti.Domain.Lab.QualificationGates(0, -1000, 0, 0, 1000, 1000), MinFoldsForPass = 0 };
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+        var store = Substitute.For<XDrishti.Application.Abstractions.Lab.IHoldOutStore>();
+        var bars = Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarQueries>();
+        var first = new DateTimeOffset(2026, 2, 2, 9, 15, 0, TimeSpan.FromHours(5.5));
+        bars.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new XDrishti.Application.Abstractions.Market.Bars.BarTotals(2, 1000, first, first.AddMonths(3), 0, 0));
+
+        await RunnerWithTrials(new RegistrationOptions(), null, 1, easy).ExecuteAsync(FullRun(), Ct);
+        await RunnerWithTrials(new RegistrationOptions(), null, 1, easy, new HoldOutOptions(Enforce: true), store, bars).ExecuteAsync(FullRun(), Ct);
+
+        verdicts[0].Outcome.ShouldBe("PASS", "the precondition: the relaxed gates pass");
+        verdicts[1].Outcome.ShouldBe("MARGINAL");
+        verdicts[1].Limits.ShouldContain(l => l.Contains("no hold-out is kept", StringComparison.Ordinal));
+        verdicts[1].Gates.ShouldBe(verdicts[0].Gates, "the gates are untouched");
+    }
+
+    [Fact]
+    public async Task With_a_kept_hold_out_a_pass_stays_a_pass()
+    {
+        ArrangeFullTest();
+        var easy = LabSettings.Default with { Gates = new XDrishti.Domain.Lab.QualificationGates(0, -1000, 0, 0, 1000, 1000), MinFoldsForPass = 0 };
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+        var store = Substitute.For<XDrishti.Application.Abstractions.Lab.IHoldOutStore>();
+        store.CurrentAsync(Arg.Any<CancellationToken>()).Returns(new XDrishti.Application.Abstractions.Lab.HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2026, 1, 5), new DateOnly(2026, 10, 30), 6, new string('d', 64), DateTimeOffset.UnixEpoch));
+        var bars = Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarQueries>();
+        var first = new DateTimeOffset(2026, 1, 5, 9, 15, 0, TimeSpan.FromHours(5.5));
+        bars.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new XDrishti.Application.Abstractions.Market.Bars.BarTotals(2, 1000, first, first.AddMonths(10), 0, 0));
+
+        await RunnerWithTrials(new RegistrationOptions(), null, 1, easy, new HoldOutOptions(Enforce: true), store, bars).ExecuteAsync(FullRun(), Ct);
+
+        verdicts.Single().Outcome.ShouldBe("PASS");
+    }
+
+    // CF-06 D6: the auto unlock follows the finish, because it reloads the run and needs it stored as succeeded
+
+    private async Task<MemoryHoldOutStore> RunWithAutoUnlockAsync(bool autoOn, string scenario = "succeeded")
+    {
+        ArrangeFullTest();
+        var run = scenario == "quick" ? Run() : FullRun();
+        if (scenario == "failed")
+        {
+            _comparisons.HandleAsync(Arg.Any<RunComparisonQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Failure<ComparisonRun>(Error.Validation("x", "stop here")));
+        }
+
+        if (scenario == "cancelled")
+        {
+            _runs.IsCancelRequestedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
+        }
+
+        var finished = false;
+        _runs.FinishAsync(Arg.Any<LabFinish>(), Arg.Any<CancellationToken>()).Returns(ci =>
+        {
+            _finishes.Add(ci.Arg<LabFinish>());
+            finished = true;
+            return true;
+        });
+        // after any finish the stored run reads as succeeded, so only the runner's own gate keeps a failed, cancelled or quick run from an unlock
+        _runs.GetAsync(run.Id, Arg.Any<CancellationToken>()).Returns(_ => run with { State = finished ? LabRunState.Succeeded : LabRunState.Running });
+        _results.GetAsync(run.Id, Arg.Any<CancellationToken>()).Returns(HoldOutUnlockerTests.Verdict());
+        var first = new DateTimeOffset(2024, 10, 1, 9, 15, 0, TimeSpan.FromHours(5.5));
+        var bars = Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarQueries>();
+        bars.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new XDrishti.Application.Abstractions.Market.Bars.BarTotals(2, 1000, first, new DateTimeOffset(2026, 10, 30, 15, 29, 0, TimeSpan.FromHours(5.5)), 0, 0));
+        var freezes = Substitute.For<IPlanFreezeStore>();
+        freezes.FirstAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new string('f', 64));
+        var store = new MemoryHoldOutStore();
+        var options = new HoldOutOptions(AutoUnlock: autoOn);
+        var unlocker = new HoldOutUnlocker(_runs, _results, store, freezes, new StubPass(), new LabHoldOutGuard(store, bars, options, _time), options, _time,
+            Substitute.For<XDrishti.Application.Abstractions.Accounts.IAccountEventLog>(), Substitute.For<XDrishti.Application.Abstractions.Accounts.IAccountUnitOfWork>(), NullLogger<HoldOutUnlocker>.Instance);
+
+        await RunnerWithTrials(new RegistrationOptions(), null, 1, unlocker: unlocker).ExecuteAsync(run, Ct);
+
+        _finishes.Single().State.ShouldBe(scenario switch { "failed" => LabRunState.Failed, "cancelled" => LabRunState.Cancelled, _ => LabRunState.Succeeded });
+        return store;
+    }
+
+    [Theory]
+    [InlineData("failed")]
+    [InlineData("cancelled")]
+    [InlineData("quick")]
+    public async Task With_the_auto_option_on_a_failed_cancelled_or_quick_run_stores_no_unlock(string scenario)
+    {
+        var store = await RunWithAutoUnlockAsync(autoOn: true, scenario);
+
+        store.Unlocks.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task With_the_auto_option_on_and_every_development_row_a_pass_a_succeeded_run_stores_exactly_one_auto_unlock()
+    {
+        var store = await RunWithAutoUnlockAsync(autoOn: true);
+
+        var unlock = store.Unlocks.ShouldHaveSingleItem();
+        unlock.Mode.ShouldBe("auto");
+        unlock.Actor.ShouldBe("system:auto-unlock");
+        unlock.StrategyId.ShouldBe("LAB_TEST");
+    }
+
+    [Fact]
+    public async Task With_the_auto_option_off_no_unlock_is_stored()
+    {
+        var store = await RunWithAutoUnlockAsync(autoOn: false);
+
+        store.Unlocks.ShouldBeEmpty();
+    }
+
+    private sealed class StubPass : IHoldOutPass
+    {
+        public ValueTask<Result<HoldOutFigures>> RunAsync(LabRun run, LabVerdictView verdict, HoldOutBlock block, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(Result.Success(new HoldOutFigures(45, 0.12, block.Start, block.HistoryLast)));
     }
 }

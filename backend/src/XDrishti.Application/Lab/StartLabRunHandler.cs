@@ -28,7 +28,9 @@ internal sealed class StartLabRunHandler(
     ICostSheetStore sheets,
     LabSettings settings,
     TimeProvider time,
-    ILogger<StartLabRunHandler> logger) : ICommandHandler<StartLabRunCommand, StartedLabRun>
+    ILogger<StartLabRunHandler> logger,
+    LabPreregistration? preregistration = null,
+    LabHoldOutGuard? holdOut = null) : ICommandHandler<StartLabRunCommand, StartedLabRun>
 {
     public async ValueTask<Result<StartedLabRun>> HandleAsync(StartLabRunCommand command, CancellationToken cancellationToken)
     {
@@ -46,6 +48,11 @@ internal sealed class StartLabRunHandler(
         }
 
         var full = LabSettings.RunsFullTest(command.Method);
+        if (full && preregistration is not null && await preregistration.CheckAsync(version, cancellationToken) is { } notRegistered)
+        {
+            return Result.Failure<StartedLabRun>(notRegistered);
+        }
+
         var universe = await ResolveUniverseAsync(command, full, cancellationToken);
         if (universe.IsFailure)
         {
@@ -59,6 +66,19 @@ internal sealed class StartLabRunHandler(
         }
 
         var (from, to, firstSession, lastSession) = window.Value;
+        string? holdOutNote = null;
+        if (holdOut is not null && await holdOut.EnsureAsync(firstSession, lastSession, cancellationToken) is { } block)
+        {
+            // CF-06: the block is fixed at the first post and no default Lab window reads it, whatever the setting; enforcement only refuses an explicit window that reaches it
+            var cut = LabHoldOutGuard.Cut(block, from, to, command.To is not null, holdOut.Enforce);
+            if (cut.IsFailure)
+            {
+                return Result.Failure<StartedLabRun>(cut.Error);
+            }
+
+            (to, holdOutNote) = cut.Value;
+        }
+
         var (basis, basisLabel) = await CostBasisAsync(from, cancellationToken);
         if (full && basis == "none")
         {
@@ -70,15 +90,27 @@ internal sealed class StartLabRunHandler(
         var configHash = LabRunIdentity.Sha256(robust ? settings.RobustConfigText(basis) : full ? settings.FullConfigText(basis) : settings.ConfigText(basis));
         var key = LabRunIdentity.Key(version.Hash, universe.Value.Label, [.. universe.Value.Instruments.Select(i => i.Id)], from, to, method, configHash, engine.EngineVersion);
         var labels = full ? FullLabels(universe.Value, from, to, firstSession, lastSession, basisLabel, robust) : Labels(universe.Value, from, to, firstSession, lastSession, basisLabel);
+        if (holdOutNote is not null)
+        {
+            labels = [.. labels, holdOutNote];
+        }
+
         var now = time.GetUtcNow();
         var inserted = await runs.InsertOrGetAsync(
             new NewLabRun(Guid.NewGuid(), key, version.StrategyId, version.Version, version.Hash, universe.Value, from, to, method, configHash, engine.EngineVersion, labels, now),
             cancellationToken);
         // one look at the family, counted whatever becomes of the run (spec P5-03, D1). Also for a run that already holds the key: the append is idempotent by run id, so a run whose first append failed is healed by the next post.
         var run = inserted.Run;
-        if (await ledger.AppendAsync(new LedgerRow(run.Id, run.Key, run.StrategyId, run.Version, run.StrategyHash, version.ParentHash, run.Universe.Label, run.From, run.To, run.Method, run.CreatedAt), cancellationToken))
+        // CF-06: the extra exit candidates of a hash's first full test are looks too
+        var extra = full && preregistration is not null ? await preregistration.ExtraTrialsAsync(run.StrategyId, run.StrategyHash, cancellationToken) : 0;
+        if (await ledger.AppendAsync(new LedgerRow(run.Id, run.Key, run.StrategyId, run.Version, run.StrategyHash, version.ParentHash, run.Universe.Label, run.From, run.To, run.Method, run.CreatedAt, "run", extra), cancellationToken))
         {
             LabRunLog.LedgerAppended(logger, run.Id, run.StrategyId, run.Version);
+        }
+
+        if (full && preregistration is not null)
+        {
+            await preregistration.FreezeAsync(run, version, cancellationToken);
         }
 
         if (inserted.Created)
@@ -201,7 +233,7 @@ internal sealed class StartLabRunHandler(
     [
         "Full test: walk-forward out of sample. Only the out-of-sample numbers are judged; the full-period figures are exploration, in-sample.",
         basisLabel,
-        $"Window {from:yyyy-MM-dd} to {to:yyyy-MM-dd} (all stored data unless posted); no hold-out (ISS-19).",
+        $"Window {from:yyyy-MM-dd} to {to:yyyy-MM-dd} (all stored data unless posted).",
         $"All {universe.Instruments.Count} instruments (no sample).",
         $"Candidate exits: {string.Join(' ', settings.Exits)}; the strategy's own exit is not a candidate.",
         $"Stored data runs from {firstSession:yyyy-MM-dd} to {lastSession:yyyy-MM-dd}.",

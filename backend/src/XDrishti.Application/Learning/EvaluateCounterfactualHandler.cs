@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
@@ -15,7 +16,8 @@ internal sealed class EvaluateCounterfactualHandler(
     ITradeFeatureStore features,
     IModelTrainer trainer,
     TimeProvider time,
-    ILogger<EvaluateCounterfactualHandler> logger) : IQueryHandler<EvaluateCounterfactualQuery, Result<CounterfactualReport>>
+    ILogger<EvaluateCounterfactualHandler> logger,
+    IHoldOutStore? holdOuts = null) : IQueryHandler<EvaluateCounterfactualQuery, Result<CounterfactualReport>>
 {
     public async ValueTask<Result<CounterfactualReport>> HandleAsync(EvaluateCounterfactualQuery query, CancellationToken cancellationToken)
     {
@@ -54,7 +56,7 @@ internal sealed class EvaluateCounterfactualHandler(
         string holdNote;
         if (query.HoldOutMonths > 0)
         {
-            var split = HoldOut.Reserve(rows, query.HoldOutMonths);
+            var split = HoldOut.Reserve(rows, query.HoldOutMonths, await SharedHoldOut.StartAsync(holdOuts, cancellationToken));
             if (split.IsFailure)
             {
                 return Refuse(split.Error);

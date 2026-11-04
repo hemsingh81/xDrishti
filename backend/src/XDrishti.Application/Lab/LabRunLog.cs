@@ -39,4 +39,13 @@ internal static partial class LabRunLog
 
     [LoggerMessage(EventId = 4449, Level = LogLevel.Information, Message = "lab.result.stored run {RunId} outcome {Outcome} variants {Variants}")]
     public static partial void ResultStored(ILogger logger, Guid runId, string outcome, int variants);
+
+    [LoggerMessage(EventId = 7090, Level = LogLevel.Information, Message = "lab.registration.stored strategy {StrategyId} version {Version}")]
+    public static partial void Registered(ILogger logger, string strategyId, int version);
+
+    [LoggerMessage(EventId = 7091, Level = LogLevel.Information, Message = "lab.holdout.unlocked run {RunId} mode {Mode} state {State}")]
+    public static partial void HoldOutUnlocked(ILogger logger, Guid runId, string mode, string state);
+
+    [LoggerMessage(EventId = 7092, Level = LogLevel.Error, Message = "lab.holdout.audit_failed run {RunId} {Failure}")]
+    public static partial void HoldOutAuditFailed(ILogger logger, Guid runId, string failure);
 }

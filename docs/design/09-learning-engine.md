@@ -138,6 +138,7 @@ Built (P6-10, [ADR 0076](../adr/0076-the-hypothesis-loop-one-knob-checked-on-sto
 6. Monte Carlo trade reshuffling for drawdown expectations.
 7. Paper stage before live.
 8. Random-entry baseline with identical exits.
+9. Built (CF-06, [ADR 0207](../adr/0207-a-strategy-version-is-pre-registered-the-ledger-counts-every-extra-look-and-a-locked-hold-out-is-fixed-at-the-first-post-and-read-once-by-an-owner-unlock-with-enforcement-and-the-honest-count-as-the-owners-switches.md)): the ML validation hold-out (`HoldOut.Reserve`) takes the start of the Lab's locked hold-out block when one is fixed, so a model and a strategy keep the same untouched sessions; with no block fixed the rule is unchanged.
 
 ## 7. Cell lifecycle
 

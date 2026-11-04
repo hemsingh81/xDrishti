@@ -58,6 +58,29 @@ internal static class ReportHtml
             h.Append("<p>").Append(Html.Text(c.Limit)).Append(" Formula: ").Append(Html.Text(c.Formula)).Append(". Settings ").Append(Html.Text(c.Settings)).Append(" (").Append(Html.Text(c.SettingsHash)).Append(").</p>\n");
         }
 
+        if (r.Trials is { } trials)
+        {
+            h.Append("<h2>Looks at this strategy</h2>\n<p>").Append(Html.Text(trials.Text)).Append("</p>\n");
+        }
+
+        if (r.Registration is { } reg)
+        {
+            h.Append("<h2>Pre-registration</h2>\n<p>State: ").Append(Html.Text(reg.State)).Append(". ").Append(Html.Text(reg.Text)).Append("</p>\n");
+            if (reg.Registration is { } text)
+            {
+                Table(h, ["Part", "Text"], [["Who is on the other side and why they lose", text.Counterparty], ["Expected sign of each parameter", text.ParameterSigns], ["Tiers and sessions", text.Applicability], ["Expected gross edge and the cost to beat", text.ExpectedEdge], ["What would retire it", text.Falsifier]]);
+            }
+        }
+
+        if (r.HoldOut is { } hold)
+        {
+            h.Append("<h2>Hold-out</h2>\n<p>State: ").Append(Html.Text(hold.State)).Append(". ").Append(Html.Text(hold.Text)).Append("</p>\n");
+            if (hold.Result is { } look)
+            {
+                Table(h, ["Mode", "Window", "Trades", "Hold-out R", "Development R", "Kept", "Status", "Counts toward a pass", "Reason"], [[look.Mode, look.From.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + " to " + look.To.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), I(look.Trades), N(look.HoldOutExpectancyR), N(look.DevelopmentExpectancyR), N(look.Ratio), look.Status, look.Passed ? "yes" : "no", look.Reason]]);
+            }
+        }
+
         h.Append("<h2>Out-of-sample figures</h2>\n");
         Table(h, ["Trades", "Expectancy R", "Profit factor", "Max drawdown R", "Folds", "Positive folds"], [[I(k.OosTrades), N(k.ExpectancyR), N(k.ProfitFactor), N(k.MaxDrawdownR), I(k.Folds), I(k.PositiveFolds)]]);
 

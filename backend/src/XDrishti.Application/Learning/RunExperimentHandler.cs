@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
@@ -14,7 +15,7 @@ namespace XDrishti.Application.Learning;
 /// parameter or exit knob, which changes it) and the same cost assumptions (a slippage knob may differ only in the <c>slippage.*</c> fill fields, and its direction is read from the stored fills, not the typed values), cuts the hold-out
 /// (P6-05), counts the experiments of the last 30 days in the ledger as the trials, judges with <see cref="ExperimentJudge"/> and appends the experiment, whatever the outcome: every look is a trial. The same experiment again is not judged twice.
 /// </summary>
-internal sealed class RunExperimentHandler(IRunStore runs, IExperimentLedger ledger, TimeProvider time, ILogger<RunExperimentHandler> logger) : ICommandHandler<RunExperimentCommand, RunExperimentOutcome>
+internal sealed class RunExperimentHandler(IRunStore runs, IExperimentLedger ledger, TimeProvider time, ILogger<RunExperimentHandler> logger, IHoldOutStore? holdOuts = null) : ICommandHandler<RunExperimentCommand, RunExperimentOutcome>
 {
     private const int MaxAttempts = 5;
 
@@ -91,7 +92,7 @@ internal sealed class RunExperimentHandler(IRunStore runs, IExperimentLedger led
             var rows = baseline.Value
                 .Select(b => new ValidationRow(b.Key, b.Value.R > 0 ? 1 : 0, b.Value.R, b.Value.TradeDate, b.Value.DecisionEpochSeconds, Math.Max(b.Value.ExitEpochSeconds, candidate.Value.TryGetValue(b.Key, out var c) ? c.ExitEpochSeconds : 0), "x", ImmutableArray<double>.Empty))
                 .ToList();
-            var split = HoldOut.Reserve(rows, command.HoldOutMonths);
+            var split = HoldOut.Reserve(rows, command.HoldOutMonths, await SharedHoldOut.StartAsync(holdOuts, cancellationToken));
             if (split.IsFailure)
             {
                 return Refuse(split.Error);

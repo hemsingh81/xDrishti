@@ -36,7 +36,10 @@ internal sealed class LabRunner(
     ILogger<LabRunner> logger,
     LabDeflation deflation,
     IVariantStatsStore variantStats,
-    LabCostStress? costStress = null) : ILabRunExecutor
+    LabCostStress? costStress = null,
+    HoldOutOptions? holdOutOptions = null,
+    LabHoldOutGuard? holdOutGuard = null,
+    HoldOutUnlocker? unlocker = null) : ILabRunExecutor
 {
     /// <summary>Who is recorded as the author of a stored run.</summary>
     public const string Actor = "lab:quick";
@@ -98,6 +101,12 @@ internal sealed class LabRunner(
 
         await StopWatcherAsync(watcherStop, watcher);
         await runs.FinishAsync(finish, CancellationToken.None);
+        if (finish.State == LabRunState.Succeeded && LabSettings.RunsFullTest(run.Method))
+        {
+            // the unlock reloads the run and needs it stored as succeeded, so it follows the finish
+            await TryAutoUnlockAsync(run, hostStop);
+        }
+
         await progress.FinishedAsync(new LabRunFinished(run.Id, LabRunStates.Code(finish.State)), CancellationToken.None);
     }
 
@@ -253,6 +262,12 @@ internal sealed class LabRunner(
         // CF-03: beside the factor; reads the stored trial statistics and writes nothing, and the outcome is not touched
         verdict = verdict with { DeflatedSharpe = await deflation.ComputeAsync(run.StrategyId, verdict, oosR, statsRows, ownerToken) };
 
+        // CF-06: with hold-out enforcement on, a PASS with no hold-out kept (history too short) is capped at MARGINAL and says so; with it off nothing changes
+        if (holdOutOptions is { Enforce: true } && holdOutGuard is not null && verdict.Outcome == "PASS" && !await HoldOutKeptAsync(holdOutGuard, ownerToken))
+        {
+            verdict = verdict with { Outcome = "MARGINAL", Limits = [.. verdict.Limits, "no hold-out is kept (the stored history is too short): capped at MARGINAL"] };
+        }
+
         ownerToken.ThrowIfCancellationRequested();
         if (await runs.IsCancelRequestedAsync(run.Id, hostStop))
         {
@@ -292,6 +307,32 @@ internal sealed class LabRunner(
         var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
         LabRunLog.Finished(logger, run.Id, keys[0][..12], full.Trades, 0, elapsedMs);
         return new LabFinish(run.Id, LabRunState.Succeeded, lastStage, keys, counts, problems, log.Snapshot(), null, time.GetUtcNow());
+    }
+
+    private static async Task<bool> HoldOutKeptAsync(LabHoldOutGuard guard, CancellationToken cancellationToken) =>
+        await guard.HistoryAsync(cancellationToken) is { } history && await guard.EnsureAsync(history.First, history.Last, cancellationToken) is not null;
+
+    /// <summary>The auto option (CF-06, D6): off unless the owner turned it on; the run and its result are already stored, so a failure here is logged and never fails the run.</summary>
+    private async Task TryAutoUnlockAsync(LabRun run, CancellationToken cancellationToken)
+    {
+        if (unlocker is null)
+        {
+            return;
+        }
+
+#pragma warning disable CA1031 // the result is stored; an auto unlock that fails is tried again by nobody and must not undo the run
+        try
+        {
+            if (await results.GetAsync(run.Id, cancellationToken) is { } verdict && await unlocker.TryAutoAsync(run.Id, verdict, cancellationToken) is { } done)
+            {
+                LabRunLog.HoldOutUnlocked(logger, run.Id, done.Mode, done.State);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LabRunLog.Crashed(logger, run.Id, "auto_unlock", ex);
+        }
+#pragma warning restore CA1031
     }
 
     private LabFinish Failed(LabRun run, StageLog log, string stage, string code, List<LabProblem> problems)

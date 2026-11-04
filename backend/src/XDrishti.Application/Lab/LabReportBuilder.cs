@@ -57,7 +57,8 @@ internal static class LabReportBuilder
             [.. run.Labels.Select(S).Concat(verdict.Labels).Distinct(StringComparer.Ordinal)],
             string.Empty,
             verdict.DeflatedSharpe,
-            verdict.CostStress);
+            verdict.CostStress,
+            verdict.Trials);
         return report with { Summary = ReportSummary.Write(report) };
     }
 

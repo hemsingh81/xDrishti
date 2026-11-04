@@ -158,6 +158,14 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<VariantStatsRecord> VariantStats => Set<VariantStatsRecord>();
 
+    internal DbSet<RegistrationRecord> Registrations => Set<RegistrationRecord>();
+
+    internal DbSet<PlanFreezeRecord> PlanFreezes => Set<PlanFreezeRecord>();
+
+    internal DbSet<HoldOutBlockRecord> HoldOutBlocks => Set<HoldOutBlockRecord>();
+
+    internal DbSet<HoldOutUnlockRecord> HoldOutUnlocks => Set<HoldOutUnlockRecord>();
+
     internal DbSet<CellStatsRecord> CellStats => Set<CellStatsRecord>();
 
     internal DbSet<TradeFeatureRecord> TradeFeatures => Set<TradeFeatureRecord>();

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
 using XDrishti.Domain.Learning;
@@ -20,7 +21,7 @@ public sealed class ProposeEntryWindowsHandlerTests
 
     private readonly IRunStore _runs = Substitute.For<IRunStore>();
 
-    private ProposeEntryWindowsHandler Handler() => new(_runs, new FakeTimeProvider(), NullLogger<ProposeEntryWindowsHandler>.Instance);
+    private ProposeEntryWindowsHandler Handler(IHoldOutStore? holdOuts = null) => new(_runs, new FakeTimeProvider(), NullLogger<ProposeEntryWindowsHandler>.Instance, holdOuts);
 
     private static StoredRunHeader Header() =>
         new(1, Key, "sim", 5, 5, "ORB", new string('b', 64), new DateOnly(2026, 1, 1), new DateOnly(2026, 6, 1), "basket", "x", 1, 1, 0, 0, 0, 0, false, "{}", null, null, 0, new string('c', 64), new string('d', 64), DateTimeOffset.UnixEpoch, "t");
@@ -63,6 +64,21 @@ public sealed class ProposeEntryWindowsHandlerTests
         cell.WindowWins.ShouldBe(16);
         cell.Status.ShouldBe(EntryWindowStatus.Inconclusive);
         result.Value.Limits.ShouldContain(l => l.Contains("No hold-out was kept"));
+    }
+
+    [Fact]
+    public async Task The_hold_out_start_is_the_shared_lab_block_when_one_is_fixed_and_the_own_rule_when_not()
+    {
+        Stored();
+        var store = Substitute.For<IHoldOutStore>();
+        var own = await Handler(store).HandleAsync(Query(holdOut: 1), Ct);
+        store.CurrentAsync(Ct).Returns(new HoldOutBlock(new DateOnly(2026, 4, 5), new DateOnly(2026, 1, 1), new DateOnly(2026, 6, 1), 6, new string('d', 64), DateTimeOffset.UnixEpoch));
+
+        var shared = await Handler(store).HandleAsync(Query(holdOut: 1), Ct);
+
+        own.Value.Rows.ShouldBe((await Handler().HandleAsync(Query(holdOut: 1), Ct)).Value.Rows, "no stored block leaves the rule unchanged");
+        shared.Value.Rows.ShouldBeGreaterThan(own.Value.Rows);
+        shared.Value.Limits.ShouldContain(l => l.Contains("from 2026-04-05", StringComparison.Ordinal));
     }
 
     [Fact]
