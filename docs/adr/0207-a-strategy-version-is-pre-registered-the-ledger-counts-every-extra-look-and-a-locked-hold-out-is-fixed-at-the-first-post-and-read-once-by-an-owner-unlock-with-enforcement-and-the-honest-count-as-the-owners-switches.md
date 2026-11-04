@@ -18,9 +18,8 @@ Without a written hypothesis, a frozen plan and a hold-out that is read once, ev
 - `CountInFactor` defaults **OFF**: the verdict keeps judging with the distinct-hash count and the honest count is shown beside it (`trials`). The tightening of the gates by the honest count (AC6) happens once, when the owner switches it on.
 - `Registration:Enforce`, `HoldOut:Enforce` and `HoldOut:AutoUnlock` are configuration values like CF-01 to CF-05 (`Confidence:*` in the host settings), not yet rows of the versioned settings tables; the move to the database settings (UNVERIFIED) is the CF-00 follow-up.
 
-## What is not built (CF-06 part B and follow-ups)
+## What is not built (follow-ups; the UI of CF-06 part B is delivered, only the queued `holdout` job of part B remains)
 - The unlock is **synchronous** in the request. A queued `lab_runs` job with method `holdout`, progress and the run log are a follow-up.
-- The UI: the registration form, the hold-out card on the report, the unlock button behind the step-up dialog, and their MSW tests are part B.
 - The unlock is not routed through `OwnerActFlow` because that flow needs a capability switch and the unlock has none by spec; the audit row is written by the unlocker itself as the P7-12 handlers do.
 - Two concurrent first posts can each store a hold-out block with a different start (the unique index is on the start); the earliest stored block is the one every reader sees, the later row is never read (marked `shortcut:` in the code; a single-row index is the follow-up).
 - The missing or wrong password of the unlock answers 401 `auth.invalid_credentials` from the shared step-up check (counted toward the lockout), not the 403 the spec names; pinned in the integration test.

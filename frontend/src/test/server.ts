@@ -56,6 +56,10 @@ export const handlers = [
   http.get('/api/assistant/briefings/:kind', () =>
     problemResponse({ title: 'No briefing is stored.', code: 'assistant.briefing_not_found' }, 404),
   ),
+  // Lab pre-registration (CF-06): none written by default; the tests of the registration bring their own.
+  http.get('/api/lab/strategies/:id/versions/:version/registration', () =>
+    problemResponse({ title: 'No registration.', code: 'lab.not_found' }, 404),
+  ),
   // Accounts (read side). Writes are mocked per test, because each test cares about a different outcome.
   http.get('/api/accounts', () => HttpResponse.json([summaryOf(buildAccountDetail()), summaryOf(buildSwingAccount())])),
   http.get('/api/accounts/:id', ({ params }) => {

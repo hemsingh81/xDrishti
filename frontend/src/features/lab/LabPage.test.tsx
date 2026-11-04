@@ -109,6 +109,8 @@ describe('LabPage', () => {
       '/api/lab/strategies/MY_ORB/versions/2/file',
     );
     expect(await screen.findByText(/Valid - hash abcdef012345/)).toBeInTheDocument();
+    // The version being opened has a registration card (none written yet: the form).
+    expect(await screen.findByRole('form', { name: 'Register this version' })).toBeInTheDocument();
   });
 
   it('lists the located problems of an invalid text and keeps Save off', async () => {
