@@ -61,6 +61,7 @@ using XDrishti.Application.OptionChain;
 using XDrishti.Application.OptionCosts;
 using XDrishti.Application.OptionExpression;
 using XDrishti.Application.OptionQuality;
+using XDrishti.Application.OptionReports;
 using XDrishti.Application.OwnerActs;
 using XDrishti.Application.Pairs;
 using XDrishti.Application.Paper;
@@ -145,6 +146,12 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetOptionChainRecorderQuery, OptionChainRecorderView>, GetOptionChainRecorderHandler>(); // the owner's option-chain switch (P14-02): read
         services.AddScoped<IQueryHandler<GetOptionBackfillQuery, OptionBackfillView>, GetOptionBackfillHandler>(); // the owner's backfill switch, acceptance and progress (P14-03): read
         services.AddScoped<IQueryHandler<GetOptionCoverageQuery, Result<OptionCoverageView>>, GetOptionCoverageHandler>(); // the stored quality verdicts of the option archive, aggregates only (P14-04): read
+        services.AddScoped<IQueryHandler<GetOptionArchiveSummaryQuery, Result<OptionArchiveSummaryView>>, GetOptionArchiveSummaryHandler>(); // the P14 reports (P14-16): read-only counts, shares, dates and verdict words
+        services.AddScoped<IQueryHandler<ListExpressionRunsQuery, Result<ExpressionRunList>>, ListExpressionRunsHandler>();
+        services.AddScoped<IQueryHandler<GetExpressionRunQuery, Result<ExpressionRunSummary>>, GetExpressionRunHandler>();
+        services.AddScoped<IQueryHandler<ListPairFormationsQuery, Result<PairFormationList>>, ListPairFormationsHandler>();
+        services.AddScoped<IQueryHandler<GetP14VerdictListQuery, Result<P14VerdictList>>, GetP14VerdictListHandler>();
+        services.AddScoped<IQueryHandler<GetOptionsReportQuery, Result<OptionsReportView>>, GetOptionsReportHandler>();
         services.AddScoped<ICommandHandler<IngestFilingsCommand, FilingIngestSummary>, IngestFilingsHandler>(); // the filing ingest (P15-02): local inbox -> store folder + insert-only envelopes; no network
         services.AddScoped<ICommandHandler<ParseResultsCommand, ParseResultsSummary>, ParseResultsHandler>(); // the results parse step of filings-ingest (P15-03): stored results files -> insert-only facts; no network
         services.AddScoped<ICommandHandler<XDrishti.Application.Market.Eod.LoadEodCommand, XDrishti.Application.Market.Eod.EodLoadSummary>, XDrishti.Application.Market.Eod.LoadEodHandler>(); // CF-04 Part A: one NSE file per trading day, OFF by default (zero requests while off)

@@ -74,7 +74,7 @@ public sealed class OptionEvaluationArchitectureTests
     public void The_exact_set_of_types_that_name_the_expression_family_list_is_the_use_case_the_shared_route_and_its_error_text()
     {
         Users(Domain, Families).ShouldBeEmpty(); // ProtocolO reads only the protocol letter, a constant the compiler inlines
-        Users(Application, Families).ShouldBe(["EvaluateExpressionHandler", "ExtensionEvaluationErrors", "ListExtensionEvaluationsHandler"]);
+        Users(Application, Families).ShouldBe(["EvaluateExpressionHandler", "ExtensionEvaluationErrors", "GetP14VerdictListHandler", "ListExtensionEvaluationsHandler"]); // GetP14VerdictListHandler (P14-16): the verdict list
         Users(Infrastructure, Families).ShouldBeEmpty();
         Users(Api, Families).ShouldBeEmpty();
     }

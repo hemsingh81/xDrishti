@@ -4535,6 +4535,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/options/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The option archive per underlying: recorded and usable chain sessions, first and last recorded date, the gaps by outcome, the backfill keys done, empty and given up, and the half-spread model state. A figure with no source is state unavailable with its reason (not_recorded, no_model), never a number. An empty list when nothing is stored. No price, IV or Greek */
+    get: operations['GetOptionArchiveSummary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/research/expression-runs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The newest stored expression runs (limit 1 to 100, default 20; profile = the 64-character lower-case hex hash): per run the profile, the counts paired and unpaired by reason, and the shares of the paired trades on a model price, a derived expiry, the recent-archive spread and each lot-feasibility word. 400 options.invalid_query for a bad limit or profile; state unavailable with no_runs and an empty list when none is stored. No price, IV or return figure */
+    get: operations['ListExpressionRuns'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/research/expression-runs/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One stored expression run by its 64-character id; 404 research.not_found for an unknown id */
+    get: operations['GetExpressionRun'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/research/pair-formations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored pair formations whose window overlaps from to to (default the last 400 days; at most 400), oldest quarter first: candidates, tested, unavailable, selected, the Benjamini-Hochberg threshold and the half-life distribution in sessions. 400 options.invalid_query for an inverted or over-long range; state unavailable with no_runs and an empty list when none is stored */
+    get: operations['ListPairFormations'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/filings/coverage': {
     parameters: {
       query?: never;
@@ -6267,6 +6335,19 @@ export interface components {
       note: string;
       /** Format: date-time */
       acceptedAt: string;
+    };
+    /** @description The backfill keys of the underlying by their latest state, or `unavailable` when the fetch log holds none. */
+    BackfillView: {
+      state: string;
+      reason: null | string;
+      /** Format: int32 */
+      done: null | number;
+      /** Format: int32 */
+      empty: null | number;
+      /** Format: int32 */
+      noData: null | number;
+      /** Format: int32 */
+      givenUp: null | number;
     };
     /** @description The backtest-versus-paper report (spec P10-04, R14). Every figure is a state and a number only for a value or provisional figure. */
     BacktestVsPaperView: {
@@ -10906,6 +10987,34 @@ export interface components {
       format: null | string;
       query: null | components['schemas']['ReportQueryInput'];
     };
+    /** @description The newest stored expression runs, newest first; State is `unavailable` with the reason `no_runs` when none is stored. */
+    ExpressionRunList: {
+      state: string;
+      reason: null | string;
+      items: components['schemas']['ExpressionRunSummary'][];
+    };
+    /**
+     * @description A stored expression run (spec P14-16): the profile, the counts paired and unpaired by reason, and the shares of the paired trades that used the model price, a derived expiry or the recent-archive spread, and per lot-feasibility word. The counts are of the whole run,
+     *     hold-out included; no figure of return, price or IV is shown.
+     */
+    ExpressionRunSummary: {
+      id: string;
+      cashRunKey: string;
+      profileHash: string;
+      remarkVersion: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: int32 */
+      trades: number;
+      /** Format: int32 */
+      paired: number;
+      unpaired: components['schemas']['UnpairedCountView'][];
+      fallbackShare: components['schemas']['ReportedShare'];
+      expiryDerivedShare: components['schemas']['ReportedShare'];
+      spreadFromRecentArchiveShare: components['schemas']['ReportedShare'];
+      lotFeasibility: components['schemas']['LotFeasibilityView'][];
+      labels: string[];
+    };
     /** @description The newest evaluations of a family, newest first, at most 100. */
     ExtensionEvaluationList: {
       family: string;
@@ -11253,6 +11362,12 @@ export interface components {
       /** Format: date-time */
       lastDetectedAt: null | string;
     };
+    /** @description The outcomes of the checked chain sessions, or `unavailable` when no session was ever checked. */
+    GapsView: {
+      state: string;
+      reason: null | string;
+      outcomes: components['schemas']['SessionOutcomeView'][];
+    };
     /** @description One gate of a verdict as served (spec P5-03, P5-04); `Actual` is null when it is not finite. */
     GateView: {
       name: string;
@@ -11465,6 +11580,19 @@ export interface components {
        * @description Losses per window.
        */
       window: number;
+    };
+    /** @description The half-lives (in sessions) of the pairs a formation selected: how many, the smallest, the median and the largest; `unavailable` when it selected none. */
+    HalfLifeView: {
+      state: string;
+      reason: null | string;
+      /** Format: int32 */
+      count: null | number;
+      /** Format: double */
+      min: null | number;
+      /** Format: double */
+      median: null | number;
+      /** Format: double */
+      max: null | number;
     };
     /**
      * @description The benchmark of a history. `State` is `ok` (the benchmark lines are filled) or `unavailable` with the `Reason` in words. `Symbol` is the canonical symbol and `Name` the display name of the index (null when the master list has
@@ -13576,6 +13704,13 @@ export interface components {
       /** Format: date */
       acquiredOn: null | string;
     };
+    /** @description The paired trades with one lot-feasibility word, and their share of the paired trades. */
+    LotFeasibilityView: {
+      feasibility: string;
+      /** Format: int32 */
+      paired: number;
+      share: components['schemas']['ReportedShare'];
+    };
     /**
      * @description A lot of a holding with its own figures: Invested is its cost, Value is its value now (open) or its sale proceeds (closed), Pnl the difference.
      *     Status is "open" or "closed"; Source "import", "added" or "manual". Estimated: the sale price is the last price a sync saw.
@@ -14029,6 +14164,10 @@ export interface components {
       /** Format: int64 */
       after: null | number;
     };
+    /** @description The option archive per underlying (spec P14-16); an empty list when nothing is stored. */
+    OptionArchiveSummaryView: {
+      underlyings: components['schemas']['UnderlyingArchiveSummary'][];
+    };
     /** @description The body of the acceptance of the probe result. The owner is never part of it: the actor comes from the signed-in session. */
     OptionBackfillProbeRequest: {
       /** @description What was read and where it is recorded (ADR 0177), 1 to 500 characters. */
@@ -14249,6 +14388,39 @@ export interface components {
       reason: null | string;
       /** @description The owner's password, typed again for THIS act and checked on every request (an earlier step-up window does not count and is not used up). */
       password: null | string;
+    };
+    /** @description The stored formations whose window overlaps the range, oldest quarter first; State is `unavailable` with the reason `no_runs` when none is stored. Truncated is true when more than 400 formations overlap the range: the oldest 400 are listed. */
+    PairFormationList: {
+      state: string;
+      reason: null | string;
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      items: components['schemas']['PairFormationSummary'][];
+      truncated: boolean;
+    };
+    /** @description One stored formation of a quarter (spec P14-16): the candidates, the tested, the unavailable, the selected, the Benjamini-Hochberg threshold at its last rejection and the half-life distribution. No spread, price or test statistic. */
+    PairFormationSummary: {
+      id: string;
+      family: string;
+      quarter: string;
+      /** Format: date */
+      windowFrom: string;
+      /** Format: date */
+      windowTo: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: int32 */
+      candidates: number;
+      /** Format: int32 */
+      tested: number;
+      /** Format: int32 */
+      unavailable: number;
+      /** Format: int32 */
+      selected: number;
+      bhThreshold: components['schemas']['ReportedShare'];
+      halfLives: components['schemas']['HalfLifeView'];
     };
     /** @description The paper accounts with the label every paper response carries. */
     PaperAccountList: {
@@ -17082,6 +17254,27 @@ export interface components {
       code: string;
       text: string;
     };
+    /** @description A count that is `ok` with its value, or `unavailable` with a reason word and no value: never 0 in the place of a non-value (P8-00 D3). */
+    ReportedCount: {
+      state: string;
+      /** Format: int32 */
+      value: null | number;
+      reason: null | string;
+    };
+    /** @description A date that is `ok` with its value, or `unavailable` with a reason word. */
+    ReportedDate: {
+      state: string;
+      /** Format: date */
+      value: null | string;
+      reason: null | string;
+    };
+    /** @description A share of 1 (or a plain measure in sessions) that is `ok` with its value, or `unavailable` with a reason word. */
+    ReportedShare: {
+      state: string;
+      /** Format: double */
+      value: null | number;
+      reason: null | string;
+    };
     /** @description The What-works answer on the default set (spec P8-17). */
     ReportsPhaseAnswerView: {
       /** @description ranked, nothing_qualifies or no_runs. */
@@ -17875,6 +18068,13 @@ export interface components {
       /** Format: double */
       medianMinutes: null | number;
       medianState: string;
+    };
+    /** @description How many sessions ended in an outcome (`pass`, `warn`, `fail`, `unavailable` with its reason). */
+    SessionOutcomeView: {
+      outcome: string;
+      reason: null | string;
+      /** Format: int32 */
+      sessions: number;
     };
     /** @description The outcome of one set: the state and, for a failure, the thresholds that did not hold, in words. */
     SetOutcome: {
@@ -19144,6 +19344,19 @@ export interface components {
       /** Format: int32 */
       targetMemberCount: number;
     };
+    /** @description One underlying of the option archive: recorded and usable chain sessions, the first and last recorded date, the gaps by outcome, the backfill keys and the half-spread model state. Counts and dates only; no price, IV or Greek. */
+    UnderlyingArchiveSummary: {
+      underlying: string;
+      recordedSessions: components['schemas']['ReportedCount'];
+      usableSessions: components['schemas']['ReportedCount'];
+      firstDate: components['schemas']['ReportedDate'];
+      lastDate: components['schemas']['ReportedDate'];
+      gaps: components['schemas']['GapsView'];
+      backfill: components['schemas']['BackfillView'];
+      spreadModelSessions: components['schemas']['ReportedCount'];
+      spreadModelFirstSession: components['schemas']['ReportedDate'];
+      spreadModelLastSession: components['schemas']['ReportedDate'];
+    };
     /** @description A figure of the answer that the tool results do not hold: its place in the text (UTF-16 code units, End exclusive) and the text itself. */
     UngroundedSpan: {
       /** Format: int32 */
@@ -19156,6 +19369,12 @@ export interface components {
     UnmatchedEntry: {
       term: string;
       reason: string;
+    };
+    /** @description The trades of a run that did not pair, by reason. */
+    UnpairedCountView: {
+      reason: string;
+      /** Format: int32 */
+      trades: number;
     };
     /** @description A cell that was looked at and is not in the ranking, listed after the ranked ones with the reason, never hidden. */
     UnrankedCellView: {
@@ -30531,6 +30750,121 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['OptionCoverageView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetOptionArchiveSummary: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OptionArchiveSummaryView'];
+        };
+      };
+    };
+  };
+  ListExpressionRuns: {
+    parameters: {
+      query?: {
+        profile?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExpressionRunList'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExpressionRun: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExpressionRunSummary'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListPairFormations: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PairFormationList'];
         };
       };
       /** @description Bad Request */

@@ -15898,6 +15898,165 @@
         }
       }
     },
+    "/api/options/summary": {
+      "get": {
+        "tags": [
+          "Options"
+        ],
+        "summary": "The option archive per underlying: recorded and usable chain sessions, first and last recorded date, the gaps by outcome, the backfill keys done, empty and given up, and the half-spread model state. A figure with no source is state unavailable with its reason (not_recorded, no_model), never a number. An empty list when nothing is stored. No price, IV or Greek",
+        "operationId": "GetOptionArchiveSummary",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptionArchiveSummaryView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/research/expression-runs": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "The newest stored expression runs (limit 1 to 100, default 20; profile = the 64-character lower-case hex hash): per run the profile, the counts paired and unpaired by reason, and the shares of the paired trades on a model price, a derived expiry, the recent-archive spread and each lot-feasibility word. 400 options.invalid_query for a bad limit or profile; state unavailable with no_runs and an empty list when none is stored. No price, IV or return figure",
+        "operationId": "ListExpressionRuns",
+        "parameters": [
+          {
+            "name": "profile",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpressionRunList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/research/expression-runs/{id}": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "One stored expression run by its 64-character id; 404 research.not_found for an unknown id",
+        "operationId": "GetExpressionRun",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpressionRunSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/research/pair-formations": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "The stored pair formations whose window overlaps from to to (default the last 400 days; at most 400), oldest quarter first: candidates, tested, unavailable, selected, the Benjamini-Hochberg threshold and the half-life distribution in sessions. 400 options.invalid_query for an inverted or over-long range; state unavailable with no_runs and an empty list when none is stored",
+        "operationId": "ListPairFormations",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairFormationList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/filings/coverage": {
       "get": {
         "tags": [
@@ -21636,6 +21795,57 @@
           }
         },
         "description": "The acceptance of the probe result."
+      },
+      "BackfillView": {
+        "required": [
+          "state",
+          "reason",
+          "done",
+          "empty",
+          "noData",
+          "givenUp"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "done": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "empty": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "noData": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "givenUp": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "The backfill keys of the underlying by their latest state, or `unavailable` when the fetch log holds none."
       },
       "BacktestVsPaperView": {
         "required": [
@@ -34564,6 +34774,104 @@
         },
         "description": "The body of an export (spec P8-20). There is no password, no actor and no file name in it: the actor is the session, the name is made by the server."
       },
+      "ExpressionRunList": {
+        "required": [
+          "state",
+          "reason",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpressionRunSummary"
+            }
+          }
+        },
+        "description": "The newest stored expression runs, newest first; State is `unavailable` with the reason `no_runs` when none is stored."
+      },
+      "ExpressionRunSummary": {
+        "required": [
+          "id",
+          "cashRunKey",
+          "profileHash",
+          "remarkVersion",
+          "createdAt",
+          "trades",
+          "paired",
+          "unpaired",
+          "fallbackShare",
+          "expiryDerivedShare",
+          "spreadFromRecentArchiveShare",
+          "lotFeasibility",
+          "labels"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "cashRunKey": {
+            "type": "string"
+          },
+          "profileHash": {
+            "type": "string"
+          },
+          "remarkVersion": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "paired": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unpaired": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnpairedCountView"
+            }
+          },
+          "fallbackShare": {
+            "$ref": "#/components/schemas/ReportedShare"
+          },
+          "expiryDerivedShare": {
+            "$ref": "#/components/schemas/ReportedShare"
+          },
+          "spreadFromRecentArchiveShare": {
+            "$ref": "#/components/schemas/ReportedShare"
+          },
+          "lotFeasibility": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotFeasibilityView"
+            }
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "A stored expression run (spec P14-16): the profile, the counts paired and unpaired by reason, and the shares of the paired trades that used the model price, a derived expiry or the recent-archive spread, and per lot-feasibility word. The counts are of the whole run,\nhold-out included; no figure of return, price or IV is shown."
+      },
       "ExtensionEvaluationList": {
         "required": [
           "family",
@@ -35502,6 +35810,32 @@
         },
         "description": "How many instrument-sessions are in each state (the Dhan phase's gap table): `open` (missing bars a refetch may still add), `unfillable` (a refetch added\nnothing), `filled`; `lastDetectedAt` is when a gap was last found (null while there never was one)."
       },
+      "GapsView": {
+        "required": [
+          "state",
+          "reason",
+          "outcomes"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionOutcomeView"
+            }
+          }
+        },
+        "description": "The outcomes of the checked chain sessions, or `unavailable` when no session was ever checked."
+      },
       "GateView": {
         "required": [
           "name",
@@ -35990,6 +36324,57 @@
           }
         },
         "description": "A tag whose share rose between two windows of losses."
+      },
+      "HalfLifeView": {
+        "required": [
+          "state",
+          "reason",
+          "count",
+          "min",
+          "median",
+          "max"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "count": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "min": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "median": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "max": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "The half-lives (in sessions) of the pairs a formation selected: how many, the smallest, the median and the largest; `unavailable` when it selected none."
       },
       "HistoryBenchmark": {
         "required": [
@@ -42386,6 +42771,27 @@
         },
         "description": "Sets the acquisition date of a lot (between 1990-01-01 and today, India)."
       },
+      "LotFeasibilityView": {
+        "required": [
+          "feasibility",
+          "paired",
+          "share"
+        ],
+        "type": "object",
+        "properties": {
+          "feasibility": {
+            "type": "string"
+          },
+          "paired": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "share": {
+            "$ref": "#/components/schemas/ReportedShare"
+          }
+        },
+        "description": "The paired trades with one lot-feasibility word, and their share of the paired trades."
+      },
       "LotRow": {
         "required": [
           "id",
@@ -43600,6 +44006,21 @@
         },
         "description": "The quantity the lots count as opening (the shares the trades do not explain): now, and after the rebuild. Null where it cannot be told (no holding, or a quantity that is not whole after a split or bonus)."
       },
+      "OptionArchiveSummaryView": {
+        "required": [
+          "underlyings"
+        ],
+        "type": "object",
+        "properties": {
+          "underlyings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnderlyingArchiveSummary"
+            }
+          }
+        },
+        "description": "The option archive per underlying (spec P14-16); an empty list when nothing is stored."
+      },
       "OptionBackfillProbeRequest": {
         "required": [
           "note",
@@ -44330,6 +44751,109 @@
           }
         },
         "description": "The body of a lesson close or dismiss and of a changelog revert (P8-19). The actor, a state and any number are never part of it: a field the server does not read is ignored."
+      },
+      "PairFormationList": {
+        "required": [
+          "state",
+          "reason",
+          "from",
+          "to",
+          "items",
+          "truncated"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PairFormationSummary"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "description": "The stored formations whose window overlaps the range, oldest quarter first; State is `unavailable` with the reason `no_runs` when none is stored. Truncated is true when more than 400 formations overlap the range: the oldest 400 are listed."
+      },
+      "PairFormationSummary": {
+        "required": [
+          "id",
+          "family",
+          "quarter",
+          "windowFrom",
+          "windowTo",
+          "createdAt",
+          "candidates",
+          "tested",
+          "unavailable",
+          "selected",
+          "bhThreshold",
+          "halfLives"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          },
+          "quarter": {
+            "type": "string"
+          },
+          "windowFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "windowTo": {
+            "type": "string",
+            "format": "date"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "candidates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tested": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unavailable": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "selected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bhThreshold": {
+            "$ref": "#/components/schemas/ReportedShare"
+          },
+          "halfLives": {
+            "$ref": "#/components/schemas/HalfLifeView"
+          }
+        },
+        "description": "One stored formation of a quarter (spec P14-16): the candidates, the tested, the unavailable, the selected, the Benjamini-Hochberg threshold at its last rejection and the half-life distribution. No spread, price or test statistic."
       },
       "PaperAccountList": {
         "required": [
@@ -51364,6 +51888,87 @@
         },
         "description": "A caution derived from the report's own numbers. It never changes the outcome."
       },
+      "ReportedCount": {
+        "required": [
+          "state",
+          "value",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A count that is `ok` with its value, or `unavailable` with a reason word and no value: never 0 in the place of a non-value (P8-00 D3)."
+      },
+      "ReportedDate": {
+        "required": [
+          "state",
+          "value",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A date that is `ok` with its value, or `unavailable` with a reason word."
+      },
+      "ReportedShare": {
+        "required": [
+          "state",
+          "value",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A share of 1 (or a plain measure in sessions) that is `ok` with its value, or `unavailable` with a reason word."
+      },
       "ReportsPhaseAnswerView": {
         "required": [
           "kind",
@@ -53653,6 +54258,30 @@
           }
         },
         "description": "The per-session line (criterion 8). Runs read `readable`, `unreadable` or `missing`; string SessionLine.MedianState is `value` or `insufficient`."
+      },
+      "SessionOutcomeView": {
+        "required": [
+          "outcome",
+          "reason",
+          "sessions"
+        ],
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sessions": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "How many sessions ended in an outcome (`pass`, `warn`, `fail`, `unavailable` with its reason)."
       },
       "SetOutcome": {
         "required": [
@@ -57221,6 +57850,54 @@
         },
         "description": "What a transfer did. Only instruments that are members of the source are transferred: the others are `notInSource` (for a repeated move, the ones\nmoved before). `added` became members of the target, `alreadyInTarget` were there already, `removed` left the source (a move only),\n`newlyTracked` of the added ones were not tracked and are now."
       },
+      "UnderlyingArchiveSummary": {
+        "required": [
+          "underlying",
+          "recordedSessions",
+          "usableSessions",
+          "firstDate",
+          "lastDate",
+          "gaps",
+          "backfill",
+          "spreadModelSessions",
+          "spreadModelFirstSession",
+          "spreadModelLastSession"
+        ],
+        "type": "object",
+        "properties": {
+          "underlying": {
+            "type": "string"
+          },
+          "recordedSessions": {
+            "$ref": "#/components/schemas/ReportedCount"
+          },
+          "usableSessions": {
+            "$ref": "#/components/schemas/ReportedCount"
+          },
+          "firstDate": {
+            "$ref": "#/components/schemas/ReportedDate"
+          },
+          "lastDate": {
+            "$ref": "#/components/schemas/ReportedDate"
+          },
+          "gaps": {
+            "$ref": "#/components/schemas/GapsView"
+          },
+          "backfill": {
+            "$ref": "#/components/schemas/BackfillView"
+          },
+          "spreadModelSessions": {
+            "$ref": "#/components/schemas/ReportedCount"
+          },
+          "spreadModelFirstSession": {
+            "$ref": "#/components/schemas/ReportedDate"
+          },
+          "spreadModelLastSession": {
+            "$ref": "#/components/schemas/ReportedDate"
+          }
+        },
+        "description": "One underlying of the option archive: recorded and usable chain sessions, the first and last recorded date, the gaps by outcome, the backfill keys and the half-spread model state. Counts and dates only; no price, IV or Greek."
+      },
       "UngroundedSpan": {
         "required": [
           "start",
@@ -57258,6 +57935,23 @@
           }
         },
         "description": "An entry that named no instrument. `reason`: `not_found` · `ambiguous` (an ISIN of several instruments) · `invalid` (too long or with control characters)."
+      },
+      "UnpairedCountView": {
+        "required": [
+          "reason",
+          "trades"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The trades of a run that did not pair, by reason."
       },
       "UnrankedCellView": {
         "required": [
@@ -57747,10 +58441,10 @@
       "name": "Options"
     },
     {
-      "name": "Filings"
+      "name": "Research"
     },
     {
-      "name": "Research"
+      "name": "Filings"
     },
     {
       "name": "Selection"

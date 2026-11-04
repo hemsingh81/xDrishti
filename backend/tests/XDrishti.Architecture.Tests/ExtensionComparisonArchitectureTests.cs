@@ -45,8 +45,8 @@ public sealed class ExtensionComparisonArchitectureTests
         Users(Application).ShouldBe(
         [
             "ComparisonEvaluation", "EvalFlagGradeSource", "EvaluateExpressionHandler", "EvaluateExtensionHandler", "EvaluatePairsHandler", "EvaluationWriter", "EventFilterVerdictReader", "EventsPhaseCheckView", "ExtensionEvaluationErrors", "ExtensionEvaluationMapper", "ExtensionFeatureExtractor", "ExtensionRunSource", "ExtensionTrainingSource", "ExtractExtensionFeaturesHandler",
-            "FilterEvaluation", "FilterPopulation", "FilterPopulationSource", "FlagEvaluation", "GetEventsPhaseCheckHandler", "GetExtensionEvaluationHandler", "IExtensionEvaluationReader", "IExtensionEvaluationStore", "IExtensionExtractionStore", "IExtensionFeatureStore", "IExtensionTrainingSource",
-            "IFlagGradeSource", "IvExtraction", "IvFeatureExtractor", "ListExtensionEvaluationsHandler", "PairConfig", "PeadEvaluation", "PeadEventSet", "PeadRunEventSource", "RunPairsHandler", "SurpriseInputsReader", "TrainingDataLoader",
+            "FilterEvaluation", "FilterPopulation", "FilterPopulationSource", "FlagEvaluation", "GetEventsPhaseCheckHandler", "GetExtensionEvaluationHandler", "GetP14VerdictListHandler", "IExtensionEvaluationReader", "IExtensionEvaluationStore", "IExtensionExtractionStore", "IExtensionFeatureStore", "IExtensionTrainingSource",
+            "IFlagGradeSource", "IvExtraction", "IvFeatureExtractor", "ListExtensionEvaluationsHandler", "ListPairFormationsHandler", "PairConfig", "PeadEvaluation", "PeadEventSet", "PeadRunEventSource", "RunPairsHandler", "SurpriseInputsReader", "TrainingDataLoader",
         ]);
     }
 

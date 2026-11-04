@@ -131,6 +131,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, OptionChainEndpoints>(); // the owner's option-chain recorder switch (P14-02): fresh password per change, insert-only; no chain data is readable
         services.AddSingleton<IEndpointModule, OptionBackfillEndpoints>(); // the owner's expired-options backfill switch and probe acceptance (P14-03): fresh password per change, insert-only; no bar is readable
         services.AddSingleton<IEndpointModule, OptionCoverageEndpoints>(); // the stored quality verdicts of the option archive (P14-04): one GET, aggregates only, no price, IV or Greek
+        services.AddSingleton<IEndpointModule, OptionReportEndpoints>(); // the read-only P14 reports (P14-16): GETs only, counts, shares, dates and verdict words
         services.AddSingleton<IEndpointModule, FilingEndpoints>(); // the stored filings as metadata and counts, optionally as of an instant (P15-02): GETs only, no file content
         services.AddSingleton<IEndpointModule, ExtensionEvaluationEndpoints>(); // the stored verdicts of protocols F, X, P and L (P15-10): GETs only; a KEEP is a record
         services.AddSingleton<IEndpointModule, EventFilterEndpoints>(); // the owner's event-risk switch (P15-06): password every time, recorded as owner; the auto option is inert until a protocol-F verdict exists; places no order

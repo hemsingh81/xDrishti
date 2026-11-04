@@ -149,7 +149,7 @@ public sealed class PairResearchArchitectureTests
             .Select(f => Path.GetFileName(f)).Order(StringComparer.Ordinal).ToList();
         var migration = File.ReadAllText(Directory.EnumerateFiles(Src("XDrishti.Infrastructure", "Persistence", "Migrations"), "*_AddPairResearch.cs").Single());
 
-        named.ShouldBe(["20261103130000_AddPairResearch.cs", "DependencyInjection.cs", "IPairResearchStore.cs", "PairFormationRow.cs", "PairResearchStore.cs", "PairTradeRow.cs"]); // the migration and the store write them; the wiring, the port and its two row types name them in comments only
+        named.ShouldBe(["20261103130000_AddPairResearch.cs", "DependencyInjection.cs", "IPairResearchStore.cs", "OptionReportReader.cs", "PairFormationRow.cs", "PairResearchStore.cs", "PairTradeRow.cs"]); // the migration and the store write them; OptionReportReader (P14-16, ADR 0201) reads them with select only; the wiring, the port and its two row types name them in comments only
         migration.ShouldContain("MakeAppendOnlyForAppRole(Schemas.Research, \"pair_formations\")");
         migration.ShouldContain("MakeAppendOnlyForAppRole(Schemas.Research, \"pair_trades\")");
         migration.ShouldNotContain("xd_exec");

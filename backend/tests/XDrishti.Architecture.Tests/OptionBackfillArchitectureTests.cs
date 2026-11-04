@@ -43,7 +43,7 @@ public sealed class OptionBackfillArchitectureTests
     }
 
     /// <summary>The simple names of the only types outside the backfill namespaces that may name a backfill type: the DI roots, the one refusal of "Run now", the routes and JSON, the broker client with its throttle, and the host's options, loop and probe command.</summary>
-    private const string MayReference = "^(DependencyInjection|RunServiceNow.*|OptionBackfill.*|ApiJsonContext.*|FeedHost|OptionsOptions|BackfillOptions|BackfillProbeCommand|DhanRollingOptionClient|BackfillThrottle)$";
+    private const string MayReference = "^(DependencyInjection|RunServiceNow.*|OptionBackfill.*|ApiJsonContext.*|FeedHost|OptionsOptions|BackfillOptions|BackfillProbeCommand|DhanRollingOptionClient|BackfillThrottle|GetOptionArchiveSummaryHandler|BackfillKeyCounts)$";
 
     [Fact]
     public void Only_the_backfill_code_its_wiring_and_its_routes_reference_a_backfill_type_in_any_assembly_of_the_solution()

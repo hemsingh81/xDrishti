@@ -46,6 +46,7 @@ using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.OptionBackfill;
 using XDrishti.Application.OptionChain;
 using XDrishti.Application.OptionQuality;
+using XDrishti.Application.OptionReports;
 using XDrishti.Application.Paper;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Platform.Services;
@@ -122,6 +123,11 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(BackfillProbeAccepted))]
 [JsonSerializable(typeof(OptionBackfillProbeRequest))]
 [JsonSerializable(typeof(OptionCoverageView))]
+[JsonSerializable(typeof(OptionArchiveSummaryView))]
+[JsonSerializable(typeof(ExpressionRunList))]
+[JsonSerializable(typeof(ExpressionRunSummary))]
+[JsonSerializable(typeof(PairFormationList))]
+[JsonSerializable(typeof(OptionsReportData))]
 [JsonSerializable(typeof(FilingCoverageView))]
 [JsonSerializable(typeof(FilingListView))]
 [JsonSerializable(typeof(ExtractionCoverageView))]
