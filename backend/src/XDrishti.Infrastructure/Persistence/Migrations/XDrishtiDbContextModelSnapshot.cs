@@ -8716,6 +8716,131 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.HoldOutBlockRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly>("HistoryFirst")
+                        .HasColumnType("date")
+                        .HasColumnName("history_first");
+
+                    b.Property<DateOnly>("HistoryLast")
+                        .HasColumnType("date")
+                        .HasColumnName("history_last");
+
+                    b.Property<int>("LengthMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("length_months");
+
+                    b.Property<string>("SettingHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("setting_hash");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.HasKey("Id")
+                        .HasName("pk_holdout_blocks");
+
+                    b.HasIndex("StartDate")
+                        .IsUnique()
+                        .HasDatabaseName("uq_holdout_blocks_start");
+
+                    b.ToTable("holdout_blocks", "lab", t =>
+                        {
+                            t.HasCheckConstraint("ck_holdout_blocks_shape", "history_first < start_date AND start_date <= history_last AND length_months >= 1 AND setting_hash ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.HoldOutUnlockRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<DateOnly>("BlockStart")
+                        .HasColumnType("date")
+                        .HasColumnName("block_start");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("LabRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lab_run_id");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("mode");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("result");
+
+                    b.Property<bool>("ReusedWindow")
+                        .HasColumnType("boolean")
+                        .HasColumnName("reused_window");
+
+                    b.Property<string>("SettingHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("setting_hash");
+
+                    b.Property<string>("StrategyId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<DateTimeOffset>("UnlockedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("unlocked_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_holdout_unlocks");
+
+                    b.HasIndex("BlockStart")
+                        .HasDatabaseName("ix_holdout_unlocks_block");
+
+                    b.HasIndex("BlockStart")
+                        .IsUnique()
+                        .HasDatabaseName("uq_holdout_unlocks_fresh")
+                        .HasFilter("NOT reused_window");
+
+                    b.HasIndex("StrategyId", "Version", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("uq_holdout_unlocks_version");
+
+                    b.ToTable("holdout_unlocks", "lab", t =>
+                        {
+                            t.HasCheckConstraint("ck_holdout_unlocks_shape", "version >= 1 AND kind IN ('strategy','model') AND mode IN ('owner','auto') AND setting_hash ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Research.LabResultRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -8934,6 +9059,98 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_lab_runs_state", "state IN ('queued', 'running', 'succeeded', 'failed', 'cancelled', 'interrupted')");
 
                             t.HasCheckConstraint("ck_lab_runs_window", "window_from <= window_to");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.PlanFreezeRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("FirstRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("first_run_id");
+
+                    b.Property<string>("PlanHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("plan_hash");
+
+                    b.Property<string>("StrategyId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_plan_freezes");
+
+                    b.HasIndex("StrategyId", "Version", "PlanHash")
+                        .IsUnique()
+                        .HasDatabaseName("uq_plan_freezes_plan");
+
+                    b.ToTable("plan_freezes", "lab", t =>
+                        {
+                            t.HasCheckConstraint("ck_plan_freezes_shape", "version >= 1 AND plan_hash ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.RegistrationRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Rationale")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("rationale");
+
+                    b.Property<string>("StrategyId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<string>("TextHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("text_hash");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_registrations");
+
+                    b.HasIndex("StrategyId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("uq_registrations_version");
+
+                    b.ToTable("registrations", "lab", t =>
+                        {
+                            t.HasCheckConstraint("ck_registrations_shape", "version >= 1 AND text_hash ~ '^[0-9a-f]{64}$'");
                         });
                 });
 
@@ -9722,6 +9939,12 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<int>("ExtraTrials")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("extra_trials");
+
                     b.Property<Guid>("LabRunId")
                         .HasColumnType("uuid")
                         .HasColumnName("lab_run_id");
@@ -9749,6 +9972,13 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("strategy_id");
+
+                    b.Property<string>("TrialKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("run")
+                        .HasColumnName("trial_kind");
 
                     b.Property<string>("UniverseLabel")
                         .IsRequired()
@@ -9780,6 +10010,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("test_ledger", "lab", t =>
                         {
                             t.HasCheckConstraint("ck_test_ledger_hash", "strategy_hash ~ '^[0-9a-f]{64}$' AND window_from <= window_to");
+
+                            t.HasCheckConstraint("ck_test_ledger_trial", "trial_kind IN ('run','replan') AND extra_trials >= 0");
                         });
                 });
 

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
@@ -16,7 +17,8 @@ internal sealed class EvaluateMetaPolicyHandler(
     IModelRegistry registry,
     IModelTrainer trainer,
     TimeProvider time,
-    ILogger<EvaluateMetaPolicyHandler> logger) : IQueryHandler<EvaluateMetaPolicyQuery, Result<MetaPolicyReport>>
+    ILogger<EvaluateMetaPolicyHandler> logger,
+    IHoldOutStore? holdOuts = null) : IQueryHandler<EvaluateMetaPolicyQuery, Result<MetaPolicyReport>>
 {
     public async ValueTask<Result<MetaPolicyReport>> HandleAsync(EvaluateMetaPolicyQuery query, CancellationToken cancellationToken)
     {
@@ -85,7 +87,7 @@ internal sealed class EvaluateMetaPolicyHandler(
         string holdNote;
         if (query.HoldOutMonths > 0)
         {
-            var split = HoldOut.Reserve(rows, query.HoldOutMonths);
+            var split = HoldOut.Reserve(rows, query.HoldOutMonths, await SharedHoldOut.StartAsync(holdOuts, cancellationToken));
             if (split.IsFailure)
             {
                 return Refuse(split.Error);

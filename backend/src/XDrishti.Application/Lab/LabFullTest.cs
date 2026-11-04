@@ -24,7 +24,8 @@ internal sealed class LabFullTest(
     ITradingCalendar calendars,
     ITestLedger ledger,
     LabSettings settings,
-    ConfidenceOptions? confidence = null)
+    ConfidenceOptions? confidence = null,
+    RegistrationOptions? registration = null)
 {
     /// <summary>Said of every cell and every verdict: what the full-period figures are.</summary>
     public const string ExplorationLabel = "exploration: in-sample on the data shown, not evidence";
@@ -106,7 +107,10 @@ internal sealed class LabFullTest(
         }
 
         var pool = OosEvidenceBuilder.Pool(cells, 0, confidence, settings.Gates);
-        var variants = MultipleTesting.Effective(await ledger.CountVariantsAsync(run.StrategyId, cancellationToken), settings.MultipleTesting);
+        // CF-06: the verdict is judged with the ledger total at this moment. Until the owner turns CountInFactor on, that total is the number of distinct hashes it always was, and the honest count is shown beside it
+        var parts = await ledger.CountTrialsAsync(run.StrategyId, cancellationToken);
+        var honest = registration is { CountInFactor: true };
+        var variants = MultipleTesting.Effective(TrialCounter.Judged(parts, honest), settings.MultipleTesting);
         var verdict = VerdictEvaluator.Evaluate(settings.Gates, pool.Evidence, variants, settings.MinFoldsForPass);
         var limits = verdict.Limits.Append(CalibrationLimit).ToList();
         limits.AddRange(verdict.Notes ?? []);
@@ -140,7 +144,8 @@ internal sealed class LabFullTest(
                 "Only the out-of-sample trades of the walk-forward winners are judged.",
                 "The full-period figures are " + ExplorationLabel + ".",
                 "The candidate exits are a fixed list; the strategy's own exit is not a candidate.",
-            ]);
+            ],
+            Trials: TrialsView.Of(parts, honest, settings.MultipleTesting));
         return Result.Success(new FullTestOutcome(runs, view, instruments, instrumentsRun, defaultTrades, OosEvidenceBuilder.Trades(cells)));
     }
 

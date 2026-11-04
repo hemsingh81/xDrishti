@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
@@ -12,7 +13,7 @@ namespace XDrishti.Application.Learning;
 /// <summary>
 /// Proposes learned entry windows per cell (spec P6-14, ADR 0069): labels the closed trades of stored runs (P6-03), cuts the hold-out (P6-05), and learns a window per cell with the purged folds. Read-only: it stores nothing and applies nothing.
 /// </summary>
-internal sealed class ProposeEntryWindowsHandler(IRunStore runs, TimeProvider time, ILogger<ProposeEntryWindowsHandler> logger) : IQueryHandler<ProposeEntryWindowsQuery, Result<EntryWindowReport>>
+internal sealed class ProposeEntryWindowsHandler(IRunStore runs, TimeProvider time, ILogger<ProposeEntryWindowsHandler> logger, IHoldOutStore? holdOuts = null) : IQueryHandler<ProposeEntryWindowsQuery, Result<EntryWindowReport>>
 {
     private static readonly string[] Styles = ["intraday", "swing"];
 
@@ -47,7 +48,7 @@ internal sealed class ProposeEntryWindowsHandler(IRunStore runs, TimeProvider ti
         string holdNote;
         if (query.HoldOutMonths > 0)
         {
-            var split = HoldOut.Reserve(rows, query.HoldOutMonths);
+            var split = HoldOut.Reserve(rows, query.HoldOutMonths, await SharedHoldOut.StartAsync(holdOuts, cancellationToken));
             if (split.IsFailure)
             {
                 return Refuse(split.Error);

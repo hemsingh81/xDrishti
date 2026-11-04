@@ -25,6 +25,16 @@ internal sealed class ConfidenceSettings
 
     public CostStressSection CostStress { get; set; } = new();
 
+    public RegistrationSection Registration { get; set; } = new();
+
+    public HoldOutSection HoldOut { get; set; } = new();
+
+    /// <summary>The <c>Confidence:Registration</c> subsection as the options of CF-06 (ADR 0207).</summary>
+    internal RegistrationOptions ToRegistrationOptions() => new(Registration.Enforce, Registration.CountInFactor);
+
+    /// <summary>The <c>Confidence:HoldOut</c> subsection as the options of CF-06 (ADR 0207).</summary>
+    internal HoldOutOptions ToHoldOutOptions() => new(HoldOut.Enforce, HoldOut.AutoUnlock, HoldOut.MinMonths, HoldOut.SharePercent, HoldOut.MinTrades, HoldOut.Retention);
+
     /// <summary>The <c>Confidence:CostStress</c> subsection as the options of CF-05 (ADR 0206).</summary>
     internal CostStressOptions ToCostStressOptions() => new(CostStress.Mode, CostStress.Enforce, CostStress.MidMultiplier, CostStress.MidFloorR, CostStress.HighMultiplier, CostStress.HighFloorR, CostStress.DelayMinutes, CostStress.DelayRetention);
 
@@ -142,5 +152,27 @@ internal sealed class ConfidenceSettings
         public int DelayMinutes { get; set; } = 1;
 
         public double DelayRetention { get; set; } = 0.70;
+    }
+
+    internal sealed class RegistrationSection
+    {
+        public bool Enforce { get; set; }
+
+        public bool CountInFactor { get; set; }
+    }
+
+    internal sealed class HoldOutSection
+    {
+        public bool Enforce { get; set; }
+
+        public bool AutoUnlock { get; set; }
+
+        public int MinMonths { get; set; } = 6;
+
+        public double SharePercent { get; set; } = 20;
+
+        public int MinTrades { get; set; } = 30;
+
+        public double Retention { get; set; } = 0.5;
     }
 }

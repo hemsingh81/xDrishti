@@ -43,7 +43,7 @@ public static class AuditKinds
             AccountEventType.CapabilityChanged, AccountEventType.BucketAdded, AccountEventType.BucketCreated, AccountEventType.BucketRenamed, AccountEventType.PortfolioRefreshSettingsChanged, AccountEventType.PortfolioBenchmarkChanged, AccountEventType.FirstImportDateChanged, AccountEventType.ComplianceRecorded,
         ]),
         (Selection, [AccountEventType.EventFilterSwitched]),
-        (Learning, [AccountEventType.ExperimentJobStarted, AccountEventType.ExperimentJobCancelled, AccountEventType.LessonMoved, AccountEventType.HypothesisMoved, AccountEventType.ChangelogReverted, AccountEventType.ReportExported]),
+        (Learning, [AccountEventType.ExperimentJobStarted, AccountEventType.ExperimentJobCancelled, AccountEventType.LessonMoved, AccountEventType.HypothesisMoved, AccountEventType.ChangelogReverted, AccountEventType.ReportExported, AccountEventType.LabHoldOutUnlocked]),
         (Autonomy, [AccountEventType.AutonomySettingsChanged, AccountEventType.RampStepSet, AccountEventType.LiveSettingsChanged, AccountEventType.ExecutionSettingsChanged]),
         (MarketData,
         [

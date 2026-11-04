@@ -2410,7 +2410,7 @@ export interface paths {
     /** Lab runs, newest first; filter by strategyId and state; limit 1 to 200 (default 50) */
     get: operations['ListLabRuns'];
     put?: never;
-    /** Queue a quick test of a stored strategy version on a basket or a list of symbols (202 with the run); the same input again returns the run that holds it (200). 422 lab.invalid_input, 404 lab.not_found, 409 lab.no_data */
+    /** Queue a quick test of a stored strategy version on a basket or a list of symbols (202 with the run); the same input again returns the run that holds it (200). 422 lab.invalid_input, 422 lab.not_registered (a full or robust run of an unregistered version, only when the owner turned registration enforcement on), 422 lab.holdout_touched (an explicit window that reaches the locked hold-out, only when hold-out enforcement is on), 404 lab.not_found, 409 lab.no_data */
     post: operations['StartLabRun'];
     delete?: never;
     options?: never;
@@ -2514,6 +2514,58 @@ export interface paths {
     get: operations['GetLabLedger'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/strategies/{id}/versions/{version}/registration': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The pre-registration of a strategy version. 404 lab.not_found when there is none */
+    get: operations['GetStrategyRegistration'];
+    /** Pre-register a strategy version (owner session): who is on the other side and why they lose, the expected sign of each parameter, tiers and sessions, the expected gross edge and the cost it must beat, and the falsifier. Plain text, five parts, each up to 2,000 characters. 404 lab.not_found, 409 lab.registration_frozen (a registration is written once, and not after a full run froze the plan of the version), 422 lab.invalid_input */
+    put: operations['RegisterStrategyVersion'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/holdout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The locked hold-out: its start and length (or what the policy would give now), whether the Lab enforces it, and every look taken. Numbers appear only in a look that was taken */
+    get: operations['GetLabHoldOut'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/runs/{id}/holdout-unlock': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Owner act, fresh password in the body: run the frozen plan of this run's strategy version once over the hold-out and store the result. Irreversible. 401 auth.invalid_credentials for a wrong password, 423 auth.locked while the sign-in is locked, 409 lab.holdout_used for a second look by the version (the stored result is unchanged), 409 lab.no_report, 409 lab.holdout_unavailable, 404 lab.not_found */
+    post: operations['UnlockLabHoldOut'];
     delete?: never;
     options?: never;
     head?: never;
@@ -11843,6 +11895,81 @@ export interface components {
       /** Format: double */
       benchmarkNav: null | number;
     };
+    /** @description The locked block as served. */
+    HoldOutBlockView: {
+      /** Format: date */
+      start: string;
+      /** Format: date */
+      historyFirst: string;
+      /** Format: date */
+      historyLast: string;
+      /** Format: int32 */
+      lengthMonths: number;
+      settingHash: string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @description The sizing the policy gives for the stored history now (D4). */
+    HoldOutPlanView: {
+      /** Format: double */
+      historyMonths: number;
+      /** Format: int32 */
+      lengthMonths: number;
+      /** Format: double */
+      developmentMonths: number;
+      /** Format: int32 */
+      folds: number;
+      /** Format: date */
+      start: null | string;
+      status: string;
+    };
+    /**
+     * @description What the one look at the hold-out said, as served and as stored (spec CF-06, D5). `State` is `used` (the first look at the block) or `reused` (a later look: the numbers are shown, the result counts as a trial and cannot count toward a pass).
+     *     `Mode` is `owner` or `auto` (the auto option, recorded as auto and never as an owner approval). `RunSawHoldOut` is true when the run the plan came from had a window reaching into the block: such a look is never a pass.
+     */
+    HoldOutResultView: {
+      strategyId: string;
+      /** Format: int32 */
+      version: number;
+      kind: string;
+      mode: string;
+      state: string;
+      /** Format: date-time */
+      unlockedAt: string;
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      reusedWindow: boolean;
+      runSawHoldOut: boolean;
+      passed: boolean;
+      status: string;
+      reason: string;
+      /** Format: double */
+      developmentExpectancyR: null | number;
+      /** Format: double */
+      holdOutExpectancyR: null | number;
+      /** Format: double */
+      ratio: null | number;
+      /** Format: int32 */
+      trades: number;
+      planHash: null | string;
+      settingHash: string;
+      actor: string;
+      notes: string[];
+    };
+    /** @description Body of `POST /api/lab/runs/{id}/holdout-unlock` (spec CF-06, D5): the owner's password, typed again for this act. */
+    HoldOutUnlockRequest: {
+      password?: null | string;
+    };
+    /** @description `GET /api/lab/holdout`: the block (or what it would be), whether the Lab enforces it, and every look taken. Numbers appear only in an unlock that was taken. */
+    HoldOutView: {
+      enforce: boolean;
+      autoUnlock: boolean;
+      block: null | components['schemas']['HoldOutBlockView'];
+      proposed: null | components['schemas']['HoldOutPlanView'];
+      unlocks: components['schemas']['HoldOutResultView'][];
+    };
     /**
      * @description One group. Key is the account id, bucket id, sector name or basket id, or `~none` for the sector "Unclassified" and the basket "No basket". Holdings counts every holding of the group in the scope;
      *     Unpriced the open ones without a usable price. DayChangeExcluded counts the open holdings left out of the day change. Parts is set only when the request had a `stackBy`. Income is the group's dividends and trade
@@ -12737,7 +12864,7 @@ export interface components {
       total: number;
     };
     /**
-     * @description The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `DeflatedSharpe` (CF-03) is the probability beside the factor, null when not computed. `CostStress` (CF-05) is the cost stress and the delay test, null when not computed. `Summary` is a deterministic
+     * @description The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `DeflatedSharpe` (CF-03) is the probability beside the factor, null when not computed. `CostStress` (CF-05) is the cost stress and the delay test, null when not computed. `Trials`, `Registration` and `HoldOut` (CF-06) are the count of looks with its parts, the pre-registration state and the hold-out state; null in a report built without them. `Summary` is a deterministic
      *     template over the numbers above, not an assistant text.
      */
     LabReportView: {
@@ -12761,6 +12888,9 @@ export interface components {
       summary: string;
       deflatedSharpe?: null | components['schemas']['DeflatedSharpeView'];
       costStress?: null | components['schemas']['CostStressView'];
+      trials?: null | components['schemas']['TrialsView'];
+      registration?: null | components['schemas']['ReportRegistrationView'];
+      holdOut?: null | components['schemas']['ReportHoldOutView'];
     };
     /** @description Client event `labRunFinished` (spec P5-02, D5): the last event of a run, with its final state. */
     LabRunFinished: {
@@ -12843,7 +12973,7 @@ export interface components {
       /** Format: int64 */
       seed: null | number;
     };
-    /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. */
+    /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. `Trials` (CF-06) is the count of looks with its parts as of the judgement; null in a result stored before it. */
     LabVerdictView: {
       outcome: string;
       /** Format: int32 */
@@ -12859,6 +12989,7 @@ export interface components {
       robustness?: null | components['schemas']['RobustnessView'];
       deflatedSharpe?: null | components['schemas']['DeflatedSharpeView'];
       costStress?: null | components['schemas']['CostStressView'];
+      trials?: null | components['schemas']['TrialsView'];
     };
     /** @description The India dates a run replays, inclusive. */
     LabWindow: {
@@ -13002,8 +13133,15 @@ export interface components {
       method: string;
       /** Format: date-time */
       createdAt: string;
+      /** @default run */
+      trialKind: string;
+      /**
+       * Format: int32
+       * @default 0
+       */
+      extraTrials: number;
     };
-    /** @description The ledger of a family, the number of variants in it and the factor the gates are tightened by now (1 when the adjustment is off). */
+    /** @description The ledger of a family, the number of variants in it and the factor the gates are tightened by now (1 when the adjustment is off). `Trials` (CF-06) is the honest count of looks with its parts. */
     LedgerView: {
       strategyId: string;
       /** Format: int32 */
@@ -13011,6 +13149,7 @@ export interface components {
       /** Format: double */
       adjustmentFactor: number;
       rows: components['schemas']['LedgerRowView'][];
+      trials?: null | components['schemas']['TrialsView'];
     };
     /** @description The window of a run. */
     LedgerWindow: {
@@ -17134,6 +17273,29 @@ export interface components {
       /** Format: int32 */
       days: number;
     };
+    /** @description Body of `PUT /api/lab/strategies/{id}/versions/{v}/registration` (spec CF-06, D1): the five plain texts. The actor is the signed-in owner, never a field. */
+    RegistrationRequest: {
+      counterparty?: null | string;
+      parameterSigns?: null | string;
+      applicability?: null | string;
+      expectedEdge?: null | string;
+      falsifier?: null | string;
+    };
+    /** @description The pre-registration of a strategy version as served (spec CF-06, D1): five plain texts (never markup), the hash of their canonical text, who wrote it and when. It is frozen once written. */
+    RegistrationView: {
+      strategyId: string;
+      /** Format: int32 */
+      version: number;
+      counterparty: string;
+      parameterSigns: string;
+      applicability: string;
+      expectedEdge: string;
+      falsifier: string;
+      textHash: string;
+      /** Format: date-time */
+      createdAt: string;
+      actor: string;
+    };
     /** @description The body of `POST /api/assistant/proposals/{id}/reject` (AC 10): an optional reason of at most 300 characters. */
     RejectProposalRequest: {
       reason: null | string;
@@ -17392,6 +17554,18 @@ export interface components {
       /** @description What always holds, as text. */
       limits: string[];
     };
+    /** @description The hold-out row of a report (spec CF-06, AC12): `not_fixed`, `kept`, `used` or `reused`; the numbers only after the look was taken. */
+    ReportHoldOutView: {
+      state: string;
+      enforce: boolean;
+      /** Format: date */
+      start: null | string;
+      /** Format: int32 */
+      lengthMonths: null | number;
+      runReachesHoldOut: boolean;
+      text: string;
+      result: null | components['schemas']['HoldOutResultView'];
+    };
     /** @description The headline figures of the out-of-sample evidence; a figure that is not finite is null. */
     ReportKpisView: {
       /** Format: int32 */
@@ -17453,6 +17627,13 @@ export interface components {
       limit?: null | string;
       /** @description The cursor the previous page of the trade list returned. */
       cursor?: null | string;
+    };
+    /** @description The registration row of a report (spec CF-06, AC12): `registered` or `not_registered`, and the texts when registered. */
+    ReportRegistrationView: {
+      state: string;
+      enforce: boolean;
+      registration: null | components['schemas']['RegistrationView'];
+      text: string;
     };
     /** @description What was tested: the strategy version, the method, the window and the universe (spec P5-06). */
     ReportRunView: {
@@ -19636,6 +19817,32 @@ export interface components {
       sourceMemberCount: number;
       /** Format: int32 */
       targetMemberCount: number;
+    };
+    /**
+     * @description The count of looks at a strategy family with its parts (spec CF-06, D3, AC12), as of the judgement. `HonestFactor` is the factor of the honest total; `FactorUsed` is the one the gates were tightened by, which is the old distinct-hash factor
+     *     until the owner turns `Confidence:Registration:CountInFactor` on (`HonestCountApplied`).
+     */
+    TrialsView: {
+      /** Format: int32 */
+      runHashes: number;
+      /** Format: int32 */
+      sweepPoints: number;
+      /** Format: int32 */
+      extraExits: number;
+      /** Format: int32 */
+      replans: number;
+      /** Format: int32 */
+      nullRows: number;
+      /** Format: int32 */
+      total: number;
+      /** Format: double */
+      honestFactor: number;
+      /** Format: int32 */
+      judgedCount: number;
+      /** Format: double */
+      factorUsed: number;
+      honestCountApplied: boolean;
+      text: string;
     };
     /** @description One underlying of the option archive: recorded and usable chain sessions, the first and last recorded date, the gaps by outcome, the backfill keys and the half-spread model state. Counts and dates only; no price, IV or Greek. */
     UnderlyingArchiveSummary: {
@@ -26131,6 +26338,183 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetStrategyRegistration: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        version: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegistrationView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RegisterStrategyVersion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        version: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RegistrationRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegistrationView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLabHoldOut: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldOutView'];
+        };
+      };
+    };
+  };
+  UnlockLabHoldOut: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['HoldOutUnlockRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldOutResultView'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
         headers: {
           [name: string]: unknown;
         };

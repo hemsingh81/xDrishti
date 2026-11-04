@@ -47,6 +47,17 @@ internal sealed class FakeLedger(Journal journal) : ITestLedger
     public ValueTask<int> CountVariantsAsync(string strategyId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(_rows.Where(r => r.StrategyId == strategyId).Select(r => r.StrategyHash).Distinct().Count());
 
+    public ValueTask<XDrishti.Domain.Lab.TrialCounts> CountTrialsAsync(string strategyId, CancellationToken cancellationToken)
+    {
+        var mine = _rows.Where(r => r.StrategyId == strategyId).ToList();
+        var runs = mine.Where(r => r.TrialKind == "run" && r.Method != "sweep").Select(r => r.StrategyHash).Distinct().ToList();
+        var sweeps = mine.Where(r => r.TrialKind == "run" && r.Method == "sweep").Select(r => r.StrategyHash).Distinct().Except(runs).Count();
+        return ValueTask.FromResult(new XDrishti.Domain.Lab.TrialCounts(runs.Count, sweeps, mine.Sum(r => r.ExtraTrials), mine.Count(r => r.TrialKind == "replan"), 0));
+    }
+
+    public ValueTask<bool> HasFullRunAsync(string strategyId, string strategyHash, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(_rows.Any(r => r.StrategyId == strategyId && r.StrategyHash == strategyHash && r.TrialKind == "run" && r.Method is "full" or "robust"));
+
     public ValueTask<bool> HasHashAsync(string strategyId, string strategyHash, CancellationToken cancellationToken) => ValueTask.FromResult(_rows.Any(r => r.StrategyId == strategyId && r.StrategyHash == strategyHash));
 
     public ValueTask<IReadOnlyList<LedgerRow>> ListAsync(string strategyId, CancellationToken cancellationToken) =>

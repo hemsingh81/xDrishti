@@ -19,7 +19,7 @@ internal sealed class LabRunsEndpoints : IEndpointModule
 
         runs.MapPost("/", StartAsync)
             .WithName("StartLabRun")
-            .WithSummary("Queue a quick test of a stored strategy version on a basket or a list of symbols (202 with the run); the same input again returns the run that holds it (200). 422 lab.invalid_input, 404 lab.not_found, 409 lab.no_data")
+            .WithSummary("Queue a quick test of a stored strategy version on a basket or a list of symbols (202 with the run); the same input again returns the run that holds it (200). 422 lab.invalid_input, 422 lab.not_registered (a full or robust run of an unregistered version, only when the owner turned registration enforcement on), 422 lab.holdout_touched (an explicit window that reaches the locked hold-out, only when hold-out enforcement is on), 404 lab.not_found, 409 lab.no_data")
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
@@ -186,7 +186,7 @@ internal sealed class LabRunsEndpoints : IEndpointModule
 
     /// <summary>A refused input is 422 (the spec's word, as the strategy create), every other failure is the shared mapping.</summary>
     private static ProblemHttpResult Problem(Error error, HttpContext http) =>
-        error.Code == LabErrors.InvalidInputCode
+        LabErrors.IsUnprocessable(error.Code)
             ? TypedResults.Problem(ProblemResults.Create(StatusCodes.Status422UnprocessableEntity, error.Message, error.Code))
             : ProblemResults.From(error, http);
 }

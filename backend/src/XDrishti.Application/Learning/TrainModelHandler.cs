@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
@@ -22,7 +23,8 @@ internal sealed class TrainModelHandler(
     IModelFiles files,
     IModelRegistry registry,
     TimeProvider time,
-    ILogger<TrainModelHandler> logger) : ICommandHandler<TrainModelCommand, TrainModelOutcome>
+    ILogger<TrainModelHandler> logger,
+    IHoldOutStore? holdOuts = null) : ICommandHandler<TrainModelCommand, TrainModelOutcome>
 {
     public async ValueTask<Result<TrainModelOutcome>> HandleAsync(TrainModelCommand command, CancellationToken cancellationToken)
     {
@@ -74,7 +76,7 @@ internal sealed class TrainModelHandler(
         var purged = 0;
         if (command.HoldOutMonths > 0)
         {
-            var split = HoldOut.Reserve(rows, command.HoldOutMonths);
+            var split = HoldOut.Reserve(rows, command.HoldOutMonths, await SharedHoldOut.StartAsync(holdOuts, cancellationToken));
             if (split.IsFailure)
             {
                 return Refuse<TrainModelOutcome>(split.Error);

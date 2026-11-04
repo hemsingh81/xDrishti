@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Globalization;
+using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
@@ -13,7 +14,7 @@ namespace XDrishti.Application.Learning.Jobs;
 /// What starting a replay on a stored run would mean (spec P8-18 criterion 12). Read only: it writes nothing and starts nothing. It says, before the owner clicks, the next trial number, the improvement that trial must show, the folds the baseline's own trades have, the best the
 /// outcome can be on them, the measured replay time (none until a job measured one) and how many starts are left today.
 /// </summary>
-internal sealed class GetExperimentPreviewHandler(IRunStore runs, ReplayPlanner planner, IExperimentLedger ledger, IExperimentJobStore jobs, ExperimentJobSettings settings, TimeProvider clock)
+internal sealed class GetExperimentPreviewHandler(IRunStore runs, ReplayPlanner planner, IExperimentLedger ledger, IExperimentJobStore jobs, ExperimentJobSettings settings, TimeProvider clock, IHoldOutStore? holdOuts = null)
     : IQueryHandler<GetExperimentPreviewQuery, Result<ExperimentPreviewView>>
 {
     private const string NoKey = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -84,7 +85,7 @@ internal sealed class GetExperimentPreviewHandler(IRunStore runs, ReplayPlanner 
         }
 
         var rows = seen.Value.Select(b => new ValidationRow(b.Key, b.Value.R > 0 ? 1 : 0, b.Value.R, b.Value.TradeDate, b.Value.DecisionEpochSeconds, b.Value.ExitEpochSeconds, "x", ImmutableArray<double>.Empty)).ToList();
-        var split = HoldOut.Reserve(rows, 6);
+        var split = HoldOut.Reserve(rows, 6, await SharedHoldOut.StartAsync(holdOuts, cancellationToken));
         if (split.IsFailure)
         {
             return 0;

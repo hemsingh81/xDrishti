@@ -330,6 +330,9 @@ public static class DependencyInjection
         services.AddSingleton<IModelScorerLoader, MlNetScorerLoader>();
         services.AddSingleton<ITradeFeatureExtractor, TradeFeatureExtractorAdapter>(); // the feature frame behind its port (ADR 0039): stateless, no I/O
         services.AddScoped<ITestLedger, TestLedger>(); // the per-family count of looks (spec P5-03)
+        services.AddScoped<IRegistrationStore, RegistrationStore>(); // the frozen pre-registration of a strategy version (CF-06, ADR 0207)
+        services.AddScoped<IPlanFreezeStore, PlanFreezeStore>(); // the frozen plan hash of a version (CF-06)
+        services.AddScoped<IHoldOutStore, HoldOutStore>(); // the locked hold-out block and the looks taken (CF-06)
         services.AddScoped<IVariantStatsStore, VariantStatsStore>(); // the per-variant statistics that give the spread of the trial Sharpe ratios (CF-03, ADR 0205)
         services.AddScoped<ILabRunStore, LabRunStore>(); // the Lab runs and their queue (spec P5-02)
         services.AddSingleton<IStrategyChecker, StrategyChecker>(); // the strategy file library behind its port for the Lab (spec P5-01): stateless, no I/O

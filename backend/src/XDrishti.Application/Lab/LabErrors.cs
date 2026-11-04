@@ -31,6 +31,24 @@ public static class LabErrors
     /// <summary>The run has no stored full-test result to report on (a quick test, or a run that has not succeeded): 409.</summary>
     public const string NoReportCode = "lab.no_report";
 
+    /// <summary>A full or robust run of a version with no registration while enforcement is on (CF-06): 422.</summary>
+    public const string NotRegisteredCode = "lab.not_registered";
+
+    /// <summary>A window that reaches the locked hold-out (CF-06): 422.</summary>
+    public const string HoldOutTouchedCode = "lab.holdout_touched";
+
+    /// <summary>The version already has a registration, which is frozen (CF-06): 409.</summary>
+    public const string RegistrationFrozenCode = "lab.registration_frozen";
+
+    /// <summary>The version already took its one look at the hold-out (CF-06): 409.</summary>
+    public const string HoldOutUsedCode = "lab.holdout_used";
+
+    /// <summary>The stored history is too short to keep a hold-out, or the plan cannot be run on it (CF-06): 409.</summary>
+    public const string HoldOutUnavailableCode = "lab.holdout_unavailable";
+
+    /// <summary>True for the codes the API answers with 422.</summary>
+    public static bool IsUnprocessable(string code) => code is InvalidInputCode or NotRegisteredCode or HoldOutTouchedCode;
+
     /// <summary>The name of the payload entry that carries the problems.</summary>
     public const string ProblemsKey = "problems";
 
@@ -72,4 +90,27 @@ public static class LabErrors
     /// <summary>A built-in is read-only: a conflict (409), whatever kind the store gave it.</summary>
     public static Error AsConflict(Error storeError) =>
         storeError.Code == StrategyStoreErrors.BuiltInReadOnlyCode ? Error.Conflict(storeError.Code, storeError.Message) : storeError;
+
+    /// <summary>An unregistered version while registration is enforced.</summary>
+    public static Error NotRegistered(string id, int version) =>
+        Error.Validation(NotRegisteredCode, $"The strategy `{id}` version {version} has no pre-registration; a full or robust run needs one (PUT /api/lab/strategies/{id}/versions/{version}/registration).");
+
+    /// <summary>A window that reaches the hold-out.</summary>
+    public static Error HoldOutTouched(DateOnly start, DateOnly from, DateOnly to) =>
+        Error.Validation(HoldOutTouchedCode, $"The window {from:yyyy-MM-dd} to {to:yyyy-MM-dd} reaches the locked hold-out, which starts on {start:yyyy-MM-dd}; no Lab run reads it.");
+
+    /// <summary>A second registration.</summary>
+    public static Error RegistrationFrozen(string id, int version) =>
+        Error.Conflict(RegistrationFrozenCode, $"The strategy `{id}` version {version} is already registered; a registration is frozen. A new version needs its own.");
+
+    /// <summary>A registration written after a full run froze the plan would not be before the search, so it is refused (same code, a 409).</summary>
+    public static Error RegistrationAfterFreeze(string id, int version) =>
+        Error.Conflict(RegistrationFrozenCode, $"The strategy `{id}` version {version} already has a frozen plan from a full run; a registration written now would not be before the data was searched. A new version needs its own, written first.");
+
+    /// <summary>A second look at the hold-out.</summary>
+    public static Error HoldOutUsed(string id, int version) =>
+        Error.Conflict(HoldOutUsedCode, $"The strategy `{id}` version {version} has already looked at the hold-out; the stored result is unchanged (GET /api/lab/holdout).");
+
+    /// <summary>No hold-out can be kept or run.</summary>
+    public static Error HoldOutUnavailable(string reason) => Error.Conflict(HoldOutUnavailableCode, reason);
 }

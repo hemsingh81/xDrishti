@@ -12,7 +12,11 @@ internal sealed class TestLedgerRowConfiguration : IEntityTypeConfiguration<Test
 {
     public void Configure(EntityTypeBuilder<TestLedgerRow> builder)
     {
-        builder.ToTable("test_ledger", Schemas.Lab, t => t.HasCheckConstraint("ck_test_ledger_hash", "strategy_hash ~ '^[0-9a-f]{64}$' AND window_from <= window_to"));
+        builder.ToTable("test_ledger", Schemas.Lab, t =>
+        {
+            t.HasCheckConstraint("ck_test_ledger_hash", "strategy_hash ~ '^[0-9a-f]{64}$' AND window_from <= window_to");
+            t.HasCheckConstraint("ck_test_ledger_trial", "trial_kind IN ('run','replan') AND extra_trials >= 0");
+        });
         builder.HasKey(x => x.Id).HasName("pk_test_ledger");
         builder.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
         builder.Property(x => x.StrategyId).HasColumnType("text").IsRequired();
@@ -25,6 +29,8 @@ internal sealed class TestLedgerRowConfiguration : IEntityTypeConfiguration<Test
         builder.Property(x => x.WindowTo).HasColumnType("date").IsRequired();
         builder.Property(x => x.Method).HasColumnType("text").IsRequired();
         builder.Property(x => x.CreatedAt).IsRequired();
+        builder.Property(x => x.TrialKind).HasColumnType("text").HasDefaultValue("run").IsRequired();
+        builder.Property(x => x.ExtraTrials).HasDefaultValue(0).IsRequired();
         builder.HasIndex(x => x.LabRunId).IsUnique().HasDatabaseName("uq_test_ledger_run");
         builder.HasIndex(x => new { x.StrategyId, x.CreatedAt }).HasDatabaseName("ix_test_ledger_strategy_created");
     }

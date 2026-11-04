@@ -26,4 +26,10 @@ internal sealed class TestLedgerRow
     public string Method { get; set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary><c>run</c> or <c>replan</c> (CF-06).</summary>
+    public string TrialKind { get; set; } = "run";
+
+    /// <summary>Extra candidate exits the first full test of the hash walked (CF-06, D3).</summary>
+    public int ExtraTrials { get; set; }
 }

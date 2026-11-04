@@ -96,6 +96,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, LiveEndpoints>();
         services.AddSingleton<IEndpointModule, LabEndpoints>();
         services.AddSingleton<IEndpointModule, LabRunsEndpoints>();
+        services.AddSingleton<IEndpointModule, LabConfidenceEndpoints>();
         services.AddSingleton<IEndpointModule, LearningOverviewEndpoints>();
         services.AddSingleton<IEndpointModule, LearningEvidenceEndpoints>();
         services.AddSingleton<IEndpointModule, DigestEndpoints>();
@@ -185,6 +186,7 @@ internal static class ApiSetup
             .Validate(s => s.ToShrinkageOptions().Problems().Count == 0, "Confidence:Shrinkage: a value is out of range or the mode is not offered (Mode Off or ReportOnly, TauSquaredFloor 0.0001..1, MinTradesForSibling 3..30, MinParentTrades 10..200, StrengthMin and StrengthMax 1..1000 with Min not above Max, QuantileLevel 0.01..0.25, SigmaPoolStrength 1..1000).")
             .Validate(s => s.ToDeflationOptions().Problems().Count == 0, "Confidence:Deflation: a value is out of range or the mode is not offered (Mode Off or ReportOnly, MinProbability 0.5..0.999, AssumedTrialSrSd 0.001..1, TBasis NEff or Raw).")
             .Validate(s => s.ToBootstrapOptions().Problems().Count == 0, "Confidence:Bootstrap: a value is out of range (Mode Off or ReportOnly, Draws 100..20000, BlockLength 0 or 2..60).")
+            .Validate(s => s.ToHoldOutOptions().Problems().Count == 0, "Confidence:HoldOut: a value is out of range (MinMonths 1..60, SharePercent 5..50, MinTrades 5..1000, Retention 0.1..1).")
             .Validate(s => s.ToCostStressOptions().Problems().Count == 0, "Confidence:CostStress: a value is out of range (Mode Off or ReportOnly, MidMultiplier above 1 up to 5, HighMultiplier above MidMultiplier up to 5, MidFloorR and HighFloorR -1..1, DelayMinutes 1..5, DelayRetention 0.1..1).")
             .ValidateOnStart();
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToOptions()));
@@ -192,6 +194,8 @@ internal static class ApiSetup
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToDeflationOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToBootstrapOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToCostStressOptions()));
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToRegistrationOptions()));
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToHoldOutOptions()));
     }
 
     /// <summary>

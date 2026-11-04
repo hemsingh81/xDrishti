@@ -706,6 +706,8 @@ public static class DependencyInjection
         services.TryAddSingleton(new DeflationOptions()); // the deflated Sharpe ratio of a Lab verdict (CF-03, ADR 0205): ReportOnly; the host replaces it with its configuration (section Confidence:Deflation)
         services.TryAddSingleton(new BootstrapOptions()); // the stationary block bootstrap of a robust Lab run (CF-03, ADR 0205): ReportOnly; the host replaces it with its configuration (section Confidence:Bootstrap)
         services.TryAddSingleton(new CostStressOptions()); // the cost stress gates and the delay test of a Lab verdict (CF-05, ADR 0206): ReportOnly, Enforce off; the host replaces it with its configuration (section Confidence:CostStress)
+        services.TryAddSingleton(new RegistrationOptions()); // pre-registration and the honest count of looks (CF-06, ADR 0207): enforcement and CountInFactor off; the host replaces it with its configuration (section Confidence:Registration)
+        services.TryAddSingleton(new HoldOutOptions()); // the locked hold-out (CF-06, ADR 0207): enforcement and AutoUnlock off; the host replaces it with its configuration (section Confidence:HoldOut)
         services.TryAddSingleton(new ConfidenceOptions()); // effective n, power, minimum track record (CF-01, ADR 0203): ReportOnly; the host replaces it with its configuration (section Confidence)
         services.TryAddSingleton<ILabProgress, NullLabProgress>(); // the host that sends events replaces it
 
@@ -726,6 +728,14 @@ public static class DependencyInjection
         services.AddScoped<ILabRunExecutor, LabRunner>();
         services.AddScoped<LabRobustness>(); // the robustness checks of a robust run (P5-05, ADR 0062)
         services.AddScoped<LabFullTest>(); // the full test of a run (P5-04, ADR 0060)
+        services.AddScoped<LabPreregistration>(); // the registration check, the extra exit looks and the plan freeze of a post (CF-06, ADR 0207)
+        services.AddScoped<LabHoldOutGuard>(); // the size, the block and the cut of the locked hold-out (CF-06)
+        services.AddScoped<IHoldOutPass, HoldOutPass>(); // the only reader of the sessions inside the hold-out (CF-06); used by the unlock only
+        services.AddScoped<HoldOutUnlocker>(); // the one look at the hold-out, by the owner or by the auto option (CF-06)
+        services.AddScoped<ICommandHandler<RegisterStrategyCommand, RegistrationView>, RegisterStrategyHandler>();
+        services.AddScoped<IQueryHandler<GetRegistrationQuery, Result<RegistrationView>>, GetRegistrationHandler>();
+        services.AddScoped<ICommandHandler<UnlockHoldOutCommand, HoldOutResultView>, UnlockHoldOutHandler>();
+        services.AddScoped<IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>, GetHoldOutHandler>();
         services.AddScoped<LabCostStress>(); // the cost stress gates and the delay test beside the outcome (CF-05, ADR 0206)
         services.AddScoped<LabDeflation>(); // the deflated Sharpe ratio beside the factor (CF-03, ADR 0205)
         services.AddSingleton<LabRunDispatcher>();

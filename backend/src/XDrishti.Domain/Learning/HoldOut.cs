@@ -14,7 +14,8 @@ public static class HoldOut
     /// <summary>Cuts <paramref name="rows"/> into development and hold-out.</summary>
     /// <param name="rows">All labelled rows.</param>
     /// <param name="months">Months to reserve (6).</param>
-    public static Result<HoldOutSplit> Reserve(IReadOnlyList<ValidationRow> rows, int months = 6)
+    /// <param name="fixedStart">The shared hold-out start of the Lab (CF-06, D4): when given, the cut is at this date instead of <c>last - months + 1 day</c>, so a model and a strategy keep the same block. Null keeps the rule above, bit for bit.</param>
+    public static Result<HoldOutSplit> Reserve(IReadOnlyList<ValidationRow> rows, int months = 6, DateOnly? fixedStart = null)
     {
         ArgumentNullException.ThrowIfNull(rows);
         if (months is < 1 or > 120)
@@ -28,7 +29,7 @@ public static class HoldOut
         }
 
         var last = rows.Max(r => r.TradeDate);
-        var start = last.AddMonths(-months).AddDays(1);
+        var start = fixedStart ?? last.AddMonths(-months).AddDays(1);
         var reserved = rows.Where(r => r.TradeDate >= start).ToList();
         if (reserved.Count == 0 || rows.Min(r => r.TradeDate) >= start)
         {
