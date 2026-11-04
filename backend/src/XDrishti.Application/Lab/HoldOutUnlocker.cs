@@ -30,31 +30,51 @@ internal sealed class HoldOutUnlocker(
     public const string OwnerMode = "owner";
     public const string AutoMode = "auto";
 
-    public async ValueTask<Result<HoldOutResultView>> UnlockAsync(Guid runId, string mode, string actor, CancellationToken cancellationToken)
+    public const string NoFrozenPlan = "This run has no frozen plan; post a full run (same explicit window, or a new run) and unlock that run.";
+
+    /// <summary>
+    /// The cheap preconditions of a look, shared by the endpoint (before it queues the job) and the job (before it runs the pass): the run exists and succeeded as a full or robust test with a stored verdict, its version has not looked yet,
+    /// the plan is frozen and the stored history can keep a block. Nothing here reads a session of the hold-out.
+    /// </summary>
+    public async ValueTask<Result<UnlockPlan>> CheckAsync(Guid runId, CancellationToken cancellationToken)
     {
         var run = await runs.GetAsync(runId, cancellationToken);
         if (run is null)
         {
-            return Result.Failure<HoldOutResultView>(LabErrors.RunNotFound(runId));
+            return Result.Failure<UnlockPlan>(LabErrors.RunNotFound(runId));
         }
 
         var state = LabRunStates.Code(run.State);
         var verdict = run.State == LabRunState.Succeeded && LabSettings.RunsFullTest(run.Method) ? await results.GetAsync(run.Id, cancellationToken) : null;
         if (verdict is null)
         {
-            return Result.Failure<HoldOutResultView>(LabErrors.NoReport(state, run.Method));
+            return Result.Failure<UnlockPlan>(LabErrors.NoReport(state, run.Method));
         }
 
         if (await store.GetUnlockAsync(run.StrategyId, run.Version, StrategyKind, cancellationToken) is not null)
         {
-            return Result.Failure<HoldOutResultView>(LabErrors.HoldOutUsed(run.StrategyId, run.Version));
+            return Result.Failure<UnlockPlan>(LabErrors.HoldOutUsed(run.StrategyId, run.Version));
         }
 
         if (await BlockAsync(cancellationToken) is not { } block)
         {
-            return Result.Failure<HoldOutResultView>(LabErrors.HoldOutUnavailable("The stored history is too short to keep a hold-out."));
+            return Result.Failure<UnlockPlan>(LabErrors.HoldOutUnavailable("The stored history is too short to keep a hold-out."));
         }
 
+        return await freezes.FirstAsync(run.StrategyId, run.Version, cancellationToken) is null
+            ? Result.Failure<UnlockPlan>(LabErrors.HoldOutUnavailable(NoFrozenPlan))
+            : Result.Success(new UnlockPlan(run, verdict, block));
+    }
+
+    public async ValueTask<Result<HoldOutResultView>> UnlockAsync(Guid runId, string mode, string actor, CancellationToken cancellationToken)
+    {
+        var plan = await CheckAsync(runId, cancellationToken);
+        if (plan.IsFailure)
+        {
+            return Result.Failure<HoldOutResultView>(plan.Error);
+        }
+
+        var (run, verdict, block) = plan.Value;
         var figures = await pass.RunAsync(run, verdict, block, cancellationToken);
         if (figures.IsFailure)
         {
@@ -121,6 +141,7 @@ internal sealed class HoldOutUnlocker(
     /// <summary>The audit cross-index row (as P7-12): ids and state words only, the mode as <c>auto</c> or <c>owner</c> and never a number of the evidence. A failure of this second write is logged and does not undo the look, which is insert-only.</summary>
     private async ValueTask AuditAsync(LabRun run, HoldOutResultView view, DateTimeOffset now)
     {
+        // shortcut: the look is the commit point and the audit row is best effort; a miss is logged (HoldOutAuditFailed) and not repaired, because a second job of the version is refused as lab.holdout_used before it reaches here
         try
         {
             events.Record(AccountEvent.Record(AccountEventType.LabHoldOutUnlocked, null, string.Create(CultureInfo.InvariantCulture, $"run={run.Id:D} strategy={run.StrategyId} v={run.Version} mode={view.Mode} state={view.State} reused={(view.ReusedWindow ? "yes" : "no")}"), view.Actor, now));
@@ -153,3 +174,6 @@ internal sealed class HoldOutUnlocker(
         return result.IsSuccess ? result.Value : null;
     }
 }
+
+/// <summary>What the cheap checks of a look found: the run, its stored verdict and the locked block.</summary>
+internal sealed record UnlockPlan(LabRun Run, LabVerdictView Verdict, HoldOutBlock Block);

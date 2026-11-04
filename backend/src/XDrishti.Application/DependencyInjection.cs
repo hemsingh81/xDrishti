@@ -725,7 +725,9 @@ public static class DependencyInjection
     /// <summary>The executor and the dispatcher of Lab runs (P5-02): only the host that runs them (the API, ADR 0058) calls this; it also registers <see cref="IRunRecordWriter"/>.</summary>
     public static IServiceCollection AddLabRunner(this IServiceCollection services)
     {
-        services.AddScoped<ILabRunExecutor, LabRunner>();
+        services.AddScoped<LabRunner>();
+        services.AddScoped<HoldOutJobRunner>(); // the queued unlock of the hold-out (CF-06 part C)
+        services.AddScoped<ILabRunExecutor, LabRunRouter>(); // a holdout job goes to the job runner, every other run to the LabRunner
         services.AddScoped<LabRobustness>(); // the robustness checks of a robust run (P5-05, ADR 0062)
         services.AddScoped<LabFullTest>(); // the full test of a run (P5-04, ADR 0060)
         services.AddScoped<LabPreregistration>(); // the registration check, the extra exit looks and the plan freeze of a post (CF-06, ADR 0207)
@@ -734,7 +736,7 @@ public static class DependencyInjection
         services.AddScoped<HoldOutUnlocker>(); // the one look at the hold-out, by the owner or by the auto option (CF-06)
         services.AddScoped<ICommandHandler<RegisterStrategyCommand, RegistrationView>, RegisterStrategyHandler>();
         services.AddScoped<IQueryHandler<GetRegistrationQuery, Result<RegistrationView>>, GetRegistrationHandler>();
-        services.AddScoped<ICommandHandler<UnlockHoldOutCommand, HoldOutResultView>, UnlockHoldOutHandler>();
+        services.AddScoped<ICommandHandler<UnlockHoldOutCommand, LabRunView>, UnlockHoldOutHandler>();
         services.AddScoped<IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>, GetHoldOutHandler>();
         services.AddScoped<LabCostStress>(); // the cost stress gates and the delay test beside the outcome (CF-05, ADR 0206)
         services.AddScoped<LabDeflation>(); // the deflated Sharpe ratio beside the factor (CF-03, ADR 0205)

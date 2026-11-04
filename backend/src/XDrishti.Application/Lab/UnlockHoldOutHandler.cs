@@ -5,15 +5,32 @@ using XDrishti.Domain.Confidence;
 
 namespace XDrishti.Application.Lab;
 
-/// <summary>The owner's unlock (spec CF-06, D5): the password was checked at the endpoint; this refuses an empty actor and runs the one look.</summary>
-internal sealed class UnlockHoldOutHandler(HoldOutUnlocker unlocker) : ICommandHandler<UnlockHoldOutCommand, HoldOutResultView>
+/// <summary>
+/// The owner's unlock (spec CF-06, D5; part C): the password was checked at the endpoint; this refuses an empty actor, checks the cheap preconditions with the same answers the pass would give, and queues a <c>holdout</c> job on the Lab dispatcher.
+/// The pass itself runs there. A job of this run that is already queued or running is returned instead of a second one.
+/// </summary>
+internal sealed class UnlockHoldOutHandler(HoldOutUnlocker unlocker, ILabRunStore runs, TimeProvider time) : ICommandHandler<UnlockHoldOutCommand, LabRunView>
 {
-    public ValueTask<Result<HoldOutResultView>> HandleAsync(UnlockHoldOutCommand command, CancellationToken cancellationToken)
+    public async ValueTask<Result<LabRunView>> HandleAsync(UnlockHoldOutCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
-        return string.IsNullOrWhiteSpace(command.Actor)
-            ? ValueTask.FromResult(Result.Failure<HoldOutResultView>(Error.Forbidden("lab.no_owner", "The hold-out is unlocked by the owner.")))
-            : unlocker.UnlockAsync(command.RunId, HoldOutUnlocker.OwnerMode, command.Actor, cancellationToken);
+        if (string.IsNullOrWhiteSpace(command.Actor))
+        {
+            return Result.Failure<LabRunView>(Error.Forbidden("lab.no_owner", "The hold-out is unlocked by the owner."));
+        }
+
+        var plan = await unlocker.CheckAsync(command.RunId, cancellationToken);
+        if (plan.IsFailure)
+        {
+            return Result.Failure<LabRunView>(plan.Error);
+        }
+
+        var run = plan.Value.Run;
+        var labels = new[] { HoldOutJob.Label(run.Id, command.Actor), "Hold-out look: the frozen plan of this run's version, run once over the locked block; the result is stored beside the report." };
+        var queued = await runs.InsertOrGetAsync(
+            new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(run.Id), run.StrategyId, run.Version, run.StrategyHash, run.Universe, run.From, run.To, HoldOutJob.Method, HoldOutJob.ConfigHash, run.EngineVersion, labels, time.GetUtcNow()),
+            cancellationToken);
+        return Result.Success(LabRunView.Of(queued.Run));
     }
 }
 

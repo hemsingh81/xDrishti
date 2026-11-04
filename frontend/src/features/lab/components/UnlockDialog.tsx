@@ -10,10 +10,13 @@ import { runKeys } from '../api/runQueries';
 export function UnlockDialog({
   runId,
   runReachesHoldOut,
+  onQueued,
   onClose,
 }: {
   runId: string;
   runReachesHoldOut: boolean;
+  /** The unlock was accepted as a queued job (202): its run id, so the card can follow it. */
+  onQueued: (jobId: string) => void;
   onClose: () => void;
 }) {
   const toast = useToast();
@@ -24,8 +27,9 @@ export function UnlockDialog({
   const unlock = useMutation({
     gcTime: 0,
     mutationFn: (typed: string) => unlockHoldOut(runId, typed),
-    onSuccess: () => {
-      toast.notify('The hold-out was opened once and the result is stored.', 'success');
+    onSuccess: (job) => {
+      toast.notify('The hold-out look is queued. The result appears here when it is stored.', 'success');
+      onQueued(job.id);
       onClose();
     },
     onError: (error) => {
@@ -34,7 +38,7 @@ export function UnlockDialog({
     onSettled: () => {
       setPassword('');
       unlock.reset();
-      // A success stored a look; a 409 `lab.holdout_used` means one is stored already: read the report again either way.
+      // A 409 `lab.holdout_used` means a look is stored already: read the report again either way (a queued look is read when its job ends).
       void queryClient.invalidateQueries({ queryKey: runKeys.reports });
       void queryClient.invalidateQueries({ queryKey: ['lab', 'ledger'] });
     },
@@ -59,9 +63,9 @@ export function UnlockDialog({
       <AppDialogBody>
         <Stack spacing={2}>
           <Typography variant="body2">
-            This runs the frozen plan once over the hold-out and stores the result. It cannot be undone, and a second
-            look by this version is refused. A look at a block that was seen before is shown but cannot count toward a
-            pass.
+            This queues the frozen plan to run once over the hold-out and store the result. It cannot be undone, and a
+            second look by this version is refused. A look at a block that was seen before is shown but cannot count
+            toward a pass.
           </Typography>
           {runReachesHoldOut && (
             <Alert severity="warning">

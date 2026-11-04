@@ -3,6 +3,7 @@ import { Alert, Box, Button, Chip, Typography } from '@mui/material';
 import { useState } from 'react';
 import { formatDate } from '@/shared/lib/format';
 import type { ReportHoldOut } from '../api/confidenceQueries';
+import { HoldOutJobStatus } from './HoldOutJobStatus';
 import { HoldOutNumbers } from './HoldOutNumbers';
 import { UnlockDialog } from './UnlockDialog';
 
@@ -19,6 +20,7 @@ const stateWord: Record<string, string> = {
  */
 export function HoldOutCard({ runId, holdOut }: { runId: string; holdOut: ReportHoldOut }) {
   const [open, setOpen] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
   const looked = (holdOut.state === 'used' || holdOut.state === 'reused') && holdOut.result !== null;
   return (
     <Box component="section" aria-label="Hold-out">
@@ -44,18 +46,28 @@ export function HoldOutCard({ runId, holdOut }: { runId: string; holdOut: Report
             The numbers of the hold-out stay hidden until the owner unlocks it. Unlocking is irreversible: the frozen
             plan runs once over the block, the result is stored, and the block counts as seen.
           </Alert>
-          <Button
-            startIcon={<LockOpenIcon />}
-            onClick={() => {
-              setOpen(true);
-            }}
-          >
-            Unlock the hold-out
-          </Button>
+          {jobId !== null ? (
+            <HoldOutJobStatus
+              jobId={jobId}
+              onDismiss={() => {
+                setJobId(null);
+              }}
+            />
+          ) : (
+            <Button
+              startIcon={<LockOpenIcon />}
+              onClick={() => {
+                setOpen(true);
+              }}
+            >
+              Unlock the hold-out
+            </Button>
+          )}
           {open && (
             <UnlockDialog
               runId={runId}
               runReachesHoldOut={holdOut.runReachesHoldOut}
+              onQueued={setJobId}
               onClose={() => {
                 setOpen(false);
               }}

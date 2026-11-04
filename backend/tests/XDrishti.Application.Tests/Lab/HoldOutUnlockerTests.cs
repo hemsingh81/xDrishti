@@ -1,6 +1,8 @@
+#pragma warning disable CA2012 // NSubstitute setup on ValueTask members is not awaited
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Market.Bars;
@@ -252,15 +254,171 @@ public sealed class HoldOutUnlockerTests
     }
 
     [Fact]
-    public async Task The_owner_handler_refuses_an_empty_actor_and_otherwise_runs_the_look_as_owner()
+    public async Task The_owner_handler_refuses_an_empty_actor_and_otherwise_queues_one_holdout_job_without_running_the_pass()
+    {
+        var run = Run();
+        var handler = new UnlockHoldOutHandler(Unlocker(), _runs, _time);
+        NewLabRun? posted = null;
+        _runs.InsertOrGetAsync(Arg.Do<NewLabRun>(n => posted = n), Arg.Any<CancellationToken>()).Returns(c => new InsertedLabRun(Queued(c.Arg<NewLabRun>()), true));
+
+        (await handler.HandleAsync(new UnlockHoldOutCommand(run.Id, " "), Ct)).Error.Kind.ShouldBe(ErrorKind.Forbidden);
+        posted.ShouldBeNull();
+        var queued = await handler.HandleAsync(new UnlockHoldOutCommand(run.Id, "owner:x"), Ct);
+
+        queued.IsSuccess.ShouldBeTrue(queued.IsFailure ? queued.Error.Message : string.Empty);
+        (queued.Value.Method, queued.Value.State).ShouldBe(("holdout", "queued"));
+        posted.ShouldNotBeNull();
+        posted.Key.ShouldBe(HoldOutJob.KeyOf(run.Id));
+        (posted.StrategyId, posted.Version, posted.StrategyHash, posted.From, posted.To).ShouldBe((run.StrategyId, run.Version, run.StrategyHash, run.From, run.To));
+        HoldOutJob.Parse(Queued(posted)).ShouldBe((run.Id, "owner:x"));
+        _pass.Calls.ShouldBe(0, "the pass runs on the dispatcher, not in the request");
+        _store.Unlocks.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_owner_handler_refuses_what_the_pass_would_refuse_without_queueing_a_job()
+    {
+        var handler = new UnlockHoldOutHandler(Unlocker(), _runs, _time);
+        var used = Run();
+        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
+        var noReport = Run(method: "quick");
+        var unfrozen = Run(strategy: "NOFREEZE");
+        _freezes.FirstAsync("NOFREEZE", Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns((string?)null);
+
+        (await handler.HandleAsync(new UnlockHoldOutCommand(Guid.NewGuid(), "owner:x"), Ct)).Error.Kind.ShouldBe(ErrorKind.NotFound);
+        (await handler.HandleAsync(new UnlockHoldOutCommand(noReport.Id, "owner:x"), Ct)).Error.Code.ShouldBe(LabErrors.NoReportCode);
+        (await handler.HandleAsync(new UnlockHoldOutCommand(unfrozen.Id, "owner:x"), Ct)).Error.Code.ShouldBe(LabErrors.HoldOutUnavailableCode);
+        await Unlocker().UnlockAsync(used.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
+        (await handler.HandleAsync(new UnlockHoldOutCommand(used.Id, "owner:x"), Ct)).Error.Code.ShouldBe(LabErrors.HoldOutUsedCode);
+
+        await _runs.DidNotReceiveWithAnyArgs().InsertOrGetAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task The_job_runs_the_one_look_stores_it_and_ends_succeeded_with_a_stage_log_and_progress_events()
     {
         _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
         var run = Run();
-        var handler = new UnlockHoldOutHandler(Unlocker());
+        var progress = Substitute.For<ILabProgress>();
+        LabFinish? finish = null;
+        _runs.FinishAsync(Arg.Do<LabFinish>(f => finish = f), Arg.Any<CancellationToken>()).Returns(true);
 
-        (await handler.HandleAsync(new UnlockHoldOutCommand(run.Id, " "), Ct)).Error.Kind.ShouldBe(ErrorKind.Forbidden);
-        (await handler.HandleAsync(new UnlockHoldOutCommand(run.Id, "owner:x"), Ct)).Value.Mode.ShouldBe("owner");
+        await Job(progress).ExecuteAsync(JobOf(run), Ct);
+
+        finish.ShouldNotBeNull();
+        (finish.State, finish.Stage, finish.Error).ShouldBe((LabRunState.Succeeded, "holdout", null));
+        finish.Stages.Single().FinishedAt.ShouldNotBeNull();
+        _store.Unlocks.Single().Result.Actor.ShouldBe("owner:x");
+        _pass.Calls.ShouldBe(1);
+        await progress.Received(1).ProgressAsync(Arg.Is<LabRunProgress>(p => p.Stage == "holdout"), Arg.Any<CancellationToken>());
+        await progress.Received(1).FinishedAsync(Arg.Is<LabRunFinished>(f => f.State == "succeeded"), Arg.Any<CancellationToken>());
+        _events.ReceivedWithAnyArgs(1).Record(default!);
     }
+
+    [Fact]
+    public async Task A_job_that_cannot_look_ends_failed_with_the_code_of_the_refusal_and_stores_nothing()
+    {
+        _pass.Failure = LabErrors.HoldOutUnavailable("The plan of this run differs.");
+        var run = Run();
+        LabFinish? finish = null;
+        _runs.FinishAsync(Arg.Do<LabFinish>(f => finish = f), Arg.Any<CancellationToken>()).Returns(true);
+
+        await Job().ExecuteAsync(JobOf(run), Ct);
+
+        finish.ShouldNotBeNull();
+        (finish.State, finish.Error).ShouldBe((LabRunState.Failed, LabErrors.HoldOutUnavailableCode));
+        finish.Problems.Single().Message.ShouldContain("differs");
+        _store.Unlocks.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_job_cancelled_before_the_pass_starts_ends_cancelled_without_a_look()
+    {
+        var run = Run();
+        var job = JobOf(run);
+        _runs.IsCancelRequestedAsync(job.Id, Arg.Any<CancellationToken>()).Returns(true);
+        LabFinish? finish = null;
+        _runs.FinishAsync(Arg.Do<LabFinish>(f => finish = f), Arg.Any<CancellationToken>()).Returns(true);
+
+        await Job().ExecuteAsync(job, Ct);
+
+        finish.ShouldNotBeNull().State.ShouldBe(LabRunState.Cancelled);
+        _pass.Calls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_crash_in_the_pass_ends_the_job_failed_run_crashed_and_asking_again_is_safe()
+    {
+        var run = Run();
+        _pass.Throw = true;
+        LabFinish? finish = null;
+        _runs.FinishAsync(Arg.Do<LabFinish>(f => finish = f), Arg.Any<CancellationToken>()).Returns(true);
+
+        await Job().ExecuteAsync(JobOf(run), Ct);
+
+        finish.ShouldNotBeNull().Error.ShouldBe("lab.run_crashed");
+        _store.Unlocks.ShouldBeEmpty();
+        _pass.Throw = false;
+        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
+        await Job().ExecuteAsync(JobOf(run), Ct);
+        _store.Unlocks.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_failure_to_write_the_audit_row_is_logged_and_the_look_stays_stored()
+    {
+        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
+        _unitOfWork.TrySaveChangesAsync(Arg.Any<CancellationToken>()).Throws(new InvalidOperationException("db"));
+
+        var result = await Unlocker().UnlockAsync(Run().Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        _store.Unlocks.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_failure_to_report_the_stage_ends_the_job_failed_run_crashed_so_the_key_is_freed()
+    {
+        var run = Run();
+        _runs.ReportAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<IReadOnlyList<LabStageLog>>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Throws(new InvalidOperationException("db"));
+        LabFinish? finish = null;
+        _runs.FinishAsync(Arg.Do<LabFinish>(f => finish = f), Arg.Any<CancellationToken>()).Returns(true);
+
+        await Job().ExecuteAsync(JobOf(run), Ct);
+
+        finish.ShouldNotBeNull().State.ShouldBe(LabRunState.Failed);
+        finish.Error.ShouldBe("lab.run_crashed");
+        _pass.Calls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_job_of_another_run_of_a_version_that_already_looked_fails_as_used()
+    {
+        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
+        await Unlocker().UnlockAsync(Run().Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
+
+        var other = await Unlocker().UnlockAsync(Run().Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
+
+        other.Error.Code.ShouldBe(LabErrors.HoldOutUsedCode);
+        _pass.Calls.ShouldBe(1);
+    }
+
+    [Fact]
+    public void A_job_is_told_by_its_method_and_a_label_that_is_not_a_job_label_is_not_parsed()
+    {
+        var run = Run();
+        HoldOutJob.Parse(run).ShouldBeNull();
+        HoldOutJob.Is(JobOf(run)).ShouldBeTrue();
+        HoldOutJob.Is(run).ShouldBeFalse();
+        HoldOutJob.Parse(JobOf(run) with { Labels = ["holdout-job run=not-a-guid actor=x"] }).ShouldBeNull();
+        HoldOutJob.Parse(JobOf(run) with { Labels = [] }).ShouldBeNull();
+    }
+
+    private HoldOutJobRunner Job(ILabProgress? progress = null) => new(_runs, Unlocker(), progress ?? Substitute.For<ILabProgress>(), _time, NullLogger<HoldOutJobRunner>.Instance);
+
+    private static LabRun Queued(NewLabRun n) => new(n.Id, n.Key, n.StrategyId, n.Version, n.StrategyHash, n.Universe, n.From, n.To, n.Method, n.ConfigHash, n.EngineVersion, LabRunState.Queued, null, 0, 0, [], null, [], [], n.Labels, null, false, n.CreatedAt, null, null);
+
+    private LabRun JobOf(LabRun source) => Queued(new NewLabRun(Guid.NewGuid(), HoldOutJob.KeyOf(source.Id), source.StrategyId, source.Version, source.StrategyHash, source.Universe, source.From, source.To, HoldOutJob.Method, HoldOutJob.ConfigHash, source.EngineVersion, [HoldOutJob.Label(source.Id, "owner:x")], _time.GetUtcNow()));
 
     [Fact]
     public async Task The_hold_out_view_shows_the_proposal_before_a_block_exists_and_numbers_only_in_a_look_that_was_taken()
@@ -289,11 +447,18 @@ public sealed class HoldOutUnlockerTests
 
         public Error? Failure { get; set; }
 
+        public bool Throw { get; set; }
+
         public int Calls { get; private set; }
 
         public ValueTask<Result<HoldOutFigures>> RunAsync(LabRun run, LabVerdictView verdict, HoldOutBlock block, CancellationToken cancellationToken)
         {
             Calls++;
+            if (Throw)
+            {
+                throw new InvalidOperationException("the pass broke");
+            }
+
             return ValueTask.FromResult(Failure is { } e ? Result.Failure<HoldOutFigures>(e) : Result.Success(Figures!));
         }
     }

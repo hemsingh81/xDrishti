@@ -86,16 +86,19 @@ export function RunDetail({ runId, poll }: RunDetailProps) {
             variant={total > 0 ? 'determinate' : 'indeterminate'}
             value={total > 0 ? (done / total) * 100 : 0}
           />
-          <Box sx={{ mt: 1 }}>
-            <Button
-              onClick={() => {
-                cancel.mutate();
-              }}
-              disabled={cancel.isPending || run.cancelRequested}
-            >
-              Cancel run
-            </Button>
-          </Box>
+          {/* a hold-out look cannot be stopped once its pass has started (CF-06 part C) */}
+          {!(run.method === 'holdout' && run.stage === 'holdout') && (
+            <Box sx={{ mt: 1 }}>
+              <Button
+                onClick={() => {
+                  cancel.mutate();
+                }}
+                disabled={cancel.isPending || run.cancelRequested}
+              >
+                Cancel run
+              </Button>
+            </Box>
+          )}
         </Box>
       )}
       {run.error && <Alert severity="error">{run.error}</Alert>}
@@ -117,7 +120,9 @@ export function RunDetail({ runId, poll }: RunDetailProps) {
         </Typography>
       ))}
       {run.verdict && <VerdictPanel verdict={run.verdict} />}
-      {run.state === 'succeeded' && run.method !== 'quick' && <ReportPanel runId={run.id} />}
+      {run.state === 'succeeded' && (run.method === 'full' || run.method === 'robust') && (
+        <ReportPanel runId={run.id} />
+      )}
     </Stack>
   );
 }

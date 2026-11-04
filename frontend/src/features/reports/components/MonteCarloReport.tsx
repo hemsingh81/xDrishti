@@ -80,8 +80,10 @@ export function MonteCarloReport({ min }: Pick<ReportPanelProps, 'min'>) {
   const [open, setOpen] = useState<readonly string[]>([]);
   return (
     <QueryPanel title="Monte Carlo risk" query={runs}>
-      {(list) =>
-        list.length === 0 ? (
+      {(all) => {
+        // only a full or robust run has a stored out-of-sample result to bootstrap
+        const list = all.filter((run) => run.method === 'full' || run.method === 'robust');
+        return list.length === 0 ? (
           <NonValue state={{ kind: 'empty', reason: 'No Lab run yet.' }} />
         ) : (
           <Box sx={{ display: 'grid', gap: 1.5 }}>
@@ -115,8 +117,8 @@ export function MonteCarloReport({ min }: Pick<ReportPanelProps, 'min'>) {
               );
             })}
           </Box>
-        )
-      }
+        );
+      }}
     </QueryPanel>
   );
 }

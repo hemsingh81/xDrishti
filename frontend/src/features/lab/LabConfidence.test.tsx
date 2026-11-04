@@ -12,8 +12,10 @@ type Registration = Schemas['RegistrationView'];
 type Report = Schemas['LabReportView'];
 type HoldOut = Schemas['ReportHoldOutView'];
 type Result = Schemas['HoldOutResultView'];
+type Run = Schemas['LabRunView'];
 
 const runId = '00000000-0000-4000-8000-0000000000a1';
+const jobId = '00000000-0000-4000-8000-0000000000b2';
 const regUrl = '/api/lab/strategies/MY_ORB/versions/2/registration';
 const markup = '<img src=x onerror="alert(1)"> forced seller';
 
@@ -53,6 +55,38 @@ const result = (over: Partial<Result> = {}): Result => ({
   settingHash: 'b'.repeat(64),
   actor: 'owner',
   notes: [],
+  ...over,
+});
+
+const job = (over: Partial<Run> = {}): Run => ({
+  id: jobId,
+  key: 'k'.repeat(64),
+  state: 'queued',
+  stage: null,
+  strategy: { id: 'MY_ORB', version: 2, hash: 'a'.repeat(64) },
+  universe: {
+    kind: 'symbols',
+    basketId: null,
+    label: '2 symbols',
+    requested: 2,
+    instruments: [],
+    sampled: false,
+    seed: null,
+  },
+  window: { from: '2025-10-01', to: '2026-04-30' },
+  method: 'holdout',
+  progress: { done: 0, total: 0 },
+  simRunKeys: [],
+  counts: null,
+  problems: [],
+  stages: [],
+  labels: [],
+  error: null,
+  cancelRequested: false,
+  createdAt: '2026-11-05T04:00:00Z',
+  startedAt: null,
+  finishedAt: null,
+  verdict: null,
   ...over,
 });
 
@@ -321,7 +355,7 @@ describe('Trials and hold-out on the report', () => {
     expect(within(card).getByText(/Does not count toward a pass.*cannot count toward a pass/)).toBeInTheDocument();
   });
 
-  it('asks for the password, unlocks once, clears the field and shows the stored numbers from the refreshed report', async () => {
+  it('asks for the password, queues the look, clears the field and shows the stored numbers once the job has succeeded', async () => {
     let unlocked = false;
     let body: unknown;
     server.use(
@@ -335,8 +369,9 @@ describe('Trials and hold-out on the report', () => {
       http.post('/api/lab/runs/:id/holdout-unlock', async ({ request }) => {
         body = await request.json();
         unlocked = true;
-        return HttpResponse.json(result());
+        return HttpResponse.json(job(), { status: 202 });
       }),
+      http.get('/api/lab/runs/:id', () => HttpResponse.json(job({ state: 'succeeded' }))),
     );
     const user = userEvent.setup();
     const view = renderWithProviders(<ReportPanel runId={runId} />);
@@ -390,14 +425,15 @@ describe('Trials and hold-out on the report', () => {
     expect(within(dialog).queryByText(/window reached the block/)).toBeNull();
   });
 
-  it('refreshes the report after an unlock', async () => {
+  it('refreshes the report when the queued job has succeeded', async () => {
     let reads = 0;
     server.use(
       http.get('/api/lab/runs/:id/report', () => {
         reads += 1;
         return HttpResponse.json(report());
       }),
-      http.post('/api/lab/runs/:id/holdout-unlock', () => HttpResponse.json(result())),
+      http.post('/api/lab/runs/:id/holdout-unlock', () => HttpResponse.json(job(), { status: 202 })),
+      http.get('/api/lab/runs/:id', () => HttpResponse.json(job({ state: 'succeeded' }))),
     );
     const user = userEvent.setup();
     renderWithProviders(<ReportPanel runId={runId} />);
@@ -406,8 +442,113 @@ describe('Trials and hold-out on the report', () => {
     await user.type(within(dialog).getByLabelText(/Your password for this act/), 'secret');
     await user.click(within(dialog).getByRole('button', { name: 'Unlock' }));
     await waitFor(() => {
-      expect(reads).toBe(2);
+      expect(reads).toBeGreaterThanOrEqual(2);
     });
+  });
+
+  it('says the look is queued while the job is going and offers no second unlock', async () => {
+    serve(report());
+    server.use(
+      http.post('/api/lab/runs/:id/holdout-unlock', () => HttpResponse.json(job(), { status: 202 })),
+      http.get('/api/lab/runs/:id', () => HttpResponse.json(job({ state: 'running' }))),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<ReportPanel runId={runId} />);
+    await user.click(await screen.findByRole('button', { name: 'Unlock the hold-out' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/Your password for this act/), 'secret');
+    await user.click(within(dialog).getByRole('button', { name: 'Unlock' }));
+
+    const card = await screen.findByRole('region', { name: 'Hold-out' });
+    expect(await within(card).findByText('The hold-out look is running.')).toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: 'Unlock the hold-out' })).toBeNull();
+    expect(within(card).getByText(/stay hidden until the owner unlocks/)).toBeInTheDocument();
+  });
+
+  it('says why a job that failed stored nothing and lets the owner ask again', async () => {
+    serve(report());
+    server.use(
+      http.post('/api/lab/runs/:id/holdout-unlock', () => HttpResponse.json(job(), { status: 202 })),
+      http.get('/api/lab/runs/:id', () =>
+        HttpResponse.json(
+          job({
+            state: 'failed',
+            error: 'lab.holdout_unavailable',
+            problems: [
+              {
+                stage: 'holdout',
+                path: 'holdout',
+                code: 'lab.holdout_unavailable',
+                message: 'The plan of this run differs from the plan the version froze first.',
+                severity: 'error',
+                line: null,
+                column: null,
+              },
+            ],
+          }),
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<ReportPanel runId={runId} />);
+    await user.click(await screen.findByRole('button', { name: 'Unlock the hold-out' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/Your password for this act/), 'secret');
+    await user.click(within(dialog).getByRole('button', { name: 'Unlock' }));
+
+    const card = await screen.findByRole('region', { name: 'Hold-out' });
+    expect(
+      await within(card).findByText(/did not complete \(failed\). Nothing was stored. The plan of this run differs/),
+    ).toBeInTheDocument();
+    await user.click(within(card).getByRole('button', { name: 'Try again' }));
+    expect(within(card).getByRole('button', { name: 'Unlock the hold-out' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['interrupted', null],
+    ['failed', 'lab.holdout_used'],
+  ])(
+    'does not claim nothing was stored when a %s job (%s) may have stored the look, and reads the report again',
+    async (state, error) => {
+      let reads = 0;
+      server.use(
+        http.get('/api/lab/runs/:id/report', () => {
+          reads += 1;
+          return HttpResponse.json(report());
+        }),
+        http.post('/api/lab/runs/:id/holdout-unlock', () => HttpResponse.json(job(), { status: 202 })),
+        http.get('/api/lab/runs/:id', () => HttpResponse.json(job({ state, error }))),
+      );
+      const user = userEvent.setup();
+      renderWithProviders(<ReportPanel runId={runId} />);
+      await user.click(await screen.findByRole('button', { name: 'Unlock the hold-out' }));
+      const dialog = await screen.findByRole('dialog');
+      await user.type(within(dialog).getByLabelText(/Your password for this act/), 'secret');
+      await user.click(within(dialog).getByRole('button', { name: 'Unlock' }));
+
+      const card = await screen.findByRole('region', { name: 'Hold-out' });
+      expect(await within(card).findByText(/Open the report to see whether the look was stored\./)).toBeInTheDocument();
+      expect(within(card).queryByText(/Nothing was stored/)).toBeNull();
+      await waitFor(() => {
+        expect(reads).toBeGreaterThanOrEqual(2);
+      });
+    },
+  );
+
+  it('says the progress could not be read when the job cannot be fetched', async () => {
+    serve(report());
+    server.use(
+      http.post('/api/lab/runs/:id/holdout-unlock', () => HttpResponse.json(job(), { status: 202 })),
+      http.get('/api/lab/runs/:id', () => problemResponse({ title: 'Down.' }, 500)),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<ReportPanel runId={runId} />);
+    await user.click(await screen.findByRole('button', { name: 'Unlock the hold-out' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText(/Your password for this act/), 'secret');
+    await user.click(within(dialog).getByRole('button', { name: 'Unlock' }));
+
+    expect(await screen.findByText(/progress of the hold-out look could not be read/)).toBeInTheDocument();
   });
 
   it.each([

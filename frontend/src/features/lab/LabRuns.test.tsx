@@ -381,6 +381,28 @@ describe('Lab runs', () => {
     expect(await screen.findByText('running (cancel requested)')).toBeInTheDocument();
   });
 
+  it('offers no cancel once a hold-out job has started its pass', async () => {
+    const jobRun = buildRun({ method: 'holdout', state: 'running', stage: 'holdout' });
+    setup([jobRun], [http.get('/api/lab/runs/:id', () => HttpResponse.json(jobRun))]);
+    const user = userEvent.setup();
+    renderWithProviders(<LabPage />);
+    await openRun(user, /MY_ORB v2 · holdout/);
+
+    expect(await screen.findByRole('progressbar', { name: 'Run progress' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel run' })).toBeNull();
+  });
+
+  it('shows no report panel for a succeeded hold-out job', async () => {
+    const jobRun = buildRun({ method: 'holdout', state: 'succeeded', stage: null });
+    setup([jobRun], [http.get('/api/lab/runs/:id', () => HttpResponse.json(jobRun))]);
+    const user = userEvent.setup();
+    renderWithProviders(<LabPage />);
+    await openRun(user, /MY_ORB v2 · holdout/);
+
+    expect(await screen.findByText('succeeded')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Report' })).toBeNull();
+  });
+
   it('shows the verdict gates with adjusted thresholds and honest limits, and the report with its links', async () => {
     const done = buildRun({ state: 'succeeded', stage: null, method: 'full', verdict });
     setup(
