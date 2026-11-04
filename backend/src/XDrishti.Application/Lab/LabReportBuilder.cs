@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using XDrishti.Domain.Lab;
 
 namespace XDrishti.Application.Lab;
 
@@ -55,7 +56,8 @@ internal static class LabReportBuilder
             Missing,
             [.. run.Labels.Select(S).Concat(verdict.Labels).Distinct(StringComparer.Ordinal)],
             string.Empty,
-            verdict.DeflatedSharpe);
+            verdict.DeflatedSharpe,
+            verdict.CostStress);
         return report with { Summary = ReportSummary.Write(report) };
     }
 
@@ -123,6 +125,25 @@ internal static class LabReportBuilder
             w.Add(new ReportWarningView("chance_not_excluded", "Chance is not excluded: " + string.Join(", ", chance) + $" (limit {P(ChanceLevel)})."));
         }
 
+        if (v.CostStress is { } cs)
+        {
+            if (!cs.CostsChecked)
+            {
+                w.Add(new ReportWarningView("costs_not_checked", "costs not checked against a bill: stress gates cannot PASS."));
+            }
+
+            var missed = cs.Rows.Where(r => r.Multiplier > 1 && r.Status == "fail").Select(r => $"{F(r.Multiplier)}x stress (net expectancy {F(r.ExpectancyR ?? double.NaN)} R, floor {F(r.Threshold)} R)").ToList();
+            if (cs.Delay is { Status: "fail" } d)
+            {
+                missed.Add($"the fill-one-minute-later test keeps {F((d.Retention ?? 0) * 100)} % of the expectancy per signal (needs {F(d.Required * 100)} %)");
+            }
+
+            if (missed.Count > 0)
+            {
+                w.Add(new ReportWarningView("cost_stress", "The edge does not survive: " + string.Join("; ", missed) + (cs.Enforce ? "." : " (report only: the outcome is not changed).")));
+            }
+        }
+
         return w;
     }
 
@@ -140,6 +161,12 @@ internal static class LabReportBuilder
             l.Add("The sign-flip baseline is lenient: it tests the mean R against 0 given the trade sizes, not a re-run with random entries.");
             l.Add("The sensitivity sweep is in-sample on the whole window.");
             l.AddRange(v.Robustness.Limits);
+        }
+
+        if (v.CostStress is not null)
+        {
+            l.Add(CostStress.Formula);
+            l.Add(CostStress.FirstOrderLimit);
         }
 
         l.AddRange(v.Limits);

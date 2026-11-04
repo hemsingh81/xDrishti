@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { formatNumber } from '@/shared/lib/format';
 import type { LabVerdict } from '../api/runQueries';
+import { CostStressBlock } from './CostStressBlock';
 
 const outcomeSeverity: Record<string, 'success' | 'warning' | 'error' | undefined> = {
   PASS: 'success',
@@ -92,6 +93,7 @@ export function VerdictPanel({ verdict }: { verdict: LabVerdict }) {
         </TableBody>
       </Table>
       <DeflatedSharpeLine figure={verdict.deflatedSharpe} />
+      <CostStressBlock block={verdict.costStress} />
       <Alert severity="info" sx={{ mt: 1 }}>
         <Typography variant="subtitle2">Honest limits</Typography>
         {verdict.limits.length > 0 ? (

@@ -90,6 +90,15 @@ public sealed class LabRunnerTests
             new LabDeflation(_ledger, _variantStats, options ?? new DeflationOptions()), _variantStats);
     }
 
+    private LabRunner RunnerWithStress(CostStressOptions options)
+    {
+        _ledger.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _variantStats.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<IReadOnlyList<VariantStatsRow>>().Count);
+        return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default, null, null, options), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, new LabCostStress(options));
+    }
+
     private LabRunner Runner(ConfidenceOptions? confidence = null) => new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, confidence), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance, new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats);
 
     [Fact]
@@ -424,6 +433,95 @@ public sealed class LabRunnerTests
         }
 
         await running.WaitAsync(TimeSpan.FromSeconds(10), Ct);
+    }
+
+    [Fact]
+    public async Task The_cost_stress_in_report_only_adds_the_block_and_leaves_the_verdict_the_sim_run_keys_and_the_stored_runs_byte_for_byte_as_they_were()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithStress(new CostStressOptions(ConfidenceMode.Off)).ExecuteAsync(RobustRun(), Ct);
+        await RunnerWithStress(new CostStressOptions()).ExecuteAsync(RobustRun(), Ct);
+
+        verdicts.Count.ShouldBe(2);
+        verdicts[0].CostStress.ShouldBeNull();
+        var block = verdicts[1].CostStress.ShouldNotBeNull();
+        block.Mode.ShouldBe("ReportOnly");
+        block.Enforce.ShouldBeFalse();
+        block.CostsChecked.ShouldBeFalse("the fixture sheet carries no bill check");
+        block.SheetId.ShouldBe("fixture-a");
+        block.SheetRatesSha256.ShouldBe(FixtureSheet.Sheet.RatesSha256);
+        block.Rows.ShouldAllBe(r => r.Status == "unavailable");
+        block.Delay.ShouldNotBeNull();
+        System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { CostStress = null }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]), "outcome, gates, reasons, limits, evidence and robustness are byte for byte the same");
+        _finishes[1].SimRunKeys.ShouldBe(_finishes[0].SimRunKeys);
+    }
+
+    [Fact]
+    public async Task A_bill_check_on_the_sheet_removes_the_label_and_the_rows_are_judged()
+    {
+        ArrangeFullTest();
+        _sheets.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Result.Success(FixtureSheet.Build("fixture-a", "Dhan contract notes, 2026-11-03")));
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithStress(new CostStressOptions()).ExecuteAsync(RobustRun(), Ct);
+
+        var block = verdicts.Single().CostStress.ShouldNotBeNull();
+        block.CostsChecked.ShouldBeTrue();
+        block.Rows.ShouldNotContain(r => r.Reason.Contains("not checked against a bill", StringComparison.Ordinal));
+        block.Rows.ShouldAllBe(r => r.Status != "unavailable" || r.ExpectancyR == null, "a row is unavailable only for want of a figure");
+    }
+
+    [Fact]
+    public async Task Enforce_on_never_raises_the_outcome_of_the_run()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithStress(new CostStressOptions(ConfidenceMode.Off)).ExecuteAsync(RobustRun(), Ct);
+        await RunnerWithStress(new CostStressOptions(Enforce: true)).ExecuteAsync(RobustRun(), Ct);
+
+        var rank = new Dictionary<string, int> { ["FAIL"] = 0, ["MARGINAL"] = 1, ["PASS"] = 2 };
+        rank[verdicts[1].Outcome].ShouldBeLessThanOrEqualTo(rank[verdicts[0].Outcome]);
+        verdicts[1].Gates.ShouldBe(verdicts[0].Gates);
+    }
+
+    [Fact]
+    public async Task The_delay_pass_asks_for_the_same_request_with_an_entry_delay_of_one_minute_and_a_full_test_takes_none()
+    {
+        ArrangeFullTest();
+        _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(_run));
+
+        await RunnerWithStress(new CostStressOptions()).ExecuteAsync(RobustRun(), Ct);
+
+        var requests = _simulation.ReceivedCalls().Select(c => ((RunSimulationQuery)c.GetArguments()[0]!).Request).ToList();
+        requests.Count.ShouldBe(6, "the base, the four sweep points and the delayed run");
+        requests.Count(r => r.Fills!.EntryDelayMinutes == 1).ShouldBe(1);
+        requests.Last().Fills!.EntryDelayMinutes.ShouldBe(1);
+        requests.Last().Parameters.ShouldBeEmpty();
+        requests.Take(5).ShouldAllBe(r => r.Fills!.EntryDelayMinutes == 0);
+
+        _simulation.ClearReceivedCalls();
+        await RunnerWithStress(new CostStressOptions()).ExecuteAsync(FullRun(), Ct);
+        _simulation.ReceivedCalls().ShouldBeEmpty("a full test has no simulation pass of its own");
+    }
+
+    [Fact]
+    public async Task A_plain_full_test_has_no_cost_stress_member_so_its_document_is_what_it_was()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithStress(new CostStressOptions()).ExecuteAsync(FullRun(), Ct);
+        await RunnerWithStress(new CostStressOptions(ConfidenceMode.Off)).ExecuteAsync(FullRun(), Ct);
+
+        verdicts[0].CostStress.ShouldBeNull();
+        System.Text.Json.JsonSerializer.Serialize(verdicts[0]).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[1]));
     }
 
     /// <summary>A simulation handler whose answer is a function of the token it was given.</summary>

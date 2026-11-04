@@ -52,6 +52,35 @@ public class FillRulesTests
         rules.ToCanonicalJson().ShouldBe("""{"entry_limit_percent":0.25,"slippage":{"ticks":0,"bar_range_frac":0,"stop_exit_extra_ticks":0,"gap_fill":"at_open"}}""");
     }
 
+    [Fact]
+    public void An_entry_delay_of_zero_leaves_the_canonical_text_and_the_default_untouched()
+    {
+        FillRules.Default.EntryDelayMinutes.ShouldBe(0);
+        FillRules.Create(0.1, SlippageConfig.Default, 0).Value.ToCanonicalJson().ShouldBe(DefaultJson);
+        FillRules.Create(0.1, SlippageConfig.Default).Value.ShouldBe(FillRules.Default);
+    }
+
+    [Fact]
+    public void An_entry_delay_above_zero_is_written_after_the_slippage_and_so_changes_the_text_only_then()
+    {
+        var rules = FillRules.Create(0.1, SlippageConfig.Default, 1).Value;
+
+        rules.EntryDelayMinutes.ShouldBe(1);
+        rules.ToCanonicalJson().ShouldBe("""{"entry_limit_percent":0.1,"slippage":{"ticks":1,"bar_range_frac":0.05,"stop_exit_extra_ticks":2,"gap_fill":"at_open"},"entry_delay_minutes":1}""");
+        rules.ToCanonicalJson().ShouldNotBe(DefaultJson);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(6)]
+    public void An_entry_delay_out_of_range_is_refused(int minutes)
+    {
+        var result = FillRules.Create(0.1, SlippageConfig.Default, minutes);
+
+        result.Error.Code.ShouldBe("simulation.fill_rules_invalid");
+        result.Error.Message.ShouldContain("EntryDelayMinutes");
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(5)]

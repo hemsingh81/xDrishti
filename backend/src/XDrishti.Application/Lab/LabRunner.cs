@@ -35,7 +35,8 @@ internal sealed class LabRunner(
     TimeProvider time,
     ILogger<LabRunner> logger,
     LabDeflation deflation,
-    IVariantStatsStore variantStats) : ILabRunExecutor
+    IVariantStatsStore variantStats,
+    LabCostStress? costStress = null) : ILabRunExecutor
 {
     /// <summary>Who is recorded as the author of a stored run.</summary>
     public const string Actor = "lab:quick";
@@ -151,7 +152,7 @@ internal sealed class LabRunner(
         var total = run.Universe.Instruments.Count;
         watch.Set(QuickTest, total);
         await BeginAsync(run, log, QuickTest, 0, total, throttle, ownerToken);
-        var request = await RequestAsync(run, description, ownerToken);
+        var (request, _) = await RequestAsync(run, description, ownerToken);
         var result = await simulation.HandleAsync(new RunSimulationQuery(request, counter), ownerToken);
         if (result.IsFailure)
         {
@@ -202,7 +203,7 @@ internal sealed class LabRunner(
         var total = run.Universe.Instruments.Count * Math.Max(1, description.Timeframes.Count);
         watch.Set(FullTest, total);
         await BeginAsync(run, log, FullTest, 0, total, throttle, ownerToken);
-        var template = await RequestAsync(run, description, ownerToken);
+        var (template, sheetUsed) = await RequestAsync(run, description, ownerToken);
         if (template.Costs is not CostChoice.SheetChoice)
         {
             return FailedStage(run, log, FullTest, Error.Validation("lab.costs_required", "A full test is costed: the charge sheet is not stored or not in force on the first day of the window."), problems);
@@ -220,12 +221,13 @@ internal sealed class LabRunner(
         var oosR = full.OosTrades.Select(t => t.R).ToList();
         var statsRows = new List<VariantStatsRow> { LabVariantStats.Of(run.StrategyId, run.Id, run.StrategyHash, TradeMoments.Of(oosR), run.Method, time.GetUtcNow()) };
         var lastStage = FullTest;
+        DelaySignals? delay = null;
         if (string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal))
         {
             ownerToken.ThrowIfCancellationRequested();
             log.Finish(FullTest, 0, time.GetUtcNow());
             var plan = robustness.Plan(description);
-            var steps = run.Universe.Instruments.Count * (1 + plan.Points.Count);
+            var steps = run.Universe.Instruments.Count * (1 + plan.Points.Count + robustness.ExtraPasses);
             watch.Set(Robustness, steps);
             await BeginAsync(run, log, Robustness, 0, steps, throttle, ownerToken);
             var robust = await robustness.RunAsync(run, time.GetUtcNow(), plan, template, full, counter, ownerToken);
@@ -237,7 +239,15 @@ internal sealed class LabRunner(
             verdict = verdict with { Robustness = robust.Value.View };
             sweepRows.AddRange(robust.Value.LedgerRows);
             statsRows.AddRange(robust.Value.VariantStats);
+            delay = robust.Value.Delay;
             lastStage = Robustness;
+        }
+
+        // CF-05: the cost stress and the delay test beside the outcome; reads one stored sheet, writes nothing, and the outcome moves only if the owner has turned Enforce on
+        // Robust runs only: a plain full run keeps the document it always had (CF-05 criterion 7); the sheet is the one the run was costed with, read once at the start
+        if (costStress is { IsOn: true } && string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal) && sheetUsed is not null)
+        {
+            verdict = costStress.Apply(verdict, full.OosTrades, sheetUsed.Id, sheetUsed.Checked is not null, delay, sheetUsed.RatesSha256);
         }
 
         // CF-03: beside the factor; reads the stored trial statistics and writes nothing, and the outcome is not touched
@@ -276,7 +286,7 @@ internal sealed class LabRunner(
             return FailedStage(run, log, FullTest, Error.Conflict("lab.result_not_stored", "The result of the full test could not be stored."), problems);
         }
 
-        LabRunLog.ResultStored(logger, run.Id, full.Verdict.Outcome, full.Verdict.VariantCount);
+        LabRunLog.ResultStored(logger, run.Id, verdict.Outcome, full.Verdict.VariantCount);
         log.Finish(lastStage, 0, time.GetUtcNow());
         var counts = new LabCounts(full.Instruments, full.InstrumentsRun, full.Instruments - full.InstrumentsRun, full.Trades, 0);
         var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
@@ -302,14 +312,15 @@ internal sealed class LabRunner(
     }
 
     /// <summary>The request of the quick test: the stored version by hash, its default timeframe (as the verb), the modelled fills (as the verb), the stored sheet if it is in force on the first day, otherwise gross.</summary>
-    private async ValueTask<SimulationRequest> RequestAsync(LabRun run, StrategyDescription description, CancellationToken cancellationToken)
+    private async ValueTask<(SimulationRequest Request, CostSheet? Sheet)> RequestAsync(LabRun run, StrategyDescription description, CancellationToken cancellationToken)
     {
         var sheet = await sheets.FindAsync(settings.CostSheetId, cancellationToken);
         var costs = sheet.IsSuccess && sheet.Value.Schedules[0].EffectiveFrom <= run.From ? CostChoice.Sheet(sheet.Value.Id) : CostChoice.Gross;
         var rules = FillRules.Default;
         var fills = new FillRulesInput(rules.EntryLimitPercent, rules.Slippage.Ticks, rules.Slippage.BarRangeFrac, rules.Slippage.StopExitExtraTicks);
         var timeframe = DefaultTimeframe(run.StrategyId, description);
-        return new SimulationRequest(run.StrategyId, new Dictionary<string, double>(), timeframe.ToCode(), run.From, run.To, [.. run.Universe.Instruments.Select(i => i.Id)], null, costs, false, null, fills, null, null, run.StrategyHash);
+        var request = new SimulationRequest(run.StrategyId, new Dictionary<string, double>(), timeframe.ToCode(), run.From, run.To, [.. run.Universe.Instruments.Select(i => i.Id)], null, costs, false, null, fills, null, null, run.StrategyHash);
+        return (request, costs is CostChoice.SheetChoice && sheet.IsSuccess ? sheet.Value : null);
     }
 
     /// <summary>The timeframe the verb would use without <c>--timeframe</c>: the built-in's default, else 15m when the strategy declares it, else the first it declares.</summary>

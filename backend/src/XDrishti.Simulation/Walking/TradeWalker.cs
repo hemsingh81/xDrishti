@@ -137,6 +137,10 @@ public static class TradeWalker
         var zeroMinutes = 0;
         var fillIndex = -1;
         var ranOff = true;   // the loop ran off the end of the list while the order could still fill
+        // CF-05, D3: with an entry delay the fill minute is the N-th minute that holds a trade after the first one, and the fill window grows by the same N minutes; the limit was placed at the decision instant and is unchanged. 0 is the rule of E1.
+        var wait = rules.Fills.EntryDelayMinutes;
+        var skipped = 0;
+        var allowedSeconds = (SimulationEngine.MaxFillDelayMinutes + wait) * SecondsPerMinute;
         for (var j = index + 1; j < bars.Count; j++)
         {
             var bar = bars[j];
@@ -155,7 +159,7 @@ public static class TradeWalker
                 }
 
                 var delay = bar.EpochSeconds - fillOpen;
-                if (barDate != entryDate || delay > SimulationEngine.MaxFillDelayMinutes * SecondsPerMinute)
+                if (barDate != entryDate || delay > allowedSeconds)
                 {
                     ranOff = false;
                     break;
@@ -166,7 +170,7 @@ public static class TradeWalker
                     continue;
                 }
             }
-            else if (barDate != entryDate || bar.EpochSeconds - candidate.DecisionEpochSeconds > SimulationEngine.MaxFillDelayMinutes * SecondsPerMinute)
+            else if (barDate != entryDate || bar.EpochSeconds - candidate.DecisionEpochSeconds > allowedSeconds)
             {
                 ranOff = false;
                 break;
@@ -175,6 +179,12 @@ public static class TradeWalker
             if (bar.Volume <= 0)
             {
                 zeroMinutes++;
+                continue;
+            }
+
+            if (skipped < wait)
+            {
+                skipped++;
                 continue;
             }
 

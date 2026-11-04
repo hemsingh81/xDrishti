@@ -27040,6 +27040,201 @@
         },
         "description": "What an import of a depository-charges sheet did. `Batch` is null when nothing new was stored. `Imported` entries (`Amount` rupees) were stored; `AlreadyImported` and `AlreadyInLedger` lines were left out; `NamesLearned` names were remembered."
       },
+      "CostStressDelayView": {
+        "required": [
+          "minutes",
+          "signals",
+          "delayedFilled",
+          "baseMeanR",
+          "delayedMeanR",
+          "retention",
+          "required",
+          "status",
+          "reason",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "minutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "signals": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "delayedFilled": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "baseMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "delayedMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "retention": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "required": {
+            "type": "number",
+            "format": "double"
+          },
+          "status": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "description": "The fill-one-minute-later test of CF-05, per signal: a signal that no longer fills counts as 0 R. The means and the share are null when the base is not above 0 (the reading then says not evaluable)."
+      },
+      "CostStressRowView": {
+        "required": [
+          "multiplier",
+          "trades",
+          "expectancyR",
+          "threshold",
+          "comparison",
+          "status",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "multiplier": {
+            "type": "number",
+            "format": "double"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expectancyR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "threshold": {
+            "type": "number",
+            "format": "double"
+          },
+          "comparison": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "One row of the cost stress (CF-05): the multiplier, the out-of-sample trades restated, the mean stressed net R, the floor and its comparison, and the reading (`pass`, `fail` or `unavailable`, which is never a pass) with its reason."
+      },
+      "CostStressView": {
+        "required": [
+          "mode",
+          "enforce",
+          "settings",
+          "settingsHash",
+          "costsChecked",
+          "sheetId",
+          "rows",
+          "tradable",
+          "delay",
+          "capped",
+          "formula",
+          "limit"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "The mode when it was computed."
+          },
+          "enforce": {
+            "type": "boolean",
+            "description": "Whether a miss capped the outcome."
+          },
+          "settings": {
+            "type": "string",
+            "description": "The text of the settings that produced the figures."
+          },
+          "settingsHash": {
+            "type": "string",
+            "description": "SHA-256 of Settings."
+          },
+          "costsChecked": {
+            "type": "boolean",
+            "description": "The charge sheet is checked against a bill."
+          },
+          "sheetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The charge sheet the trades were costed with."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CostStressRowView"
+            },
+            "description": "1x, the middle and the high multiplier."
+          },
+          "tradable": {
+            "type": "string",
+            "description": "The worst of the rows: `pass`, `fail` or `unavailable`."
+          },
+          "delay": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The delay test; null when the run did not take it (a full test, not a robust one).",
+                "$ref": "#/components/schemas/CostStressDelayView"
+              }
+            ]
+          },
+          "capped": {
+            "type": "boolean",
+            "description": "True when the outcome was capped at MARGINAL by an enforced stress gate."
+          },
+          "formula": {
+            "type": "string",
+            "description": "The stress formula."
+          },
+          "limit": {
+            "type": "string",
+            "description": "The first-order limit of the formula."
+          },
+          "sheetRatesSha256": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The hash of the sheet's rates the run was costed with, so a stored verdict says which numbers were checked."
+          }
+        },
+        "description": "The cost stress and the delay test of a Lab verdict (CF-05, ADR 0206), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a miss caps the outcome at MARGINAL and never raises it. Every settings figure used is in\nstring CostStressView.Settings and its hash in string CostStressView.SettingsHash. string CostStressView.Tradable is the worst of the three multipliers. bool CostStressView.CostsChecked is false until `cost-sheet check` has recorded a bill check, and the rows are then unavailable."
+      },
       "CostUndoResult": {
         "required": [
           "batch",
@@ -39519,9 +39714,19 @@
                 "$ref": "#/components/schemas/DeflatedSharpeView"
               }
             ]
+          },
+          "costStress": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CostStressView"
+              }
+            ]
           }
         },
-        "description": "The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `DeflatedSharpe` (CF-03) is the probability beside the factor, null when not computed. `Summary` is a deterministic\ntemplate over the numbers above, not an assistant text."
+        "description": "The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `DeflatedSharpe` (CF-03) is the probability beside the factor, null when not computed. `CostStress` (CF-05) is the cost stress and the delay test, null when not computed. `Summary` is a deterministic\ntemplate over the numbers above, not an assistant text."
       },
       "LabRunFinished": {
         "required": [
@@ -39884,9 +40089,19 @@
                 "$ref": "#/components/schemas/DeflatedSharpeView"
               }
             ]
+          },
+          "costStress": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CostStressView"
+              }
+            ]
           }
         },
-        "description": "The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off."
+        "description": "The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off."
       },
       "LabWindow": {
         "required": [

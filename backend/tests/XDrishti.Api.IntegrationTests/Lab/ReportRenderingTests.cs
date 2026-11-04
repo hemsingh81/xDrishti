@@ -42,6 +42,25 @@ public sealed class ReportRenderingTests
     }
 
     [Fact]
+    public void The_costs_and_delay_block_is_in_the_page_only_when_the_report_has_it_and_its_text_is_escaped()
+    {
+        var block = new CostStressView(
+            "ReportOnly", false, "ReportOnly/enforce=off", new string('9', 64), false, "fixture-a",
+            [new CostStressRowView(1.5, 40, 0.04, 0.08, ">=", "unavailable", Evil)],
+            "unavailable", new CostStressDelayView(1, 100, 90, 0.2, 0.16, 0.8, 0.7, "unavailable", Evil, "n"), false, "formula", "limit");
+
+        var plain = ReportHtml.Render(Report());
+        var page = ReportHtml.Render(Report() with { CostStress = block });
+
+        plain.ShouldNotContain("Costs and delay");
+        page.ShouldContain("<h2>Costs and delay</h2>");
+        page.ShouldContain("costs not checked against a bill");
+        page.ShouldContain("report only");
+        page.ShouldNotContain("<script");
+        page.ShouldContain("&lt;script&gt;");
+    }
+
+    [Fact]
     public void The_same_report_gives_the_same_page_and_the_same_zip_bytes()
     {
         ReportHtml.Render(Report()).ShouldBe(ReportHtml.Render(Report()));

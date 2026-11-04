@@ -232,6 +232,19 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         verdict.GetProperty("deflatedSharpe").GetProperty("note").GetString().ShouldStartWith("unavailable: ");
         (await CountAsync("SELECT count(*) FROM lab.variant_stats WHERE method = 'robust'")).ShouldBe(1);
         (await CountAsync("SELECT count(*) FROM lab.variant_stats WHERE method = 'sweep'")).ShouldBeLessThanOrEqualTo(sweepRows);
+
+        // CF-05: the cost stress and the delay test sit beside the outcome, report-only; the sheet carries no bill check so every row reads unavailable and says why
+        var stress = verdict.GetProperty("costStress");
+        stress.GetProperty("mode").GetString().ShouldBe("ReportOnly");
+        stress.GetProperty("enforce").GetBoolean().ShouldBeFalse();
+        stress.GetProperty("capped").GetBoolean().ShouldBeFalse();
+        stress.GetProperty("costsChecked").GetBoolean().ShouldBeFalse();
+        stress.GetProperty("settingsHash").GetString()!.Length.ShouldBe(64);
+        stress.GetProperty("rows").EnumerateArray().Select(r => r.GetProperty("multiplier").GetDouble()).ShouldBe([1, 1.5, 2]);
+        stress.GetProperty("rows").EnumerateArray().ShouldAllBe(r => r.GetProperty("status").GetString() == "unavailable");
+        stress.GetProperty("tradable").GetString().ShouldBe("unavailable");
+        stress.GetProperty("delay").GetProperty("minutes").GetInt32().ShouldBe(1);
+        stress.GetProperty("formula").GetString()!.ShouldContain("RExact + m x");
     }
 
     // P5-06

@@ -23,6 +23,11 @@ internal sealed class ConfidenceSettings
 
     public BootstrapSection Bootstrap { get; set; } = new();
 
+    public CostStressSection CostStress { get; set; } = new();
+
+    /// <summary>The <c>Confidence:CostStress</c> subsection as the options of CF-05 (ADR 0206).</summary>
+    internal CostStressOptions ToCostStressOptions() => new(CostStress.Mode, CostStress.Enforce, CostStress.MidMultiplier, CostStress.MidFloorR, CostStress.HighMultiplier, CostStress.HighFloorR, CostStress.DelayMinutes, CostStress.DelayRetention);
+
     /// <summary>The <c>Confidence:Deflation</c> subsection as the options of CF-03 (ADR 0205).</summary>
     internal DeflationOptions ToDeflationOptions() => new(Deflation.Mode, Deflation.MinProbability, Deflation.AssumedTrialSrSd, Deflation.TBasis);
 
@@ -118,5 +123,24 @@ internal sealed class ConfidenceSettings
         public int? Draws { get; set; }
 
         public int BlockLength { get; set; }
+    }
+
+    internal sealed class CostStressSection
+    {
+        public ConfidenceMode Mode { get; set; } = ConfidenceMode.ReportOnly;
+
+        public bool Enforce { get; set; }
+
+        public double MidMultiplier { get; set; } = 1.5;
+
+        public double MidFloorR { get; set; } = 0.08;
+
+        public double HighMultiplier { get; set; } = 2;
+
+        public double HighFloorR { get; set; }
+
+        public int DelayMinutes { get; set; } = 1;
+
+        public double DelayRetention { get; set; } = 0.70;
     }
 }

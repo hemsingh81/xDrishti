@@ -295,6 +295,7 @@ strategy_lab:
   # CF-01 (ADR 0203) reads the configuration section Confidence: EffectiveN:Mode (Off | ReportOnly | Gate, default ReportOnly; Gate is the owner's switch), EffectiveN:MinSessionsForAutocorr 20 (5..250), EffectiveN:MinTradesForEstimate 5 (3..50), EffectiveN:MinClusters 5 (3..50), Power:Alpha 0.05 (0.001..0.2), Power:Power 0.80 (0.5..0.99), Power:SigmaFloorR 0.5 (0.1..5), Power:TargetEdgeR (unset = the gate's MinExpectancyR; 0.01..5), MinTrl:Confidence 0.95 (0.5..0.999), MinTrl:BenchmarkSr 0 (-1..1); a value out of range stops the host at start
   # CF-02 (ADR 0204) reads Confidence:Shrinkage: Mode (Off | ReportOnly, default ReportOnly; Gate is refused until the lower bound is validated), TauSquaredFloor 0.01 (0.0001..1), MinTradesForSibling 5 (3..30), MinParentTrades 30 (10..200), StrengthMin 5 and StrengthMax 200 (1..1000), QuantileLevel 0.05 (0.01..0.25), SigmaPoolStrength 30 (1..1000); the existing bayes_prior strength stays the fallback
   # CF-03 (ADR 0205) reads Confidence:Deflation: Mode (Off | ReportOnly, default ReportOnly; Gate is refused), MinProbability 0.95 (0.5..0.999), AssumedTrialSrSd (unset; 0.001..1), TBasis (NEff | Raw, default NEff); and Confidence:Bootstrap: Mode (Off | ReportOnly), Draws (unset = Robustness McDraws; 100..20000), BlockLength 0 (auto; else 2..60)
+  # CF-05 ([ADR 0206](../adr/0206-the-lab-verdict-shows-a-cost-stress-at-1x-1-5x-and-2x-and-a-fill-one-minute-later-test-beside-the-outcome-in-report-only-mode-and-enforce-is-the-owners-switch.md)) reads Confidence:CostStress: Mode (Off | ReportOnly, default ReportOnly), Enforce (default false: the owner's switch), MidMultiplier 1.5 (>1..5), MidFloorR 0.08 (-1..1), HighMultiplier 2 (>Mid..5), HighFloorR 0 (-1..1), DelayMinutes 1 (1..5), DelayRetention 0.70 (0.1..1); the text and hash of the values are stored with every verdict
   assistant_can_run_tests: true
   assistant_can_promote: false
 
@@ -596,4 +597,9 @@ The ingest is the service `filings-ingest` of the scheduler in `xd-api` ([ADR 01
 | `Confidence:Bootstrap:Mode` | Whether the stationary block bootstrap of a robust run is computed: `Off`, `ReportOnly` | ReportOnly |
 | `Confidence:Bootstrap:Draws` | Resamples of the block bootstrap; unset takes `Robustness` McDraws | unset |
 | `Confidence:Bootstrap:BlockLength` | Mean block length in sessions; 0 is `round(k^(1/3))`, at least 2 | 0 |
+| `Confidence:CostStress:Mode` | Whether the cost stress (1x, 1.5x, 2x) and the fill-one-minute-later test are computed and shown beside the outcome: `Off`, `ReportOnly` (CF-05, ADR 0206) | ReportOnly |
+| `Confidence:CostStress:Enforce` | The owner's switch: on, a missed stress gate caps a PASS at MARGINAL; off, the figures decide nothing | false |
+| `Confidence:CostStress:MidMultiplier` / `MidFloorR` | The middle multiplier of charges and slippage and the least net expectancy at it | 1.5 / 0.08 R |
+| `Confidence:CostStress:HighMultiplier` / `HighFloorR` | The high multiplier and the net expectancy that must be exceeded at it | 2 / 0 R |
+| `Confidence:CostStress:DelayMinutes` / `DelayRetention` | Minutes the entry fill is delayed and the least share of the base expectancy per signal that must remain | 1 / 0.70 |
 | `goals.max_drawdown_pct` | Halt-and-review threshold | 8% |

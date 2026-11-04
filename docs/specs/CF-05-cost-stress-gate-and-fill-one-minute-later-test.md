@@ -80,3 +80,8 @@ Whether `Costing` exposes a ready `chargesR` or only the 16 lines and net R (der
 
 ## Review fixes 2026-10-27
 1. AC6 addition: evidence that comes only from tier C is a hard fail in CF-11 (D3 of CF-11), and tier C trades are excluded from the "tradable" label; the report prints how many were excluded.
+
+## Build notes 2026-11-04
+Built in the first change ([ADR 0206](../adr/0206-the-lab-verdict-shows-a-cost-stress-at-1x-1-5x-and-2x-and-a-fill-one-minute-later-test-beside-the-outcome-in-report-only-mode-and-enforce-is-the-owners-switch.md)): the stress gate, the delay test, the settings, the report block and warnings, the tier mechanics in the walker (`Slip` with a tier floor), the pure tier and capacity rules, the bill-check label, the Lab screen block. Left as a follow-up, listed in the ADR: wiring the tiers into runs (`slippage: conservative`, tier C counted and excluded), evaluating `min_turnover` and marking `capacity_breach`, and the `stress` request field. Criteria 1 to 5, 8 to 10 have tests; 6 has the pure rules only; criterion 7 is met for `quick` and `full` runs (no `costStress` member); `robust` runs carry the block by default until the `stress` request field is built.
+
+Open owner question 6 (added at review): the delay test compares the default exit over the whole window including in-sample dates, and a base signal blocked by the one-position rule in the delayed run counts as 0 R; restrict it to the winners' test windows?

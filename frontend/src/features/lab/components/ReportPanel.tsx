@@ -21,6 +21,7 @@ import { useCapability } from '@/features/owner-acts';
 import { formatNumber } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { reportHtmlHref, reportQuery, reportZipHref } from '../api/runQueries';
+import { CostStressBlock } from './CostStressBlock';
 import { RobustnessSummary } from './RobustnessSummary';
 import { noLimits } from './VerdictPanel';
 
@@ -90,6 +91,7 @@ export function ReportPanel({ runId }: { runId: string }) {
           </List>
         </Alert>
       )}
+      <CostStressBlock block={r.costStress} />
       <Alert severity="info">
         <Bullets label="Honest limits" items={r.honestLimits.length > 0 ? r.honestLimits : [noLimits]} />
       </Alert>

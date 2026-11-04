@@ -14,13 +14,18 @@ using XDrishti.Domain.Research;
 namespace XDrishti.Application.Lab;
 
 /// <summary>What the robustness stage produced: the block for the result, the ledger rows of the sweep points and the statistics of each point (CF-03), both written by the runner after its last cancel check.</summary>
-internal sealed record RobustnessOutcome(RobustnessView View, IReadOnlyList<LedgerRow> LedgerRows, IReadOnlyList<VariantStatsRow> VariantStats);
+internal sealed record RobustnessOutcome(RobustnessView View, IReadOnlyList<LedgerRow> LedgerRows, IReadOnlyList<VariantStatsRow> VariantStats, DelaySignals? Delay = null);
+
+/// <summary>
+/// The signals of the fill-one-minute-later test (CF-05): for each signal the base run filled, its net R and the net R of the delayed run's trade on the same signal, null when the delayed run did not fill it. <paramref name="Error"/> is the reason the test could not be run.
+/// </summary>
+internal sealed record DelaySignals(int Minutes, IReadOnlyList<(double BaseR, double? DelayedR)> Signals, string? Error);
 
 /// <summary>
 /// The robustness checks of a <c>robust</c> run (spec P5-05, ADR 0062): a one-at-a-time sensitivity sweep (each point a plain run of the default exit, in-sample), a seeded Monte Carlo and a sign-flip baseline over the out-of-sample trades of the full test,
 /// and the same trades by year. Nothing is written here and the verdict is not touched.
 /// </summary>
-internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<SimulationRun>> simulation, LabSettings settings, IContextFigures? contextFigures = null, BootstrapOptions? bootstrap = null)
+internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<SimulationRun>> simulation, LabSettings settings, IContextFigures? contextFigures = null, BootstrapOptions? bootstrap = null, CostStressOptions? costStress = null)
 {
     /// <summary>Said in the block when there is no source of regime labels at all (P6-02: with one, the text names the reason of each missing label).</summary>
     public const string RegimeUnavailable = "unavailable: no market-context source is available";
@@ -33,6 +38,9 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
 
     /// <summary>The method written on the ledger rows of the sweep points.</summary>
     public const string SweepMethod = "sweep";
+
+    /// <summary>Whole-universe passes the stage takes besides the base and the sweep points (the delay pass of CF-05), for the progress total.</summary>
+    public int ExtraPasses => costStress is { IsOn: true } ? 1 : 0;
 
     /// <summary>The sweep of this strategy: the parameters taken and the points it would run.</summary>
     public SweepSchedule Plan(StrategyDescription description)
@@ -59,7 +67,8 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
 
         var exit = new ExitChoice([exits.Candidates[0]], null);
         var instruments = run.Universe.Instruments.Count;
-        var baseResult = (await PointAsync(template, exit, new SweepPoint(string.Empty, 0), new Dictionary<string, double>(), progress, 0, instruments, cancellationToken)).Result;
+        var baseRun = await PointAsync(template, exit, new SweepPoint(string.Empty, 0), new Dictionary<string, double>(), progress, 0, instruments, cancellationToken, keepTrades: costStress is { IsOn: true });
+        var baseResult = baseRun.Result;
         var results = new List<SweepResult>();
         var rows = new List<LedgerRow>();
         var stats = new List<VariantStatsRow>();
@@ -120,8 +129,47 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
             regime is null ? null : [.. regime.Buckets.Select(b => new RegimeBucketView(b.Part, b.Basis, b.Trades, b.MeanR, b.TotalR, b.Enough))],
             regime is null ? null : [.. regime.Tally.UnavailableByReason.Select(r => new RegimeMissingView(r.Key, r.Value))],
             BlockOf(full.OosTrades, seed ^ BlockSeedMask, draws, mc));
-        return Result.Success(new RobustnessOutcome(view, rows, stats));
+        // CF-05: the fill-one-minute-later test, one more walk of the same signals (the default exit, the whole window); the verdict is not touched here
+        DelaySignals? delay = null;
+        if (costStress is { IsOn: true })
+        {
+            delay = baseRun.Trades is { } baseTrades
+                ? await DelayAsync(template, exit, baseTrades, costStress.DelayMinutes, progress, plan.Count + 1, instruments, cancellationToken)
+                : new DelaySignals(costStress.DelayMinutes, [], null);
+        }
+
+        return Result.Success(new RobustnessOutcome(view, rows, stats, delay));
     }
+
+    /// <summary>The same signals with the entry fill <paramref name="minutes"/> later, matched to the base run's trades by instrument, side and decision instant (CF-05, D3).</summary>
+    private async ValueTask<DelaySignals> DelayAsync(SimulationRequest template, ExitChoice exit, IReadOnlyList<SimTrade> baseTrades, int minutes, IProgress<int>? progress, int index, int instruments, CancellationToken cancellationToken)
+    {
+        var rules = template.Fills ?? new FillRulesInput(FillRules.Default.EntryLimitPercent, FillRules.Default.Slippage.Ticks, FillRules.Default.Slippage.BarRangeFrac, FillRules.Default.Slippage.StopExitExtraTicks);
+        var request = template with { Parameters = new Dictionary<string, double>(), Exits = exit, Fills = rules with { EntryDelayMinutes = minutes } };
+        var ran = await simulation.HandleAsync(new RunSimulationQuery(request, progress is null ? null : new OffsetProgress(progress, index * instruments)), cancellationToken);
+        if (ran.IsFailure)
+        {
+            return new DelaySignals(minutes, [], ran.Error.Message);
+        }
+
+        var delayed = new Dictionary<(Guid, Side, long), double>();
+        foreach (var t in ran.Value.Trades)
+        {
+            delayed.TryAdd(SignalOf(t.Trade), NetR(t.Trade));
+        }
+
+        var signals = new List<(double BaseR, double? DelayedR)>(baseTrades.Count);
+        foreach (var t in baseTrades)
+        {
+            signals.Add((NetR(t), delayed.TryGetValue(SignalOf(t), out var r) ? r : null));
+        }
+
+        return new DelaySignals(minutes, signals, null);
+    }
+
+    private static (Guid, Side, long) SignalOf(SimTrade t) => (t.InstrumentId, t.Side, t.DecisionEpochSeconds);
+
+    private static double NetR(SimTrade t) => t.Costing is { } c ? c.RNet : t.RFilled;
 
     /// <summary>
     /// The stationary block bootstrap of the out-of-sample trades by entry session (CF-03, ADR 0205); null when its mode is Off. Fewer than 2 sessions with a trade, or a result that is not a finite number, gives the figure with <c>unavailable: &lt;reason&gt;</c> and no number.
@@ -195,9 +243,9 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
     }
 
     /// <summary>A sweep point's result and the moments of its trades (null when it ran no trade or failed).</summary>
-    private sealed record PointRun(SweepResult Result, TradeMoments? Moments);
+    private sealed record PointRun(SweepResult Result, TradeMoments? Moments, IReadOnlyList<SimTrade>? Trades = null);
 
-    private async ValueTask<PointRun> PointAsync(SimulationRequest template, ExitChoice exit, SweepPoint point, Dictionary<string, double> parameters, IProgress<int>? progress, int index, int instruments, CancellationToken cancellationToken)
+    private async ValueTask<PointRun> PointAsync(SimulationRequest template, ExitChoice exit, SweepPoint point, Dictionary<string, double> parameters, IProgress<int>? progress, int index, int instruments, CancellationToken cancellationToken, bool keepTrades = false)
     {
         var request = template with { Parameters = parameters, Exits = exit };
         var ran = await simulation.HandleAsync(new RunSimulationQuery(request, progress is null ? null : new OffsetProgress(progress, index * instruments)), cancellationToken);
@@ -214,7 +262,7 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
 
         var gains = r.Where(v => v > 0).Sum();
         var losses = -r.Where(v => v < 0).Sum();
-        return new PointRun(new SweepResult(point, r.Count, r.Average(), losses > 0 ? gains / losses : null, r.Sum(), null), TradeMoments.Of(r));
+        return new PointRun(new SweepResult(point, r.Count, r.Average(), losses > 0 ? gains / losses : null, r.Sum(), null), TradeMoments.Of(r), keepTrades ? [.. ran.Value.Trades.Select(t => t.Trade)] : null);
     }
 
     private static SweepPointView ViewOf(SweepResult r) => new SweepPointView(r.Point.Parameter, r.Point.Value, r.Trades, r.MeanR, r.ProfitFactor, r.TotalR, r.Error);

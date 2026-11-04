@@ -46,6 +46,18 @@ internal static class ReportHtml
             h.Append("<p>").Append(Html.Text(d.Note)).Append("</p>\n");
         }
 
+        if (r.CostStress is { } c)
+        {
+            h.Append("<h2>Costs and delay</h2>\n<p>Mode ").Append(Html.Text(c.Mode)).Append(c.Enforce ? ", enforced" : ", report only (the outcome is not changed)").Append("; tradable: ").Append(Html.Text(c.Tradable)).Append(c.CostsChecked ? "." : "; costs not checked against a bill: stress gates cannot PASS.").Append("</p>\n");
+            Table(h, ["Multiplier", "Trades", "Net expectancy R", "Floor R", "Comparison", "Status", "Reason"], c.Rows.Select(x => new[] { N(x.Multiplier) + "x", I(x.Trades), N(x.ExpectancyR), N(x.Threshold), x.Comparison, x.Status, x.Reason }));
+            if (c.Delay is { } d)
+            {
+                Table(h, ["Delay minutes", "Signals", "Still filled", "Base mean R per signal", "Delayed mean R per signal", "Kept", "Needs", "Status", "Reason"], [[I(d.Minutes), I(d.Signals), I(d.DelayedFilled), N(d.BaseMeanR), N(d.DelayedMeanR), N(d.Retention), N(d.Required), d.Status, d.Reason]]);
+            }
+
+            h.Append("<p>").Append(Html.Text(c.Limit)).Append(" Formula: ").Append(Html.Text(c.Formula)).Append(". Settings ").Append(Html.Text(c.Settings)).Append(" (").Append(Html.Text(c.SettingsHash)).Append(").</p>\n");
+        }
+
         h.Append("<h2>Out-of-sample figures</h2>\n");
         Table(h, ["Trades", "Expectancy R", "Profit factor", "Max drawdown R", "Folds", "Positive folds"], [[I(k.OosTrades), N(k.ExpectancyR), N(k.ProfitFactor), N(k.MaxDrawdownR), I(k.Folds), I(k.PositiveFolds)]]);
 

@@ -325,7 +325,7 @@ internal sealed class RunSimulationHandler(
             return Result.Failure<FillRules?>(slippage.Error);
         }
 
-        var rules = FillRules.Create(input.EntryLimitPercent, slippage.Value);
+        var rules = FillRules.Create(input.EntryLimitPercent, slippage.Value, input.EntryDelayMinutes);
         return rules.IsFailure ? Result.Failure<FillRules?>(rules.Error) : Result.Success<FillRules?>(rules.Value);
     }
 

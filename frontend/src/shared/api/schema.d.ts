@@ -8257,6 +8257,71 @@ export interface components {
       /** Format: int32 */
       namesLearned: number;
     };
+    /** @description The fill-one-minute-later test of CF-05, per signal: a signal that no longer fills counts as 0 R. The means and the share are null when the base is not above 0 (the reading then says not evaluable). */
+    CostStressDelayView: {
+      /** Format: int32 */
+      minutes: number;
+      /** Format: int32 */
+      signals: number;
+      /** Format: int32 */
+      delayedFilled: number;
+      /** Format: double */
+      baseMeanR: null | number;
+      /** Format: double */
+      delayedMeanR: null | number;
+      /** Format: double */
+      retention: null | number;
+      /** Format: double */
+      required: number;
+      status: string;
+      reason: string;
+      note: string;
+    };
+    /** @description One row of the cost stress (CF-05): the multiplier, the out-of-sample trades restated, the mean stressed net R, the floor and its comparison, and the reading (`pass`, `fail` or `unavailable`, which is never a pass) with its reason. */
+    CostStressRowView: {
+      /** Format: double */
+      multiplier: number;
+      /** Format: int32 */
+      trades: number;
+      /** Format: double */
+      expectancyR: null | number;
+      /** Format: double */
+      threshold: number;
+      comparison: string;
+      status: string;
+      reason: string;
+    };
+    /**
+     * @description The cost stress and the delay test of a Lab verdict (CF-05, ADR 0206), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a miss caps the outcome at MARGINAL and never raises it. Every settings figure used is in
+     *     string CostStressView.Settings and its hash in string CostStressView.SettingsHash. string CostStressView.Tradable is the worst of the three multipliers. bool CostStressView.CostsChecked is false until `cost-sheet check` has recorded a bill check, and the rows are then unavailable.
+     */
+    CostStressView: {
+      /** @description The mode when it was computed. */
+      mode: string;
+      /** @description Whether a miss capped the outcome. */
+      enforce: boolean;
+      /** @description The text of the settings that produced the figures. */
+      settings: string;
+      /** @description SHA-256 of Settings. */
+      settingsHash: string;
+      /** @description The charge sheet is checked against a bill. */
+      costsChecked: boolean;
+      /** @description The charge sheet the trades were costed with. */
+      sheetId: null | string;
+      /** @description 1x, the middle and the high multiplier. */
+      rows: components['schemas']['CostStressRowView'][];
+      /** @description The worst of the rows: `pass`, `fail` or `unavailable`. */
+      tradable: string;
+      delay: null | components['schemas']['CostStressDelayView'];
+      /** @description True when the outcome was capped at MARGINAL by an enforced stress gate. */
+      capped: boolean;
+      /** @description The stress formula. */
+      formula: string;
+      /** @description The first-order limit of the formula. */
+      limit: string;
+      /** @description The hash of the sheet's rates the run was costed with, so a stored verdict says which numbers were checked. */
+      sheetRatesSha256?: null | string;
+    };
     /** @description What undoing a cost batch did: its entries are voided (nothing is deleted). Undoing a batch again is a no-op (`AlreadyUndone`, `Voided` 0). */
     CostUndoResult: {
       batch: components['schemas']['CostBatchView'];
@@ -12672,7 +12737,7 @@ export interface components {
       total: number;
     };
     /**
-     * @description The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `DeflatedSharpe` (CF-03) is the probability beside the factor, null when not computed. `Summary` is a deterministic
+     * @description The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `DeflatedSharpe` (CF-03) is the probability beside the factor, null when not computed. `CostStress` (CF-05) is the cost stress and the delay test, null when not computed. `Summary` is a deterministic
      *     template over the numbers above, not an assistant text.
      */
     LabReportView: {
@@ -12695,6 +12760,7 @@ export interface components {
       labels: string[];
       summary: string;
       deflatedSharpe?: null | components['schemas']['DeflatedSharpeView'];
+      costStress?: null | components['schemas']['CostStressView'];
     };
     /** @description Client event `labRunFinished` (spec P5-02, D5): the last event of a run, with its final state. */
     LabRunFinished: {
@@ -12777,7 +12843,7 @@ export interface components {
       /** Format: int64 */
       seed: null | number;
     };
-    /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. */
+    /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. */
     LabVerdictView: {
       outcome: string;
       /** Format: int32 */
@@ -12792,6 +12858,7 @@ export interface components {
       labels: string[];
       robustness?: null | components['schemas']['RobustnessView'];
       deflatedSharpe?: null | components['schemas']['DeflatedSharpeView'];
+      costStress?: null | components['schemas']['CostStressView'];
     };
     /** @description The India dates a run replays, inclusive. */
     LabWindow: {

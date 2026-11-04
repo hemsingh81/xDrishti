@@ -92,7 +92,7 @@ internal sealed class LabFullTest(
                 var style = comparison.Report.GateApplied ? "intraday" : "swing";
                 var cell = comparison.Candidates[0].Run.Strategy.Id + " " + timeframes[i] + " " + sideText + " " + style + " *";
                 var trades = all.Where(t => t.Trade.Side == side)
-                    .Select(t => new SelectionTrade(t.Candidate, t.Trade.TradeDate, DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(t.Trade.ExitEpochSeconds).ToOffset(IndiaOffset).DateTime), costed ? t.Trade.Costing!.RNet : t.Trade.RFilled))
+                    .Select(t => new SelectionTrade(t.Candidate, t.Trade.TradeDate, DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(t.Trade.ExitEpochSeconds).ToOffset(IndiaOffset).DateTime), costed ? t.Trade.Costing!.RNet : t.Trade.RFilled, costed ? t.Trade.RExact : null))
                     .ToList();
                 var input = new SelectionInput(cell, comparison.Report.Unit, !comparison.Report.GateApplied, comparison.EntriesKey, [.. comparison.Candidates.Select(c => c.Exit)], trades, sessions, new SelectionOptions());
                 var selection = ExitSelector.Select(input);
