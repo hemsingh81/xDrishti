@@ -235,11 +235,12 @@ describe('exit comparison', () => {
   });
 });
 
-const labRun = (id: string, state = 'succeeded'): LabRun =>
+const labRun = (id: string, state = 'succeeded', method = 'robust'): LabRun =>
   ({
     id,
     key: 'k',
     state,
+    method,
     stage: null,
     strategy: { id: 'MY_ORB', version: 1, hash: 'h' },
     createdAt: '2026-10-20T04:00:00Z',
@@ -327,6 +328,21 @@ describe('Monte Carlo risk', () => {
     renderReports('?view=montecarlo');
     await userEvent.click(await screen.findByRole('button', { name: 'Show Monte Carlo risk' }));
     expect(await screen.findByText(/has no report/)).toBeInTheDocument();
+  });
+
+  it('lists only full and robust runs: a quick run or a hold-out job has no stored result to bootstrap', async () => {
+    reportServer();
+    server.use(
+      http.get('/api/lab/runs', () =>
+        HttpResponse.json([
+          labRun(runId, 'succeeded', 'holdout'),
+          labRun(runId.replace('a1', 'a2'), 'succeeded', 'quick'),
+        ]),
+      ),
+    );
+    renderReports('?view=montecarlo');
+    expect(await screen.findByText('No Lab run yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show Monte Carlo risk' })).toBeNull();
   });
 
   it('says so when there is no Lab run', async () => {

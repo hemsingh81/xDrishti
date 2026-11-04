@@ -73,6 +73,7 @@ public sealed class LabConfidenceApiTests(ApiFactory factory) : DataTestBase(fac
         (await none.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("code").GetString().ShouldBe("auth.invalid_credentials");
         (await ScalarAsync<long>("SELECT count(*) FROM lab.holdout_unlocks")).ShouldBe(0);
         (await ScalarAsync<long>("SELECT count(*) FROM lab.holdout_blocks")).ShouldBe(0);
+        (await ScalarAsync<long>("SELECT count(*) FROM lab.lab_runs WHERE method = 'holdout'")).ShouldBe(0);
     }
 
     [Fact]
@@ -152,9 +153,66 @@ public sealed class LabConfidenceApiTests(ApiFactory factory) : DataTestBase(fac
     }
 
     [Fact]
-    public async Task A_first_look_over_http_with_the_pass_stubbed_stores_one_owner_unlock_and_a_second_is_409()
+    public async Task A_first_look_over_http_is_queued_as_a_holdout_job_the_dispatcher_stores_one_owner_unlock_and_a_second_is_409()
     {
-        await SeedWithBarsAsync("HOLD002");
+        var created = await SeedUnlockableRunAsync("HOLD002");
+        using var host = Factory.WithWebHostBuilder(b => b.ConfigureTestServices(services => services.AddScoped<IHoldOutPass, StubPass>()));
+        using var client = await SignInAsync(host);
+
+        using var first = await client.PostJsonAsync($"/api/lab/runs/{created}/holdout-unlock", new { password = Factory.OwnerPassword }, Ct);
+
+        // 202: nothing is looked at in the request; the job is queued and carries no password
+        first.StatusCode.ShouldBe(HttpStatusCode.Accepted, await first.Content.ReadAsStringAsync(Ct));
+        var job = await first.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        (job.GetProperty("method").GetString(), job.GetProperty("state").GetString()).ShouldBe(("holdout", "queued"));
+        first.Headers.Location!.ToString().ShouldEndWith(job.GetProperty("id").GetString()!);
+        (await ScalarAsync<long>("SELECT count(*) FROM lab.holdout_unlocks")).ShouldBe(0);
+        (await ScalarAsync<string>($"SELECT labels::text FROM lab.lab_runs WHERE id = '{job.GetProperty("id").GetString()}'")).ShouldNotContain(Factory.OwnerPassword);
+
+        await host.Services.GetRequiredService<LabRunDispatcher>().DrainAsync(Ct);
+
+        using var done = await client.GetAsync(new Uri($"/api/lab/runs/{job.GetProperty("id").GetString()}", UriKind.Relative), Ct);
+        (await done.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("state").GetString().ShouldBe("succeeded");
+        using var second = await client.PostJsonAsync($"/api/lab/runs/{created}/holdout-unlock", new { password = Factory.OwnerPassword }, Ct);
+        using var look = await client.GetAsync(new Uri("/api/lab/holdout", UriKind.Relative), Ct);
+        var unlocks = (await look.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("unlocks");
+        unlocks.GetArrayLength().ShouldBe(1);
+        (unlocks[0].GetProperty("mode").GetString(), unlocks[0].GetProperty("state").GetString(), unlocks[0].GetProperty("passed").GetBoolean(), unlocks[0].GetProperty("status").GetString()).ShouldBe(("owner", "used", true, "pass"));
+        second.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await second.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("code").GetString().ShouldBe("lab.holdout_used");
+        (await ScalarAsync<long>("SELECT count(*) FROM lab.holdout_unlocks WHERE mode = 'owner'")).ShouldBe(1);
+        (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'LabHoldOutUnlocked'")).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_second_post_while_the_first_job_is_queued_returns_the_same_job_and_one_row_and_asking_again_after_a_failed_job_creates_a_new_one()
+    {
+        var run = await SeedUnlockableRunAsync("HOLD003");
+        using var host = Factory.WithWebHostBuilder(b => b.ConfigureTestServices(services => services.AddScoped<IHoldOutPass, RefusingPass>()));
+        using var client = await SignInAsync(host);
+
+        using var first = await client.PostJsonAsync($"/api/lab/runs/{run}/holdout-unlock", new { password = Factory.OwnerPassword }, Ct);
+        using var again = await client.PostJsonAsync($"/api/lab/runs/{run}/holdout-unlock", new { password = Factory.OwnerPassword }, Ct);
+
+        first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        again.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        var firstId = (await first.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetString();
+        (await again.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetString().ShouldBe(firstId);
+        (await ScalarAsync<long>("SELECT count(*) FROM lab.lab_runs WHERE method = 'holdout'")).ShouldBe(1);
+
+        await host.Services.GetRequiredService<LabRunDispatcher>().DrainAsync(Ct);
+
+        (await ScalarAsync<string>($"SELECT state FROM lab.lab_runs WHERE id = '{firstId}'")).ShouldBe("failed");
+        (await ScalarAsync<long>("SELECT count(*) FROM lab.holdout_unlocks")).ShouldBe(0);
+        using var retry = await client.PostJsonAsync($"/api/lab/runs/{run}/holdout-unlock", new { password = Factory.OwnerPassword }, Ct);
+        retry.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        (await retry.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetString().ShouldNotBe(firstId);
+        (await ScalarAsync<long>("SELECT count(*) FROM lab.lab_runs WHERE method = 'holdout'")).ShouldBe(2);
+    }
+
+    private async Task<Guid> SeedUnlockableRunAsync(string symbol)
+    {
+        await SeedWithBarsAsync(symbol);
         using var scope = Factory.Services.CreateScope();
         var version = await scope.ServiceProvider.GetRequiredService<XDrishti.Application.Abstractions.Research.IStrategyStore>().GetVersionAsync("ORB", 1, Ct);
         var created = await scope.ServiceProvider.GetRequiredService<ILabRunStore>().InsertOrGetAsync(
@@ -167,24 +225,19 @@ public sealed class LabConfidenceApiTests(ApiFactory factory) : DataTestBase(fac
         var verdict = new LabVerdictView("PASS", 1, 1, new EvidenceView(100, 0.2, 1.5, 6, 5, 3, 0, "walk_forward"), [], [], [], [], []);
         (await scope.ServiceProvider.GetRequiredService<ILabResultStore>().AppendAsync(created.Run.Id, "ORB", version.Hash, verdict, DateTimeOffset.UtcNow, Ct)).ShouldBeTrue();
         (await scope.ServiceProvider.GetRequiredService<IHoldOutStore>().InsertBlockAsync(new HoldOutBlock(new DateOnly(2026, 5, 1), new DateOnly(2024, 10, 1), new DateOnly(2026, 10, 30), 6, Hash, DateTimeOffset.UtcNow), Ct)).ShouldBeTrue();
-        using var host = Factory.WithWebHostBuilder(b => b.ConfigureTestServices(services => services.AddScoped<IHoldOutPass, StubPass>()));
-        using var client = await SignInAsync(host);
-
-        using var first = await client.PostJsonAsync($"/api/lab/runs/{created.Run.Id}/holdout-unlock", new { password = Factory.OwnerPassword }, Ct);
-        using var second = await client.PostJsonAsync($"/api/lab/runs/{created.Run.Id}/holdout-unlock", new { password = Factory.OwnerPassword }, Ct);
-
-        first.StatusCode.ShouldBe(HttpStatusCode.OK, await first.Content.ReadAsStringAsync(Ct));
-        var body = await first.Content.ReadFromJsonAsync<JsonElement>(Ct);
-        (body.GetProperty("mode").GetString(), body.GetProperty("state").GetString(), body.GetProperty("passed").GetBoolean(), body.GetProperty("status").GetString()).ShouldBe(("owner", "used", true, "pass"));
-        second.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        (await second.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("code").GetString().ShouldBe("lab.holdout_used");
-        (await ScalarAsync<long>("SELECT count(*) FROM lab.holdout_unlocks WHERE mode = 'owner'")).ShouldBe(1);
-        (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'LabHoldOutUnlocked'")).ShouldBe(1);
+        await scope.ServiceProvider.GetRequiredService<IPlanFreezeStore>().FreezeAsync("ORB", 1, new string('f', 64), created.Run.Id, DateTimeOffset.UtcNow, Ct);
+        return created.Run.Id;
     }
 
     private sealed class StubPass : IHoldOutPass
     {
         public ValueTask<Result<HoldOutFigures>> RunAsync(LabRun run, LabVerdictView verdict, HoldOutBlock block, CancellationToken cancellationToken) =>
             ValueTask.FromResult(Result.Success(new HoldOutFigures(45, 0.12, block.Start, block.HistoryLast)));
+    }
+
+    private sealed class RefusingPass : IHoldOutPass
+    {
+        public ValueTask<Result<HoldOutFigures>> RunAsync(LabRun run, LabVerdictView verdict, HoldOutBlock block, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(Result.Failure<HoldOutFigures>(Error.Conflict("lab.holdout_unavailable", "refused")));
     }
 }

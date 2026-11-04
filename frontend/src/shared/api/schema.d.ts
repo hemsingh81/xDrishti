@@ -2564,7 +2564,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Owner act, fresh password in the body: run the frozen plan of this run's strategy version once over the hold-out and store the result. Irreversible. 401 auth.invalid_credentials for a wrong password, 423 auth.locked while the sign-in is locked, 409 lab.holdout_used for a second look by the version (the stored result is unchanged), 409 lab.no_report, 409 lab.holdout_unavailable, 404 lab.not_found */
+    /** Owner act, fresh password in the body: queue the one look of this run's strategy version at the hold-out (a Lab job of method holdout, answered 202 with the job; poll GET /api/lab/runs/{id} until it is succeeded, then read the stored look in the report). The password is checked here and is never stored in the job. Irreversible. 401 auth.invalid_credentials for a wrong password, 423 auth.locked while the sign-in is locked, 409 lab.holdout_used for a second look by the version (the stored result is unchanged; also the failure code of a job that lost the race), 409 lab.no_report, 409 lab.holdout_unavailable, 404 lab.not_found */
     post: operations['UnlockLabHoldOut'];
     delete?: never;
     options?: never;
@@ -26468,13 +26468,13 @@ export interface operations {
       };
     };
     responses: {
-      /** @description OK */
-      200: {
+      /** @description Accepted */
+      202: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['HoldOutResultView'];
+          'application/json': components['schemas']['LabRunView'];
         };
       };
       /** @description Unauthorized */

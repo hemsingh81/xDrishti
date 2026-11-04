@@ -29,12 +29,12 @@ public sealed class LabHoldOutArchitectureTests
     }
 
     [Fact]
-    public void The_unlock_is_reached_only_from_the_owner_handler_and_the_runners_auto_path()
+    public void The_unlock_is_reached_only_from_the_owner_handler_the_queued_job_and_the_runners_auto_path()
     {
         var users = Types.InAssembly(Application).That().HaveDependencyOn("XDrishti.Application.Lab.HoldOutUnlocker").GetTypes()
             .Select(t => t.Name.Split('`')[0]).Where(n => !n.StartsWith('<')).Distinct().Order(StringComparer.Ordinal).ToList();
 
-        users.ShouldBe(["DependencyInjection", "HoldOutUnlocker", "LabRunner", "UnlockHoldOutHandler"]);
+        users.ShouldBe(["DependencyInjection", "HoldOutJobRunner", "HoldOutUnlocker", "LabRunner", "UnlockHoldOutHandler"]);
     }
 
     [Fact]
