@@ -169,7 +169,7 @@ public sealed class OptionQualityArchitectureTests
         Naming("chain_requests").ShouldBe(["OptionArchiveReader.cs", "OptionChainStore.cs"]);
         Naming("chain_sessions").ShouldBe(["OptionChainStore.cs"]);
         Naming("rolling_bars").ShouldBe(["OptionArchiveReader.cs", "RollingBarReader.cs", "RollingBarStore.cs"]); // P14-08 (ADR 0197) added the re-mark's RollingBarReader
-        Naming("fetch_log").ShouldBe(["BackfillFetchLog.cs", "OptionArchiveReader.cs", "RollingBarReader.cs", "RollingBarStore.cs"]);
+        Naming("fetch_log").ShouldBe(["BackfillFetchLog.cs", "OptionArchiveReader.cs", "OptionsPhaseReader.cs", "RollingBarReader.cs", "RollingBarStore.cs"]); // OptionsPhaseReader: when a fetch ended, by id, for the P14 phase check (P14-17, ADR 0202)
         Naming("quality_results").ShouldBe(["OptionArchiveReader.cs", "OptionQualityStore.cs", "OptionReportReader.cs"]); // P14-16 (ADR 0201): the reports' underlying list
         Naming("quality_runs").ShouldBe(["OptionQualityStore.cs"]);
     }

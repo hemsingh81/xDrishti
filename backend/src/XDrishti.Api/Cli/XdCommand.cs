@@ -214,6 +214,11 @@ internal static class XdCommand
             return await AssistantProposeCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "options" && args[1] == "phase-check")
+        {
+            return await OptionsPhaseCheckCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "options" && args[1] == "spread-model")
         {
             return await OptionsSpreadModelCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);

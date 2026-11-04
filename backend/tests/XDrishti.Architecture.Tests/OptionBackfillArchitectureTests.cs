@@ -149,7 +149,7 @@ public sealed class OptionBackfillArchitectureTests
 
         // P14-04 (ADR 0178) added exactly one reader: the quality checks' OptionArchiveReader; P14-08 (ADR 0197) added exactly one more, the re-mark's RollingBarReader (one series over one time range, and the fetch-log watermark). A further name here is a failure.
         Naming("rolling_bars").ShouldBe(["OptionArchiveReader.cs", "RollingBarReader.cs", "RollingBarStore.cs"]);
-        Naming("fetch_log").ShouldBe(["BackfillFetchLog.cs", "OptionArchiveReader.cs", "RollingBarReader.cs", "RollingBarStore.cs"]);
+        Naming("fetch_log").ShouldBe(["BackfillFetchLog.cs", "OptionArchiveReader.cs", "OptionsPhaseReader.cs", "RollingBarReader.cs", "RollingBarStore.cs"]); // OptionsPhaseReader: when a fetch ended, by id, for the P14 phase check (P14-17, ADR 0202)
     }
 
     [Fact]

@@ -60,6 +60,7 @@ using XDrishti.Application.OptionBackfill;
 using XDrishti.Application.OptionChain;
 using XDrishti.Application.OptionCosts;
 using XDrishti.Application.OptionExpression;
+using XDrishti.Application.OptionPhaseCheck;
 using XDrishti.Application.OptionQuality;
 using XDrishti.Application.OptionReports;
 using XDrishti.Application.OwnerActs;
@@ -152,6 +153,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListPairFormationsQuery, Result<PairFormationList>>, ListPairFormationsHandler>();
         services.AddScoped<IQueryHandler<GetP14VerdictListQuery, Result<P14VerdictList>>, GetP14VerdictListHandler>();
         services.AddScoped<IQueryHandler<GetOptionsReportQuery, Result<OptionsReportView>>, GetOptionsReportHandler>();
+        services.AddScoped<IQueryHandler<OptionsPhaseCheckQuery, Result<OptionsPhaseCheckView>>, GetOptionsPhaseCheckHandler>(); // the P14 phase check (P14-17): stored verdicts, read only
         services.AddScoped<ICommandHandler<IngestFilingsCommand, FilingIngestSummary>, IngestFilingsHandler>(); // the filing ingest (P15-02): local inbox -> store folder + insert-only envelopes; no network
         services.AddScoped<ICommandHandler<ParseResultsCommand, ParseResultsSummary>, ParseResultsHandler>(); // the results parse step of filings-ingest (P15-03): stored results files -> insert-only facts; no network
         services.AddScoped<ICommandHandler<XDrishti.Application.Market.Eod.LoadEodCommand, XDrishti.Application.Market.Eod.EodLoadSummary>, XDrishti.Application.Market.Eod.LoadEodHandler>(); // CF-04 Part A: one NSE file per trading day, OFF by default (zero requests while off)

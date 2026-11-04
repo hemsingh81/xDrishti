@@ -74,7 +74,7 @@ public sealed class OptionExpressionArchitectureTests
     [Fact]
     public void Only_the_wiring_the_verb_and_the_use_case_name_the_application_or_infrastructure_remark_namespaces()
     {
-        TopLevelUsers(Application, AppNamespaces, AppNamespaces).ShouldBe(["DependencyInjection", "IvFeatureExtractor"]); // IvFeatureExtractor: the iv-1 extraction (P14-11) reads the rolling bars and the contract expiries through their ports
+        TopLevelUsers(Application, AppNamespaces, AppNamespaces).ShouldBe(["DependencyInjection", "GetOptionsPhaseCheckHandler", "IvFeatureExtractor"]); // GetOptionsPhaseCheckHandler (P14-17): reads the remark settings' condor sheet id; IvFeatureExtractor: the iv-1 extraction (P14-11) reads the rolling bars and the contract expiries through their ports
         TopLevelUsers(Infrastructure, AppNamespaces).ShouldBe(["ContractExpiryReader", "DependencyInjection", "ExpressionReader", "ExpressionTradeStore", "NoRegimeLabels", "RemarkSettings", "RollingBarReader"]); // NoRegimeLabels: the regime port (P14-10) until P6-02 stores labels
         TopLevelUsers(Assembly.Load(new AssemblyName("XDrishti.Api")), AppNamespaces).ShouldBe(["OptionsCondorsCommand", "OptionsExpressionEvalCommand", "OptionsRemarkCommand"]);
     }
@@ -173,7 +173,7 @@ public sealed class OptionExpressionArchitectureTests
             .Select(f => Path.GetFileName(f)).Order(StringComparer.Ordinal).ToList();
         var migration = File.ReadAllText(Directory.EnumerateFiles(Src("XDrishti.Infrastructure", "Persistence", "Migrations"), "*_AddExpressionTrades.cs").Single());
 
-        named.ShouldBe(["20261103183027_AddExpressionTrades.cs", "20261103224548_AddExpressionLegs.cs", "DependencyInjection.cs", "ExpressionReader.cs", "ExpressionRunRow.cs", "ExpressionTradeStore.cs", "IExpressionTradeStore.cs", "OptionReportReader.cs", "StructureLegRow.cs"]); // OptionReportReader (P14-16, ADR 0201) reads run counts with select only; StructureLegRow: its comment names the legs table (P14-10); the migration and the store write them; the wiring, the port and the run row name them in comments only; ExpressionReader (P14-09) reads them with select only
+        named.ShouldBe(["20261103183027_AddExpressionTrades.cs", "20261103224548_AddExpressionLegs.cs", "DependencyInjection.cs", "ExpressionReader.cs", "ExpressionRunRow.cs", "ExpressionTradeStore.cs", "IExpressionTradeStore.cs", "OptionReportReader.cs", "OptionsPhaseReader.cs", "StructureLegRow.cs"]); // OptionReportReader (P14-16, ADR 0201) reads run counts with select only; StructureLegRow: its comment names the legs table (P14-10); the migration and the store write them; the wiring, the port and the run row name them in comments only; ExpressionReader (P14-09) reads them with select only
         migration.ShouldContain("MakeAppendOnlyForAppRole(Schemas.Research, \"expression_runs\")");
         migration.ShouldContain("MakeAppendOnlyForAppRole(Schemas.Research, \"expression_trades\")");
         migration.ShouldNotContain("xd_exec");

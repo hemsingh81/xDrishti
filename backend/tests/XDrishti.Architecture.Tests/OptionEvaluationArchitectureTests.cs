@@ -64,7 +64,7 @@ public sealed class OptionEvaluationArchitectureTests
     [Fact]
     public void The_exact_set_of_types_that_name_an_evaluation_type_is_the_use_case_its_port_and_the_reader()
     {
-        Users(Application, Evaluation).ShouldBe(["EvaluateExpressionHandler", "ExpressionDates", "IExpressionReader"]);
+        Users(Application, Evaluation).ShouldBe(["EvaluateExpressionHandler", "ExpressionDates", "GetOptionsPhaseCheckHandler", "IExpressionReader"]); // GetOptionsPhaseCheckHandler (P14-17): the pre-registered primary profile hash of a family
         Users(Infrastructure, Evaluation).ShouldBe(["ExpressionReader"]);
         Users(Api, Evaluation).ShouldBeEmpty();
         Users(Domain, Evaluation, Evaluation).ShouldBeEmpty();
