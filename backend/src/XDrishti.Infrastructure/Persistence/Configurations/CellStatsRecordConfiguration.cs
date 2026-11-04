@@ -12,7 +12,11 @@ internal sealed class CellStatsRecordConfiguration : IEntityTypeConfiguration<Ce
 {
     public void Configure(EntityTypeBuilder<CellStatsRecord> builder)
     {
-        builder.ToTable("cell_stats", Schemas.Research, t => t.HasCheckConstraint("ck_cell_stats_shape", "snapshot_key ~ '^[0-9a-f]{64}$' AND window_code IN ('all','250d','60d') AND n >= 0 AND wins >= 0 AND wins <= n"));
+        builder.ToTable("cell_stats", Schemas.Research, t =>
+        {
+            t.HasCheckConstraint("ck_cell_stats_shape", "snapshot_key ~ '^[0-9a-f]{64}$' AND window_code IN ('all','250d','60d') AND n >= 0 AND wins >= 0 AND wins <= n");
+            t.HasCheckConstraint("ck_cell_stats_n_eff_method", "n_eff_method IS NULL OR n_eff_method IN ('cluster','serial','none')");
+        });
         builder.HasKey(x => x.Id).HasName("pk_cell_stats");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.Property(x => x.SnapshotKey).HasColumnType("character(64)").IsRequired();
@@ -28,6 +32,9 @@ internal sealed class CellStatsRecordConfiguration : IEntityTypeConfiguration<Ce
         builder.Property(x => x.Sources).HasColumnType("text").IsRequired();
         builder.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
         builder.Property(x => x.CreatedAt).IsRequired();
+        builder.Property(x => x.NEffMethod).HasColumnType("text");
+        builder.Property(x => x.NEffMode).HasColumnType("text");
+        builder.Property(x => x.NEffNote).HasColumnType("text");
         builder.HasIndex(x => new { x.SnapshotKey, x.CellKey, x.Window }).IsUnique().HasDatabaseName("uq_cell_stats_snapshot_cell_window");
         builder.HasIndex(x => new { x.AsOf, x.CreatedAt }).HasDatabaseName("ix_cell_stats_as_of_created");
         builder.HasIndex(x => x.CellKey).HasDatabaseName("ix_cell_stats_cell_key");

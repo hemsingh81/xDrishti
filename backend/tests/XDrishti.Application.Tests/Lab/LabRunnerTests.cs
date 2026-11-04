@@ -8,6 +8,7 @@ using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
@@ -78,7 +79,7 @@ public sealed class LabRunnerTests
         });
     }
 
-    private LabRunner Runner() => new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance);
+    private LabRunner Runner(ConfidenceOptions? confidence = null) => new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, confidence), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance);
 
     [Fact]
     public async Task A_valid_run_goes_through_the_three_stages_stores_the_simulation_once_and_succeeds_with_its_key_and_counts()
@@ -291,6 +292,28 @@ public sealed class LabRunnerTests
         verdicts[0].Robustness.ShouldBeNull();
         verdicts[1].Robustness.ShouldNotBeNull();
         System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { Robustness = null }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]));
+    }
+
+    [Fact]
+    public async Task Effective_n_in_report_only_adds_the_block_and_leaves_the_outcome_the_gates_and_the_evidence_as_they_were()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await Runner().ExecuteAsync(FullRun(), Ct);
+        await Runner(new ConfidenceOptions()).ExecuteAsync(FullRun(), Ct);
+
+        verdicts.Count.ShouldBe(2);
+        verdicts[0].Evidence.Dependence.ShouldBeNull();
+        verdicts[1].Outcome.ShouldBe(verdicts[0].Outcome);
+        verdicts[1].Gates.ShouldBe(verdicts[0].Gates);
+        (verdicts[1].Evidence with { Dependence = null }).ShouldBe(verdicts[0].Evidence);
+        verdicts[1].Evidence.Dependence.ShouldNotBeNull();
+        verdicts[1].Evidence.Dependence!.Mode.ShouldBe("ReportOnly");
+        verdicts[1].Evidence.Dependence!.Settings.ShouldBe(new ConfidenceOptions().KeyText());
+        verdicts[1].Limits.ShouldContain(XDrishti.Application.Confidence.DependenceView.LimitsText);
+        verdicts[0].Limits.ShouldNotContain(XDrishti.Application.Confidence.DependenceView.LimitsText);
     }
 
     [Fact]

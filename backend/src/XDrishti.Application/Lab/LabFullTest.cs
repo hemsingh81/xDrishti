@@ -2,8 +2,10 @@ using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Confidence;
 using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
@@ -21,7 +23,8 @@ internal sealed class LabFullTest(
     IQueryHandler<RunComparisonQuery, Result<ComparisonRun>> comparisons,
     ITradingCalendar calendars,
     ITestLedger ledger,
-    LabSettings settings)
+    LabSettings settings,
+    ConfidenceOptions? confidence = null)
 {
     /// <summary>Said of every cell and every verdict: what the full-period figures are.</summary>
     public const string ExplorationLabel = "exploration: in-sample on the data shown, not evidence";
@@ -102,10 +105,16 @@ internal sealed class LabFullTest(
             }
         }
 
-        var pool = OosEvidenceBuilder.Pool(cells, 0);
+        var pool = OosEvidenceBuilder.Pool(cells, 0, confidence, settings.Gates);
         var variants = MultipleTesting.Effective(await ledger.CountVariantsAsync(run.StrategyId, cancellationToken), settings.MultipleTesting);
         var verdict = VerdictEvaluator.Evaluate(settings.Gates, pool.Evidence, variants, settings.MinFoldsForPass);
         var limits = verdict.Limits.Append(CalibrationLimit).ToList();
+        limits.AddRange(verdict.Notes ?? []);
+        if (verdict.Dependence is { Mode: not ConfidenceMode.Off })
+        {
+            limits.Add(DependenceView.LimitsText);
+        }
+        // CF-01: remarks that never cap the outcome
         var weak = cells.Count(c => (c.Selection.Stability.Stable != true || c.Selection.NoChoiceReason is not null) && OosEvidenceBuilder.Pool([c], 0).Evidence.OosTrades > 0);
         if (weak > 0)
         {
@@ -122,7 +131,7 @@ internal sealed class LabFullTest(
             verdict.Outcome.ToString().ToUpperInvariant(),
             verdict.VariantCount,
             verdict.AdjustmentFactor,
-            EvidenceOf(pool.Evidence),
+            EvidenceOf(pool.Evidence, verdict.Dependence),
             [.. verdict.Gates.Select(g => new GateView(g.Name, g.Required, g.Adjusted, Finite(g.Actual), g.Passed, g.Reason))],
             limits,
             cellList,
@@ -162,7 +171,9 @@ internal sealed class LabFullTest(
         return new FullPeriodView(cell, candidate, r.Count, r.Count == 0 ? null : r.Average(), losses > 0 ? gains / losses : null, r.Count == 0 ? null : r.Sum(), ExplorationLabel);
     }
 
-    private static EvidenceView EvidenceOf(OosEvidence e) => new(e.OosTrades, Finite(e.ExpectancyR), Finite(e.ProfitFactor), e.Folds, e.PositiveFolds, Finite(e.MaxDrawdownR), e.CalibrationErrorPp, e.Method);
+    // the dependence block comes from the verdict: its EnoughByNEff is judged against the adjusted minimum of gate 1
+    private static EvidenceView EvidenceOf(OosEvidence e, DependenceAssessment? dependence) =>
+        new(e.OosTrades, Finite(e.ExpectancyR), Finite(e.ProfitFactor), e.Folds, e.PositiveFolds, Finite(e.MaxDrawdownR), e.CalibrationErrorPp, e.Method, DependenceView.Of(dependence));
 
     private static double? Finite(double value) => double.IsFinite(value) ? value : null;
 

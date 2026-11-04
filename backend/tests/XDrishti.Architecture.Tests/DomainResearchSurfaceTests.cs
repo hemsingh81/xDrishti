@@ -11,7 +11,7 @@ public sealed class DomainResearchSurfaceTests
 
     private static readonly string[] Namespaces =
     [
-        "XDrishti.Domain.Accounts", "XDrishti.Domain.Allocation", "XDrishti.Domain.Assistant", "XDrishti.Domain.Assistant.Drafting", "XDrishti.Domain.Assistant.Evaluation", "XDrishti.Domain.Assistant.Grounding", "XDrishti.Domain.Assistant.Proposals", "XDrishti.Domain.Assistant.Text", "XDrishti.Domain.Audit", "XDrishti.Domain.Auth", "XDrishti.Domain.Autonomy", "XDrishti.Domain.Capabilities", "XDrishti.Domain.Checklist", "XDrishti.Domain.Common", "XDrishti.Domain.Execution", "XDrishti.Domain.Execution.Confirm", "XDrishti.Domain.Execution.Limits", "XDrishti.Domain.Execution.PhaseCheck", "XDrishti.Domain.Filings", "XDrishti.Domain.Filings.Extraction", "XDrishti.Domain.Lab", "XDrishti.Domain.Learning", "XDrishti.Domain.Learning.Extensions", "XDrishti.Domain.LiveTrading", "XDrishti.Domain.Market", "XDrishti.Domain.Market.Actions", "XDrishti.Domain.Market.Bars", "XDrishti.Domain.Market.Baskets",
+        "XDrishti.Domain.Accounts", "XDrishti.Domain.Allocation", "XDrishti.Domain.Assistant", "XDrishti.Domain.Assistant.Drafting", "XDrishti.Domain.Assistant.Evaluation", "XDrishti.Domain.Assistant.Grounding", "XDrishti.Domain.Assistant.Proposals", "XDrishti.Domain.Assistant.Text", "XDrishti.Domain.Audit", "XDrishti.Domain.Auth", "XDrishti.Domain.Autonomy", "XDrishti.Domain.Capabilities", "XDrishti.Domain.Checklist", "XDrishti.Domain.Common", "XDrishti.Domain.Confidence", "XDrishti.Domain.Execution", "XDrishti.Domain.Execution.Confirm", "XDrishti.Domain.Execution.Limits", "XDrishti.Domain.Execution.PhaseCheck", "XDrishti.Domain.Filings", "XDrishti.Domain.Filings.Extraction", "XDrishti.Domain.Lab", "XDrishti.Domain.Learning", "XDrishti.Domain.Learning.Extensions", "XDrishti.Domain.LiveTrading", "XDrishti.Domain.Market", "XDrishti.Domain.Market.Actions", "XDrishti.Domain.Market.Bars", "XDrishti.Domain.Market.Baskets",
         "XDrishti.Domain.Market.Calendar", "XDrishti.Domain.Market.Context", "XDrishti.Domain.Market.Quality", "XDrishti.Domain.Options", "XDrishti.Domain.Options.Costs", "XDrishti.Domain.Options.Evaluation", "XDrishti.Domain.Options.Iv", "XDrishti.Domain.Options.Pricing", "XDrishti.Domain.Options.Quality", "XDrishti.Domain.Options.Reports", "XDrishti.Domain.Options.Remark", "XDrishti.Domain.Options.Structures", "XDrishti.Domain.PairResearch", "XDrishti.Domain.Pairs", "XDrishti.Domain.Paper", "XDrishti.Domain.Planning", "XDrishti.Domain.Platform", "XDrishti.Domain.Platform.Services", "XDrishti.Domain.Portfolio", "XDrishti.Domain.Reporting", "XDrishti.Domain.Research", "XDrishti.Domain.Selection", "XDrishti.Domain.Selection.SmartRules",
     ];
 
@@ -57,5 +57,16 @@ public sealed class DomainResearchSurfaceTests
 
         research.ShouldAllBe(t => t.IsEnum || t.IsSealed);
         Domain.GetReferencedAssemblies().Select(a => a.Name).ShouldNotContain(n => n != null && n.StartsWith("XDrishti.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_confidence_types_are_pure_statistics_that_depend_on_nothing_outside_the_domain_and_the_framework_maths()
+    {
+        // CF-01: no I/O, no clock, no random number, no other project
+        var result = NetArchTest.Rules.Types.InAssembly(Domain).That().ResideInNamespace("XDrishti.Domain.Confidence")
+            .ShouldNot().HaveDependencyOnAny("System.IO", "System.Net", "System.Data", "System.Threading.Tasks", "System.Diagnostics", "System.TimeProvider", "System.Environment", "System.Random", "System.Text.Json", "System.Security.Cryptography", "XDrishti.Application", "XDrishti.Infrastructure")
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
 }

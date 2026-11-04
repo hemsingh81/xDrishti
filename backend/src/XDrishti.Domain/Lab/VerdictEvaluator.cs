@@ -1,4 +1,5 @@
 using System.Globalization;
+using XDrishti.Domain.Confidence;
 
 namespace XDrishti.Domain.Lab;
 
@@ -30,9 +31,25 @@ public static class VerdictEvaluator
         var hard = false;
 
         var minTrades = Math.Ceiling(Math.Round(gates.MinOosTrades * f, 9));
-        var tradesOk = evidence.OosTrades >= minTrades;
-        hard |= evidence.OosTrades < minTrades / 2;
-        results.Add(Gate("oos_trades", gates.MinOosTrades, minTrades, evidence.OosTrades, tradesOk, ">=", n, 0));
+        var dep = evidence.Dependence;
+        var gateOnEffective = dep is { Mode: ConfidenceMode.Gate };
+        var tradesActual = (double)evidence.OosTrades;
+        var effective = dep?.NEff is { } nEff ? DependenceEstimator.CeilN(nEff) : (int?)null;
+        if (gateOnEffective && effective.HasValue)
+        {
+            tradesActual = effective.Value;   // CF-01 Gate mode (owner's switch): gate 1 compares effective n
+        }
+
+        // an unavailable effective n never passes: in Gate mode the gate is missed (and hard only by the plain count)
+        var tradesOk = gateOnEffective && !effective.HasValue ? false : tradesActual >= minTrades;
+        hard |= tradesActual < minTrades / 2;
+        var tradesGate = Gate("oos_trades", gates.MinOosTrades, minTrades, tradesActual, tradesOk, ">=", n, 0);
+        if (gateOnEffective)
+        {
+            tradesGate = tradesGate with { Reason = tradesGate.Reason + (effective.HasValue ? $"; effective n used instead of {evidence.OosTrades.ToString(Inv)} trades (Gate mode)" : $"; effective n unavailable, so the gate is not passed (Gate mode; {dep!.Note})") };
+        }
+
+        results.Add(tradesGate);
 
         var minExp = gates.MinExpectancyR * f;
         hard |= Min("expectancy_R", gates.MinExpectancyR, minExp, evidence.ExpectancyR, n, results);
@@ -59,7 +76,34 @@ public static class VerdictEvaluator
 
         var allPass = results.TrueForAll(r => r.Passed);
         var outcome = hard ? VerdictOutcome.Fail : allPass && limits.Count == 0 ? VerdictOutcome.Pass : VerdictOutcome.Marginal;
-        return new Verdict(outcome, results, n, f, limits);
+        return new Verdict(outcome, results, n, f, limits, NotesOf(dep, evidence.OosTrades, minTrades, gateOnEffective), dep is null ? null : dep with { EnoughByNEff = effective.HasValue ? effective.Value >= minTrades : null });
+    }
+
+    // CF-01: remarks only (never a limit, so the outcome is the one it was without them)
+    private static List<string>? NotesOf(DependenceAssessment? dep, int trades, double minTrades, bool gateOnEffective)
+    {
+        if (dep is null || dep.Mode == ConfidenceMode.Off)
+        {
+            return null;
+        }
+
+        var notes = new List<string>(1);
+        if (dep.NEff is not { } nEff)
+        {
+            notes.Add($"effective n unavailable ({(dep.Note.StartsWith("unavailable: ", StringComparison.Ordinal) ? dep.Note["unavailable: ".Length..] : dep.Note)}); {trades.ToString(Inv)} trades shown alone");
+            return notes;
+        }
+
+        var effective = DependenceEstimator.CeilN(nEff);
+        if (effective < minTrades)
+        {
+            var use = gateOnEffective
+                ? "used in the verdict (Gate mode)"
+                : effective < minTrades / 2 ? "not used in the verdict: it would read FAIL on trades if effective n were used" : "not used in the verdict: the trades gate would be missed if effective n were used";
+            notes.Add($"{trades.ToString(Inv)} trades, effective {effective.ToString(Inv)} of {Num(minTrades, 0)} needed; {use}");
+        }
+
+        return notes;
     }
 
     /// <summary>A gate that needs at least <paramref name="adjusted"/>; true when missed by more than the margin.</summary>

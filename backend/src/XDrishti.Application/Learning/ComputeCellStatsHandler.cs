@@ -7,6 +7,7 @@ using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Context;
@@ -18,7 +19,7 @@ namespace XDrishti.Application.Learning;
 /// source), runs the pure <see cref="CellStatsCalculator"/> and appends the snapshot. The same inputs give the same snapshot key and a second run writes nothing. R is net of charges when the run was costed, else from the filled prices; each row says which.
 /// Nothing of a trade is logged.
 /// </summary>
-internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore store, IContextFigures contextFigures, TimeProvider time, ILogger<ComputeCellStatsHandler> logger) : ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>
+internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore store, IContextFigures contextFigures, TimeProvider time, ILogger<ComputeCellStatsHandler> logger, ConfidenceOptions? confidence = null) : ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>
 {
     /// <summary>The most runs one snapshot reads.</summary>
     public const int MaxSources = 50;
@@ -57,9 +58,9 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
             regimeText = RegimeTags.Canonical(labels);
         }
 
-        var rows = CellStatsCalculator.Compute(ordered, command.AsOf, command.Options, regime?.Cells);
+        var rows = CellStatsCalculator.Compute(ordered, command.AsOf, command.Options, regime?.Cells, confidence);
         var sources = string.Join(',', command.Sources.OrderBy(s => s.RunKey, StringComparer.Ordinal).Select(s => $"{s.RunKey}:{s.Style}:{s.Exit}"));
-        var key64 = KeyOf(command.AsOf, command.Options, sources, regimeText);
+        var key64 = KeyOf(command.AsOf, command.Options, sources, regimeText, confidence);
         var snapshot = new CellSnapshotToStore(key64, command.AsOf, command.Options, sources, rows, command.Actor, time.GetUtcNow());
         bool written;
         try
@@ -79,10 +80,11 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
         return Result.Success(outcome);
     }
 
-    internal static string KeyOf(DateOnly asOf, CellStatsOptions o, string sources, string? regimeLabels = null)
+    internal static string KeyOf(DateOnly asOf, CellStatsOptions o, string sources, string? regimeLabels = null, ConfidenceOptions? confidence = null)
     {
-        // the regime part is appended only when the split was asked for, so the key of every snapshot without it is the key it always had
-        var text = string.Create(CultureInfo.InvariantCulture, $"cell-stats/1|{asOf:yyyy-MM-dd}|{o.RecencyHalfLifeDays:R}|{o.PriorStrength:R}|{o.MinTrades}|{o.CredibleLevel:R}|{sources}") + (regimeLabels is null ? string.Empty : "|regime=" + regimeLabels);
+        // the regime part is appended only when the split was asked for, so the key of every snapshot without it is the key it always had; the same for the confidence part (CF-01), which is added only when effective n is computed, so a changed setting is a new snapshot
+        var text = string.Create(CultureInfo.InvariantCulture, $"cell-stats/1|{asOf:yyyy-MM-dd}|{o.RecencyHalfLifeDays:R}|{o.PriorStrength:R}|{o.MinTrades}|{o.CredibleLevel:R}|{sources}") + (regimeLabels is null ? string.Empty : "|regime=" + regimeLabels)
+            + (confidence is { IsOn: true } ? "|confidence=" + confidence.KeyText() : string.Empty);
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     }
 

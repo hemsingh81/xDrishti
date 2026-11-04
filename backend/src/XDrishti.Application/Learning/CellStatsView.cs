@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Learning;
+using XDrishti.Application.Confidence;
 
 namespace XDrishti.Application.Learning;
 
@@ -41,10 +42,14 @@ public sealed record CellStatsView(
     double CredibleLevel,
     string SnapshotKey,
     DateTimeOffset CreatedAt,
-    string Limits)
+    string Limits,
+    DependenceView? Dependence = null)
 {
     /// <summary>Printed on every row (doc 09, P6-00 honest limits).</summary>
     public const string LimitsText = "Replayed history with modelled fills, about 2 years, in-sample on the data shown: a description of the past, not a forecast. The prior's parent group includes the cell's own trades. The credible interval treats trades as independent, which overlapping trades are not, so it is too narrow. One run per strategy feeds a snapshot, else signals would be counted twice.";
+
+    /// <summary>CF-01 <c>IndependentN</c>: trades after same-session and serial correction; null when not computed. Three different numbers: <see cref="EffectiveN"/> is the recency-weight sum, <c>KishWeightN</c> (CF-02) is (sum w)^2 / sum w^2, this is the independence count.</summary>
+    public double? IndependentN => Dependence?.NEff;
 
     /// <summary>The regime name of a regime cell (P6-02), null for a <c>*</c> cell.</summary>
     public string? RegimeName => Domain.Market.Context.RegimeNames.ParsePart(Regime)?.Name;
@@ -59,7 +64,7 @@ public sealed record CellStatsView(
             r.Cell.Key, r.Cell.Strategy, r.Cell.Timeframe, r.Cell.Side, r.Cell.Style, r.Cell.Exit, r.Cell.Regime, r.Cell.Universe, Domain.Learning.ExpressionNames.Code(r.Cell.Expression), Domain.Learning.CellWindowExtensions.Code(r.Window), r.AsOf,
             r.Costed ? "net R (after charges)" : "gross R (before charges)",
             r.N, r.Wins, r.EffectiveN, r.WinRateRaw, r.PriorRate, r.WinRatePosterior, r.WinRateLower, r.WinRateUpper, r.AvgWinR, r.AvgLossR, r.ExpectancyR, r.ProfitFactor, r.MaxDrawdownR, r.MaeP50, r.MaeP90, r.MfeP50, r.MfeP90,
-            r.Enough, r.Enough ? "enough" : "not enough evidence (fewer trades than the minimum)",
-            s.Options.RecencyHalfLifeDays, s.Options.PriorStrength, s.Options.MinTrades, s.Options.CredibleLevel, s.SnapshotKey, s.CreatedAt, LimitsText);
+            r.Enough, r.Enough ? "enough" : r.Dependence?.Mode == Domain.Confidence.ConfidenceMode.Gate ? "not enough evidence (fewer effective trades than the minimum, or effective n unavailable)" : "not enough evidence (fewer trades than the minimum)",
+            s.Options.RecencyHalfLifeDays, s.Options.PriorStrength, s.Options.MinTrades, s.Options.CredibleLevel, s.SnapshotKey, s.CreatedAt, r.Dependence is { Mode: not Domain.Confidence.ConfidenceMode.Off } ? LimitsText + " " + DependenceView.LimitsText : LimitsText, DependenceView.Of(r.Dependence));
     }
 }

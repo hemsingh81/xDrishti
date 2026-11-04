@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
 using Serilog;
 using XDrishti.Api.Auth;
+using XDrishti.Api.Confidence;
 using XDrishti.Api.Endpoints;
 using XDrishti.Api.Lab;
 using XDrishti.Api.Live;
@@ -167,9 +168,22 @@ internal static class ApiSetup
         services.AddHostedService(sp => new StrategyWarmupService(sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILogger<StrategyWarmupService>>(), CompilerWarmup.Run));
 
         services.AddLabRuns();
+        services.AddConfidence();
         services.AddExperimentJobs();
         services.AddLiveHub();
         return services;
+    }
+
+    /// <summary>
+    /// The <c>Confidence</c> section (CF-01, ADR 0203) as the options of effective n, power and minimum track record; a value out of range stops the host at start. The default mode is ReportOnly: shown, nothing decided.
+    /// </summary>
+    private static void AddConfidence(this IServiceCollection services)
+    {
+        services.AddOptions<ConfidenceSettings>()
+            .BindConfiguration(ConfidenceSettings.SectionName)
+            .Validate(s => s.ToOptions().Problems().Count == 0, "Confidence: a value is out of range (EffectiveN:MinSessionsForAutocorr 5..250, MinTradesForEstimate 3..50, MinClusters 3..50, Power:Alpha 0.001..0.2, Power 0.5..0.99, SigmaFloorR 0.1..5, TargetEdgeR 0.01..5, MinTrl:Confidence 0.5..0.999, BenchmarkSr -1..1).")
+            .ValidateOnStart();
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToOptions()));
     }
 
     /// <summary>

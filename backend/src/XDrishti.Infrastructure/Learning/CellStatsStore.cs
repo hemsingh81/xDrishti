@@ -2,6 +2,7 @@ using System.Data.Common;
 using Npgsql;
 using NpgsqlTypes;
 using XDrishti.Application.Abstractions.Learning;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 
 namespace XDrishti.Infrastructure.Learning;
@@ -13,6 +14,9 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
         snapshot_key, created_at, half_life_days, prior_strength, min_trades, credible_level, sources, as_of, strategy, timeframe, side, style, exit_policy, regime, window_code, costed, n, wins, effective_n, win_rate_raw, prior_rate,
         win_rate_posterior, win_rate_lower, win_rate_upper, avg_win_r, avg_loss_r, expectancy_r, profit_factor, max_drawdown_r, mae_p50, mae_p90, mfe_p50, mfe_p90, enough
         """;
+
+    // CF-01 (ADR 0203): the dependence columns, read after cell_key (ordinals 35 to 45); all null in a row written before the migration
+    private const string DependenceColumns = "n_eff, design_effect, n_eff_method, needed_trades, min_detectable_edge_r, min_trl, enough_by_n_eff, span_years, n_eff_mode, n_eff_note, target_edge_r";
 
     // P14-06 (ADR 0193): a cash key has exactly five separators (the six-part text every stored key has). The decision reads choose their snapshot among cash keys only, so a later snapshot that holds only option or pair cells cannot hide the cash snapshot.
     private const string CashKey = "(length(cell_key) - length(replace(cell_key, '|', '')) = 5)";
@@ -46,10 +50,10 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
             await using var insert = new NpgsqlCommand("""
                 INSERT INTO research.cell_stats (snapshot_key, as_of, cell_key, strategy, timeframe, side, style, exit_policy, regime, window_code, costed, n, wins, effective_n, win_rate_raw, prior_rate, win_rate_posterior,
                     win_rate_lower, win_rate_upper, avg_win_r, avg_loss_r, expectancy_r, profit_factor, max_drawdown_r, mae_p50, mae_p90, mfe_p50, mfe_p90, enough, half_life_days, prior_strength, min_trades, credible_level,
-                    sources, created_at, created_by)
+                    sources, created_at, created_by, n_eff, design_effect, n_eff_method, needed_trades, min_detectable_edge_r, min_trl, enough_by_n_eff, span_years, n_eff_mode, n_eff_note, target_edge_r)
                 VALUES (@snapshot_key, @as_of, @cell_key, @strategy, @timeframe, @side, @style, @exit, @regime, @window, @costed, @n, @wins, @effective_n, @raw, @prior, @posterior,
                     @lower, @upper, @avg_win, @avg_loss, @expectancy, @pf, @dd, @mae50, @mae90, @mfe50, @mfe90, @enough, @half_life, @strength, @min_trades, @level,
-                    @sources, @created_at, @created_by)
+                    @sources, @created_at, @created_by, @n_eff, @design_effect, @n_eff_method, @needed_trades, @min_detectable_edge_r, @min_trl, @enough_by_n_eff, @span_years, @n_eff_mode, @n_eff_note, @target_edge_r)
                 ON CONFLICT (snapshot_key, cell_key, window_code) DO NOTHING
                 """, connection, transaction);
             var p = insert.Parameters;
@@ -89,6 +93,18 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
             p.AddWithValue("sources", NpgsqlDbType.Text, snapshot.Sources);
             p.AddWithValue("created_at", NpgsqlDbType.TimestampTz, snapshot.CreatedAt);
             p.AddWithValue("created_by", NpgsqlDbType.Varchar, snapshot.CreatedBy);
+            var d = row.Dependence;
+            Nullable(p, "n_eff", d?.NEff);
+            Nullable(p, "design_effect", d?.DesignEffect);
+            p.AddWithValue("n_eff_method", NpgsqlDbType.Text, d is null ? DBNull.Value : (object)d.Method);
+            p.AddWithValue("needed_trades", NpgsqlDbType.Integer, d?.NeededTrades is { } needed ? (object)needed : DBNull.Value);
+            Nullable(p, "min_detectable_edge_r", d?.MinDetectableEdgeR);
+            p.AddWithValue("min_trl", NpgsqlDbType.Integer, d?.MinTrl is { } trl ? (object)trl : DBNull.Value);
+            p.AddWithValue("enough_by_n_eff", NpgsqlDbType.Boolean, d?.EnoughByNEff is { } enoughBy ? (object)enoughBy : DBNull.Value);
+            Nullable(p, "span_years", d?.SpanYears);
+            p.AddWithValue("n_eff_mode", NpgsqlDbType.Text, d is null ? DBNull.Value : (object)d.Mode.ToString());
+            Nullable(p, "target_edge_r", d?.TargetEdgeR);
+            p.AddWithValue("n_eff_note", NpgsqlDbType.Text, d is null ? DBNull.Value : (object)d.Note);
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -99,7 +115,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     public async ValueTask<IReadOnlyList<StoredCellStats>> ListLatestAsync(string? strategy, string? window, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand($"""
-            SELECT {Columns}, cell_key FROM research.cell_stats
+            SELECT {Columns}, cell_key, {DependenceColumns} FROM research.cell_stats
             WHERE snapshot_key = {Newest} AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
@@ -111,7 +127,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     public async ValueTask<IReadOnlyList<StoredCellStats>> ListLatestCashAsync(string? strategy, string? window, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand($"""
-            SELECT {Columns}, cell_key FROM research.cell_stats
+            SELECT {Columns}, cell_key, {DependenceColumns} FROM research.cell_stats
             WHERE snapshot_key = {NewestCash} AND {CashKey} AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
@@ -124,7 +140,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     {
         // P6-02 (ADR 0146): the newest snapshot that holds any regime row; the rows carry their own as-of date and snapshot key, so an older snapshot is visible as older
         await using var command = dataSource.CreateCommand($"""
-            SELECT {Columns}, cell_key FROM research.cell_stats
+            SELECT {Columns}, cell_key, {DependenceColumns} FROM research.cell_stats
             WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE regime <> '*' ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)
               AND regime <> '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
@@ -143,7 +159,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     public async ValueTask<IReadOnlyList<StoredCellStats>> ListLatestBeforeAsync(DateOnly before, string? strategy, string? window, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand($"""
-            SELECT {Columns}, cell_key FROM research.cell_stats
+            SELECT {Columns}, cell_key, {DependenceColumns} FROM research.cell_stats
             WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE as_of < @before AND {CashKey} ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)
               AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
@@ -157,7 +173,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     public async ValueTask<IReadOnlyList<StoredCellStats>> FindLatestAsync(string cellKey, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand($"""
-            SELECT {Columns}, cell_key FROM research.cell_stats
+            SELECT {Columns}, cell_key, {DependenceColumns} FROM research.cell_stats
             WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE cell_key = @key ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1) AND cell_key = @key
             ORDER BY window_code
             """);
@@ -167,6 +183,37 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
 
     private static void Nullable(NpgsqlParameterCollection parameters, string name, double? value) =>
         parameters.AddWithValue(name, NpgsqlDbType.Double, value.HasValue ? value.Value : DBNull.Value);
+
+    // a row written before CF-01 has no method: "not computed" (null), never a number
+    private static DependenceAssessment? DependenceOf(DbDataReader reader, int n)
+    {
+        if (reader.IsDBNull(37) || !Enum.TryParse<ConfidenceMode>(reader.IsDBNull(43) ? null : reader.GetString(43), out var mode))
+        {
+            return null;
+        }
+
+        var nEff = Opt(reader, 35);
+        var de = Opt(reader, 36);
+        int? needed = reader.IsDBNull(38) ? null : reader.GetInt32(38);
+        int? trl = reader.IsDBNull(40) ? null : reader.GetInt32(40);
+        var span = Opt(reader, 42);
+        return new DependenceAssessment(
+            mode,
+            n,
+            nEff,
+            de,
+            reader.GetString(37),
+            needed,
+            Opt(reader, 39),
+            trl,
+            trl.HasValue && de.HasValue ? (int)Math.Ceiling(Math.Round(trl.Value * de.Value, 9)) : null,
+            span,
+            nEff.HasValue && needed.HasValue && span.HasValue ? PowerAnalysis.YearsToEvidence(nEff.Value, span.Value, needed.Value) : null,
+            reader.IsDBNull(41) ? null : reader.GetBoolean(41),
+            n < 20,
+            reader.IsDBNull(44) ? string.Empty : reader.GetString(44),
+            Opt(reader, 45));
+    }
 
     private static double? Opt(DbDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetDouble(ordinal);
 
@@ -194,7 +241,8 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
             var window = CellWindowExtensions.Parse(reader.GetString(14)) ?? throw new InvalidDataException("A stored cell row has an unknown window.");
             var row = new CellStatsRow(
                 cell, window, reader.GetFieldValue<DateOnly>(7), reader.GetBoolean(15), reader.GetInt32(16), reader.GetInt32(17), reader.GetDouble(18), Opt(reader, 19), reader.GetDouble(20), reader.GetDouble(21), reader.GetDouble(22),
-                reader.GetDouble(23), Opt(reader, 24), Opt(reader, 25), Opt(reader, 26), Opt(reader, 27), reader.GetDouble(28), Opt(reader, 29), Opt(reader, 30), Opt(reader, 31), Opt(reader, 32), reader.GetBoolean(33));
+                reader.GetDouble(23), Opt(reader, 24), Opt(reader, 25), Opt(reader, 26), Opt(reader, 27), reader.GetDouble(28), Opt(reader, 29), Opt(reader, 30), Opt(reader, 31), Opt(reader, 32), reader.GetBoolean(33),
+                DependenceOf(reader, reader.GetInt32(16)));
             list.Add(new StoredCellStats(reader.GetString(0), reader.GetFieldValue<DateTimeOffset>(1), options, reader.GetString(6), row));
         }
 

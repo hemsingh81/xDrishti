@@ -1,3 +1,4 @@
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.Domain.Lab;
@@ -11,21 +12,23 @@ public static class OosEvidenceBuilder
 {
     /// <param name="cells">For each cell the input of the choice and its result.</param>
     /// <param name="calibrationErrorPp">The calibration error to put in the evidence (0 for a strategy with no probability model).</param>
-    public static OosPool Pool(IReadOnlyList<(SelectionInput Input, ExitSelection Selection)> cells, double calibrationErrorPp)
+    /// <param name="confidence">CF-01: when given and on, the evidence carries the effective n of the pooled trades (clusters = the entry date of each trade); the numbers of the evidence itself are the same either way.</param>
+    /// <param name="gates">The gates, for the target edge and the trade minimum of the dependence figures (default gates when null).</param>
+    public static OosPool Pool(IReadOnlyList<(SelectionInput Input, ExitSelection Selection)> cells, double calibrationErrorPp, ConfidenceOptions? confidence = null, QualificationGates? gates = null)
     {
         ArgumentNullException.ThrowIfNull(cells);
-        return Pool(cells, calibrationErrorPp, out _);
+        return Pool(cells, calibrationErrorPp, confidence, gates, out _);
     }
 
     /// <summary>The trades the pooled evidence is made of, in the order of exit (spec P5-05): the input of the robustness checks.</summary>
     public static IReadOnlyList<SelectionTrade> Trades(IReadOnlyList<(SelectionInput Input, ExitSelection Selection)> cells)
     {
         ArgumentNullException.ThrowIfNull(cells);
-        Pool(cells, 0, out var trades);
+        Pool(cells, 0, null, null, out var trades);
         return trades;
     }
 
-    private static OosPool Pool(IReadOnlyList<(SelectionInput Input, ExitSelection Selection)> cells, double calibrationErrorPp, out IReadOnlyList<SelectionTrade> orderedTrades)
+    private static OosPool Pool(IReadOnlyList<(SelectionInput Input, ExitSelection Selection)> cells, double calibrationErrorPp, ConfidenceOptions? confidence, QualificationGates? gates, out IReadOnlyList<SelectionTrade> orderedTrades)
     {
         var taken = new List<SelectionTrade>();
         var windows = new SortedDictionary<(DateOnly, DateOnly), (int Trades, double Total)>();
@@ -68,7 +71,12 @@ public static class OosEvidenceBuilder
             list.Count(w => w.TotalR > 0),
             drawdown,
             calibrationErrorPp,
-            OosEvidence.WalkForward);
+            OosEvidence.WalkForward,
+            confidence is { IsOn: true } c ? Dependence(ordered, c, gates ?? QualificationGates.Default) : null);
         return new OosPool(evidence, list.AsReadOnly());
     }
+
+    // the cluster of a pooled trade is its India entry date; sessions are the entry dates
+    private static DependenceAssessment Dependence(List<SelectionTrade> ordered, ConfidenceOptions confidence, QualificationGates gates) =>
+        DependenceEstimator.Assess([.. ordered.Select(t => (t.Entry, t.R))], confidence, gates.MinOosTrades, gates.MinExpectancyR);
 }

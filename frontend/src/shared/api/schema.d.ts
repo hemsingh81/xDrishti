@@ -7337,6 +7337,12 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
       limits: string;
+      dependence?: null | components['schemas']['DependenceView'];
+      /**
+       * Format: double
+       * @description CF-01 `IndependentN`: trades after same-session and serial correction; null when not computed. Three different numbers: double CellStatsView.EffectiveN is the recency-weight sum, `KishWeightN` (CF-02) is (sum w)^2 / sum w^2, this is the independence count.
+       */
+      independentN?: null | number;
       /** @description The regime name of a regime cell (P6-02), null for a `*` cell. */
       regimeName?: null | string;
       /** @description What the regime of the cell was built from: `index_and_vix` or `index_only`, or `all` for a `*` cell. A cell never mixes the two. */
@@ -9032,6 +9038,69 @@ export interface components {
       toMode: null | string;
       reason: null | string;
     };
+    /**
+     * @description How many independent trades a cell or a verdict rests on (CF-01, ADR 0203), as the API shows it. Every figure is null when it could not be computed and string DependenceView.Note then says `unavailable: &lt;reason&gt;`.
+     *     `IndependentN` (here double? DependenceView.NEff) is trades after same-session clustering and serial correction: not `EffectiveN` of a cell row (the recency-weight sum). Shown beside the old figures; it changes nothing unless the mode is `Gate`.
+     */
+    DependenceView: {
+      /** @description `Off`, `ReportOnly` or `Gate`, the mode when it was computed. */
+      mode: string;
+      /**
+       * Format: int32
+       * @description Trades.
+       */
+      n: number;
+      /**
+       * Format: double
+       * @description Independent trades (1 to N).
+       */
+      nEff: null | number;
+      /**
+       * Format: double
+       * @description N over NEff.
+       */
+      designEffect: null | number;
+      /** @description `cluster`, `serial` or `none`. */
+      method: string;
+      /**
+       * Format: int32
+       * @description Independent trades needed to see the target edge (a lower bound: normal R).
+       */
+      neededTrades: null | number;
+      /**
+       * Format: double
+       * @description The smallest edge in R that NEff independent trades could see now.
+       */
+      minDetectableEdgeR: null | number;
+      /**
+       * Format: int32
+       * @description Minimum track record in iid trades.
+       */
+      minTrl: null | number;
+      /**
+       * Format: int32
+       * @description MinTrl times the design effect: trades at this set's dependence.
+       */
+      minTrlDependent: null | number;
+      /**
+       * Format: double
+       * @description Years to reach NeededTrades at the arrival rate of NEff, if the rate and the edge hold.
+       */
+      yearsToEvidence: null | number;
+      /** @description Whether effective n reaches the minimum trades; null when unavailable. */
+      enoughByNEff: null | boolean;
+      /** @description Remarks and unavailable reasons. */
+      note: string;
+      /** @description One line of words for a screen. */
+      summary: string;
+      /**
+       * Format: double
+       * @description The edge in R that NeededTrades is about.
+       */
+      targetEdgeR?: null | number;
+      /** @description The settings that produced the block (Lab verdicts); null for a stored cell row, whose snapshot key records them. */
+      settings?: null | string;
+    };
     /** @description The answer of a switch change: the row and the new value. */
     DepthRecorderSwitched: {
       /** Format: int64 */
@@ -10226,6 +10295,7 @@ export interface components {
       /** Format: double */
       calibrationErrorPp: number;
       method: string;
+      dependence?: null | components['schemas']['DependenceView'];
     };
     /** @description How many tickets were left out of the report for one reason. */
     ExclusionCountView: {

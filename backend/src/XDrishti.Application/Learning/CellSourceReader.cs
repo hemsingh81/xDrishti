@@ -58,7 +58,7 @@ internal static class CellSourceReader
                     return Result.Failure<CellSourceData>(LearningErrors.CellDuplicate(id.Key));
                 }
 
-                cell.Trades.Add(new CellTrade(SessionClock.DateOf(t.ExitEpochSeconds), r, t.MaeR, t.MfeR));
+                cell.Trades.Add(new CellTrade(SessionClock.DateOf(t.ExitEpochSeconds), r, t.MaeR, t.MfeR, t.TradeDate));
                 all.Add(new SourceTrade(t, id.Key));
             }
         }

@@ -1,3 +1,5 @@
+using XDrishti.Domain.Confidence;
+
 namespace XDrishti.Domain.Learning;
 
 /// <summary>
@@ -15,8 +17,9 @@ public static class CellStatsCalculator
     /// <summary>
     /// The rows, for every cell and every window, in the order of the input then the windows. The options must be usable (<see cref="CellStatsOptions.Problems"/>). With <paramref name="regimeCells"/> (P6-02, ADR 0146) the rows of those cells follow,
     /// shrunk toward the same strategy rate; the system and strategy rates are taken from <paramref name="cells"/> alone, so a trade is never counted twice and the rows of <paramref name="cells"/> are the same with and without them.
+    /// With <paramref name="confidence"/> (CF-01, ADR 0203) each row also carries its <see cref="CellStatsRow.Dependence"/> (null or Off: no such member and every other field exactly as before); only in the <see cref="ConfidenceMode.Gate"/> mode does <see cref="CellStatsRow.Enough"/> change.
     /// </summary>
-    public static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, DateOnly asOf, CellStatsOptions options, IReadOnlyList<CellInput>? regimeCells = null)
+    public static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, DateOnly asOf, CellStatsOptions options, IReadOnlyList<CellInput>? regimeCells = null, ConfidenceOptions? confidence = null)
     {
         ArgumentNullException.ThrowIfNull(cells);
         ArgumentNullException.ThrowIfNull(options);
@@ -50,7 +53,7 @@ public static class CellStatsCalculator
             foreach (var window in Windows)
             {
                 var (input, trades) = slices[window][i];
-                rows.Add(Row(input, window, trades, asOf, strategyRates[window][input.Cell.Strategy], options));
+                rows.Add(Row(input, window, trades, asOf, strategyRates[window][input.Cell.Strategy], options, confidence));
             }
         }
 
@@ -65,7 +68,7 @@ public static class CellStatsCalculator
                         throw new ArgumentException($"The regime cell {input.Cell.Key} has no cell of its strategy among the cells.", nameof(regimeCells));
                     }
 
-                    rows.Add(Row(input, window, InWindow(input.Trades, asOf, window), asOf, prior, options));
+                    rows.Add(Row(input, window, InWindow(input.Trades, asOf, window), asOf, prior, options, confidence));
                 }
             }
         }
@@ -100,7 +103,7 @@ public static class CellStatsCalculator
         return (wins, weight);
     }
 
-    private static CellStatsRow Row(CellInput input, CellWindow window, List<CellTrade> trades, DateOnly asOf, double priorRate, CellStatsOptions options)
+    private static CellStatsRow Row(CellInput input, CellWindow window, List<CellTrade> trades, DateOnly asOf, double priorRate, CellStatsOptions options, ConfidenceOptions? confidence)
     {
         var (wWins, wTotal) = Sum(trades, asOf, options);
         var (posterior, lower, upper) = BetaShrinkage.Posterior(wWins, wTotal, priorRate, options.PriorStrength, options.CredibleLevel);
@@ -129,6 +132,7 @@ public static class CellStatsCalculator
         var any = trades.Count > 0;
         var mae = trades.Select(t => t.MaeR).Order().ToList();
         var mfe = trades.Select(t => t.MfeR).Order().ToList();
+        var dependence = Dependence(trades, options, confidence);
         return new CellStatsRow(
             input.Cell,
             window,
@@ -151,7 +155,37 @@ public static class CellStatsCalculator
             Quantile(mae, 0.9),
             Quantile(mfe, 0.5),
             Quantile(mfe, 0.9),
-            trades.Count >= options.MinTrades);
+            confidence?.Mode == ConfidenceMode.Gate ? dependence?.EnoughByNEff == true : trades.Count >= options.MinTrades,
+            dependence);
+    }
+
+    // CF-01: unweighted, on the window's trades (already limited to exits on or before the as-of date). A trade whose entry date is not known cannot be clustered by its entry session: the cell then says so instead of using the exit date.
+    private static DependenceAssessment? Dependence(List<CellTrade> trades, CellStatsOptions options, ConfidenceOptions? confidence)
+    {
+        if (confidence is not { IsOn: true })
+        {
+            return null;
+        }
+
+        var gateEdge = Lab.QualificationGates.Default.MinExpectancyR;
+        var full = DependenceEstimator.Assess([.. trades.Select(t => (t.EntryDate ?? t.ExitDate, t.R))], confidence, options.MinTrades, gateEdge);
+        if (trades.Count == 0 || trades.All(t => t.HasEntryCluster) || !full.NEff.HasValue)
+        {
+            return full;
+        }
+
+        // some trade has no entry date: keep the power and MinTRL figures (they do not depend on the cluster) and withdraw the dependence ones
+        return full with
+        {
+            NEff = null,
+            DesignEffect = null,
+            Method = EffectiveEstimate.NoneMethod,
+            MinDetectableEdgeR = null,
+            MinTrlDependent = null,
+            YearsToEvidence = null,
+            EnoughByNEff = null,
+            Note = "unavailable: entry dates not carried (a cluster per exit date is not the entry cluster)",
+        };
     }
 
     /// <summary>Never NaN or Infinity in a row (a weight can underflow to 0): such a value is reported as unknown.</summary>

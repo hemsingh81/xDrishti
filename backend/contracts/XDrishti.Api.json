@@ -24490,6 +24490,24 @@
           "limits": {
             "type": "string"
           },
+          "dependence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DependenceView"
+              }
+            ]
+          },
+          "independentN": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "CF-01 `IndependentN`: trades after same-session and serial correction; null when not computed. Three different numbers: double CellStatsView.EffectiveN is the recency-weight sum, `KishWeightN` (CF-02) is (sum w)^2 / sum w^2, this is the independence count.",
+            "format": "double"
+          },
           "regimeName": {
             "type": [
               "null",
@@ -29138,6 +29156,126 @@
         },
         "description": "The owner's step down."
       },
+      "DependenceView": {
+        "required": [
+          "mode",
+          "n",
+          "nEff",
+          "designEffect",
+          "method",
+          "neededTrades",
+          "minDetectableEdgeR",
+          "minTrl",
+          "minTrlDependent",
+          "yearsToEvidence",
+          "enoughByNEff",
+          "note",
+          "summary"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "`Off`, `ReportOnly` or `Gate`, the mode when it was computed."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Trades.",
+            "format": "int32"
+          },
+          "nEff": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Independent trades (1 to N).",
+            "format": "double"
+          },
+          "designEffect": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "N over NEff.",
+            "format": "double"
+          },
+          "method": {
+            "type": "string",
+            "description": "`cluster`, `serial` or `none`."
+          },
+          "neededTrades": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Independent trades needed to see the target edge (a lower bound: normal R).",
+            "format": "int32"
+          },
+          "minDetectableEdgeR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The smallest edge in R that NEff independent trades could see now.",
+            "format": "double"
+          },
+          "minTrl": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Minimum track record in iid trades.",
+            "format": "int32"
+          },
+          "minTrlDependent": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "MinTrl times the design effect: trades at this set's dependence.",
+            "format": "int32"
+          },
+          "yearsToEvidence": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Years to reach NeededTrades at the arrival rate of NEff, if the rate and the edge hold.",
+            "format": "double"
+          },
+          "enoughByNEff": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Whether effective n reaches the minimum trades; null when unavailable."
+          },
+          "note": {
+            "type": "string",
+            "description": "Remarks and unavailable reasons."
+          },
+          "summary": {
+            "type": "string",
+            "description": "One line of words for a screen."
+          },
+          "targetEdgeR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The edge in R that NeededTrades is about.",
+            "format": "double"
+          },
+          "settings": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The settings that produced the block (Lab verdicts); null for a stored cell row, whose snapshot key records them."
+          }
+        },
+        "description": "How many independent trades a cell or a verdict rests on (CF-01, ADR 0203), as the API shows it. Every figure is null when it could not be computed and string DependenceView.Note then says `unavailable: &lt;reason&gt;`.\n`IndependentN` (here double? DependenceView.NEff) is trades after same-session clustering and serial correction: not `EffectiveN` of a cell row (the recency-weight sum). Shown beside the old figures; it changes nothing unless the mode is `Gate`."
+      },
       "DepthRecorderSwitched": {
         "required": [
           "id",
@@ -32511,6 +32649,16 @@
           },
           "method": {
             "type": "string"
+          },
+          "dependence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DependenceView"
+              }
+            ]
           }
         },
         "description": "The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words."

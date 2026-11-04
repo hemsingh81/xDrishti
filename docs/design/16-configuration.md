@@ -292,6 +292,7 @@ strategy_lab:
   # P5-03 reads StrategyLab:Gates (MinOosTrades, MinExpectancyR, MinProfitFactor, MinPositiveFoldsPct, MaxDrawdownR, MaxCalibrationErrorPp; the qualification_gates above are the defaults), StrategyLab:MinFoldsForPass (6; fewer walk-forward folds cap a verdict at MARGINAL) and StrategyLab:MultipleTesting (the switch above); the tightening is 1 + 0.25·log2(variants) (ADR 0059)
   # P5-04 reads StrategyLab:FullExits (array of --exit flags, default ["FIXED_RR:rr=2|1.5|2.5|3"]; must expand to 2 to 16 candidates, the first is the default exit) for the candidate exits of a full test.
   # P5-05 reads StrategyLab:Robustness (SweepParams 1 to 4, SweepSteps 1 to 4 positive factors, default [0.8, 0.9, 1.1, 1.2]; McDraws 100 to 20000, default 1000) for the robust method; the values are in the run key.
+  # CF-01 (ADR 0203) reads the configuration section Confidence: EffectiveN:Mode (Off | ReportOnly | Gate, default ReportOnly; Gate is the owner's switch), EffectiveN:MinSessionsForAutocorr 20 (5..250), EffectiveN:MinTradesForEstimate 5 (3..50), EffectiveN:MinClusters 5 (3..50), Power:Alpha 0.05 (0.001..0.2), Power:Power 0.80 (0.5..0.99), Power:SigmaFloorR 0.5 (0.1..5), Power:TargetEdgeR (unset = the gate's MinExpectancyR; 0.01..5), MinTrl:Confidence 0.95 (0.5..0.999), MinTrl:BenchmarkSr 0 (-1..1); a value out of range stops the host at start
   assistant_can_run_tests: true
   assistant_can_promote: false
 
@@ -584,4 +585,5 @@ The ingest is the service `filings-ingest` of the scheduler in `xd-api` ([ADR 01
 | `portfolio.min_days_for_xirr` | Below this, show absolute return instead of XIRR (v1: fixed at 30 in `Xirr.MinDays`, not yet configurable) | 30 |
 | `selection.min_p_win` / `min_exp_R_lower` | Trade quality bar | 0.45 / +0.10R |
 | `learning.min_trades` | Evidence needed per cell | 30 |
+| `Confidence:EffectiveN:Mode` | How effective n is used: `Off`, `ReportOnly` (shown, decides nothing), `Gate` (the owner's switch: `Enough` and gate 1 compare effective n) (CF-01, ADR 0203) | ReportOnly |
 | `goals.max_drawdown_pct` | Halt-and-review threshold | 8% |

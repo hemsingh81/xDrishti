@@ -329,6 +329,8 @@ Full walk-forward: ~10–60 min depending on universe, timeframes and exits.
 | Trades | Full list with chart replay |
 | Summary | Plain English from the assistant, using report numbers only |
 
+Built (CF-01, [ADR 0203](../adr/0203-effective-n-is-the-smaller-of-an-entry-session-cluster-estimate-and-a-serial-estimate-shown-beside-n-in-report-only-mode-and-power-and-minimum-track-record-are-printed-with-it.md)): the verdict's out-of-sample evidence gains an optional `dependence` block (effective n of the pooled trades with the entry date as cluster, design effect, trades needed to see the target edge, smallest visible edge, minimum track record in iid trades), and a note such as "34 trades, effective 11 of 60 needed; not used in the verdict: it would read FAIL on trades if effective n were used". In the default `ReportOnly` mode the outcome, the six gates and their reasons are unchanged (the note is not a limit, so it never caps a PASS); only in `Gate` (the owner's switch) gate 1 compares `ceil(effective n)` with the adjusted minimum, and an unavailable effective n never passes. Old documents read "not computed".
+
 ## 5. Guarding against "test until it passes"
 
 - Every variant recorded in a per-family **test ledger**; thresholds tighten as variants grow.

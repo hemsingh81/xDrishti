@@ -90,6 +90,7 @@ using XDrishti.Application.Research.CostSheets;
 using XDrishti.Application.Selection;
 using XDrishti.Application.Ticks;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Research;
@@ -701,6 +702,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetLabReportQuery, Result<LabReportView>>, GetLabReportHandler>(); // the report of a full or robust run (P5-06, ADR 0063)
         services.AddScoped<IQueryHandler<GetLedgerQuery, Result<LedgerView>>, GetLedgerHandler>(); // the test ledger (P5-03, ADR 0059)
         services.TryAddSingleton(LabSettings.Default); // the host replaces it with its configuration
+        services.TryAddSingleton(new ConfidenceOptions()); // effective n, power, minimum track record (CF-01, ADR 0203): ReportOnly; the host replaces it with its configuration (section Confidence)
         services.TryAddSingleton<ILabProgress, NullLabProgress>(); // the host that sends events replaces it
 
         // Replay jobs started from the screen (P8-18 Part B, ADR 0129): the API's use cases; the executor and dispatcher are AddExperimentJobRunner, called by the host that runs them. The start needs the capability, which only the owner switches on.

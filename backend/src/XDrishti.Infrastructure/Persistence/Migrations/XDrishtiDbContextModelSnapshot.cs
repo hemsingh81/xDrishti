@@ -3233,6 +3233,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("double precision")
                         .HasColumnName("credible_level");
 
+                    b.Property<double?>("DesignEffect")
+                        .HasColumnType("double precision")
+                        .HasColumnName("design_effect");
+
                     b.Property<double>("EffectiveN")
                         .HasColumnType("double precision")
                         .HasColumnName("effective_n");
@@ -3240,6 +3244,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Enough")
                         .HasColumnType("boolean")
                         .HasColumnName("enough");
+
+                    b.Property<bool?>("EnoughByNEff")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enough_by_n_eff");
 
                     b.Property<string>("ExitPolicy")
                         .IsRequired()
@@ -3275,13 +3283,41 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("double precision")
                         .HasColumnName("mfe_p90");
 
+                    b.Property<double?>("MinDetectableEdgeR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("min_detectable_edge_r");
+
                     b.Property<int>("MinTrades")
                         .HasColumnType("integer")
                         .HasColumnName("min_trades");
 
+                    b.Property<int?>("MinTrl")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_trl");
+
                     b.Property<int>("N")
                         .HasColumnType("integer")
                         .HasColumnName("n");
+
+                    b.Property<double?>("NEff")
+                        .HasColumnType("double precision")
+                        .HasColumnName("n_eff");
+
+                    b.Property<string>("NEffMethod")
+                        .HasColumnType("text")
+                        .HasColumnName("n_eff_method");
+
+                    b.Property<string>("NEffMode")
+                        .HasColumnType("text")
+                        .HasColumnName("n_eff_mode");
+
+                    b.Property<string>("NEffNote")
+                        .HasColumnType("text")
+                        .HasColumnName("n_eff_note");
+
+                    b.Property<int?>("NeededTrades")
+                        .HasColumnType("integer")
+                        .HasColumnName("needed_trades");
 
                     b.Property<double>("PriorRate")
                         .HasColumnType("double precision")
@@ -3317,6 +3353,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("sources");
 
+                    b.Property<double?>("SpanYears")
+                        .HasColumnType("double precision")
+                        .HasColumnName("span_years");
+
                     b.Property<string>("Strategy")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -3328,6 +3368,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("style");
+
+                    b.Property<double?>("TargetEdgeR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("target_edge_r");
 
                     b.Property<string>("Timeframe")
                         .IsRequired()
@@ -3376,6 +3420,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("cell_stats", "research", t =>
                         {
+                            t.HasCheckConstraint("ck_cell_stats_n_eff_method", "n_eff_method IS NULL OR n_eff_method IN ('cluster','serial','none')");
+
                             t.HasCheckConstraint("ck_cell_stats_shape", "snapshot_key ~ '^[0-9a-f]{64}$' AND window_code IN ('all','250d','60d') AND n >= 0 AND wins >= 0 AND wins <= n");
                         });
                 });

@@ -1,7 +1,9 @@
+using XDrishti.Application.Confidence;
+
 namespace XDrishti.Application.Lab;
 
 /// <summary>The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words.</summary>
-public sealed record EvidenceView(int OosTrades, double? ExpectancyR, double? ProfitFactor, int Folds, int PositiveFolds, double? MaxDrawdownR, double CalibrationErrorPp, string Method);
+public sealed record EvidenceView(int OosTrades, double? ExpectancyR, double? ProfitFactor, int Folds, int PositiveFolds, double? MaxDrawdownR, double CalibrationErrorPp, string Method, DependenceView? Dependence = null);
 
 /// <summary>One gate of a verdict as served (spec P5-03, P5-04); <c>Actual</c> is null when it is not finite.</summary>
 public sealed record GateView(string Name, double Required, double Adjusted, double? Actual, bool Passed, string Reason);

@@ -76,4 +76,27 @@ internal sealed class CellStatsRecord
     public DateTimeOffset CreatedAt { get; set; }
 
     public string CreatedBy { get; set; } = string.Empty;
+
+    // CF-01 (ADR 0203): effective n, power and minimum track record of the window's trades; all null in a row written before the migration ("not computed")
+    public double? NEff { get; set; }
+
+    public double? DesignEffect { get; set; }
+
+    public string? NEffMethod { get; set; }
+
+    public int? NeededTrades { get; set; }
+
+    public double? MinDetectableEdgeR { get; set; }
+
+    public int? MinTrl { get; set; }
+
+    public bool? EnoughByNEff { get; set; }
+
+    public double? SpanYears { get; set; }
+
+    public string? NEffMode { get; set; }
+
+    public string? NEffNote { get; set; }
+
+    public double? TargetEdgeR { get; set; }
 }

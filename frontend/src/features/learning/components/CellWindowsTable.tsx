@@ -6,6 +6,7 @@ import {
   formatRate,
   formatRatio,
   MetricCell,
+  metricOf,
   type MetricState,
 } from '@/shared/analytics';
 import { formatDate } from '@/shared/lib/format';
@@ -13,6 +14,9 @@ import { cellWindows, windowLabels, type CellStats } from '../api/learningQuerie
 import { basisOf, statState } from '../lib/cells';
 
 const finiteCount = (value: number): MetricState => ({ kind: 'value', value });
+
+/** Why an independent-n figure is missing: the server's reason, or that the row predates the figure. */
+const whyNot = (cell: CellStats) => cell.dependence?.note ?? 'Not computed';
 
 interface Line {
   id: string;
@@ -27,6 +31,25 @@ const lines: readonly Line[] = [
   { id: 'n', label: 'Trades (n)', state: (c) => finiteCount(c.n), format: formatCount },
   { id: 'wins', label: 'Wins', state: (c) => finiteCount(c.wins), format: formatCount },
   { id: 'effn', label: 'Effective n (recency-weighted)', state: (c) => finiteCount(c.effectiveN), format: formatRatio },
+  // CF-01: shown beside n, never in place of it, whether or not the cell has enough trades (a thin cell is where it matters).
+  {
+    id: 'indep',
+    label: 'Independent n (same-session and serial corrected)',
+    state: (c) => metricOf(c.dependence?.nEff, whyNot(c)),
+    format: formatRatio,
+  },
+  {
+    id: 'needed',
+    label: 'Independent trades needed to see the target edge',
+    state: (c) => metricOf(c.dependence?.neededTrades, whyNot(c)),
+    format: formatCount,
+  },
+  {
+    id: 'mde',
+    label: 'Smallest edge visible now',
+    state: (c) => metricOf(c.dependence?.minDetectableEdgeR, whyNot(c)),
+    format: formatR,
+  },
   {
     id: 'raw',
     label: 'Win rate, raw',
