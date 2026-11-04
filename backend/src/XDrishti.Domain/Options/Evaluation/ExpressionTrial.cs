@@ -22,11 +22,19 @@ public static class ExpressionTrial
         return string.Join('\n', "expr-trial/1", "profile:" + profileHash, "population:cash run " + cashRunKey + ", out-of-sample test windows (oos-windows/1), paired trades", "unit:R_equiv(option) - R_equiv(cash), same rupee risk", "protocol:O");
     }
 
-    /// <summary>The trial of a profile on the cash run, with the data window of the run.</summary>
+    /// <summary>The canonical text of a condor trial (P14-10, protocol R): the profile and the population of range-regime entries; no cash run.</summary>
+    public static string CondorText(string profileHash, string populationKey)
+    {
+        ArgumentNullException.ThrowIfNull(profileHash);
+        ArgumentNullException.ThrowIfNull(populationKey);
+        return string.Join('\n', "expr-trial/1", "profile:" + profileHash, "population:condor entries " + populationKey + ", first session of each week, previous session range, before the hold-out", "unit:R = net rupees / maximum loss", "protocol:R");
+    }
+
+    /// <summary>The trial of a profile on the cash run (or, for the condor family, on the condor population), with the data window of the run.</summary>
     public static ExtensionTrialId Of(string family, string profileHash, string cashRunKey, DateOnly from, DateOnly to)
     {
         ArgumentNullException.ThrowIfNull(family);
-        var text = Text(profileHash, cashRunKey);
+        var text = family == ExpressionFamilies.IronCondor ? CondorText(profileHash, cashRunKey) : Text(profileHash, cashRunKey);
         var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(family + "\n" + text)));
         var window = string.Create(CultureInfo.InvariantCulture, $"{RunIdPrefix}\n{hash}\n{from:yyyy-MM-dd}\n{to:yyyy-MM-dd}");
         return new ExtensionTrialId(family, text, hash, new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(window)).AsSpan(0, 16)));

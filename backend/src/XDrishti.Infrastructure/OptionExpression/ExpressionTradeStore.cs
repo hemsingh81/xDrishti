@@ -2,6 +2,7 @@ using Npgsql;
 using NpgsqlTypes;
 using XDrishti.Application.Abstractions.OptionExpression;
 using XDrishti.Domain.Options.Remark;
+using XDrishti.Domain.Options.Structures;
 
 namespace XDrishti.Infrastructure.OptionExpression;
 
@@ -15,13 +16,22 @@ internal sealed class ExpressionTradeStore(NpgsqlDataSource dataSource) : IExpre
         return await command.ExecuteScalarAsync(cancellationToken) is not null;
     }
 
-    public async ValueTask<bool> AppendAsync(ExpressionRunRow run, IReadOnlyList<RemarkRow> rows, CancellationToken cancellationToken)
+    public ValueTask<bool> AppendAsync(ExpressionRunRow run, IReadOnlyList<RemarkRow> rows, CancellationToken cancellationToken) => AppendAsync(run, rows, [], cancellationToken);
+
+    public async ValueTask<bool> AppendAsync(ExpressionRunRow run, IReadOnlyList<RemarkRow> rows, IReadOnlyList<StructureLegRow> legs, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(run);
         ArgumentNullException.ThrowIfNull(rows);
+        ArgumentNullException.ThrowIfNull(legs);
         if (rows.Count != run.Trades)
         {
             throw new InvalidOperationException("The rows of an expression run must be as many as its trades.");
+        }
+
+        var pairedKeys = rows.Where(r => r.IsPaired).Select(r => r.TradeKey).ToHashSet(StringComparer.Ordinal);
+        if (legs.Any(l => !pairedKeys.Contains(l.TradeKey)))
+        {
+            throw new InvalidOperationException("A leg must belong to a paired row of the run.");
         }
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -51,6 +61,7 @@ internal sealed class ExpressionTradeStore(NpgsqlDataSource dataSource) : IExpre
             }
         }
 
+        // shortcut: per-row insert, move to COPY when runs exceed ~5k trades (as the sibling stores)
         foreach (var row in rows)
         {
             await using var command = new NpgsqlCommand(
@@ -85,6 +96,30 @@ internal sealed class ExpressionTradeStore(NpgsqlDataSource dataSource) : IExpre
             if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
             {
                 throw new InvalidOperationException("An expression trade row was not written.");
+            }
+        }
+
+        foreach (var leg in legs)
+        {
+            await using var command = new NpgsqlCommand(
+                """
+                INSERT INTO research.expression_legs (run_id, trade_key, leg, side, position, strike_px, entry_premium_px, exit_premium_px, labels)
+                VALUES (@run, @key, @leg, @side, @position, @strike, @entryPx, @exitPx, @labels)
+                ON CONFLICT (run_id, trade_key, leg) DO NOTHING
+                """, connection, transaction);
+            var p = command.Parameters;
+            p.AddWithValue("run", NpgsqlDbType.Char, run.RunId);
+            p.AddWithValue("key", NpgsqlDbType.Varchar, leg.TradeKey);
+            p.AddWithValue("leg", NpgsqlDbType.Smallint, (short)leg.Leg);
+            p.AddWithValue("side", NpgsqlDbType.Char, leg.Side);
+            p.AddWithValue("position", NpgsqlDbType.Char, leg.Position);
+            p.AddWithValue("strike", NpgsqlDbType.Integer, leg.StrikePx);
+            p.AddWithValue("entryPx", NpgsqlDbType.Integer, leg.EntryPremiumPx);
+            p.AddWithValue("exitPx", NpgsqlDbType.Integer, leg.ExitPremiumPx);
+            p.AddWithValue("labels", NpgsqlDbType.Array | NpgsqlDbType.Text, leg.Labels.ToArray());
+            if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+            {
+                throw new InvalidOperationException("An expression leg row was not written.");
             }
         }
 

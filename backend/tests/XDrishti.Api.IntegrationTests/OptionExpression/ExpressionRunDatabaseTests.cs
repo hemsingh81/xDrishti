@@ -13,6 +13,7 @@ using XDrishti.Application.Abstractions.OptionQuality;
 using XDrishti.Application.OptionExpression;
 using XDrishti.Domain.Options.Quality;
 using XDrishti.Domain.Options.Remark;
+using XDrishti.Domain.Options.Structures;
 using XDrishti.Domain.Research;
 using XDrishti.Infrastructure.OptionBackfill;
 using XDrishti.Tests.Shared;
@@ -26,7 +27,7 @@ namespace XDrishti.Api.IntegrationTests.OptionExpression;
 [Collection(ApiTestSuite.Name)]
 public sealed class ExpressionRunDatabaseTests(ApiFactory factory) : DataTestBase(factory)
 {
-    private const string Truncate = "TRUNCATE options.rolling_bars, options.fetch_log, options.quality_results, options.quality_runs, options.contracts, research.expression_trades, research.expression_runs RESTART IDENTITY";
+    private const string Truncate = "TRUNCATE options.rolling_bars, options.fetch_log, options.quality_results, options.quality_runs, options.contracts, research.expression_legs, research.expression_trades, research.expression_runs RESTART IDENTITY";
 
     private static readonly DateOnly Tuesday = new(2025, 6, 10);
     private static readonly TimeSpan India = TimeSpan.FromMinutes(330);
@@ -208,5 +209,52 @@ public sealed class ExpressionRunDatabaseTests(ApiFactory factory) : DataTestBas
         output.ToString().ShouldContain("1 trades, 1 paired");
         output.ToString().ShouldContain("(already stored", Case.Sensitive); // the console cuts a line to its first characters
         (await ScalarAsync<long>("SELECT count(*) FROM research.expression_runs")).ShouldBe(1);
+    }
+
+    /// <summary>The bars of one day at the offsets, the premium of an offset on the side falling 12 rupees a step from 60 rupees at the money (the spot never moves).</summary>
+    private async Task SeedDecayAsync(DateOnly day, string side, params int[] offsets)
+    {
+        foreach (var offset in offsets)
+        {
+            var premium = 6000 - (1200 * Math.Abs(offset));
+            var bars = Times(day).Select(t => new BackfillBar(t, _nifty, 'W', 1, offset, side, 5, 2_200_000 + (offset * 5000), 2_200_000, premium, premium + 50, premium - 50, premium, 1000, 10_000, 15f, 0)).ToList();
+            var key = new BackfillKey(_nifty, 'W', 1, offset, side, 5, new DateOnly(2025, 5, 20));
+            await WithAsync(async p => await new RollingBarStore(p.GetRequiredService<NpgsqlDataSource>()).AppendAsync(new BackfillFetchRecord(key, 1, At(Tuesday, 20, 0), At(Tuesday, 20, 1), "ok", 200, null, 0, 100), bars, Ct));
+        }
+    }
+
+    [Fact]
+    public async Task A_debit_spread_profile_through_the_one_verb_stores_the_trade_row_and_its_two_legs_with_the_maximum_loss_and_a_second_run_writes_nothing_while_a_credit_profile_is_refused_without_a_regime()
+    {
+        await SeedDecayAsync(Tuesday, "CE", 0, 2);
+        await SeedVerdictsAsync(Tuesday, 1, 0, 2);
+        var debit = SpreadParams.Create(XDrishti.Domain.Learning.Expression.DebitSpread, "atm", 2, "nearest_safe", null, 1).Value.ToProfile().Value;
+        var credit = SpreadParams.Create(XDrishti.Domain.Learning.Expression.CreditSpread, "atm", 2, "nearest_safe", null, 1).Value.ToProfile().Value;
+        var condor = CondorParams.Primary.ToProfile().Value;
+        foreach (var profile in new[] { debit, credit, condor })
+        {
+            await WithAsync(async p => await p.GetRequiredService<IExpressionProfileStore>().AppendAsync(profile, Ct));
+        }
+
+        var trade = FabricatedRun.Trade(_nifty, "NSE:NIFTY", Side.Buy, Tuesday, ExitReason.Target, entryMinute: 560, entry: 100, stop: 99, target: 102, exitPrice: 102, rExact: 2, rFilled: 2);
+        var run = FabricatedRun.Assemble(FabricatedRun.List((_nifty, "NSE:NIFTY")), [FabricatedRun.Ran(_nifty, "NSE:NIFTY", Tuesday, Tuesday.AddDays(8))], [trade], from: Tuesday, to: Tuesday.AddDays(8), strategy: "SPREAD");
+        (await StoreKit.WithStoreAsync(Factory.Services, s => s.StoreAsync(StoreKit.ToStore(run), Ct).AsTask())).IsSuccess.ShouldBeTrue();
+
+        var first = await WithAsync(p => p.GetRequiredService<ICommandHandler<RemarkRunCommand, RemarkRunSummary>>().HandleAsync(new RemarkRunCommand(run.RunKey, debit.Hash), Ct).AsTask());
+        var second = await WithAsync(p => p.GetRequiredService<ICommandHandler<RemarkRunCommand, RemarkRunSummary>>().HandleAsync(new RemarkRunCommand(run.RunKey, debit.Hash), Ct).AsTask());
+        var refused = await WithAsync(p => p.GetRequiredService<ICommandHandler<RemarkRunCommand, RemarkRunSummary>>().HandleAsync(new RemarkRunCommand(run.RunKey, credit.Hash), Ct).AsTask());
+        var noCash = await WithAsync(p => p.GetRequiredService<ICommandHandler<RemarkRunCommand, RemarkRunSummary>>().HandleAsync(new RemarkRunCommand(run.RunKey, condor.Hash), Ct).AsTask());
+        var condors = await WithAsync(p => p.GetRequiredService<ICommandHandler<SimulateCondorsCommand, RemarkRunSummary>>().HandleAsync(new SimulateCondorsCommand(condor.Hash, Tuesday, Tuesday.AddDays(30), "NSE:NIFTY"), Ct).AsTask());
+
+        first.IsSuccess.ShouldBeTrue(first.IsFailure ? first.Error.Message : null);
+        (first.Value.Trades, first.Value.Paired).ShouldBe((1, 1));
+        second.Value.Stored.ShouldBeFalse();
+        (await ScalarAsync<long>("SELECT count(*) FROM research.expression_trades WHERE run_id = @r AND fate = 'paired' AND side = 'CE' AND entry_premium_px = 2400 AND labels @> ARRAY['max_loss_px: 2400', 'max_gain_px: 7600']", ("r", first.Value.RunId))).ShouldBe(1);
+        (await ScalarAsync<long>("SELECT count(*) FROM research.expression_legs WHERE run_id = @r", ("r", first.Value.RunId))).ShouldBe(2);
+        (await ScalarAsync<long>("SELECT count(*) FROM research.expression_legs WHERE run_id = @r AND ((leg = 0 AND position = 'long' AND strike_px = 2200000 AND entry_premium_px = 6000) OR (leg = 1 AND position = 'short' AND strike_px = 2210000 AND entry_premium_px = 3600))", ("r", first.Value.RunId))).ShouldBe(2);
+        refused.Error.Code.ShouldBe(RemarkStructureHandler.RegimeUnavailableCode);
+        noCash.Error.Code.ShouldBe(RemarkDispatchHandler.CondorHasNoCashRunCode);
+        condors.Error.Code.ShouldBe(RemarkStructureHandler.RegimeUnavailableCode);
+        (await ScalarAsync<long>("SELECT count(*) FROM research.expression_runs")).ShouldBe(1, "the gated credit and condor verbs wrote nothing");
     }
 }

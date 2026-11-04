@@ -14,6 +14,7 @@ namespace XDrishti.Api.IntegrationTests.OptionExpression;
 public sealed class ExpressionMigrationTests(ApiFactory factory)
 {
     private const string Before = "20261103130000_AddPairResearch";
+    private const string Trades = "20261103183027_AddExpressionTrades";
 
     private const string Columns = "SELECT column_name || '|' || data_type || '|' || coalesce(character_maximum_length::text, '') || '|' || is_nullable FROM information_schema.columns WHERE table_schema = 'research' AND table_name = @t";
 
@@ -51,7 +52,7 @@ public sealed class ExpressionMigrationTests(ApiFactory factory)
         await migrator.MigrateAsync(Before, Ct);
         (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' AND table_name LIKE 'expression_%'")).ShouldBeEmpty();
 
-        await migrator.MigrateAsync(null, Ct);
+        await migrator.MigrateAsync(Trades, Ct);
 
         (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' AND table_name LIKE 'expression_%' ORDER BY 1")).ShouldBe(["expression_runs", "expression_trades"]);
         (await ListAsync(connection, Columns, ("t", "expression_runs"))).Order(StringComparer.Ordinal).ShouldBe(
@@ -77,7 +78,7 @@ public sealed class ExpressionMigrationTests(ApiFactory factory)
         (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' AND table_name LIKE 'expression_%'")).ShouldBeEmpty();
         (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' AND table_name = 'pair_trades'")).ShouldBe(["pair_trades"], "Down removes the two tables and nothing else");
 
-        await migrator.MigrateAsync(null, Ct);
+        await migrator.MigrateAsync(Trades, Ct);
 
         (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' AND table_name LIKE 'expression_%' ORDER BY 1")).ShouldBe(["expression_runs", "expression_trades"]);
     }

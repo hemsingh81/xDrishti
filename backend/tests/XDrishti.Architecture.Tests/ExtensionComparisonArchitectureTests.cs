@@ -36,7 +36,7 @@ public sealed class ExtensionComparisonArchitectureTests
     [Fact]
     public void The_exact_set_of_domain_types_that_name_an_extension_type_is_the_training_data_builder_and_the_pairs_study()
     {
-        Users(Domain, ExtensionNamespace).ShouldBe(["ExpressionTrial", "FormationResult", "IvFeatures", "PairFormationId", "PairQuarter", "PairTrial", "ProtocolO", "ProtocolOResult", "ProtocolS", "ProtocolSResult", "RealisedVolatility", "TrainingDataBuilder"]); // IvFeatures, RealisedVolatility: the iv-1 features (P14-11) return the extension cell type; ExpressionTrial, ProtocolO, ProtocolOResult: protocol O (P14-09) builds on the extension record, the ledger trial identity and the JSON writer; the first five: the pairs study (P14-13) builds on the extension record, the quarter code and the JSON writer
+        Users(Domain, ExtensionNamespace).ShouldBe(["ExpressionTrial", "FormationResult", "IvFeatures", "PairFormationId", "PairQuarter", "PairTrial", "ProtocolO", "ProtocolOResult", "ProtocolR", "ProtocolS", "ProtocolSResult", "RealisedVolatility", "StructureGate", "TrainingDataBuilder"]); // ProtocolR, StructureGate: the condor protocol (P14-10) is protocol O's core with its own words and the gate builds the NOT_EVALUABLE outcome; IvFeatures, RealisedVolatility: the iv-1 features (P14-11) return the extension cell type; ExpressionTrial, ProtocolO, ProtocolOResult: protocol O (P14-09) builds on the extension record, the ledger trial identity and the JSON writer; the first five: the pairs study (P14-13) builds on the extension record, the quarter code and the JSON writer
     }
 
     [Fact]

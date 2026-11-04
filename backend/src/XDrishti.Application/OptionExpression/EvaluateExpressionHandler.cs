@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.OptionCosts;
 using XDrishti.Application.Abstractions.OptionExpression;
 using XDrishti.Application.Abstractions.OptionQuality;
 using XDrishti.Application.Abstractions.Research;
@@ -10,6 +11,7 @@ using XDrishti.Application.Learning;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning.Extensions;
 using XDrishti.Domain.Options.Evaluation;
+using XDrishti.Domain.Options.Remark;
 
 namespace XDrishti.Application.OptionExpression;
 
@@ -23,6 +25,9 @@ internal sealed class EvaluateExpressionHandler(
     IExpressionProfileStore profiles,
     IExpressionReader reader,
     IOptionReference reference,
+    IRegimeLabels regime,
+    ISpreadModelStore spreadModels,
+    ISpreadModelSettings spreadSettings,
     ITestLedger ledger,
     IExtensionEvaluationStore evaluations,
     EvaluationWriter writer,
@@ -32,7 +37,9 @@ internal sealed class EvaluateExpressionHandler(
     public const string RunNotFullCode = "expression.run_not_full";
     public const string HoldOutPrimaryOnlyCode = "expression.holdout_primary_only";
     public const string RemarkNotFoundCode = "expression.remark_not_found";
+    public const string ProfileKindMismatchCode = "expression.profile_kind_mismatch";
     private const string FullTestOrigin = "lab:full";
+    private static readonly string[] IndexSymbols = [ExpiryRules.Nifty, ExpiryRules.BankNifty];
 
     public async ValueTask<Result<ExtensionEvaluationOutcome>> HandleAsync(EvaluateExpressionCommand command, CancellationToken cancellationToken)
     {
@@ -42,7 +49,9 @@ internal sealed class EvaluateExpressionHandler(
             return Result.Failure<ExtensionEvaluationOutcome>(Error.Validation(ExtensionEvaluationErrors.InvalidQuery, "The family is " + string.Join(", ", ExpressionFamilies.All) + "."));
         }
 
-        var options = ExpressionStudyOptions.Default;
+        var condor = command.Family == ExpressionFamilies.IronCondor;
+        var protocol = ExpressionFamilies.ProtocolOf(command.Family);
+        var options = condor ? ExpressionStudyOptions.Condor : ExpressionStudyOptions.Default;
 
         // A spent hold-out refuses before anything is looked up, counted or read.
         if (command.HoldOut && await evaluations.HoldOutUsedAsync(command.Family, ExpressionFamilies.VersionKey, cancellationToken))
@@ -51,38 +60,66 @@ internal sealed class EvaluateExpressionHandler(
             return Result.Failure<ExtensionEvaluationOutcome>(Error.Conflict(ExtensionEvaluationErrors.HoldOutUsed, "The hold-out of " + command.Family + " for " + ExpressionFamilies.VersionKey + " has been read already; it is read once."));
         }
 
-        var primary = ExpressionProfiles.PrimaryHash;
+        var primary = ExpressionProfiles.PrimaryHashOf(command.Family)!;
         var profileHash = command.ProfileHash ?? primary;
         if (command.HoldOut && profileHash != primary)
         {
             return Refused(command.Family, HoldOutPrimaryOnlyCode, Error.Validation(HoldOutPrimaryOnlyCode, "The hold-out is read once for the whole family: only the pre-registered primary profile may read it."));
         }
 
-        if (await profiles.GetAsync(profileHash, cancellationToken) is null)
+        var storedProfile = await profiles.GetAsync(profileHash, cancellationToken);
+        if (storedProfile is null)
         {
             return Refused(command.Family, RemarkRunHandler.ProfileNotFoundCode, Error.NotFound(RemarkRunHandler.ProfileNotFoundCode, "No expression profile has that hash."));
         }
 
-        var header = await runs.FindAsync(command.RunKey, cancellationToken);
-        if (header is null)
+        if (storedProfile.Profile.Kind != ExpressionProfiles.KindOf(command.Family))
         {
-            return Refused(command.Family, RemarkRunHandler.RunNotFoundCode, Error.NotFound(RemarkRunHandler.RunNotFoundCode, "No stored run has that key."));
+            return Refused(command.Family, ProfileKindMismatchCode, Error.Validation(ProfileKindMismatchCode, "That profile is not of the kind the family judges: each structure is its own family."));
         }
 
-        if (!string.Equals(header.CreatedBy, FullTestOrigin, StringComparison.Ordinal))
+        // The condor has no cash run: its population is the one the condor verb printed. Every other family is a stored full-test cash run.
+        StoredRunHeader? header = null;
+        if (!condor)
         {
-            return Refused(command.Family, RunNotFullCode, Error.Validation(RunNotFullCode, "Only the runs of a full Lab test are judged: their out-of-sample windows are the population (re-marking in-sample trades would flatter both sides)."));
+            header = await runs.FindAsync(command.RunKey, cancellationToken);
+            if (header is null)
+            {
+                return Refused(command.Family, RemarkRunHandler.RunNotFoundCode, Error.NotFound(RemarkRunHandler.RunNotFoundCode, "No stored run has that key."));
+            }
+
+            if (!string.Equals(header.CreatedBy, FullTestOrigin, StringComparison.Ordinal))
+            {
+                return Refused(command.Family, RunNotFullCode, Error.Validation(RunNotFullCode, "Only the runs of a full Lab test are judged: their out-of-sample windows are the population (re-marking in-sample trades would flatter both sides)."));
+            }
+        }
+
+        // The credit gates: a stored regime and a measured half-spread. A failed gate is a NOT_EVALUABLE record that counts no trial and reads no bar, no date and no figure.
+        if (command.Family is ExpressionFamilies.CreditSpread or ExpressionFamilies.IronCondor)
+        {
+            var missing = StructureGate.Missing(await regime.AnyAsync(cancellationToken), await BestMeasuredSessionsAsync(cancellationToken), spreadSettings.MinUsableSessions);
+            if (missing.Count > 0)
+            {
+                return await GateAsync(command, options, protocol, profileHash, primary, missing, cancellationToken);
+            }
         }
 
         var remarked = await reader.FindRunAsync(command.RunKey, profileHash, cancellationToken);
         if (remarked is null)
         {
-            return Refused(command.Family, RemarkNotFoundCode, Error.NotFound(RemarkNotFoundCode, "That run has not been re-marked under that profile: run 'xd options remark' first."));
+            return Refused(command.Family, RemarkNotFoundCode, Error.NotFound(RemarkNotFoundCode, condor ? "That population has not been simulated under that profile: run 'xd options condors' first." : "That run has not been re-marked under that profile: run 'xd options remark' first."));
+        }
+
+        var from = header?.From ?? remarked.From;
+        var to = header?.To ?? remarked.To;
+        if (from is not { } fromDate || to is not { } toDate)
+        {
+            return Refused(command.Family, RemarkNotFoundCode, Error.NotFound(RemarkNotFoundCode, "The condor population carries no dates."));
         }
 
         // Ledger first: the trial is a counted look before a date, a count or a figure of the run is read.
-        var trial = ExpressionTrial.Of(command.Family, profileHash, command.RunKey, header.From, header.To);
-        var trials = await writer.AppendTrialAsync(trial, command.RunKey, header.From, header.To, "expression-trial", cancellationToken);
+        var trial = ExpressionTrial.Of(command.Family, profileHash, command.RunKey, fromDate, toDate);
+        var trials = await writer.AppendTrialAsync(trial, command.RunKey, fromDate, toDate, "expression-trial", cancellationToken);
         if (!await ledger.HasHashAsync(command.Family, trial.Hash, cancellationToken))
         {
             return Refused(command.Family, TrialNotInLedgerCode, Error.Validation(TrialNotInLedgerCode, "The trial is not in the test ledger of " + command.Family + ": nothing was computed."));
@@ -90,7 +127,7 @@ internal sealed class EvaluateExpressionHandler(
 
         var epochFrom = ExpressionEpochs.LatestFrom(await reference.EpochsAsync(cancellationToken));
         var dates = await reader.DatesAsync(remarked.RunId, cancellationToken);
-        var windows = ExpressionWindows.Of(dates.Sides);
+        var windows = condor ? [.. dates.Sides.Select(side => new ExpressionWindow(side.Side, side.First, side.Last))] : ExpressionWindows.Of(dates.Sides);
 
         // The hold-out is cut first, from dates only: everything printed or stored for the development verdict is built from the development windows.
         DateOnly? holdStart = null;
@@ -105,7 +142,8 @@ internal sealed class EvaluateExpressionHandler(
         var unpaired = await reader.UnpairedAsync(remarked.RunId, devWindows, cancellationToken);
         var pairs = rows.Select(ToPair).ToList();
 
-        var evaluated = ProtocolO.Evaluate(new ProtocolOInput(pairs, unpaired, trials, epochFrom, holdStart, options, dates.LastPaired));
+        var input = new ProtocolOInput(pairs, unpaired, trials, epochFrom, holdStart, options, dates.LastPaired);
+        var evaluated = condor ? ProtocolR.Evaluate(input) : ProtocolO.Evaluate(input);
         if (evaluated.IsFailure)
         {
             return Result.Failure<ExtensionEvaluationOutcome>(evaluated.Error);
@@ -113,7 +151,7 @@ internal sealed class EvaluateExpressionHandler(
 
         var result = evaluated.Value;
         var (development, _) = ProtocolO.Cut(pairs, options, holdStart);
-        var record = Identity(options, trial.Hash, trials, command, profileHash, primary, remarked.RunId, development, devWindows, unpaired, holdStart, epochFrom, false, null).ToRecord(result.Outcome);
+        var record = Identity(options, protocol, trial.Hash, trials, command, profileHash, primary, remarked.RunId, development, devWindows, unpaired, holdStart, epochFrom, false, null).ToRecord(result.Outcome);
         ExtensionEvaluationRecord? holdRecord = null;
         string? note = null;
         if (command.HoldOut)
@@ -125,13 +163,14 @@ internal sealed class EvaluateExpressionHandler(
             else
             {
                 var holdRows = await reader.PairedAsync(remarked.RunId, ExpressionWindows.From(windows, start), cancellationToken);
-                var hold = ProtocolO.HoldOut([.. holdRows.Select(ToPair)], options, start);
+                var holdPairs = holdRows.Select(ToPair).ToList();
+                var hold = condor ? ProtocolR.HoldOut(holdPairs, options, start) : ProtocolO.HoldOut(holdPairs, options, start);
                 if (hold.IsFailure)
                 {
                     return Result.Failure<ExtensionEvaluationOutcome>(hold.Error);
                 }
 
-                holdRecord = Identity(options, trial.Hash, trials, command, profileHash, primary, remarked.RunId, development, devWindows, unpaired, holdStart, epochFrom, true, record.EvaluationId).ToRecord(hold.Value);
+                holdRecord = Identity(options, protocol, trial.Hash, trials, command, profileHash, primary, remarked.RunId, development, devWindows, unpaired, holdStart, epochFrom, true, record.EvaluationId).ToRecord(hold.Value);
             }
         }
 
@@ -160,6 +199,37 @@ internal sealed class EvaluateExpressionHandler(
         return Result.Success(new ExtensionEvaluationOutcome(command.Family, stored, string.Join('\n', lines)));
     }
 
+    /// <summary>The largest session count of a stored measured model of an index underlying (the credit structures are for indices); null when no model is stored. An owner assumption is not a model.</summary>
+    private async ValueTask<int?> BestMeasuredSessionsAsync(CancellationToken cancellationToken)
+    {
+        int? best = null;
+        foreach (var symbol in IndexSymbols)
+        {
+            if (await reference.FindUnderlyingAsync(symbol, cancellationToken) is { } id && await spreadModels.LatestAsync(id, cancellationToken) is { } model)
+            {
+                best = Math.Max(best ?? 0, model.Sessions);
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>Stores the NOT_EVALUABLE record of a failed credit gate: no trial counted, nothing read.</summary>
+    private async ValueTask<Result<ExtensionEvaluationOutcome>> GateAsync(EvaluateExpressionCommand command, ExpressionStudyOptions options, string protocol, string profileHash, string primary, IReadOnlyList<string> missing, CancellationToken cancellationToken)
+    {
+        var trials = await writer.CountAsync(command.Family, cancellationToken);
+        var outcome = StructureGate.NotEvaluable(protocol, missing);
+        var record = Identity(options, protocol, null, trials, command, profileHash, primary, "none", [], [], new Dictionary<string, int>(), null, ExpressionEpochs.DefaultLatestFrom, false, null).ToRecord(outcome);
+        var written = await writer.StoreAsync(record, cancellationToken);
+        if (written.IsFailure)
+        {
+            return Result.Failure<ExtensionEvaluationOutcome>(written.Error);
+        }
+
+        ExpressionEvalLog.Evaluated(logger, record.Family, record.VersionKey, record.Verdict, 0, written.Value.Stored);
+        return Result.Success(new ExtensionEvaluationOutcome(command.Family, [written.Value], string.Join('\n', missing.Select(m => "missing: " + m))));
+    }
+
     private Result<ExtensionEvaluationOutcome> Refused(string family, string code, Error error)
     {
         ExpressionEvalLog.Refused(logger, family, code);
@@ -169,7 +239,7 @@ internal sealed class EvaluateExpressionHandler(
     private static ExpressionPair ToPair(ExpressionPairRow r) => ExpressionPair.Of(r.TradeKey, r.EntryTs, r.ExitTs, r.OptionR, r.CashR, r.Net, r.ExpirySource, r.Sizable, r.Labels);
 
     private static ProtocolIdentity Identity(
-        ExpressionStudyOptions options, string trialHash, int trials, EvaluateExpressionCommand command, string profileHash, string primary, string expressionRun, IReadOnlyList<ExpressionPair> development, IReadOnlyList<ExpressionWindow> windows,
+        ExpressionStudyOptions options, string protocol, string? trialHash, int trials, EvaluateExpressionCommand command, string profileHash, string primary, string expressionRun, IReadOnlyList<ExpressionPair> development, IReadOnlyList<ExpressionWindow> windows,
         IReadOnlyDictionary<string, int> unpaired, DateOnly? holdStart, DateOnly epochFrom, bool holdOut, string? developmentRecord)
     {
         var c = CultureInfo.InvariantCulture;
@@ -178,7 +248,7 @@ internal sealed class EvaluateExpressionHandler(
         var basis = development.Count == 0 ? "none" : development.All(p => p.Net) ? "net" : development.Any(p => p.Net) ? "mixed" : "gross";
         return new ProtocolIdentity(
             command.Family,
-            ExpressionFamilies.Protocol,
+            protocol,
             null,
             ExpressionFamilies.VersionKey,
             "none",
@@ -189,7 +259,7 @@ internal sealed class EvaluateExpressionHandler(
             "quarter",
             new SortedDictionary<string, string>(StringComparer.Ordinal)
             {
-                ["cash_run"] = command.RunKey,
+                [command.Family == ExpressionFamilies.IronCondor ? "condor_population" : "cash_run"] = command.RunKey,
                 ["charge_basis"] = basis,
                 ["development_record"] = developmentRecord ?? "none",
                 ["expression_run"] = expressionRun,

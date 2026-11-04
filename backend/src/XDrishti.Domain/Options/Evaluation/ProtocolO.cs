@@ -60,6 +60,7 @@ public static class ProtocolO
     {
         ArgumentNullException.ThrowIfNull(input);
         var o = input.Options;
+        var w = input.Wording ?? ProtocolWording.Expression;
         if (input.Trials < 1 || !o.IsValid || input.Pairs.Any(p => !double.IsFinite(p.OptionR) || !double.IsFinite(p.CashR)))
         {
             return Result.Failure<ProtocolOResult>(Error.Validation("extensions.options", "Protocol O needs the ledger count (at least 1), valid options and a finite R_equiv for every paired trade."));
@@ -81,7 +82,7 @@ public static class ProtocolO
         var allInHoldOut = dev.Count == 0 && input.HoldOutStart is { } cut && input.LastPaired is { } lastPaired && lastPaired >= cut;
         if (dev.Count == 0 && !allInHoldOut)
         {
-            missing.Add(NoPairedTrades + string.Create(c, $" ({unpairedTotal} out-of-sample trades, none paired)"));
+            missing.Add(w.NoPairs + string.Create(c, $" ({unpairedTotal} out-of-sample trades, none paired)"));
             if (spreadLost > 0)
             {
                 missing.Add(SpreadUnavailable + string.Create(c, $" ({spreadLost} of {unpairedTotal} unpaired trades have no half-spread)"));
@@ -96,8 +97,8 @@ public static class ProtocolO
         if (pool.Count < o.MinPaired)
         {
             missing.Add(allInHoldOut
-                ? string.Create(c, $"paired trades 0 of {o.MinPaired} (every paired trade lies in the hold-out from {input.HoldOutStart:yyyy-MM-dd})")
-                : string.Create(c, $"paired trades {pool.Count} of {o.MinPaired}"));
+                ? string.Create(c, $"{w.Pairs} 0 of {o.MinPaired} (every {(w.CashTwin ? "paired trade" : "condor")} lies in the hold-out from {input.HoldOutStart:yyyy-MM-dd})")
+                : string.Create(c, $"{w.Pairs} {pool.Count} of {o.MinPaired}"));
         }
 
         BootstrapBounds? dayBounds = null;
@@ -192,15 +193,27 @@ public static class ProtocolO
         }
 
         var verdict = VerdictTable.Decide(missing, failed, unrepairable);
-        var limits = new List<string>
-        {
-            ExpressionWindows.Rule,
-            "future baseline: NOT_EVALUABLE no_futures_bars (no futures bars exist)",
-            "survivorship (ISS-22) and the recent-spread assumption flatter both sides unequally",
-            "bar timestamp, IV unit, open-interest unit and the derived expiry weekdays are UNVERIFIED (ADR 0197); the fill is the next option bar's open, up to one bar after the cash fill",
-            gross ? "costs: gross, the owner's charge lines were not applied to both sides; the result is INCONCLUSIVE whichever way it points" : "costs: net of the owner's option and cash charge lines and the half-spread",
-            "Advisory research only: the expression stays cash on every decision path.",
-        };
+        var costs = w.CashTwin
+            ? (gross ? "costs: gross, the owner's charge lines were not applied to both sides; the result is INCONCLUSIVE whichever way it points" : "costs: net of the owner's option and cash charge lines and the half-spread")
+            : (gross ? "costs: gross, the owner's charge lines were not applied to every leg; the result is INCONCLUSIVE whichever way it points" : "costs: net of the owner's charge lines on every leg and the half-spread");
+        var limits = w.CashTwin
+            ? new List<string>
+            {
+                ExpressionWindows.Rule,
+                "future baseline: NOT_EVALUABLE no_futures_bars (no futures bars exist)",
+                "survivorship (ISS-22) and the recent-spread assumption flatter both sides unequally",
+                "bar timestamp, IV unit, open-interest unit and the derived expiry weekdays are UNVERIFIED (ADR 0197); the fill is the next option bar's open, up to one bar after the cash fill",
+                costs,
+                "Advisory research only: the expression stays cash on every decision path.",
+            }
+            : new List<string>
+            {
+                "no cash twin: the condor is judged on its own out-of-sample R; nothing is fitted, so every range-regime entry before the hold-out is out of sample",
+                "bar timestamp, IV unit, open-interest unit and the derived expiry weekdays are UNVERIFIED (ADR 0197); the fill is the next option bar's open",
+                "the regime labels are the stored ones (P6-02); a half-spread from a recent archive is flagged, not hidden",
+                costs,
+                "Advisory research only: no order path exists for a multi-leg structure.",
+            };
         var total = input.Pairs.Count + unpairedTotal;
         if (total > 0 && unpairedTotal > o.UnpairedLimitShare * total)
         {
@@ -220,8 +233,8 @@ public static class ProtocolO
             .Count("sizable_n", sizable.Count).Number("sizable_mean_d", sizable.Count > 0 ? sizable.Average(p => p.D) : null).Number("sizable_day_lower", sizableBounds?.Lower).Number("max_drawdown_option_r", drawdown).Count("embargo_dropped", dropped).EndObject();
 
         using var evidence = new ExtensionJson();
-        evidence.Object().Text("protocol", Protocol).Count("ledger_trials", input.Trials).Number("factor", factor).Text("basis", dev.Count == 0 ? null : gross ? "gross" : "net").Text("calibration_gate", "not applicable (no probability)")
-            .Text("hold_out_start", input.HoldOutStart?.ToString("yyyy-MM-dd", c)).Text("future_baseline", "NOT_EVALUABLE no_futures_bars").Text("oos_rule", ExpressionWindows.Rule).Object("unpaired").Count("total", unpairedTotal);
+        evidence.Object().Text("protocol", w.Letter).Count("ledger_trials", input.Trials).Number("factor", factor).Text("basis", dev.Count == 0 ? null : gross ? "gross" : "net").Text("calibration_gate", "not applicable (no probability)")
+            .Text("hold_out_start", input.HoldOutStart?.ToString("yyyy-MM-dd", c)).Text("future_baseline", w.CashTwin ? "NOT_EVALUABLE no_futures_bars" : null).Text("oos_rule", w.CashTwin ? ExpressionWindows.Rule : "own out-of-sample R, no cash twin").Object("unpaired").Count("total", unpairedTotal);
         foreach (var reason in input.Unpaired.OrderBy(r => r.Key, StringComparer.Ordinal))
         {
             evidence.Count(reason.Key, reason.Value);
@@ -248,19 +261,24 @@ public static class ProtocolO
         var lines = new List<string>
         {
             string.Create(c, $"ledger: N {input.Trials}, F {factor:F2}, margin {required:F3} R"),
-            string.Create(c, $"paired {dev.Count} ({pool.Count} in {evaluable.Count} evaluable of {folds.Count} quarters); unpaired {unpairedTotal}: {string.Join(", ", input.Unpaired.OrderBy(r => r.Key, StringComparer.Ordinal).Where(r => r.Value > 0).Select(r => r.Key + " " + r.Value.ToString(c) + " (" + (total > 0 ? r.Value * 100.0 / total : 0).ToString("F1", c) + " %)"))}"),
-            "mean d (option - cash, R): " + Fmt(meanD) + "; sd " + Fmt(sd) + "; design effect " + Fmt(designEffect) + "; minimum detectable effect " + Fmt(mde) + " R",
+            string.Create(c, $"{w.Pairs} {dev.Count} ({pool.Count} in {evaluable.Count} evaluable of {folds.Count} quarters); unpaired {unpairedTotal}: {string.Join(", ", input.Unpaired.OrderBy(r => r.Key, StringComparer.Ordinal).Where(r => r.Value > 0).Select(r => r.Key + " " + r.Value.ToString(c) + " (" + (total > 0 ? r.Value * 100.0 / total : 0).ToString("F1", c) + " %)"))}"),
+            w.Mean + ": " + Fmt(meanD) + "; sd " + Fmt(sd) + "; design effect " + Fmt(designEffect) + "; minimum detectable effect " + Fmt(mde) + " R",
             string.Create(c, $"latest epoch from {input.LatestEpochFrom:yyyy-MM-dd}: n {latest.Count}, mean d {Fmt(latestMean)}"),
             "Black-76 fallback share " + Pct(fallbackShare) + "; derived expiry share " + Pct(derivedShare) + "; spread from the recent archive share " + Pct(recentSpreadShare),
             string.Create(c, $"sizable-only (lot feasible): n {sizable.Count}, mean d {Fmt(sizable.Count > 0 ? sizable.Average(p => p.D) : null)}, day-block lower {Fmt(sizableBounds?.Lower)}"),
-            "futures baseline: NOT_EVALUABLE no_futures_bars",
         };
+        if (w.CashTwin)
+        {
+            lines.Add("futures baseline: NOT_EVALUABLE no_futures_bars");
+        }
+
         return Result.Success(new ProtocolOResult(outcome, dropped, lines));
     }
 
     /// <summary>The one reading of the hold-out: <paramref name="pairs"/> are the paired trades dated on or after the hold-out start. KEEP (confirmed) when there are at least 100, they are net, the mean d is above 0 and its day-block lower bound is above 0; INCONCLUSIVE when not; NOT_EVALUABLE under 100 or without a bound.</summary>
-    public static Result<ProtocolOutcome> HoldOut(IReadOnlyList<ExpressionPair> pairs, ExpressionStudyOptions options, DateOnly holdOutStart)
+    public static Result<ProtocolOutcome> HoldOut(IReadOnlyList<ExpressionPair> pairs, ExpressionStudyOptions options, DateOnly holdOutStart, ProtocolWording? wording = null)
     {
+        var w = wording ?? ProtocolWording.Expression;
         ArgumentNullException.ThrowIfNull(pairs);
         ArgumentNullException.ThrowIfNull(options);
         if (!options.IsValid || pairs.Any(p => !double.IsFinite(p.OptionR) || !double.IsFinite(p.CashR)))
@@ -272,7 +290,7 @@ public static class ProtocolO
         var missing = new List<string>();
         if (hold.Count < options.MinHoldOutPaired)
         {
-            missing.Add(string.Create(CultureInfo.InvariantCulture, $"hold-out paired trades {hold.Count} of {options.MinHoldOutPaired}"));
+            missing.Add(string.Create(CultureInfo.InvariantCulture, $"hold-out {w.Pairs} {hold.Count} of {options.MinHoldOutPaired}"));
         }
 
         BootstrapBounds? bounds = null;
@@ -301,9 +319,9 @@ public static class ProtocolO
         using var estimates = new ExtensionJson();
         estimates.Object().Count("hold_out_paired", hold.Count).Number("hold_out_mean_d", missing.Count == 0 ? mean : null).Number("day_lower", bounds?.Lower).Text("hold_out_start", holdOutStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)).EndObject();
         using var evidence = new ExtensionJson();
-        evidence.Object().Text("protocol", Protocol).Text("read", "hold-out, once");
+        evidence.Object().Text("protocol", w.Letter).Text("read", "hold-out, once");
         EvidenceBlock.Close(evidence, verdict, missing, failed);
-        return Result.Success(new ProtocolOutcome(verdict, missing, failed, ["The hold-out is read once; this record is that reading.", "Advisory research only: a KEEP is a record, the expression stays cash."], estimates.Finish(), evidence.Finish(), 1, 0, hold.Count));
+        return Result.Success(new ProtocolOutcome(verdict, missing, failed, ["The hold-out is read once; this record is that reading.", w.CashTwin ? "Advisory research only: a KEEP is a record, the expression stays cash." : "Advisory research only: a KEEP is a record, no order path exists for a multi-leg structure."], estimates.Finish(), evidence.Finish(), 1, 0, hold.Count));
     }
 
     private static DateOnly QuarterStart(DateOnly date) => new(date.Year, ((date.Month - 1) / 3 * 3) + 1, 1);

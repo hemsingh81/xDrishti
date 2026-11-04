@@ -11,6 +11,15 @@ public sealed record ExpressionStudyOptions
 {
     public static ExpressionStudyOptions Default { get; } = new();
 
+    /// <summary>
+    /// The settings of protocol R (the condor, P14-10): the spec's own 6 quarters and 200 condors; the fewest condors in a quarter for it to be evaluable is 10, not protocol O's 20, because a weekly entry in a range regime is at most 13 a quarter (OPEN owner question 3 of the ADR: the spec names no per-quarter minimum).
+    /// Everything else is protocol O's.
+    /// </summary>
+    public static ExpressionStudyOptions Condor { get; } = new() { Name = "protocol-r/1", MinPairedPerFold = 10, MinPaired = 200 };
+
+    /// <summary>The first token of <see cref="Canonical"/>: a different protocol is a different hash.</summary>
+    public string Name { get; init; } = "protocol-o/1";
+
     /// <summary>The fewest paired trades in a calendar quarter for it to be an evaluable fold.</summary>
     public int MinPairedPerFold { get; init; } = 20;
 
@@ -67,6 +76,6 @@ public sealed record ExpressionStudyOptions
         var c = CultureInfo.InvariantCulture;
         return string.Create(
             c,
-            $"protocol-o/1;minFold={MinPairedPerFold};folds={MinFolds};paired={MinPaired};margin={MarginR:R};pos={PositiveFoldShare:R};epochN={MinLatestEpochPaired};fallback={MaxFallbackShare:R};unpaired={UnpairedLimitShare:R};draws={Draws};seed={Seed};level={Level:R};block={BlockSessions};holdout={HoldOutMonths}/{MinHoldOutPaired}/{EmbargoSessions};mde={MdeMultiple:R};gates={Gates.MinOosTrades}/{Gates.MinExpectancyR:R}/{Gates.MinProfitFactor:R}/{Gates.MinPositiveFoldsPct:R}/{Gates.MaxDrawdownR:R}/{Gates.MaxCalibrationErrorPp:R}");
+            $"{Name};minFold={MinPairedPerFold};folds={MinFolds};paired={MinPaired};margin={MarginR:R};pos={PositiveFoldShare:R};epochN={MinLatestEpochPaired};fallback={MaxFallbackShare:R};unpaired={UnpairedLimitShare:R};draws={Draws};seed={Seed};level={Level:R};block={BlockSessions};holdout={HoldOutMonths}/{MinHoldOutPaired}/{EmbargoSessions};mde={MdeMultiple:R};gates={Gates.MinOosTrades}/{Gates.MinExpectancyR:R}/{Gates.MinProfitFactor:R}/{Gates.MinPositiveFoldsPct:R}/{Gates.MaxDrawdownR:R}/{Gates.MaxCalibrationErrorPp:R}");
     }
 }

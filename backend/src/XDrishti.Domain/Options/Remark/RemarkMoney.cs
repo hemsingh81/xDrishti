@@ -54,4 +54,55 @@ public static class RemarkMoney
 
         return new NetOutcome(Math.Round(gross - entryCost - exitCost, 2, MidpointRounding.AwayFromZero), null, labels);
     }
+
+    /// <summary>
+    /// The units of a defined-risk structure whose maximum loss equals the cash trade's rupee risk (P14-10 decision 3): <c>risk / (max loss per unit in rupees)</c>, fractional. Null when the maximum loss or the risk is not above zero.
+    /// </summary>
+    public static decimal? UnitsForMaxLoss(decimal riskRupees, int maxLossPx)
+    {
+        if (riskRupees <= 0 || maxLossPx <= 0)
+        {
+            return null;
+        }
+
+        return riskRupees / (maxLossPx / 100m);
+    }
+
+    /// <summary>One fill of a multi-leg structure: the side, the price in paise, the date and the half-spread of that leg at that instant.</summary>
+    public sealed record LegFill(Side Side, int PricePx, DateOnly Date, HalfSpreadValue Spread);
+
+    /// <summary>
+    /// Net rupees of a structure: gross less the charges of every fill on the owner's sheet and one half-spread per fill (P14-07; four fills for a spread round trip, eight for a condor). As <see cref="Net"/>: no option lines for a fill is
+    /// <see cref="RemarkFates.BasisMismatch"/>, a spread that is unavailable is <see cref="RemarkFates.SpreadUnavailable"/>; a missing figure is never taken as zero.
+    /// </summary>
+    public static NetOutcome NetLegs(CostSheet sheet, decimal gross, decimal units, IReadOnlyList<LegFill> fills)
+    {
+        ArgumentNullException.ThrowIfNull(sheet);
+        ArgumentNullException.ThrowIfNull(fills);
+        var labels = new List<string>();
+        var total = 0m;
+        foreach (var fill in fills)
+        {
+            var cost = OptionLegCost.Evaluate(sheet, CostSegment.Options, fill.Side, fill.PricePx / 100m, units, fill.Date, fill.Spread);
+            if (cost.Charges is null)
+            {
+                return new NetOutcome(null, RemarkFates.BasisMismatch, [cost.ChargesLabel]);
+            }
+
+            if (cost.TotalRupees is not { } leg)
+            {
+                return new NetOutcome(null, RemarkFates.SpreadUnavailable, [HalfSpreadValue.Unavailable.Label]);
+            }
+
+            total += leg;
+            labels.Add(cost.ChargesLabel);
+            labels.Add(fill.Spread.Label);
+            if (fill.Spread.FromRecentArchive)
+            {
+                labels.Add(HalfSpreadValue.SpreadFromRecentArchive);
+            }
+        }
+
+        return new NetOutcome(Math.Round(gross - total, 2, MidpointRounding.AwayFromZero), null, [.. labels.Distinct(StringComparer.Ordinal)]);
+    }
 }

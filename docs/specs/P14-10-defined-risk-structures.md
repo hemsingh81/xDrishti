@@ -71,7 +71,7 @@ A five-year condor simulation on NIFTY ≤ 1 minute (about 260 entries; UNVERIFI
 2. The condor parameters (`k` 6, `m` 1, wings 2 steps)? **Default: as drafted, pre-registered.**
 
 ## Done when
-- [ ] All acceptance criteria have evidence
+- [x] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer (Opus): no blockers/majors (told to look for any naked short leg, any loss beyond the stored maximum, any credit verdict on an assumed spread or without a regime, any cross-family trial)
-- [ ] Migration `AddExpressionLegs` with `Down`
-- [ ] ADR written; doc 20 §C updated
+- [x] Migration `AddExpressionLegs` with `Down` (also widens four checks of `expression_trades`; see the ADR)
+- [x] ADR written ([ADR 0200](../adr/0200-defined-risk-structures-are-re-marked-leg-by-leg-with-the-loss-capped-at-entry-each-is-its-own-family-credit-structures-are-gated-on-a-stored-regime-and-a-measured-spread-before-any-trial-or-bar-and-the-condor-is-judged-by-protocol-r.md)); doc 20 §C updated

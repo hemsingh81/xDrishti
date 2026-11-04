@@ -9,6 +9,7 @@ using XDrishti.Application.OptionExpression;
 using XDrishti.Domain.Lab;
 using XDrishti.Domain.Options.Evaluation;
 using XDrishti.Domain.Options.Remark;
+using XDrishti.Domain.Options.Structures;
 
 namespace XDrishti.Api.IntegrationTests.OptionExpression;
 
@@ -19,7 +20,7 @@ namespace XDrishti.Api.IntegrationTests.OptionExpression;
 [Collection(ApiTestSuite.Name)]
 public sealed class ExpressionReaderDatabaseTests(ApiFactory factory) : DataTestBase(factory)
 {
-    private const string Truncate = "TRUNCATE research.expression_trades, research.expression_runs; DELETE FROM lab.test_ledger WHERE strategy_id = 'expr:option_buy'; DELETE FROM research.extension_evaluations WHERE family = 'expr:option_buy'; DELETE FROM research.sim_runs WHERE run_key = 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'";
+    private const string Truncate = "TRUNCATE research.expression_legs, research.expression_trades, research.expression_runs; DELETE FROM lab.test_ledger WHERE strategy_id LIKE 'expr:%'; DELETE FROM research.extension_evaluations WHERE family LIKE 'expr:%'; DELETE FROM research.sim_runs WHERE run_key = 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'";
 
     private static readonly TimeSpan India = TimeSpan.FromMinutes(330);
     private static readonly string Cash = new('a', 64);
@@ -225,5 +226,75 @@ public sealed class ExpressionReaderDatabaseTests(ApiFactory factory) : DataTest
         var refused = await scope.ServiceProvider.GetRequiredService<IExtensionEvaluationStore>().AppendAsync(other, DateTimeOffset.UtcNow, Ct);
         refused.IsFailure.ShouldBeTrue();
         refused.Error.Code.ShouldBe("extensions.holdout_used");
+    }
+
+    [Fact]
+    public async Task A_condor_population_is_found_with_its_dates_and_its_rows_read_with_a_cash_R_of_zero_and_the_condor_side()
+    {
+        var entry = At(6, 2, 9, 30);
+        var condor = Paired("c1", "IC", entry, 0.4, 0, true, StructureNames.NoCashTwin) with { CashR = null };
+        var second = Paired("c2", "IC", At(6, 9, 9, 30), -1.0, 0, true, StructureNames.NoCashTwin) with { CashR = null };
+        var rows = new List<RemarkRow> { condor, second, Unpaired("c3", "IC", At(6, 16, 9, 30), StructureNames.StructureInvalid) };
+        var id = await WithAsync(async p =>
+        {
+            var inputs = "{\"from\":\"2025-06-01\",\"to\":\"2025-06-30\",\"underlying\":\"NSE:NIFTY\"}";
+            var written = await p.GetRequiredService<IExpressionTradeStore>().AppendAsync(new ExpressionRunRow(new string('3', 64), Cash, Profile, "expr-1", inputs, 3, 2, "{}", 0.0, []), rows, [], Ct);
+            written.ShouldBeTrue();
+            return new string('3', 64);
+        });
+
+        var found = await ReadAsync(async r => await r.FindRunAsync(Cash, Profile, Ct));
+        var dates = await ReadAsync(async r => await r.DatesAsync(id, Ct));
+        var paired = await ReadAsync(async r => await r.PairedAsync(id, [new ExpressionWindow("IC", new DateOnly(2025, 6, 1), new DateOnly(2025, 6, 30))], Ct));
+        var unpaired = await ReadAsync(async r => await r.UnpairedAsync(id, [new ExpressionWindow("IC", new DateOnly(2025, 6, 1), new DateOnly(2025, 6, 30))], Ct));
+
+        found.ShouldNotBeNull();
+        (found.RunId, found.From, found.To).ShouldBe((id, new DateOnly(2025, 6, 1), new DateOnly(2025, 6, 30)));
+        dates.Sides.ShouldHaveSingleItem().ShouldBe(new SideBounds("IC", new DateOnly(2025, 6, 2), new DateOnly(2025, 6, 16)));
+        dates.LastPaired.ShouldBe(new DateOnly(2025, 6, 9));
+        paired.Select(r => (r.TradeKey, r.OptionR, r.CashR)).ShouldBe([("c1", 0.4, 0d), ("c2", -1.0, 0d)]);
+        unpaired.ShouldBe(new Dictionary<string, int> { [StructureNames.StructureInvalid] = 1 });
+    }
+
+    [Fact]
+    public async Task The_credit_and_condor_families_are_NOT_EVALUABLE_regime_unavailable_in_the_real_store_with_no_trial_counted_while_the_debit_spread_counts_its_own_trial()
+    {
+        const string cashKey = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(
+                connection,
+                """
+                SET session_replication_role = replica;
+                INSERT INTO lab.strategies (id, style, built_in, created_at) VALUES ('ORB', 'intraday', true, now()) ON CONFLICT DO NOTHING;
+                INSERT INTO research.sim_runs (run_key, engine_version, record_schema_version, trade_schema_version, strategy_id, definition_sha256, from_date, to_date, universe_kind, universe_label, instruments, instruments_run,
+                    trades_in_window, candidates_in_window, trade_count, open_at_end_count, acknowledge_csv_adjusted, fills, record_json, record_sha256, trades_sha256, created_at, created_by)
+                VALUES ('cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc', 'sim-9', 5, 5, 'ORB', repeat('d', 64), '2024-01-02', '2026-12-31', 'basket', 'B1', 1, 1, 0, 0, 0, 0, false, 'modelled', '{}', repeat('e', 64), repeat('f', 64), '2026-12-31T05:00:00Z', 'lab:full');
+                """);
+        }
+
+        var credit = SpreadParams.Create(XDrishti.Domain.Learning.Expression.CreditSpread, "atm", 2, "nearest_safe", null, 1).Value.ToProfile().Value;
+        var debit = SpreadParams.Create(XDrishti.Domain.Learning.Expression.DebitSpread, "atm", 2, "nearest_safe", null, 1).Value.ToProfile().Value;
+        var condor = CondorParams.Primary.ToProfile().Value;
+        foreach (var profile in new[] { credit, debit, condor })
+        {
+            await WithAsync(async p => await p.GetRequiredService<IExpressionProfileStore>().AppendAsync(profile, Ct));
+        }
+
+        async Task<XDrishti.Domain.Common.Result<ExtensionEvaluationOutcome>> Run(string family, string run) =>
+            await WithAsync(async p => await p.GetRequiredService<ICommandHandler<EvaluateExpressionCommand, ExtensionEvaluationOutcome>>().HandleAsync(new EvaluateExpressionCommand(family, run, null, false), Ct));
+
+        var creditResult = await Run("expr:credit_spread", cashKey);
+        var condorResult = await Run("expr:iron_condor", new string('5', 64));
+        var again = await Run("expr:credit_spread", cashKey);
+        var debitResult = await Run("expr:debit_spread", cashKey);
+
+        creditResult.Value.Records.Single().Verdict.ShouldBe("NOT_EVALUABLE");
+        creditResult.Value.Records.Single().Missing.ShouldContain(m => m.StartsWith("regime_unavailable", StringComparison.Ordinal));
+        condorResult.Value.Records.Single().Protocol.ShouldBe("R");
+        again.Value.Records.Single().Stored.ShouldBeFalse();
+        debitResult.Error.Code.ShouldBe("expression.remark_not_found", "the debit spread has not been re-marked: refused after the profile and the run, before the ledger");
+        (await ScalarAsync<long>("SELECT count(*) FROM research.extension_evaluations WHERE family IN ('expr:credit_spread', 'expr:iron_condor') AND verdict = 'NOT_EVALUABLE' AND trial_hash IS NULL")).ShouldBe(2);
+        (await ScalarAsync<long>("SELECT count(*) FROM lab.test_ledger WHERE strategy_id LIKE 'expr:%'")).ShouldBe(0, "a failed gate counts no trial");
     }
 }

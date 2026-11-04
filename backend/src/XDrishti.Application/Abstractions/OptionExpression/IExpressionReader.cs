@@ -2,8 +2,8 @@ using XDrishti.Domain.Options.Evaluation;
 
 namespace XDrishti.Application.Abstractions.OptionExpression;
 
-/// <summary>An expression run found for a cash run and a profile: its id and the time it was stored. Counts are not here: the run row counts the whole run, hold-out included.</summary>
-public sealed record ExpressionRunRef(string RunId, DateTimeOffset CreatedAt);
+/// <summary>An expression run found for a cash run and a profile: its id and the time it was stored. Counts are not here: the run row counts the whole run, hold-out included. <see cref="From"/> and <see cref="To"/> are the dates of the condor population typed on the command line (null for a re-mark of a cash run, whose dates are the cash run's).</summary>
+public sealed record ExpressionRunRef(string RunId, DateTimeOffset CreatedAt, DateOnly? From = null, DateOnly? To = null);
 
 /// <summary>The dates of an expression run, no figure: the first and last entry of each side's closed trades, and the last date of a paired trade.</summary>
 public sealed record ExpressionDates(IReadOnlyList<SideBounds> Sides, DateOnly? LastPaired);

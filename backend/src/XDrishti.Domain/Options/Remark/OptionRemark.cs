@@ -141,7 +141,7 @@ public static class OptionRemark
 
     private static string OptionSide(RemarkTrade trade) => trade.IsBuy ? "CE" : "PE";
 
-    private static DateOnly DateOf(DateTimeOffset at) => SessionClock.DateOf(at.ToUnixTimeSeconds());
+    internal static DateOnly DateOf(DateTimeOffset at) => SessionClock.DateOf(at.ToUnixTimeSeconds());
 
     private static bool TryDelta(OptionBar row, OptionKind kind, DateOnly expiry, DateTimeOffset at, out double delta, out string ivUnit)
     {
@@ -162,7 +162,7 @@ public static class OptionRemark
         return true;
     }
 
-    private static HalfSpreadValue Spread(RemarkContext context, int steps, DateOnly expiry, DateTimeOffset at)
+    internal static HalfSpreadValue Spread(RemarkContext context, int steps, DateOnly expiry, DateTimeOffset at)
     {
         var ist = IndiaTime.ToIst(at);
         var bucket = SpreadBuckets.Of(steps, expiry.DayNumber - DateOnly.FromDateTime(ist.DateTime).DayNumber, TimeOnly.FromDateTime(ist.DateTime));
@@ -173,13 +173,12 @@ public static class OptionRemark
 
     private static ExitPoint Fault(string fate) => new(fate, default, 0, string.Empty, default, false);
 
-    private static ExitPoint PlanExit(RemarkTrade trade, SeriesPlan plan, OptionProfileParams profile, BarGrid grid, HeldStrikeSeries series, OptionKind kind, RemarkContext context, int entryIndex, int entryPx)
+    internal static ExitSchedule Schedule(SeriesPlan plan, RemarkContext context, BarGrid grid, DateTimeOffset entryTs, long exitEpoch, string cashReason)
     {
         var interval = TimeSpan.FromMinutes(plan.IntervalMinutes);
-        var exitMinute = DateTimeOffset.FromUnixTimeSeconds(trade.ExitEpoch);
-        var exitDate = SessionClock.DateOf(trade.ExitEpoch);
-        var entryTs = grid.Times[entryIndex];
-        var reason = trade.ExitReason;
+        var exitMinute = DateTimeOffset.FromUnixTimeSeconds(exitEpoch);
+        var exitDate = SessionClock.DateOf(exitEpoch);
+        var reason = cashReason;
         DateTimeOffset barTime;
         var atClose = false;
         if (exitDate > plan.LastSession)
@@ -189,7 +188,7 @@ public static class OptionRemark
             reason = RemarkFates.ExpiryExit;
             barTime = LastBarStart(context, plan.LastSession, interval);
         }
-        else if (SessionClock.MinuteOfDay(trade.ExitEpoch) >= CloseMinute(context, exitDate) - plan.IntervalMinutes)
+        else if (SessionClock.MinuteOfDay(exitEpoch) >= CloseMinute(context, exitDate) - plan.IntervalMinutes)
         {
             // a square-off, or an exit after the regular last bar began: the close of that last bar.
             atClose = true;
@@ -207,7 +206,15 @@ public static class OptionRemark
             atClose = false;
         }
 
-        var pricedAt = atClose ? barTime + interval : barTime;
+        return new ExitSchedule(barTime, atClose ? barTime + interval : barTime, atClose, reason, exitMinute);
+    }
+
+    private static ExitPoint PlanExit(RemarkTrade trade, SeriesPlan plan, OptionProfileParams profile, BarGrid grid, HeldStrikeSeries series, OptionKind kind, RemarkContext context, int entryIndex, int entryPx)
+    {
+        var interval = TimeSpan.FromMinutes(plan.IntervalMinutes);
+        var entryTs = grid.Times[entryIndex];
+        var schedule = Schedule(plan, context, grid, entryTs, trade.ExitEpoch, trade.ExitReason);
+        var (barTime, pricedAt, atClose, reason, exitMinute) = (schedule.BarTime, schedule.PricedAt, schedule.AtClose, schedule.Reason, schedule.ExitMinute);
         var planned = PremiumAt(series, kind, plan.Expiry.Date, context, barTime, pricedAt, atClose);
         if (planned.Fate is not null)
         {
@@ -216,8 +223,7 @@ public static class OptionRemark
 
         var cash = new ExitPoint(null, pricedAt, planned.Px, reason, barTime, planned.Model);
         var stopLevel = profile.PremiumStopPct is { } pct ? (int?)Math.Round(entryPx * (1m - (pct / 100m)), 0, MidpointRounding.AwayFromZero) : null;
-        var at = grid.FirstAtOrAfter(barTime);
-        var end = at < 0 ? grid.Times.Count : (atClose && grid.Times[at] == barTime ? at + 1 : at);
+        var end = schedule.End(grid);
         for (var i = entryIndex; i < end; i++)
         {
             var time = grid.Times[i];
@@ -251,29 +257,27 @@ public static class OptionRemark
         return cash;
     }
 
-    private static int CloseMinute(RemarkContext context, DateOnly date) => context.Calendar.SessionOf(date)?.ToMinute ?? SessionClock.CloseMinute;
+    internal static int CloseMinute(RemarkContext context, DateOnly date) => context.Calendar.SessionOf(date)?.ToMinute ?? SessionClock.CloseMinute;
 
-    private static DateTimeOffset LastBarStart(RemarkContext context, DateOnly date, TimeSpan interval) =>
+    internal static DateTimeOffset LastBarStart(RemarkContext context, DateOnly date, TimeSpan interval) =>
         new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).AddMinutes(CloseMinute(context, date)) - interval;
 
-    private readonly record struct Premium(string? Fate, int Open, int Low, int Px, bool Model);
-
-    private static Premium PremiumAt(HeldStrikeSeries series, OptionKind kind, DateOnly expiry, RemarkContext context, DateTimeOffset barTime, DateTimeOffset pricedAt, bool atClose)
+    internal static BarPremium PremiumAt(HeldStrikeSeries series, OptionKind kind, DateOnly expiry, RemarkContext context, DateTimeOffset barTime, DateTimeOffset pricedAt, bool atClose)
     {
         switch (series.Held(barTime, out var bar))
         {
             case HeldState.Available:
-                return new Premium(null, bar!.OpenPx, bar.LowPx, atClose ? bar.ClosePx : bar.OpenPx, false);
+                return new BarPremium(null, bar!.OpenPx, bar.LowPx, bar.HighPx, atClose ? bar.ClosePx : bar.OpenPx, false);
             case HeldState.Unusable:
-                return new Premium(RemarkFates.ArchiveUnusable, 0, 0, 0, false);
+                return new BarPremium(RemarkFates.ArchiveUnusable, 0, 0, 0, 0, false);
             default:
                 var model = Fallback(series, kind, expiry, context, barTime, pricedAt);
                 if (model is null)
                 {
-                    return new Premium(RemarkFates.StrikeLeftWindow, 0, 0, 0, false);
+                    return new BarPremium(RemarkFates.StrikeLeftWindow, 0, 0, 0, 0, false);
                 }
 
-                return new Premium(null, model.Value, model.Value, model.Value, true);
+                return new BarPremium(null, model.Value, model.Value, model.Value, model.Value, true);
         }
     }
 

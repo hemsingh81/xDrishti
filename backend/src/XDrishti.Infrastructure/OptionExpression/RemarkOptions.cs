@@ -11,4 +11,8 @@ internal sealed class RemarkOptions
     [Required]
     [Range(5, 390)]
     public int? MaxIvAgeMinutes { get; set; } = 60;
+
+    /// <summary>The stored charge sheet id the condor family is costed on; empty for gross.</summary>
+    [MaxLength(64)]
+    public string? CondorCostSheetId { get; set; }
 }

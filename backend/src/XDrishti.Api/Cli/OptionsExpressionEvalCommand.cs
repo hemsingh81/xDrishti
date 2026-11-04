@@ -13,8 +13,8 @@ internal static class OptionsExpressionEvalCommand
 {
     public const string Usage = """
         usage:
-          xd options expression-eval --family expr:option_buy --run RUNKEY [--profile HASH] [--holdout]
-            protocol O over the out-of-sample paired trades of a full-test cash run (64 hex characters) re-marked under the profile (64 hex characters; the pre-registered primary profile when omitted): the trial is appended to the test ledger BEFORE any figure is read;
+          xd options expression-eval --family expr:option_buy|expr:debit_spread|expr:credit_spread|expr:iron_condor --run RUNKEY [--profile HASH] [--holdout]
+            protocol R for expr:iron_condor (--run is the population key 'xd options condors' printed; the condor has no cash twin) and protocol O for the others; credit_spread and iron_condor are NOT_EVALUABLE regime_unavailable without a stored regime and spread_not_measured without a measured spread model, counting no trial; protocol O over the out-of-sample paired trades of a full-test cash run (64 hex characters) re-marked under the profile (64 hex characters; the pre-registered primary profile when omitted): the trial is appended to the test ledger BEFORE any figure is read;
             KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE with each missing quantity named; a gross result is INCONCLUSIVE whichever way it points; --holdout (primary profile only: the family has one hold-out reading, consumed by whichever profile uses it) reads the last six months once, after a stored development KEEP
         research only: the expression stays cash; nothing selects, plans or orders
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled

@@ -66,7 +66,7 @@ public static class SeriesPlanner
     }
 
     /// <summary>Whether the backfill holds the series (kind and code) for the underlying on the date (ADR 0177 decision 3).</summary>
-    private static bool Held(string symbol, char flag, int code, DateOnly tradeDate, DateOnly weeklyEnd) => symbol switch
+    internal static bool Held(string symbol, char flag, int code, DateOnly tradeDate, DateOnly weeklyEnd) => symbol switch
     {
         ExpiryRules.Nifty => (flag == 'W' && code <= 2) || (flag == 'M' && code == 1),
         ExpiryRules.BankNifty => (flag == 'M' && code <= 2) || (flag == 'W' && code == 1 && tradeDate <= weeklyEnd),

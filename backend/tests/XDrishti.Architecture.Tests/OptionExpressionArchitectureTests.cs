@@ -66,7 +66,7 @@ public sealed class OptionExpressionArchitectureTests
     [Fact]
     public void The_exact_set_of_types_that_name_a_remark_type_is_the_use_case_its_ports_and_the_adapters()
     {
-        TopLevelUsers(Application, [Remark]).ShouldBe(["IContractExpiryReader", "IExpressionTradeStore", "IRollingBarReader", "IvFeatureExtractor", "RemarkRunHandler"]); // IvFeatureExtractor: the iv-1 extraction (P14-11) reads the bars through the same port
+        TopLevelUsers(Application, [Remark]).ShouldBe(["IContractExpiryReader", "IExpressionTradeStore", "IRollingBarReader", "IvFeatureExtractor", "RemarkRunHandler", "RemarkShared", "RemarkStructureHandler", "SimulateCondorsHandler"]); // IvFeatureExtractor: the iv-1 extraction (P14-11) reads the bars through the same port; RemarkStructureHandler, SimulateCondorsHandler and their shared helpers: the structures (P14-10); (EvaluateExpressionHandler reads the ExpiryRules symbol constants, which the compiler inlines)
         TopLevelUsers(Infrastructure, [Remark]).ShouldBe(["ContractExpiryReader", "ExpressionTradeStore", "RollingBarReader"]);
         TopLevelUsers(Assembly.Load(new AssemblyName("XDrishti.Api")), [Remark]).ShouldBeEmpty();
     }
@@ -75,8 +75,8 @@ public sealed class OptionExpressionArchitectureTests
     public void Only_the_wiring_the_verb_and_the_use_case_name_the_application_or_infrastructure_remark_namespaces()
     {
         TopLevelUsers(Application, AppNamespaces, AppNamespaces).ShouldBe(["DependencyInjection", "IvFeatureExtractor"]); // IvFeatureExtractor: the iv-1 extraction (P14-11) reads the rolling bars and the contract expiries through their ports
-        TopLevelUsers(Infrastructure, AppNamespaces).ShouldBe(["ContractExpiryReader", "DependencyInjection", "ExpressionReader", "ExpressionTradeStore", "RemarkSettings", "RollingBarReader"]);
-        TopLevelUsers(Assembly.Load(new AssemblyName("XDrishti.Api")), AppNamespaces).ShouldBe(["OptionsExpressionEvalCommand", "OptionsRemarkCommand"]);
+        TopLevelUsers(Infrastructure, AppNamespaces).ShouldBe(["ContractExpiryReader", "DependencyInjection", "ExpressionReader", "ExpressionTradeStore", "NoRegimeLabels", "RemarkSettings", "RollingBarReader"]); // NoRegimeLabels: the regime port (P14-10) until P6-02 stores labels
+        TopLevelUsers(Assembly.Load(new AssemblyName("XDrishti.Api")), AppNamespaces).ShouldBe(["OptionsCondorsCommand", "OptionsExpressionEvalCommand", "OptionsRemarkCommand"]);
     }
 
     [Theory]
@@ -154,7 +154,7 @@ public sealed class OptionExpressionArchitectureTests
     public void The_remark_code_names_no_order_broker_or_network_type_and_no_clock()
     {
         var files = Directory.EnumerateFiles(Src("XDrishti.Domain", "Options", "Remark"), "*.cs").Concat(Directory.EnumerateFiles(Src("XDrishti.Application", "OptionExpression"), "*.cs")).Concat(Directory.EnumerateFiles(Src("XDrishti.Application", "Abstractions", "OptionExpression"), "*.cs"))
-            .Concat(Directory.EnumerateFiles(Src("XDrishti.Infrastructure", "OptionExpression"), "*.cs")).Concat([Src("XDrishti.Api", "Cli", "OptionsRemarkCommand.cs")]);
+            .Concat(Directory.EnumerateFiles(Src("XDrishti.Infrastructure", "OptionExpression"), "*.cs")).Concat([Src("XDrishti.Api", "Cli", "OptionsRemarkCommand.cs"), Src("XDrishti.Api", "Cli", "OptionsCondorsCommand.cs")]).Concat(Directory.EnumerateFiles(Src("XDrishti.Domain", "Options", "Structures"), "*.cs"));
         foreach (var file in files)
         {
             var text = File.ReadAllText(file);
@@ -169,16 +169,24 @@ public sealed class OptionExpressionArchitectureTests
     public void Only_the_store_the_migration_and_the_comments_of_the_ports_name_the_two_tables_and_the_migration_is_insert_only_for_the_runtime_role_and_nothing_for_any_other()
     {
         var named = Directory.EnumerateFiles(Src(), "*.cs", SearchOption.AllDirectories)
-            .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.EndsWith(".Designer.cs", StringComparison.Ordinal) && Regex.IsMatch(File.ReadAllText(f), @"expression_runs|expression_trades", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(5)))
+            .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.EndsWith(".Designer.cs", StringComparison.Ordinal) && Regex.IsMatch(File.ReadAllText(f), @"expression_runs|expression_trades|expression_legs", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(5)))
             .Select(f => Path.GetFileName(f)).Order(StringComparer.Ordinal).ToList();
         var migration = File.ReadAllText(Directory.EnumerateFiles(Src("XDrishti.Infrastructure", "Persistence", "Migrations"), "*_AddExpressionTrades.cs").Single());
 
-        named.ShouldBe(["20261103183027_AddExpressionTrades.cs", "DependencyInjection.cs", "ExpressionReader.cs", "ExpressionRunRow.cs", "ExpressionTradeStore.cs", "IExpressionTradeStore.cs"]); // the migration and the store write them; the wiring, the port and the run row name them in comments only; ExpressionReader (P14-09) reads them with select only
+        named.ShouldBe(["20261103183027_AddExpressionTrades.cs", "20261103224548_AddExpressionLegs.cs", "DependencyInjection.cs", "ExpressionReader.cs", "ExpressionRunRow.cs", "ExpressionTradeStore.cs", "IExpressionTradeStore.cs", "StructureLegRow.cs"]); // StructureLegRow: its comment names the legs table (P14-10); the migration and the store write them; the wiring, the port and the run row name them in comments only; ExpressionReader (P14-09) reads them with select only
         migration.ShouldContain("MakeAppendOnlyForAppRole(Schemas.Research, \"expression_runs\")");
         migration.ShouldContain("MakeAppendOnlyForAppRole(Schemas.Research, \"expression_trades\")");
         migration.ShouldNotContain("xd_exec");
         migration.ShouldNotContain("GrantSchemaUsageToAppRole");
         migration.ShouldContain("DROP TABLE IF EXISTS research.expression_trades");
         migration.ShouldContain("DROP TABLE IF EXISTS research.expression_runs");
+
+        // P14-10 (ADR 0200): the legs table is insert-only for the runtime role too, nothing for the execution role, and Down deletes no row
+        var legs = File.ReadAllText(Directory.EnumerateFiles(Src("XDrishti.Infrastructure", "Persistence", "Migrations"), "*_AddExpressionLegs.cs").Single());
+        legs.ShouldContain("MakeAppendOnlyForAppRole(Schemas.Research, \"expression_legs\")");
+        legs.ShouldNotContain("xd_exec");
+        legs.ShouldNotContain("GrantSchemaUsageToAppRole");
+        legs.ShouldContain("DROP TABLE IF EXISTS research.expression_legs");
+        legs.ShouldNotContain("DELETE FROM");
     }
 }

@@ -50,7 +50,7 @@ public sealed class OptionsExpressionEvalCommandTests
     {
         OptionsExpressionEvalCommand.Usage.ShouldContain("exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled");
         OptionsExpressionEvalCommand.Usage.ShouldContain("BEFORE any figure is read");
-        XdOptions.Usage.ShouldContain("xd options expression-eval --family expr:option_buy --run RUNKEY [--profile HASH] [--holdout]");
+        XdOptions.Usage.ShouldContain("xd options expression-eval --family expr:option_buy|expr:debit_spread|expr:credit_spread|expr:iron_condor --run RUNKEY [--profile HASH] [--holdout]");
         EvaluateExpressionCommand.OptionBuyFamily.ShouldBe(ExpressionFamilies.OptionBuy);
     }
 }

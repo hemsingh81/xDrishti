@@ -98,6 +98,27 @@ public sealed class ExtensionEvaluationApiTests(ApiFactory factory) : DataTestBa
         pead.GetProperty("items").GetArrayLength().ShouldBe(0);
     }
 
+    [Theory]
+    [InlineData("expr:debit_spread", "O")]
+    [InlineData("expr:credit_spread", "O")]
+    [InlineData("expr:iron_condor", "R")]
+    public async Task The_shared_route_lists_each_structure_family_with_its_own_record_and_protocol(string family, string protocol)
+    {
+        var record = new ExtensionEvaluationRecord(
+            Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(family))),
+            family, protocol, null, "expr-1", "none", new string('a', 64), null, null, 1, 1.0, "quarter", 0, 0, 0, null, "{\"status\":\"unavailable\"}", "NOT_EVALUABLE", ["regime_unavailable (no regime label is stored: P6-02 and P3-01d are not built)"], [],
+            "{\"verdict\":\"NOT_EVALUABLE\"}", "{}", false);
+        await StoreAsync(record);
+
+        var body = await Client.GetFromJsonAsync<JsonElement>(new Uri(List + "?family=" + family, UriKind.Relative), Ct);
+        var other = await Client.GetFromJsonAsync<JsonElement>(new Uri(List + "?family=expr:option_buy", UriKind.Relative), Ct);
+
+        body.GetProperty("items").GetArrayLength().ShouldBe(1);
+        body.GetProperty("items")[0].GetProperty("protocol").GetString().ShouldBe(protocol);
+        body.GetProperty("items")[0].GetProperty("verdict").GetString().ShouldBe("NOT_EVALUABLE");
+        other.GetProperty("items").GetArrayLength().ShouldBe(0);
+    }
+
     [Fact]
     public async Task The_shared_route_lists_the_iv_family_and_its_record_and_the_p15_families_stay_apart()
     {

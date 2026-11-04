@@ -41,5 +41,6 @@ public sealed class OptionsRemarkCommandTests
     {
         OptionsRemarkCommand.Usage.ShouldContain("exit codes: 0 done, 1 unknown run or profile, 2 wrong command line, 3 failure, 130 cancelled");
         XdOptions.Usage.ShouldContain("xd options remark --run RUNKEY --profile HASH");
+        XdOptions.Usage.ShouldContain("xd options condors --profile HASH --from YYYY-MM-DD --to YYYY-MM-DD");
     }
 }

@@ -7,5 +7,6 @@ namespace XDrishti.Domain.Options.Evaluation;
 /// <param name="LatestEpochFrom">The first day of the latest rule epoch (<c>nifty_expiry_tuesday</c>).</param>
 /// <param name="HoldOutStart">The first day of the hold-out, or null when there is none.</param>
 /// <param name="Options">The settings.</param>
+/// <param name="Wording">The words of the protocol (O by default; R for the condor).</param>
 /// <param name="LastPaired">The last entry date of any paired trade (a date only), or null; it lets the record say that every paired trade lies in the hold-out.</param>
-public sealed record ProtocolOInput(IReadOnlyList<ExpressionPair> Pairs, IReadOnlyDictionary<string, int> Unpaired, int Trials, DateOnly LatestEpochFrom, DateOnly? HoldOutStart, ExpressionStudyOptions Options, DateOnly? LastPaired = null);
+public sealed record ProtocolOInput(IReadOnlyList<ExpressionPair> Pairs, IReadOnlyDictionary<string, int> Unpaired, int Trials, DateOnly LatestEpochFrom, DateOnly? HoldOutStart, ExpressionStudyOptions Options, DateOnly? LastPaired = null, ProtocolWording? Wording = null);

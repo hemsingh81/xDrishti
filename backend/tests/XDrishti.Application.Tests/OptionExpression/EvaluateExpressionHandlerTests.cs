@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Learning;
+using XDrishti.Application.Abstractions.OptionCosts;
 using XDrishti.Application.Abstractions.OptionExpression;
 using XDrishti.Application.Abstractions.OptionQuality;
 using XDrishti.Application.Abstractions.Research;
@@ -33,6 +34,9 @@ public sealed class EvaluateExpressionHandlerTests
     private readonly IRunStore _runs = Substitute.For<IRunStore>();
     private readonly IExpressionProfileStore _profiles = Substitute.For<IExpressionProfileStore>();
     private readonly IOptionReference _reference = Substitute.For<IOptionReference>();
+    private readonly IRegimeLabels _regime = Substitute.For<IRegimeLabels>();
+    private readonly ISpreadModelStore _spreadModels = Substitute.For<ISpreadModelStore>();
+    private readonly ISpreadModelSettings _spreadSettings = Substitute.For<ISpreadModelSettings>();
     private readonly string _primary = ExpressionProfiles.PrimaryHash;
 
     public EvaluateExpressionHandlerTests()
@@ -55,7 +59,7 @@ public sealed class EvaluateExpressionHandlerTests
     private EvaluateExpressionHandler Handler()
     {
         var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
-        return new EvaluateExpressionHandler(_runs, _profiles, _reader, _reference, _ledger, _evaluations, new EvaluationWriter(_evaluations, _ledger, time), NullLogger<EvaluateExpressionHandler>.Instance);
+        return new EvaluateExpressionHandler(_runs, _profiles, _reader, _reference, _regime, _spreadModels, _spreadSettings, _ledger, _evaluations, new EvaluationWriter(_evaluations, _ledger, time), NullLogger<EvaluateExpressionHandler>.Instance);
     }
 
     private static EvaluateExpressionCommand Command(bool holdOut = false, string? profile = null) => new("expr:option_buy", RunKey, profile, holdOut);

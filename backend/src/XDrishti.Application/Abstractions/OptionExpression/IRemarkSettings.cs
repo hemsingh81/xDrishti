@@ -4,4 +4,7 @@ namespace XDrishti.Application.Abstractions.OptionExpression;
 public interface IRemarkSettings
 {
     int MaxIvAgeMinutes { get; }
+
+    /// <summary>The stored charge sheet id the condor family is costed on (<c>Options:Remark:CondorCostSheetId</c>, P14-10); null for gross (a gross condor can neither be kept nor dropped).</summary>
+    string? CondorCostSheetId { get; }
 }

@@ -25,7 +25,7 @@ public sealed partial class ExpressionDimensionArchitectureTests
     [GeneratedRegex(@"\bExpression(Profile|Names)?\b|\bIExpressionProfileStore\b|\bStoredExpressionProfile\b")]
     private static partial Regex ExpressionTypes();
 
-    private static readonly string[] AllowedForNonCash = ["XDrishti.Domain/Learning/", "XDrishti.Domain/Options/", "XDrishti.Domain/Pairs/", "XDrishti.Infrastructure/Learning/", "XDrishti.Infrastructure/Research/"];
+    private static readonly string[] AllowedForNonCash = ["XDrishti.Domain/Learning/", "XDrishti.Domain/Options/", "XDrishti.Domain/Pairs/", "XDrishti.Application/OptionExpression/", "XDrishti.Infrastructure/Learning/", "XDrishti.Infrastructure/Research/"];
 
     [Fact]
     public void A_non_cash_expression_value_is_named_only_in_the_research_areas()

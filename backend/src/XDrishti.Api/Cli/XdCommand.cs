@@ -219,6 +219,11 @@ internal static class XdCommand
             return await OptionsExpressionEvalCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "options" && args[1] == "condors")
+        {
+            return await OptionsCondorsCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "options" && args[1] == "remark")
         {
             return await OptionsRemarkCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);

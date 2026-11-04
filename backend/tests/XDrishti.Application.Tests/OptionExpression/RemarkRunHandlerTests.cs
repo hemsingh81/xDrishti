@@ -16,6 +16,7 @@ using XDrishti.Domain.Options;
 using XDrishti.Domain.Options.Costs;
 using XDrishti.Domain.Options.Quality;
 using XDrishti.Domain.Options.Remark;
+using XDrishti.Domain.Options.Structures;
 using XDrishti.Domain.Research;
 using XDrishti.Tests.Shared;
 
@@ -318,5 +319,7 @@ public sealed class RemarkRunHandlerTests
             Rows = rows;
             return ValueTask.FromResult(true);
         }
+
+        public ValueTask<bool> AppendAsync(ExpressionRunRow run, IReadOnlyList<RemarkRow> rows, IReadOnlyList<StructureLegRow> legs, CancellationToken cancellationToken) => AppendAsync(run, rows, cancellationToken);
     }
 }

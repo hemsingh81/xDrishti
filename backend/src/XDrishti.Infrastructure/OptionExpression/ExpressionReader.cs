@@ -15,11 +15,11 @@ internal sealed class ExpressionReader(NpgsqlDataSource dataSource) : IExpressio
 
     public async ValueTask<ExpressionRunRef?> FindRunAsync(string cashRunKey, string profileHash, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("SELECT run_id, created_at FROM research.expression_runs WHERE cash_run_key = @cash AND profile_hash = @profile ORDER BY created_at DESC, run_id DESC LIMIT 1");
+        await using var command = dataSource.CreateCommand("SELECT run_id, created_at, inputs->>'from', inputs->>'to' FROM research.expression_runs WHERE cash_run_key = @cash AND profile_hash = @profile ORDER BY created_at DESC, run_id DESC LIMIT 1");
         command.Parameters.AddWithValue("cash", NpgsqlDbType.Char, cashRunKey ?? string.Empty);
         command.Parameters.AddWithValue("profile", NpgsqlDbType.Char, profileHash ?? string.Empty);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? new ExpressionRunRef(reader.GetString(0), reader.GetFieldValue<DateTimeOffset>(1)) : null;
+        return await reader.ReadAsync(cancellationToken) ? new ExpressionRunRef(reader.GetString(0), reader.GetFieldValue<DateTimeOffset>(1), DateOf(reader, 2), DateOf(reader, 3)) : null;
     }
 
     public async ValueTask<ExpressionDates> DatesAsync(string runId, CancellationToken cancellationToken)
@@ -54,13 +54,13 @@ internal sealed class ExpressionReader(NpgsqlDataSource dataSource) : IExpressio
             return rows;
         }
 
-        await using var command = dataSource.CreateCommand("SELECT trade_key, entry_ts, exit_ts, r_equiv, cash_r, net_inr IS NOT NULL, expiry_source, sizable, labels FROM research.expression_trades WHERE run_id = @id AND fate = 'paired' AND (" + Predicate(windows) + ") ORDER BY entry_ts, trade_key");
+        await using var command = dataSource.CreateCommand("SELECT trade_key, entry_ts, exit_ts, r_equiv, CASE WHEN 'no_cash_twin' = ANY(labels) THEN 0 ELSE cash_r END, net_inr IS NOT NULL, expiry_source, sizable, labels FROM research.expression_trades WHERE run_id = @id AND fate = 'paired' AND (" + Predicate(windows) + ") ORDER BY entry_ts, trade_key");
         Bind(command, runId, windows);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
             rows.Add(new ExpressionPairRow(
-                reader.GetString(0), reader.GetFieldValue<DateTimeOffset>(1), reader.GetFieldValue<DateTimeOffset>(2), reader.GetDouble(3), reader.GetDouble(4), reader.GetBoolean(5), reader.GetString(6).Trim(), reader.GetString(7), reader.GetFieldValue<string[]>(8)));
+                reader.GetString(0), reader.GetFieldValue<DateTimeOffset>(1), reader.GetFieldValue<DateTimeOffset>(2), reader.GetDouble(3), reader.IsDBNull(4) ? throw new InvalidOperationException("A paired expression row has no cash R and no no_cash_twin label.") : reader.GetDouble(4), reader.GetBoolean(5), reader.GetString(6).Trim(), reader.GetString(7), reader.GetFieldValue<string[]>(8)));
         }
 
         return rows;
@@ -84,6 +84,10 @@ internal sealed class ExpressionReader(NpgsqlDataSource dataSource) : IExpressio
 
         return counts;
     }
+
+    /// <summary>A date written by the condor verb into the run's inputs; null for a re-mark of a cash run (it has none).</summary>
+    private static DateOnly? DateOf(NpgsqlDataReader reader, int ordinal) =>
+        !reader.IsDBNull(ordinal) && DateOnly.TryParseExact(reader.GetString(ordinal), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : null;
 
     private static string Predicate(IReadOnlyList<ExpressionWindow> windows)
     {

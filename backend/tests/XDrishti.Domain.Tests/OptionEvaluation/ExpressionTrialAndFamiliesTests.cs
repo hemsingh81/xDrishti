@@ -13,9 +13,10 @@ public sealed class ExpressionTrialAndFamiliesTests
     public void The_expression_family_is_known_to_its_list_and_not_to_the_p15_or_pairs_lists()
     {
         ExpressionFamilies.IsKnown("expr:option_buy").ShouldBeTrue();
-        ExpressionFamilies.All.ShouldBe(["expr:option_buy"]);
+        ExpressionFamilies.All.ShouldBe(["expr:option_buy", "expr:debit_spread", "expr:credit_spread", "expr:iron_condor"]); // P14-10: each structure is its own family
         ExtensionFamilies.IsKnown("expr:option_buy").ShouldBeFalse();
         ExtensionFamilies.All.ShouldNotContain("expr:option_buy");
+        ExtensionFamilies.All.Concat(PairFamilies.All).ShouldNotContain(f => f.StartsWith("expr:", StringComparison.Ordinal));
         PairFamilies.IsKnown("expr:option_buy").ShouldBeFalse();
         (ExpressionFamilies.Protocol, ExpressionFamilies.VersionKey).ShouldBe(("O", "expr-1"));
     }
