@@ -50,6 +50,7 @@ const passwordCheckPaths = new Set<string>([
   '/api/assistant/settings',
   '/api/live-trading/compliance',
   '/api/selection/event-filter',
+  '/api/lab/runs/{id}/holdout-unlock',
 ]);
 
 api.use({

@@ -8,6 +8,7 @@ import { versionQuery } from '../api/labQueries';
 import { EditorCard, type Draft } from './EditorCard';
 import { LedgerCard } from './LedgerCard';
 import { LibraryCard } from './LibraryCard';
+import { RegistrationCard } from './RegistrationCard';
 import { RunsCard } from './RunsCard';
 
 interface Origin {
@@ -64,6 +65,11 @@ export function LabPage() {
             onSaved={(c) => void open(c.id, c.version)}
           />
         </Grid>
+        {origin && (
+          <Grid size={12}>
+            <RegistrationCard key={`${origin.id}:${origin.version}`} strategyId={origin.id} version={origin.version} />
+          </Grid>
+        )}
         <Grid size={12}>
           <RunsCard familyId={familyId} target={origin} runId={runId} onSelectRun={setRunId} />
         </Grid>

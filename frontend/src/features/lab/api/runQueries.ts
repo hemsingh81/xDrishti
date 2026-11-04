@@ -16,6 +16,8 @@ export const runKeys = {
   lists: ['lab', 'runs', 'list'] as const,
   list: (strategyId: string | null) => ['lab', 'runs', 'list', strategyId ?? 'all'] as const,
   one: (id: string) => ['lab', 'runs', 'one', id] as const,
+  /** Every run report. */
+  reports: ['lab', 'runs', 'report'] as const,
   report: (id: string) => ['lab', 'runs', 'report', id] as const,
   ledger: (strategyId: string) => ['lab', 'ledger', strategyId] as const,
 };
