@@ -43,7 +43,7 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
     public override async ValueTask InitializeAsync()
     {
         await base.InitializeAsync();
-        await StoreSqlAsync("DELETE FROM lab.lab_results; DELETE FROM lab.test_ledger; DELETE FROM lab.lab_runs; DELETE FROM research.sim_trades WHERE run_id IN (SELECT id FROM research.sim_runs WHERE created_by = 'lab:full'); DELETE FROM research.sim_runs WHERE created_by = 'lab:full'");
+        await StoreSqlAsync("DELETE FROM lab.lab_results; DELETE FROM lab.variant_stats; DELETE FROM lab.test_ledger; DELETE FROM lab.lab_runs; DELETE FROM research.sim_trades WHERE run_id IN (SELECT id FROM research.sim_runs WHERE created_by = 'lab:full'); DELETE FROM research.sim_runs WHERE created_by = 'lab:full'");
         await StrategySeeding.SeedAsync(Factory.Services, Ct); // the built-ins ORB, VWAP_PULLBACK and BASE_BREAKOUT, as `xd-api migrate` writes them
     }
 
@@ -222,6 +222,16 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         block.GetProperty("limits").GetArrayLength().ShouldBeGreaterThan(0);
         var sweepRows = await CountAsync("SELECT count(*) FROM lab.test_ledger WHERE method = 'sweep'");
         sweepRows.ShouldBe(block.GetProperty("sensitivity").GetProperty("parameters").EnumerateArray().Sum(p => p.GetProperty("points").GetArrayLength()));
+
+        // CF-03: the block bootstrap and the deflated Sharpe ratio sit beside the old figures, in their honest states, and the statistics of the variants are stored
+        block.GetProperty("monteCarloBlock").GetProperty("mode").GetString().ShouldBe("ReportOnly");
+        block.GetProperty("monteCarloBlock").GetProperty("note").GetString().ShouldStartWith("unavailable: fewer than 2 sessions"); // three days have no out-of-sample trade
+        block.GetProperty("monteCarloBlock").GetProperty("p05").ValueKind.ShouldBe(JsonValueKind.Null);
+        verdict.GetProperty("deflatedSharpe").GetProperty("mode").GetString().ShouldBe("ReportOnly");
+        verdict.GetProperty("deflatedSharpe").GetProperty("probability").ValueKind.ShouldBe(JsonValueKind.Null);
+        verdict.GetProperty("deflatedSharpe").GetProperty("note").GetString().ShouldStartWith("unavailable: ");
+        (await CountAsync("SELECT count(*) FROM lab.variant_stats WHERE method = 'robust'")).ShouldBe(1);
+        (await CountAsync("SELECT count(*) FROM lab.variant_stats WHERE method = 'sweep'")).ShouldBeLessThanOrEqualTo(sweepRows);
     }
 
     // P5-06

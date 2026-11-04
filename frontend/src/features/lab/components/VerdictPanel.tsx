@@ -26,6 +26,29 @@ export const noLimits = 'No limits were listed; treat any result as exploration,
 
 const num = (v: number | null): string => (v === null ? 'n/a' : formatNumber(v));
 
+/** The deflated Sharpe ratio (CF-03): shown beside the factor, decides nothing, and says why when it cannot be computed. Absent in a result stored before it. */
+function DeflatedSharpeLine({ figure }: { figure?: LabVerdict['deflatedSharpe'] }) {
+  if (!figure) {
+    return (
+      <Typography sx={{ mt: 1 }} aria-label="Deflated Sharpe ratio">
+        Deflated Sharpe ratio: not computed.
+      </Typography>
+    );
+  }
+  return (
+    <Box component="section" aria-label="Deflated Sharpe ratio" sx={{ mt: 1 }}>
+      <Typography>
+        {figure.probability === null
+          ? 'Deflated Sharpe ratio: not available.'
+          : `Deflated Sharpe ratio ${formatNumber(figure.probability)} against a luck bar of ${num(figure.luckBarSr)} per trade over ${figure.trials ?? 'n/a'} trials (read against ${formatNumber(figure.minProbability)}; informational, no gate uses it).`}
+      </Typography>
+      <Typography variant="caption" component="p" color="text.secondary">
+        {figure.note}
+      </Typography>
+    </Box>
+  );
+}
+
 /** The verdict: outcome, how many variants tightened it, every gate with its adjusted threshold, and the honest limits. */
 export function VerdictPanel({ verdict }: { verdict: LabVerdict }) {
   const severity = outcomeSeverity[verdict.outcome] ?? 'info';
@@ -68,6 +91,7 @@ export function VerdictPanel({ verdict }: { verdict: LabVerdict }) {
           ))}
         </TableBody>
       </Table>
+      <DeflatedSharpeLine figure={verdict.deflatedSharpe} />
       <Alert severity="info" sx={{ mt: 1 }}>
         <Typography variant="subtitle2">Honest limits</Typography>
         {verdict.limits.length > 0 ? (

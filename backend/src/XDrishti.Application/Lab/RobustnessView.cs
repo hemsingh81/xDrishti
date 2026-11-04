@@ -18,6 +18,27 @@ public sealed record YearView(int Year, int Trades, double MeanR, double TotalR,
 /// <summary>The sign-flip baseline: lenient (mean R against 0 given the trade sizes), not a re-run with random entries.</summary>
 public sealed record SignFlipBaselineView(string Kind, int Trades, int Draws, string Seed, double ObservedMeanR, double NullMeanP95, double PValue, string Label);
 
+/// <summary>
+/// The stationary block bootstrap of the out-of-sample trades by entry session (CF-03, ADR 0205), beside <see cref="MonteCarloView"/>, which stays as it was. Every figure is null when it could not be computed and <see cref="Note"/> then starts with <c>unavailable: </c>.
+/// <c>WidthRatioToIid</c> is the width of this interval (5th to 95th percentile of the mean) over the width of the iid one: above 1 means same-day and serial clustering widen the interval.
+/// </summary>
+public sealed record MonteCarloBlockView(
+    string Mode,
+    int Sessions,
+    int? BlockLength,
+    int Draws,
+    string Seed,
+    double? ObservedMeanR,
+    double? P05,
+    double? P50,
+    double? P95,
+    double? DdMedian,
+    double? DdP95,
+    double? ShareNonPositive,
+    double? WidthRatioToIid,
+    string Settings,
+    string Note);
+
 /// <summary>One regime part of the out-of-sample trades (P6-02): the regime and its basis are one bucket; below 30 trades it is shown but is not evidence.</summary>
 public sealed record RegimeBucketView(string Regime, string Basis, int Trades, double MeanR, double TotalR, bool Enough);
 
@@ -33,4 +54,5 @@ public sealed record RobustnessView(
     string ByRegime,
     IReadOnlyList<string> Limits,
     IReadOnlyList<RegimeBucketView>? ByRegimeBuckets = null,
-    IReadOnlyList<RegimeMissingView>? ByRegimeUnavailable = null);
+    IReadOnlyList<RegimeMissingView>? ByRegimeUnavailable = null,
+    MonteCarloBlockView? MonteCarloBlock = null);

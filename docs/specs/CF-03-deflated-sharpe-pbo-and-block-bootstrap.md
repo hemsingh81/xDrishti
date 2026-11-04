@@ -98,3 +98,6 @@ Status stays Draft; size 6.5 -> **7 agent-days** (+0.5 power arm). Amends the te
 5. **PBO is diagnostic.** The whole-window PBO never feeds a selection (no variant is chosen by it); it only flags.
 6. **Series size.** 17 variants x ~520 sessions is about 70 KB as numbers; values are rounded to 4 decimals to stay under the 100 KB limit (AC 15 checks both).
 7. **Dependency.** `Phi` and `Phi^-1` come from CF-01's `NormalDistribution`.
+
+## Build note 2026-11-04 (Part A)
+Part A is built ([ADR 0205](../adr/README.md)): deflated Sharpe, the stationary block bootstrap, `lab.variant_stats` (Part A, not B), the settings `Confidence:Deflation` and `Confidence:Bootstrap`. `Gate` is refused for DSR because the power arm of AC 6 fails (null 0.25 %, power 10.5 %). Part B (CSCV, PBO, the series in the document, `Pbo:*`) is not built.

@@ -28985,6 +28985,118 @@
         },
         "description": "The owner's unlock of one account for one India session date, valid until 15:30 India time."
       },
+      "DeflatedSharpeView": {
+        "required": [
+          "mode",
+          "trials",
+          "ledgerTrials",
+          "trialSrSd",
+          "luckBarSr",
+          "sr",
+          "nEff",
+          "skew",
+          "kurt",
+          "probability",
+          "minProbability",
+          "basis",
+          "settings",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "The mode when it was computed."
+          },
+          "trials": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "N: the variants whose statistics are stored (the ledger count when the owner assumed the spread).",
+            "format": "int32"
+          },
+          "ledgerTrials": {
+            "type": "integer",
+            "description": "The variants the ledger counts for the family.",
+            "format": "int32"
+          },
+          "trialSrSd": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "sigma_SR: the standard deviation of the trial Sharpe ratios (or the owner's assumption).",
+            "format": "double"
+          },
+          "luckBarSr": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "SR0: the Sharpe ratio luck alone is expected to reach among the trials.",
+            "format": "double"
+          },
+          "sr": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The judged variant's Sharpe ratio per trade (out-of-sample).",
+            "format": "double"
+          },
+          "nEff": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "T: the trades the probability rests on (the effective trades unless the basis is raw).",
+            "format": "double"
+          },
+          "skew": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Skewness of the out-of-sample R.",
+            "format": "double"
+          },
+          "kurt": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Kurtosis of the out-of-sample R.",
+            "format": "double"
+          },
+          "probability": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The deflated Sharpe ratio, 0 to 1.",
+            "format": "double"
+          },
+          "minProbability": {
+            "type": "number",
+            "description": "The level it is read against; it decides nothing in ReportOnly.",
+            "format": "double"
+          },
+          "basis": {
+            "type": "string",
+            "description": "`nEff` or `raw`: what T is."
+          },
+          "settings": {
+            "type": "string",
+            "description": "The settings that produced the figure."
+          },
+          "note": {
+            "type": "string",
+            "description": "The reading and the honest limits, or the unavailable reason."
+          }
+        },
+        "description": "The deflated Sharpe ratio of the verdict (CF-03, ADR 0205), shown beside the heuristic factor and changing no outcome in `ReportOnly`. Per-trade units. Every figure is null when it could not be computed and string DeflatedSharpeView.Note then starts with\n`unavailable:` and gives the reason; an unavailable figure is never a pass."
+      },
       "DematDifference": {
         "required": [
           "isin",
@@ -39397,9 +39509,19 @@
           },
           "summary": {
             "type": "string"
+          },
+          "deflatedSharpe": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DeflatedSharpeView"
+              }
+            ]
           }
         },
-        "description": "The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `Summary` is a deterministic\ntemplate over the numbers above, not an assistant text."
+        "description": "The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `DeflatedSharpe` (CF-03) is the probability beside the factor, null when not computed. `Summary` is a deterministic\ntemplate over the numbers above, not an assistant text."
       },
       "LabRunFinished": {
         "required": [
@@ -39752,9 +39874,19 @@
                 "$ref": "#/components/schemas/RobustnessView"
               }
             ]
+          },
+          "deflatedSharpe": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DeflatedSharpeView"
+              }
+            ]
           }
         },
-        "description": "The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block."
+        "description": "The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off."
       },
       "LabWindow": {
         "required": [
@@ -43982,6 +44114,112 @@
           }
         },
         "description": "The body of a modification: sizes can only be reduced; nothing else can be edited."
+      },
+      "MonteCarloBlockView": {
+        "required": [
+          "mode",
+          "sessions",
+          "blockLength",
+          "draws",
+          "seed",
+          "observedMeanR",
+          "p05",
+          "p50",
+          "p95",
+          "ddMedian",
+          "ddP95",
+          "shareNonPositive",
+          "widthRatioToIid",
+          "settings",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string"
+          },
+          "sessions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "blockLength": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "draws": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "seed": {
+            "type": "string"
+          },
+          "observedMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "p05": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "p50": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "p95": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "ddMedian": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "ddP95": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "shareNonPositive": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "widthRatioToIid": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "settings": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "description": "The stationary block bootstrap of the out-of-sample trades by entry session (CF-03, ADR 0205), beside MonteCarloView, which stays as it was. Every figure is null when it could not be computed and string MonteCarloBlockView.Note then starts with `unavailable:`.\n`WidthRatioToIid` is the width of this interval (5th to 95th percentile of the mean) over the width of the iid one: above 1 means same-day and serial clustering widen the interval."
       },
       "MonteCarloView": {
         "required": [
@@ -53176,6 +53414,16 @@
             "items": {
               "$ref": "#/components/schemas/RegimeMissingView"
             }
+          },
+          "monteCarloBlock": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MonteCarloBlockView"
+              }
+            ]
           }
         },
         "description": "The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it)."

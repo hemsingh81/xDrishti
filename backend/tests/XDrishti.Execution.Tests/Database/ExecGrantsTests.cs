@@ -265,6 +265,15 @@ public sealed class ExecGrantsTests(ExecDatabase db)
         (await ExecDatabase.SqlStateAsync(db.Exec, "SELECT count(*) FROM lab.expression_profiles")).ShouldBe("42501");
     }
 
+    // CF-03: the per-variant statistics are research only; the execution role may not even see the table, the runtime role inserts and reads it and never changes it.
+    [Fact]
+    public async Task The_execution_role_holds_nothing_on_the_variant_stats_and_the_runtime_role_only_inserts_and_reads()
+    {
+        (await HeldOnAsync("xd_exec", "lab.variant_stats")).ShouldBeEmpty();
+        (await HeldOnAsync("xd_app", "lab.variant_stats")).ShouldBe(["INSERT", "SELECT"]);
+        (await ExecDatabase.SqlStateAsync(db.Exec, "SELECT count(*) FROM lab.variant_stats")).ShouldBe("42501");
+    }
+
     // P14-07: the half-spread models are research only; the execution role may not even see the tables, the runtime role inserts and reads them and never changes them.
     [Fact]
     public async Task The_execution_role_holds_nothing_on_the_option_spread_models_and_the_runtime_role_only_inserts_and_reads()

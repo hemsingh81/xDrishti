@@ -14,7 +14,7 @@ public sealed record CellView(string Cell, string Timeframe, string Side, string
 /// <summary>A full-period (in-sample) figure of one candidate in one cell. It is exploration and never reaches the verdict.</summary>
 public sealed record FullPeriodView(string Cell, string Candidate, int Trades, double? MeanR, double? ProfitFactor, double? TotalR, string Label);
 
-/// <summary>The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block.</summary>
+/// <summary>The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. <c>DeflatedSharpe</c> (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off.</summary>
 public sealed record LabVerdictView(
     string Outcome,
     int VariantCount,
@@ -25,4 +25,5 @@ public sealed record LabVerdictView(
     IReadOnlyList<CellView> Cells,
     IReadOnlyList<FullPeriodView> FullPeriod,
     IReadOnlyList<string> Labels,
-    RobustnessView? Robustness = null);
+    RobustnessView? Robustness = null,
+    DeflatedSharpeView? DeflatedSharpe = null);

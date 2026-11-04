@@ -24,6 +24,9 @@ public sealed class SeededRandom(ulong seed)
         return (int)(((NextBits() >> 32) * (ulong)bound) >> 32);
     }
 
+    /// <summary>A number in <c>[0, 1)</c> from the top 53 bits (CF-03: the uniform stream of the stationary bootstrap).</summary>
+    public double NextDouble() => (NextBits() >> 11) * (1.0 / (1UL << 53));
+
     /// <summary>The seed of a run: the first 8 bytes of the sha256 of its key.</summary>
     public static ulong SeedOf(string runKey)
     {

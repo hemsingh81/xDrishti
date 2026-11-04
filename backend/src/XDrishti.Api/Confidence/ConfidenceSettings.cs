@@ -19,6 +19,16 @@ internal sealed class ConfidenceSettings
 
     public ShrinkageSection Shrinkage { get; set; } = new();
 
+    public DeflationSection Deflation { get; set; } = new();
+
+    public BootstrapSection Bootstrap { get; set; } = new();
+
+    /// <summary>The <c>Confidence:Deflation</c> subsection as the options of CF-03 (ADR 0205).</summary>
+    internal DeflationOptions ToDeflationOptions() => new(Deflation.Mode, Deflation.MinProbability, Deflation.AssumedTrialSrSd, Deflation.TBasis);
+
+    /// <summary>The <c>Confidence:Bootstrap</c> subsection as the options of CF-03 (ADR 0205).</summary>
+    internal BootstrapOptions ToBootstrapOptions() => new(Bootstrap.Mode, Bootstrap.Draws, Bootstrap.BlockLength);
+
     /// <summary>The <c>Confidence:Shrinkage</c> subsection as the options of CF-02 (ADR 0204).</summary>
     internal ShrinkageOptions ToShrinkageOptions() => new(
         Shrinkage.Mode,
@@ -88,5 +98,25 @@ internal sealed class ConfidenceSettings
         public double QuantileLevel { get; set; } = 0.05;
 
         public double SigmaPoolStrength { get; set; } = 30;
+    }
+
+    internal sealed class DeflationSection
+    {
+        public ConfidenceMode Mode { get; set; } = ConfidenceMode.ReportOnly;
+
+        public double MinProbability { get; set; } = 0.95;
+
+        public double? AssumedTrialSrSd { get; set; }
+
+        public DeflationBasis TBasis { get; set; } = DeflationBasis.NEff;
+    }
+
+    internal sealed class BootstrapSection
+    {
+        public ConfidenceMode Mode { get; set; } = ConfidenceMode.ReportOnly;
+
+        public int? Draws { get; set; }
+
+        public int BlockLength { get; set; }
     }
 }

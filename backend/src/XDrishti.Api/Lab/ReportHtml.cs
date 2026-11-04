@@ -35,6 +35,17 @@ internal static class ReportHtml
         Table(h, ["Gate", "Required", "Adjusted", "Actual", "Met", "Reason"], r.Gates.Select(g => new[] { g.Name, N(g.Required), N(g.Adjusted), N(g.Actual), g.Passed ? "yes" : "no", g.Reason }));
 
         var k = r.Kpis;
+        if (r.DeflatedSharpe is null)
+        {
+            h.Append("<h2>Deflated Sharpe ratio</h2>\n<p>Deflated Sharpe ratio: not computed.</p>\n");
+        }
+        else if (r.DeflatedSharpe is { } d)
+        {
+            h.Append("<h2>Deflated Sharpe ratio</h2>\n");
+            Table(h, ["Trials", "Ledger trials", "Trial SR sd", "Luck bar SR", "SR", "T", "Probability", "Read against"], [[d.Trials is { } n ? I(n) : "-", I(d.LedgerTrials), N(d.TrialSrSd), N(d.LuckBarSr), N(d.Sr), N(d.NEff), N(d.Probability), N(d.MinProbability)]]);
+            h.Append("<p>").Append(Html.Text(d.Note)).Append("</p>\n");
+        }
+
         h.Append("<h2>Out-of-sample figures</h2>\n");
         Table(h, ["Trades", "Expectancy R", "Profit factor", "Max drawdown R", "Folds", "Positive folds"], [[I(k.OosTrades), N(k.ExpectancyR), N(k.ProfitFactor), N(k.MaxDrawdownR), I(k.Folds), I(k.PositiveFolds)]]);
 
@@ -70,6 +81,16 @@ internal static class ReportHtml
         if (b.MonteCarlo is { } m)
         {
             Table(h, ["MC trades", "Draws", "Observed mean R", "Mean P05", "Mean P50", "Mean P95", "Drawdown P95", "Share not positive"], [[I(m.Trades), I(m.Draws), N(m.ObservedMeanR), N(m.MeanP05), N(m.MeanP50), N(m.MeanP95), N(m.DrawdownP95), N(m.ShareNotPositive)]]);
+        }
+
+        if (b.MonteCarloBlock is null)
+        {
+            h.Append("<p>Block bootstrap: not computed.</p>\n");
+        }
+        else if (b.MonteCarloBlock is { } k)
+        {
+            Table(h, ["Block sessions", "Block length", "Draws", "Block mean P05", "Block mean P50", "Block mean P95", "Block drawdown P95", "Share not positive", "Width over iid"], [[I(k.Sessions), k.BlockLength is { } l ? I(l) : "-", I(k.Draws), N(k.P05), N(k.P50), N(k.P95), N(k.DdP95), N(k.ShareNonPositive), N(k.WidthRatioToIid)]]);
+            h.Append("<p>").Append(Html.Text(k.Note)).Append("</p>\n");
         }
 
         Table(h, ["Year", "Trades", "Mean R", "Total R", "Profit factor"], b.ByYear.Select(y => new[] { I(y.Year), I(y.Trades), N(y.MeanR), N(y.TotalR), N(y.ProfitFactor) }));

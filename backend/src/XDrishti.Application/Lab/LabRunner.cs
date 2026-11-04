@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
@@ -32,7 +33,9 @@ internal sealed class LabRunner(
     ILabProgress progress,
     LabSettings settings,
     TimeProvider time,
-    ILogger<LabRunner> logger) : ILabRunExecutor
+    ILogger<LabRunner> logger,
+    LabDeflation deflation,
+    IVariantStatsStore variantStats) : ILabRunExecutor
 {
     /// <summary>Who is recorded as the author of a stored run.</summary>
     public const string Actor = "lab:quick";
@@ -214,6 +217,8 @@ internal sealed class LabRunner(
         var full = outcome.Value;
         var verdict = full.Verdict;
         var sweepRows = new List<LedgerRow>();
+        var oosR = full.OosTrades.Select(t => t.R).ToList();
+        var statsRows = new List<VariantStatsRow> { LabVariantStats.Of(run.StrategyId, run.Id, run.StrategyHash, TradeMoments.Of(oosR), run.Method, time.GetUtcNow()) };
         var lastStage = FullTest;
         if (string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal))
         {
@@ -231,8 +236,12 @@ internal sealed class LabRunner(
 
             verdict = verdict with { Robustness = robust.Value.View };
             sweepRows.AddRange(robust.Value.LedgerRows);
+            statsRows.AddRange(robust.Value.VariantStats);
             lastStage = Robustness;
         }
+
+        // CF-03: beside the factor; reads the stored trial statistics and writes nothing, and the outcome is not touched
+        verdict = verdict with { DeflatedSharpe = await deflation.ComputeAsync(run.StrategyId, verdict, oosR, statsRows, ownerToken) };
 
         ownerToken.ThrowIfCancellationRequested();
         if (await runs.IsCancelRequestedAsync(run.Id, hostStop))
@@ -258,6 +267,8 @@ internal sealed class LabRunner(
         {
             await ledger.AppendAsync(row, hostStop);
         }
+
+        await variantStats.AppendAsync(statsRows, hostStop);
 
         if (!await results.AppendAsync(run.Id, run.StrategyId, run.StrategyHash, verdict, time.GetUtcNow(), hostStop)
             && await results.GetAsync(run.Id, hostStop) is null)

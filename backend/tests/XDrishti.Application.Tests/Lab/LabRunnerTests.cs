@@ -48,6 +48,8 @@ public sealed class LabRunnerTests
 
     private readonly ITestLedger _ledger = Substitute.For<ITestLedger>();
 
+    private readonly IVariantStatsStore _variantStats = Substitute.For<IVariantStatsStore>();
+
     private readonly ILabResultStore _results = Substitute.For<ILabResultStore>();
 
     private readonly ILabProgress _progress = Substitute.For<ILabProgress>();
@@ -79,7 +81,16 @@ public sealed class LabRunnerTests
         });
     }
 
-    private LabRunner Runner(ConfidenceOptions? confidence = null) => new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, confidence), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance);
+    private LabRunner RunnerWithDeflation(DeflationOptions? options = null)
+    {
+        _ledger.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _variantStats.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<IReadOnlyList<VariantStatsRow>>().Count);
+        return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
+            new LabDeflation(_ledger, _variantStats, options ?? new DeflationOptions()), _variantStats);
+    }
+
+    private LabRunner Runner(ConfidenceOptions? confidence = null) => new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, confidence), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance, new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats);
 
     [Fact]
     public async Task A_valid_run_goes_through_the_three_stages_stores_the_simulation_once_and_succeeds_with_its_key_and_counts()
@@ -419,5 +430,126 @@ public sealed class LabRunnerTests
     private sealed class Scripted(Func<CancellationToken, ValueTask<Result<SimulationRun>>> answer) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>
     {
         public ValueTask<Result<SimulationRun>> HandleAsync(RunSimulationQuery query, CancellationToken cancellationToken) => answer(cancellationToken);
+    }
+
+    [Fact]
+    public async Task A_robust_run_stores_the_statistics_of_the_judged_variant_and_each_sweep_point_after_the_ledger_rows_and_before_the_result()
+    {
+        ArrangeFullTest();
+        var calls = new List<string>();
+        var stored = new List<VariantStatsRow>();
+        _ledger.AppendAsync(Arg.Any<LedgerRow>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            calls.Add("ledger");
+            return true;
+        });
+        var runner = RunnerWithDeflation();
+        _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci =>
+        {
+            calls.Add("stats");
+            stored.AddRange(ci.Arg<IReadOnlyList<VariantStatsRow>>());
+            return 5;
+        });
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<LabVerdictView>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            calls.Add("result");
+            return true;
+        });
+        var run = RobustRun();
+
+        await runner.ExecuteAsync(run, Ct);
+
+        calls.Last().ShouldBe("result");
+        calls.ShouldContain("stats");
+        calls.IndexOf("stats").ShouldBeGreaterThan(calls.LastIndexOf("ledger"));
+        calls.IndexOf("stats").ShouldBeLessThan(calls.IndexOf("result"));
+        stored.Count.ShouldBe(5, "the judged variant and the four sweep points");
+        stored[0].RunId.ShouldBe(run.Id);
+        stored[0].VariantHash.ShouldBe(run.StrategyHash);
+        stored[0].Method.ShouldBe("robust");
+        stored.Skip(1).ShouldAllBe(r => r.Method == "sweep" && r.VariantHash != run.StrategyHash);
+        stored.ShouldAllBe(r => r.StrategyId == "LAB_TEST");
+    }
+
+    [Fact]
+    public async Task The_deflated_sharpe_ratio_changes_no_outcome_gate_evidence_or_limit_of_the_verdict()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithDeflation(new DeflationOptions(ConfidenceMode.Off)).ExecuteAsync(RobustRun(), Ct);
+        await RunnerWithDeflation().ExecuteAsync(RobustRun(), Ct);
+
+        verdicts.Count.ShouldBe(2);
+        verdicts[0].DeflatedSharpe.ShouldBeNull();
+        verdicts[1].DeflatedSharpe.ShouldNotBeNull().Mode.ShouldBe("ReportOnly");
+        System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { DeflatedSharpe = null }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]), "outcome, six gates, reasons, limits, evidence and robustness are byte for byte the same");
+    }
+
+    [Fact]
+    public async Task Off_still_stores_the_statistics_but_shows_no_figure()
+    {
+        ArrangeFullTest();
+
+        await RunnerWithDeflation(new DeflationOptions(ConfidenceMode.Off)).ExecuteAsync(RobustRun(), Ct);
+
+        await _variantStats.Received(1).AppendAsync(Arg.Is<IReadOnlyList<VariantStatsRow>>(r => r.Count == 5), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_full_run_with_one_trial_says_unavailable_and_stores_its_own_row()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithDeflation().ExecuteAsync(FullRun(), Ct);
+
+        var figure = verdicts.Single().DeflatedSharpe!;
+        figure.Probability.ShouldBeNull();
+        figure.Note.ShouldStartWith("unavailable: trial Sharpe ratios not stored");
+        await _variantStats.Received(1).AppendAsync(Arg.Is<IReadOnlyList<VariantStatsRow>>(r => r.Count == 1 && r[0].Method == "full"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_cancel_seen_after_the_sweep_stores_no_statistics()
+    {
+        ArrangeFullTest();
+        _runs.IsCancelRequestedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithDeflation().ExecuteAsync(RobustRun(), Ct);
+
+        _finishes.Single().State.ShouldBe(LabRunState.Cancelled);
+        await _variantStats.DidNotReceive().AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Sweep_points_that_ran_no_trade_still_count_in_the_ledger_so_low_coverage_reads_unavailable()
+    {
+        ArrangeFullTest();
+        // the base run and every sweep point run no trade: the points get a row with no figure, and are variants of the family
+        var empty = FabricatedRun.Standard() with { Trades = [] };
+        _simulation = new Scripted(_ => ValueTask.FromResult(Result.Success(empty)));
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+        var stored = new List<VariantStatsRow>();
+
+        var runner = RunnerWithDeflation();
+        _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci =>
+        {
+            stored.AddRange(ci.Arg<IReadOnlyList<VariantStatsRow>>());
+            return 1;
+        });
+        _variantStats.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([
+            new VariantStatsRow("LAB_TEST", Guid.NewGuid(), new string('1', 64), 50, 0.1, 1, 0, 3, 0.10, "sweep", DateTimeOffset.UnixEpoch),
+            new VariantStatsRow("LAB_TEST", Guid.NewGuid(), new string('2', 64), 50, 0.2, 1, 0, 3, 0.20, "sweep", DateTimeOffset.UnixEpoch)]);
+        await runner.ExecuteAsync(RobustRun(), Ct);
+
+        stored.Count.ShouldBe(5, "the judged variant and every sweep point, also those without a trade");
+        stored.Skip(1).ShouldAllBe(r => r.N == 0 && r.SrPerTrade == null);
+        var note = verdicts.Single().DeflatedSharpe!.Note;
+        note.ShouldStartWith("unavailable: trial statistics stored for only");
+        note.ShouldContain("of 5 variants");
     }
 }

@@ -9783,6 +9783,79 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.VariantStatsRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<double?>("Kurt")
+                        .HasColumnType("double precision")
+                        .HasColumnName("kurt");
+
+                    b.Property<double?>("MeanR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("mean_r");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("method");
+
+                    b.Property<int>("N")
+                        .HasColumnType("integer")
+                        .HasColumnName("n");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<double?>("SdR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("sd_r");
+
+                    b.Property<double?>("Skew")
+                        .HasColumnType("double precision")
+                        .HasColumnName("skew");
+
+                    b.Property<double?>("SrPerTrade")
+                        .HasColumnType("double precision")
+                        .HasColumnName("sr_per_trade");
+
+                    b.Property<string>("StrategyId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<string>("VariantHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("variant_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_variant_stats");
+
+                    b.HasIndex("RunId", "VariantHash")
+                        .IsUnique()
+                        .HasDatabaseName("uq_variant_stats_run_variant");
+
+                    b.HasIndex("StrategyId", "CreatedAt")
+                        .HasDatabaseName("ix_variant_stats_strategy_created");
+
+                    b.ToTable("variant_stats", "lab", t =>
+                        {
+                            t.HasCheckConstraint("ck_variant_stats_finite", "(mean_r IS NULL OR (mean_r <> 'NaN'::float8 AND abs(mean_r) <> 'Infinity'::float8)) AND (sd_r IS NULL OR (sd_r <> 'NaN'::float8 AND abs(sd_r) <> 'Infinity'::float8)) AND (skew IS NULL OR (skew <> 'NaN'::float8 AND abs(skew) <> 'Infinity'::float8)) AND (kurt IS NULL OR (kurt <> 'NaN'::float8 AND abs(kurt) <> 'Infinity'::float8)) AND (sr_per_trade IS NULL OR (sr_per_trade <> 'NaN'::float8 AND abs(sr_per_trade) <> 'Infinity'::float8))");
+
+                            t.HasCheckConstraint("ck_variant_stats_shape", "variant_hash ~ '^[0-9a-f]{64}$' AND n >= 0 AND (sd_r IS NULL OR sd_r >= 0) AND method IN ('full','robust','sweep')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Accounts.AccountEvent", b =>
                 {
                     b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)

@@ -156,6 +156,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<TestLedgerRow> TestLedger => Set<TestLedgerRow>();
 
+    internal DbSet<VariantStatsRecord> VariantStats => Set<VariantStatsRecord>();
+
     internal DbSet<CellStatsRecord> CellStats => Set<CellStatsRecord>();
 
     internal DbSet<TradeFeatureRecord> TradeFeatures => Set<TradeFeatureRecord>();

@@ -8981,6 +8981,70 @@ export interface components {
       /** Format: date-time */
       expiresAt: string;
     };
+    /**
+     * @description The deflated Sharpe ratio of the verdict (CF-03, ADR 0205), shown beside the heuristic factor and changing no outcome in `ReportOnly`. Per-trade units. Every figure is null when it could not be computed and string DeflatedSharpeView.Note then starts with
+     *     `unavailable:` and gives the reason; an unavailable figure is never a pass.
+     */
+    DeflatedSharpeView: {
+      /** @description The mode when it was computed. */
+      mode: string;
+      /**
+       * Format: int32
+       * @description N: the variants whose statistics are stored (the ledger count when the owner assumed the spread).
+       */
+      trials: null | number;
+      /**
+       * Format: int32
+       * @description The variants the ledger counts for the family.
+       */
+      ledgerTrials: number;
+      /**
+       * Format: double
+       * @description sigma_SR: the standard deviation of the trial Sharpe ratios (or the owner's assumption).
+       */
+      trialSrSd: null | number;
+      /**
+       * Format: double
+       * @description SR0: the Sharpe ratio luck alone is expected to reach among the trials.
+       */
+      luckBarSr: null | number;
+      /**
+       * Format: double
+       * @description The judged variant's Sharpe ratio per trade (out-of-sample).
+       */
+      sr: null | number;
+      /**
+       * Format: double
+       * @description T: the trades the probability rests on (the effective trades unless the basis is raw).
+       */
+      nEff: null | number;
+      /**
+       * Format: double
+       * @description Skewness of the out-of-sample R.
+       */
+      skew: null | number;
+      /**
+       * Format: double
+       * @description Kurtosis of the out-of-sample R.
+       */
+      kurt: null | number;
+      /**
+       * Format: double
+       * @description The deflated Sharpe ratio, 0 to 1.
+       */
+      probability: null | number;
+      /**
+       * Format: double
+       * @description The level it is read against; it decides nothing in ReportOnly.
+       */
+      minProbability: number;
+      /** @description `nEff` or `raw`: what T is. */
+      basis: string;
+      /** @description The settings that produced the figure. */
+      settings: string;
+      /** @description The reading and the honest limits, or the unavailable reason. */
+      note: string;
+    };
     /** @description A security whose depository quantity differs from the synced holding's. */
     DematDifference: {
       isin: string;
@@ -12608,7 +12672,7 @@ export interface components {
       total: number;
     };
     /**
-     * @description The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `Summary` is a deterministic
+     * @description The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `DeflatedSharpe` (CF-03) is the probability beside the factor, null when not computed. `Summary` is a deterministic
      *     template over the numbers above, not an assistant text.
      */
     LabReportView: {
@@ -12630,6 +12694,7 @@ export interface components {
       notIncluded: string[];
       labels: string[];
       summary: string;
+      deflatedSharpe?: null | components['schemas']['DeflatedSharpeView'];
     };
     /** @description Client event `labRunFinished` (spec P5-02, D5): the last event of a run, with its final state. */
     LabRunFinished: {
@@ -12712,7 +12777,7 @@ export interface components {
       /** Format: int64 */
       seed: null | number;
     };
-    /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. */
+    /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. */
     LabVerdictView: {
       outcome: string;
       /** Format: int32 */
@@ -12726,6 +12791,7 @@ export interface components {
       fullPeriod: components['schemas']['FullPeriodView'][];
       labels: string[];
       robustness?: null | components['schemas']['RobustnessView'];
+      deflatedSharpe?: null | components['schemas']['DeflatedSharpeView'];
     };
     /** @description The India dates a run replays, inclusive. */
     LabWindow: {
@@ -14173,6 +14239,38 @@ export interface components {
       reason: null | string;
       /** @description The new quantities. */
       quantities: null | components['schemas']['QuantityChangeRequest'][];
+    };
+    /**
+     * @description The stationary block bootstrap of the out-of-sample trades by entry session (CF-03, ADR 0205), beside MonteCarloView, which stays as it was. Every figure is null when it could not be computed and string MonteCarloBlockView.Note then starts with `unavailable:`.
+     *     `WidthRatioToIid` is the width of this interval (5th to 95th percentile of the mean) over the width of the iid one: above 1 means same-day and serial clustering widen the interval.
+     */
+    MonteCarloBlockView: {
+      mode: string;
+      /** Format: int32 */
+      sessions: number;
+      /** Format: int32 */
+      blockLength: null | number;
+      /** Format: int32 */
+      draws: number;
+      seed: string;
+      /** Format: double */
+      observedMeanR: null | number;
+      /** Format: double */
+      p05: null | number;
+      /** Format: double */
+      p50: null | number;
+      /** Format: double */
+      p95: null | number;
+      /** Format: double */
+      ddMedian: null | number;
+      /** Format: double */
+      ddP95: null | number;
+      /** Format: double */
+      shareNonPositive: null | number;
+      /** Format: double */
+      widthRatioToIid: null | number;
+      settings: string;
+      note: string;
     };
     /** @description The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number). */
     MonteCarloView: {
@@ -17715,6 +17813,7 @@ export interface components {
       limits: string[];
       byRegimeBuckets?: null | components['schemas']['RegimeBucketView'][];
       byRegimeUnavailable?: null | components['schemas']['RegimeMissingView'][];
+      monteCarloBlock?: null | components['schemas']['MonteCarloBlockView'];
     };
     RoleToggleInput: {
       enabled: boolean;

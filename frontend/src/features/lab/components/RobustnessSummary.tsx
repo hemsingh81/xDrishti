@@ -28,6 +28,17 @@ export function RobustnessSummary({ robustness: r }: { robustness: Schemas['Robu
           draws without an edge.
         </Typography>
       )}
+      {!r.monteCarloBlock && <Typography>Block bootstrap: not computed.</Typography>}
+      {r.monteCarloBlock && (
+        <Typography>
+          {r.monteCarloBlock.p05 === null
+            ? 'Block bootstrap: not available.'
+            : `Block bootstrap (${r.monteCarloBlock.sessions} sessions, blocks of ${r.monteCarloBlock.blockLength ?? 'n/a'}, ${r.monteCarloBlock.draws} draws): mean R between ${num(r.monteCarloBlock.p05)} and ${num(r.monteCarloBlock.p95)}; ${num(r.monteCarloBlock.widthRatioToIid)} times the width of the independent-trades interval.`}{' '}
+          <Typography variant="caption" color="text.secondary" component="span">
+            {r.monteCarloBlock.note}
+          </Typography>
+        </Typography>
+      )}
       {r.signFlipBaseline && (
         <Typography>
           Chance baseline (sign flip): p = {num(r.signFlipBaseline.pValue)}. {r.signFlipBaseline.label}

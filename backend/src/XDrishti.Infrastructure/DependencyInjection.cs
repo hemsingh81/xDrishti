@@ -330,6 +330,7 @@ public static class DependencyInjection
         services.AddSingleton<IModelScorerLoader, MlNetScorerLoader>();
         services.AddSingleton<ITradeFeatureExtractor, TradeFeatureExtractorAdapter>(); // the feature frame behind its port (ADR 0039): stateless, no I/O
         services.AddScoped<ITestLedger, TestLedger>(); // the per-family count of looks (spec P5-03)
+        services.AddScoped<IVariantStatsStore, VariantStatsStore>(); // the per-variant statistics that give the spread of the trial Sharpe ratios (CF-03, ADR 0205)
         services.AddScoped<ILabRunStore, LabRunStore>(); // the Lab runs and their queue (spec P5-02)
         services.AddSingleton<IStrategyChecker, StrategyChecker>(); // the strategy file library behind its port for the Lab (spec P5-01): stateless, no I/O
         services.AddScoped<StrategySeeder>(); // the built-ins as text, written by `xd-api migrate`

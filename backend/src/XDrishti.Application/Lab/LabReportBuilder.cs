@@ -54,7 +54,8 @@ internal static class LabReportBuilder
             Limits(run, verdict, minFoldsForPass),
             Missing,
             [.. run.Labels.Select(S).Concat(verdict.Labels).Distinct(StringComparer.Ordinal)],
-            string.Empty);
+            string.Empty,
+            verdict.DeflatedSharpe);
         return report with { Summary = ReportSummary.Write(report) };
     }
 
