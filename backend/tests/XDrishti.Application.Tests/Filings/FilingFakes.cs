@@ -96,6 +96,8 @@ internal sealed class FakeInstruments : IFilingInstruments
 
 internal sealed class FakeFiles : IFilingFiles
 {
+    private readonly Lock _gate = new();
+
     public List<string> Events { get; set; } = [];
 
     public HashSet<string> Stored { get; } = [];
@@ -128,25 +130,38 @@ internal sealed class FakeFiles : IFilingFiles
 
         using var copy = new MemoryStream();
         await source.CopyToAsync(copy, cancellationToken);
-        Content.TryAdd(sha256, System.Text.Encoding.UTF8.GetString(copy.ToArray()));
-        Events.Add("copy:" + sha256[..4]);
-        var created = Stored.Add(sha256);
-        Copies += created ? 1 : 0;
-        return Result.Success(created);
+        var text = System.Text.Encoding.UTF8.GetString(copy.ToArray());
+        lock (_gate)
+        {
+            Content.TryAdd(sha256, text);
+            Events.Add("copy:" + sha256[..4]);
+            var created = Stored.Add(sha256);
+            Copies += created ? 1 : 0;
+            return Result.Success(created);
+        }
     }
 
     public int RebuildableCopies { get; private set; }
 
     public ValueTask<Result<bool>> CopyRebuildableAsync(Stream source, string sha256, long expectedBytes, CancellationToken cancellationToken)
     {
-        RebuildableCopies++;
+        lock (_gate)
+        {
+            RebuildableCopies++;
+        }
+
         return CopyAsync(source, sha256, expectedBytes, cancellationToken);
     }
 
     public Dictionary<string, string> Content { get; } = [];
 
-    public ValueTask<Result<Stream>> OpenAsync(string sha256, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(Content.TryGetValue(sha256, out var text) ? Result.Success<Stream>(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(text))) : Result.Failure<Stream>(Error.Validation("unreadable", "missing")));
+    public ValueTask<Result<Stream>> OpenAsync(string sha256, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            return ValueTask.FromResult(Content.TryGetValue(sha256, out var text) ? Result.Success<Stream>(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(text))) : Result.Failure<Stream>(Error.Validation("unreadable", "missing")));
+        }
+    }
 }
 
 internal sealed class FakeSettings : IFilingSettings
