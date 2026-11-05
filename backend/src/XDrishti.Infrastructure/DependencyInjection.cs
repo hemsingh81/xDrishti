@@ -191,6 +191,7 @@ public static class DependencyInjection
         services.AddAuditSources(); // the six insert-only stores behind the audit screen, read-only (spec P8-22)
         services.AddScoped<ILearningChangelog, LearningChangelog>(); // the insert-only learning changelog (spec P6-08)
         services.AddScoped<IModelRegistry, ModelRegistry>(); // the registered models and their designations (spec P6-07)
+        services.AddScoped<IMlInfluenceChecks, MlInfluenceChecks>(); // the insert-only record of how the influence predicate stood for a model (CF-10 part 10c-2)
         services.AddScoped<IExperimentLedger, ExperimentLedger>(); // the experiment ledger: insert-only, its 30-day count is the trials (spec P6-11)
         services.AddScoped<IHypothesisLog, HypothesisLogStore>(); // the insert-only hypothesis log (spec P6-10)
         services.AddScoped<ILessonLog, LessonLogStore>(); // the insert-only lesson log (spec P6-16)

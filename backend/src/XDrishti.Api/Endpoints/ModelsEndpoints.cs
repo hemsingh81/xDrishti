@@ -6,7 +6,7 @@ using XDrishti.Domain.Common;
 
 namespace XDrishti.Api.Endpoints;
 
-/// <summary>The model registry of spec P6-07 (ADR 0070): read the registered models and one model in full. Training and naming a champion are the <c>xd learn model</c> and <c>xd learn designate</c> verbs; nothing here writes.</summary>
+/// <summary>The model registry of spec P6-07 (ADR 0070): read the registered models and one model in full, and (CF-10 part 10c-2, ADR 0217) whether a model may influence a decision. Training and naming a champion are the <c>xd learn model</c> and <c>xd learn designate</c> verbs; nothing here writes.</summary>
 internal sealed class ModelsEndpoints : IEndpointModule
 {
     public void Map(IEndpointRouteBuilder api)
@@ -22,6 +22,22 @@ internal sealed class ModelsEndpoints : IEndpointModule
             .WithName("GetModel")
             .WithSummary("One model with its parameters, the full validation report with its honest limits, the calibration table, the feature importance (path-based, not exact, not SHAP) and every designation. No model bytes. 404 models.not_found")
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        // the route of the spec (CF-10 contract): under /learning, beside the other learning reads; the registry reads above keep their older /api/models route
+        api.MapGroup("/learning/models").WithTags("Learning").MapGet("/{id:long}/influence", InfluenceAsync)
+            .WithName("GetModelInfluence")
+            .WithSummary("Whether the model may influence a decision (CF-10 MlMayInfluence), term by term: the hold-out (once per model family), the forward shadow candidates, the calibration detector and the owner's switch. Off by default, an unavailable figure is never a pass, and nothing here places an order. 404 models.not_found")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+    }
+
+    private static async Task<Results<Ok<MlInfluenceView>, ProblemHttpResult>> InfluenceAsync(
+        long id,
+        HttpContext http,
+        IQueryHandler<GetMlInfluenceQuery, Result<MlInfluenceView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetMlInfluenceQuery(id), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<IReadOnlyList<ModelView>>, ProblemHttpResult>> ListAsync(

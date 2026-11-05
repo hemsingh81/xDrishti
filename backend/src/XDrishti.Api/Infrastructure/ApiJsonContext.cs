@@ -96,6 +96,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ModelView))]
 [JsonSerializable(typeof(IReadOnlyList<ModelView>))]
 [JsonSerializable(typeof(ModelDetailView))]
+[JsonSerializable(typeof(MlInfluenceView))]
 [JsonSerializable(typeof(ExperimentView))]
 [JsonSerializable(typeof(IReadOnlyList<ExperimentView>))]
 [JsonSerializable(typeof(HypothesisView))]

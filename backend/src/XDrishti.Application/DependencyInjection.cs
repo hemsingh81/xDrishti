@@ -714,6 +714,7 @@ public static class DependencyInjection
         services.TryAddSingleton(new CalibrationOptions()); // the cut between Platt and isotonic calibration of a model (CF-10 part 10a, ADR 0214): no mode, changes no decision; the host replaces it with its configuration (section Confidence:Calibration)
         services.TryAddSingleton(new LadderOptions()); // the complexity ladder, events-per-variable cap and feature stability evidence of a model (CF-10 part 10b, ADR 0215): ReportOnly, nothing enforces; the host replaces it with its configuration (section Confidence:Ladder)
         services.TryAddSingleton(new PairedBootstrapOptions()); // the paired day-cluster bootstrap and fold sign test beside the ladder (CF-10 part 10c-1, ADR 0216): ReportOnly, nothing enforces; the host replaces it with its configuration (section Confidence:PairedBootstrap)
+        services.TryAddSingleton(new MlInfluenceOptions()); // the thresholds of the MlMayInfluence predicate (CF-10 part 10c-2, ADR 0217): proposals of the spec; no mode, no switch; the host replaces it with its configuration (section Confidence:MlInfluence)
         services.TryAddSingleton(new SequentialOptions()); // the sequential failure test of the paper edge series (CF-09, ADR 0213): flags only, no mode; the host replaces it with its configuration (section Confidence:Sequential)
         services.TryAddSingleton(new RegistrationOptions()); // pre-registration and the honest count of looks (CF-06, ADR 0207): enforcement and CountInFactor off; the host replaces it with its configuration (section Confidence:Registration)
         services.TryAddSingleton(new HoldOutOptions()); // the locked hold-out (CF-06, ADR 0207): enforcement and AutoUnlock off; the host replaces it with its configuration (section Confidence:HoldOut)
@@ -857,6 +858,12 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListModelsQuery, Result<IReadOnlyList<ModelView>>>, ListModelsHandler>();
         services.AddScoped<IQueryHandler<GetModelQuery, Result<ModelDetailView>>, GetModelHandler>();
         services.AddScoped<IQueryHandler<ScoreWithModelQuery, Result<ModelScoreView>>, ScoreWithModelHandler>(); // for experiments and P7 (advisory)
+        services.TryAddSingleton<IMlInfluenceEvidence, NoMlInfluenceEvidence>(); // the figures of the predicate: nothing is available until the hold-out scoring, the model id on shadow candidates and the stored calibration detector exist (CF-10 part 10c-2)
+        services.TryAddSingleton<IMlInfluenceSwitch, MlInfluenceSwitchOff>(); // the owner's switch ml.influence.enabled: always off until its store and owner act exist (CF-10 part 10d)
+        services.AddScoped<ModelHoldOutLooks>(); // the one look a model family takes at the locked hold-out (CF-10 part 10c-2, ADR 0217)
+        services.AddScoped<MlInfluenceEvaluator>();
+        services.AddScoped<IMlInfluenceGate, MlInfluenceGate>(); // the only way Planning, Selection and Autonomy may read a model score (CF-10 part 10c-2, AC10)
+        services.AddScoped<IQueryHandler<GetMlInfluenceQuery, Result<MlInfluenceView>>, GetMlInfluenceHandler>(); // the influence predicate of a model, term by term, read only (CF-10 part 10c-2)
         services.AddScoped<ICommandHandler<RunExperimentCommand, RunExperimentOutcome>, RunExperimentHandler>(); // judge a knob change and record it (P6-11, ADR 0072)
         services.AddScoped<IQueryHandler<ListExperimentsQuery, Result<IReadOnlyList<ExperimentView>>>, ListExperimentsHandler>();
         services.AddScoped<IQueryHandler<GetExperimentQuery, Result<ExperimentView>>, GetExperimentHandler>();

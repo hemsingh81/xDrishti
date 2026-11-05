@@ -100,7 +100,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             }
         }
 
-        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "expression_legs", "expression_runs", "expression_trades", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
+        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "expression_legs", "expression_runs", "expression_trades", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "ml_influence_checks", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -135,6 +135,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
         (await SqlStateAsync(_app, "INSERT INTO research.learning_changelog (kind) VALUES ('transition')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a changelog row is there; the row is incomplete");
         (await SqlStateAsync(_app, "INSERT INTO research.hypotheses (state) VALUES ('proposed')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a hypothesis row is there; the row is incomplete");
         (await SqlStateAsync(_app, "INSERT INTO research.learning_reports (kind) VALUES ('counterfactual')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a learning report is there; the row is incomplete");
+        (await SqlStateAsync(_app, "INSERT INTO research.ml_influence_checks (model_id) VALUES (1)")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert an influence check is there; the row is incomplete");
         (await SqlStateAsync(_app, "INSERT INTO research.lessons (state) VALUES ('open')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a lesson row is there; the row is incomplete");
         (await SqlStateAsync(_app, "INSERT INTO research.training_sets (rule_version) VALUES ('tb-1')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a training set is there; the row is incomplete");
         foreach (var statement in new[]
@@ -163,6 +164,9 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             "UPDATE research.model_designations SET role = 'champion' WHERE false",
             "DELETE FROM research.model_designations WHERE false",
             "TRUNCATE research.model_designations",
+            "UPDATE research.ml_influence_checks SET may_influence = true WHERE false",
+            "DELETE FROM research.ml_influence_checks WHERE false",
+            "TRUNCATE research.ml_influence_checks",
             "UPDATE research.learning_changelog SET reason = 'X' WHERE false",
             "DELETE FROM research.learning_changelog WHERE false",
             "TRUNCATE research.learning_changelog",
@@ -213,7 +217,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(29);
+        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(30);
     }
 
     [Fact]
@@ -263,6 +267,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
     [InlineData("AddCellStats", new[] { "cell_stats" })]
     [InlineData("AddTradeFeaturesAndTrainingSets", new[] { "trade_features", "training_sets" })]
     [InlineData("AddModelRegistry", new[] { "model_versions", "model_designations" })]
+    [InlineData("AddMlSafety", new[] { "ml_influence_checks" })]
     [InlineData("AddExperiments", new[] { "experiments" })]
     [InlineData("AddLearningChangelog", new[] { "learning_changelog" })]
     [InlineData("AddHypotheses", new[] { "hypotheses" })]

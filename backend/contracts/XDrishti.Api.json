@@ -9962,6 +9962,48 @@
         }
       }
     },
+    "/api/learning/models/{id}/influence": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Whether the model may influence a decision (CF-10 MlMayInfluence), term by term: the hold-out (once per model family), the forward shadow candidates, the calibration detector and the owner's switch. Off by default, an unavailable figure is never a pass, and nothing here places an order. 404 models.not_found",
+        "operationId": "GetModelInfluence",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MlInfluenceView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/experiments": {
       "get": {
         "tags": [
@@ -44832,6 +44874,172 @@
           }
         },
         "description": "A missing minute: the India date and the minute (`HH:mm`)."
+      },
+      "MlHoldOutView": {
+        "required": [
+          "state",
+          "family",
+          "blockStart",
+          "rows",
+          "probabilityBeatsNoMl",
+          "policyEffectR"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "`not_kept`, `kept`, `used` or `reused`."
+          },
+          "family": {
+            "type": "string",
+            "description": "The model family whose one look it is."
+          },
+          "blockStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The start of the block the look was taken on, or null before a look.",
+            "format": "date"
+          },
+          "rows": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Hold-out rows the model was scored on, or null when not available.",
+            "format": "int32"
+          },
+          "probabilityBeatsNoMl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The probability of beating the best no-ML baseline there, or null when not available.",
+            "format": "double"
+          },
+          "policyEffectR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The effect of the take rule on realised R there, or null when not available.",
+            "format": "double"
+          }
+        },
+        "description": "Where the model stands with the locked hold-out."
+      },
+      "MlInfluenceView": {
+        "required": [
+          "modelId",
+          "role",
+          "mayInfluence",
+          "terms",
+          "reasons",
+          "holdOut",
+          "switchOn",
+          "settingHash",
+          "settings",
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": "integer",
+            "description": "The registry id.",
+            "format": "int64"
+          },
+          "role": {
+            "type": "string",
+            "description": "The model's current role."
+          },
+          "mayInfluence": {
+            "type": "boolean",
+            "description": "True only when every term holds and the model is the current champion; false by default."
+          },
+          "terms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MlTermView"
+            },
+            "description": "The four terms."
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MlReasonView"
+            },
+            "description": "Every reason of every term that does not hold, plus `not_champion`; empty only when allowed."
+          },
+          "holdOut": {
+            "description": "The hold-out state.",
+            "$ref": "#/components/schemas/MlHoldOutView"
+          },
+          "switchOn": {
+            "type": "boolean",
+            "description": "The owner's switch ml.influence.enabled."
+          },
+          "settingHash": {
+            "type": "string",
+            "description": "SHA-256 of the thresholds and the switch."
+          },
+          "settings": {
+            "type": "string",
+            "description": "The thresholds as text."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What a reader must know about the figures that are not available."
+          }
+        },
+        "description": "`GET /api/learning/models/{id}/influence`: whether the model may influence a decision, term by term (CF-10 part 10c-2, ADR 0217)."
+      },
+      "MlReasonView": {
+        "required": [
+          "code",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "A stable code such as `holdout_reused`."
+          },
+          "text": {
+            "type": "string",
+            "description": "A sentence."
+          }
+        },
+        "description": "One reason a term of the influence predicate does not hold."
+      },
+      "MlTermView": {
+        "required": [
+          "name",
+          "state",
+          "reasons"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The term (HoldOutBeatsNoMl, ForwardShadowOk, NoCalibrationAlarm, SwitchOn)."
+          },
+          "state": {
+            "type": "string",
+            "description": "`holds`, `fails` or `unavailable` (an unavailable figure is not a pass)."
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MlReasonView"
+            },
+            "description": "Why not; empty when it holds."
+          }
+        },
+        "description": "One term of the influence predicate."
       },
       "ModelDetailView": {
         "required": [
