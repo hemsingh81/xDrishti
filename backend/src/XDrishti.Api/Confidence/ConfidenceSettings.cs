@@ -39,6 +39,10 @@ internal sealed class ConfidenceSettings
 
     public MlInfluenceSection MlInfluence { get; set; } = new();
 
+    public DecaySection Decay { get; set; } = new();
+
+    public LoopSection Loop { get; set; } = new();
+
     public RegistrationSection Registration { get; set; } = new();
 
     public HoldOutSection HoldOut { get; set; } = new();
@@ -69,6 +73,12 @@ internal sealed class ConfidenceSettings
 
     /// <summary>The <c>Confidence:MlInfluence</c> subsection as the options of CF-10 part 10c-2 (ADR 0217).</summary>
     internal MlInfluenceOptions ToMlInfluenceOptions() => new(MlInfluence.HoldOutMinRows, MlInfluence.HoldOutMinProbability, MlInfluence.ForwardMinCandidates, MlInfluence.ForwardMinWeeks, MlInfluence.ForwardMaxEcePp);
+
+    /// <summary>The <c>Confidence:Decay</c> subsection as the options of CF-12 part 12a (ADR 0218).</summary>
+    internal DecayOptions ToDecayOptions() => new(Decay.WindowTrades, Decay.Sigmas, Decay.QuarterFloorR);
+
+    /// <summary>The <c>Confidence:Loop</c> subsection as the options of CF-12 part 12a (ADR 0218).</summary>
+    internal LoopOptions ToLoopOptions() => new(Loop.MinDays, Loop.Draws, Loop.Level, Loop.HelpsAt, Loop.MinSlopePer50Rows, Loop.TargetGain, Loop.SlopeLow, Loop.SlopeHigh, Loop.SlopeSe);
 
     /// <summary>Whether the plateau gate is enforced while the block it lives in (<c>Confidence:Nulls</c>) is computed at all: it is not computed with <c>Nulls:Mode</c> Off, so enforcing it then would cap nothing (ADR 0210).</summary>
     internal bool PlateauEnforcedWithoutNulls() => Plateau.Enforce && Nulls.Mode == ConfidenceMode.Off;
@@ -274,6 +284,36 @@ internal sealed class ConfidenceSettings
         public int ForwardMinWeeks { get; set; } = 4;
 
         public double ForwardMaxEcePp { get; set; } = 5;
+    }
+
+    internal sealed class DecaySection
+    {
+        public int WindowTrades { get; set; } = DecayOptions.DefaultWindowTrades;
+
+        public double Sigmas { get; set; } = DecayOptions.DefaultSigmas;
+
+        public double QuarterFloorR { get; set; } = DecayOptions.DefaultQuarterFloorR;
+    }
+
+    internal sealed class LoopSection
+    {
+        public int MinDays { get; set; } = LoopOptions.DefaultMinDays;
+
+        public int Draws { get; set; } = LoopOptions.DefaultDraws;
+
+        public double Level { get; set; } = LoopOptions.DefaultLevel;
+
+        public double HelpsAt { get; set; } = LoopOptions.DefaultHelpsAt;
+
+        public double MinSlopePer50Rows { get; set; } = 0.002;
+
+        public double TargetGain { get; set; } = 0.01;
+
+        public double SlopeLow { get; set; } = LoopOptions.DefaultSlopeLow;
+
+        public double SlopeHigh { get; set; } = LoopOptions.DefaultSlopeHigh;
+
+        public double SlopeSe { get; set; } = LoopOptions.DefaultSlopeSe;
     }
 
     internal sealed class PairedBootstrapSection

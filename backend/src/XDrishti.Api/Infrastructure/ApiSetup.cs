@@ -119,6 +119,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, PaperGovernanceEndpoints>();
         services.AddSingleton<IEndpointModule, PaperReviewEndpoints>();
         services.AddSingleton<IEndpointModule, PaperCompareEndpoints>(); // backtest versus paper (P10-04): one GET, computed on read
+        services.AddSingleton<IEndpointModule, ConfidenceEndpoints>(); // the decay monitor of a strategy and "is the learning loop helping?" (CF-12 part 12a): read only, nothing is proposed or changed
         services.AddSingleton<IEndpointModule, PaperSequentialEndpoints>(); // the sequential failure test of the paper edge series (CF-09): a flag, never a pass, read only
         services.AddSingleton<IEndpointModule, PaperShadowEndpoints>(); // the shadow record summary and the owner's switch (CF-08 part B): fresh password per change, insert-only
         services.AddSingleton<IEndpointModule, PaperPhaseCheckEndpoints>(); // the paper phase check (P10-06): one GET, computed on read
@@ -198,6 +199,8 @@ internal static class ApiSetup
             .Validate(s => s.ToLadderOptions().Problems().Count == 0, "Confidence:Ladder: a value is out of range (Mode Off or ReportOnly, Epv 5..50, MaxLogisticFeatures 1..50, MinTreeEvents 10..100000, MinProbability 0.50..0.999, PsiWatch above 0 and below PsiAlarm up to 5, PsiBins 2..100, MinRows 5..100000, MaxFlipShare above 0 and below 0.5).")
             .Validate(s => s.ToPairedBootstrapOptions().Problems().Count == 0, "Confidence:PairedBootstrap: a value is out of range (Mode Off or ReportOnly, Draws 100..20000, Level above 0.50 and below 1, MinDays 2..1000, PromisingFrom 0.50..0.99).")
             .Validate(s => s.ToMlInfluenceOptions().Problems().Count == 0, "Confidence:MlInfluence: a value is out of range or looser than the spec's proposal (HoldOutMinRows 100..100000, HoldOutMinProbability 0.95..0.999, ForwardMinCandidates 30..100000, ForwardMinWeeks 4..520, ForwardMaxEcePp above 0 up to 5; configuration can only tighten them).")
+            .Validate(s => s.ToDecayOptions().Problems().Count == 0, "Confidence:Decay: a value is out of range or looser than the spec's proposal (WindowTrades 20..60, Sigmas above 0 up to 1.5, QuarterFloorR -0.05..0; configuration can only tighten them).")
+            .Validate(s => s.ToLoopOptions().Problems().Count == 0, "Confidence:Loop: a value is out of range or looser than the spec's proposal (MinDays 20..250 (a trade-off, not a tightening), Draws 2000..20000, Level 0.90..0.99, HelpsAt 0.95..0.999, MinSlopePer50Rows above 0 up to 0.1, TargetGain 0.001..0.1, SlopeLow 0.8 up to but not including 1, SlopeHigh above 1 up to 1.2, SlopeSe 1..2; the reliability window is fixed at 200 and the hurts bar at 0.95; configuration can only tighten the rest).")
             .Validate(s => s.MlInfluence.HoldOutMinProbability >= s.Ladder.MinProbability, "Confidence:MlInfluence:HoldOutMinProbability must not be below Confidence:Ladder:MinProbability (the hold-out bar is never lower than the ladder's pass bar).")
             .Validate(s => new Domain.Learning.ValidationOptions(Ladder: s.ToLadderOptions(), Paired: s.ToPairedBootstrapOptions()).Problems().Count == 0, "Confidence:PairedBootstrap:PromisingFrom must not be above Confidence:Ladder:MinProbability (a probability between them reads promising, never pass).")
             .ValidateOnStart();
@@ -213,6 +216,8 @@ internal static class ApiSetup
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToLadderOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToPairedBootstrapOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToMlInfluenceOptions()));
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToDecayOptions()));
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToLoopOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToRegistrationOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToHoldOutOptions()));
     }

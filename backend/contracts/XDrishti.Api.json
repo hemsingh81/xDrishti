@@ -12205,6 +12205,77 @@
         }
       }
     },
+    "/api/confidence/decay": {
+      "get": {
+        "tags": [
+          "Confidence"
+        ],
+        "summary": "The decay monitor of one strategy's forward series (strategy=<id>): non-overlapping windows of graded trades against mu_ref - z x sigma x sqrt(DEFF / n + 1 / N_ref), twice in a row, the P6-09 CUSUM on the same series, a by-quarter table, and the kill-rule evaluations with their numbers (cost stress, drawdown, decay twice in a row, the CF-09 failure boundary as a proposal-only input). The edge series (graded shadow trades) is the primary reading with the P10 behavioural series beside it. Report only: nothing is proposed, stored or paused and no order exists; a figure without a source says unavailable and why. 404 paper.not_found when the strategy has neither a shadow edge candidate nor a counted paper trade in the current epoch, 400 paper.invalid",
+        "operationId": "GetConfidenceDecay",
+        "parameters": [
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecayReportView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/confidence/loop": {
+      "get": {
+        "tags": [
+          "Confidence"
+        ],
+        "summary": "Is the learning loop helping? The three arms on the same candidates (frozen, retrained, no model) as paired day-cluster differences, the learning curve, the reliability slope and the decision-quality lift. Report only; each section whose input has no source yet says unavailable and why (today none has one). No order exists.",
+        "operationId": "GetConfidenceLoop",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoopReportView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/paper/sequential": {
       "get": {
         "tags": [
@@ -29582,6 +29653,436 @@
         },
         "description": "The owner's unlock of one account for one India session date, valid until 15:30 India time."
       },
+      "DecayCusumView": {
+        "required": [
+          "alarm",
+          "events",
+          "latest"
+        ],
+        "type": "object",
+        "properties": {
+          "alarm": {
+            "type": "boolean",
+            "description": "Whether the last CUSUM event is an alarm."
+          },
+          "events": {
+            "type": "integer",
+            "description": "How many alarms and clears the series has had.",
+            "format": "int32"
+          },
+          "latest": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The latest event's evidence sentence, or null."
+          }
+        },
+        "description": "The P6-09 CUSUM on the same series, against the same reference."
+      },
+      "DecayKillView": {
+        "required": [
+          "rule",
+          "state",
+          "value",
+          "limit",
+          "trades",
+          "proposalOnly",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "rule": {
+            "type": "string",
+            "description": "`cost_stress`, `drawdown`, `decay_twice` or `failure_boundary`."
+          },
+          "state": {
+            "type": "string",
+            "description": "`not_evaluated`, `holds`, `fires` or `held`. `not_evaluated` is not a pass."
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The figure judged, or null.",
+            "format": "double"
+          },
+          "limit": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "What it was judged against, or null.",
+            "format": "double"
+          },
+          "trades": {
+            "type": "integer",
+            "description": "Trades the figure is based on.",
+            "format": "int32"
+          },
+          "proposalOnly": {
+            "type": "boolean",
+            "description": "True for the CF-09 failure boundary."
+          },
+          "text": {
+            "type": "string",
+            "description": "The words, with the numbers."
+          }
+        },
+        "description": "One kill rule's evaluation, with its numbers. An evaluation only: nothing is proposed, stored or executed in this part."
+      },
+      "DecayQuarterView": {
+        "required": [
+          "label",
+          "trades",
+          "meanR",
+          "weak"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "For example `2026-Q4`."
+          },
+          "trades": {
+            "type": "integer",
+            "description": "Trades in the quarter.",
+            "format": "int32"
+          },
+          "meanR": {
+            "type": "number",
+            "description": "Their mean R.",
+            "format": "double"
+          },
+          "weak": {
+            "type": "boolean",
+            "description": "Whether the mean is below the quarter floor."
+          }
+        },
+        "description": "One calendar quarter of the by-quarter table."
+      },
+      "DecayReferenceView": {
+        "required": [
+          "state",
+          "reason",
+          "trades",
+          "meanR",
+          "sigma",
+          "basis"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "`available` or `unavailable` (a series with no reference is never judged)."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why it is unavailable, or null."
+          },
+          "trades": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Backtest trades the reference is made of (N_ref).",
+            "format": "int32"
+          },
+          "meanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "mu_ref.",
+            "format": "double"
+          },
+          "sigma": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "sigma, the sample standard deviation of the reference.",
+            "format": "double"
+          },
+          "basis": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`net` or `gross` of costs, as the backtest was run."
+          }
+        },
+        "description": "The reference a series is judged against."
+      },
+      "DecayReportView": {
+        "required": [
+          "strategy",
+          "epoch",
+          "hasSeries",
+          "settings",
+          "reference",
+          "edge",
+          "behavioural",
+          "kill",
+          "statements",
+          "line"
+        ],
+        "type": "object",
+        "properties": {
+          "strategy": {
+            "type": "string",
+            "description": "The strategy."
+          },
+          "epoch": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The paper epoch both series are read for; null when there is none.",
+            "format": "int64"
+          },
+          "hasSeries": {
+            "type": "boolean",
+            "description": "Whether the strategy has any shadow edge candidate or any counted paper trade in the epoch (the endpoint answers 404 when it has neither)."
+          },
+          "settings": {
+            "description": "The settings.",
+            "$ref": "#/components/schemas/DecaySettingsView"
+          },
+          "reference": {
+            "description": "The reference, as the edge series sees it.",
+            "$ref": "#/components/schemas/DecayReferenceView"
+          },
+          "edge": {
+            "description": "The edge series.",
+            "$ref": "#/components/schemas/DecaySeriesView"
+          },
+          "behavioural": {
+            "description": "The behavioural paper series, beside it.",
+            "$ref": "#/components/schemas/DecaySeriesView"
+          },
+          "kill": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecayKillView"
+            },
+            "description": "The kill rules evaluated on the edge series, proposals only (none is stored or executed)."
+          },
+          "statements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honesty sentences."
+          },
+          "line": {
+            "type": "string",
+            "description": "One line for a report."
+          }
+        },
+        "description": "The decay monitor of a strategy (spec CF-12 D1 and the kill-rule evaluations of D2, part 12a). The edge series (graded shadow trades that count for edge) is the primary reading and the P10 behavioural series sits beside it. Report only: no proposal is\nwritten, nothing is paused and no order exists."
+      },
+      "DecaySeriesView": {
+        "required": [
+          "basis",
+          "note",
+          "state",
+          "trades",
+          "pendingTrades",
+          "streak",
+          "twiceInARow",
+          "firstTwiceAtWindow",
+          "windows",
+          "cusum",
+          "quarters",
+          "weakQuarterShare"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "What the R is."
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the reader should know (no series, held back sessions, trades left out); null when nothing."
+          },
+          "state": {
+            "type": "string",
+            "description": "`no_series`, `unavailable` (no reference), `monitoring` (no completed window yet), `ok` or `alert` (the latest completed window is below its level). A flag; never a pass."
+          },
+          "trades": {
+            "type": "integer",
+            "description": "Trades in the series.",
+            "format": "int32"
+          },
+          "pendingTrades": {
+            "type": "integer",
+            "description": "Trades after the last completed window.",
+            "format": "int32"
+          },
+          "streak": {
+            "type": "integer",
+            "description": "Completed windows below their level in a row at the end.",
+            "format": "int32"
+          },
+          "twiceInARow": {
+            "type": "boolean",
+            "description": "Whether the last two completed windows are both below."
+          },
+          "firstTwiceAtWindow": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The window at which two in a row was first reached, or null.",
+            "format": "int32"
+          },
+          "windows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecayWindowView"
+            },
+            "description": "The completed windows."
+          },
+          "cusum": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The P6-09 CUSUM; null when the series is not judged.",
+                "$ref": "#/components/schemas/DecayCusumView"
+              }
+            ]
+          },
+          "quarters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecayQuarterView"
+            },
+            "description": "The by-quarter table."
+          },
+          "weakQuarterShare": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The share of quarters below the floor, or null.",
+            "format": "double"
+          }
+        },
+        "description": "One series run through the decay monitor."
+      },
+      "DecaySettingsView": {
+        "required": [
+          "windowTrades",
+          "sigmas",
+          "quarterFloorR",
+          "settingsHash",
+          "settings",
+          "rho",
+          "rhoIsPlaceholder"
+        ],
+        "type": "object",
+        "properties": {
+          "windowTrades": {
+            "type": "integer",
+            "description": "Window size.",
+            "format": "int32"
+          },
+          "sigmas": {
+            "type": "number",
+            "description": "Standard errors below the reference mean.",
+            "format": "double"
+          },
+          "quarterFloorR": {
+            "type": "number",
+            "description": "The weak-quarter floor.",
+            "format": "double"
+          },
+          "settingsHash": {
+            "type": "string",
+            "description": "The SHA-256 of the settings."
+          },
+          "settings": {
+            "type": "string",
+            "description": "The text of the settings."
+          },
+          "rho": {
+            "type": "number",
+            "description": "The same-day correlation used.",
+            "format": "double"
+          },
+          "rhoIsPlaceholder": {
+            "type": "boolean",
+            "description": "Whether it is the placeholder until CF-01 estimates it."
+          }
+        },
+        "description": "The settings that produced the figures."
+      },
+      "DecayWindowView": {
+        "required": [
+          "index",
+          "trades",
+          "firstDay",
+          "lastDay",
+          "meanR",
+          "designEffect",
+          "threshold",
+          "below"
+        ],
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "description": "1-based.",
+            "format": "int32"
+          },
+          "trades": {
+            "type": "integer",
+            "description": "Trades in the window.",
+            "format": "int32"
+          },
+          "firstDay": {
+            "type": "string",
+            "description": "First trade day.",
+            "format": "date"
+          },
+          "lastDay": {
+            "type": "string",
+            "description": "Last trade day.",
+            "format": "date"
+          },
+          "meanR": {
+            "type": "number",
+            "description": "The window's mean R.",
+            "format": "double"
+          },
+          "designEffect": {
+            "type": "number",
+            "description": "The mean design effect of its days (CF-01; the correlation is the placeholder until CF-01 estimates it).",
+            "format": "double"
+          },
+          "threshold": {
+            "type": "number",
+            "description": "The alert level for this window.",
+            "format": "double"
+          },
+          "below": {
+            "type": "boolean",
+            "description": "Whether the mean is below the level (an alert)."
+          }
+        },
+        "description": "One completed window of the decay monitor."
+      },
       "DeflatedSharpeView": {
         "required": [
           "mode",
@@ -43843,6 +44344,517 @@
           }
         },
         "description": "A profitable open lot that turns 12 months old soon (the `long_term_soon` rule): `LongTermOn` is the date it is 12 months old, `DaysLeft` the days until then, `GainPct` its unrealised gain in percent (null for a lot that cost nothing, for example bonus shares: the gain is then the whole value and has no percentage)."
+      },
+      "LoopArmView": {
+        "required": [
+          "name",
+          "verdict",
+          "candidates",
+          "days",
+          "meanDifference",
+          "low",
+          "high",
+          "probabilityBetter",
+          "probabilityWorse",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "`retrained_vs_frozen` (is retraining helping) or `retrained_vs_no_ml` (is the model helping)."
+          },
+          "verdict": {
+            "type": "string",
+            "description": "`helps`, `hurts`, `no_measurable_difference`, `inconclusive` (fewer days than the minimum) or `unavailable`. \"No measurable difference\" is an answer."
+          },
+          "candidates": {
+            "type": "integer",
+            "description": "Candidates compared.",
+            "format": "int32"
+          },
+          "days": {
+            "type": "integer",
+            "description": "Distinct days.",
+            "format": "int32"
+          },
+          "meanDifference": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "First arm minus second arm, per candidate.",
+            "format": "double"
+          },
+          "low": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Lower end of the interval.",
+            "format": "double"
+          },
+          "high": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Upper end.",
+            "format": "double"
+          },
+          "probabilityBetter": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "P(first arm better).",
+            "format": "double"
+          },
+          "probabilityWorse": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "P(first arm worse).",
+            "format": "double"
+          },
+          "text": {
+            "type": "string",
+            "description": "The words."
+          }
+        },
+        "description": "One comparison of two arms."
+      },
+      "LoopArmsView": {
+        "required": [
+          "state",
+          "reason",
+          "candidates",
+          "frozenMean",
+          "retrainedMean",
+          "noMlMean",
+          "retrainedVsFrozen",
+          "retrainedVsNoMl"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "`available` or `unavailable`."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why it is unavailable, or null."
+          },
+          "candidates": {
+            "type": "integer",
+            "description": "Candidates in the common set.",
+            "format": "int32"
+          },
+          "frozenMean": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Mean value per candidate of arm A (frozen).",
+            "format": "double"
+          },
+          "retrainedMean": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Arm B (retrained, the champion now).",
+            "format": "double"
+          },
+          "noMlMean": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Arm C (no model, take every candidate).",
+            "format": "double"
+          },
+          "retrainedVsFrozen": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "B minus A.",
+                "$ref": "#/components/schemas/LoopArmView"
+              }
+            ]
+          },
+          "retrainedVsNoMl": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "B minus C.",
+                "$ref": "#/components/schemas/LoopArmView"
+              }
+            ]
+          }
+        },
+        "description": "The three arms on the same candidates."
+      },
+      "LoopCurveView": {
+        "required": [
+          "state",
+          "reason",
+          "verdict",
+          "pointsUsed",
+          "slopePer50Rows",
+          "standardError",
+          "projectedRows",
+          "moreRows",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "`available` or `unavailable`."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why it is unavailable, or null."
+          },
+          "verdict": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`rising`, `flat`, `unclear` or `insufficient`; null when unavailable."
+          },
+          "pointsUsed": {
+            "type": "integer",
+            "description": "Points fitted.",
+            "format": "int32"
+          },
+          "slopePer50Rows": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Gain per 50 rows.",
+            "format": "double"
+          },
+          "standardError": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Its standard error per 50 rows, or null with three points.",
+            "format": "double"
+          },
+          "projectedRows": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Total rows at which the line reaches the target, or null.",
+            "format": "double"
+          },
+          "moreRows": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Rows beyond the last point, or null.",
+            "format": "double"
+          },
+          "text": {
+            "type": "string",
+            "description": "The words."
+          }
+        },
+        "description": "The learning curve."
+      },
+      "LoopLiftView": {
+        "required": [
+          "state",
+          "reason",
+          "topTrades",
+          "bottomTrades",
+          "lift",
+          "standardError",
+          "liftZ",
+          "approvedTickets",
+          "approvedInTop",
+          "approvedZ",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "`available` or `unavailable`."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why it is unavailable, or null."
+          },
+          "topTrades": {
+            "type": "integer",
+            "description": "Graded trades in the top half.",
+            "format": "int32"
+          },
+          "bottomTrades": {
+            "type": "integer",
+            "description": "Graded trades in the bottom half.",
+            "format": "int32"
+          },
+          "lift": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Top minus bottom mean R.",
+            "format": "double"
+          },
+          "standardError": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Its standard error.",
+            "format": "double"
+          },
+          "liftZ": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "z of the lift.",
+            "format": "double"
+          },
+          "approvedTickets": {
+            "type": "integer",
+            "description": "Approved tickets that had a stored score.",
+            "format": "int32"
+          },
+          "approvedInTop": {
+            "type": "integer",
+            "description": "Of those, in the top half.",
+            "format": "int32"
+          },
+          "approvedZ": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "z of the share against 50 %.",
+            "format": "double"
+          },
+          "text": {
+            "type": "string",
+            "description": "The words."
+          }
+        },
+        "description": "The decision-quality lift."
+      },
+      "LoopReportView": {
+        "required": [
+          "settings",
+          "arms",
+          "curve",
+          "slope",
+          "lift",
+          "statements",
+          "line"
+        ],
+        "type": "object",
+        "properties": {
+          "settings": {
+            "description": "The settings.",
+            "$ref": "#/components/schemas/LoopSettingsView"
+          },
+          "arms": {
+            "description": "The three arms.",
+            "$ref": "#/components/schemas/LoopArmsView"
+          },
+          "curve": {
+            "description": "The learning curve.",
+            "$ref": "#/components/schemas/LoopCurveView"
+          },
+          "slope": {
+            "description": "The reliability slope.",
+            "$ref": "#/components/schemas/LoopSlopeView"
+          },
+          "lift": {
+            "description": "The decision-quality lift.",
+            "$ref": "#/components/schemas/LoopLiftView"
+          },
+          "statements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honesty sentences."
+          },
+          "line": {
+            "type": "string",
+            "description": "One line for a report."
+          }
+        },
+        "description": "\"Is the learning loop helping?\" (spec CF-12 D4 to D7). Report only."
+      },
+      "LoopSettingsView": {
+        "required": [
+          "minDays",
+          "draws",
+          "level",
+          "helpsAt",
+          "minSlopePer50Rows",
+          "targetGain",
+          "slopeWindow",
+          "slopeLow",
+          "slopeHigh",
+          "slopeSe",
+          "settingsHash",
+          "settings"
+        ],
+        "type": "object",
+        "properties": {
+          "minDays": {
+            "type": "integer",
+            "description": "The fewest distinct days.",
+            "format": "int32"
+          },
+          "draws": {
+            "type": "integer",
+            "description": "Bootstrap draws.",
+            "format": "int32"
+          },
+          "level": {
+            "type": "number",
+            "description": "Interval coverage.",
+            "format": "double"
+          },
+          "helpsAt": {
+            "type": "number",
+            "description": "The bar.",
+            "format": "double"
+          },
+          "minSlopePer50Rows": {
+            "type": "number",
+            "description": "The flat-curve limit.",
+            "format": "double"
+          },
+          "targetGain": {
+            "type": "number",
+            "description": "The projection target.",
+            "format": "double"
+          },
+          "slopeWindow": {
+            "type": "integer",
+            "description": "The reliability window.",
+            "format": "int32"
+          },
+          "slopeLow": {
+            "type": "number",
+            "description": "Lower alarm bar.",
+            "format": "double"
+          },
+          "slopeHigh": {
+            "type": "number",
+            "description": "Upper alarm bar.",
+            "format": "double"
+          },
+          "slopeSe": {
+            "type": "number",
+            "description": "Standard errors from 1.",
+            "format": "double"
+          },
+          "settingsHash": {
+            "type": "string",
+            "description": "The SHA-256 of the settings."
+          },
+          "settings": {
+            "type": "string",
+            "description": "The text of the settings."
+          }
+        },
+        "description": "The settings that produced the loop figures."
+      },
+      "LoopSlopeView": {
+        "required": [
+          "state",
+          "reason",
+          "verdict",
+          "outcomes",
+          "slope",
+          "intercept",
+          "standardError",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "`available` or `unavailable`."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why it is unavailable, or null."
+          },
+          "verdict": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`ok`, `alarm`, `shown_only` (fewer outcomes than the window) or `unavailable`."
+          },
+          "outcomes": {
+            "type": "integer",
+            "description": "Outcomes in the fit.",
+            "format": "int32"
+          },
+          "slope": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The slope.",
+            "format": "double"
+          },
+          "intercept": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The intercept.",
+            "format": "double"
+          },
+          "standardError": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The slope's standard error.",
+            "format": "double"
+          },
+          "text": {
+            "type": "string",
+            "description": "The words."
+          }
+        },
+        "description": "The reliability slope."
       },
       "LossTagDetailView": {
         "required": [
@@ -61541,6 +62553,9 @@
     },
     {
       "name": "Paper"
+    },
+    {
+      "name": "Confidence"
     },
     {
       "name": "Ticket alerts"

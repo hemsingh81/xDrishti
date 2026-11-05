@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Capabilities;
+using XDrishti.Application.Abstractions.Confidence;
 using XDrishti.Application.Abstractions.Depth;
 using XDrishti.Application.Abstractions.Filings;
 using XDrishti.Application.Abstractions.Lab;
@@ -33,6 +34,7 @@ using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
 using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
+using XDrishti.Application.Confidence;
 using XDrishti.Application.Depth;
 using XDrishti.Application.Execution;
 using XDrishti.Application.Filings;
@@ -716,6 +718,8 @@ public static class DependencyInjection
         services.TryAddSingleton(new PairedBootstrapOptions()); // the paired day-cluster bootstrap and fold sign test beside the ladder (CF-10 part 10c-1, ADR 0216): ReportOnly, nothing enforces; the host replaces it with its configuration (section Confidence:PairedBootstrap)
         services.TryAddSingleton(new MlInfluenceOptions()); // the thresholds of the MlMayInfluence predicate (CF-10 part 10c-2, ADR 0217): proposals of the spec; no mode, no switch; the host replaces it with its configuration (section Confidence:MlInfluence)
         services.TryAddSingleton(new SequentialOptions()); // the sequential failure test of the paper edge series (CF-09, ADR 0213): flags only, no mode; the host replaces it with its configuration (section Confidence:Sequential)
+        services.TryAddSingleton(new DecayOptions()); // the decay monitor of a forward series (CF-12 part 12a, ADR 0218): report only, tighten-only; the host replaces it with its configuration (section Confidence:Decay)
+        services.TryAddSingleton(new LoopOptions()); // "is the learning loop helping?" (CF-12 part 12a, ADR 0218): report only, tighten-only; the host replaces it with its configuration (section Confidence:Loop)
         services.TryAddSingleton(new RegistrationOptions()); // pre-registration and the honest count of looks (CF-06, ADR 0207): enforcement and CountInFactor off; the host replaces it with its configuration (section Confidence:Registration)
         services.TryAddSingleton(new HoldOutOptions()); // the locked hold-out (CF-06, ADR 0207): enforcement and AutoUnlock off; the host replaces it with its configuration (section Confidence:HoldOut)
         services.TryAddSingleton(new ConfidenceOptions()); // effective n, power, minimum track record (CF-01, ADR 0203): ReportOnly; the host replaces it with its configuration (section Confidence)
@@ -951,6 +955,9 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<GradeShadowCommand, ShadowGradeOutcome>, GradeShadowHandler>(); // grades the shadow record through the one replay path, insert-only (CF-08 part B)
         services.AddScoped<IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView>, GetShadowSummaryHandler>(); // the shadow summary: raw and effective n, labelled gross unless the sheet is confirmed (CF-08 part B)
         services.AddScoped<IQueryHandler<GetSequentialStatusQuery, Result<SequentialStatusView>>, GetSequentialStatusHandler>(); // the sequential failure test: flags only, never a pass, derived on request (CF-09)
+        services.AddScoped<IQueryHandler<GetDecayReportQuery, Result<DecayReportView>>, GetDecayReportHandler>(); // the decay monitor of a strategy's forward series and the kill-rule evaluations: report only, derived on request (CF-12 part 12a)
+        services.AddScoped<IQueryHandler<GetLoopReportQuery, Result<LoopReportView>>, GetLoopReportHandler>(); // "is the learning loop helping?": report only, derived on request (CF-12 part 12a)
+        services.AddSingleton<ILoopEvidence, NoLoopEvidence>(); // the one source of loop evidence: nothing is available yet (CF-12 part 12a)
         services.AddScoped<IQueryHandler<VerifyShadowChainQuery, ShadowChainCheckView>, VerifyShadowChainHandler>(); // recomputes the digest chain from the stored rows (CF-08 part B)
         services.AddScoped<ICommandHandler<ChangeShadowSwitchCommand, ShadowSwitched>, ChangeShadowSwitchHandler>(); // the owner's switch, behind a fresh password in the endpoint (CF-08 part B)
         services.AddScoped<IQueryHandler<ListPaperEntriesQuery, Result<PaperEntryList>>, ListPaperEntriesHandler>();
