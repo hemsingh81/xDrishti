@@ -12,8 +12,8 @@ using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Lab;
 
-/// <summary>What a full test produced: the candidate runs (to be stored whole), the verdict and the counts.</summary>
-internal sealed record FullTestOutcome(IReadOnlyList<SimulationRun> Runs, LabVerdictView Verdict, int Instruments, int InstrumentsRun, int Trades, IReadOnlyList<SelectionTrade> OosTrades);
+/// <summary>What a full test produced: the candidate runs (to be stored whole), the verdict and the counts. <paramref name="OosSources"/> is the simulated trade behind each of <paramref name="OosTrades"/>, in the same order (the random-entry null of CF-07 restates them); null when not kept.</summary>
+internal sealed record FullTestOutcome(IReadOnlyList<SimulationRun> Runs, LabVerdictView Verdict, int Instruments, int InstrumentsRun, int Trades, IReadOnlyList<SelectionTrade> OosTrades, IReadOnlyList<SimTrade>? OosSources = null);
 
 /// <summary>
 /// The full test of a Lab run (spec P5-04, ADR 0060): for each timeframe the strategy declares, one same-entries comparison of the candidate exits over the whole window (P4-05); the trades of each side are split off and the exit of each
@@ -62,6 +62,7 @@ internal sealed class LabFullTest(
         var runs = new List<SimulationRun>();
         var cells = new List<(SelectionInput Input, ExitSelection Selection)>();
         var cellViews = new List<(string Timeframe, string Side, ExitSelection Selection, SelectionInput Input)>();
+        var sources = new Dictionary<SelectionTrade, SimTrade>(ReferenceEqualityComparer.Instance);
         var fullPeriod = new List<FullPeriodView>();
         var instruments = 0;
         var instrumentsRun = 0;
@@ -92,9 +93,14 @@ internal sealed class LabFullTest(
                 var sideText = side.ToString().ToUpperInvariant();
                 var style = comparison.Report.GateApplied ? "intraday" : "swing";
                 var cell = comparison.Candidates[0].Run.Strategy.Id + " " + timeframes[i] + " " + sideText + " " + style + " *";
-                var trades = all.Where(t => t.Trade.Side == side)
-                    .Select(t => new SelectionTrade(t.Candidate, t.Trade.TradeDate, DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(t.Trade.ExitEpochSeconds).ToOffset(IndiaOffset).DateTime), costed ? t.Trade.Costing!.RNet : t.Trade.RFilled, costed ? t.Trade.RExact : null))
-                    .ToList();
+                var trades = new List<SelectionTrade>();
+                foreach (var t in all.Where(t => t.Trade.Side == side))
+                {
+                    var selected = new SelectionTrade(t.Candidate, t.Trade.TradeDate, DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(t.Trade.ExitEpochSeconds).ToOffset(IndiaOffset).DateTime), costed ? t.Trade.Costing!.RNet : t.Trade.RFilled, costed ? t.Trade.RExact : null);
+                    trades.Add(selected);
+                    sources[selected] = t.Trade;   // by reference: the pooled evidence returns these very instances (CF-07)
+                }
+
                 var input = new SelectionInput(cell, comparison.Report.Unit, !comparison.Report.GateApplied, comparison.EntriesKey, [.. comparison.Candidates.Select(c => c.Exit)], trades, sessions, new SelectionOptions());
                 var selection = ExitSelector.Select(input);
                 cells.Add((input, selection));
@@ -146,7 +152,8 @@ internal sealed class LabFullTest(
                 "The candidate exits are a fixed list; the strategy's own exit is not a candidate.",
             ],
             Trials: TrialsView.Of(parts, honest, settings.MultipleTesting));
-        return Result.Success(new FullTestOutcome(runs, view, instruments, instrumentsRun, defaultTrades, OosEvidenceBuilder.Trades(cells)));
+        var oos = OosEvidenceBuilder.Trades(cells);
+        return Result.Success(new FullTestOutcome(runs, view, instruments, instrumentsRun, defaultTrades, oos, [.. oos.Select(t => sources[t])]));
     }
 
     private static CellView CellOf(string timeframe, string side, ExitSelection selection, SelectionInput input)

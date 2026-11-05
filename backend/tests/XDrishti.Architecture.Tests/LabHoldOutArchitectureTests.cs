@@ -38,6 +38,20 @@ public sealed class LabHoldOutArchitectureTests
     }
 
     [Fact]
+    public void The_random_entry_null_names_no_hold_out_type_and_the_random_entry_walk_is_pure()
+    {
+        string[] holdOut = ["XDrishti.Application.Lab.IHoldOutPass", "XDrishti.Application.Lab.HoldOutPass", "XDrishti.Application.Lab.HoldOutUnlocker", "XDrishti.Application.Lab.LabHoldOutGuard", "XDrishti.Application.Abstractions.Lab.IHoldOutStore", "XDrishti.Application.Abstractions.Lab.HoldOutBlock"];
+
+        // CF-07: the null reads the window of the run only (the development window); nothing in it can reach the block
+        Types.InAssembly(Application).That().HaveName("LabNulls").Or().HaveName("RunNullWalkQuery").Or().HaveName("IRandomEntryEngine").Should().NotHaveDependencyOnAny(holdOut).GetResult().IsSuccessful.ShouldBeTrue();
+
+        var simulation = typeof(XDrishti.Simulation.Replay.RandomEntryWalker).Assembly;
+        string[] banned = ["System.IO", "System.Net", "Npgsql", "Microsoft.EntityFrameworkCore", "System.TimeProvider", "System.Random", "XDrishti.Application", "XDrishti.Infrastructure"];
+        var walk = Types.InAssembly(simulation).That().HaveName("RandomEntryWalker").Or().HaveName("EntryOverride").Should().NotHaveDependencyOnAny(banned).GetResult();
+        walk.IsSuccessful.ShouldBeTrue(string.Join(", ", walk.FailingTypeNames ?? []));
+    }
+
+    [Fact]
     public void The_domain_lab_and_confidence_types_do_no_io_and_read_no_clock()
     {
         string[] banned = ["System.IO", "System.Net", "System.Diagnostics.Process", "Npgsql", "Microsoft.EntityFrameworkCore", "System.TimeProvider"];

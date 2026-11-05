@@ -12864,7 +12864,7 @@ export interface components {
       total: number;
     };
     /**
-     * @description The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `DeflatedSharpe` (CF-03) is the probability beside the factor, null when not computed. `CostStress` (CF-05) is the cost stress and the delay test, null when not computed. `Trials`, `Registration` and `HoldOut` (CF-06) are the count of looks with its parts, the pre-registration state and the hold-out state; null in a report built without them. `Summary` is a deterministic
+     * @description The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `DeflatedSharpe` (CF-03) is the probability beside the factor, null when not computed. `CostStress` (CF-05) is the cost stress and the delay test, null when not computed. `Trials`, `Registration` and `HoldOut` (CF-06) are the count of looks with its parts, the pre-registration state and the hold-out state; null in a report built without them. `Nulls` (CF-07) is the random-entry null, null when not computed. `Summary` is a deterministic
      *     template over the numbers above, not an assistant text.
      */
     LabReportView: {
@@ -12891,6 +12891,7 @@ export interface components {
       trials?: null | components['schemas']['TrialsView'];
       registration?: null | components['schemas']['ReportRegistrationView'];
       holdOut?: null | components['schemas']['ReportHoldOutView'];
+      nulls?: null | components['schemas']['NullsView'];
     };
     /** @description Client event `labRunFinished` (spec P5-02, D5): the last event of a run, with its final state. */
     LabRunFinished: {
@@ -12973,7 +12974,7 @@ export interface components {
       /** Format: int64 */
       seed: null | number;
     };
-    /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. `Trials` (CF-06) is the count of looks with its parts as of the judgement; null in a result stored before it. */
+    /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. `Trials` (CF-06) is the count of looks with its parts as of the judgement; null in a result stored before it. `Nulls` (CF-07) is the random-entry null beside the outcome; null in a result stored before it, in a run that is not robust or when its mode is Off. */
     LabVerdictView: {
       outcome: string;
       /** Format: int32 */
@@ -12990,6 +12991,7 @@ export interface components {
       deflatedSharpe?: null | components['schemas']['DeflatedSharpeView'];
       costStress?: null | components['schemas']['CostStressView'];
       trials?: null | components['schemas']['TrialsView'];
+      nulls?: null | components['schemas']['NullsView'];
     };
     /** @description The India dates a run replays, inclusive. */
     LabWindow: {
@@ -14526,6 +14528,28 @@ export interface components {
       reason: null | string;
       /** @description What the owner confirmed, as text; null when nothing is confirmed. */
       confirmed: null | string;
+    };
+    /**
+     * @description The chance tests of a Lab verdict (CF-07, ADR 0208), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a null that is not a pass caps a PASS at MARGINAL and never raises an outcome. The placebo set, the mirror
+     *     gate and the plateau gate of the spec are not built yet and have no field here.
+     */
+    NullsView: {
+      /** @description The mode when it was computed. */
+      mode: string;
+      /** @description Whether the null could cap the outcome. */
+      enforce: boolean;
+      /** @description The text of the settings that produced the figures. */
+      settings: string;
+      /** @description SHA-256 of Settings. */
+      settingsHash: string;
+      /** @description The random-entry null. */
+      randomEntry: components['schemas']['RandomEntryView'];
+      /** @description True when the outcome was capped at MARGINAL by an enforced null. */
+      capped: boolean;
+      /** @description What the null is made over: the development window, the in-sample walk and the cost sheet. */
+      basis: string;
+      /** @description The limits of the figure and the reasons trades were left out. */
+      notes: string[];
     };
     /** @description The comparison of the derived daily bar with the broker's official daily candle: not available until official daily candles are fetched. */
     OfficialDailyCheck: {
@@ -17058,6 +17082,106 @@ export interface components {
        * @description Completed sessions at this step.
        */
       sessions: number;
+    };
+    /**
+     * @description The random-entry null of one Lab verdict (CF-07, D1): the real mean net R against the means of int RandomEntryView.Draws seeds, each a full set of random-entry trades with the real trades' instrument, session, side, risk fraction, target multiple and costs.
+     *     The reading is double? RandomEntryView.PValue against double RandomEntryView.Threshold: string RandomEntryView.Status is `pass` only when the p-value is at most the threshold; the percentiles are displayed, not a second test. `unavailable` is never a pass and
+     *     double? RandomEntryView.PValue is then null.
+     */
+    RandomEntryView: {
+      /**
+       * Format: int32
+       * @description Out-of-sample trades of the verdict.
+       */
+      oosTrades: number;
+      /**
+       * Format: int32
+       * @description How many of them were restated with random entries (the real mean is the mean of these).
+       */
+      trades: number;
+      /**
+       * Format: int32
+       * @description Seeds asked for.
+       */
+      draws: number;
+      /**
+       * Format: int32
+       * @description Seeds with at least one random trade.
+       */
+      validSeeds: number;
+      /**
+       * Format: double
+       * @description Mean net R of the restated real trades; null when no trade could be restated.
+       */
+      realMeanR: null | number;
+      /**
+       * Format: double
+       * @description Mean of the seed means.
+       */
+      randomMeanR: null | number;
+      /**
+       * Format: double
+       * @description 5th percentile of the seed means.
+       */
+      p05: null | number;
+      /**
+       * Format: double
+       * @description Median of the seed means.
+       */
+      p50: null | number;
+      /**
+       * Format: double
+       * @description 95th percentile of the seed means.
+       */
+      p95: null | number;
+      /**
+       * Format: double
+       * @description 99th percentile of the seed means.
+       */
+      p99: null | number;
+      /**
+       * Format: double
+       * @description The configured percentile (95), which sets the level of the test.
+       */
+      percentile: number;
+      /**
+       * Format: double
+       * @description The seed means at that percentile.
+       */
+      percentileValue: null | number;
+      /**
+       * Format: int32
+       * @description Seeds whose mean is at least the real mean.
+       */
+      countAtLeast: number;
+      /**
+       * Format: double
+       * @description `(CountAtLeast + 1) / (ValidSeeds + 1)`.
+       */
+      pValue: null | number;
+      /**
+       * Format: double
+       * @description The level of the test, `1 - percentile / 100`.
+       */
+      threshold: number;
+      /** @description How the value is read against the threshold (`&lt;=`). */
+      comparison: string;
+      /** @description `pass`, `fail` or `unavailable`. */
+      status: string;
+      /** @description One sentence for the reading. */
+      reason: string;
+      /**
+       * Format: double
+       * @description Share of the (trade, seed) draws dropped after the redraws.
+       */
+      droppedShare: number;
+      /**
+       * Format: int32
+       * @description Redraws spent over all seeds.
+       */
+      redraws: number;
+      /** @description The seed of the run for this null, as text. */
+      seed: string;
     };
     /** @description A cell with enough sample in its place in the ranking by the credible lower bound of expectancy. */
     RankedCellView: {

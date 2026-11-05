@@ -339,6 +339,7 @@ public static class DependencyInjection
         services.AddScoped<StrategySeeder>(); // the built-ins as text, written by `xd-api migrate`
         services.AddSingleton<ISimulationEngineVersion>(sp => new EngineVersionOf(sp.GetRequiredService<ISimulationEngine>().EngineVersion)); // the engine version alone, for read-only checks (P15-12)
         services.AddSingleton<ISimulationEngine, SimulationEngineAdapter>(); // the simulation library behind its port (ADR 0039): stateless, no I/O
+        services.AddSingleton<IRandomEntryEngine>(sp => sp.GetRequiredService<ISimulationEngine>() as IRandomEntryEngine ?? new SimulationEngineAdapter()); // the random-entry walk of the Lab's chance test (CF-07, ADR 0208): the one stateless adapter, a second port (a host that wraps the engine, as the tests do, gets a fresh stateless adapter for the walk)
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database", HealthStatus.Unhealthy, ["ready"]);

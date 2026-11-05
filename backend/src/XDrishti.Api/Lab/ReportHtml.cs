@@ -58,6 +58,14 @@ internal static class ReportHtml
             h.Append("<p>").Append(Html.Text(c.Limit)).Append(" Formula: ").Append(Html.Text(c.Formula)).Append(". Settings ").Append(Html.Text(c.Settings)).Append(" (").Append(Html.Text(c.SettingsHash)).Append(").</p>\n");
         }
 
+        if (r.Nulls is { } nulls)
+        {
+            var e = nulls.RandomEntry;
+            h.Append("<h2>Chance: random entry</h2>\n<p>Mode ").Append(Html.Text(nulls.Mode)).Append(nulls.Enforce ? ", enforced" : ", report only (the outcome is not changed)").Append("; status: ").Append(Html.Text(e.Status)).Append(". ").Append(Html.Text(e.Reason)).Append(".</p>\n");
+            Table(h, ["Trades", "Seeds", "Real mean R", "Random mean R", "P5", "P50", "P95", "P99", "At or above real", "p-value", "Threshold", "Status", "Dropped share", "Seed"], [[I(e.Trades) + " of " + I(e.OosTrades), I(e.ValidSeeds) + " of " + I(e.Draws), N(e.RealMeanR), N(e.RandomMeanR), N(e.P05), N(e.P50), N(e.P95), N(e.P99), I(e.CountAtLeast), N(e.PValue), e.Comparison + " " + N(e.Threshold), e.Status, N(e.DroppedShare), e.Seed]]);
+            h.Append("<p>").Append(Html.Text(nulls.Basis)).Append(". Settings ").Append(Html.Text(nulls.Settings)).Append(" (").Append(Html.Text(nulls.SettingsHash)).Append(").</p>\n");
+        }
+
         if (r.Trials is { } trials)
         {
             h.Append("<h2>Looks at this strategy</h2>\n<p>").Append(Html.Text(trials.Text)).Append("</p>\n");

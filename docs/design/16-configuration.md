@@ -297,6 +297,7 @@ strategy_lab:
   # CF-03 (ADR 0205) reads Confidence:Deflation: Mode (Off | ReportOnly, default ReportOnly; Gate is refused), MinProbability 0.95 (0.5..0.999), AssumedTrialSrSd (unset; 0.001..1), TBasis (NEff | Raw, default NEff); and Confidence:Bootstrap: Mode (Off | ReportOnly), Draws (unset = Robustness McDraws; 100..20000), BlockLength 0 (auto; else 2..60)
   # CF-05 ([ADR 0206](../adr/0206-the-lab-verdict-shows-a-cost-stress-at-1x-1-5x-and-2x-and-a-fill-one-minute-later-test-beside-the-outcome-in-report-only-mode-and-enforce-is-the-owners-switch.md)) reads Confidence:CostStress: Mode (Off | ReportOnly, default ReportOnly), Enforce (default false: the owner's switch), MidMultiplier 1.5 (>1..5), MidFloorR 0.08 (-1..1), HighMultiplier 2 (>Mid..5), HighFloorR 0 (-1..1), DelayMinutes 1 (1..5), DelayRetention 0.70 (0.1..1); the text and hash of the values are stored with every verdict
   # CF-06 ([ADR 0207](../adr/0207-a-strategy-version-is-pre-registered-the-ledger-counts-every-extra-look-and-a-locked-hold-out-is-fixed-at-the-first-post-and-read-once-by-an-owner-unlock-with-enforcement-and-the-honest-count-as-the-owners-switches.md)) reads Confidence:Registration: Enforce (default false), CountInFactor (default false); Confidence:HoldOut: Enforce (false), AutoUnlock (false), MinMonths 6 (1..60), SharePercent 20 (5..50), MinTrades 30 (5..1000), Retention 0.5 (0.1..1); the text and hash of the HoldOut values are stored with every unlock
+  # CF-07 ([ADR 0208](../adr/0208-the-lab-verdict-shows-a-random-entry-null-beside-the-sign-flip-in-report-only-mode-and-the-null-is-one-look-in-the-ledger-with-enforce-the-owners-switch.md)) reads Confidence:Nulls: Mode (Off | ReportOnly, default ReportOnly), Enforce (default false: the owner's switch), Draws 1000 (200..5000), Percentile 95 (90..99), Redraws 5 (0..20); the text and hash of the values are stored with every verdict
   assistant_can_run_tests: true
   assistant_can_promote: false
 
@@ -609,4 +610,7 @@ The ingest is the service `filings-ingest` of the scheduler in `xd-api` ([ADR 01
 | `Confidence:HoldOut:AutoUnlock` | The auto option: on, the one hold-out look runs by itself when every development row is a pass, recorded as `auto` | false |
 | `Confidence:HoldOut:MinMonths` / `SharePercent` | Shortest hold-out and its share of the stored history | 6 / 20 % |
 | `Confidence:HoldOut:MinTrades` / `Retention` | Fewest hold-out trades and the share of the development expectancy that must remain | 30 / 0.5 |
+| `Confidence:Nulls:Mode` | Whether the random-entry null of a robust run is computed and shown beside the outcome: `Off`, `ReportOnly` (CF-07, ADR 0208) | ReportOnly |
+| `Confidence:Nulls:Enforce` | The owner's switch: on, a null that is a fail or unavailable caps a PASS at MARGINAL; off, the figure decides nothing | false |
+| `Confidence:Nulls:Draws` / `Percentile` / `Redraws` | Seeds (each one full set of random-entry trades), the percentile that sets the level of the test (`1 - percentile / 100`), and the times a draw that makes no trade is drawn again before it is dropped and counted | 1000 / 95 / 5 |
 | `goals.max_drawdown_pct` | Halt-and-review threshold | 8% |

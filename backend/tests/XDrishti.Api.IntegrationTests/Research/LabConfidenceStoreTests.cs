@@ -106,22 +106,22 @@ public sealed class LabConfidenceStoreTests(ApiFactory factory, ResearchGrantsTe
     }
 
     [Fact]
-    public async Task The_count_of_looks_adds_up_hashes_sweep_points_extra_exits_and_re_plans_from_the_ledger()
+    public async Task The_count_of_looks_adds_up_hashes_sweep_points_extra_exits_re_plans_and_nulls_from_the_ledger()
     {
         await using var host = Host();
         var t = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
         LedgerRow Row(char hash, string method, string kind = "run", int extra = 0) =>
             new(Guid.NewGuid(), new string('k', 64), "CNT", 1, new string(hash, 64), null, "symbols as listed", new DateOnly(2025, 5, 1), new DateOnly(2026, 4, 30), method, t, kind, extra);
-        foreach (var row in new[] { Row('a', "full", extra: 3), Row('a', "robust", "replan"), Row('b', "quick"), Row('c', "sweep"), Row('d', "sweep"), Row('b', "sweep") })
+        foreach (var row in new[] { Row('a', "full", extra: 3), Row('a', "robust", "replan"), Row('b', "quick"), Row('c', "sweep"), Row('d', "sweep"), Row('b', "sweep"), Row('a', "null", "null") })
         {
             (await WithAsync<ITestLedger, bool>(host, l => l.AppendAsync(row, Ct).AsTask())).ShouldBeTrue();
         }
 
         var parts = await WithAsync<ITestLedger, TrialCounts>(host, l => l.CountTrialsAsync("CNT", Ct).AsTask());
 
-        parts.ShouldBe(new TrialCounts(2, 2, 3, 1, 0));
+        parts.ShouldBe(new TrialCounts(2, 2, 3, 1, 1));
         parts.DistinctHashes.ShouldBe(await WithAsync<ITestLedger, int>(host, l => l.CountVariantsAsync("CNT", Ct).AsTask()), "the old count is unchanged");
-        parts.Total.ShouldBe(8);
+        parts.Total.ShouldBe(9);
     }
 
     [Fact]

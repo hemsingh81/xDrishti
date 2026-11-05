@@ -8823,7 +8823,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_holdout_unlocks");
 
-                    b.HasIndex("BlockStart")
+                    b.HasIndex(new[] { "BlockStart" }, "ix_holdout_unlocks_block")
                         .HasDatabaseName("ix_holdout_unlocks_block");
 
                     b.HasIndex("BlockStart")
@@ -10011,7 +10011,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_test_ledger_hash", "strategy_hash ~ '^[0-9a-f]{64}$' AND window_from <= window_to");
 
-                            t.HasCheckConstraint("ck_test_ledger_trial", "trial_kind IN ('run','replan') AND extra_trials >= 0");
+                            t.HasCheckConstraint("ck_test_ledger_trial", "trial_kind IN ('run','replan','null') AND extra_trials >= 0");
                         });
                 });
 
