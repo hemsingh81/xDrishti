@@ -37,6 +37,8 @@ internal sealed class ConfidenceSettings
 
     public PairedBootstrapSection PairedBootstrap { get; set; } = new();
 
+    public MlInfluenceSection MlInfluence { get; set; } = new();
+
     public RegistrationSection Registration { get; set; } = new();
 
     public HoldOutSection HoldOut { get; set; } = new();
@@ -64,6 +66,9 @@ internal sealed class ConfidenceSettings
 
     /// <summary>The <c>Confidence:PairedBootstrap</c> subsection as the options of CF-10 part 10c-1 (ADR 0216).</summary>
     internal PairedBootstrapOptions ToPairedBootstrapOptions() => new(PairedBootstrap.Mode, PairedBootstrap.Draws, PairedBootstrap.Level, PairedBootstrap.MinDays, PairedBootstrap.PromisingFrom);
+
+    /// <summary>The <c>Confidence:MlInfluence</c> subsection as the options of CF-10 part 10c-2 (ADR 0217).</summary>
+    internal MlInfluenceOptions ToMlInfluenceOptions() => new(MlInfluence.HoldOutMinRows, MlInfluence.HoldOutMinProbability, MlInfluence.ForwardMinCandidates, MlInfluence.ForwardMinWeeks, MlInfluence.ForwardMaxEcePp);
 
     /// <summary>Whether the plateau gate is enforced while the block it lives in (<c>Confidence:Nulls</c>) is computed at all: it is not computed with <c>Nulls:Mode</c> Off, so enforcing it then would cap nothing (ADR 0210).</summary>
     internal bool PlateauEnforcedWithoutNulls() => Plateau.Enforce && Nulls.Mode == ConfidenceMode.Off;
@@ -256,6 +261,19 @@ internal sealed class ConfidenceSettings
         public int MinRows { get; set; } = 30;
 
         public double MaxFlipShare { get; set; } = 1.0 / 3.0;
+    }
+
+    internal sealed class MlInfluenceSection
+    {
+        public int HoldOutMinRows { get; set; } = 100;
+
+        public double HoldOutMinProbability { get; set; } = 0.95;
+
+        public int ForwardMinCandidates { get; set; } = 30;
+
+        public int ForwardMinWeeks { get; set; } = 4;
+
+        public double ForwardMaxEcePp { get; set; } = 5;
     }
 
     internal sealed class PairedBootstrapSection

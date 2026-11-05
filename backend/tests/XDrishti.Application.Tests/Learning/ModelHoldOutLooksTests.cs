@@ -1,0 +1,278 @@
+using Microsoft.Extensions.Time.Testing;
+using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Lab;
+using XDrishti.Application.Learning;
+using XDrishti.Domain.Common;
+using static XDrishti.Application.Tests.Learning.MlInfluenceKit;
+
+namespace XDrishti.Application.Tests.Learning;
+
+/// <summary>CF-10 part 10c-2 (ADR 0217): the one look a model family takes at the locked hold-out, and what a spent hold-out reads as.</summary>
+public sealed class ModelHoldOutLooksTests
+{
+    private static readonly string Hash = new('d', 64);
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 1, 9, 0, 0, TimeSpan.Zero));
+
+    private (ModelHoldOutLooks Looks, FakeHoldOutStore Store) Make(HoldOutBlock? block)
+    {
+        var store = new FakeHoldOutStore(block);
+        return (new ModelHoldOutLooks(store, _time), store);
+    }
+
+    [Fact]
+    public async Task A_model_that_has_not_looked_reads_as_kept_with_no_figures()
+    {
+        var (looks, _) = Make(Block());
+
+        var reading = await looks.ReadAsync(Model(), Ct);
+
+        reading.State.ShouldBe("kept");
+        reading.Facts.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_model_trained_without_a_hold_out_reads_as_not_kept()
+    {
+        var (looks, _) = Make(Block());
+
+        var reading = await looks.ReadAsync(Model(heldOut: false), Ct);
+
+        reading.State.ShouldBe("not_kept");
+        reading.Facts!.Kept.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task The_first_model_of_a_family_takes_the_look_as_a_fresh_one_and_owns_it()
+    {
+        var (looks, store) = Make(Block());
+        var model = Model();
+
+        var claim = await looks.ClaimAsync(model, "auto", "system:ml", Hash, Ct);
+        var reading = await looks.ReadAsync(model, Ct);
+
+        claim.IsSuccess.ShouldBeTrue();
+        claim.Value.Kind.ShouldBe("model");
+        claim.Value.StrategyId.ShouldBe("model-family:tf-1@2026-05-01");
+        claim.Value.Version.ShouldBe(1);
+        claim.Value.ReusedWindow.ShouldBeFalse();
+        claim.Value.Result.Passed.ShouldBeFalse();
+        claim.Value.BlockStart.ShouldBe(BlockStart);
+        store.Unlocks.Count.ShouldBe(1);
+        reading.State.ShouldBe("used");
+        reading.Facts!.Reused.ShouldBeFalse();
+        reading.Facts.ProbabilityBeatsNoMl.ShouldBeNull("the figures are not scored in this part: unavailable, never a pass");
+    }
+
+    [Fact]
+    public async Task A_second_model_of_the_same_family_is_refused_and_reads_as_reused()
+    {
+        var (looks, store) = Make(Block());
+        await looks.ClaimAsync(Model(7, hash: 'e'), "owner", "owner", Hash, Ct);
+        var other = Model(8, hash: 'b');
+
+        var claim = await looks.ClaimAsync(other, "owner", "owner", Hash, Ct);
+        var reading = await looks.ReadAsync(other, Ct);
+
+        claim.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutReusedCode);
+        claim.Error.Kind.ShouldBe(ErrorKind.Conflict);
+        store.Unlocks.Count.ShouldBe(1, "nothing is written by the refused look");
+        reading.State.ShouldBe("reused");
+        reading.Facts!.Reused.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task The_same_model_cannot_look_twice()
+    {
+        var (looks, store) = Make(Block());
+        var model = Model();
+        await looks.ClaimAsync(model, "owner", "owner", Hash, Ct);
+
+        var again = await looks.ClaimAsync(model, "owner", "owner", Hash, Ct);
+
+        again.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutReusedCode);
+        store.Unlocks.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_different_family_has_its_own_look_but_the_block_is_already_seen_so_it_is_a_reused_window_that_cannot_count()
+    {
+        var (looks, store) = Make(Block());
+        await looks.ClaimAsync(Model(7), "owner", "owner", Hash, Ct);
+        var other = Model(9, featureVersion: "tf-2", hash: 'c');
+
+        var claim = await looks.ClaimAsync(other, "owner", "owner", Hash, Ct);
+        var reading = await looks.ReadAsync(other, Ct);
+
+        claim.IsSuccess.ShouldBeTrue();
+        claim.Value.ReusedWindow.ShouldBeTrue();
+        store.Unlocks.Count.ShouldBe(2);
+        reading.State.ShouldBe("reused");
+        reading.Facts!.Reused.ShouldBeTrue("a look at a block somebody had seen cannot make the term true");
+    }
+
+    [Fact]
+    public async Task A_strategys_fresh_look_at_the_block_makes_a_models_first_look_a_reused_window()
+    {
+        var (looks, store) = Make(Block());
+        store.Unlocks.Add(new StoredUnlock("ORB", 1, "strategy", "owner", "owner", _time.GetUtcNow(), Hash, false, BlockStart, Guid.NewGuid(), null!));
+        var model = Model();
+
+        var claim = await looks.ClaimAsync(model, "owner", "owner", Hash, Ct);
+
+        claim.Value.ReusedWindow.ShouldBeTrue();
+        (await looks.ReadAsync(model, Ct)).Facts!.Reused.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_model_without_a_kept_hold_out_cannot_look()
+    {
+        var (looks, store) = Make(Block());
+
+        var claim = await looks.ClaimAsync(Model(heldOut: false), "owner", "owner", Hash, Ct);
+
+        claim.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutUnavailableCode);
+        store.Unlocks.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task No_fixed_block_means_no_look()
+    {
+        var (looks, store) = Make(null);
+
+        var claim = await looks.ClaimAsync(Model(), "owner", "owner", Hash, Ct);
+
+        claim.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutUnavailableCode);
+        store.Unlocks.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void The_family_is_the_feature_version_and_a_models_look_id_is_stable_and_differs_by_file_hash()
+    {
+        ModelHoldOutLooks.FamilyId(Model().Model).ShouldBe("model-family:tf-1");
+        ModelHoldOutLooks.LookKey(Model().Model, BlockStart).ShouldBe("model-family:tf-1@2026-05-01");
+        ModelHoldOutLooks.LookId(Model(hash: 'e').Model).ShouldBe(ModelHoldOutLooks.LookId(Model(hash: 'e').Model));
+        ModelHoldOutLooks.LookId(Model(hash: 'e').Model).ShouldNotBe(ModelHoldOutLooks.LookId(Model(hash: 'b').Model));
+    }
+
+    [Fact]
+    public async Task A_model_whose_kept_hold_out_starts_after_the_locked_block_cannot_look()
+    {
+        var (looks, store) = Make(Block());
+        var model = Model(holdOutStart: BlockStart.AddDays(1));
+
+        var claim = await looks.ClaimAsync(model, "owner", "owner", Hash, Ct);
+
+        claim.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutUnavailableCode);
+        store.Unlocks.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_model_that_kept_an_earlier_start_than_the_block_may_look()
+    {
+        var (looks, _) = Make(Block());
+
+        var claim = await looks.ClaimAsync(Model(holdOutStart: BlockStart.AddDays(-30)), "owner", "owner", Hash, Ct);
+
+        claim.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_look_on_a_block_that_starts_before_the_hold_out_the_model_kept_does_not_count()
+    {
+        var (looks, store) = Make(Block());
+        var model = Model(holdOutStart: BlockStart.AddDays(10));
+        var view = new HoldOutResultView("x", 1, "model", "owner", "used", _time.GetUtcNow(), BlockStart, BlockStart, false, false, false, "inconclusive", "r", null, null, null, 0, null, Hash, "o", []);
+        store.Unlocks.Add(new StoredUnlock(ModelHoldOutLooks.LookKey(model.Model, BlockStart), 1, "model", "owner", "o", _time.GetUtcNow(), Hash, false, BlockStart, ModelHoldOutLooks.LookId(model.Model), view));
+
+        var reading = await looks.ReadAsync(model, Ct);
+
+        reading.State.ShouldBe("reused");
+        reading.Facts!.Reused.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task When_the_owner_advances_the_block_the_family_gets_a_fresh_look_and_the_old_look_no_longer_counts()
+    {
+        var (looks, store) = Make(Block());
+        var model = Model(holdOutStart: new DateOnly(2026, 1, 1));
+        await looks.ClaimAsync(model, "owner", "owner", Hash, Ct);
+        var later = new DateOnly(2026, 11, 1); // a new, non-overlapping block: it starts after the old one (2026-05-01, six months) ends
+        store.Block = Block(later);
+
+        var before = await looks.ReadAsync(model, Ct);
+        var claim = await looks.ClaimAsync(Model(9, hash: 'b', holdOutStart: new DateOnly(2026, 1, 1)), "owner", "owner", Hash, Ct);
+
+        before.State.ShouldBe("kept", "the look at the old block is not the look at the current one");
+        claim.IsSuccess.ShouldBeTrue();
+        claim.Value.StrategyId.ShouldBe("model-family:tf-1@2026-11-01");
+        claim.Value.ReusedWindow.ShouldBeFalse("the old look burned only the old block; nobody has looked at the new one");
+    }
+
+    [Fact]
+    public async Task A_fresh_place_taken_between_the_read_and_the_insert_stores_the_claim_as_a_reused_window()
+    {
+        var (looks, store) = Make(Block());
+        store.AfterAnyUnlock = () =>
+        {
+            store.AfterAnyUnlock = null;
+            store.Unlocks.Add(new StoredUnlock("ORB", 1, "strategy", "owner", "o", _time.GetUtcNow(), Hash, false, BlockStart, Guid.NewGuid(), null!));
+        };
+
+        var claim = await looks.ClaimAsync(Model(), "owner", "owner", Hash, Ct);
+
+        claim.IsSuccess.ShouldBeTrue();
+        claim.Value.ReusedWindow.ShouldBeTrue("the block's one fresh look went to the other look");
+        store.Unlocks.Count.ShouldBe(2);
+    }
+
+    [Theory]
+    [InlineData("admin", "owner", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("owner", "", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("owner", "owner", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")]
+    [InlineData("owner", "owner", "abc")]
+    public async Task A_mode_an_actor_or_a_hash_that_cannot_be_stored_is_a_refusal_not_a_database_error(string mode, string actor, string hash)
+    {
+        var (looks, store) = Make(Block());
+
+        var claim = await looks.ClaimAsync(Model(), mode, actor, hash, Ct);
+
+        claim.Error.Code.ShouldBe(LearningErrors.InvalidCode);
+        store.Unlocks.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_model_that_kept_no_hold_out_reads_as_not_kept_even_when_the_block_has_a_look()
+    {
+        var (looks, store) = Make(Block());
+        var model = Model(heldOut: false);
+        var view = new HoldOutResultView("x", 1, "model", "owner", "used", _time.GetUtcNow(), BlockStart, BlockStart, false, false, false, "inconclusive", "r", null, null, null, 0, null, Hash, "o", []);
+        store.Unlocks.Add(new StoredUnlock(ModelHoldOutLooks.LookKey(model.Model, BlockStart), 1, "model", "owner", "o", _time.GetUtcNow(), Hash, false, BlockStart, Guid.NewGuid(), view));
+
+        var reading = await looks.ReadAsync(model, Ct);
+
+        reading.State.ShouldBe("not_kept");
+        reading.Facts!.Kept.ShouldBeFalse();
+        reading.Facts.Reused.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task A_look_with_the_same_key_that_appears_between_the_read_and_the_insert_is_refused_as_reused_without_a_retry()
+    {
+        var (looks, store) = Make(Block());
+        var model = Model();
+        var view = new HoldOutResultView("x", 1, "model", "owner", "used", _time.GetUtcNow(), BlockStart, BlockStart, false, false, false, "inconclusive", "r", null, null, null, 0, null, Hash, "o", []);
+        store.AfterAnyUnlock = () =>
+        {
+            store.AfterAnyUnlock = null;
+            store.Unlocks.Add(new StoredUnlock(ModelHoldOutLooks.LookKey(model.Model, BlockStart), 1, "model", "owner", "o", _time.GetUtcNow(), Hash, false, BlockStart, Guid.NewGuid(), view));
+        };
+
+        var claim = await looks.ClaimAsync(model, "owner", "owner", Hash, Ct);
+
+        claim.Error.Code.ShouldBe(MlInfluenceErrors.HoldOutReusedCode);
+        store.Unlocks.Count.ShouldBe(1, "only the row that got there first; no retry stored a second one");
+    }
+}

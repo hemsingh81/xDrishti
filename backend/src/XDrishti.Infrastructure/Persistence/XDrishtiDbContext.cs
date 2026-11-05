@@ -175,6 +175,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<ModelVersionRecord> ModelVersions => Set<ModelVersionRecord>();
 
     internal DbSet<ModelDesignationRecord> ModelDesignations => Set<ModelDesignationRecord>();
+
+    internal DbSet<MlInfluenceCheckRecord> MlInfluenceChecks => Set<MlInfluenceCheckRecord>();
     internal DbSet<LearningChangelogRecord> LearningChangelog => Set<LearningChangelogRecord>();
 
     internal DbSet<ExperimentRecord> Experiments => Set<ExperimentRecord>();

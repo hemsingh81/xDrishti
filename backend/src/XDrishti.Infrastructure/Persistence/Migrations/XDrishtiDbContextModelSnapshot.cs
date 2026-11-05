@@ -4277,6 +4277,54 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.MlInfluenceCheckRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("EvaluatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("evaluated_at");
+
+                    b.Property<string>("InputsHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("inputs_hash");
+
+                    b.Property<bool>("MayInfluence")
+                        .HasColumnType("boolean")
+                        .HasColumnName("may_influence");
+
+                    b.Property<long>("ModelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("model_id");
+
+                    b.Property<string>("SettingHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("setting_hash");
+
+                    b.Property<string>("Terms")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("terms");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ml_influence_checks");
+
+                    b.HasIndex("ModelId", "Id")
+                        .HasDatabaseName("ix_ml_influence_checks_model_id_id");
+
+                    b.ToTable("ml_influence_checks", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_ml_influence_checks_hashes", "setting_hash ~ '^[0-9a-f]{64}$' AND inputs_hash ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.ModelDesignationRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -10926,6 +10974,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasForeignKey("LessonId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_lessons_lessons_lesson_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.MlInfluenceCheckRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Learning.ModelVersionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ModelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ml_influence_checks_model_versions_model_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.ModelDesignationRecord", b =>
