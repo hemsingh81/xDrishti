@@ -2929,6 +2929,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/learning/models/{id}/influence': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Whether the model may influence a decision (CF-10 MlMayInfluence), term by term: the hold-out (once per model family), the forward shadow candidates, the calibration detector and the owner's switch. Off by default, an unavailable figure is never a pass, and nothing here places an order. 404 models.not_found */
+    get: operations['GetModelInfluence'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/experiments': {
     parameters: {
       query?: never;
@@ -14408,6 +14425,75 @@ export interface components {
       /** Format: date */
       date: string;
       time: string;
+    };
+    /** @description Where the model stands with the locked hold-out. */
+    MlHoldOutView: {
+      /** @description `not_kept`, `kept`, `used` or `reused`. */
+      state: string;
+      /** @description The model family whose one look it is. */
+      family: string;
+      /**
+       * Format: date
+       * @description The start of the block the look was taken on, or null before a look.
+       */
+      blockStart: null | string;
+      /**
+       * Format: int32
+       * @description Hold-out rows the model was scored on, or null when not available.
+       */
+      rows: null | number;
+      /**
+       * Format: double
+       * @description The probability of beating the best no-ML baseline there, or null when not available.
+       */
+      probabilityBeatsNoMl: null | number;
+      /**
+       * Format: double
+       * @description The effect of the take rule on realised R there, or null when not available.
+       */
+      policyEffectR: null | number;
+    };
+    /** @description `GET /api/learning/models/{id}/influence`: whether the model may influence a decision, term by term (CF-10 part 10c-2, ADR 0217). */
+    MlInfluenceView: {
+      /**
+       * Format: int64
+       * @description The registry id.
+       */
+      modelId: number;
+      /** @description The model's current role. */
+      role: string;
+      /** @description True only when every term holds and the model is the current champion; false by default. */
+      mayInfluence: boolean;
+      /** @description The four terms. */
+      terms: components['schemas']['MlTermView'][];
+      /** @description Every reason of every term that does not hold, plus `not_champion`; empty only when allowed. */
+      reasons: components['schemas']['MlReasonView'][];
+      /** @description The hold-out state. */
+      holdOut: components['schemas']['MlHoldOutView'];
+      /** @description The owner's switch ml.influence.enabled. */
+      switchOn: boolean;
+      /** @description SHA-256 of the thresholds and the switch. */
+      settingHash: string;
+      /** @description The thresholds as text. */
+      settings: string;
+      /** @description What a reader must know about the figures that are not available. */
+      notes: string[];
+    };
+    /** @description One reason a term of the influence predicate does not hold. */
+    MlReasonView: {
+      /** @description A stable code such as `holdout_reused`. */
+      code: string;
+      /** @description A sentence. */
+      text: string;
+    };
+    /** @description One term of the influence predicate. */
+    MlTermView: {
+      /** @description The term (HoldOutBeatsNoMl, ForwardShadowOk, NoCalibrationAlarm, SwitchOn). */
+      name: string;
+      /** @description `holds`, `fails` or `unavailable` (an unavailable figure is not a pass). */
+      state: string;
+      /** @description Why not; empty when it holds. */
+      reasons: components['schemas']['MlReasonView'][];
     };
     /** @description A model with everything the registry keeps about it (P6-07). */
     ModelDetailView: {
@@ -28035,6 +28121,37 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ModelDetailView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetModelInfluence: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MlInfluenceView'];
         };
       };
       /** @description Not Found */
