@@ -27,6 +27,8 @@ internal sealed class ConfidenceSettings
 
     public NullsSection Nulls { get; set; } = new();
 
+    public PlateauSection Plateau { get; set; } = new();
+
     public RegistrationSection Registration { get; set; } = new();
 
     public HoldOutSection HoldOut { get; set; } = new();
@@ -39,6 +41,12 @@ internal sealed class ConfidenceSettings
 
     /// <summary>The <c>Confidence:Nulls</c> subsection as the options of CF-07 (ADR 0208).</summary>
     internal NullOptions ToNullOptions() => new(Nulls.Mode, Nulls.Enforce, Nulls.Draws, Nulls.Percentile, Nulls.Redraws, Nulls.Placebos, Nulls.MinPlacebos);
+
+    /// <summary>The <c>Confidence:Plateau</c> subsection as the options of CF-07 part C (ADR 0210).</summary>
+    internal PlateauOptions ToPlateauOptions() => new(Plateau.Mode, Plateau.Enforce, Plateau.Retention, Plateau.MinPoints);
+
+    /// <summary>Whether the plateau gate is enforced while the block it lives in (<c>Confidence:Nulls</c>) is computed at all: it is not computed with <c>Nulls:Mode</c> Off, so enforcing it then would cap nothing (ADR 0210).</summary>
+    internal bool PlateauEnforcedWithoutNulls() => Plateau.Enforce && Nulls.Mode == ConfidenceMode.Off;
 
     /// <summary>The <c>Confidence:CostStress</c> subsection as the options of CF-05 (ADR 0206).</summary>
     internal CostStressOptions ToCostStressOptions() => new(CostStress.Mode, CostStress.Enforce, CostStress.MidMultiplier, CostStress.MidFloorR, CostStress.HighMultiplier, CostStress.HighFloorR, CostStress.DelayMinutes, CostStress.DelayRetention);
@@ -174,6 +182,17 @@ internal sealed class ConfidenceSettings
         public bool Placebos { get; set; } = true;
 
         public int MinPlacebos { get; set; } = 19;
+    }
+
+    internal sealed class PlateauSection
+    {
+        public ConfidenceMode Mode { get; set; } = ConfidenceMode.ReportOnly;
+
+        public bool Enforce { get; set; }
+
+        public double Retention { get; set; } = 0.70;
+
+        public int MinPoints { get; set; } = 3;
     }
 
     internal sealed class RegistrationSection

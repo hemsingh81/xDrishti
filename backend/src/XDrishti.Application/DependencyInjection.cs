@@ -707,6 +707,7 @@ public static class DependencyInjection
         services.TryAddSingleton(new BootstrapOptions()); // the stationary block bootstrap of a robust Lab run (CF-03, ADR 0205): ReportOnly; the host replaces it with its configuration (section Confidence:Bootstrap)
         services.TryAddSingleton(new CostStressOptions()); // the cost stress gates and the delay test of a Lab verdict (CF-05, ADR 0206): ReportOnly, Enforce off; the host replaces it with its configuration (section Confidence:CostStress)
         services.TryAddSingleton(new NullOptions()); // the random-entry null of a robust Lab run (CF-07, ADR 0208): ReportOnly, Enforce off; the host replaces it with its configuration (section Confidence:Nulls)
+        services.TryAddSingleton(new PlateauOptions()); // the plateau gate on the swept parameters (CF-07 part C, ADR 0210): ReportOnly, Enforce off; the host replaces it with its configuration (section Confidence:Plateau)
         services.TryAddSingleton(new RegistrationOptions()); // pre-registration and the honest count of looks (CF-06, ADR 0207): enforcement and CountInFactor off; the host replaces it with its configuration (section Confidence:Registration)
         services.TryAddSingleton(new HoldOutOptions()); // the locked hold-out (CF-06, ADR 0207): enforcement and AutoUnlock off; the host replaces it with its configuration (section Confidence:HoldOut)
         services.TryAddSingleton(new ConfidenceOptions()); // effective n, power, minimum track record (CF-01, ADR 0203): ReportOnly; the host replaces it with its configuration (section Confidence)
@@ -739,6 +740,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetRegistrationQuery, Result<RegistrationView>>, GetRegistrationHandler>();
         services.AddScoped<ICommandHandler<UnlockHoldOutCommand, LabRunView>, UnlockHoldOutHandler>();
         services.AddScoped<IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>, GetHoldOutHandler>();
+        services.AddScoped<LabPlateau>(); // the plateau gate beside the nulls, read from the stored sweep (CF-07 part C, ADR 0210)
         services.AddScoped<LabNulls>(); // the random-entry null beside the outcome and its ledger row (CF-07, ADR 0208)
         services.AddScoped<LabPlacebos>(); // the placebo set and the mirror gate beside it, and their ledger row (CF-07 part B, ADR 0209)
         services.AddScoped<LabCostStress>(); // the cost stress gates and the delay test beside the outcome (CF-05, ADR 0206)

@@ -76,6 +76,19 @@ internal static class ReportHtml
                 Table(h, ["Trades", "Mirror mean R", "Real mean R", "Threshold", "Status"], [[I(mirror.Trades), N(mirror.MirrorMeanR), N(mirror.RealMeanR), mirror.Comparison + " " + N(mirror.Threshold), mirror.Status]]);
             }
 
+            if (nulls.Plateau is { } plateau)
+            {
+                h.Append("<h2>Chance: plateau (in-sample sweep)</h2>\n<p>Mode ").Append(Html.Text(plateau.Mode)).Append(plateau.Enforce ? ", enforced" : ", report only (the outcome is not changed)").Append("; status: ").Append(Html.Text(plateau.Status)).Append(". ").Append(Html.Text(plateau.Reason)).Append(".</p>\n");
+                Table(h, ["Parameter", "Declared", "Valid points", "Base mean R", "Below", "Keeps", "Above", "Keeps", "Needs", "Median R", "Plateau centre", "Reading", "Status"], [.. plateau.Parameters.Select(x => new[] { x.Param, N(x.Declared), I(x.ValidPoints), N(x.BaseMeanR), N(x.LowerValue), N(x.LowerRetention), N(x.UpperValue), N(x.UpperRetention), plateau.Comparison + " " + N(plateau.Retention), N(x.Median), x.CentreValue is { } cv ? N(cv) + " (smoothed " + N(x.CentreMeanR) + " R)" : "-", x.Reading, x.Status })]);
+                foreach (var x in plateau.Parameters)
+                {
+                    h.Append("<p>").Append(Html.Text(x.Param)).Append(": ").Append(Html.Text(x.Reason)).Append(".</p>\n");
+                    Table(h, ["Value", "Declared", "Trades", "Mean R", "Kept of base"], [.. x.Points.Select(pt => new[] { N(pt.Value), pt.Declared ? "yes" : "no", I(pt.Trades), N(pt.MeanR), N(pt.Retention) })]);
+                }
+
+                h.Append("<p>").Append(Html.Text(plateau.Basis)).Append(". Settings ").Append(Html.Text(plateau.Settings)).Append(" (").Append(Html.Text(plateau.SettingsHash)).Append(").</p>\n");
+            }
+
             h.Append("<p>").Append(Html.Text(nulls.Basis)).Append(". Settings ").Append(Html.Text(nulls.Settings)).Append(" (").Append(Html.Text(nulls.SettingsHash)).Append(").</p>\n");
         }
 

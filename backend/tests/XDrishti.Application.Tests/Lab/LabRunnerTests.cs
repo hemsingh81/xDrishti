@@ -883,7 +883,7 @@ public sealed class LabRunnerTests
         AnswerPlacebos();
         var options = new HoldOutOptions();
         return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
-            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, null, options, new XDrishti.Application.Lab.LabHoldOutGuard(store, bars, options, _time), nulls: new LabNulls(_walks, new LabPlacebos(_placeboWalks, new NullOptions()), new NullOptions(), LabSettings.Default));
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, null, options, new XDrishti.Application.Lab.LabHoldOutGuard(store, bars, options, _time), nulls: new LabNulls(_walks, new LabPlacebos(_placeboWalks, new NullOptions()), new NullOptions(), LabSettings.Default), plateau: new LabPlateau(new PlateauOptions()));
     }
 
     [Fact]
@@ -935,7 +935,7 @@ public sealed class LabRunnerTests
     }
 
     /// <summary>A runner with the random-entry null (CF-07); the walk answers every trade of the plan with the same two draws.</summary>
-    private LabRunner RunnerWithNulls(NullOptions options)
+    private LabRunner RunnerWithNulls(NullOptions options, PlateauOptions? plateau = null)
     {
         _ledger.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
         _variantStats.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
@@ -944,7 +944,7 @@ public sealed class LabRunnerTests
             Result.Success(new NullWalkRun([.. ci.Arg<RunNullWalkQuery>().Plan.Trades.Select(t => new NullTradeDraws(t.Id, new double[ci.Arg<RunNullWalkQuery>().Plan.Draws], 0, null))])));
         AnswerPlacebos();
         return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
-            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, nulls: new LabNulls(_walks, new LabPlacebos(_placeboWalks, options), options, LabSettings.Default));
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, nulls: new LabNulls(_walks, new LabPlacebos(_placeboWalks, options), options, LabSettings.Default), plateau: plateau is null ? null : new LabPlateau(plateau));
     }
 
     [Fact]
@@ -983,6 +983,89 @@ public sealed class LabRunnerTests
         block.Capped.ShouldBeFalse();
         System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { Nulls = null }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]));
         _finishes[1].SimRunKeys.ShouldBe(_finishes[0].SimRunKeys);
+    }
+
+    [Fact]
+    public async Task The_plateau_gate_in_report_only_adds_its_member_to_the_nulls_block_and_changes_nothing_else_not_even_the_ledger()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        var rows = new List<LedgerRow>();
+        _ledger.AppendAsync(Arg.Any<LedgerRow>(), Arg.Any<CancellationToken>()).Returns(ci =>
+        {
+            rows.Add(ci.Arg<LedgerRow>());
+            return true;
+        });
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithNulls(new NullOptions(), new PlateauOptions(ConfidenceMode.Off)).ExecuteAsync(RobustRun(), Ct);
+        var withoutRows = rows.Count;
+        await RunnerWithNulls(new NullOptions(), new PlateauOptions()).ExecuteAsync(RobustRun(), Ct);
+
+        verdicts[0].Nulls.ShouldNotBeNull().Plateau.ShouldBeNull("the mode is off");
+        var plateau = verdicts[1].Nulls.ShouldNotBeNull().Plateau.ShouldNotBeNull();
+        plateau.Mode.ShouldBe("ReportOnly");
+        plateau.Enforce.ShouldBeFalse();
+        plateau.Capped.ShouldBeFalse();
+        plateau.Basis.ShouldContain("in-sample sweep");
+        var parameter = plateau.Parameters.Single();
+        parameter.Param.ShouldBe("period");
+        parameter.Points.Select(p => p.Value).ShouldBe([8.0, 9.0, 10.0, 11.0, 12.0], "the declared 10 and the four steps 0.8, 0.9, 1.1, 1.2");
+        System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { Nulls = verdicts[1].Nulls! with { Plateau = null } }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]));
+        (rows.Count - withoutRows).ShouldBe(withoutRows, "the plateau gate adds no ledger row: the sweep points it reads are already rows");
+        _finishes[1].Stages.Select(s => s.Name).ShouldBe(_finishes[0].Stages.Select(s => s.Name), "no stage of its own");
+    }
+
+    [Fact]
+    public async Task The_plateau_gate_lives_in_the_nulls_block_so_with_the_nulls_off_there_is_no_block_and_no_gate()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithNulls(new NullOptions(ConfidenceMode.Off), new PlateauOptions(Enforce: true)).ExecuteAsync(RobustRun(), Ct);
+
+        verdicts.Single().Nulls.ShouldBeNull();
+        verdicts.Single().Outcome.ShouldNotBe("MARGINAL", "an enforcing switch with nothing computed caps nothing");
+    }
+
+    [Fact]
+    public async Task A_plain_full_run_has_no_plateau_member_so_its_document_is_what_it_was()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithNulls(new NullOptions(), new PlateauOptions()).ExecuteAsync(FullRun(), Ct);
+
+        verdicts.Single().Nulls.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_window_that_reaches_the_hold_out_block_makes_the_plateau_gate_unavailable_without_reading_the_sweep()
+    {
+        ArrangeYearOfTrades();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithNullsAndBlock(new DateOnly(2026, 4, 20)).ExecuteAsync(RobustRun() with { From = new DateOnly(2025, 5, 1) }, Ct);
+
+        var plateau = verdicts.Single().Nulls.ShouldNotBeNull().Plateau.ShouldNotBeNull();
+        plateau.Status.ShouldBe("unavailable");
+        plateau.Reason.ShouldContain("hold-out");
+        plateau.Parameters.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_window_that_stays_clear_of_the_hold_out_block_keeps_the_plateau_reading()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithNullsAndBlock(new DateOnly(2026, 6, 1)).ExecuteAsync(RobustRun(), Ct);
+
+        verdicts.Single().Nulls.ShouldNotBeNull().Plateau.ShouldNotBeNull().Parameters.ShouldHaveSingleItem();
     }
 
     [Fact]

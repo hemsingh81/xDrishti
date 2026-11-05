@@ -51,7 +51,7 @@ public sealed record RandomEntryView(
 
 /// <summary>
 /// The chance tests of a Lab verdict (CF-07, ADRs 0208 and 0209), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns <c>Enforce</c> on, then a null, a placebo set or a mirror gate that is not a pass caps a PASS at MARGINAL and never raises an outcome.
-/// The plateau gate of the spec is not built yet and has no field here.
+/// The plateau gate on parameters (CF-07 part C, ADR 0210) sits in the same block as <c>Plateau</c>, with a mode and an enforce switch of its own.
 /// </summary>
 /// <param name="Mode">The mode when it was computed.</param>
 /// <param name="Enforce">Whether the null could cap the outcome.</param>
@@ -63,4 +63,5 @@ public sealed record RandomEntryView(
 /// <param name="Notes">The limits of the figure and the reasons trades were left out.</param>
 /// <param name="Placebos">The rank of the strategy among the 20 placebo shapes (CF-07 part B); null in a result stored before it or when <c>Confidence:Nulls:Placebos</c> is off.</param>
 /// <param name="Mirror">The mirror gate (CF-07 part B); null as <paramref name="Placebos"/>.</param>
-public sealed record NullsView(string Mode, bool Enforce, string Settings, string SettingsHash, RandomEntryView RandomEntry, bool Capped, string Basis, IReadOnlyList<string> Notes, PlaceboSetView? Placebos = null, MirrorView? Mirror = null);
+/// <param name="Plateau">The plateau gate on the swept parameters (CF-07 part C); null in a result stored before it or when <c>Confidence:Plateau:Mode</c> is Off.</param>
+public sealed record NullsView(string Mode, bool Enforce, string Settings, string SettingsHash, RandomEntryView RandomEntry, bool Capped, string Basis, IReadOnlyList<string> Notes, PlaceboSetView? Placebos = null, MirrorView? Mirror = null, PlateauView? Plateau = null);

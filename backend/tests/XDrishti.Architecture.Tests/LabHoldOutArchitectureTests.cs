@@ -43,12 +43,23 @@ public sealed class LabHoldOutArchitectureTests
         string[] holdOut = ["XDrishti.Application.Lab.IHoldOutPass", "XDrishti.Application.Lab.HoldOutPass", "XDrishti.Application.Lab.HoldOutUnlocker", "XDrishti.Application.Lab.LabHoldOutGuard", "XDrishti.Application.Abstractions.Lab.IHoldOutStore", "XDrishti.Application.Abstractions.Lab.HoldOutBlock"];
 
         // CF-07: the null reads the window of the run only (the development window); nothing in it can reach the block
-        Types.InAssembly(Application).That().HaveName("LabNulls").Or().HaveName("RunNullWalkQuery").Or().HaveName("IRandomEntryEngine").Or().HaveName("LabPlacebos").Or().HaveName("RunPlaceboWalkQuery").Or().HaveName("IPlaceboEngine").Should().NotHaveDependencyOnAny(holdOut).GetResult().IsSuccessful.ShouldBeTrue();
+        Types.InAssembly(Application).That().HaveName("LabNulls").Or().HaveName("RunNullWalkQuery").Or().HaveName("IRandomEntryEngine").Or().HaveName("LabPlacebos").Or().HaveName("RunPlaceboWalkQuery").Or().HaveName("IPlaceboEngine").Or().HaveName("LabPlateau").Should().NotHaveDependencyOnAny(holdOut).GetResult().IsSuccessful.ShouldBeTrue();
 
         var simulation = typeof(XDrishti.Simulation.Replay.RandomEntryWalker).Assembly;
         string[] banned = ["System.IO", "System.Net", "Npgsql", "Microsoft.EntityFrameworkCore", "System.TimeProvider", "System.Random", "XDrishti.Application", "XDrishti.Infrastructure"];
         var walk = Types.InAssembly(simulation).That().HaveName("RandomEntryWalker").Or().HaveName("EntryOverride").Or().HaveName("PlaceboWalker").Should().NotHaveDependencyOnAny(banned).GetResult();
         walk.IsSuccessful.ShouldBeTrue(string.Join(", ", walk.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void The_plateau_gate_reads_the_stored_sweep_only_it_depends_on_no_port_no_simulation_and_no_store()
+    {
+        // CF-07 part C (ADR 0210): no new simulation and no new look; the gate is a pure reading of the sweep the robustness stage already stored
+        string[] banned = ["XDrishti.Application.Abstractions", "XDrishti.Application.Research", "XDrishti.Infrastructure", "XDrishti.Simulation", "System.IO", "System.Net", "System.TimeProvider", "System.Random"];
+
+        var result = Types.InAssembly(Application).That().HaveName("LabPlateau").Should().NotHaveDependencyOnAny(banned).GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(string.Join(", ", result.FailingTypeNames ?? []));
     }
 
     [Fact]

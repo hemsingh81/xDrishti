@@ -14560,7 +14560,7 @@ export interface components {
     };
     /**
      * @description The chance tests of a Lab verdict (CF-07, ADRs 0208 and 0209), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a null, a placebo set or a mirror gate that is not a pass caps a PASS at MARGINAL and never raises an outcome.
-     *     The plateau gate of the spec is not built yet and has no field here.
+     *     The plateau gate on parameters (CF-07 part C, ADR 0210) sits in the same block as `Plateau`, with a mode and an enforce switch of its own.
      */
     NullsView: {
       /** @description The mode when it was computed. */
@@ -14581,6 +14581,7 @@ export interface components {
       notes: string[];
       placebos?: null | components['schemas']['PlaceboSetView'];
       mirror?: null | components['schemas']['MirrorView'];
+      plateau?: null | components['schemas']['PlateauView'];
     };
     /** @description The comparison of the derived daily bar with the broker's official daily candle: not available until official daily candles are fetched. */
     OfficialDailyCheck: {
@@ -16337,6 +16338,135 @@ export interface components {
       minTickets: number;
       /** @description The basis and the limits. */
       evidence: components['schemas']['PlanVsActualEvidenceView'];
+    };
+    /**
+     * @description The plateau reading of one swept parameter (CF-07, D4): the two points next to the declared value must each keep the retention of the base and the median over the valid points must be above 0. string PlateauParameterView.Reading is `plateau`, `spike`,
+     *     `no_base_edge` or `inconclusive`; string PlateauParameterView.Status is `pass`, `fail` or `unavailable`. The centre is reported, never applied.
+     */
+    PlateauParameterView: {
+      /** @description The parameter name. */
+      param: string;
+      /**
+       * Format: double
+       * @description The declared value.
+       */
+      declared: number;
+      /**
+       * Format: int32
+       * @description Valid points, the declared value included.
+       */
+      validPoints: number;
+      /**
+       * Format: double
+       * @description Net expectancy at the declared value.
+       */
+      baseMeanR: null | number;
+      /**
+       * Format: double
+       * @description The swept value just below the declared one.
+       */
+      lowerValue: null | number;
+      /**
+       * Format: double
+       * @description Its mean over the base mean.
+       */
+      lowerRetention: null | number;
+      /**
+       * Format: double
+       * @description The swept value just above the declared one.
+       */
+      upperValue: null | number;
+      /**
+       * Format: double
+       * @description Its mean over the base mean.
+       */
+      upperRetention: null | number;
+      /**
+       * Format: double
+       * @description Median net expectancy over the valid points.
+       */
+      median: null | number;
+      /**
+       * Format: double
+       * @description The value maximizing the mean of itself and its two neighbours.
+       */
+      centreValue: null | number;
+      /**
+       * Format: double
+       * @description That smoothed mean.
+       */
+      centreMeanR: null | number;
+      /** @description plateau, spike, no_base_edge or inconclusive. */
+      reading: string;
+      /** @description pass, fail or unavailable. */
+      status: string;
+      /** @description One sentence for the reading. */
+      reason: string;
+      /** @description All points in value order. */
+      points: components['schemas']['PlateauPointView'][];
+    };
+    /** @description One point of a parameter's curve in the plateau gate (CF-07, D4): the declared value is marked. */
+    PlateauPointView: {
+      /**
+       * Format: double
+       * @description The parameter value.
+       */
+      value: number;
+      /** @description True for the value the strategy declares (the base run). */
+      declared: boolean;
+      /**
+       * Format: int32
+       * @description Trades of its in-sample run.
+       */
+      trades: number;
+      /**
+       * Format: double
+       * @description Net expectancy of the run; null when it gave no trade or was refused.
+       */
+      meanR: null | number;
+      /**
+       * Format: double
+       * @description Its mean over the base mean; null when either cannot be read or the base is not above 0.
+       */
+      retention: null | number;
+      /** @description Why the engine refused the run; null otherwise. */
+      error: null | string;
+    };
+    /**
+     * @description The plateau gate of a Lab verdict (CF-07 part C, ADR 0210), read from the stored points of the in-sample sweep (no new simulation): string PlateauView.Status is `pass` only when every swept parameter sits on a plateau, `fail` when one does not, and
+     *     `unavailable` (never a pass) when one has no reading or the strategy sweeps none. Report-only beside PASS/MARGINAL/FAIL unless the owner turns `Plateau:Enforce` on.
+     */
+    PlateauView: {
+      /** @description The mode when it was computed. */
+      mode: string;
+      /** @description Whether the gate could cap the outcome. */
+      enforce: boolean;
+      /** @description The text of the settings that produced the figures. */
+      settings: string;
+      /** @description SHA-256 of Settings. */
+      settingsHash: string;
+      /**
+       * Format: double
+       * @description The share of the base each neighbour must keep (the threshold).
+       */
+      retention: number;
+      /**
+       * Format: int32
+       * @description The fewest valid points of a parameter for a reading.
+       */
+      minPoints: number;
+      /** @description How a neighbour's retention is read against the threshold (`&gt;=`). */
+      comparison: string;
+      /** @description pass, fail or unavailable. */
+      status: string;
+      /** @description One sentence for the reading. */
+      reason: string;
+      /** @description True when the outcome was capped at MARGINAL by the enforced gate. */
+      capped: boolean;
+      /** @description What the figure is made over: the in-sample sweep, its window and the exit. */
+      basis: string;
+      /** @description One reading per swept parameter. */
+      parameters: components['schemas']['PlateauParameterView'][];
     };
     /** @description A pooled out-of-sample figure: the number of trades and the mean and score as states (a number only for a value). */
     PooledFigureView: {

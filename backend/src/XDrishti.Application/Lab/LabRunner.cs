@@ -40,7 +40,8 @@ internal sealed class LabRunner(
     HoldOutOptions? holdOutOptions = null,
     LabHoldOutGuard? holdOutGuard = null,
     HoldOutUnlocker? unlocker = null,
-    LabNulls? nulls = null) : ILabRunExecutor
+    LabNulls? nulls = null,
+    LabPlateau? plateau = null) : ILabRunExecutor
 {
     /// <summary>Who is recorded as the author of a stored run.</summary>
     public const string Actor = "lab:quick";
@@ -236,6 +237,7 @@ internal sealed class LabRunner(
         var lastStage = FullTest;
         DelaySignals? delay = null;
         NullsOutcome? nullsOutcome = null;
+        PlateauView? plateauView = null;
         if (string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal))
         {
             ownerToken.ThrowIfCancellationRequested();
@@ -266,6 +268,13 @@ internal sealed class LabRunner(
                 watch.Set(Nulls, nullSteps);
                 await BeginAsync(run, log, Nulls, 0, nullSteps, throttle, ownerToken);
                 nullsOutcome = await nulls.RunAsync(run, time.GetUtcNow(), template, full, developmentEnd, holdOutKept, counter, ownerToken);
+
+                // CF-07 part C: the plateau gate reads the sweep just stored in the robustness block (no simulation, no ledger row), and travels in the same block
+                if (plateau is { IsOn: true })
+                {
+                    plateauView = plateau.Read(description.Parameters, plan.Parameters, robust.Value.View.Sensitivity, developmentEnd, template.To);
+                }
+
                 lastStage = Nulls;
             }
         }
@@ -280,7 +289,8 @@ internal sealed class LabRunner(
         // CF-07: the random-entry null beside the outcome; the outcome moves only if the owner has turned Enforce on, and the family-level nulls (the random-entry null and the placebo set) are one more look each in the ledger (written with the sweep rows below)
         if (nullsOutcome is not null && nulls is not null)
         {
-            verdict = nulls.Apply(verdict, nullsOutcome.View);
+            verdict = nulls.Apply(verdict, plateauView is null ? nullsOutcome.View : nullsOutcome.View with { Plateau = plateauView });
+            verdict = plateau?.Apply(verdict) ?? verdict;
             sweepRows.AddRange(nullsOutcome.Rows);
         }
 
