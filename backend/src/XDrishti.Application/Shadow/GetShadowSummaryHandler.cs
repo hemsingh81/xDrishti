@@ -18,7 +18,7 @@ internal sealed class GetShadowSummaryHandler(
     IShadowResultReader reader,
     IPaperLedgerData ledger,
     IBacktestPaperData paperData,
-    ICostConfirmationFact costs) : IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView>
+    ICostConfirmationFact confirmation) : IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView>
 {
     private const int TargetEffectiveN = 60;
 
@@ -50,9 +50,9 @@ internal sealed class GetShadowSummaryHandler(
         var eta = pace.EtaSessions(TargetEffectiveN);
 
         // The figure and the label agree: net R only when every graded trade is net and every sheet is confirmed as the owner's, otherwise the gross R (before charges) of the same trades.
-        var costs = await CostsAsync(graded, cancellationToken);
-        var figures = graded.Select(r => costs.Gross ? GrossOf(r) : r.RSim).OfType<double>().ToList();
-        var byGroup = graded.Where(r => (costs.Gross ? GrossOf(r) : r.RSim) is not null).ToLookup(r => r.TicketGroup, r => (costs.Gross ? GrossOf(r) : r.RSim)!.Value);
+        var costs = await ShadowCostBasis.ReadAsync(graded, confirmation, cancellationToken);
+        var figures = graded.Select(r => ShadowCostBasis.Figure(r, costs)).OfType<double>().ToList();
+        var byGroup = graded.Where(r => ShadowCostBasis.Figure(r, costs) is not null).ToLookup(r => r.TicketGroup, r => ShadowCostBasis.Figure(r, costs)!.Value);
 
         var counts = new ShadowCountsView(
             behavioural, edge.RawN, edge.EffectiveN, rows.Count, edgeRows.Count, edgeRows.Count(r => r.Status == "pending"), edgeRows.Count(r => r.Status == "not_triggered"), edgeRows.Count(r => r.Status == "not_gradable"));
@@ -66,9 +66,6 @@ internal sealed class GetShadowSummaryHandler(
             enabled, rows.Count > 0, rows.Count > 0 ? null : NoRows(enabled), ShadowWording.ModelledFills, ShadowWording.SeparateCount, counts, edgeView, groups, costs,
             new ShadowChainView(chain.Sessions, chain.Gaps, chain.LastSession, chain.LastDigest));
     }
-
-    /// <summary>The R before charges of a graded row; a gross-basis row's own R when the stored gross figure is missing, else none.</summary>
-    private static double? GrossOf(ShadowResultRow row) => row.RGross ?? (row.RBasis == "gross" ? row.RSim : null);
 
     private static string NoRows(bool enabled) =>
         enabled
@@ -112,36 +109,5 @@ internal sealed class GetShadowSummaryHandler(
 
         var (low, high) = BacktestBand.PaperInterval(r, Draws, SeedBase + (ulong)n);
         return new ShadowGroupView(name, n, new MetricView("value", mean, null), new MetricView("value", low, null), new MetricView("value", high, null), new MetricView("value", hit, null));
-    }
-
-    private async ValueTask<ShadowCostView> CostsAsync(List<ShadowResultRow> graded, CancellationToken cancellationToken)
-    {
-        var sheets = graded.Select(r => r.SheetId).OfType<string>().Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
-        if (graded.Count == 0)
-        {
-            return new ShadowCostView("none yet: no shadow trade is graded", true, [], false);
-        }
-
-        var allNet = graded.All(r => r.RBasis == "net");
-        if (!allNet)
-        {
-            return new ShadowCostView(graded.All(r => r.RBasis == "gross") ? "gross, no charges" : "gross, before charges: some trades carry a charge sheet's charges and the rest are gross; the gross R of each is shown", true, sheets, false);
-        }
-
-        if (sheets.Count == 0)
-        {
-            return new ShadowCostView("gross, before charges: a net grade names no charge sheet, so the gross R is shown", true, sheets, false);
-        }
-
-        var confirmed = true;
-        foreach (var id in sheets)
-        {
-            confirmed &= await costs.ConfirmedOnAsync(id, cancellationToken) is not null;
-        }
-
-        var list = string.Join(", ", sheets);
-        return confirmed
-            ? new ShadowCostView("net of the charge sheet " + list + ", confirmed as the owner's", false, sheets, true)
-            : new ShadowCostView("gross, before charges: the stored charge sheet " + list + " is not confirmed as the owner's, so the figures are the gross R of each trade and are not called net (P10-00 D5)", true, sheets, false);
     }
 }

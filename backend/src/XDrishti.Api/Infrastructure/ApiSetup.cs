@@ -119,6 +119,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, PaperGovernanceEndpoints>();
         services.AddSingleton<IEndpointModule, PaperReviewEndpoints>();
         services.AddSingleton<IEndpointModule, PaperCompareEndpoints>(); // backtest versus paper (P10-04): one GET, computed on read
+        services.AddSingleton<IEndpointModule, PaperSequentialEndpoints>(); // the sequential failure test of the paper edge series (CF-09): a flag, never a pass, read only
         services.AddSingleton<IEndpointModule, PaperShadowEndpoints>(); // the shadow record summary and the owner's switch (CF-08 part B): fresh password per change, insert-only
         services.AddSingleton<IEndpointModule, PaperPhaseCheckEndpoints>(); // the paper phase check (P10-06): one GET, computed on read
         services.AddSingleton<IEndpointModule, TicketAlertsEndpoints>(); // price-crossing alerts and prompts on the plan screen (P7-20); preferences only, no order
@@ -192,6 +193,7 @@ internal static class ApiSetup
             .Validate(s => s.ToNullOptions().Problems().Count == 0, "Confidence:Nulls: a value is out of range (Mode Off or ReportOnly and not Enforce with Mode Off, Draws 200..5000, Percentile 90..99, Redraws 0..20, MinPlacebos 19..20).")
             .Validate(s => s.ToPlateauOptions().Problems().Count == 0, "Confidence:Plateau: a value is out of range (Mode Off or ReportOnly and not Enforce with Mode Off, Retention 0.50..0.95, MinPoints 3..5).")
             .Validate(s => !s.PlateauEnforcedWithoutNulls(), "Confidence:Plateau:Enforce needs Confidence:Nulls:Mode ReportOnly (the plateau gate is computed inside the nulls stage; with Nulls:Mode Off nothing is computed to enforce).")
+            .Validate(s => s.ToSequentialOptions().Problems().Count == 0, "Confidence:Sequential: a value is out of range (Mu1 above 0 up to 2, Sigma 0.5..5, Alpha above 0 up to 0.2, BetaCaution above 0 up to 0.5 with (1 - BetaCaution) / Alpha above 1, BetaFail above 0 and below BetaCaution, SigmaFromN 5..200).")
             .ValidateOnStart();
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToShrinkageOptions()));
@@ -200,6 +202,7 @@ internal static class ApiSetup
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToCostStressOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToNullOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToPlateauOptions()));
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToSequentialOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToRegistrationOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToHoldOutOptions()));
     }

@@ -58,7 +58,7 @@ public sealed class ShadowArchitectureTests
             .Select(t => t.Name.Split('`')[0]).Where(n => !n.StartsWith('<')).Distinct().ToList();
 
         storeUsers.ShouldBe(["VerifyShadowChainHandler", "WriteShadowHandler"]); // the chain check only reads
-        readerUsers.ShouldBe(["GetShadowSummaryHandler"], "the one display use case of the Api; no Planning, Selection or Autonomy type names the port (above)");
+        readerUsers.Order(StringComparer.Ordinal).ToList().ShouldBe(["GetSequentialStatusHandler", "GetShadowSummaryHandler"], "the two display use cases of the Api (the summary, CF-08; the sequential failure test, CF-09); no Planning, Selection or Autonomy type names the port (above)");
         gradeStoreUsers.ShouldBe(["GradeShadowHandler"]);
     }
 

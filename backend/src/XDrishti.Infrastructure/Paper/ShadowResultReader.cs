@@ -9,7 +9,7 @@ internal sealed class ShadowResultReader(NpgsqlDataSource dataSource) : IShadowR
     public async ValueTask<IReadOnlyList<ShadowResultRow>> ResultsAsync(CancellationToken cancellationToken)
     {
         await using var select = dataSource.CreateCommand("""
-            SELECT e.session_date, e.trade_key, e.ticket_group, e.counts_for_edge, COALESCE(g.status, 'pending'), g.r_sim, g.r_basis, g.sheet_id, g.r_gross
+            SELECT e.session_date, e.trade_key, e.ticket_group, e.counts_for_edge, COALESCE(g.status, 'pending'), g.r_sim, g.r_basis, g.sheet_id, g.r_gross, e.edge_epoch
             FROM paper.shadow_entries e
             LEFT JOIN paper.shadow_grades g ON g.entry_id = e.id
             ORDER BY e.session_date, e.id
@@ -20,7 +20,7 @@ internal sealed class ShadowResultReader(NpgsqlDataSource dataSource) : IShadowR
         {
             result.Add(new ShadowResultRow(
                 DateOnly.FromDateTime(reader.GetDateTime(0)), reader.GetString(1), reader.GetString(2), reader.GetBoolean(3), reader.GetString(4),
-                reader.IsDBNull(5) ? null : reader.GetDouble(5), reader.IsDBNull(6) ? null : reader.GetString(6), reader.IsDBNull(7) ? null : reader.GetString(7), reader.IsDBNull(8) ? null : reader.GetDouble(8)));
+                reader.IsDBNull(5) ? null : reader.GetDouble(5), reader.IsDBNull(6) ? null : reader.GetString(6), reader.IsDBNull(7) ? null : reader.GetString(7), reader.IsDBNull(8) ? null : reader.GetDouble(8), reader.IsDBNull(9) ? null : reader.GetInt64(9)));
         }
 
         return result;

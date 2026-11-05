@@ -711,6 +711,7 @@ public static class DependencyInjection
         services.TryAddSingleton(new CostStressOptions()); // the cost stress gates and the delay test of a Lab verdict (CF-05, ADR 0206): ReportOnly, Enforce off; the host replaces it with its configuration (section Confidence:CostStress)
         services.TryAddSingleton(new NullOptions()); // the random-entry null of a robust Lab run (CF-07, ADR 0208): ReportOnly, Enforce off; the host replaces it with its configuration (section Confidence:Nulls)
         services.TryAddSingleton(new PlateauOptions()); // the plateau gate on the swept parameters (CF-07 part C, ADR 0210): ReportOnly, Enforce off; the host replaces it with its configuration (section Confidence:Plateau)
+        services.TryAddSingleton(new SequentialOptions()); // the sequential failure test of the paper edge series (CF-09, ADR 0213): flags only, no mode; the host replaces it with its configuration (section Confidence:Sequential)
         services.TryAddSingleton(new RegistrationOptions()); // pre-registration and the honest count of looks (CF-06, ADR 0207): enforcement and CountInFactor off; the host replaces it with its configuration (section Confidence:Registration)
         services.TryAddSingleton(new HoldOutOptions()); // the locked hold-out (CF-06, ADR 0207): enforcement and AutoUnlock off; the host replaces it with its configuration (section Confidence:HoldOut)
         services.TryAddSingleton(new ConfidenceOptions()); // effective n, power, minimum track record (CF-01, ADR 0203): ReportOnly; the host replaces it with its configuration (section Confidence)
@@ -939,6 +940,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>, WriteShadowHandler>(); // the shadow record: forward-only, insert-only, switch OFF by default, no order (CF-08)
         services.AddScoped<ICommandHandler<GradeShadowCommand, ShadowGradeOutcome>, GradeShadowHandler>(); // grades the shadow record through the one replay path, insert-only (CF-08 part B)
         services.AddScoped<IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView>, GetShadowSummaryHandler>(); // the shadow summary: raw and effective n, labelled gross unless the sheet is confirmed (CF-08 part B)
+        services.AddScoped<IQueryHandler<GetSequentialStatusQuery, Result<SequentialStatusView>>, GetSequentialStatusHandler>(); // the sequential failure test: flags only, never a pass, derived on request (CF-09)
         services.AddScoped<IQueryHandler<VerifyShadowChainQuery, ShadowChainCheckView>, VerifyShadowChainHandler>(); // recomputes the digest chain from the stored rows (CF-08 part B)
         services.AddScoped<ICommandHandler<ChangeShadowSwitchCommand, ShadowSwitched>, ChangeShadowSwitchHandler>(); // the owner's switch, behind a fresh password in the endpoint (CF-08 part B)
         services.AddScoped<IQueryHandler<ListPaperEntriesQuery, Result<PaperEntryList>>, ListPaperEntriesHandler>();

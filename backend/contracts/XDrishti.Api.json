@@ -12163,6 +12163,63 @@
         }
       }
     },
+    "/api/paper/sequential": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The sequential failure test of the paper edge series (graded shadow trades that count for edge, current paper epoch, in session then trade-key order) with the P10 behavioural series beside it: state (monitoring, on_track, caution or failure; failure is latched for the epoch), running sum, boundaries and odds, trades counted, effective n, first crossing, the correlation used, the settings hash and a path summary. scope=system (default) or scope=strategy with strategy=<id>. A flag only: report only, never a pass; the fixed P10 gates still decide a pass. Gaussian model, modelled fills. Read only; no order exists. 404 paper.not_found when no shadow edge candidate exists in the scope, 400 paper.invalid",
+        "operationId": "GetPaperSequentialStatus",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SequentialStatusView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/paper/shadow/summary": {
       "get": {
         "tags": [
@@ -55713,6 +55770,259 @@
           }
         },
         "description": "The parameter sensitivity (spec P5-05): the exit and timeframe every point used, the base and the parameters."
+      },
+      "SequentialBoundariesView": {
+        "required": [
+          "caution",
+          "failure",
+          "onTrack",
+          "cautionOdds",
+          "failureOdds"
+        ],
+        "type": "object",
+        "properties": {
+          "caution": {
+            "type": "number",
+            "description": "The caution boundary.",
+            "format": "double"
+          },
+          "failure": {
+            "type": "number",
+            "description": "The failure boundary.",
+            "format": "double"
+          },
+          "onTrack": {
+            "type": "number",
+            "description": "The level the sum is reflected at; a label, never a pass.",
+            "format": "double"
+          },
+          "cautionOdds": {
+            "type": "number",
+            "description": "The evidence ratio at the caution boundary.",
+            "format": "double"
+          },
+          "failureOdds": {
+            "type": "number",
+            "description": "The evidence ratio at the failure boundary.",
+            "format": "double"
+          }
+        },
+        "description": "The boundaries of the test, computed from the settings (never stored)."
+      },
+      "SequentialPathView": {
+        "required": [
+          "lowest",
+          "lowestAtTrade",
+          "sigmaUsed"
+        ],
+        "type": "object",
+        "properties": {
+          "lowest": {
+            "type": "number",
+            "description": "The lowest sum of the path.",
+            "format": "double"
+          },
+          "lowestAtTrade": {
+            "type": "integer",
+            "description": "The 1-based trade of the lowest sum; 0 with no trade.",
+            "format": "int32"
+          },
+          "sigmaUsed": {
+            "type": "number",
+            "description": "The sigma of the last step.",
+            "format": "double"
+          }
+        },
+        "description": "A short summary of the sum path (the whole path is not sent)."
+      },
+      "SequentialSeriesView": {
+        "required": [
+          "basis",
+          "note",
+          "state",
+          "stateText",
+          "sum",
+          "tradesCounted",
+          "effectiveN",
+          "firstCautionTrade",
+          "firstCautionDate",
+          "firstFailureTrade",
+          "firstFailureDate",
+          "heldBackTrades",
+          "heldBackFromSession",
+          "path"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "What the R is: gross or net, and whose fills."
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the reader should know about the series: why there is nothing to test (no epoch, no graded trade), which session holds trades back, how many graded trades have no gross figure; null when there is nothing to say."
+          },
+          "state": {
+            "type": "string",
+            "description": "`monitoring`, `on_track`, `caution` or `failure`. None of them is a pass."
+          },
+          "stateText": {
+            "type": "string",
+            "description": "The words of the state."
+          },
+          "sum": {
+            "type": "number",
+            "description": "The running sum now.",
+            "format": "double"
+          },
+          "tradesCounted": {
+            "type": "integer",
+            "description": "Trades in the series.",
+            "format": "int32"
+          },
+          "effectiveN": {
+            "type": "number",
+            "description": "The trades over the design effect of their days.",
+            "format": "double"
+          },
+          "firstCautionTrade": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The 1-based number of the first trade at or below the caution boundary; null when never.",
+            "format": "int32"
+          },
+          "firstCautionDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Its day; null when never.",
+            "format": "date"
+          },
+          "firstFailureTrade": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The 1-based number of the first trade at or below the failure boundary; null when never.",
+            "format": "int32"
+          },
+          "firstFailureDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Its day; null when never.",
+            "format": "date"
+          },
+          "heldBackTrades": {
+            "type": "integer",
+            "description": "Graded trades not in the series because an earlier session still has a candidate without a grade (the test runs only over the complete sessions from the start of the epoch, so a late grade can only add to the end and never rewrite a shown path); 0 for the behavioural series.",
+            "format": "int32"
+          },
+          "heldBackFromSession": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The first session with a candidate still without a grade, where the series stops (it may never be graded: a replay can wait or fail for good); null when the series is complete.",
+            "format": "date"
+          },
+          "path": {
+            "description": "The path summary.",
+            "$ref": "#/components/schemas/SequentialPathView"
+          }
+        },
+        "description": "One series run through the test."
+      },
+      "SequentialStatusView": {
+        "required": [
+          "scope",
+          "strategy",
+          "epoch",
+          "hasSeries",
+          "boundaries",
+          "rho",
+          "rhoIsPlaceholder",
+          "settingsHash",
+          "settings",
+          "edge",
+          "behavioural",
+          "statements",
+          "line"
+        ],
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "description": "`system` or `strategy`."
+          },
+          "strategy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The strategy of a `strategy` scope."
+          },
+          "epoch": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The paper epoch both series are read for (the current one); null when there is none.",
+            "format": "int64"
+          },
+          "hasSeries": {
+            "type": "boolean",
+            "description": "Whether any shadow edge candidate of the epoch exists in the scope (the endpoint answers 404 when not)."
+          },
+          "boundaries": {
+            "description": "The boundaries.",
+            "$ref": "#/components/schemas/SequentialBoundariesView"
+          },
+          "rho": {
+            "type": "number",
+            "description": "The same-day correlation used.",
+            "format": "double"
+          },
+          "rhoIsPlaceholder": {
+            "type": "boolean",
+            "description": "Whether it is the placeholder until CF-01 estimates it."
+          },
+          "settingsHash": {
+            "type": "string",
+            "description": "The SHA-256 of the settings that produced the figures."
+          },
+          "settings": {
+            "type": "string",
+            "description": "The text of those settings."
+          },
+          "edge": {
+            "description": "The edge series (graded shadow trades that count for edge); the primary reading.",
+            "$ref": "#/components/schemas/SequentialSeriesView"
+          },
+          "behavioural": {
+            "description": "The P10 counted trades of the epoch, run through the same test, beside it.",
+            "$ref": "#/components/schemas/SequentialSeriesView"
+          },
+          "statements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honesty sentences: the model, the odds, the indifference point, the same-day discount, that the fixed gates decide."
+          },
+          "line": {
+            "type": "string",
+            "description": "One line for the report beside the P10 phase check."
+          }
+        },
+        "description": "The sequential failure test (spec CF-09): the edge series of the shadow record with the P10 behavioural series beside it. A flag only."
       },
       "ServiceIssueView": {
         "required": [

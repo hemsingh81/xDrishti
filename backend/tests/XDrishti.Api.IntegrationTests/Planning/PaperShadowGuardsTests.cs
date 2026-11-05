@@ -295,4 +295,30 @@ public sealed class PaperShadowGuardsTests(ResearchGrantsTests.DedicatedServer s
 
         (await InstantAsync("SELECT graded_at FROM paper.shadow_grades")).ShouldBe(Utc(2026, 11, 11, 11, 0));
     }
+
+    [Fact]
+    public async Task The_result_reader_hands_over_the_epoch_a_candidate_was_written_in_and_its_grade_for_the_sequential_test()
+    {
+        // CF-09: the sequential test reads the current epoch's rows only, so the reader must return the stored edge epoch (null when there was none)
+        var session = new DateOnly(2026, 11, 12);
+        var (plan, items) = await PlanAsync(session, Utc(2026, 11, 11, 15, 40), 3);
+        await SetClockAsync(Utc(2026, 11, 12, 2, 0));
+        (await SessionAsync(session, rows: 3)).ShouldBeNull();
+        for (var i = 0; i < 3; i++)
+        {
+            (await EntryAsync(session, plan, items[i], "ORB|s" + i + "|Buy|2026-11-12")).ShouldBeNull();
+        }
+
+        await StoreKit.ExecuteAsync(server.Owner, "UPDATE paper.shadow_entries SET edge_epoch = 4 WHERE trade_key <> 'ORB|s2|Buy|2026-11-12'", Ct);
+        await SetClockAsync(Utc(2026, 11, 12, 11, 0));
+        var first = await ScalarAsync<long>(server.Owner, "SELECT id FROM paper.shadow_entries WHERE trade_key = 'ORB|s0|Buy|2026-11-12'");
+        (await SqlStateAsync("INSERT INTO paper.shadow_grades (entry_id, status, r_sim, r_basis, engine_version, graded_at) VALUES (@e, 'graded', -1.0, 'gross', 'sim-6', '2000-01-01')", ("e", first))).ShouldBeNull();
+        await using var source = NpgsqlDataSource.Create(server.App);
+
+        var rows = await new XDrishti.Infrastructure.Paper.ShadowResultReader(source).ResultsAsync(Ct);
+
+        rows.Select(r => (r.TradeKey, r.EdgeEpoch, r.Status)).ShouldBe(
+            [("ORB|s0|Buy|2026-11-12", 4L, "graded"), ("ORB|s1|Buy|2026-11-12", 4L, "pending"), ("ORB|s2|Buy|2026-11-12", null, "pending")], ignoreOrder: true);
+        rows.Single(r => r.Status == "graded").RSim.ShouldBe(-1.0);
+    }
 }

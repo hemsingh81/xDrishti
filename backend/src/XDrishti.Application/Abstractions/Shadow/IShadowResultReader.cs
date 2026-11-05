@@ -10,7 +10,8 @@ namespace XDrishti.Application.Abstractions.Shadow;
 /// <param name="RBasis"><c>net</c> or <c>gross</c>, or null while not graded.</param>
 /// <param name="SheetId">The charge sheet that charged a net grade, or null.</param>
 /// <param name="RGross">The same trade's R before charges (the replay's filled R), or null while not graded.</param>
-public sealed record ShadowResultRow(DateOnly SessionDate, string TradeKey, string TicketGroup, bool CountsForEdge, string Status, double? RSim, string? RBasis, string? SheetId, double? RGross);
+/// <param name="EdgeEpoch">The paper epoch in force when the candidate was written, or null when there was none (spec CF-09 reads the current epoch's rows only).</param>
+public sealed record ShadowResultRow(DateOnly SessionDate, string TradeKey, string TicketGroup, bool CountsForEdge, string Status, double? RSim, string? RBasis, string? SheetId, double? RGross, long? EdgeEpoch = null);
 
 /// <summary>The size and head of the chain, for the summary.</summary>
 /// <param name="Sessions">Stored sessions, ok and gap.</param>
