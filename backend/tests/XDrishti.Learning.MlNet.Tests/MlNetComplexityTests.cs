@@ -39,4 +39,18 @@ public sealed class MlNetComplexityTests
         on.Verdicts.Select(v => (v.Name, v.Outcome, v.FoldsBeatingBoth, v.PooledBeatsBoth, v.PooledEcePp, string.Join('|', v.Reasons)))
             .ShouldBe(off.Verdicts.Select(v => (v.Name, v.Outcome, v.FoldsBeatingBoth, v.PooledBeatsBoth, v.PooledEcePp, string.Join('|', v.Reasons))));
     }
+
+    [Fact]
+    public void With_the_paired_bootstrap_the_real_model_gets_a_probability_and_still_cannot_read_earned_the_trainer_is_not_rung_4()
+    {
+        var rows = SyntheticRows.Make(1000, learnable: true);
+
+        var report = WalkForwardValidator.Compare(rows, [new MlNetScorerFactory()], new ValidationOptions(Ladder: new LadderOptions(), Paired: new PairedBootstrapOptions())).Value;
+        var model = report.Complexity.ShouldNotBeNull().Ladder.Single(a => a.Scorer == "meta_model");
+
+        model.ProbabilityBeatsBelow.ShouldNotBeNull();
+        model.Earned.ShouldBeFalse();
+        model.Reasons.ShouldContain(r => r.Contains("no monotone constraints", StringComparison.Ordinal));
+        report.Complexity.Paired.ShouldNotBeNull().Select(p => p.Scorer).ShouldBe(["logistic", "meta_model"]);
+    }
 }

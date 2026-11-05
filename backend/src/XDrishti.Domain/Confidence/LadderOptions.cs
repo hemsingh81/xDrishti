@@ -11,7 +11,7 @@ namespace XDrishti.Domain.Confidence;
 /// <param name="Epv">Events per variable (default 15; the literature range is 10 to 20): a logistic model may have at most <c>floor(events / Epv)</c> features, where events are the smaller class.</param>
 /// <param name="MaxLogisticFeatures">The most features of a logistic model whatever the events (default 8).</param>
 /// <param name="MinTreeEvents">The fewest events for a tree model (default 100).</param>
-/// <param name="MinProbability">The probability that a rung beats the rung below that earns it (default 0.95); the figure itself comes from the paired bootstrap (part 10c) and is "unavailable" until then.</param>
+/// <param name="MinProbability">The probability that a rung beats the rung below that earns it (default 0.95); the figure itself comes from <c>PairedDayBootstrap</c> when <c>Confidence:PairedBootstrap</c> is on and is "not available" otherwise.</param>
 /// <param name="PsiWatch">The population stability index from which a feature is on watch (default 0.10).</param>
 /// <param name="PsiAlarm">The index above which a feature is in alarm (default 0.25).</param>
 /// <param name="PsiBins">Equal-mass bins of the index (default 10).</param>

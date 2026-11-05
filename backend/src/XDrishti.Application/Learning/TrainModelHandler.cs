@@ -26,7 +26,8 @@ internal sealed class TrainModelHandler(
     TimeProvider time,
     ILogger<TrainModelHandler> logger,
     IHoldOutStore? holdOuts = null,
-    LadderOptions? ladder = null) : ICommandHandler<TrainModelCommand, TrainModelOutcome>
+    LadderOptions? ladder = null,
+    PairedBootstrapOptions? paired = null) : ICommandHandler<TrainModelCommand, TrainModelOutcome>
 {
     public async ValueTask<Result<TrainModelOutcome>> HandleAsync(TrainModelCommand command, CancellationToken cancellationToken)
     {
@@ -77,6 +78,11 @@ internal sealed class TrainModelHandler(
         if (ladder is not null && validation.Ladder is null)
         {
             validation = validation with { Ladder = ladder }; // the complexity evidence of CF-10 part 10b: the report prints it, no verdict reads it, and it is not part of the parameter text that keys the model version
+        }
+
+        if (paired is not null && validation.Paired is null)
+        {
+            validation = validation with { Paired = paired }; // the paired bootstrap beside the ladder (CF-10 part 10c-1): the same rule, the report prints it and no verdict reads it
         }
 
         DateOnly? holdOutStart = null;

@@ -19,6 +19,7 @@ namespace XDrishti.Domain.Learning;
 /// <param name="EceDraws">Day-cluster bootstrap resamples of the pooled calibration error of each candidate (CF-10 part 10a, ADR 0214); 0 gives no interval (100 to 20000 otherwise). The interval only reports: no verdict reads it.</param>
 /// <param name="EceLevel">The coverage of that interval (0.90).</param>
 /// <param name="Ladder">When set and on, the report also shows the complexity ladder, the events-per-variable cap and the feature stability checks (CF-10 part 10b, ADR 0215); null shows none. It reports only: no verdict reads it.</param>
+/// <param name="Paired">When set and on (and the ladder is on), the ladder also gets the paired day-cluster bootstrap and the fold sign test of each rung against the rung below (CF-10 part 10c-1, ADR 0216); null gives none, and the ladder reads the probability as not available. It reports only: no verdict reads it.</param>
 /// <param name="HoldOutStart">When set, any row on or after this date is refused: the hold-out is not used in development.</param>
 public sealed record ValidationOptions(
     int MinTrainMonths = 9,
@@ -35,7 +36,8 @@ public sealed record ValidationOptions(
     DateOnly? HoldOutStart = null,
     int EceDraws = 1000,
     double EceLevel = 0.90,
-    LadderOptions? Ladder = null)
+    LadderOptions? Ladder = null,
+    PairedBootstrapOptions? Paired = null)
 {
     /// <summary>The fewest folds a verdict is worth; a model judged on fewer cannot be champion (<see cref="ChampionRule"/>).</summary>
     public const int DefaultMinFolds = 6;
@@ -107,6 +109,15 @@ public sealed record ValidationOptions(
         if (Ladder is not null)
         {
             problems.AddRange(Ladder.Problems());
+        }
+
+        if (Paired is not null)
+        {
+            problems.AddRange(Paired.Problems());
+            if (Ladder is { } l && Paired.PromisingFrom > l.MinProbability)
+            {
+                problems.Add("PairedBootstrap:PromisingFrom must not be above Ladder:MinProbability");
+            }
         }
 
         return problems;

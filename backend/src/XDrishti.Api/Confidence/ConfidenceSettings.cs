@@ -35,6 +35,8 @@ internal sealed class ConfidenceSettings
 
     public LadderSection Ladder { get; set; } = new();
 
+    public PairedBootstrapSection PairedBootstrap { get; set; } = new();
+
     public RegistrationSection Registration { get; set; } = new();
 
     public HoldOutSection HoldOut { get; set; } = new();
@@ -59,6 +61,9 @@ internal sealed class ConfidenceSettings
 
     /// <summary>The <c>Confidence:Ladder</c> subsection as the options of CF-10 part 10b (ADR 0215).</summary>
     internal LadderOptions ToLadderOptions() => new(Ladder.Mode, Ladder.Epv, Ladder.MaxLogisticFeatures, Ladder.MinTreeEvents, Ladder.MinProbability, Ladder.PsiWatch, Ladder.PsiAlarm, Ladder.PsiBins, Ladder.MinRows, Ladder.MaxFlipShare);
+
+    /// <summary>The <c>Confidence:PairedBootstrap</c> subsection as the options of CF-10 part 10c-1 (ADR 0216).</summary>
+    internal PairedBootstrapOptions ToPairedBootstrapOptions() => new(PairedBootstrap.Mode, PairedBootstrap.Draws, PairedBootstrap.Level, PairedBootstrap.MinDays, PairedBootstrap.PromisingFrom);
 
     /// <summary>Whether the plateau gate is enforced while the block it lives in (<c>Confidence:Nulls</c>) is computed at all: it is not computed with <c>Nulls:Mode</c> Off, so enforcing it then would cap nothing (ADR 0210).</summary>
     internal bool PlateauEnforcedWithoutNulls() => Plateau.Enforce && Nulls.Mode == ConfidenceMode.Off;
@@ -251,6 +256,19 @@ internal sealed class ConfidenceSettings
         public int MinRows { get; set; } = 30;
 
         public double MaxFlipShare { get; set; } = 1.0 / 3.0;
+    }
+
+    internal sealed class PairedBootstrapSection
+    {
+        public ConfidenceMode Mode { get; set; } = ConfidenceMode.ReportOnly;
+
+        public int Draws { get; set; } = 2000;
+
+        public double Level { get; set; } = 0.90;
+
+        public int MinDays { get; set; } = 10;
+
+        public double PromisingFrom { get; set; } = 0.90;
     }
 
     internal sealed class RegistrationSection

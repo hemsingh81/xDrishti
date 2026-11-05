@@ -17,6 +17,8 @@ namespace XDrishti.Domain.Learning;
 /// <param name="Stability">One entry per candidate.</param>
 /// <param name="Settings">The text of the settings that produced the figures (<c>LadderOptions.KeyText</c>).</param>
 /// <param name="PsiBins">The most bins of the stability index (fewer on small samples).</param>
+/// <param name="EffectiveRows">How many independent labels the training rows are worth (the sum of their average uniqueness, CF-10 part 10c-1), or null when it could not be computed.</param>
+/// <param name="Paired">The paired bootstrap and sign test of each scorer against the rung below (CF-10 part 10c-1); empty when the paired bootstrap is off.</param>
 public sealed record ComplexityReport(
     int TrainRows,
     int Wins,
@@ -27,7 +29,9 @@ public sealed record ComplexityReport(
     IReadOnlyList<FeatureShift> Shifts,
     IReadOnlyList<CandidateStability> Stability,
     string Settings,
-    int PsiBins)
+    int PsiBins,
+    double? EffectiveRows = null,
+    IReadOnlyList<RungComparison>? Paired = null)
 {
     private const int Listed = 8;
 
@@ -41,9 +45,15 @@ public sealed record ComplexityReport(
         var t = new StringBuilder();
         t.Append(c, $"complexity (evidence only, no verdict reads it); settings {Settings}\n");
         t.Append(c, $"  the last training set has {TrainRows} trades, {Events} events ({Wins} wins, {Losses} losses); a logistic model may have {Cap} features\n");
+        t.Append(c, $"  effective count of the last training set (overlapping labels counted once): {(EffectiveRows is { } e ? e.ToString("F1", c) : "not computed")} of {TrainRows}\n");
         foreach (var a in Ladder)
         {
             t.Append(c, $"  {a.Scorer,-12} rung {(int)a.Rung} {a.Rung}, {a.FeatureCount} features: {(a.Earned ? "earned" : "not earned - " + string.Join("; ", a.Reasons))}\n");
+        }
+
+        foreach (var p in Paired ?? [])
+        {
+            t.Append(c, $"  paired {p.Scorer} against {p.Below}: {(p.Bootstrap is { } b ? b.ToText(p.Reading) : "not available (" + p.Unavailable + ")")}; folds better {p.Sign.Better} of {p.Sign.Folds}{(p.Sign.Ties > 0 ? $" ({p.Sign.Ties} tied)" : string.Empty)}, sign test p {(p.Sign.PValue is { } v ? v.ToString("F4", c) : "n/a")}\n");
         }
 
         var alarm = Shifts.Where(s => s.Level == PsiLevel.Alarm).ToArray();

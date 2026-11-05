@@ -196,6 +196,8 @@ internal static class ApiSetup
             .Validate(s => s.ToSequentialOptions().Problems().Count == 0, "Confidence:Sequential: a value is out of range (Mu1 above 0 up to 2, Sigma 0.5..5, Alpha above 0 up to 0.2, BetaCaution above 0 up to 0.5 with (1 - BetaCaution) / Alpha above 1, BetaFail above 0 and below BetaCaution, SigmaFromN 5..200).")
             .Validate(s => s.ToCalibrationOptions().Problems().Count == 0, "Confidence:Calibration: a value is out of range (IsotonicMinRows 1..100000).")
             .Validate(s => s.ToLadderOptions().Problems().Count == 0, "Confidence:Ladder: a value is out of range (Mode Off or ReportOnly, Epv 5..50, MaxLogisticFeatures 1..50, MinTreeEvents 10..100000, MinProbability 0.50..0.999, PsiWatch above 0 and below PsiAlarm up to 5, PsiBins 2..100, MinRows 5..100000, MaxFlipShare above 0 and below 0.5).")
+            .Validate(s => s.ToPairedBootstrapOptions().Problems().Count == 0, "Confidence:PairedBootstrap: a value is out of range (Mode Off or ReportOnly, Draws 100..20000, Level above 0.50 and below 1, MinDays 2..1000, PromisingFrom 0.50..0.99).")
+            .Validate(s => new Domain.Learning.ValidationOptions(Ladder: s.ToLadderOptions(), Paired: s.ToPairedBootstrapOptions()).Problems().Count == 0, "Confidence:PairedBootstrap:PromisingFrom must not be above Confidence:Ladder:MinProbability (a probability between them reads promising, never pass).")
             .ValidateOnStart();
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToShrinkageOptions()));
@@ -207,6 +209,7 @@ internal static class ApiSetup
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToSequentialOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToCalibrationOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToLadderOptions()));
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToPairedBootstrapOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToRegistrationOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToHoldOutOptions()));
     }
