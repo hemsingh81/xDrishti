@@ -37,7 +37,7 @@ public sealed class TrainModelHandlerTests
 
     private IReadOnlyList<ValidationRow>? _trainedOn;
 
-    private TrainModelHandler Handler(bool created = true, LadderOptions? ladder = null)
+    private TrainModelHandler Handler(bool created = true, LadderOptions? ladder = null, PairedBootstrapOptions? paired = null)
     {
         _trainer.Candidate.Returns(new ConstantScorer());
         _trainer.Parameters.Returns("fake");
@@ -45,7 +45,7 @@ public sealed class TrainModelHandlerTests
             Result.Success(new TrainedModel([1, 2, 3], new string('e', 64), "FastTree", null, TradeFeatureCatalog.Names.Count, 30, 10, [0.0, 1.0], [0.4, 0.6], [.. Enumerable.Repeat(0.1, TradeFeatureCatalog.Names.Count)])));
         _files.WriteAsync(Arg.Any<string>(), Arg.Any<byte[]>(), Ct).Returns(Result.Success());
         _registry.RegisterAsync(Arg.Do<ModelToRegister>(m => _registered = m), Ct).Returns(new RegisteredModel(7, created));
-        return new TrainModelHandler(_runs, _features, _sets, _trainer, _files, _registry, new FakeTimeProvider(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero)), NullLogger<TrainModelHandler>.Instance, ladder: ladder);
+        return new TrainModelHandler(_runs, _features, _sets, _trainer, _files, _registry, new FakeTimeProvider(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero)), NullLogger<TrainModelHandler>.Instance, ladder: ladder, paired: paired);
     }
 
     private static StoredRunHeader Header() =>
@@ -119,6 +119,29 @@ public sealed class TrainModelHandlerTests
         withText.ShouldNotBe(withoutText);
         _registered.Parameters.ShouldBe(withoutParameters);
         with.Value.ModelId.ShouldBe(without.Value.ModelId);
+    }
+
+    [Fact]
+    public async Task The_paired_bootstrap_is_in_the_stored_report_only_when_the_setting_is_given_with_the_ladder_and_changes_no_verdict()
+    {
+        Run(60);
+
+        var ladderOnly = await Handler(ladder: new LadderOptions(MinRows: 5)).HandleAsync(Command(), Ct);
+        var ladderOnlyRegistered = _registered.ShouldNotBeNull();
+        var ladderOnlyText = ladderOnlyRegistered.ReportText;
+        var both = await Handler(ladder: new LadderOptions(MinRows: 5), paired: new PairedBootstrapOptions()).HandleAsync(Command(), Ct);
+        var bothRegistered = _registered.ShouldNotBeNull();
+        var bothText = bothRegistered.ReportText;
+        var pairedOnly = await Handler(paired: new PairedBootstrapOptions()).HandleAsync(Command(), Ct);
+
+        ladderOnlyText.ShouldNotContain("  paired logistic against");
+        bothText.ShouldContain("  paired logistic against cell_rate: ");
+        bothText.ShouldContain("effective count of the last training set");
+        bothRegistered.Parameters.ShouldBe(ladderOnlyRegistered.Parameters);
+        bothRegistered.Sha256.ShouldBe(ladderOnlyRegistered.Sha256);
+        both.Value.Verdict.ShouldBe(ladderOnly.Value.Verdict);
+        pairedOnly.IsSuccess.ShouldBeTrue(); // without the ladder the paired bootstrap has nowhere to show
+        _registered.ReportText.ShouldNotContain("complexity (evidence only");
     }
 
     [Fact]

@@ -134,7 +134,14 @@ public static class WalkForwardValidator
         }
 
         var report = new ValidationReport(options, ordered.Length, from, to, folds, results, pooled, verdicts, LimitsOf(options, ordered.Length, from, to, results.Count, notes, noted, fits));
-        return Result.Success(ladder is null ? report : report with { Complexity = ComplexityEvidence.Build([.. candidates.Select(c => c.Name)], width, lastTrainRows, signs, shifts, ladder) });
+        if (ladder is null)
+        {
+            return Result.Success(report);
+        }
+
+        var paired = options.Paired is { IsOn: true } p0 ? p0 : null;
+        var pairs = paired is null ? null : ComplexityEvidence.Pair([.. scorers.Select(s => s.Name)], pooledScores, pooledLabels, pooledDays, results, baselines.Length, paired, ladder.MinProbability);
+        return Result.Success(report with { Complexity = ComplexityEvidence.Build([.. candidates.Select(c => c.Name)], width, lastTrainRows, signs, shifts, ladder, pairs, ComplexityEvidence.EffectiveRows(lastTrainRows), paired?.KeyText()) });
     }
 
     /// <summary>The pooled result of a scorer; a candidate also gets its calibration error with an interval (CF-10 part 10a). The seed is made of the scorer name and the span, so a rerun on the same rows repeats. With the interval off nothing is added; when it cannot be computed the result says why.</summary>

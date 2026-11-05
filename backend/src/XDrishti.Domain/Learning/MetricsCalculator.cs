@@ -20,13 +20,19 @@ public static class MetricsCalculator
         double loss = 0, brier = 0;
         for (var i = 0; i < n; i++)
         {
-            var p = Math.Clamp(scores[i], Eps, 1 - Eps);
-            loss -= labels[i] == 1 ? Math.Log(p) : Math.Log(1 - p);
+            loss += RowLogLoss(scores[i], labels[i]);
             brier += (scores[i] - labels[i]) * (scores[i] - labels[i]);
         }
 
         var order = Enumerable.Range(0, n).OrderBy(i => scores[i]).ToArray();
         return new ProbabilityMetrics(n, positives, loss / n, brier / n, Auc(scores, labels, order, positives), Ece(scores, labels, order, bins), Lift(scores, labels, order, positives));
+    }
+
+    /// <summary>The log loss of one prediction (the probability is kept at least 1e-15 from 0 and 1); the mean over the rows is <see cref="ProbabilityMetrics.LogLoss"/>.</summary>
+    public static double RowLogLoss(double score, int label)
+    {
+        var p = Math.Clamp(score, Eps, 1 - Eps);
+        return label == 1 ? -Math.Log(p) : -Math.Log(1 - p);
     }
 
     /// <summary>Only the expected calibration error in percentage points (the same figure as <see cref="Compute"/>'s <c>EcePp</c>, without the other metrics); the same input rules.</summary>
