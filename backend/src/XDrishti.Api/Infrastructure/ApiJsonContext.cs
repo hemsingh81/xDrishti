@@ -64,6 +64,7 @@ using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Application.Reporting;
 using XDrishti.Application.Selection;
+using XDrishti.Application.Shadow;
 using XDrishti.Application.Ticks;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Portfolio;
@@ -320,6 +321,9 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(PaperReviewList))]
 [JsonSerializable(typeof(DisciplineView))]
 [JsonSerializable(typeof(BacktestVsPaperView))]
+[JsonSerializable(typeof(ShadowSummaryView))]
+[JsonSerializable(typeof(ShadowSwitched))]
+[JsonSerializable(typeof(ShadowSwitchRequest))]
 [JsonSerializable(typeof(PaperPhaseCheckView))]
 [JsonSerializable(typeof(CaptureRunList))]
 [JsonSerializable(typeof(EpochList))]

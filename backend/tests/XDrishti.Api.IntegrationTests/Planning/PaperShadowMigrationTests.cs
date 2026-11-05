@@ -17,6 +17,10 @@ public sealed class PaperShadowMigrationTests(ApiFactory factory)
 
     private const string This = "20261105051654_AddPaperShadow";
 
+    private const string Second = "20261105065744_StampShadowSettingInCommitOrder";
+
+    private const string Third = "20261105075405_AddShadowGradeGross";
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private static async Task<long> CountAsync(NpgsqlConnection connection, string sql)
@@ -54,5 +58,61 @@ public sealed class PaperShadowMigrationTests(ApiFactory factory)
         await migrator.MigrateAsync(This, Ct);
 
         (await CountAsync(connection, Objects)).ShouldBe(ObjectCount);
+    }
+
+    [Fact]
+    public async Task The_second_migration_stamps_the_switch_under_a_lock_and_its_Down_restores_the_first_stamp()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_paper_shadow_stamp_probe", Ct);
+        using var scope = scratch.Host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>();
+        var migrator = db.GetService<IMigrator>();
+        await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+        await connection.OpenAsync(Ct);
+        const string Definition = "SELECT pg_get_functiondef('paper.stamp_shadow_setting()'::regprocedure)";
+
+        (await ScalarTextAsync(connection, Definition)).ShouldContain("pg_advisory_xact_lock");
+        (await ScalarTextAsync(connection, Definition)).ShouldContain("nextval");
+
+        await migrator.MigrateAsync(This, Ct);
+
+        (await ScalarTextAsync(connection, Definition)).ShouldNotContain("pg_advisory_xact_lock");
+        (await CountAsync(connection, Objects)).ShouldBe(ObjectCount, "the first migration is still whole");
+
+        await migrator.MigrateAsync(Second, Ct);
+
+        (await ScalarTextAsync(connection, Definition)).ShouldContain("pg_advisory_xact_lock");
+    }
+
+    [Fact]
+    public async Task The_third_migration_adds_the_gross_r_column_and_its_Down_removes_only_that_column()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_paper_shadow_gross_probe", Ct);
+        using var scope = scratch.Host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>();
+        var migrator = db.GetService<IMigrator>();
+        await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+        await connection.OpenAsync(Ct);
+        const string Column = "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'paper' AND table_name = 'shadow_grades' AND column_name = 'r_gross' AND is_nullable = 'YES' AND data_type = 'double precision'";
+        const string Columns = "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'paper' AND table_name = 'shadow_grades'";
+
+        db.Database.HasPendingModelChanges().ShouldBeFalse("the migration and the model snapshot agree");
+        (await CountAsync(connection, Column)).ShouldBe(1);
+        var withColumn = await CountAsync(connection, Columns);
+
+        await migrator.MigrateAsync(Second, Ct);
+
+        (await CountAsync(connection, Column)).ShouldBe(0);
+        (await CountAsync(connection, Columns)).ShouldBe(withColumn - 1);
+
+        await migrator.MigrateAsync(Third, Ct);
+
+        (await CountAsync(connection, Column)).ShouldBe(1);
+    }
+
+    private static async Task<string> ScalarTextAsync(NpgsqlConnection connection, string sql)
+    {
+        await using var command = new NpgsqlCommand(sql, connection);
+        return (string)(await command.ExecuteScalarAsync(Ct))!;
     }
 }

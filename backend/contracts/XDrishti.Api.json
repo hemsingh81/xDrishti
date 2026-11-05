@@ -12163,6 +12163,68 @@
         }
       }
     },
+    "/api/paper/shadow/summary": {
+      "get": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "The shadow record of every nightly candidate (written before the open, graded after the close by the paper replay): raw n and effective n with the correlation used (and whether it is the placeholder), the mean R with a 90% interval and the hit rate for all and by group (primary, reserve, rejected), the behavioural count of P10 and the edge count side by side, the pace once 10 trades are graded, the chain head (sessions, gaps, last digest) and the charge-sheet basis (gross unless the sheet is confirmed). Always says: modelled fills; no queue, no latency, and that this is a separate count (the P10 exit criterion is untouched). Says so when there are no rows. Read only; no order exists",
+        "operationId": "GetShadowSummary",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShadowSummaryView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper/shadow/settings": {
+      "put": {
+        "tags": [
+          "Paper"
+        ],
+        "summary": "Switch the shadow record (paper.shadow.enabled, OFF by default) ON or OFF as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). ON only allows the services shadow-write and shadow-grade (which also start paused). 401 auth.invalid_credentials, 423 auth.locked, 403 paper.shadow_owner_only, 400 paper.shadow_reason_invalid, 429 auth.rate_limited",
+        "operationId": "ChangeShadowSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShadowSwitchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShadowSwitched"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/paper/phase-check": {
       "get": {
         "tags": [
@@ -56432,6 +56494,346 @@
           }
         },
         "description": "The summary of one set: its outcome, its rates with intervals, and the repeat figures (`pass@1` and `stability` where they apply)."
+      },
+      "ShadowChainView": {
+        "required": [
+          "sessions",
+          "gaps",
+          "lastSession",
+          "lastDigest"
+        ],
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "integer",
+            "description": "Stored sessions.",
+            "format": "int32"
+          },
+          "gaps": {
+            "type": "integer",
+            "description": "Gap sessions: the writer did not run before the open; never back-filled.",
+            "format": "int32"
+          },
+          "lastSession": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The newest session.",
+            "format": "date"
+          },
+          "lastDigest": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Its digest."
+          }
+        },
+        "description": "The chain of digests: the owner copies the last one outside the database, and `xd paper shadow verify` recomputes it."
+      },
+      "ShadowCostView": {
+        "required": [
+          "basis",
+          "gross",
+          "sheetIds",
+          "confirmed"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "The label of the figures."
+          },
+          "gross": {
+            "type": "boolean",
+            "description": "True when the figures are the gross R (before charges): no charge sheet, a sheet the owner has not confirmed, or a mix. The numbers, this flag and Basis always agree."
+          },
+          "sheetIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The charge sheets that charged any graded trade."
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "Whether every such sheet is confirmed as the owner's."
+          }
+        },
+        "description": "What the R is net of, and whether it may be called net (P10-00 D5)."
+      },
+      "ShadowCountsView": {
+        "required": [
+          "behavioural",
+          "edgeRaw",
+          "edgeEffective",
+          "candidates",
+          "edgeCandidates",
+          "pending",
+          "notTriggered",
+          "notGradable"
+        ],
+        "type": "object",
+        "properties": {
+          "behavioural": {
+            "type": "integer",
+            "description": "The P10 counted trades of the newest epoch (the exit criterion's n).",
+            "format": "int32"
+          },
+          "edgeRaw": {
+            "type": "integer",
+            "description": "Graded shadow trades that count for edge.",
+            "format": "int32"
+          },
+          "edgeEffective": {
+            "type": "number",
+            "description": "The effective n of the edge count.",
+            "format": "double"
+          },
+          "candidates": {
+            "type": "integer",
+            "description": "Every stored candidate, set-aside ones included.",
+            "format": "int32"
+          },
+          "edgeCandidates": {
+            "type": "integer",
+            "description": "Candidates that count for edge.",
+            "format": "int32"
+          },
+          "pending": {
+            "type": "integer",
+            "description": "Edge candidates with no stored grade yet.",
+            "format": "int32"
+          },
+          "notTriggered": {
+            "type": "integer",
+            "description": "Edge candidates graded as not triggered.",
+            "format": "int32"
+          },
+          "notGradable": {
+            "type": "integer",
+            "description": "Edge candidates graded as not gradable.",
+            "format": "int32"
+          }
+        },
+        "description": "The two counts side by side (criterion 10). The behavioural count is P10's own: the owner-approved, armed, primary, measured trades of the newest epoch. The edge count is the graded shadow trades that count for edge. They are never added."
+      },
+      "ShadowEdgeView": {
+        "required": [
+          "rawN",
+          "effectiveN",
+          "rho",
+          "rhoIsPlaceholder",
+          "rhoNote",
+          "sessions",
+          "targetEffectiveN",
+          "etaSessions",
+          "etaNote"
+        ],
+        "type": "object",
+        "properties": {
+          "rawN": {
+            "type": "integer",
+            "description": "Graded shadow trades that count for edge.",
+            "format": "int32"
+          },
+          "effectiveN": {
+            "type": "number",
+            "description": "Raw n over the design effect of each day.",
+            "format": "double"
+          },
+          "rho": {
+            "type": "number",
+            "description": "The same-day correlation used.",
+            "format": "double"
+          },
+          "rhoIsPlaceholder": {
+            "type": "boolean",
+            "description": "Whether it is the placeholder until CF-01 estimates it."
+          },
+          "rhoNote": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Says so when it is the placeholder, else null."
+          },
+          "sessions": {
+            "type": "integer",
+            "description": "Sessions with at least one final grade: the sessions the pace is counted over (a session not graded yet does not lower the rate).",
+            "format": "int32"
+          },
+          "targetEffectiveN": {
+            "type": "integer",
+            "description": "The effective n the ETA aims at (60, as the paper programme).",
+            "format": "int32"
+          },
+          "etaSessions": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Sessions still needed at the rate seen so far; null until 10 trades are graded.",
+            "format": "int32"
+          },
+          "etaNote": {
+            "type": "string",
+            "description": "What the ETA is or why there is none."
+          }
+        },
+        "description": "The effective n of the edge count and the pace (criteria 8 and 9)."
+      },
+      "ShadowGroupView": {
+        "required": [
+          "group",
+          "n",
+          "meanR",
+          "low90",
+          "high90",
+          "hitRate"
+        ],
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "string",
+            "description": "`all`, `primary`, `reserve` or `rejected`."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Graded trades.",
+            "format": "int32"
+          },
+          "meanR": {
+            "description": "The mean R.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "low90": {
+            "description": "The 5th percentile of the bootstrapped mean.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "high90": {
+            "description": "The 95th percentile of the bootstrapped mean.",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "hitRate": {
+            "description": "The share of trades with R above 0.",
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "The graded edge trades of one group: n, mean R with a 90% interval and the hit rate. A figure is a state and a number only when it is a value."
+      },
+      "ShadowSummaryView": {
+        "required": [
+          "enabled",
+          "hasRows",
+          "note",
+          "statement",
+          "separateCount",
+          "counts",
+          "edge",
+          "groups",
+          "costs",
+          "chain"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether `paper.shadow.enabled` is ON."
+          },
+          "hasRows": {
+            "type": "boolean",
+            "description": "Whether any shadow row is stored."
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Says so when there are no rows (and why none is written while the switch is OFF); null otherwise."
+          },
+          "statement": {
+            "type": "string",
+            "description": "Always: modelled fills; no queue, no latency."
+          },
+          "separateCount": {
+            "type": "string",
+            "description": "Always: this is a separate count and the P10 exit criterion is untouched."
+          },
+          "counts": {
+            "description": "The behavioural and edge counts side by side.",
+            "$ref": "#/components/schemas/ShadowCountsView"
+          },
+          "edge": {
+            "description": "The effective n and the pace.",
+            "$ref": "#/components/schemas/ShadowEdgeView"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShadowGroupView"
+            },
+            "description": "Overall (`all`), then primary, reserve and rejected."
+          },
+          "costs": {
+            "description": "What the R is net of.",
+            "$ref": "#/components/schemas/ShadowCostView"
+          },
+          "chain": {
+            "description": "The chain head.",
+            "$ref": "#/components/schemas/ShadowChainView"
+          }
+        },
+        "description": "The shadow summary (criterion 10)."
+      },
+      "ShadowSwitchRequest": {
+        "required": [
+          "enabled",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "The new value of `paper.shadow.enabled`: ON lets the services shadow-write and shadow-grade work (they also start paused), OFF stops them."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS change, ON or OFF. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout."
+          }
+        },
+        "description": "The body of the shadow-record switch. The owner is never part of it: the actor comes from the signed-in session."
+      },
+      "ShadowSwitched": {
+        "required": [
+          "id",
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row appended.",
+            "format": "int64"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "The value now in force."
+          }
+        },
+        "description": "The answer of a switch change: the row and the new value."
       },
       "ShrinkageView": {
         "required": [

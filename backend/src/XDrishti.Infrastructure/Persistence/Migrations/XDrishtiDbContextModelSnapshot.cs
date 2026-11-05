@@ -6190,6 +6190,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(5)")
                         .HasColumnName("r_basis");
 
+                    b.Property<double?>("RGross")
+                        .HasColumnType("double precision")
+                        .HasColumnName("r_gross");
+
                     b.Property<double?>("RSim")
                         .HasColumnType("double precision")
                         .HasColumnName("r_sim");

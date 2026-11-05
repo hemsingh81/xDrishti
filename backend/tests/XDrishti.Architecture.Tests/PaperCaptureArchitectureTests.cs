@@ -16,6 +16,11 @@ public sealed class PaperCaptureArchitectureTests
     {
         Source("Planning", "TicketReplayer.cs").ShouldContain("new RunSimulationQuery(");
         Source("Planning", "GradePlansHandler.cs").ShouldNotContain("RunSimulationQuery(");
+        foreach (var file in Directory.GetFiles(Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Application", "Shadow", "GradeShadowHandler.cs"))!, "*.cs"))
+        {
+            File.ReadAllText(file).ShouldNotContain("new RunSimulationQuery(", customMessage: file); // the shadow grader (CF-08 part B) replays through the same replayer
+        }
+
         foreach (var file in Directory.GetFiles(Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Application", "Paper", "CapturePaperFillsHandler.cs"))!, "*.cs"))
         {
             File.ReadAllText(file).ShouldNotContain("new RunSimulationQuery(", customMessage: file);

@@ -7,9 +7,8 @@ namespace XDrishti.Application.Shadow;
 /// Writes the shadow record of a nightly plan before its session (spec CF-08, ADR 0211): every candidate of the stored plan becomes a row, once, and the session gets a chained digest. It places no order, calls no broker, moves no ticket and changes nothing
 /// the plan reads. A session that has opened is never written: it gets a gap row and is never back-filled. With the switch OFF it writes nothing.
 /// </summary>
-/// <param name="Session">One session, or null for every session of the stored plans that is not written yet.</param>
-/// <param name="Manual">Whether a person started it.</param>
-public sealed record WriteShadowCommand(DateOnly? Session, bool Manual) : ICommand;
+/// <param name="Session">One session (the sessions before it that the chain lacks are recorded first), or null for every session of the stored plans that is not written yet.</param>
+public sealed record WriteShadowCommand(DateOnly? Session) : ICommand;
 
 /// <summary>What a shadow write did. Counts only.</summary>
 /// <param name="Enabled">Whether the switch was ON.</param>

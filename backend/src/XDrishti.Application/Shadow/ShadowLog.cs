@@ -10,4 +10,16 @@ internal static partial class ShadowLog
 
     [LoggerMessage(EventId = 5401, Level = LogLevel.Information, Message = "shadow.write: switched off, nothing written")]
     public static partial void SwitchedOff(ILogger logger);
+
+    [LoggerMessage(EventId = 5402, Level = LogLevel.Information, Message = "shadow.grade: {Seen} looked at, {Graded} graded, {NotTriggered} not triggered, {NotGradable} not gradable, {Pending} pending, {Failed} failed")]
+    public static partial void Graded(ILogger logger, int seen, int graded, int notTriggered, int notGradable, int pending, int failed);
+
+    [LoggerMessage(EventId = 5403, Level = LogLevel.Information, Message = "shadow.grade: switched off, nothing graded")]
+    public static partial void GradeSwitchedOff(ILogger logger);
+
+    [LoggerMessage(EventId = 5404, Level = LogLevel.Information, Message = "shadow.switch: row {Row} appended, enabled {Enabled} (1 = on)")]
+    public static partial void SwitchChanged(ILogger logger, int row, int enabled);
+
+    [LoggerMessage(EventId = 5405, Level = LogLevel.Warning, Message = "shadow.switch: the row stands but its audit event could not be recorded")]
+    public static partial void AuditFailed(ILogger logger);
 }

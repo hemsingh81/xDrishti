@@ -6,8 +6,8 @@ using XDrishti.Application.Abstractions.Shadow;
 namespace XDrishti.Architecture.Tests;
 
 /// <summary>
-/// Spec CF-08 part A (ADR 0211): the shadow record is forward-only and insert-only (criterion 3), P10's counting types never name it (6), and nothing that chooses what to approve can read shadow outcomes (7). The shadow code moves no ticket, builds no simulation
-/// request and logs counts only. The no-order tripwire (<see cref="NoOrderPlacementArchitectureTests"/>) covers the new types as well.
+/// Spec CF-08 (ADR 0211, part A; ADR 0212, part B): the shadow record is forward-only and insert-only (criterion 3), P10's counting types never name it (6), and nothing that chooses what to approve can read shadow outcomes (7). The grader replays only through the one
+/// replayer of grading and paper capture (5). The shadow code moves no ticket, builds no simulation request and logs counts only. The no-order tripwire (<see cref="NoOrderPlacementArchitectureTests"/>) covers the new types as well.
 /// </summary>
 public sealed class ShadowArchitectureTests
 {
@@ -48,38 +48,59 @@ public sealed class ShadowArchitectureTests
     }
 
     [Fact]
-    public void Only_the_writer_names_the_shadow_store_and_the_rest_of_the_application_does_not_name_the_result_reader()
+    public void Only_the_writer_and_the_chain_check_name_the_shadow_store_and_only_the_summary_names_the_result_reader()
     {
         var storeUsers = Types.InAssembly(Application).That().HaveDependencyOn(typeof(IShadowStore).FullName!).GetTypes()
             .Select(t => t.Name.Split('`')[0]).Where(n => !n.StartsWith('<')).Distinct().Order(StringComparer.Ordinal).ToList();
         var readerUsers = Types.InAssembly(Application).That().HaveDependencyOn(typeof(IShadowResultReader).FullName!).GetTypes()
             .Select(t => t.Name.Split('`')[0]).Where(n => !n.StartsWith('<')).Distinct().ToList();
+        var gradeStoreUsers = Types.InAssembly(Application).That().HaveDependencyOn(typeof(IShadowGradeStore).FullName!).GetTypes()
+            .Select(t => t.Name.Split('`')[0]).Where(n => !n.StartsWith('<')).Distinct().ToList();
 
-        storeUsers.ShouldBe(["WriteShadowHandler"]);
-        readerUsers.ShouldBeEmpty("the port exists for the Learning, Reports and Api use cases of part B; no use case names it yet");
+        storeUsers.ShouldBe(["VerifyShadowChainHandler", "WriteShadowHandler"]); // the chain check only reads
+        readerUsers.ShouldBe(["GetShadowSummaryHandler"], "the one display use case of the Api; no Planning, Selection or Autonomy type names the port (above)");
+        gradeStoreUsers.ShouldBe(["GradeShadowHandler"]);
     }
 
     [Fact]
-    public void The_shadow_store_port_only_reads_and_writes_a_whole_session_so_no_code_path_adds_a_row_to_a_session_that_has_opened()
+    public void The_chain_check_only_reads_the_store()
+    {
+        Source("XDrishti.Application", "Shadow", "VerifyShadowChainHandler.cs").ShouldNotContain("WriteSessionAsync");
+    }
+
+    [Fact]
+    public void The_grader_replays_only_through_the_one_replayer_of_grading_and_paper_capture()
+    {
+        // criterion 5: GradeShadowHandler names the TicketReplayer and neither the simulation use case nor the strategy and basket ports the replayer hides
+        const string Replayer = "XDrishti.Application.Planning.TicketReplayer";
+        Types.InAssembly(Application).That().HaveName("GradeShadowHandler").Should().HaveDependencyOn(Replayer).GetResult().IsSuccessful.ShouldBeTrue();
+        Types.InAssembly(Application).That().HaveName("GradeShadowHandler").Should().NotHaveDependencyOnAny("XDrishti.Application.Research.RunSimulationQuery", "XDrishti.Application.Abstractions.Research.IStrategyStore", "XDrishti.Application.Abstractions.Market.IBasketQueries").GetResult().IsSuccessful.ShouldBeTrue();
+        Source("XDrishti.Application", "Shadow", "GradeShadowHandler.cs").ShouldNotContain("RunSimulationQuery(");
+    }
+
+    [Fact]
+    public void The_shadow_ports_only_read_and_insert_so_no_code_path_adds_a_row_to_a_session_that_has_opened_or_rewrites_a_grade()
     {
         typeof(IShadowStore).GetMethods(BindingFlags.Public | BindingFlags.Instance).Select(m => m.Name).Order().ShouldBe(["HeadAsync", "ReadChainAsync", "WriteSessionAsync"]);
         typeof(IShadowSettings).GetMethods(BindingFlags.Public | BindingFlags.Instance).Select(m => m.Name).ShouldBe(["IsEnabledAsync"]);
-        typeof(IShadowResultReader).GetMethods(BindingFlags.Public | BindingFlags.Instance).Select(m => m.Name).ShouldBe(["ResultsAsync"]);
+        typeof(IShadowResultReader).GetMethods(BindingFlags.Public | BindingFlags.Instance).Select(m => m.Name).Order().ShouldBe(["ChainAsync", "ResultsAsync"]);
+        typeof(IShadowGradeStore).GetMethods(BindingFlags.Public | BindingFlags.Instance).Select(m => m.Name).Order().ShouldBe(["InsertAsync", "UngradedAsync"]);
+        typeof(IShadowSwitchStore).GetMethods(BindingFlags.Public | BindingFlags.Instance).Select(m => m.Name).ShouldBe(["AppendAsync"]);
     }
 
     [Fact]
     public void The_shadow_adapters_use_only_select_and_insert()
     {
-        foreach (var file in new[] { "ShadowStore.cs", "ShadowSettings.cs" })
+        foreach (var file in new[] { "ShadowStore.cs", "ShadowSettings.cs", "ShadowGradeStore.cs", "ShadowResultReader.cs" })
         {
             var text = Source("XDrishti.Infrastructure", "Paper", file);
             text.ShouldNotContain("UPDATE ", customMessage: file);
             text.ShouldNotContain("DELETE ", customMessage: file);
             text.ShouldNotContain("TRUNCATE", customMessage: file);
-            text.ShouldNotContain("ON CONFLICT", customMessage: file); // a stored session is refused, never merged or overwritten
+            text.ShouldNotContain("ON CONFLICT", customMessage: file); // a stored session or grade is refused, never merged or overwritten
         }
 
-        Types.InAssembly(Infrastructure).That().HaveName("ShadowStore").Or().HaveName("ShadowSettings").Should().NotHaveDependencyOnAny("XDrishti.Application.Planning", "XDrishti.Application.Paper").GetResult().IsSuccessful.ShouldBeTrue();
+        Types.InAssembly(Infrastructure).That().HaveName("ShadowStore").Or().HaveName("ShadowSettings").Or().HaveName("ShadowGradeStore").Or().HaveName("ShadowResultReader").Should().NotHaveDependencyOnAny("XDrishti.Application.Planning", "XDrishti.Application.Paper").GetResult().IsSuccessful.ShouldBeTrue();
     }
 
     [Fact]

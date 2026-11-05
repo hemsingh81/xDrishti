@@ -366,6 +366,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, PlanExpiryService>(); // expires the day's armed tickets after the close (P7-11); starts paused
         services.AddSingleton<IScheduledService, PaperCaptureService>(); // paper fills of armed tickets after the end-of-day run (P10-01); starts paused, no order
         services.AddSingleton<IScheduledService, ShadowWriteService>(); // the shadow record of every nightly candidate, written before the open (CF-08); starts paused, setting paper.shadow.enabled OFF, no order
+        services.AddSingleton<IScheduledService, ShadowGradeService>(); // grades the shadow record after the close with the same replay as paper (CF-08 part B); starts paused, setting paper.shadow.enabled OFF, no order
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, BriefingService>(); // the daily briefing text after the suggestions (P9-06); starts paused, the model is used only under both switches
         services.AddSingleton<IScheduledService, WeeklyReviewService>(); // the weekly review text after the digest (P9-06); starts paused, applies nothing
@@ -936,6 +937,10 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ExplainChangeCommand, ExplainOutcome>, ExplainChangeHandler>(); // owner note, CLI only (P10-05)
         services.AddScoped<ICommandHandler<CapturePaperFillsCommand, PaperCaptureOutcome>, CapturePaperFillsHandler>(); // paper fills of armed tickets: insert-only, replayed on stored bars, no order (P10-01)
         services.AddScoped<ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>, WriteShadowHandler>(); // the shadow record: forward-only, insert-only, switch OFF by default, no order (CF-08)
+        services.AddScoped<ICommandHandler<GradeShadowCommand, ShadowGradeOutcome>, GradeShadowHandler>(); // grades the shadow record through the one replay path, insert-only (CF-08 part B)
+        services.AddScoped<IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView>, GetShadowSummaryHandler>(); // the shadow summary: raw and effective n, labelled gross unless the sheet is confirmed (CF-08 part B)
+        services.AddScoped<IQueryHandler<VerifyShadowChainQuery, ShadowChainCheckView>, VerifyShadowChainHandler>(); // recomputes the digest chain from the stored rows (CF-08 part B)
+        services.AddScoped<ICommandHandler<ChangeShadowSwitchCommand, ShadowSwitched>, ChangeShadowSwitchHandler>(); // the owner's switch, behind a fresh password in the endpoint (CF-08 part B)
         services.AddScoped<IQueryHandler<ListPaperEntriesQuery, Result<PaperEntryList>>, ListPaperEntriesHandler>();
         services.AddScoped<IQueryHandler<ListCaptureRunsQuery, Result<CaptureRunList>>, ListCaptureRunsHandler>();
         services.AddScoped<PaperLedgerService>(); // the derived paper ledger of each paper account, from the stored trades only (P10-02, ADR 0118)

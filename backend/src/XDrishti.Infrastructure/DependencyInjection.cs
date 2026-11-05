@@ -209,6 +209,9 @@ public static class DependencyInjection
         services.AddScoped<IPaperStore, PaperStore>(); // insert-only paper record (P10-01, ADR 0116)
         services.AddScoped<IShadowStore, ShadowStore>(); // forward-only, insert-only, chained shadow record of every nightly candidate (CF-08, ADR 0211)
         services.AddScoped<IShadowSettings, ShadowSettings>(); // paper.shadow.enabled: the newest row of paper.shadow_settings, OFF when none (CF-08)
+        services.AddScoped<IShadowGradeStore, ShadowGradeStore>(); // insert-only grades of the shadow record, one per entry (CF-08 part B, ADR 0212)
+        services.AddScoped<IShadowResultReader, ShadowResultReader>(); // the one read of shadow outcomes, for the summary only; no Planning, Selection or Autonomy type may name it (CF-08 part B)
+        services.AddScoped<IShadowSwitchStore, ShadowSettings>(); // the owner's switch history and append, insert-only (CF-08 part B)
         services.AddOptions<TicketAlertOptions>().Bind(configuration.GetSection(TicketAlertOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // price-crossing alerts and post-trade prompts, default OFF (P7-20, ADR 0115)
         services.AddSingleton<ITicketAlertSettings>(sp => new TicketAlertSettings(sp.GetRequiredService<IOptions<TicketAlertOptions>>().Value));
         services.AddScoped<ITicketAlertStore, TicketAlertStore>(); // insert-only alerts, prompts and the owner's acts (P7-20); no order, no ticket change

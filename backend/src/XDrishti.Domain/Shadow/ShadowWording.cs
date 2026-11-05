@@ -11,7 +11,4 @@ public static class ShadowWording
 
     /// <summary>Said when the correlation behind the effective n is the placeholder.</summary>
     public const string PlaceholderRho = "the same-day correlation is a placeholder (0.3) until CF-01 estimates it";
-
-    /// <summary>Stored in the session row of a night the writer did not run: the night is never filled in afterwards.</summary>
-    public const string GapMeaning = "the writer did not run before the open of this session; it is never back-filled";
 }

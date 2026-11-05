@@ -79,6 +79,8 @@ internal sealed class ShadowGradeRecord
 
     public string? RBasis { get; set; }
 
+    public double? RGross { get; set; }
+
     public DateTimeOffset? EntryAt { get; set; }
 
     public DateTimeOffset? ExitAt { get; set; }
