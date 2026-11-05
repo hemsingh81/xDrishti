@@ -31,6 +31,8 @@ internal sealed class ConfidenceSettings
 
     public SequentialSection Sequential { get; set; } = new();
 
+    public CalibrationSection Calibration { get; set; } = new();
+
     public RegistrationSection Registration { get; set; } = new();
 
     public HoldOutSection HoldOut { get; set; } = new();
@@ -49,6 +51,9 @@ internal sealed class ConfidenceSettings
 
     /// <summary>The <c>Confidence:Sequential</c> subsection as the options of CF-09 (ADR 0213).</summary>
     internal SequentialOptions ToSequentialOptions() => new(Sequential.Mu1, Sequential.Sigma, Sequential.Alpha, Sequential.BetaCaution, Sequential.BetaFail, Sequential.SigmaFromN);
+
+    /// <summary>The <c>Confidence:Calibration</c> subsection as the options of CF-10 part 10a (ADR 0214).</summary>
+    internal CalibrationOptions ToCalibrationOptions() => new(Calibration.IsotonicMinRows);
 
     /// <summary>Whether the plateau gate is enforced while the block it lives in (<c>Confidence:Nulls</c>) is computed at all: it is not computed with <c>Nulls:Mode</c> Off, so enforcing it then would cap nothing (ADR 0210).</summary>
     internal bool PlateauEnforcedWithoutNulls() => Plateau.Enforce && Nulls.Mode == ConfidenceMode.Off;
@@ -213,6 +218,11 @@ internal sealed class ConfidenceSettings
         public double BetaFail { get; set; } = 0.05;
 
         public int SigmaFromN { get; set; } = 20;
+    }
+
+    internal sealed class CalibrationSection
+    {
+        public int IsotonicMinRows { get; set; } = 500;
     }
 
     internal sealed class RegistrationSection

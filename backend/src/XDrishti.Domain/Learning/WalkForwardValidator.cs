@@ -47,6 +47,7 @@ public static class WalkForwardValidator
         var results = new List<FoldResult>();
         var pooledScores = scorers.Select(_ => new List<double>()).ToArray();
         var pooledLabels = new List<int>();
+        var pooledDays = new List<DateOnly>();
         var notes = new SortedSet<string>(StringComparer.Ordinal);
         var lastTrain = 0;
         var noted = 0;
@@ -93,6 +94,7 @@ public static class WalkForwardValidator
             }
 
             pooledLabels.AddRange(labels);
+            pooledDays.AddRange(test.Select(r => r.TradeDate));
             lastTrain = fold.Train.Length;
             for (var k = 0; k < candidates.Count; k++)
             {
@@ -108,7 +110,7 @@ public static class WalkForwardValidator
             return Fail("validation.no_folds", string.Create(c, $"No usable fold in {from:yyyy-MM-dd} to {to:yyyy-MM-dd}: {cuts.Count} windows after {options.MinTrainMonths} months of training, {dropped} short final window dropped, {folds.Count(f => !f.Usable)} skipped."));
         }
 
-        var pooled = scorers.Select((s, i) => new ScorerFoldResult(s.Name, MetricsCalculator.Compute(pooledScores[i], pooledLabels, options.CalibrationBins))).ToArray();
+        var pooled = scorers.Select((s, i) => PooledResult(s.Name, i < baselines.Length, pooledScores[i], pooledLabels, pooledDays, options)).ToArray();
         var verdicts = new List<CandidateVerdict>();
         for (var k = 0; k < candidates.Count; k++)
         {
@@ -117,6 +119,20 @@ public static class WalkForwardValidator
         }
 
         return Result.Success(new ValidationReport(options, ordered.Length, from, to, folds, results, pooled, verdicts, LimitsOf(options, ordered.Length, from, to, results.Count, notes, noted, fits)));
+    }
+
+    /// <summary>The pooled result of a scorer; a candidate also gets its calibration error with an interval (CF-10 part 10a). The seed is made of the scorer name and the span, so a rerun on the same rows repeats. With the interval off nothing is added; when it cannot be computed the result says why.</summary>
+    private static ScorerFoldResult PooledResult(string name, bool baseline, List<double> scores, List<int> labels, List<DateOnly> days, ValidationOptions options)
+    {
+        var metrics = MetricsCalculator.Compute(scores, labels, options.CalibrationBins);
+        if (baseline || options.EceDraws == 0)
+        {
+            return new ScorerFoldResult(name, metrics);
+        }
+
+        var seed = string.Create(CultureInfo.InvariantCulture, $"{name}|{days.Min():yyyy-MM-dd}|{days.Max():yyyy-MM-dd}|{days.Count}");
+        var assessed = EceInterval.Assess(scores, labels, days, options.EceDraws, options.EceLevel, options.CalibrationBins, seed);
+        return assessed.IsSuccess ? new ScorerFoldResult(name, metrics, assessed.Value) : new ScorerFoldResult(name, metrics, null, assessed.Error.Code);
     }
 
     /// <summary>One fold of the walk-forward geometry: the fold facts with its train rows (purged and embargoed) and test rows.</summary>

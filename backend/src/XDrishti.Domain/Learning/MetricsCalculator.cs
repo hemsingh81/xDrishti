@@ -29,6 +29,19 @@ public static class MetricsCalculator
         return new ProbabilityMetrics(n, positives, loss / n, brier / n, Auc(scores, labels, order, positives), Ece(scores, labels, order, bins), Lift(scores, labels, order, positives));
     }
 
+    /// <summary>Only the expected calibration error in percentage points (the same figure as <see cref="Compute"/>'s <c>EcePp</c>, without the other metrics); the same input rules.</summary>
+    public static double EcePp(IReadOnlyList<double> scores, IReadOnlyList<int> labels, int bins = 10)
+    {
+        ArgumentNullException.ThrowIfNull(scores);
+        ArgumentNullException.ThrowIfNull(labels);
+        if (scores.Count != labels.Count || scores.Count == 0 || bins < 1)
+        {
+            throw new ArgumentException("Scores and labels must be the same non-zero length and bins at least 1.");
+        }
+
+        return Ece(scores, labels, Enumerable.Range(0, scores.Count).OrderBy(i => scores[i]).ToArray(), bins);
+    }
+
     private static double? Auc(IReadOnlyList<double> scores, IReadOnlyList<int> labels, int[] order, int positives)
     {
         var n = order.Length;

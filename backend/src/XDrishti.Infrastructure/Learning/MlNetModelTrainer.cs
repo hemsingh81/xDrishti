@@ -1,6 +1,7 @@
 using System.Globalization;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 using XDrishti.Learning.MlNet;
 
@@ -12,14 +13,22 @@ namespace XDrishti.Infrastructure.Learning;
 /// </summary>
 internal sealed class MlNetModelTrainer : IModelTrainer
 {
-    private static readonly MlNetTrainerOptions Settings = new(Preferred: TreeTrainer.FastTree);
+    private readonly MlNetTrainerOptions _settings;
+    private readonly MlNetScorerFactory _factory;
 
-    private readonly MlNetScorerFactory _factory = new(Settings);
+    /// <summary>The trainer with the calibration cut of <c>Confidence:Calibration</c> (CF-10 part 10a, ADR 0214).</summary>
+    public MlNetModelTrainer(CalibrationOptions calibration)
+    {
+        ArgumentNullException.ThrowIfNull(calibration);
+        _settings = new MlNetTrainerOptions(Preferred: TreeTrainer.FastTree, IsotonicMinRows: calibration.IsotonicMinRows);
+        _factory = new MlNetScorerFactory(_settings);
+        Parameters = string.Create(CultureInfo.InvariantCulture,
+            $"preferred={_settings.Preferred} trees={_settings.Trees} leaves={_settings.Leaves} learning_rate={_settings.LearningRate:R} min_leaf_rows={_settings.MinLeafRows} seed={_settings.Seed} calibration_share={_settings.CalibrationShare:R} min_fit_rows={_settings.MinFitRows} min_calibration_rows={_settings.MinCalibrationRows} probability_floor={_settings.ProbabilityFloor:R} isotonic_min_rows={_settings.IsotonicMinRows}");
+    }
 
     public IScorerFactory Candidate => _factory;
 
-    public string Parameters { get; } = string.Create(CultureInfo.InvariantCulture,
-        $"preferred={Settings.Preferred} trees={Settings.Trees} leaves={Settings.Leaves} learning_rate={Settings.LearningRate:R} min_leaf_rows={Settings.MinLeafRows} seed={Settings.Seed} calibration_share={Settings.CalibrationShare:R} min_fit_rows={Settings.MinFitRows} min_calibration_rows={Settings.MinCalibrationRows} probability_floor={Settings.ProbabilityFloor:R}");
+    public string Parameters { get; }
 
     public Result<TrainedModel> Train(IReadOnlyList<ValidationRow> rows)
     {

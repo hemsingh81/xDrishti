@@ -45,6 +45,14 @@ public sealed record ValidationReport(
         foreach (var s in Pooled)
         {
             t.Append(c, $"  {s.Name,-12} {Line(s.Metrics)}\n");
+            if (s.Calibration is { } calibration)
+            {
+                t.Append(c, $"  {"",-12} {calibration.ToText()}\n");
+            }
+            else if (s.CalibrationUnavailable is { } code)
+            {
+                t.Append(c, $"  {"",-12} ece interval unavailable: {code}\n");
+            }
         }
 
         foreach (var v in Verdicts)

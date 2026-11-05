@@ -14,6 +14,8 @@ namespace XDrishti.Domain.Learning;
 /// <param name="MaxCalibrationErrorPp">The pooled expected calibration error must not exceed this (doc 16 <c>max_calibration_error_pp</c>, 5).</param>
 /// <param name="CalibrationBins">Equal-mass bins of the calibration error.</param>
 /// <param name="Trials">How many models and settings have been looked at, for <c>MultipleTesting.Factor</c>; widens the margins.</param>
+/// <param name="EceDraws">Day-cluster bootstrap resamples of the pooled calibration error of each candidate (CF-10 part 10a, ADR 0214); 0 gives no interval (100 to 20000 otherwise). The interval only reports: no verdict reads it.</param>
+/// <param name="EceLevel">The coverage of that interval (0.90).</param>
 /// <param name="HoldOutStart">When set, any row on or after this date is refused: the hold-out is not used in development.</param>
 public sealed record ValidationOptions(
     int MinTrainMonths = 9,
@@ -27,7 +29,9 @@ public sealed record ValidationOptions(
     double MaxCalibrationErrorPp = 5,
     int CalibrationBins = 10,
     int Trials = 1,
-    DateOnly? HoldOutStart = null)
+    DateOnly? HoldOutStart = null,
+    int EceDraws = 1000,
+    double EceLevel = 0.90)
 {
     /// <summary>The fewest folds a verdict is worth; a model judged on fewer cannot be champion (<see cref="ChampionRule"/>).</summary>
     public const int DefaultMinFolds = 6;
@@ -79,6 +83,16 @@ public sealed record ValidationOptions(
         if (CalibrationBins is < 1 or > 1000)
         {
             problems.Add("calibration_bins must be 1 to 1000");
+        }
+
+        if (EceDraws != 0 && EceDraws is < 100 or > 20000)
+        {
+            problems.Add("ece_draws must be 0 or 100 to 20000");
+        }
+
+        if (!(EceLevel > 0.5 && EceLevel < 1))
+        {
+            problems.Add("ece_level must be above 0.5 and below 1");
         }
 
         if (Trials < 1)

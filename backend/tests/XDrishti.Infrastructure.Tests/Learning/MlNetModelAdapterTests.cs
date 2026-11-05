@@ -28,7 +28,7 @@ public sealed class MlNetModelAdapterTests
     [Fact]
     public void The_production_trainer_is_fast_tree_without_a_fall_back_note_and_registers_a_calibration_table_and_importance()
     {
-        var trainer = new MlNetModelTrainer();
+        var trainer = new MlNetModelTrainer(new XDrishti.Domain.Confidence.CalibrationOptions());
 
         var trained = trainer.Train(Rows(300));
 
@@ -43,10 +43,25 @@ public sealed class MlNetModelAdapterTests
         trainer.Parameters.ShouldContain("preferred=FastTree");
     }
 
+    private static XDrishti.Domain.Learning.CalibrationKind KindOf(XDrishti.Application.Abstractions.Learning.TrainedModel trained) =>
+        XDrishti.Learning.MlNet.MlNetModel.Load(trained.Bytes, trained.Sha256).Value.Calibration.Kind;
+
+    [Fact]
+    public void The_trainer_calibrates_with_platt_below_the_cut_and_says_the_cut_in_its_parameters()
+    {
+        var below = new MlNetModelTrainer(new XDrishti.Domain.Confidence.CalibrationOptions());
+        var atCut = new MlNetModelTrainer(new XDrishti.Domain.Confidence.CalibrationOptions(IsotonicMinRows: 75));
+
+        below.Parameters.ShouldContain("isotonic_min_rows=500");
+        atCut.Parameters.ShouldContain("isotonic_min_rows=75");
+        KindOf(below.Train(Rows(300)).Value).ShouldBe(XDrishti.Domain.Learning.CalibrationKind.Platt, "75 calibration rows are below the cut of 500");
+        KindOf(atCut.Train(Rows(300)).Value).ShouldBe(XDrishti.Domain.Learning.CalibrationKind.Isotonic, "75 calibration rows are at the cut of 75");
+    }
+
     [Fact]
     public void The_same_rows_give_the_same_hash_and_the_loader_scores_like_the_trained_model()
     {
-        var trainer = new MlNetModelTrainer();
+        var trainer = new MlNetModelTrainer(new XDrishti.Domain.Confidence.CalibrationOptions());
         var rows = Rows(300);
         var one = trainer.Train(rows).Value;
         var two = trainer.Train([.. rows.AsEnumerable().Reverse()]).Value;
@@ -64,7 +79,7 @@ public sealed class MlNetModelAdapterTests
     [Fact]
     public void The_loader_refuses_a_wrong_hash_and_bytes_that_are_not_a_model()
     {
-        var trained = new MlNetModelTrainer().Train(Rows(300)).Value;
+        var trained = new MlNetModelTrainer(new XDrishti.Domain.Confidence.CalibrationOptions()).Train(Rows(300)).Value;
 
         var wrong = new MlNetScorerLoader().Load(trained.Bytes, new string('0', 64));
         var foreign = new MlNetScorerLoader().Load([1, 2, 3], Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(new byte[] { 1, 2, 3 })));
@@ -77,6 +92,6 @@ public sealed class MlNetModelAdapterTests
     [Fact]
     public void Too_few_rows_are_a_failure_with_a_code()
     {
-        new MlNetModelTrainer().Train(Rows(20)).Error.Code.ShouldBe("ml.too_few_rows");
+        new MlNetModelTrainer(new XDrishti.Domain.Confidence.CalibrationOptions()).Train(Rows(20)).Error.Code.ShouldBe("ml.too_few_rows");
     }
 }

@@ -1,3 +1,5 @@
+using XDrishti.Domain.Learning;
+
 namespace XDrishti.Learning.MlNet;
 
 /// <summary>
@@ -13,6 +15,7 @@ namespace XDrishti.Learning.MlNet;
 /// <param name="CalibrationShare">The share of the train rows (the latest by decision time) held back to fit the calibration map.</param>
 /// <param name="MinFitRows">Fewest rows the trees are fitted on.</param>
 /// <param name="MinCalibrationRows">Fewest rows the calibration is fitted on.</param>
+/// <param name="IsotonicMinRows">Calibration rows at and above which the isotonic map is used; fewer get Platt scaling (CF-10 part 10a, <c>Confidence:Calibration:IsotonicMinRows</c>).</param>
 /// <param name="ProbabilityFloor">The calibrated probability is kept within [floor, 1 - floor], so that a certain wrong answer cannot have an infinite loss.</param>
 public sealed record MlNetTrainerOptions(
     TreeTrainer Preferred = TreeTrainer.LightGbm,
@@ -24,7 +27,8 @@ public sealed record MlNetTrainerOptions(
     double CalibrationShare = 0.25,
     int MinFitRows = 40,
     int MinCalibrationRows = 15,
-    double ProbabilityFloor = 0.005)
+    double ProbabilityFloor = 0.005,
+    int IsotonicMinRows = CalibrationChoice.DefaultIsotonicMinRows)
 {
     /// <summary>The problems of the values, empty when they are usable.</summary>
     public IReadOnlyList<string> Problems()
@@ -63,6 +67,11 @@ public sealed record MlNetTrainerOptions(
         if (!double.IsFinite(ProbabilityFloor) || ProbabilityFloor is <= 0 or >= 0.5)
         {
             problems.Add("probability_floor must be above 0 and below 0.5");
+        }
+
+        if (IsotonicMinRows is < 1 or > 100000)
+        {
+            problems.Add("isotonic_min_rows must be 1 to 100000");
         }
 
         return problems;
