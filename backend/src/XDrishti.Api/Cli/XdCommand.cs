@@ -264,6 +264,11 @@ internal static class XdCommand
             return await PlanGradeCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "paper" && PaperShadowCommand.Handles([.. args.Skip(1)]))
+        {
+            return await PaperShadowCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "paper" && PaperReviewCommand.Handles([.. args.Skip(1)]))
         {
             return await PaperReviewCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);

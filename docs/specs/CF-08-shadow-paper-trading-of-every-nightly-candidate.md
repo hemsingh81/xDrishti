@@ -64,10 +64,14 @@ Whether duplicates and not-eligible candidates are persisted before the plan rec
 1. Confirm that shadow trades are a **separate** edge count and the P10 exit criterion stays as written (a change would need an ADR and the owner's decision, P10-00 D6). 2. Include reserve and fill-rejected candidates in the edge count (recommended), or primary only? 3. Switch it on now (default OFF), given it needs the nightly plan running? 4. Keep shadow rows forever (recommended) or set a retention?
 
 ## Done when
-- [ ] All acceptance criteria have evidence
+- [x] All acceptance criteria have evidence (part A: 1 to 4, 6, 7, 11 in part; part B: 5 `GradeShadowHandlerTests` and `PaperShadowGradeEndToEndTests`, 6 the golden test with a captured primary entry, 8 and 9 `EdgeCountTests` and `GetShadowSummaryHandlerTests`, 10 `GetShadowSummaryHandlerTests` and the summary endpoint tests, 11 `PaperShadowSwitchApiTests`; the 409 `paper.shadow_gap` is not raised, see ADR 0212 "What is not built")
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] Contract regenerated (`scripts/gen-api.sh`); migration `AddPaperShadow` added and tested up and down
-- [ ] Design docs/ADR updated (docs 09, 18; P10 notes); `scripts/build-docs.sh`
+- [x] Contract regenerated (`scripts/gen-api.sh`); migrations `AddPaperShadow`, `StampShadowSettingInCommitOrder` and `AddShadowGradeGross` added and tested up and down
+- [x] Design docs/ADR updated (docs 09, 18; ADRs 0211, 0212); `scripts/build-docs.sh` not run on request (docs/site only on the owner's ask)
+- [ ] Open follow-up: the weekly digest into the Reports export and to a file outside the database (review fix 4); the `/paper` Shadow tab
+
+## Part B (built 2026-11-05)
+`GradeShadowHandler`, `ShadowGradeService` (`shadow-grade`), `GetShadowSummaryHandler`, `ChangeShadowSwitchHandler`, `VerifyShadowChainHandler`, the ports `IShadowGradeStore`, `IShadowSwitchStore` and the `IShadowResultReader` adapter; `GET /api/paper/shadow/summary`, `PUT /api/paper/shadow/settings`; `xd paper shadow verify|summary`. ADR 0212.
 
 ## Review fixes 2026-10-27
 1. **Cut-off** is 09:00 IST (03:30 UTC), not 09:15 (arming runs at 09:10). AC2 uses 09:01 (refused) and 08:59 (accepted).

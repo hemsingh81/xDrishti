@@ -1,3 +1,5 @@
+using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Research;
 using XDrishti.Domain.Shadow;
 
 namespace XDrishti.Domain.Tests.Shadow;
@@ -29,6 +31,22 @@ public sealed class ShadowRulesTests
         ShadowTradeKey.For("ORB", "NSE:PAPA", side, new DateOnly(2026, 11, 2)).ShouldBe(expected);
     }
 
+    [Theory]
+    [InlineData(2026, 11, 3, 9, 45, 2026, 11, 3, "BUY")] // an intraday cell is decided on the session itself
+    [InlineData(2026, 11, 2, 15, 30, 2026, 11, 2, "BUY")] // a daily cell is decided at the close of the day before the session
+    [InlineData(2026, 11, 3, 9, 45, 2026, 11, 3, "SELL")]
+    public void The_key_built_before_the_session_equals_the_key_of_the_simulated_trade(int y, int mo, int d, int h, int mi, int ky, int kmo, int kd, string side)
+    {
+        var decided = new DateTimeOffset(y, mo, d, h, mi, 0, TimeSpan.FromMinutes(330)).ToUnixTimeSeconds();
+        var bar = new Bar(decided - 900, 99, 100.5, 98, 100, 1_000);
+        var trade = new SimTrade(
+            SimTrade.CurrentSchemaVersion, "ORB", Guid.Empty, "NSE:PAPA", side == "BUY" ? Side.Buy : Side.Sell, Session, decided, Timeframe.M15, bar, 15, true,
+            decided, 100.5, 98, 105.5, decided + 3600, 105.5, ExitReason.Target, 1, 0.4, 2.2, FillBasis.Exact, CostBasis.None, null,
+            1, 0, 100.5, 105.5, EntryFill.AtLimit, false, 1, 0, null);
+
+        ShadowTradeKey.For("ORB", "NSE:PAPA", side, new DateOnly(ky, kmo, kd)).ShouldBe(trade.Key);
+    }
+
     [Fact]
     public void A_side_other_than_buy_or_sell_has_no_key()
     {
@@ -42,6 +60,5 @@ public sealed class ShadowRulesTests
         ShadowWording.SeparateCount.ShouldContain("separate count");
         ShadowWording.SeparateCount.ShouldContain("P10 exit criterion is untouched");
         ShadowWording.PlaceholderRho.ShouldContain("placeholder");
-        ShadowWording.GapMeaning.ShouldContain("never back-filled");
     }
 }

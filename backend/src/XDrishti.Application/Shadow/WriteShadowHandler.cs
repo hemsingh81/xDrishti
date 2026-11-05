@@ -32,6 +32,9 @@ internal sealed class WriteShadowHandler(
 {
     private const int PlanLookback = 20;
 
+    // shortcut: a stored plan dated more than 10 days after today is ignored when choosing the sessions to look at (a guard against listing years of days for a mistaken plan date); real plans are for the next session.
+    private const int MaxDaysAhead = 10;
+
     public async ValueTask<Result<ShadowWriteOutcome>> HandleAsync(WriteShadowCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -52,20 +55,14 @@ internal sealed class WriteShadowHandler(
         var sessions = await SessionsAsync(command.Session, head, now, calendar, cancellationToken);
         var total = new Totals();
         string? previous = head?.Digest;
-        var headDate = head?.SessionDate;
         Context? context = null;
         foreach (var date in sessions)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (headDate is { } h && date <= h)
-            {
-                continue; // the chain only moves forward: an earlier session is never added
-            }
-
             NewShadowSession? session;
             if (ShadowCutoff.IsOpened(date, now))
             {
-                session = new NewShadowSession(date, "gap", previous, ShadowDigest.Next(previous, []), []);
+                session = new NewShadowSession(date, "gap", previous, ShadowDigest.Next(previous, date, "gap", []), []);
             }
             else
             {
@@ -73,13 +70,13 @@ internal sealed class WriteShadowHandler(
                 session = await BuildAsync(date, previous, calendar, context, total, cancellationToken);
             }
 
+            // The chain only moves forward, so a session that cannot be stored now ends the run: a later one stored first would leave this one (still unopened, so it cannot be a gap) without a row for ever.
             if (session is null || !await store.WriteSessionAsync(session, cancellationToken))
             {
-                continue;
+                break;
             }
 
             previous = session.Digest;
-            headDate = date;
             if (session.Status == "gap")
             {
                 total.Gaps++;
@@ -96,36 +93,53 @@ internal sealed class WriteShadowHandler(
         return Result.Success(new ShadowWriteOutcome(true, total.Sessions, total.Rows, total.EdgeRows, total.Gaps, total.Dropped));
     }
 
-    /// <summary>The sessions to look at, oldest first: for a run without a date, every trading session that opened after the newest stored one (each is a gap) and every session of a recent stored plan that has not opened.</summary>
+    /// <summary>
+    /// The trading sessions to look at, oldest first, with none left out between the newest stored session and the last one wanted: each that has opened becomes a gap, each that has not opened is written from its plan, and the run stops at the first that cannot be written
+    /// (a session the chain skipped could never be added). A run without a date looks as far as the furthest stored plan that has not opened. A first run has no history to be a gap in: it starts at the first session that has not opened, or at the asked one when that has opened.
+    /// </summary>
     private async Task<List<DateOnly>> SessionsAsync(DateOnly? asked, ShadowHead? head, DateTimeOffset now, TradingCalendar calendar, CancellationToken cancellationToken)
     {
-        if (asked is { } one)
+        var today = IndiaTime.Today(now);
+        var last = asked ?? today;
+        if (asked is null)
         {
-            return [one];
-        }
-
-        var result = new SortedSet<DateOnly>();
-        if (head is not null)
-        {
-            // A first run has no history to be a gap in: the record starts with the first session it writes.
-            for (var day = head.SessionDate.AddDays(1); day <= IndiaTime.Today(now); day = day.AddDays(1))
+            foreach (var plan in await plans.ListAsync(null, null, PlanLookback, cancellationToken))
             {
-                if (calendar.IsTradingDay(day) && ShadowCutoff.IsOpened(day, now))
+                if (!ShadowCutoff.IsOpened(plan.Plan.ForDate, now) && plan.Plan.ForDate <= today.AddDays(MaxDaysAhead) && plan.Plan.ForDate > last)
                 {
-                    result.Add(day);
+                    last = plan.Plan.ForDate;
                 }
             }
         }
 
-        foreach (var plan in await plans.ListAsync(null, null, PlanLookback, cancellationToken))
+        DateOnly first;
+        if (head is not null)
         {
-            if (!ShadowCutoff.IsOpened(plan.Plan.ForDate, now) && calendar.IsTradingDay(plan.Plan.ForDate))
+            first = head.SessionDate.AddDays(1);
+        }
+        else if (asked is { } one && ShadowCutoff.IsOpened(one, now))
+        {
+            first = one;
+        }
+        else
+        {
+            first = today;
+            while (first <= last && !(calendar.IsTradingDay(first) && !ShadowCutoff.IsOpened(first, now)))
             {
-                result.Add(plan.Plan.ForDate);
+                first = first.AddDays(1);
             }
         }
 
-        return [.. result];
+        var result = new List<DateOnly>();
+        for (var day = first; day <= last; day = day.AddDays(1))
+        {
+            if (calendar.IsTradingDay(day))
+            {
+                result.Add(day);
+            }
+        }
+
+        return result;
     }
 
     private async Task<Context> ReadContextAsync(CancellationToken cancellationToken)
@@ -168,7 +182,7 @@ internal sealed class WriteShadowHandler(
                 ShadowPlanFacts.CountsForEdge(item), context.EdgeEpoch));
         }
 
-        return new NewShadowSession(date, "ok", previous, ShadowDigest.Next(previous, entries.Select(e => e.RowHash)), entries);
+        return new NewShadowSession(date, "ok", previous, ShadowDigest.Next(previous, date, "ok", entries.Select(e => e.RowHash)), entries);
     }
 
     private sealed record Context(long? EdgeEpoch, string? ConfigHash);

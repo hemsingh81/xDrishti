@@ -178,6 +178,26 @@ internal sealed class SelectionPlanBuilder(
     /// <summary>The marker on an item that never reached the smart rules and the fill (held, not eligible or dropped in the merge); the shadow record reads it to set such an item aside as edge evidence.</summary>
     internal const string SmartRulesNotRun = "smart_rules";
 
+    /// <summary>The advisory note of a plan item that has a model figure, <c>model P(win) 0.712, advisory only</c> (three decimals at most). The one place the words are written; the shadow record parses against it (<see cref="TryReadAdvisoryNote"/>).</summary>
+    internal static string AdvisoryNote(double pWin) => string.Create(CultureInfo.InvariantCulture, $"{AdvisoryNotePrefix}{pWin:0.###}{AdvisoryNoteSuffix}");
+
+    /// <summary>The probability inside <paramref name="note"/> when the note is exactly what <see cref="AdvisoryNote"/> writes for it, else false: no other text, no more than three decimals.</summary>
+    internal static bool TryReadAdvisoryNote(string? note, out double pWin)
+    {
+        pWin = 0;
+        if (note is null || !note.StartsWith(AdvisoryNotePrefix, StringComparison.Ordinal) || !note.EndsWith(AdvisoryNoteSuffix, StringComparison.Ordinal) || note.Length <= AdvisoryNotePrefix.Length + AdvisoryNoteSuffix.Length)
+        {
+            return false;
+        }
+
+        var figure = note.AsSpan(AdvisoryNotePrefix.Length, note.Length - AdvisoryNotePrefix.Length - AdvisoryNoteSuffix.Length);
+        return double.TryParse(figure, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out pWin) && string.Equals(AdvisoryNote(pWin), note, StringComparison.Ordinal);
+    }
+
+    private const string AdvisoryNotePrefix = "model P(win) ";
+
+    private const string AdvisoryNoteSuffix = ", advisory only";
+
     // The smart-rule flags that apply to everything the rules and the fill saw, plus what was not run for the item.
     private static List<string> Applied(string[] always, List<string> flagCodes, bool filled, bool sized)
     {
@@ -211,7 +231,7 @@ internal sealed class SelectionPlanBuilder(
             stats?.WinRatePosterior,
             expectancy,
             unavailable,
-            advisory is { } p ? string.Create(CultureInfo.InvariantCulture, $"model P(win) {p:0.###}, advisory only") : null,
+            advisory is { } p ? AdvisoryNote(p) : null,
             stats?.WinRateLower);
         return new NewPlanItem(
             rank, group, draft.Symbol, draft.Side, draft.StrategyId, draft.StrategyVersionHash,

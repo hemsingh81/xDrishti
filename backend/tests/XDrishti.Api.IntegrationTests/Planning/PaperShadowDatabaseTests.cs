@@ -1,10 +1,14 @@
+using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using XDrishti.Api.IntegrationTests.Data;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Shadow;
+using XDrishti.Application.Planning;
 using XDrishti.Application.Shadow;
+using XDrishti.Domain.Paper;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Shadow;
 
@@ -29,6 +33,13 @@ public sealed class PaperShadowDatabaseTests(ApiFactory factory) : DataTestBase(
             new PlanEvidence(Cell, 41, "replayed history", "cell statistics only", 0.72, 0.12, reachedFill ? [] : ["portfolio_fill", "checklist", "smart_rules", "allocation"], null, 0.7), [],
             TicketLevels.Create("BUY", 100m, Monday, 98m, StopAnchor.CloseOfD, 104m, 2m).Value);
 
+    /// <summary>The application clock sits on the Sunday evening before the plans (2099-01-04, 21:10 India time), so that Monday is the first session that has not opened; the database clock is the real one.</summary>
+    public override async ValueTask InitializeAsync()
+    {
+        await base.InitializeAsync();
+        Factory.Clock.Pin(new DateTimeOffset(2099, 1, 4, 15, 40, 0, TimeSpan.Zero));
+    }
+
     private async Task PublishAsync(string key, DateOnly session, params NewPlanItem[] items)
     {
         var plan = new NewPlan(key, session, new DateTimeOffset(session.ToDateTime(new TimeOnly(3, 35)), TimeSpan.Zero), 1, new string('c', 64), "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, items);
@@ -45,7 +56,7 @@ public sealed class PaperShadowDatabaseTests(ApiFactory factory) : DataTestBase(
     private async Task<ShadowWriteOutcome> RunAsync(DateOnly? session = null)
     {
         using var scope = Factory.Services.CreateScope();
-        var result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>>().HandleAsync(new WriteShadowCommand(session, true), Ct);
+        var result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>>().HandleAsync(new WriteShadowCommand(session), Ct);
         result.IsSuccess.ShouldBeTrue();
         return result.Value;
     }
@@ -152,12 +163,58 @@ public sealed class PaperShadowDatabaseTests(ApiFactory factory) : DataTestBase(
         (await RunAsync()).Rows.ShouldBe(7);
     }
 
-    [Fact]
-    public async Task The_paper_reads_of_P10_are_byte_identical_with_and_without_shadow_rows()
+    private static readonly Guid AccountId = Guid.Parse("0b6f2a9e-7a52-4d7e-9c3a-5d0a7e0b7a05");
+
+    /// <summary>One armed, owner-approved primary paper entry with its exit in the epoch of Monday, so that the counted set and the band of P10 are not empty.</summary>
+    private async Task SeedCapturedPrimaryEntryAsync()
     {
-        await PublishNightlyPlanAsync("shadow-5", Monday, "NSE:");
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(
+                connection,
+                """
+                INSERT INTO accounts.broker_accounts (id, slug, name, broker, client_id, api_key_issued_on, color, created_at, updated_at, data_enabled, data_primary, data_standby, live_feed_budget)
+                VALUES (@id, 'probe-shadow', 'Probe', 'Dhan', '1000000081', current_date, '#1A2B3C', now(), now(), false, false, false, 200)
+                ON CONFLICT (id) DO NOTHING
+                """,
+                ("id", AccountId));
+        }
+
+        var cutoff = new DateTimeOffset(2099, 1, 5, 3, 35, 0, TimeSpan.Zero);
+        var afterClose = new DateTimeOffset(2099, 1, 5, 11, 30, 0, TimeSpan.Zero);
+        Factory.Clock.Pin(new DateTimeOffset(2099, 1, 5, 2, 0, 0, TimeSpan.Zero));
+        var item = new NewPlanItem(
+            1, TicketGroup.Primary, "NSE:PAPA", "BUY", "ORB", new string('a', 64), "close above 15m high", "0.8 ATR below entry", "2R", "09:30-11:30", [],
+            new PlanEvidence(Cell, 41, "replayed history", "cell statistics only", 0.72, 0.12, [], null, 0.7), [new NewAllocation(AccountId, "paper", 100)]);
+        var plan = new NewPlan("shadow-golden", Monday, cutoff, 1, new string('c', 64), "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, [item]);
+        using var scope = Factory.Services.CreateScope();
+        var services = scope.ServiceProvider;
+        var plans = services.GetRequiredService<IPlanStore>();
+        var published = await plans.PublishAsync(plan, Ct);
+        var id = (await plans.ItemsAsync(published.Id, Ct)).Single().Id;
+        (await services.GetRequiredService<ICommandHandler<MoveTicketCommand, TicketMoveOutcome>>().HandleAsync(new MoveTicketCommand(id, TicketState.Approved, "owner:test@example.com", "approved for watching"), Ct)).IsSuccess.ShouldBeTrue();
+        (await services.GetRequiredService<ICommandHandler<MovePlanCommand, PlanMoveOutcome>>().HandleAsync(new MovePlanCommand(published.Id, PlanState.Approved, "system:test", "approved"), Ct)).IsSuccess.ShouldBeTrue();
+        Factory.Clock.Pin(afterClose.AddHours(-7));
+        (await plans.MoveItemAsync(new ItemMove(id, TicketState.Approved, TicketState.Armed, "system:preopen", "armed", null), Ct)).ShouldBe(MoveStatus.Created);
+        Factory.Clock.Pin(afterClose);
+        (await plans.MoveItemAsync(new ItemMove(id, TicketState.Armed, TicketState.Expired, "system:plan-expiry", "expired", null), Ct)).ShouldBe(MoveStatus.Created);
+
+        var paper = services.GetRequiredService<IPaperStore>();
+        var epoch = await paper.EnsureFirstEpochAsync(Monday, afterClose, Ct);
+        var approval = await ScalarAsync<long>("SELECT id FROM workflow.approvals WHERE item_id = @i", ("i", id));
+        var armed = new DateTimeOffset(DateTime.SpecifyKind(await ScalarAsync<DateTime>("SELECT created_at FROM trading.plan_events WHERE item_id = @i AND to_state = 'armed'", ("i", id)), DateTimeKind.Utc));
+        var entry = new PaperEntry(published.Id, id, AccountId, "NSE:PAPA", "BUY", "ORB", new string('a', 64), Cell, "primary", approval, "owner", 100, 60, armed, armed.AddMinutes(10), 100.15m, 100.10m, 99m, 102.3m, false, "ORB|NSE:PAPA|Buy|2099-01-05", new string('d', 64), "sim-6");
+        var exit = new PaperExit(armed.AddMinutes(70), 102.30m, "Target", 1, 129m, null, null, null, PaperWording.Gross, 2, 1.95, null, 1.95, "gross", 0.4, 2.1);
+        await paper.WriteSessionAsync(new SessionWrite(epoch.Id, [new EpochAccount(AccountId, 100_000m, "test")], [new NewPaperEntry(entry, "measured", exit)], [], [], new NewCaptureRun(Monday, afterClose, afterClose, "done", 1, 0, 0, true, "test")), Ct);
+    }
+
+    [Fact]
+    public async Task The_counted_set_and_the_band_of_P10_are_byte_identical_with_and_without_shadow_rows_when_a_captured_primary_entry_exists()
+    {
+        await SeedCapturedPrimaryEntryAsync(); // the clock is left at the close of Monday, so Tuesday has not opened
+        await PublishNightlyPlanAsync("shadow-5", Tuesday, "NSE:");
         await ResignInAsync();
-        string[] reads = ["/api/paper/phase-check", "/api/paper/entries?limit=50", "/api/paper/capture-runs?limit=50", "/api/paper/epochs"];
+        string[] reads = ["/api/paper/phase-check", "/api/paper/backtest-vs-paper", "/api/paper/entries?limit=50", "/api/paper/capture-runs?limit=50", "/api/paper/epochs"];
 
         async Task<string[]> ReadAsync() => [.. await Task.WhenAll(reads.Select(path => Client.GetStringAsync(new Uri(path, UriKind.Relative), Ct)))];
 
@@ -167,5 +224,12 @@ public sealed class PaperShadowDatabaseTests(ApiFactory factory) : DataTestBase(
         var with = await ReadAsync();
 
         with.ShouldBe(without);
+        using var compare = System.Text.Json.JsonDocument.Parse(with[1]);
+        compare.RootElement.GetProperty("counts").GetProperty("counted").GetInt32().ShouldBe(1); // the golden output is not empty: one counted trade
+        compare.RootElement.GetProperty("n").GetInt32().ShouldBe(1);
+        var summary = await Client.GetFromJsonAsync<System.Text.Json.JsonElement>(new Uri("/api/paper/shadow/summary", UriKind.Relative), Ct);
+        summary.GetProperty("counts").GetProperty("behavioural").GetInt32().ShouldBe(1); // the seven shadow candidates are not added to the one paper trade
+        summary.GetProperty("counts").GetProperty("candidates").GetInt32().ShouldBe(7);
+        summary.GetProperty("counts").GetProperty("edgeRaw").GetInt32().ShouldBe(0);
     }
 }

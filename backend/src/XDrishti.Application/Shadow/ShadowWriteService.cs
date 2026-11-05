@@ -41,7 +41,7 @@ public sealed class ShadowWriteService(IServiceScopeFactory scopes) : IScheduled
         ArgumentNullException.ThrowIfNull(context);
         await using var scope = scopes.CreateAsyncScope();
         var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>>();
-        var result = await handler.HandleAsync(new WriteShadowCommand(null, context.Trigger == ServiceRunTrigger.Manual), cancellationToken);
+        var result = await handler.HandleAsync(new WriteShadowCommand(null), cancellationToken);
         return result.IsFailure ? ServiceOutcome.Failed(result.Error.Message) : ServiceOutcome.Succeeded(result.Value.Summary);
     }
 }

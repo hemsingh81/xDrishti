@@ -12,7 +12,7 @@ public sealed class ShadowDigestTests
 
     private static ShadowChainSession Session(DateOnly date, string? prev, params ShadowEntry[] entries)
     {
-        var digest = ShadowDigest.Next(prev, entries.Select(e => e.RowHash));
+        var digest = ShadowDigest.Next(prev, date, "ok", entries.Select(e => e.RowHash));
         return new ShadowChainSession(date, "ok", prev, digest, [.. entries.Select(e => new StoredShadowEntry(e, e.RowHash))]);
     }
 
@@ -27,8 +27,8 @@ public sealed class ShadowDigestTests
     [Fact]
     public void The_digest_is_64_hex_characters_and_does_not_depend_on_the_order_of_the_rows()
     {
-        var a = ShadowDigest.Next(null, ["bb", "aa", "cc"]);
-        var b = ShadowDigest.Next(null, ["cc", "aa", "bb"]);
+        var a = ShadowDigest.Next(null, Monday, "ok", ["bb", "aa", "cc"]);
+        var b = ShadowDigest.Next(null, Monday, "ok", ["cc", "aa", "bb"]);
 
         a.ShouldBe(b);
         a.Length.ShouldBe(64);
@@ -38,12 +38,35 @@ public sealed class ShadowDigestTests
     [Fact]
     public void The_digest_depends_on_the_previous_digest_and_on_every_row()
     {
-        var baseline = ShadowDigest.Next("p", ["a", "b"]);
+        var baseline = ShadowDigest.Next("p", Monday, "ok", ["a", "b"]);
 
-        ShadowDigest.Next("q", ["a", "b"]).ShouldNotBe(baseline);
-        ShadowDigest.Next("p", ["a"]).ShouldNotBe(baseline);
-        ShadowDigest.Next("p", ["a", "b", "c"]).ShouldNotBe(baseline);
-        ShadowDigest.Next(null, []).ShouldNotBe(ShadowDigest.Next("p", []));
+        ShadowDigest.Next("q", Monday, "ok", ["a", "b"]).ShouldNotBe(baseline);
+        ShadowDigest.Next("p", Monday, "ok", ["a"]).ShouldNotBe(baseline);
+        ShadowDigest.Next("p", Monday, "ok", ["a", "b", "c"]).ShouldNotBe(baseline);
+        ShadowDigest.Next(null, Monday, "ok", []).ShouldNotBe(ShadowDigest.Next("p", Monday, "ok", []));
+    }
+
+    [Fact]
+    public void The_digest_binds_the_date_and_the_status_of_the_session_and_its_format_is_pinned()
+    {
+        var baseline = ShadowDigest.Next("p", Monday, "ok", ["a", "b"]);
+
+        ShadowDigest.Next("p", Monday.AddDays(1), "ok", ["a", "b"]).ShouldNotBe(baseline);
+        ShadowDigest.Next("p", Monday, "gap", ["a", "b"]).ShouldNotBe(baseline);
+        ShadowDigest.Next(null, Monday, "gap", []).ShouldBe(System.Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("|2026-11-02|gap|")))); // sha256(prev|date|status|hashes)
+        ShadowDigest.Next("p", Monday, "ok", ["b", "a"]).ShouldBe(System.Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("p|2026-11-02|ok|a,b"))));
+    }
+
+    [Fact]
+    public void A_session_moved_to_another_date_or_an_ok_session_turned_into_a_gap_breaks_the_chain_from_that_session()
+    {
+        var moved = Week();
+        moved[2] = moved[2] with { SessionDate = Monday.AddDays(5) };
+        var turned = Week();
+        turned[1] = turned[1] with { Status = "gap" };
+
+        ShadowDigest.FirstBroken(moved).ShouldBe(Monday.AddDays(5));
+        ShadowDigest.FirstBroken(turned).ShouldBe(Monday.AddDays(1));
     }
 
     [Fact]
@@ -98,7 +121,7 @@ public sealed class ShadowDigestTests
     public void A_gap_is_a_link_of_the_chain_with_no_rows()
     {
         var one = Session(Monday, null, Entry(Monday, "A"));
-        var gap = new ShadowChainSession(Monday.AddDays(1), "gap", one.Digest, ShadowDigest.Next(one.Digest, []), []);
+        var gap = new ShadowChainSession(Monday.AddDays(1), "gap", one.Digest, ShadowDigest.Next(one.Digest, Monday.AddDays(1), "gap", []), []);
         var three = Session(Monday.AddDays(2), gap.Digest, Entry(Monday.AddDays(2), "D"));
 
         ShadowDigest.FirstBroken([one, gap, three]).ShouldBeNull();

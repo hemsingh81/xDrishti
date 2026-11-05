@@ -230,6 +230,51 @@ public sealed class PaperShadowGuardsTests(ResearchGrantsTests.DedicatedServer s
     }
 
     [Fact]
+    public async Task Two_changes_of_the_switch_are_serialised_so_that_the_highest_id_is_the_last_to_commit()
+    {
+        const string Insert = "INSERT INTO paper.shadow_settings (enabled, actor, reason) VALUES (@e, 'owner:probe@example.test', 'probe') RETURNING id";
+        await using var first = new NpgsqlConnection(server.App);
+        await first.OpenAsync(Ct);
+        await using var transaction = await first.BeginTransactionAsync(Ct);
+        await using var one = new NpgsqlCommand(Insert, first, transaction);
+        one.Parameters.AddWithValue("e", true);
+        var firstId = (long)(await one.ExecuteScalarAsync(Ct))!;
+
+        var second = SecondAsync();
+        await WaitForAdvisoryWaiterAsync(); // the second change waits for the first to end; with the id drawn before the lock it would not wait
+        await transaction.CommitAsync(Ct);
+        var secondId = await second;
+
+        secondId.ShouldBeGreaterThan(firstId);
+        (await ScalarAsync<bool>(server.Owner, "SELECT enabled FROM paper.shadow_settings ORDER BY id DESC LIMIT 1")).ShouldBeFalse();
+
+        async Task<long> SecondAsync()
+        {
+            await using var connection = new NpgsqlConnection(server.App);
+            await connection.OpenAsync(Ct);
+            await using var command = new NpgsqlCommand(Insert, connection);
+            command.Parameters.AddWithValue("e", false);
+            return (long)(await command.ExecuteScalarAsync(Ct))!;
+        }
+    }
+
+    private async Task WaitForAdvisoryWaiterAsync()
+    {
+        // Polls the lock table (bounded) until a backend waits for an advisory lock; there is no clock to advance here, the wait is another backend's in the database (the same poll as AutoApprovalDatabaseTests).
+        for (var i = 0; i < 200; i++)
+        {
+            if (await ScalarAsync<long>(server.Owner, "SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted") > 0)
+            {
+                return;
+            }
+
+            await Task.Delay(25, Ct);
+        }
+
+        throw new InvalidOperationException("Nobody waited for the advisory lock.");
+    }
+
+    [Fact]
     public async Task A_grade_is_stamped_by_the_database_once_per_entry_and_never_before_the_open_of_its_session()
     {
         var session = new DateOnly(2026, 11, 11);

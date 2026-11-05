@@ -3661,6 +3661,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/paper/shadow/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The shadow record of every nightly candidate (written before the open, graded after the close by the paper replay): raw n and effective n with the correlation used (and whether it is the placeholder), the mean R with a 90% interval and the hit rate for all and by group (primary, reserve, rejected), the behavioural count of P10 and the edge count side by side, the pace once 10 trades are graded, the chain head (sessions, gaps, last digest) and the charge-sheet basis (gross unless the sheet is confirmed). Always says: modelled fills; no queue, no latency, and that this is a separate count (the P10 exit criterion is untouched). Says so when there are no rows. Read only; no order exists */
+    get: operations['GetShadowSummary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/paper/shadow/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Switch the shadow record (paper.shadow.enabled, OFF by default) ON or OFF as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). ON only allows the services shadow-write and shadow-grade (which also start paused). 401 auth.invalid_credentials, 423 auth.locked, 403 paper.shadow_owner_only, 400 paper.shadow_reason_invalid, 429 auth.rate_limited */
+    put: operations['ChangeShadowSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/paper/phase-check': {
     parameters: {
       query?: never;
@@ -18896,6 +18930,179 @@ export interface components {
       /** Format: double */
       intentLowest: null | number;
     };
+    /** @description The chain of digests: the owner copies the last one outside the database, and `xd paper shadow verify` recomputes it. */
+    ShadowChainView: {
+      /**
+       * Format: int32
+       * @description Stored sessions.
+       */
+      sessions: number;
+      /**
+       * Format: int32
+       * @description Gap sessions: the writer did not run before the open; never back-filled.
+       */
+      gaps: number;
+      /**
+       * Format: date
+       * @description The newest session.
+       */
+      lastSession: null | string;
+      /** @description Its digest. */
+      lastDigest: null | string;
+    };
+    /** @description What the R is net of, and whether it may be called net (P10-00 D5). */
+    ShadowCostView: {
+      /** @description The label of the figures. */
+      basis: string;
+      /** @description True when the figures are the gross R (before charges): no charge sheet, a sheet the owner has not confirmed, or a mix. The numbers, this flag and Basis always agree. */
+      gross: boolean;
+      /** @description The charge sheets that charged any graded trade. */
+      sheetIds: string[];
+      /** @description Whether every such sheet is confirmed as the owner's. */
+      confirmed: boolean;
+    };
+    /** @description The two counts side by side (criterion 10). The behavioural count is P10's own: the owner-approved, armed, primary, measured trades of the newest epoch. The edge count is the graded shadow trades that count for edge. They are never added. */
+    ShadowCountsView: {
+      /**
+       * Format: int32
+       * @description The P10 counted trades of the newest epoch (the exit criterion's n).
+       */
+      behavioural: number;
+      /**
+       * Format: int32
+       * @description Graded shadow trades that count for edge.
+       */
+      edgeRaw: number;
+      /**
+       * Format: double
+       * @description The effective n of the edge count.
+       */
+      edgeEffective: number;
+      /**
+       * Format: int32
+       * @description Every stored candidate, set-aside ones included.
+       */
+      candidates: number;
+      /**
+       * Format: int32
+       * @description Candidates that count for edge.
+       */
+      edgeCandidates: number;
+      /**
+       * Format: int32
+       * @description Edge candidates with no stored grade yet.
+       */
+      pending: number;
+      /**
+       * Format: int32
+       * @description Edge candidates graded as not triggered.
+       */
+      notTriggered: number;
+      /**
+       * Format: int32
+       * @description Edge candidates graded as not gradable.
+       */
+      notGradable: number;
+    };
+    /** @description The effective n of the edge count and the pace (criteria 8 and 9). */
+    ShadowEdgeView: {
+      /**
+       * Format: int32
+       * @description Graded shadow trades that count for edge.
+       */
+      rawN: number;
+      /**
+       * Format: double
+       * @description Raw n over the design effect of each day.
+       */
+      effectiveN: number;
+      /**
+       * Format: double
+       * @description The same-day correlation used.
+       */
+      rho: number;
+      /** @description Whether it is the placeholder until CF-01 estimates it. */
+      rhoIsPlaceholder: boolean;
+      /** @description Says so when it is the placeholder, else null. */
+      rhoNote: null | string;
+      /**
+       * Format: int32
+       * @description Sessions with at least one final grade: the sessions the pace is counted over (a session not graded yet does not lower the rate).
+       */
+      sessions: number;
+      /**
+       * Format: int32
+       * @description The effective n the ETA aims at (60, as the paper programme).
+       */
+      targetEffectiveN: number;
+      /**
+       * Format: int32
+       * @description Sessions still needed at the rate seen so far; null until 10 trades are graded.
+       */
+      etaSessions: null | number;
+      /** @description What the ETA is or why there is none. */
+      etaNote: string;
+    };
+    /** @description The graded edge trades of one group: n, mean R with a 90% interval and the hit rate. A figure is a state and a number only when it is a value. */
+    ShadowGroupView: {
+      /** @description `all`, `primary`, `reserve` or `rejected`. */
+      group: string;
+      /**
+       * Format: int32
+       * @description Graded trades.
+       */
+      n: number;
+      /** @description The mean R. */
+      meanR: components['schemas']['MetricView'];
+      /** @description The 5th percentile of the bootstrapped mean. */
+      low90: components['schemas']['MetricView'];
+      /** @description The 95th percentile of the bootstrapped mean. */
+      high90: components['schemas']['MetricView'];
+      /** @description The share of trades with R above 0. */
+      hitRate: components['schemas']['MetricView'];
+    };
+    /** @description The shadow summary (criterion 10). */
+    ShadowSummaryView: {
+      /** @description Whether `paper.shadow.enabled` is ON. */
+      enabled: boolean;
+      /** @description Whether any shadow row is stored. */
+      hasRows: boolean;
+      /** @description Says so when there are no rows (and why none is written while the switch is OFF); null otherwise. */
+      note: null | string;
+      /** @description Always: modelled fills; no queue, no latency. */
+      statement: string;
+      /** @description Always: this is a separate count and the P10 exit criterion is untouched. */
+      separateCount: string;
+      /** @description The behavioural and edge counts side by side. */
+      counts: components['schemas']['ShadowCountsView'];
+      /** @description The effective n and the pace. */
+      edge: components['schemas']['ShadowEdgeView'];
+      /** @description Overall (`all`), then primary, reserve and rejected. */
+      groups: components['schemas']['ShadowGroupView'][];
+      /** @description What the R is net of. */
+      costs: components['schemas']['ShadowCostView'];
+      /** @description The chain head. */
+      chain: components['schemas']['ShadowChainView'];
+    };
+    /** @description The body of the shadow-record switch. The owner is never part of it: the actor comes from the signed-in session. */
+    ShadowSwitchRequest: {
+      /** @description The new value of `paper.shadow.enabled`: ON lets the services shadow-write and shadow-grade work (they also start paused), OFF stops them. */
+      enabled: boolean;
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS change, ON or OFF. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
+      password: null | string;
+    };
+    /** @description The answer of a switch change: the row and the new value. */
+    ShadowSwitched: {
+      /**
+       * Format: int64
+       * @description The row appended.
+       */
+      id: number;
+      /** @description The value now in force. */
+      enabled: boolean;
+    };
     /**
      * @description The shrunk figures of a cell row (CF-02, ADR 0204), as the API shows them beside the raw ones: "an estimate of the past edge, pulled toward its group", not a forecast. Every figure is null when it could not be computed and string ShrinkageView.Note then
      *     says `unavailable: &lt;reason&gt;`. It changes no other figure of the row.
@@ -29198,6 +29405,59 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetShadowSummary: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ShadowSummaryView'];
+        };
+      };
+    };
+  };
+  ChangeShadowSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ShadowSwitchRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ShadowSwitched'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
         };
       };
     };

@@ -5,6 +5,7 @@ using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Shadow;
+using XDrishti.Application.Planning;
 using XDrishti.Application.Shadow;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Planning;
@@ -55,7 +56,7 @@ public sealed class WriteShadowHandlerTests
 
     private async Task<ShadowWriteOutcome> RunAsync(DateOnly? session = null)
     {
-        var result = await Handler().HandleAsync(new WriteShadowCommand(session, false), Ct);
+        var result = await Handler().HandleAsync(new WriteShadowCommand(session), Ct);
         result.IsSuccess.ShouldBeTrue();
         return result.Value;
     }
@@ -144,6 +145,27 @@ public sealed class WriteShadowHandlerTests
         ShadowPlanFacts.AdvisoryPWin(Item(1, TicketGroup.Primary, "NSE:P1", note: note)).ShouldBe(expected);
     }
 
+    [Theory]
+    [InlineData(0.7123, "model P(win) 0.712, advisory only", 0.712)]
+    [InlineData(0.9996, "model P(win) 1, advisory only", 1.0)]
+    [InlineData(0.0004, "model P(win) 0, advisory only", 0.0)]
+    [InlineData(0.05, "model P(win) 0.05, advisory only", 0.05)]
+    public void The_note_the_plan_builder_writes_is_read_back_by_the_same_format(double figure, string words, double expected)
+    {
+        var note = SelectionPlanBuilder.AdvisoryNote(figure); // the one place the builder writes the words
+
+        note.ShouldBe(words);
+        ShadowPlanFacts.AdvisoryPWin(Item(1, TicketGroup.Primary, "NSE:P1", note: note)).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void A_note_with_more_decimals_or_other_words_than_the_builder_writes_is_not_read()
+    {
+        ShadowPlanFacts.AdvisoryPWin(Item(1, TicketGroup.Primary, "NSE:P1", note: "model P(win) 0.7123, advisory only")).ShouldBeNull();
+        ShadowPlanFacts.AdvisoryPWin(Item(1, TicketGroup.Primary, "NSE:P1", note: "model P(win) -0.5, advisory only")).ShouldBeNull();
+        ShadowPlanFacts.AdvisoryPWin(Item(1, TicketGroup.Primary, "NSE:P1", note: "model P(win) , advisory only")).ShouldBeNull();
+    }
+
     [Fact]
     public async Task The_trade_key_uses_the_decision_day_of_the_cell_as_the_paper_record_does()
     {
@@ -183,9 +205,9 @@ public sealed class WriteShadowHandlerTests
 
         var second = _store.Sessions.Single(s => s.SessionDate == wednesday);
         first.PrevDigest.ShouldBeNull();
-        first.Digest.ShouldBe(ShadowDigest.Next(null, first.Entries.Select(e => e.RowHash)));
+        first.Digest.ShouldBe(ShadowDigest.Next(null, first.SessionDate, "ok", first.Entries.Select(e => e.RowHash)));
         second.PrevDigest.ShouldBe(first.Digest);
-        second.Digest.ShouldBe(ShadowDigest.Next(first.Digest, second.Entries.Select(e => e.RowHash)));
+        second.Digest.ShouldBe(ShadowDigest.Next(first.Digest, second.SessionDate, "ok", second.Entries.Select(e => e.RowHash)));
         ShadowDigest.FirstBroken((await _store.ReadChainAsync(Ct)).ToList()).ShouldBeNull();
     }
 
@@ -201,7 +223,7 @@ public sealed class WriteShadowHandlerTests
         outcome.Rows.ShouldBe(0);
         var gap = _store.Sessions.Single();
         (gap.SessionDate, gap.Status, gap.Entries.Count).ShouldBe((Tuesday, "gap", 0));
-        gap.Digest.ShouldBe(ShadowDigest.Next(null, []));
+        gap.Digest.ShouldBe(ShadowDigest.Next(null, Tuesday, "gap", []));
         await _plans.DidNotReceive().ItemsAsync(Arg.Any<long>(), Ct);
     }
 
@@ -234,6 +256,40 @@ public sealed class WriteShadowHandlerTests
         outcome.Sessions.ShouldBe(1);
         _store.Sessions.OrderBy(s => s.SessionDate).Select(s => (s.SessionDate.Day, s.Status)).ShouldBe([(3, "ok"), (4, "gap"), (5, "gap"), (6, "ok")]);
         ShadowDigest.FirstBroken((await _store.ReadChainAsync(Ct)).ToList()).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_run_for_one_session_first_records_a_gap_for_every_opened_session_the_chain_lacks()
+    {
+        TheNightlyPlan();
+        await RunAsync(); // Tuesday written on Monday evening
+        _time.SetUtcNow(new DateTimeOffset(2026, 11, 5, 15, 40, 0, TimeSpan.Zero)); // Thursday evening
+        var friday = new DateOnly(2026, 11, 6);
+        _plans.ListAsync(friday, null, Arg.Any<int>(), Ct).Returns([Plan(12, friday)]);
+        Items(12, Item(1, TicketGroup.Primary, "NSE:P7"));
+
+        var outcome = await RunAsync(friday);
+
+        outcome.Gaps.ShouldBe(2);
+        _store.Sessions.OrderBy(s => s.SessionDate).Select(s => (s.SessionDate.Day, s.Status)).ShouldBe([(3, "ok"), (4, "gap"), (5, "gap"), (6, "ok")]);
+        ShadowDigest.FirstBroken((await _store.ReadChainAsync(Ct)).ToList()).ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_session_is_never_written_while_an_earlier_session_that_has_not_opened_has_no_row(bool asked)
+    {
+        var wednesday = new DateOnly(2026, 11, 4); // Tuesday has no plan; Wednesday has one
+        _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns([Plan(20, wednesday)]);
+        _plans.ListAsync(Tuesday, null, Arg.Any<int>(), Ct).Returns([]);
+        _plans.ListAsync(wednesday, null, Arg.Any<int>(), Ct).Returns([Plan(20, wednesday)]);
+        Items(20, Item(1, TicketGroup.Primary, "NSE:W1"));
+
+        var outcome = await RunAsync(asked ? wednesday : null);
+
+        outcome.Sessions.ShouldBe(0);
+        _store.WriteCalls.ShouldBe(0); // writing Wednesday first would leave Tuesday, still unopened and so no gap, without a row for ever
     }
 
     [Fact]
@@ -316,7 +372,7 @@ public sealed class WriteShadowHandlerTests
     [Fact]
     public async Task A_date_that_is_not_a_trading_session_is_refused()
     {
-        var result = await Handler().HandleAsync(new WriteShadowCommand(new DateOnly(2026, 11, 7), true), Ct); // a Saturday
+        var result = await Handler().HandleAsync(new WriteShadowCommand(new DateOnly(2026, 11, 7)), Ct); // a Saturday
 
         result.IsFailure.ShouldBeTrue();
         _store.WriteCalls.ShouldBe(0);

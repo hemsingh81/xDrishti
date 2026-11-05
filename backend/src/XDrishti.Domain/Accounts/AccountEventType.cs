@@ -96,4 +96,5 @@ public enum AccountEventType
     OptionBackfillProbeAccepted,
     EventFilterSwitched,
     LabHoldOutUnlocked,
+    ShadowRecordSwitched,
 }
