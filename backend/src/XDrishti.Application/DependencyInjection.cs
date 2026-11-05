@@ -88,6 +88,7 @@ using XDrishti.Application.Reporting;
 using XDrishti.Application.Research;
 using XDrishti.Application.Research.CostSheets;
 using XDrishti.Application.Selection;
+using XDrishti.Application.Shadow;
 using XDrishti.Application.Ticks;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
@@ -364,6 +365,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, PreOpenService>(); // arms the approved tickets at 09:10 (P7-11); starts paused, no order, no promotion
         services.AddSingleton<IScheduledService, PlanExpiryService>(); // expires the day's armed tickets after the close (P7-11); starts paused
         services.AddSingleton<IScheduledService, PaperCaptureService>(); // paper fills of armed tickets after the end-of-day run (P10-01); starts paused, no order
+        services.AddSingleton<IScheduledService, ShadowWriteService>(); // the shadow record of every nightly candidate, written before the open (CF-08); starts paused, setting paper.shadow.enabled OFF, no order
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, BriefingService>(); // the daily briefing text after the suggestions (P9-06); starts paused, the model is used only under both switches
         services.AddSingleton<IScheduledService, WeeklyReviewService>(); // the weekly review text after the digest (P9-06); starts paused, applies nothing
@@ -933,6 +935,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<StartEpochCommand, EpochView>, StartEpochHandler>(); // owner act, CLI only (P10-05)
         services.AddScoped<ICommandHandler<ExplainChangeCommand, ExplainOutcome>, ExplainChangeHandler>(); // owner note, CLI only (P10-05)
         services.AddScoped<ICommandHandler<CapturePaperFillsCommand, PaperCaptureOutcome>, CapturePaperFillsHandler>(); // paper fills of armed tickets: insert-only, replayed on stored bars, no order (P10-01)
+        services.AddScoped<ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>, WriteShadowHandler>(); // the shadow record: forward-only, insert-only, switch OFF by default, no order (CF-08)
         services.AddScoped<IQueryHandler<ListPaperEntriesQuery, Result<PaperEntryList>>, ListPaperEntriesHandler>();
         services.AddScoped<IQueryHandler<ListCaptureRunsQuery, Result<CaptureRunList>>, ListCaptureRunsHandler>();
         services.AddScoped<PaperLedgerService>(); // the derived paper ledger of each paper account, from the stored trades only (P10-02, ADR 0118)

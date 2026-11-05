@@ -6009,6 +6009,295 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.ShadowEntryRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CellKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("cell_key");
+
+                    b.Property<string>("ConfigHash")
+                        .HasColumnType("char(64)")
+                        .HasColumnName("config_hash");
+
+                    b.Property<bool>("CountsForEdge")
+                        .HasColumnType("boolean")
+                        .HasColumnName("counts_for_edge");
+
+                    b.Property<long?>("EdgeEpoch")
+                        .HasColumnType("bigint")
+                        .HasColumnName("edge_epoch");
+
+                    b.Property<decimal?>("EntryLimit")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("entry_limit");
+
+                    b.Property<string>("FeatureVersion")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("feature_version");
+
+                    b.Property<string>("Features")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("features");
+
+                    b.Property<string>("ModelId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("model_id");
+
+                    b.Property<double?>("PWin")
+                        .HasColumnType("double precision")
+                        .HasColumnName("p_win");
+
+                    b.Property<long>("PlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_id");
+
+                    b.Property<long>("PlanItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_item_id");
+
+                    b.Property<string>("RowHash")
+                        .IsRequired()
+                        .HasColumnType("char(64)")
+                        .HasColumnName("row_hash");
+
+                    b.Property<DateOnly>("SessionDate")
+                        .HasColumnType("date")
+                        .HasColumnName("session_date");
+
+                    b.Property<string>("Side")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("side");
+
+                    b.Property<decimal?>("Stop")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("stop");
+
+                    b.Property<string>("StrategyHash")
+                        .IsRequired()
+                        .HasColumnType("char(64)")
+                        .HasColumnName("strategy_hash");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("symbol");
+
+                    b.Property<decimal?>("Target")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("target");
+
+                    b.Property<string>("TicketGroup")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("ticket_group");
+
+                    b.Property<string>("TimeRule")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("time_rule");
+
+                    b.Property<string>("TradeKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("trade_key");
+
+                    b.Property<DateTimeOffset>("WrittenAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("written_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shadow_entries");
+
+                    b.HasIndex("PlanId")
+                        .HasDatabaseName("ix_shadow_entries_plan_id");
+
+                    b.HasIndex("PlanItemId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_shadow_entries_plan_item_id");
+
+                    b.HasIndex("SessionDate", "TradeKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_shadow_entries_session_trade_key");
+
+                    b.ToTable("shadow_entries", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_shadow_entries_shape", "ticket_group IN ('primary', 'reserve', 'rejected') AND side IN ('BUY', 'SELL') AND row_hash ~ '^[0-9a-f]{64}$' AND (config_hash IS NULL OR config_hash ~ '^[0-9a-f]{64}$') AND (p_win IS NULL OR (p_win >= 0 AND p_win <= 1)) AND ((features IS NULL) = (feature_version IS NULL)) AND length(btrim(trade_key)) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.ShadowGradeRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("EngineVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("engine_version");
+
+                    b.Property<DateTimeOffset?>("EntryAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("entry_at");
+
+                    b.Property<long>("EntryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("entry_id");
+
+                    b.Property<DateTimeOffset?>("ExitAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("exit_at");
+
+                    b.Property<string>("ExitReason")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("exit_reason");
+
+                    b.Property<DateTimeOffset>("GradedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("graded_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("RBasis")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)")
+                        .HasColumnName("r_basis");
+
+                    b.Property<double?>("RSim")
+                        .HasColumnType("double precision")
+                        .HasColumnName("r_sim");
+
+                    b.Property<string>("SheetId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("sheet_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shadow_grades");
+
+                    b.HasIndex("EntryId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_shadow_grades_entry_id");
+
+                    b.ToTable("shadow_grades", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_shadow_grades_shape", "status IN ('graded', 'not_triggered', 'not_gradable') AND ((status = 'graded') = (r_sim IS NOT NULL)) AND ((status = 'graded') = (r_basis IS NOT NULL)) AND (r_basis IS NULL OR r_basis IN ('net', 'gross')) AND (exit_at IS NULL OR entry_at IS NULL OR exit_at >= entry_at) AND length(btrim(engine_version)) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.ShadowSessionRecord", b =>
+                {
+                    b.Property<DateOnly>("SessionDate")
+                        .HasColumnType("date")
+                        .HasColumnName("session_date");
+
+                    b.Property<string>("Digest")
+                        .IsRequired()
+                        .HasColumnType("char(64)")
+                        .HasColumnName("digest");
+
+                    b.Property<int>("NRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("n_rows");
+
+                    b.Property<string>("PrevDigest")
+                        .HasColumnType("char(64)")
+                        .HasColumnName("prev_digest");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("WrittenAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("written_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("SessionDate")
+                        .HasName("pk_shadow_sessions");
+
+                    b.ToTable("shadow_sessions", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_shadow_sessions_shape", "status IN ('ok', 'gap') AND n_rows >= 0 AND (status = 'ok' OR n_rows = 0) AND digest ~ '^[0-9a-f]{64}$' AND (prev_digest IS NULL OR prev_digest ~ '^[0-9a-f]{64}$')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.ShadowSettingRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shadow_settings");
+
+                    b.ToTable("shadow_settings", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_shadow_settings_shape", "actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND length(btrim(reason)) > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiBriefingAttemptRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -8823,9 +9112,6 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_holdout_unlocks");
 
-                    b.HasIndex(new[] { "BlockStart" }, "ix_holdout_unlocks_block")
-                        .HasDatabaseName("ix_holdout_unlocks_block");
-
                     b.HasIndex("BlockStart")
                         .IsUnique()
                         .HasDatabaseName("uq_holdout_unlocks_fresh")
@@ -8834,6 +9120,9 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasIndex("StrategyId", "Version", "Kind")
                         .IsUnique()
                         .HasDatabaseName("uq_holdout_unlocks_version");
+
+                    b.HasIndex(new[] { "BlockStart" }, "ix_holdout_unlocks_block")
+                        .HasDatabaseName("ix_holdout_unlocks_block");
 
                     b.ToTable("holdout_unlocks", "lab", t =>
                         {
@@ -10795,6 +11084,26 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_skips_epochs_epoch_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.ShadowEntryRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Paper.ShadowSessionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SessionDate")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_shadow_entries_shadow_sessions_session_date");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.ShadowGradeRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Paper.ShadowEntryRecord", null)
+                        .WithMany()
+                        .HasForeignKey("EntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_shadow_grades_shadow_entries_entry_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Persistence.AiBriefingAttemptRecord", b =>

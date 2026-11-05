@@ -222,6 +222,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await this.WithDbAsync(async db =>
         {
             await db.Database.ExecuteSqlRawAsync("""
+                DELETE FROM paper.shadow_grades;
+                DELETE FROM paper.shadow_entries;
+                DELETE FROM paper.shadow_sessions;
+                DELETE FROM paper.shadow_settings;
                 DELETE FROM paper.exits;
                 DELETE FROM paper.entries;
                 DELETE FROM paper.skips;

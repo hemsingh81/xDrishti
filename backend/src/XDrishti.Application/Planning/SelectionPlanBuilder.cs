@@ -173,7 +173,10 @@ internal sealed class SelectionPlanBuilder(
     }
 
     // What was not applied to an item that never reached the smart rules and the fill (rejected by the selection, or lost in the merge).
-    private static List<string> NotRun(string[] always) => [.. always, "portfolio_fill", "checklist", "smart_rules", "allocation"];
+    private static List<string> NotRun(string[] always) => [.. always, "portfolio_fill", "checklist", SmartRulesNotRun, "allocation"];
+
+    /// <summary>The marker on an item that never reached the smart rules and the fill (held, not eligible or dropped in the merge); the shadow record reads it to set such an item aside as edge evidence.</summary>
+    internal const string SmartRulesNotRun = "smart_rules";
 
     // The smart-rule flags that apply to everything the rules and the fill saw, plus what was not run for the item.
     private static List<string> Applied(string[] always, List<string> flagCodes, bool filled, bool sized)
