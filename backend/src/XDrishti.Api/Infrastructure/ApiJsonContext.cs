@@ -321,6 +321,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(PaperReviewList))]
 [JsonSerializable(typeof(DisciplineView))]
 [JsonSerializable(typeof(BacktestVsPaperView))]
+[JsonSerializable(typeof(SequentialStatusView))]
 [JsonSerializable(typeof(ShadowSummaryView))]
 [JsonSerializable(typeof(ShadowSwitched))]
 [JsonSerializable(typeof(ShadowSwitchRequest))]

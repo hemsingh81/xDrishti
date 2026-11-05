@@ -3661,6 +3661,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/paper/sequential': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The sequential failure test of the paper edge series (graded shadow trades that count for edge, current paper epoch, in session then trade-key order) with the P10 behavioural series beside it: state (monitoring, on_track, caution or failure; failure is latched for the epoch), running sum, boundaries and odds, trades counted, effective n, first crossing, the correlation used, the settings hash and a path summary. scope=system (default) or scope=strategy with strategy=<id>. A flag only: report only, never a pass; the fixed P10 gates still decide a pass. Gaussian model, modelled fills. Read only; no order exists. 404 paper.not_found when no shadow edge candidate exists in the scope, 400 paper.invalid */
+    get: operations['GetPaperSequentialStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/paper/shadow/summary': {
     parameters: {
       query?: never;
@@ -18674,6 +18691,145 @@ export interface components {
       parameters: components['schemas']['ParameterSensitivityView'][];
       label: string;
     };
+    /** @description The boundaries of the test, computed from the settings (never stored). */
+    SequentialBoundariesView: {
+      /**
+       * Format: double
+       * @description The caution boundary.
+       */
+      caution: number;
+      /**
+       * Format: double
+       * @description The failure boundary.
+       */
+      failure: number;
+      /**
+       * Format: double
+       * @description The level the sum is reflected at; a label, never a pass.
+       */
+      onTrack: number;
+      /**
+       * Format: double
+       * @description The evidence ratio at the caution boundary.
+       */
+      cautionOdds: number;
+      /**
+       * Format: double
+       * @description The evidence ratio at the failure boundary.
+       */
+      failureOdds: number;
+    };
+    /** @description A short summary of the sum path (the whole path is not sent). */
+    SequentialPathView: {
+      /**
+       * Format: double
+       * @description The lowest sum of the path.
+       */
+      lowest: number;
+      /**
+       * Format: int32
+       * @description The 1-based trade of the lowest sum; 0 with no trade.
+       */
+      lowestAtTrade: number;
+      /**
+       * Format: double
+       * @description The sigma of the last step.
+       */
+      sigmaUsed: number;
+    };
+    /** @description One series run through the test. */
+    SequentialSeriesView: {
+      /** @description What the R is: gross or net, and whose fills. */
+      basis: string;
+      /** @description What the reader should know about the series: why there is nothing to test (no epoch, no graded trade), which session holds trades back, how many graded trades have no gross figure; null when there is nothing to say. */
+      note: null | string;
+      /** @description `monitoring`, `on_track`, `caution` or `failure`. None of them is a pass. */
+      state: string;
+      /** @description The words of the state. */
+      stateText: string;
+      /**
+       * Format: double
+       * @description The running sum now.
+       */
+      sum: number;
+      /**
+       * Format: int32
+       * @description Trades in the series.
+       */
+      tradesCounted: number;
+      /**
+       * Format: double
+       * @description The trades over the design effect of their days.
+       */
+      effectiveN: number;
+      /**
+       * Format: int32
+       * @description The 1-based number of the first trade at or below the caution boundary; null when never.
+       */
+      firstCautionTrade: null | number;
+      /**
+       * Format: date
+       * @description Its day; null when never.
+       */
+      firstCautionDate: null | string;
+      /**
+       * Format: int32
+       * @description The 1-based number of the first trade at or below the failure boundary; null when never.
+       */
+      firstFailureTrade: null | number;
+      /**
+       * Format: date
+       * @description Its day; null when never.
+       */
+      firstFailureDate: null | string;
+      /**
+       * Format: int32
+       * @description Graded trades not in the series because an earlier session still has a candidate without a grade (the test runs only over the complete sessions from the start of the epoch, so a late grade can only add to the end and never rewrite a shown path); 0 for the behavioural series.
+       */
+      heldBackTrades: number;
+      /**
+       * Format: date
+       * @description The first session with a candidate still without a grade, where the series stops (it may never be graded: a replay can wait or fail for good); null when the series is complete.
+       */
+      heldBackFromSession: null | string;
+      /** @description The path summary. */
+      path: components['schemas']['SequentialPathView'];
+    };
+    /** @description The sequential failure test (spec CF-09): the edge series of the shadow record with the P10 behavioural series beside it. A flag only. */
+    SequentialStatusView: {
+      /** @description `system` or `strategy`. */
+      scope: string;
+      /** @description The strategy of a `strategy` scope. */
+      strategy: null | string;
+      /**
+       * Format: int64
+       * @description The paper epoch both series are read for (the current one); null when there is none.
+       */
+      epoch: null | number;
+      /** @description Whether any shadow edge candidate of the epoch exists in the scope (the endpoint answers 404 when not). */
+      hasSeries: boolean;
+      /** @description The boundaries. */
+      boundaries: components['schemas']['SequentialBoundariesView'];
+      /**
+       * Format: double
+       * @description The same-day correlation used.
+       */
+      rho: number;
+      /** @description Whether it is the placeholder until CF-01 estimates it. */
+      rhoIsPlaceholder: boolean;
+      /** @description The SHA-256 of the settings that produced the figures. */
+      settingsHash: string;
+      /** @description The text of those settings. */
+      settings: string;
+      /** @description The edge series (graded shadow trades that count for edge); the primary reading. */
+      edge: components['schemas']['SequentialSeriesView'];
+      /** @description The P10 counted trades of the epoch, run through the same test, beside it. */
+      behavioural: components['schemas']['SequentialSeriesView'];
+      /** @description The honesty sentences: the model, the odds, the indifference point, the same-day discount, that the fixed gates decide. */
+      statements: string[];
+      /** @description One line for the report beside the P10 phase check. */
+      line: string;
+    };
     /** @description A finding of the schedule checks. `severity`: error (blocks saving) · warning. `field` is a dotted path like the request (schedule.time, retries, parameters.x); `relatedServiceId` names the other service of a finding that involves two. */
     ServiceIssueView: {
       serviceId: string;
@@ -29400,6 +29556,47 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPaperSequentialStatus: {
+    parameters: {
+      query?: {
+        scope?: string;
+        strategy?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SequentialStatusView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

@@ -74,10 +74,15 @@ The design-effect estimator (CF-01). That CF-08 provides the ordering and the da
 1. `mu1` (0.2 R) and the indifference point it implies (0.1 R net). 2. Two lower levels (caution 21 %, failure 5.3 % wrong-stop odds) or only the failure level? 3. Should the P10 phase tab show the line, or only the shadow summary?
 
 ## Done when
-- [ ] All acceptance criteria have evidence
-- [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] Contract regenerated (`scripts/gen-api.sh`)
-- [ ] Design docs/ADR updated (docs 09, 18); `scripts/build-docs.sh`
+- [x] All acceptance criteria have evidence (unit, application, architecture and integration tests listed in ADR 0213)
+- [x] `scripts/check.sh` green (39006 tests, 0 failed)
+- [ ] Reviewer agent: no blockers/majors (the caller's independent pass)
+- [x] Contract regenerated (`scripts/gen-api.sh`)
+- [x] Design docs/ADR updated (docs 09, 18, ADR 0213); `scripts/build-docs.sh` is not run per story (owner rule: docs/site only on request)
 
 ## Review fixes 2026-10-27
 1. AC12 honesty text states the cumulative false-failure bound: "at most 5.3 %, then about 0.33 % per later return to the cap" (not a bare 5.3 %).
+
+## Review fixes 2026-11-05 (build review)
+1. Criterion 10 holds only if a shown path cannot be rewritten by a late grade: the edge series is the longest run of complete sessions from the start of the epoch (it stops at the first session with a candidate still without a grade; later graded trades are held back and counted in the view and the note). A charge-sheet confirmation that flips the series between gross and net R is named, next to a setting change, as something that can change what is read (ADR 0213).
+2. A strategy id holding `|` is refused (400 `paper.invalid`); the report line beside the phase check never changes the phase check's exit code (a failing sequential read is one stderr note).

@@ -29,6 +29,8 @@ internal sealed class ConfidenceSettings
 
     public PlateauSection Plateau { get; set; } = new();
 
+    public SequentialSection Sequential { get; set; } = new();
+
     public RegistrationSection Registration { get; set; } = new();
 
     public HoldOutSection HoldOut { get; set; } = new();
@@ -44,6 +46,9 @@ internal sealed class ConfidenceSettings
 
     /// <summary>The <c>Confidence:Plateau</c> subsection as the options of CF-07 part C (ADR 0210).</summary>
     internal PlateauOptions ToPlateauOptions() => new(Plateau.Mode, Plateau.Enforce, Plateau.Retention, Plateau.MinPoints);
+
+    /// <summary>The <c>Confidence:Sequential</c> subsection as the options of CF-09 (ADR 0213).</summary>
+    internal SequentialOptions ToSequentialOptions() => new(Sequential.Mu1, Sequential.Sigma, Sequential.Alpha, Sequential.BetaCaution, Sequential.BetaFail, Sequential.SigmaFromN);
 
     /// <summary>Whether the plateau gate is enforced while the block it lives in (<c>Confidence:Nulls</c>) is computed at all: it is not computed with <c>Nulls:Mode</c> Off, so enforcing it then would cap nothing (ADR 0210).</summary>
     internal bool PlateauEnforcedWithoutNulls() => Plateau.Enforce && Nulls.Mode == ConfidenceMode.Off;
@@ -193,6 +198,21 @@ internal sealed class ConfidenceSettings
         public double Retention { get; set; } = 0.70;
 
         public int MinPoints { get; set; } = 3;
+    }
+
+    internal sealed class SequentialSection
+    {
+        public double Mu1 { get; set; } = 0.2;
+
+        public double Sigma { get; set; } = 1.5;
+
+        public double Alpha { get; set; } = 0.05;
+
+        public double BetaCaution { get; set; } = 0.20;
+
+        public double BetaFail { get; set; } = 0.05;
+
+        public int SigmaFromN { get; set; } = 20;
     }
 
     internal sealed class RegistrationSection
