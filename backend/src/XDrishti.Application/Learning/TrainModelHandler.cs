@@ -7,6 +7,7 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 
 namespace XDrishti.Application.Learning;
@@ -24,7 +25,8 @@ internal sealed class TrainModelHandler(
     IModelRegistry registry,
     TimeProvider time,
     ILogger<TrainModelHandler> logger,
-    IHoldOutStore? holdOuts = null) : ICommandHandler<TrainModelCommand, TrainModelOutcome>
+    IHoldOutStore? holdOuts = null,
+    LadderOptions? ladder = null) : ICommandHandler<TrainModelCommand, TrainModelOutcome>
 {
     public async ValueTask<Result<TrainModelOutcome>> HandleAsync(TrainModelCommand command, CancellationToken cancellationToken)
     {
@@ -72,6 +74,11 @@ internal sealed class TrainModelHandler(
             .Select(r => new ValidationRow(r.TradeKey, r.Label, r.R, r.TradeDate, r.DecisionEpochSeconds, r.ResolvedEpochSeconds, loaded.Value.CellOf[r.TradeKey], [.. r.Values]))
             .ToList();
         var validation = command.Validation ?? new ValidationOptions();
+        if (ladder is not null && validation.Ladder is null)
+        {
+            validation = validation with { Ladder = ladder }; // the complexity evidence of CF-10 part 10b: the report prints it, no verdict reads it, and it is not part of the parameter text that keys the model version
+        }
+
         DateOnly? holdOutStart = null;
         var purged = 0;
         if (command.HoldOutMonths > 0)
@@ -115,7 +122,8 @@ internal sealed class TrainModelHandler(
             reasons.Add(string.Create(CultureInfo.InvariantCulture, $"The verdict was asked for with {validation.MinFoldsForVerdict} folds as the minimum; below {ValidationOptions.DefaultMinFolds} it cannot be Eligible."));
         }
 
-        var reportText = report.ToText() + (holdOutStart is { } h
+        var featureNames = rows[0].Features.Length == TradeFeatureCatalog.Names.Count ? TradeFeatureCatalog.Names : null;
+        var reportText = report.ToText(featureNames) + (holdOutStart is { } h
             ? string.Create(CultureInfo.InvariantCulture, $"The last {command.HoldOutMonths} months (from {h:yyyy-MM-dd}) are held out: neither the verdict nor the model has seen them. {purged} development trades were purged because their label horizon reaches into the hold-out.\n")
             : "No hold-out was kept: every trade was used in the verdict and in the model.\n")
             + string.Create(CultureInfo.InvariantCulture, $"Trials allowed for: {validation.Trials} (the models of this feature version in the registry, this one included, or the number given, if larger).\n")

@@ -33,6 +33,8 @@ internal sealed class ConfidenceSettings
 
     public CalibrationSection Calibration { get; set; } = new();
 
+    public LadderSection Ladder { get; set; } = new();
+
     public RegistrationSection Registration { get; set; } = new();
 
     public HoldOutSection HoldOut { get; set; } = new();
@@ -54,6 +56,9 @@ internal sealed class ConfidenceSettings
 
     /// <summary>The <c>Confidence:Calibration</c> subsection as the options of CF-10 part 10a (ADR 0214).</summary>
     internal CalibrationOptions ToCalibrationOptions() => new(Calibration.IsotonicMinRows);
+
+    /// <summary>The <c>Confidence:Ladder</c> subsection as the options of CF-10 part 10b (ADR 0215).</summary>
+    internal LadderOptions ToLadderOptions() => new(Ladder.Mode, Ladder.Epv, Ladder.MaxLogisticFeatures, Ladder.MinTreeEvents, Ladder.MinProbability, Ladder.PsiWatch, Ladder.PsiAlarm, Ladder.PsiBins, Ladder.MinRows, Ladder.MaxFlipShare);
 
     /// <summary>Whether the plateau gate is enforced while the block it lives in (<c>Confidence:Nulls</c>) is computed at all: it is not computed with <c>Nulls:Mode</c> Off, so enforcing it then would cap nothing (ADR 0210).</summary>
     internal bool PlateauEnforcedWithoutNulls() => Plateau.Enforce && Nulls.Mode == ConfidenceMode.Off;
@@ -223,6 +228,29 @@ internal sealed class ConfidenceSettings
     internal sealed class CalibrationSection
     {
         public int IsotonicMinRows { get; set; } = 500;
+    }
+
+    internal sealed class LadderSection
+    {
+        public ConfidenceMode Mode { get; set; } = ConfidenceMode.ReportOnly;
+
+        public int Epv { get; set; } = 15;
+
+        public int MaxLogisticFeatures { get; set; } = 8;
+
+        public int MinTreeEvents { get; set; } = 100;
+
+        public double MinProbability { get; set; } = 0.95;
+
+        public double PsiWatch { get; set; } = 0.10;
+
+        public double PsiAlarm { get; set; } = 0.25;
+
+        public int PsiBins { get; set; } = 10;
+
+        public int MinRows { get; set; } = 30;
+
+        public double MaxFlipShare { get; set; } = 1.0 / 3.0;
     }
 
     internal sealed class RegistrationSection
