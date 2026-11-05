@@ -5,8 +5,6 @@ using XDrishti.Application.Abstractions.Shadow;
 using XDrishti.Application.Paper;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
-using XDrishti.Domain.Market;
-using XDrishti.Domain.Paper;
 using XDrishti.Domain.Shadow;
 
 namespace XDrishti.Application.Shadow;
@@ -65,28 +63,19 @@ internal sealed class GetSequentialStatusHandler(
     {
         // shortcut: every shadow row of every epoch is read and filtered in memory; filter by edge_epoch (and trade key) in SQL when the record grows.
         var rows = await reader.ResultsAsync(cancellationToken);
-        var scoped = rows.Where(r => r.CountsForEdge && r.EdgeEpoch == epochId && (prefix is null || r.TradeKey.StartsWith(prefix, StringComparison.Ordinal))).ToList();
 
-        // The series is the longest run of complete sessions from the start of the epoch: it stops at the first session with a candidate still without a grade. Grades are insert-only, so a later grade can then only add to the end of the series and never rewrite
-        // the path already shown (a failure seen stays seen); what is held back is counted and said.
-        var sessions = scoped.GroupBy(r => r.SessionDate).OrderBy(g => g.Key).ToList();
-        var firstPending = sessions.Find(g => g.Any(r => r.Status == "pending"));
-        var complete = sessions.TakeWhile(g => g != firstPending).SelectMany(g => g).ToList();
-        var graded = complete.Where(r => r.Status == "graded" && r.RSim is not null).ToList();
-        var heldBack = firstPending is null ? 0 : sessions.SkipWhile(g => g != firstPending).SelectMany(g => g).Count(r => r.Status == "graded" && r.RSim is not null);
+        // The series is the longest run of complete sessions from the start of the epoch: it stops at the first session with a candidate still without a grade (EdgeSeries).
+        var selection = EdgeSeries.Select(rows, epochId, prefix);
+        var graded = selection.Graded;
+        var heldBack = selection.HeldBack;
         var costs = await ShadowCostBasis.ReadAsync(graded, confirmation, cancellationToken);
-        var candidates = scoped.GroupBy(r => r.SessionDate).ToDictionary(g => g.Key, g => g.Count());
-        var figures = graded.Select(r => (Row: r, R: ShadowCostBasis.Figure(r, costs))).ToList();
-        var ordered = figures
-            .Where(x => x.R is { } v && double.IsFinite(v))
-            .OrderBy(x => x.Row.SessionDate).ThenBy(x => x.Row.TradeKey, StringComparer.Ordinal)
-            .ToList();
-        var noFigure = figures.Count - ordered.Count;
-        var series = ordered.Select(x => new SequentialTrade(x.R!.Value, candidates[x.Row.SessionDate])).ToList();
-        var days = ordered.Select(x => x.Row.SessionDate).ToList();
-        var basis = (costs.Gross ? "gross R (before charges)" : "net R (after the confirmed charge sheet)") + ", " + ShadowWording.ModelledFills + "; " + costs.Basis;
+        var figures = EdgeSeries.Figures(selection, costs);
+        var noFigure = figures.NoFigure;
+        var series = figures.Trades.Select(x => new SequentialTrade(x.R, x.DayCandidates)).ToList();
+        var days = figures.Trades.Select(x => x.Row.SessionDate).ToList();
+        var basis = EdgeSeries.Basis(costs);
         var notes = new List<string>();
-        if (scoped.Count == 0)
+        if (selection.ScopedCount == 0)
         {
             notes.Add("No shadow candidate of the current paper epoch counts for edge in this scope: there is no series.");
         }
@@ -95,9 +84,9 @@ internal sealed class GetSequentialStatusHandler(
             notes.Add("No shadow trade of the current paper epoch is graded yet.");
         }
 
-        if (firstPending is not null)
+        if (selection.FirstPending is { } firstPending)
         {
-            notes.Add(string.Create(CultureInfo.InvariantCulture, $"The series stops before the session {firstPending.Key:yyyy-MM-dd}, which still has a candidate without a grade; {heldBack} graded trade(s) from that session on are held back until it is graded, so that a late grade can only add to the end and never rewrite a shown path."));
+            notes.Add(string.Create(CultureInfo.InvariantCulture, $"The series stops before the session {firstPending:yyyy-MM-dd}, which still has a candidate without a grade; {heldBack} graded trade(s) from that session on are held back until it is graded, so that a late grade can only add to the end and never rewrite a shown path."));
         }
 
         if (noFigure > 0)
@@ -105,7 +94,7 @@ internal sealed class GetSequentialStatusHandler(
             notes.Add(string.Create(CultureInfo.InvariantCulture, $"{noFigure} graded trade(s) have no gross figure and are left out of the series; they still count among the day's candidates for the design effect."));
         }
 
-        return (scoped.Count > 0, View(basis, notes.Count == 0 ? null : string.Join(' ', notes), series, days, rho, heldBack, firstPending?.Key));
+        return (selection.ScopedCount > 0, View(basis, notes.Count == 0 ? null : string.Join(' ', notes), series, days, rho, heldBack, selection.FirstPending));
     }
 
     private async ValueTask<SequentialSeriesView> BehaviouralAsync(long? epochId, string? prefix, double rho, CancellationToken cancellationToken)
@@ -117,12 +106,10 @@ internal sealed class GetSequentialStatusHandler(
         }
 
         var data = await paperData.ReadAsync(id, cancellationToken);
-        IReadOnlyList<PaperCompareRow> rows = prefix is null ? data.Rows : [.. data.Rows.Where(r => r.TradeKey.StartsWith(prefix, StringComparison.Ordinal))];
-        var counted = CountedSet.Select(rows, data.OtherEpochs).Trades.Where(t => double.IsFinite(t.R)).ToList();
-        var perDay = counted.GroupBy(t => IndiaTime.Today(t.EntryAt)).ToDictionary(g => g.Key, g => g.Count());
-        var series = counted.Select(t => new SequentialTrade(t.R, perDay[IndiaTime.Today(t.EntryAt)])).ToList();
-        var days = counted.Select(t => IndiaTime.Today(t.ExitAt)).ToList();
-        var basis = Label + "; " + (counted.Count == 0 ? "none counted yet" : counted.All(t => t.RBasis == "net") ? "net R as the P10 count stores it" : "some trades are gross (before charges), as the P10 count stores them");
+        var counted = BehaviouralSeries.Select(data, prefix);
+        var series = counted.Select(t => new SequentialTrade(t.Trade.R, t.DayCandidates)).ToList();
+        var days = counted.Select(t => t.ExitDay).ToList();
+        var basis = Label + "; " + (counted.Count == 0 ? "none counted yet" : counted.All(t => t.Trade.RBasis == "net") ? "net R as the P10 count stores it" : "some trades are gross (before charges), as the P10 count stores them");
         return View(basis, counted.Count == 0 ? "No counted paper trade in the epoch yet." : null, series, days, rho);
     }
 

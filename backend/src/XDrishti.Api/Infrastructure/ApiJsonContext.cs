@@ -23,6 +23,7 @@ using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
 using XDrishti.Application.Capabilities;
 using XDrishti.Application.ChargeSheet;
+using XDrishti.Application.Confidence;
 using XDrishti.Application.Depth;
 using XDrishti.Application.Execution;
 using XDrishti.Application.Filings;
@@ -323,6 +324,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(DisciplineView))]
 [JsonSerializable(typeof(BacktestVsPaperView))]
 [JsonSerializable(typeof(SequentialStatusView))]
+[JsonSerializable(typeof(DecayReportView))]
+[JsonSerializable(typeof(LoopReportView))]
 [JsonSerializable(typeof(ShadowSummaryView))]
 [JsonSerializable(typeof(ShadowSwitched))]
 [JsonSerializable(typeof(ShadowSwitchRequest))]

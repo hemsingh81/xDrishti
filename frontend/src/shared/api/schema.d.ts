@@ -3678,6 +3678,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/confidence/decay': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The decay monitor of one strategy's forward series (strategy=<id>): non-overlapping windows of graded trades against mu_ref - z x sigma x sqrt(DEFF / n + 1 / N_ref), twice in a row, the P6-09 CUSUM on the same series, a by-quarter table, and the kill-rule evaluations with their numbers (cost stress, drawdown, decay twice in a row, the CF-09 failure boundary as a proposal-only input). The edge series (graded shadow trades) is the primary reading with the P10 behavioural series beside it. Report only: nothing is proposed, stored or paused and no order exists; a figure without a source says unavailable and why. 404 paper.not_found when the strategy has neither a shadow edge candidate nor a counted paper trade in the current epoch, 400 paper.invalid */
+    get: operations['GetConfidenceDecay'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/confidence/loop': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Is the learning loop helping? The three arms on the same candidates (frozen, retrained, no model) as paired day-cluster differences, the learning curve, the reliability slope and the decision-quality lift. Report only; each section whose input has no source yet says unavailable and why (today none has one). No order exists. */
+    get: operations['GetConfidenceLoop'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/paper/sequential': {
     parameters: {
       query?: never;
@@ -9166,6 +9200,224 @@ export interface components {
       /** Format: date-time */
       expiresAt: string;
     };
+    /** @description The P6-09 CUSUM on the same series, against the same reference. */
+    DecayCusumView: {
+      /** @description Whether the last CUSUM event is an alarm. */
+      alarm: boolean;
+      /**
+       * Format: int32
+       * @description How many alarms and clears the series has had.
+       */
+      events: number;
+      /** @description The latest event's evidence sentence, or null. */
+      latest: null | string;
+    };
+    /** @description One kill rule's evaluation, with its numbers. An evaluation only: nothing is proposed, stored or executed in this part. */
+    DecayKillView: {
+      /** @description `cost_stress`, `drawdown`, `decay_twice` or `failure_boundary`. */
+      rule: string;
+      /** @description `not_evaluated`, `holds`, `fires` or `held`. `not_evaluated` is not a pass. */
+      state: string;
+      /**
+       * Format: double
+       * @description The figure judged, or null.
+       */
+      value: null | number;
+      /**
+       * Format: double
+       * @description What it was judged against, or null.
+       */
+      limit: null | number;
+      /**
+       * Format: int32
+       * @description Trades the figure is based on.
+       */
+      trades: number;
+      /** @description True for the CF-09 failure boundary. */
+      proposalOnly: boolean;
+      /** @description The words, with the numbers. */
+      text: string;
+    };
+    /** @description One calendar quarter of the by-quarter table. */
+    DecayQuarterView: {
+      /** @description For example `2026-Q4`. */
+      label: string;
+      /**
+       * Format: int32
+       * @description Trades in the quarter.
+       */
+      trades: number;
+      /**
+       * Format: double
+       * @description Their mean R.
+       */
+      meanR: number;
+      /** @description Whether the mean is below the quarter floor. */
+      weak: boolean;
+    };
+    /** @description The reference a series is judged against. */
+    DecayReferenceView: {
+      /** @description `available` or `unavailable` (a series with no reference is never judged). */
+      state: string;
+      /** @description Why it is unavailable, or null. */
+      reason: null | string;
+      /**
+       * Format: int32
+       * @description Backtest trades the reference is made of (N_ref).
+       */
+      trades: null | number;
+      /**
+       * Format: double
+       * @description mu_ref.
+       */
+      meanR: null | number;
+      /**
+       * Format: double
+       * @description sigma, the sample standard deviation of the reference.
+       */
+      sigma: null | number;
+      /** @description `net` or `gross` of costs, as the backtest was run. */
+      basis: null | string;
+    };
+    /**
+     * @description The decay monitor of a strategy (spec CF-12 D1 and the kill-rule evaluations of D2, part 12a). The edge series (graded shadow trades that count for edge) is the primary reading and the P10 behavioural series sits beside it. Report only: no proposal is
+     *     written, nothing is paused and no order exists.
+     */
+    DecayReportView: {
+      /** @description The strategy. */
+      strategy: string;
+      /**
+       * Format: int64
+       * @description The paper epoch both series are read for; null when there is none.
+       */
+      epoch: null | number;
+      /** @description Whether the strategy has any shadow edge candidate or any counted paper trade in the epoch (the endpoint answers 404 when it has neither). */
+      hasSeries: boolean;
+      /** @description The settings. */
+      settings: components['schemas']['DecaySettingsView'];
+      /** @description The reference, as the edge series sees it. */
+      reference: components['schemas']['DecayReferenceView'];
+      /** @description The edge series. */
+      edge: components['schemas']['DecaySeriesView'];
+      /** @description The behavioural paper series, beside it. */
+      behavioural: components['schemas']['DecaySeriesView'];
+      /** @description The kill rules evaluated on the edge series, proposals only (none is stored or executed). */
+      kill: components['schemas']['DecayKillView'][];
+      /** @description The honesty sentences. */
+      statements: string[];
+      /** @description One line for a report. */
+      line: string;
+    };
+    /** @description One series run through the decay monitor. */
+    DecaySeriesView: {
+      /** @description What the R is. */
+      basis: string;
+      /** @description What the reader should know (no series, held back sessions, trades left out); null when nothing. */
+      note: null | string;
+      /** @description `no_series`, `unavailable` (no reference), `monitoring` (no completed window yet), `ok` or `alert` (the latest completed window is below its level). A flag; never a pass. */
+      state: string;
+      /**
+       * Format: int32
+       * @description Trades in the series.
+       */
+      trades: number;
+      /**
+       * Format: int32
+       * @description Trades after the last completed window.
+       */
+      pendingTrades: number;
+      /**
+       * Format: int32
+       * @description Completed windows below their level in a row at the end.
+       */
+      streak: number;
+      /** @description Whether the last two completed windows are both below. */
+      twiceInARow: boolean;
+      /**
+       * Format: int32
+       * @description The window at which two in a row was first reached, or null.
+       */
+      firstTwiceAtWindow: null | number;
+      /** @description The completed windows. */
+      windows: components['schemas']['DecayWindowView'][];
+      cusum: null | components['schemas']['DecayCusumView'];
+      /** @description The by-quarter table. */
+      quarters: components['schemas']['DecayQuarterView'][];
+      /**
+       * Format: double
+       * @description The share of quarters below the floor, or null.
+       */
+      weakQuarterShare: null | number;
+    };
+    /** @description The settings that produced the figures. */
+    DecaySettingsView: {
+      /**
+       * Format: int32
+       * @description Window size.
+       */
+      windowTrades: number;
+      /**
+       * Format: double
+       * @description Standard errors below the reference mean.
+       */
+      sigmas: number;
+      /**
+       * Format: double
+       * @description The weak-quarter floor.
+       */
+      quarterFloorR: number;
+      /** @description The SHA-256 of the settings. */
+      settingsHash: string;
+      /** @description The text of the settings. */
+      settings: string;
+      /**
+       * Format: double
+       * @description The same-day correlation used.
+       */
+      rho: number;
+      /** @description Whether it is the placeholder until CF-01 estimates it. */
+      rhoIsPlaceholder: boolean;
+    };
+    /** @description One completed window of the decay monitor. */
+    DecayWindowView: {
+      /**
+       * Format: int32
+       * @description 1-based.
+       */
+      index: number;
+      /**
+       * Format: int32
+       * @description Trades in the window.
+       */
+      trades: number;
+      /**
+       * Format: date
+       * @description First trade day.
+       */
+      firstDay: string;
+      /**
+       * Format: date
+       * @description Last trade day.
+       */
+      lastDay: string;
+      /**
+       * Format: double
+       * @description The window's mean R.
+       */
+      meanR: number;
+      /**
+       * Format: double
+       * @description The mean design effect of its days (CF-01; the correlation is the placeholder until CF-01 estimates it).
+       */
+      designEffect: number;
+      /**
+       * Format: double
+       * @description The alert level for this window.
+       */
+      threshold: number;
+      /** @description Whether the mean is below the level (an alert). */
+      below: boolean;
+    };
     /**
      * @description The deflated Sharpe ratio of the verdict (CF-03, ADR 0205), shown beside the heuristic factor and changing no outcome in `ReportOnly`. Per-trade units. Every figure is null when it could not be computed and string DeflatedSharpeView.Note then starts with
      *     `unavailable:` and gives the reason; an unavailable figure is never a pass.
@@ -14045,6 +14297,269 @@ export interface components {
       daysLeft: number;
       /** Format: double */
       gainPct: null | number;
+    };
+    /** @description One comparison of two arms. */
+    LoopArmView: {
+      /** @description `retrained_vs_frozen` (is retraining helping) or `retrained_vs_no_ml` (is the model helping). */
+      name: string;
+      /** @description `helps`, `hurts`, `no_measurable_difference`, `inconclusive` (fewer days than the minimum) or `unavailable`. "No measurable difference" is an answer. */
+      verdict: string;
+      /**
+       * Format: int32
+       * @description Candidates compared.
+       */
+      candidates: number;
+      /**
+       * Format: int32
+       * @description Distinct days.
+       */
+      days: number;
+      /**
+       * Format: double
+       * @description First arm minus second arm, per candidate.
+       */
+      meanDifference: null | number;
+      /**
+       * Format: double
+       * @description Lower end of the interval.
+       */
+      low: null | number;
+      /**
+       * Format: double
+       * @description Upper end.
+       */
+      high: null | number;
+      /**
+       * Format: double
+       * @description P(first arm better).
+       */
+      probabilityBetter: null | number;
+      /**
+       * Format: double
+       * @description P(first arm worse).
+       */
+      probabilityWorse: null | number;
+      /** @description The words. */
+      text: string;
+    };
+    /** @description The three arms on the same candidates. */
+    LoopArmsView: {
+      /** @description `available` or `unavailable`. */
+      state: string;
+      /** @description Why it is unavailable, or null. */
+      reason: null | string;
+      /**
+       * Format: int32
+       * @description Candidates in the common set.
+       */
+      candidates: number;
+      /**
+       * Format: double
+       * @description Mean value per candidate of arm A (frozen).
+       */
+      frozenMean: null | number;
+      /**
+       * Format: double
+       * @description Arm B (retrained, the champion now).
+       */
+      retrainedMean: null | number;
+      /**
+       * Format: double
+       * @description Arm C (no model, take every candidate).
+       */
+      noMlMean: null | number;
+      retrainedVsFrozen: null | components['schemas']['LoopArmView'];
+      retrainedVsNoMl: null | components['schemas']['LoopArmView'];
+    };
+    /** @description The learning curve. */
+    LoopCurveView: {
+      /** @description `available` or `unavailable`. */
+      state: string;
+      /** @description Why it is unavailable, or null. */
+      reason: null | string;
+      /** @description `rising`, `flat`, `unclear` or `insufficient`; null when unavailable. */
+      verdict: null | string;
+      /**
+       * Format: int32
+       * @description Points fitted.
+       */
+      pointsUsed: number;
+      /**
+       * Format: double
+       * @description Gain per 50 rows.
+       */
+      slopePer50Rows: null | number;
+      /**
+       * Format: double
+       * @description Its standard error per 50 rows, or null with three points.
+       */
+      standardError: null | number;
+      /**
+       * Format: double
+       * @description Total rows at which the line reaches the target, or null.
+       */
+      projectedRows: null | number;
+      /**
+       * Format: double
+       * @description Rows beyond the last point, or null.
+       */
+      moreRows: null | number;
+      /** @description The words. */
+      text: string;
+    };
+    /** @description The decision-quality lift. */
+    LoopLiftView: {
+      /** @description `available` or `unavailable`. */
+      state: string;
+      /** @description Why it is unavailable, or null. */
+      reason: null | string;
+      /**
+       * Format: int32
+       * @description Graded trades in the top half.
+       */
+      topTrades: number;
+      /**
+       * Format: int32
+       * @description Graded trades in the bottom half.
+       */
+      bottomTrades: number;
+      /**
+       * Format: double
+       * @description Top minus bottom mean R.
+       */
+      lift: null | number;
+      /**
+       * Format: double
+       * @description Its standard error.
+       */
+      standardError: null | number;
+      /**
+       * Format: double
+       * @description z of the lift.
+       */
+      liftZ: null | number;
+      /**
+       * Format: int32
+       * @description Approved tickets that had a stored score.
+       */
+      approvedTickets: number;
+      /**
+       * Format: int32
+       * @description Of those, in the top half.
+       */
+      approvedInTop: number;
+      /**
+       * Format: double
+       * @description z of the share against 50 %.
+       */
+      approvedZ: null | number;
+      /** @description The words. */
+      text: string;
+    };
+    /** @description "Is the learning loop helping?" (spec CF-12 D4 to D7). Report only. */
+    LoopReportView: {
+      /** @description The settings. */
+      settings: components['schemas']['LoopSettingsView'];
+      /** @description The three arms. */
+      arms: components['schemas']['LoopArmsView'];
+      /** @description The learning curve. */
+      curve: components['schemas']['LoopCurveView'];
+      /** @description The reliability slope. */
+      slope: components['schemas']['LoopSlopeView'];
+      /** @description The decision-quality lift. */
+      lift: components['schemas']['LoopLiftView'];
+      /** @description The honesty sentences. */
+      statements: string[];
+      /** @description One line for a report. */
+      line: string;
+    };
+    /** @description The settings that produced the loop figures. */
+    LoopSettingsView: {
+      /**
+       * Format: int32
+       * @description The fewest distinct days.
+       */
+      minDays: number;
+      /**
+       * Format: int32
+       * @description Bootstrap draws.
+       */
+      draws: number;
+      /**
+       * Format: double
+       * @description Interval coverage.
+       */
+      level: number;
+      /**
+       * Format: double
+       * @description The bar.
+       */
+      helpsAt: number;
+      /**
+       * Format: double
+       * @description The flat-curve limit.
+       */
+      minSlopePer50Rows: number;
+      /**
+       * Format: double
+       * @description The projection target.
+       */
+      targetGain: number;
+      /**
+       * Format: int32
+       * @description The reliability window.
+       */
+      slopeWindow: number;
+      /**
+       * Format: double
+       * @description Lower alarm bar.
+       */
+      slopeLow: number;
+      /**
+       * Format: double
+       * @description Upper alarm bar.
+       */
+      slopeHigh: number;
+      /**
+       * Format: double
+       * @description Standard errors from 1.
+       */
+      slopeSe: number;
+      /** @description The SHA-256 of the settings. */
+      settingsHash: string;
+      /** @description The text of the settings. */
+      settings: string;
+    };
+    /** @description The reliability slope. */
+    LoopSlopeView: {
+      /** @description `available` or `unavailable`. */
+      state: string;
+      /** @description Why it is unavailable, or null. */
+      reason: null | string;
+      /** @description `ok`, `alarm`, `shown_only` (fewer outcomes than the window) or `unavailable`. */
+      verdict: null | string;
+      /**
+       * Format: int32
+       * @description Outcomes in the fit.
+       */
+      outcomes: number;
+      /**
+       * Format: double
+       * @description The slope.
+       */
+      slope: null | number;
+      /**
+       * Format: double
+       * @description The intercept.
+       */
+      intercept: null | number;
+      /**
+       * Format: double
+       * @description The slope's standard error.
+       */
+      standardError: null | number;
+      /** @description The words. */
+      text: string;
     };
     /** @description A tag on one loss. */
     LossTagDetailView: {
@@ -29678,6 +30193,66 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetConfidenceDecay: {
+    parameters: {
+      query?: {
+        strategy?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DecayReportView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetConfidenceLoop: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LoopReportView'];
         };
       };
     };
