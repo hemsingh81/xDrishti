@@ -1,18 +1,16 @@
 using System.Collections.Immutable;
 using Microsoft.ML;
-using Microsoft.ML.Calibrators;
 using Microsoft.ML.Data;
 using Microsoft.ML.Trainers.FastTree;
 using Microsoft.ML.Trainers.LightGbm;
 using Microsoft.ML.Transforms;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
-using Isotonic = XDrishti.Domain.Learning.IsotonicCalibrator;
 
 namespace XDrishti.Learning.MlNet;
 
 /// <summary>
-/// A trained model (P6-06, ADR 0068): imputation means, a tree ensemble, a PAV calibration map. <see cref="Score"/> is the calibrated probability of label 1; <see cref="RawScore"/> is the margin of the trees; <see cref="Explain"/> gives path-based
+/// A trained model (P6-06, ADR 0068): imputation means, a tree ensemble, a calibration map (Platt scaling below the isotonic cut of calibration rows, a PAV isotonic map from it, CF-10 part 10a). <see cref="Score"/> is the calibrated probability of label 1; <see cref="RawScore"/> is the margin of the trees; <see cref="Explain"/> gives path-based
 /// per-feature attributions in raw-score units: they point the same way as the margin and rank the features, but they are not exact (they do not add up to <see cref="RawScore"/>), not SHAP, and the bias term is not included. A missing or
 /// non-finite feature value is imputed to the fit mean and then appears as an ordinary contribution of that mean value. Thread-safe: one scoring call at a time per model.
 /// </summary>
@@ -21,12 +19,12 @@ public sealed class MlNetModel : IExplainableScorer, IFitNote
     private readonly MLContext _ml;
     private readonly ITransformer _trees;
     private readonly double[] _means;
-    private readonly Isotonic _calibration;
+    private readonly ScoreCalibration _calibration;
     private readonly double _floor;
     private readonly Lock _gate = new();
     private FeatureContributionCalculatingTransformer? _contributor;
 
-    internal MlNetModel(MLContext ml, ITransformer trees, ArtifactHeader header, Isotonic calibration)
+    internal MlNetModel(MLContext ml, ITransformer trees, ArtifactHeader header, ScoreCalibration calibration)
     {
         _ml = ml;
         _trees = trees;
@@ -51,8 +49,8 @@ public sealed class MlNetModel : IExplainableScorer, IFitNote
     /// <inheritdoc />
     public string? Note => Header.Note;
 
-    /// <summary>The calibration map.</summary>
-    public Isotonic Calibration => _calibration;
+    /// <summary>The calibration map (Platt or isotonic by the number of calibration rows, CF-10 part 10a).</summary>
+    public ScoreCalibration Calibration => _calibration;
 
     internal ArtifactHeader Header { get; }
 
@@ -98,7 +96,7 @@ public sealed class MlNetModel : IExplainableScorer, IFitNote
             var ml = new MLContext(seed: header.Seed);
             using var stream = new MemoryStream(zip);
             var trees = ml.Model.Load(stream, out _);
-            var calibration = Isotonic.FromKnots(header.CalibrationScores, header.CalibrationValues);
+            var calibration = Restore(header);
             var model = new MlNetModel(ml, trees, header, calibration);
             return model.Check() is { } problem ? Bad(problem) : Result.Success(model);
         }
@@ -109,6 +107,13 @@ public sealed class MlNetModel : IExplainableScorer, IFitNote
         }
     }
 
+    private static ScoreCalibration Restore(ArtifactHeader header) => CalibrationKindExtensions.FromCode(header.CalibrationKind) switch
+    {
+        CalibrationKind.Isotonic => ScoreCalibration.FromIsotonic(IsotonicCalibrator.FromKnots(header.CalibrationScores, header.CalibrationValues), header.CalibrationRows),
+        { } kind => ScoreCalibration.FromPlatt(PlattCalibrator.FromParameters(header.PlattSlope, header.PlattCenter, header.PlattIntercept), header.CalibrationScores, kind, header.CalibrationRows),
+        _ => throw new ArgumentException("The calibration kind is not known.", nameof(header)),
+    };
+
     private static Result<MlNetModel> TooBig() => Bad("The artifact is larger than " + ArtifactCodec.MaxArtifactBytes + " bytes.");
 
     private static Result<MlNetModel> Bad(string message) => Result.Failure<MlNetModel>(Error.Validation("ml.bad_artifact", message));
@@ -118,8 +123,8 @@ public sealed class MlNetModel : IExplainableScorer, IFitNote
     {
         var inputType = (Header.Trainer, _trees) switch
         {
-            (TreeTrainer.LightGbm, BinaryPredictionTransformer<CalibratedModelParametersBase<LightGbmBinaryModelParameters, PlattCalibrator>> t) => t.FeatureColumnType,
-            (TreeTrainer.FastTree, BinaryPredictionTransformer<CalibratedModelParametersBase<FastTreeBinaryModelParameters, PlattCalibrator>> t) => t.FeatureColumnType,
+            (TreeTrainer.LightGbm, BinaryPredictionTransformer<Microsoft.ML.Calibrators.CalibratedModelParametersBase<LightGbmBinaryModelParameters, Microsoft.ML.Calibrators.PlattCalibrator>> t) => t.FeatureColumnType,
+            (TreeTrainer.FastTree, BinaryPredictionTransformer<Microsoft.ML.Calibrators.CalibratedModelParametersBase<FastTreeBinaryModelParameters, Microsoft.ML.Calibrators.PlattCalibrator>> t) => t.FeatureColumnType,
             _ => null,
         };
         if (inputType is null)
@@ -233,9 +238,9 @@ public sealed class MlNetModel : IExplainableScorer, IFitNote
         var sample = Example.View(_ml, [new Example { Features = new float[Width] }], Width);
         return _trees switch
         {
-            BinaryPredictionTransformer<CalibratedModelParametersBase<LightGbmBinaryModelParameters, PlattCalibrator>> lightGbm =>
+            BinaryPredictionTransformer<Microsoft.ML.Calibrators.CalibratedModelParametersBase<LightGbmBinaryModelParameters, Microsoft.ML.Calibrators.PlattCalibrator>> lightGbm =>
                 _ml.Transforms.CalculateFeatureContribution(lightGbm, Width, Width, normalize: false).Fit(sample),
-            BinaryPredictionTransformer<CalibratedModelParametersBase<FastTreeBinaryModelParameters, PlattCalibrator>> fastTree =>
+            BinaryPredictionTransformer<Microsoft.ML.Calibrators.CalibratedModelParametersBase<FastTreeBinaryModelParameters, Microsoft.ML.Calibrators.PlattCalibrator>> fastTree =>
                 _ml.Transforms.CalculateFeatureContribution(fastTree, Width, Width, normalize: false).Fit(sample),
             _ => throw new NotSupportedException("The loaded model is not a calibrated LightGBM or FastTree binary model."),
         };

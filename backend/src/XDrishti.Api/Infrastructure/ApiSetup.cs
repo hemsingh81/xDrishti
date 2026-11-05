@@ -194,6 +194,7 @@ internal static class ApiSetup
             .Validate(s => s.ToPlateauOptions().Problems().Count == 0, "Confidence:Plateau: a value is out of range (Mode Off or ReportOnly and not Enforce with Mode Off, Retention 0.50..0.95, MinPoints 3..5).")
             .Validate(s => !s.PlateauEnforcedWithoutNulls(), "Confidence:Plateau:Enforce needs Confidence:Nulls:Mode ReportOnly (the plateau gate is computed inside the nulls stage; with Nulls:Mode Off nothing is computed to enforce).")
             .Validate(s => s.ToSequentialOptions().Problems().Count == 0, "Confidence:Sequential: a value is out of range (Mu1 above 0 up to 2, Sigma 0.5..5, Alpha above 0 up to 0.2, BetaCaution above 0 up to 0.5 with (1 - BetaCaution) / Alpha above 1, BetaFail above 0 and below BetaCaution, SigmaFromN 5..200).")
+            .Validate(s => s.ToCalibrationOptions().Problems().Count == 0, "Confidence:Calibration: a value is out of range (IsotonicMinRows 1..100000).")
             .ValidateOnStart();
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToShrinkageOptions()));
@@ -203,6 +204,7 @@ internal static class ApiSetup
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToNullOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToPlateauOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToSequentialOptions()));
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToCalibrationOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToRegistrationOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToHoldOutOptions()));
     }

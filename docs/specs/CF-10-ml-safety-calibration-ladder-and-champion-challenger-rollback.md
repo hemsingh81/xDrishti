@@ -74,6 +74,15 @@ Whether ML.NET already Platt-calibrates the raw score before the isotonic map. P
 - [ ] Contract regenerated (`scripts/gen-api.sh`); migration `AddMlSafety` added and tested up and down
 - [ ] Design docs/ADR updated (docs 09, 16); `scripts/build-docs.sh`
 
+## Part 10a status (built 2026-11-05, ADR 0214)
+- [x] AC1 calibration choice (499 Platt, 500 isotonic, 0 constant; the 3-in-8 hand table 0.389286 against 0.375) - unit
+- [x] AC2 ECE interval (gap 5 pp, standard error 5 pp, not a breach; deterministic for a seed; day-cluster); AC11 (the gap numbers and the three-check rollback) stays open for 10d, against `CalibrationDriftDetector`
+- [x] D1 report: ECE with interval and log loss minus the base-rate log loss in the validation report; `Confidence:Calibration:IsotonicMinRows` bound and validated at start; kind and parameters in the artifact header
+- [x] UNVERIFIED resolved: the isotonic map received the raw margin, not ML.NET's Platt probability (ADR 0214)
+- [x] AC15 (part): no secrets or rows logged (no log event added); Architecture tests green; existing P6 tests unchanged, the calibrator default change documented in the ADR
+- [ ] **Owner to-do after 10a:** a champion trained before 10a reads as "no policy" in the meta-labelling evaluation (its stored trainer parameters differ); retrain and re-designate it (ADR 0214)
+- [ ] Left for 10b to 10d: AC11 as above; AC3 to AC14 (EPV cap, ladder, bootstrap oracle, sign test, uniqueness, PSI and stability, predicate, enforcement, promotion and rollback, auto versus manual, no-champion fallback, regime rule), the migration `AddMlSafety`, the `calibration_kind` column, the endpoints, the verbs and the Models-screen additions; the Done-when items above stay open for the whole spec
+
 ## Review fixes 2026-10-27
 1. **Cycle removed.** CF-10c owns `PairedDayBootstrap`; CF-12 is no longer in CF-10's Needs and uses the bootstrap from CF-10c. Build order: 10c, CF-12, 10d. D7's promotion rule reads CF-12's challenger-versus-champion comparison only once CF-12 exists (until then promotion stays manual with the P6-12 counterfactual).
 2. **Step-up, made consistent in D6, D7, D8, AC12:** `ml.influence.enabled` and `ml.auto_promote` need a fresh password; `ml.auto_rollback` needs the owner session and CSRF only (it lowers reliance on ML).

@@ -258,7 +258,7 @@ public sealed class MlNetScorerFactoryTests
         Refuse(header with { ProbabilityFloor = 0 }, zip);
         Refuse(header with { ProbabilityFloor = 0.5 }, zip);
         Refuse(header with { ProbabilityFloor = -0.1 }, zip);
-        Refuse(header with { Version = 2 }, zip);
+        Refuse(header with { Version = 3 }, zip);
         Refuse(header with { Trainer = (TreeTrainer)9 }, zip);
         Refuse(header with { Trainer = header.Trainer == TreeTrainer.FastTree ? TreeTrainer.LightGbm : TreeTrainer.FastTree }, zip);
         Refuse(header with { Width = 2, Means = [0, 0] }, zip);

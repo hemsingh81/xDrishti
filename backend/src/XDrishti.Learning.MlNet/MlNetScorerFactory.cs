@@ -1,18 +1,16 @@
 using System.Globalization;
 using Microsoft.ML;
-using Microsoft.ML.Calibrators;
 using Microsoft.ML.Data;
 using Microsoft.ML.Trainers.FastTree;
 using Microsoft.ML.Trainers.LightGbm;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
-using Isotonic = XDrishti.Domain.Learning.IsotonicCalibrator;
 
 namespace XDrishti.Learning.MlNet;
 
 /// <summary>
 /// The candidate model of the validation harness (P6-06, ADR 0068): <see cref="IScorerFactory"/> over the train rows of a fold. The train rows are ordered by decision time; the earliest part fits the trees, the latest
-/// <see cref="MlNetTrainerOptions.CalibrationShare"/> is held back and only fits the PAV calibration map (fit rows whose label horizon reaches the first held-back decision are dropped, so the map is not fitted on rows the trees were helped by).
+/// <see cref="MlNetTrainerOptions.CalibrationShare"/> is held back and only fits the calibration map (Platt scaling below <see cref="MlNetTrainerOptions.IsotonicMinRows"/> calibration rows, the PAV isotonic map from there, CF-10 part 10a; fit rows whose label horizon reaches the first held-back decision are dropped, so the map is not fitted on rows the trees were helped by).
 /// Test rows never reach <c>Fit</c>. LightGBM is tried first; when its native library cannot load (only a load failure is caught; any other error is a bug and surfaces), FastTree is used and the model's note says so. Deterministic: one thread, fixed seed.
 /// When the rows cannot be trained on (too few, one class, no features) <see cref="Fit"/> returns the smoothed base rate with a note, and <see cref="Train"/> returns the failure.
 /// </summary>
@@ -93,10 +91,19 @@ public sealed class MlNetScorerFactory : IScorerFactory
 
         var (trees, trainer, note) = FitTrees(ml, data);
         var header = new ArtifactHeader(1, trainer, width, means, [], [], _options.ProbabilityFloor, fit.Length, held.Length, _options.Seed, note);
-        var uncalibrated = new MlNetModel(ml, trees, header, Isotonic.FromKnots([0], [0.5]));
+        var uncalibrated = new MlNetModel(ml, trees, header, ScoreCalibration.FromPlatt(PlattCalibrator.Constant(0.5), [0], CalibrationKind.BaseRate));
         var raw = held.Select(uncalibrated.RawScore).ToArray();
-        var calibration = Isotonic.Fit(raw, [.. held.Select(r => r.Label)]);
-        header = header with { CalibrationScores = [.. calibration.Scores], CalibrationValues = [.. calibration.Values] };
+        var calibration = CalibrationChoice.Fit(raw, [.. held.Select(r => r.Label)], _options.IsotonicMinRows);
+        header = header with
+        {
+            Version = calibration.Kind == CalibrationKind.Isotonic ? 1 : 2,
+            CalibrationScores = [.. calibration.Scores],
+            CalibrationValues = [.. calibration.Values],
+            CalibrationKind = calibration.Kind.Code(),
+            PlattSlope = calibration.Platt?.Slope ?? 0,
+            PlattCenter = calibration.Platt?.Center ?? 0,
+            PlattIntercept = calibration.Platt?.Intercept ?? 0,
+        };
         return Result.Success(new MlNetModel(ml, trees, header, calibration));
     }
 
@@ -142,7 +149,7 @@ public sealed class MlNetScorerFactory : IScorerFactory
         return (FitFastTree(ml, data), TreeTrainer.FastTree, note);
     }
 
-    private BinaryPredictionTransformer<CalibratedModelParametersBase<LightGbmBinaryModelParameters, PlattCalibrator>> FitLightGbm(MLContext ml, IDataView data) =>
+    private BinaryPredictionTransformer<Microsoft.ML.Calibrators.CalibratedModelParametersBase<LightGbmBinaryModelParameters, Microsoft.ML.Calibrators.PlattCalibrator>> FitLightGbm(MLContext ml, IDataView data) =>
         ml.BinaryClassification.Trainers.LightGbm(new LightGbmBinaryTrainer.Options
         {
             LabelColumnName = "Label",
@@ -155,7 +162,7 @@ public sealed class MlNetScorerFactory : IScorerFactory
             Seed = _options.Seed,
         }).Fit(data);
 
-    private BinaryPredictionTransformer<CalibratedModelParametersBase<FastTreeBinaryModelParameters, PlattCalibrator>> FitFastTree(MLContext ml, IDataView data) =>
+    private BinaryPredictionTransformer<Microsoft.ML.Calibrators.CalibratedModelParametersBase<FastTreeBinaryModelParameters, Microsoft.ML.Calibrators.PlattCalibrator>> FitFastTree(MLContext ml, IDataView data) =>
         ml.BinaryClassification.Trainers.FastTree(new FastTreeBinaryTrainer.Options
         {
             LabelColumnName = "Label",
