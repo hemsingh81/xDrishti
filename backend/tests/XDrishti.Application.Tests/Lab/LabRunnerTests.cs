@@ -829,6 +829,199 @@ public sealed class LabRunnerTests
         store.Unlocks.ShouldBeEmpty();
     }
 
+    private readonly IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>> _walks = Substitute.For<IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>>();
+
+    /// <summary>A comparison with one costed intraday trade on every weekday of a year and a sheet in force over all of it, so the walk-forward has out-of-sample trades to give the null (the first test window starts after nine months).</summary>
+    private void ArrangeYearOfTrades()
+    {
+        ArrangeFullTest();
+        var sheet = TestCostSheet.Of(FixtureSheet.Id, TestCostSheet.Schedule(new DateOnly(2025, 1, 1), TestCostSheet.IntradayA, TestCostSheet.DeliveryA));
+        _sheets.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Result.Success(sheet));
+        var context = TestCostSheet.Context(sheet: sheet);
+        var trades = new List<SimTrade>();
+        for (var d = new DateOnly(2025, 5, 1); d <= new DateOnly(2026, 4, 29); d = d.AddDays(1))
+        {
+            if (d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                continue;
+            }
+
+            var gross = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:AAA", Side.Buy, d, rExact: 2 - (trades.Count % 3 * 1.5), rFilled: 1.9 - (trades.Count % 3 * 1.5));
+            trades.Add(TradeCostApplier.Apply(gross, context, CostSegment.IntradayEquity).Value.Trade!);
+        }
+
+        var candidates = ExitFlags.Parse([.. LabSettings.Default.Exits], null, [])!.Candidates
+            .Select((exit, i) => new CandidateRun(exit.Id, exit, FabricatedRun.Assemble(FabricatedRun.List((FabricatedRun.IdA, "NSE:AAA")), [FabricatedRun.Ran(FabricatedRun.IdA, "NSE:AAA", new DateOnly(2025, 5, 1), new DateOnly(2026, 4, 30))], trades, from: new DateOnly(2025, 5, 1), costs: CostRecord.Of(context)) with { RunKey = new string((char)('1' + i), 64) }, 0))
+            .ToList();
+        _comparisons.HandleAsync(Arg.Any<RunComparisonQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success(new ComparisonRun(candidates, ComparisonReport.Build(candidates, true), new string('e', 64))));
+    }
+
+    /// <summary>The runner with the null and a stored hold-out block that starts on <paramref name="blockStart"/> (CF-06 + CF-07: an explicit window may reach it, and the null must not).</summary>
+    private LabRunner RunnerWithNullsAndBlock(DateOnly blockStart)
+    {
+        var store = Substitute.For<XDrishti.Application.Abstractions.Lab.IHoldOutStore>();
+        store.CurrentAsync(Arg.Any<CancellationToken>()).Returns(new XDrishti.Application.Abstractions.Lab.HoldOutBlock(blockStart, new DateOnly(2025, 5, 1), new DateOnly(2026, 4, 30), 2, new string('d', 64), DateTimeOffset.UnixEpoch));
+        var bars = Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarQueries>();
+        var first = new DateTimeOffset(2025, 5, 1, 9, 15, 0, TimeSpan.FromHours(5.5));
+        bars.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new XDrishti.Application.Abstractions.Market.Bars.BarTotals(2, 1000, first, new DateTimeOffset(2026, 4, 30, 15, 29, 0, TimeSpan.FromHours(5.5)), 0, 0));
+        _ledger.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _variantStats.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<IReadOnlyList<VariantStatsRow>>().Count);
+        _walks.HandleAsync(Arg.Any<RunNullWalkQuery>(), Arg.Any<CancellationToken>()).Returns(ci =>
+            Result.Success(new NullWalkRun([.. ci.Arg<RunNullWalkQuery>().Plan.Trades.Select(t => new NullTradeDraws(t.Id, new double[ci.Arg<RunNullWalkQuery>().Plan.Draws], 0, null))])));
+        var options = new HoldOutOptions();
+        return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, null, options, new XDrishti.Application.Lab.LabHoldOutGuard(store, bars, options, _time), nulls: new LabNulls(_walks, new NullOptions(), LabSettings.Default));
+    }
+
+    [Fact]
+    public async Task A_run_whose_window_reaches_the_hold_out_block_gives_the_null_a_walk_that_ends_the_day_before_it_and_the_block_says_so()
+    {
+        ArrangeYearOfTrades();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+        var blockStart = new DateOnly(2026, 4, 20);
+        var run = RobustRun() with { From = new DateOnly(2025, 5, 1) };   // an explicit window that ends 2026-04-30, after the block start
+
+        await RunnerWithNullsAndBlock(blockStart).ExecuteAsync(run, Ct);
+
+        run.To.ShouldBeGreaterThanOrEqualTo(blockStart);
+        var nulls = verdicts.Single().Nulls.ShouldNotBeNull();
+        nulls.Basis.ShouldContain("ending 2026-04-19");
+        nulls.Basis.ShouldContain("cut to stay clear of the hold-out block");
+        nulls.RandomEntry.Trades.ShouldBeLessThan(nulls.RandomEntry.OosTrades, "the real trades from the block start on are left out");
+        nulls.Notes.ShouldContain(n => n.Contains("inside the hold-out block", StringComparison.Ordinal));
+        _walks.ReceivedCalls().ShouldNotBeEmpty("the walk was sent");
+        foreach (var call in _walks.ReceivedCalls())
+        {
+            var query = call.GetArguments()[0].ShouldBeOfType<RunNullWalkQuery>();
+            query.Request.To.ShouldBeLessThan(blockStart, "no bar at or after the block start is requested");
+            query.Plan.Trades.ShouldAllBe(t => t.Date < blockStart, "no trade on or after the block start is restated");
+        }
+    }
+
+    [Fact]
+    public async Task A_run_whose_window_stays_clear_of_the_block_keeps_its_own_end_for_the_null()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithNullsAndBlock(new DateOnly(2026, 6, 1)).ExecuteAsync(RobustRun(), Ct);
+
+        var basis = verdicts.Single().Nulls.ShouldNotBeNull().Basis;
+        basis.ShouldContain("ending 2026-04-30");
+        basis.ShouldNotContain("was cut");
+    }
+
+    /// <summary>A runner with the random-entry null (CF-07); the walk answers every trade of the plan with the same two draws.</summary>
+    private LabRunner RunnerWithNulls(NullOptions options)
+    {
+        _ledger.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _variantStats.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<IReadOnlyList<VariantStatsRow>>().Count);
+        _walks.HandleAsync(Arg.Any<RunNullWalkQuery>(), Arg.Any<CancellationToken>()).Returns(ci =>
+            Result.Success(new NullWalkRun([.. ci.Arg<RunNullWalkQuery>().Plan.Trades.Select(t => new NullTradeDraws(t.Id, new double[ci.Arg<RunNullWalkQuery>().Plan.Draws], 0, null))])));
+        return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, nulls: new LabNulls(_walks, options, LabSettings.Default));
+    }
+
+    [Fact]
+    public async Task A_robust_run_adds_the_nulls_stage_after_robustness_and_a_full_run_or_an_off_mode_adds_none()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithNulls(new NullOptions()).ExecuteAsync(RobustRun(), Ct);
+        await RunnerWithNulls(new NullOptions()).ExecuteAsync(FullRun(), Ct);
+        await RunnerWithNulls(new NullOptions(ConfidenceMode.Off)).ExecuteAsync(RobustRun(), Ct);
+
+        _finishes[0].Stages.Select(s => s.Name).ShouldBe(["validate", "compile", "full_test", "robustness", "nulls"]);
+        _finishes[0].Stages.ShouldAllBe(s => s.FinishedAt != null);
+        _finishes[1].Stages.Select(s => s.Name).ShouldBe(["validate", "compile", "full_test"]);
+        _finishes[2].Stages.Select(s => s.Name).ShouldBe(["validate", "compile", "full_test", "robustness"]);
+        verdicts[0].Nulls.ShouldNotBeNull();
+        verdicts[1].Nulls.ShouldBeNull("a plain full run keeps the document it had");
+        verdicts[2].Nulls.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task The_null_in_report_only_adds_the_block_and_leaves_the_outcome_gates_evidence_and_limits_byte_for_byte_as_they_were()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithNulls(new NullOptions(ConfidenceMode.Off)).ExecuteAsync(RobustRun(), Ct);
+        await RunnerWithNulls(new NullOptions()).ExecuteAsync(RobustRun(), Ct);
+
+        var block = verdicts[1].Nulls.ShouldNotBeNull();
+        block.Mode.ShouldBe("ReportOnly");
+        block.Enforce.ShouldBeFalse();
+        block.Capped.ShouldBeFalse();
+        System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { Nulls = null }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]));
+        _finishes[1].SimRunKeys.ShouldBe(_finishes[0].SimRunKeys);
+    }
+
+    [Fact]
+    public async Task The_null_is_one_ledger_row_of_kind_null_written_with_the_sweep_rows_after_the_last_cancel_check_and_before_the_result()
+    {
+        ArrangeFullTest();
+        var calls = new List<string>();
+        var rows = new List<LedgerRow>();
+        _ledger.AppendAsync(Arg.Any<LedgerRow>(), Arg.Any<CancellationToken>()).Returns(ci =>
+        {
+            rows.Add(ci.Arg<LedgerRow>());
+            calls.Add("ledger");
+            return true;
+        });
+        _runs.IsCancelRequestedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            calls.Add("cancel-check");
+            return false;
+        });
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<LabVerdictView>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            calls.Add("result");
+            return true;
+        });
+        var run = RobustRun();
+
+        await RunnerWithNulls(new NullOptions()).ExecuteAsync(run, Ct);
+
+        rows.Count(r => r.TrialKind == "null").ShouldBe(1);
+        rows.Count(r => r.TrialKind == "run").ShouldBe(4, "the four sweep points");
+        rows.Single(r => r.TrialKind == "null").Method.ShouldBe("null");
+        calls.IndexOf("ledger").ShouldBeGreaterThan(calls.LastIndexOf("cancel-check"));
+        calls.Last().ShouldBe("result");
+    }
+
+    [Fact]
+    public async Task A_cancel_after_the_nulls_stage_stores_no_result_no_run_and_no_null_ledger_row()
+    {
+        ArrangeFullTest();
+        _runs.IsCancelRequestedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithNulls(new NullOptions()).ExecuteAsync(RobustRun(), Ct);
+
+        _finishes.Single().State.ShouldBe(LabRunState.Cancelled);
+        await _ledger.DidNotReceive().AppendAsync(Arg.Any<LedgerRow>(), Arg.Any<CancellationToken>());
+        await _store.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+        await _results.DidNotReceiveWithAnyArgs().AppendAsync(default, default!, default!, default!, default, Ct);
+    }
+
+    [Fact]
+    public async Task The_nulls_stage_is_what_the_progress_reports_while_it_runs()
+    {
+        ArrangeFullTest();
+
+        await RunnerWithNulls(new NullOptions()).ExecuteAsync(RobustRun(), Ct);
+
+        await _runs.Received().ReportAsync(Arg.Any<Guid>(), "nulls", Arg.Any<int>(), Arg.Any<int>(), Arg.Any<IReadOnlyList<LabStageLog>>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+    }
+
     private sealed class StubPass : IHoldOutPass
     {
         public ValueTask<Result<HoldOutFigures>> RunAsync(LabRun run, LabVerdictView verdict, HoldOutBlock block, CancellationToken cancellationToken) =>

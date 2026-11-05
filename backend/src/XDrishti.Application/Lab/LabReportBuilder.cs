@@ -58,7 +58,8 @@ internal static class LabReportBuilder
             string.Empty,
             verdict.DeflatedSharpe,
             verdict.CostStress,
-            verdict.Trials);
+            verdict.Trials,
+            Nulls: verdict.Nulls);
         return report with { Summary = ReportSummary.Write(report) };
     }
 
@@ -145,6 +146,19 @@ internal static class LabReportBuilder
             }
         }
 
+        if (v.Nulls is { } nulls)
+        {
+            var e = nulls.RandomEntry;
+            if (e.Status == "fail")
+            {
+                w.Add(new ReportWarningView("random_entry", $"Random entries with the same exits and costs do as well: p = {P(e.PValue ?? double.NaN)} against {P(e.Threshold)}, real mean {F(e.RealMeanR ?? double.NaN)} R" + (nulls.Enforce ? "." : " (report only: the outcome is not changed).")));
+            }
+            else if (e.Status == "unavailable")
+            {
+                w.Add(new ReportWarningView("random_entry", "The random-entry null is unavailable and is not a pass: " + e.Reason.Replace("unavailable: ", string.Empty, StringComparison.Ordinal) + (nulls.Enforce ? "." : " (report only: the outcome is not changed).")));
+            }
+        }
+
         return w;
     }
 
@@ -168,6 +182,12 @@ internal static class LabReportBuilder
         {
             l.Add(CostStress.Formula);
             l.Add(CostStress.FirstOrderLimit);
+        }
+
+        if (v.Nulls is { } n)
+        {
+            l.Add(n.Basis);
+            l.AddRange(n.Notes);
         }
 
         l.AddRange(v.Limits);

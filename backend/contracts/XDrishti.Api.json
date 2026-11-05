@@ -40244,9 +40244,19 @@
                 "$ref": "#/components/schemas/ReportHoldOutView"
               }
             ]
+          },
+          "nulls": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NullsView"
+              }
+            ]
           }
         },
-        "description": "The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `DeflatedSharpe` (CF-03) is the probability beside the factor, null when not computed. `CostStress` (CF-05) is the cost stress and the delay test, null when not computed. `Trials`, `Registration` and `HoldOut` (CF-06) are the count of looks with its parts, the pre-registration state and the hold-out state; null in a report built without them. `Summary` is a deterministic\ntemplate over the numbers above, not an assistant text."
+        "description": "The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `DeflatedSharpe` (CF-03) is the probability beside the factor, null when not computed. `CostStress` (CF-05) is the cost stress and the delay test, null when not computed. `Trials`, `Registration` and `HoldOut` (CF-06) are the count of looks with its parts, the pre-registration state and the hold-out state; null in a report built without them. `Nulls` (CF-07) is the random-entry null, null when not computed. `Summary` is a deterministic\ntemplate over the numbers above, not an assistant text."
       },
       "LabRunFinished": {
         "required": [
@@ -40629,9 +40639,19 @@
                 "$ref": "#/components/schemas/TrialsView"
               }
             ]
+          },
+          "nulls": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NullsView"
+              }
+            ]
           }
         },
-        "description": "The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. `Trials` (CF-06) is the count of looks with its parts as of the judgement; null in a result stored before it."
+        "description": "The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. `Trials` (CF-06) is the count of looks with its parts as of the judgement; null in a result stored before it. `Nulls` (CF-07) is the random-entry null beside the outcome; null in a result stored before it, in a run that is not robust or when its mode is Off."
       },
       "LabWindow": {
         "required": [
@@ -45125,6 +45145,57 @@
           }
         },
         "description": "Whether a net report can be made at all (P8-00 question 19): `value` when the owner's stored confirmation of the charge sheet exists, otherwise `unavailable` with the reason. The confirmation is read from storage; a request cannot supply it."
+      },
+      "NullsView": {
+        "required": [
+          "mode",
+          "enforce",
+          "settings",
+          "settingsHash",
+          "randomEntry",
+          "capped",
+          "basis",
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "The mode when it was computed."
+          },
+          "enforce": {
+            "type": "boolean",
+            "description": "Whether the null could cap the outcome."
+          },
+          "settings": {
+            "type": "string",
+            "description": "The text of the settings that produced the figures."
+          },
+          "settingsHash": {
+            "type": "string",
+            "description": "SHA-256 of Settings."
+          },
+          "randomEntry": {
+            "description": "The random-entry null.",
+            "$ref": "#/components/schemas/RandomEntryView"
+          },
+          "capped": {
+            "type": "boolean",
+            "description": "True when the outcome was capped at MARGINAL by an enforced null."
+          },
+          "basis": {
+            "type": "string",
+            "description": "What the null is made over: the development window, the in-sample walk and the cost sheet."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The limits of the figure and the reasons trades were left out."
+          }
+        },
+        "description": "The chance tests of a Lab verdict (CF-07, ADR 0208), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a null that is not a pass caps a PASS at MARGINAL and never raises an outcome. The placebo set, the mirror\ngate and the plateau gate of the spec are not built yet and have no field here."
       },
       "OfficialDailyCheck": {
         "required": [
@@ -51430,6 +51501,160 @@
           }
         },
         "description": "An account on the ramp. `step` is null while no step is set (no live allocation). `scaleEffective` is the factor of the step; the live risk is the intended risk times it. `eligible` is true only when G1 to G6 all pass; an unreadable gate\nis never a pass."
+      },
+      "RandomEntryView": {
+        "required": [
+          "oosTrades",
+          "trades",
+          "draws",
+          "validSeeds",
+          "realMeanR",
+          "randomMeanR",
+          "p05",
+          "p50",
+          "p95",
+          "p99",
+          "percentile",
+          "percentileValue",
+          "countAtLeast",
+          "pValue",
+          "threshold",
+          "comparison",
+          "status",
+          "reason",
+          "droppedShare",
+          "redraws",
+          "seed"
+        ],
+        "type": "object",
+        "properties": {
+          "oosTrades": {
+            "type": "integer",
+            "description": "Out-of-sample trades of the verdict.",
+            "format": "int32"
+          },
+          "trades": {
+            "type": "integer",
+            "description": "How many of them were restated with random entries (the real mean is the mean of these).",
+            "format": "int32"
+          },
+          "draws": {
+            "type": "integer",
+            "description": "Seeds asked for.",
+            "format": "int32"
+          },
+          "validSeeds": {
+            "type": "integer",
+            "description": "Seeds with at least one random trade.",
+            "format": "int32"
+          },
+          "realMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Mean net R of the restated real trades; null when no trade could be restated.",
+            "format": "double"
+          },
+          "randomMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Mean of the seed means.",
+            "format": "double"
+          },
+          "p05": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "5th percentile of the seed means.",
+            "format": "double"
+          },
+          "p50": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Median of the seed means.",
+            "format": "double"
+          },
+          "p95": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "95th percentile of the seed means.",
+            "format": "double"
+          },
+          "p99": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "99th percentile of the seed means.",
+            "format": "double"
+          },
+          "percentile": {
+            "type": "number",
+            "description": "The configured percentile (95), which sets the level of the test.",
+            "format": "double"
+          },
+          "percentileValue": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The seed means at that percentile.",
+            "format": "double"
+          },
+          "countAtLeast": {
+            "type": "integer",
+            "description": "Seeds whose mean is at least the real mean.",
+            "format": "int32"
+          },
+          "pValue": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "`(CountAtLeast + 1) / (ValidSeeds + 1)`.",
+            "format": "double"
+          },
+          "threshold": {
+            "type": "number",
+            "description": "The level of the test, `1 - percentile / 100`.",
+            "format": "double"
+          },
+          "comparison": {
+            "type": "string",
+            "description": "How the value is read against the threshold (`&lt;=`)."
+          },
+          "status": {
+            "type": "string",
+            "description": "`pass`, `fail` or `unavailable`."
+          },
+          "reason": {
+            "type": "string",
+            "description": "One sentence for the reading."
+          },
+          "droppedShare": {
+            "type": "number",
+            "description": "Share of the (trade, seed) draws dropped after the redraws.",
+            "format": "double"
+          },
+          "redraws": {
+            "type": "integer",
+            "description": "Redraws spent over all seeds.",
+            "format": "int32"
+          },
+          "seed": {
+            "type": "string",
+            "description": "The seed of the run for this null, as text."
+          }
+        },
+        "description": "The random-entry null of one Lab verdict (CF-07, D1): the real mean net R against the means of int RandomEntryView.Draws seeds, each a full set of random-entry trades with the real trades' instrument, session, side, risk fraction, target multiple and costs.\nThe reading is double? RandomEntryView.PValue against double RandomEntryView.Threshold: string RandomEntryView.Status is `pass` only when the p-value is at most the threshold; the percentiles are displayed, not a second test. `unavailable` is never a pass and\ndouble? RandomEntryView.PValue is then null."
       },
       "RankedCellView": {
         "required": [

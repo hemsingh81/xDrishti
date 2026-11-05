@@ -1,6 +1,6 @@
 # CF-07 — Random-entry null, placebo / mirror runs and the plateau gate
 
-- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
+- **Status:** Approved; **part A delivered 2026-11-05 (random-entry null, ADR 0208); parts B (placebo set, mirror gate) and C (plateau gate) open** (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** CF — Confidence programme (row added by CF-00; UNVERIFIED). Extends P5-05 (robustness) and P5-06 (verdict and report).
 - **Design refs:** docs/design/11-strategy-lab.md §3, §4 · 08-exits-and-risk.md §3 (plateau preference in exit selection) · docs/research/confidence-edge-realism.md §3 rows 4 to 7, §4 rows 7 to 9 · ADRs 0060, 0062, 0063
 - **Needs:** P5-04/05/06 (built), CF-00 (report-only rule, settings home), CF-06 (trial ledger: these runs are looks and are counted). Feeds CF-11 rows 7, 8, 9.
@@ -69,3 +69,7 @@ The walker's change size for the entry override. Whether P3-02e (BUY to SELL mir
 1. Pass rule: pass if and only if `p <= 0.05` (`(count_ge + 1) / (draws + 1)`); the 95th percentile is displayed only and is not a second test.
 2. Random-entry null, placebos and plateau run only inside the clamped development window (CF-06 AC8); no hold-out session is ever read here.
 3. AC9 now matches CF-06 D3, which counts one trial per null row (see CF-06 Review fixes).
+
+## Build notes 2026-11-05
+Part A built ([ADR 0208](../adr/0208-the-lab-verdict-shows-a-random-entry-null-beside-the-sign-flip-in-report-only-mode-and-the-null-is-one-look-in-the-ledger-with-enforce-the-owners-switch.md)): the entry-override seam (the walker needed no change: the seam is the forced `EntryCandidate`), `RandomEntryWalker`, the pure `RandomEntryNull`, the settings `Confidence:Nulls`, the stage `nulls` after `robustness`, the `nulls` block of the verdict and report, the HTML section, the ledger row of kind `null` (migration `AddLabNullTrialKind` widens one check constraint). Criteria 1 (by hand, constructed series), 2 (seam: reproduction, leak, determinism, redraw cap), 3 (same structure, same sheet at the random quantity), 8 (report-only equals the run without the stage, byte for byte) and 9 (one `null` row per run, idempotent by run id) and 10 (cancel stores nothing, hold-out never read) have tests.
+Left for **part B**: D2 the 20 placebo shapes and the rank (criteria 4 and 5), D3 the mirror gate (criterion 6). Left for **part C**: D4 the plateau gate and its settings `Confidence:Plateau:*` (criterion 7). Also open: the `nulls`/`draws` fields of `POST /api/lab/runs`, the "Chance and plateau" block of the Lab screen, and null coverage of swing strategies and non-fixed-target exits.

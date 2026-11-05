@@ -57,7 +57,7 @@ internal sealed class ReplayBars
         return new ReplayBars(fed, starts);
     }
 
-    private static Bar Adjusted(Bar bar, double factor) => new(
+    internal static Bar Adjusted(Bar bar, double factor) => new(
         bar.EpochSeconds,
         AdjustmentFactors.Price(bar.Open, factor),
         AdjustmentFactors.Price(bar.High, factor),

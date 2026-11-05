@@ -213,7 +213,7 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         var run = await PostAndDrainAsync(FullBySymbols(members.Select(m => m.Symbol), "robust"));
 
         run.GetProperty("state").GetString().ShouldBe("succeeded", run.GetRawText());
-        run.GetProperty("stages").EnumerateArray().Select(x => x.GetProperty("name").GetString()).ShouldBe(["validate", "compile", "full_test", "robustness"]);
+        run.GetProperty("stages").EnumerateArray().Select(x => x.GetProperty("name").GetString()).ShouldBe(["validate", "compile", "full_test", "robustness", "nulls"]);
         var verdict = run.GetProperty("verdict");
         verdict.GetProperty("outcome").GetString().ShouldBe("FAIL");
         var block = verdict.GetProperty("robustness");
@@ -245,6 +245,20 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         stress.GetProperty("tradable").GetString().ShouldBe("unavailable");
         stress.GetProperty("delay").GetProperty("minutes").GetInt32().ShouldBe(1);
         stress.GetProperty("formula").GetString()!.ShouldContain("RExact + m x");
+
+        // CF-07: the random-entry null sits beside the outcome, report-only; three days have no out-of-sample trade so it is unavailable, says why and is one look in the ledger
+        var nulls = verdict.GetProperty("nulls");
+        nulls.GetProperty("mode").GetString().ShouldBe("ReportOnly");
+        nulls.GetProperty("enforce").GetBoolean().ShouldBeFalse();
+        nulls.GetProperty("capped").GetBoolean().ShouldBeFalse();
+        nulls.GetProperty("settingsHash").GetString()!.Length.ShouldBe(64);
+        var entry = nulls.GetProperty("randomEntry");
+        entry.GetProperty("status").GetString().ShouldBe("unavailable");
+        entry.GetProperty("reason").GetString().ShouldStartWith("unavailable: ");
+        entry.GetProperty("pValue").ValueKind.ShouldBe(JsonValueKind.Null);
+        entry.GetProperty("threshold").GetDouble().ShouldBe(0.05);
+        entry.GetProperty("draws").GetInt32().ShouldBe(1000);
+        (await CountAsync("SELECT count(*) FROM lab.test_ledger WHERE trial_kind = 'null' AND method = 'null'")).ShouldBe(1);
     }
 
     // P5-06
@@ -292,10 +306,14 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         report.GetProperty("summary").GetString()!.ShouldContain("ended as");
         report.GetProperty("honestLimits").GetArrayLength().ShouldBeGreaterThan(0);
         report.GetProperty("robustness").ValueKind.ShouldBe(JsonValueKind.Object);
+        report.GetProperty("nulls").GetProperty("randomEntry").GetProperty("status").GetString().ShouldBe("unavailable");
+        report.GetProperty("warnings").EnumerateArray().Select(w => w.GetProperty("code").GetString()).ShouldContain("random_entry");
         html.StatusCode.ShouldBe(HttpStatusCode.OK);
         html.Content.Headers.ContentType!.MediaType.ShouldBe("text/html");
         html.Headers.GetValues("Content-Security-Policy").Single().ShouldContain("default-src 'none'");
-        (await html.Content.ReadAsStringAsync(Ct)).ShouldNotContain("<script");
+        var htmlText = await html.Content.ReadAsStringAsync(Ct);
+        htmlText.ShouldNotContain("<script");
+        htmlText.ShouldContain("Chance: random entry");
         zip2.ShouldBe(zip1);
         (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'ReportExported' AND detail LIKE 'kind=lab-report-html format=html rows=0 bytes=%'")).ShouldBe(1);
         (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'ReportExported' AND detail LIKE 'kind=lab-report-folder format=zip rows=0 bytes=%'")).ShouldBe(2);

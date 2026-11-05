@@ -77,7 +77,7 @@ internal sealed class HoldOutUnlockRecordConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.LabRunId).IsRequired();
         builder.Property(x => x.Result).HasColumnType("jsonb").IsRequired();
         builder.HasIndex(x => new { x.StrategyId, x.Version, x.Kind }).IsUnique().HasDatabaseName("uq_holdout_unlocks_version");
-        builder.HasIndex(x => x.BlockStart).HasDatabaseName("ix_holdout_unlocks_block");
+        builder.HasIndex(x => x.BlockStart, "ix_holdout_unlocks_block").HasDatabaseName("ix_holdout_unlocks_block");   // a named index: without the name it is the same index as the unique one below and the later call wins
         // at most one fresh look at a block, decided by the database and not by a read before the insert (two looks at once cannot both be fresh)
         builder.HasIndex(x => x.BlockStart).IsUnique().HasFilter("NOT reused_window").HasDatabaseName("uq_holdout_unlocks_fresh");
     }

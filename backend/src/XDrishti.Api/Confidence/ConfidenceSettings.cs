@@ -25,6 +25,8 @@ internal sealed class ConfidenceSettings
 
     public CostStressSection CostStress { get; set; } = new();
 
+    public NullsSection Nulls { get; set; } = new();
+
     public RegistrationSection Registration { get; set; } = new();
 
     public HoldOutSection HoldOut { get; set; } = new();
@@ -34,6 +36,9 @@ internal sealed class ConfidenceSettings
 
     /// <summary>The <c>Confidence:HoldOut</c> subsection as the options of CF-06 (ADR 0207).</summary>
     internal HoldOutOptions ToHoldOutOptions() => new(HoldOut.Enforce, HoldOut.AutoUnlock, HoldOut.MinMonths, HoldOut.SharePercent, HoldOut.MinTrades, HoldOut.Retention);
+
+    /// <summary>The <c>Confidence:Nulls</c> subsection as the options of CF-07 (ADR 0208).</summary>
+    internal NullOptions ToNullOptions() => new(Nulls.Mode, Nulls.Enforce, Nulls.Draws, Nulls.Percentile, Nulls.Redraws);
 
     /// <summary>The <c>Confidence:CostStress</c> subsection as the options of CF-05 (ADR 0206).</summary>
     internal CostStressOptions ToCostStressOptions() => new(CostStress.Mode, CostStress.Enforce, CostStress.MidMultiplier, CostStress.MidFloorR, CostStress.HighMultiplier, CostStress.HighFloorR, CostStress.DelayMinutes, CostStress.DelayRetention);
@@ -152,6 +157,19 @@ internal sealed class ConfidenceSettings
         public int DelayMinutes { get; set; } = 1;
 
         public double DelayRetention { get; set; } = 0.70;
+    }
+
+    internal sealed class NullsSection
+    {
+        public ConfidenceMode Mode { get; set; } = ConfidenceMode.ReportOnly;
+
+        public bool Enforce { get; set; }
+
+        public int Draws { get; set; } = 1000;
+
+        public double Percentile { get; set; } = 95;
+
+        public int Redraws { get; set; } = 5;
     }
 
     internal sealed class RegistrationSection

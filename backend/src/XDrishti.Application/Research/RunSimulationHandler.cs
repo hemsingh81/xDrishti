@@ -42,7 +42,8 @@ internal sealed class RunSimulationHandler(
     IResultsFilingTimes filingTimes,
     ISurpriseInputsReader surpriseReader,
     TimeProvider time,
-    ILogger<RunSimulationHandler> logger) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>
+    ILogger<RunSimulationHandler> logger,
+    IRandomEntryEngine randomEntries) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>
 {
     private readonly InstrumentInputReader _reader = new(bars, barQueries, adjustments);
 
@@ -86,10 +87,34 @@ internal sealed class RunSimulationHandler(
         return Result.Success(new ComparisonRun(candidates.AsReadOnly(), report, done.EntriesKey));
     }
 
+    /// <summary>
+    /// The random-entry walk of CF-07: the same preparation and reading as a run, but each instrument of the plan is handed to the random-entry engine instead of the replay, over the window of the request only. The run record that would be assembled is not built.
+    /// </summary>
+    public async ValueTask<Result<NullWalkRun>> HandleAsync(RunNullWalkQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var collected = new Dictionary<int, NullTradeDraws>();
+        var executed = await ExecuteAsync(query.Request, query.Progress, cancellationToken, null, new NullWalk(randomEntries, query.Plan, collected));
+        return executed.IsFailure
+            ? Result.Failure<NullWalkRun>(executed.Error)
+            : Result.Success(new NullWalkRun([.. query.Plan.Trades.Select(t => collected.GetValueOrDefault(t.Id) ?? new NullTradeDraws(t.Id, [], 0, "the instrument could not be read"))]));
+    }
+
+    /// <summary>The random-entry walk a call of <see cref="ExecuteAsync"/> is made for: the engine, the plan and where the draws are kept.</summary>
+    private sealed record NullWalk(IRandomEntryEngine Engine, NullWalkPlan Plan, Dictionary<int, NullTradeDraws> Collected);
+
+    /// <summary>Turns the one-per-trade reports of the random-entry engine into the running total the progress port takes.</summary>
+    private sealed class TradeCounter(IProgress<int>? progress) : IProgress<int>
+    {
+        private int _done;
+
+        public void Report(int value) => progress?.Report(Interlocked.Add(ref _done, value));
+    }
+
     /// <summary>What a run produced: one run record per candidate (one for a plain run), the gated counts and the entries key.</summary>
     private sealed record Executed(IReadOnlyList<SimulationRun> Runs, IReadOnlyList<CandidateRecord> Candidates, IReadOnlyList<long> Gated, string EntriesKey, bool HoldsOvernight);
 
-    private async ValueTask<Result<Executed>> ExecuteAsync(SimulationRequest request, IProgress<int>? progress, CancellationToken cancellationToken, ExplainBasisSink? basisSink = null)
+    private async ValueTask<Result<Executed>> ExecuteAsync(SimulationRequest request, IProgress<int>? progress, CancellationToken cancellationToken, ExplainBasisSink? basisSink = null, NullWalk? nullWalk = null)
     {
 
         // (1) the request, (2) the fill rules, (3) the strategy: no port is read until all three pass.
@@ -196,13 +221,30 @@ internal sealed class RunSimulationHandler(
         var candidates = prepared.Value.Candidates;
         var replays = candidates.Select(_ => new List<InstrumentReplay>(targets.Ids.Count)).ToList();
         var gated = new long[candidates.Count];
-        foreach (var id in targets.Ids)
+        var nullTrades = nullWalk is null ? null : new TradeCounter(progress);   // a random-entry walk reports the trades done, not the instruments
+        // CF-07: a random-entry walk reads only the instruments that have a real trade in the plan
+        var walked = nullWalk is null ? targets.Ids : [.. targets.Ids.Where(id => nullWalk.Plan.Trades.Any(t => t.InstrumentId == id))];
+        foreach (var id in walked)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var readStart = time.GetTimestamp();
             var input = await ReadInstrumentAsync(context, id, cancellationToken);
             var replayStart = time.GetTimestamp();
             readTime += time.GetElapsedTime(readStart, replayStart);
+
+            if (nullWalk is not null)
+            {
+                if (input is not null)
+                {
+                    foreach (var draws in nullWalk.Engine.WalkRandomEntries(prepared.Value, input, nullWalk.Plan, nullTrades, cancellationToken).Trades)
+                    {
+                        nullWalk.Collected[draws.TradeId] = draws;
+                    }
+                }
+
+                replayTime += time.GetElapsedTime(replayStart);
+                continue;
+            }
 
             var many = input is null
                 ? new ComparisonReplay(candidates.Select(_ => new InstrumentReplay(InstrumentRun.NotFound(id), [], [])).ToList(), candidates.Select(_ => 0L).ToList())
@@ -221,6 +263,12 @@ internal sealed class RunSimulationHandler(
             }
 
             progress?.Report(replays[0].Count);
+        }
+
+        if (nullWalk is not null)
+        {
+            // the random-entry walk has no run record: its caller reads the draws from the collector
+            return Result.Success(new Executed([], candidates, gated, string.Empty, prepared.Value.HoldsOvernight));
         }
 
         var assemblyStart = time.GetTimestamp();

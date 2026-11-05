@@ -39,7 +39,8 @@ internal sealed class LabRunner(
     LabCostStress? costStress = null,
     HoldOutOptions? holdOutOptions = null,
     LabHoldOutGuard? holdOutGuard = null,
-    HoldOutUnlocker? unlocker = null) : ILabRunExecutor
+    HoldOutUnlocker? unlocker = null,
+    LabNulls? nulls = null) : ILabRunExecutor
 {
     /// <summary>Who is recorded as the author of a stored run.</summary>
     public const string Actor = "lab:quick";
@@ -58,6 +59,9 @@ internal sealed class LabRunner(
 
     /// <summary>The robustness stage of a <c>robust</c> run (P5-05).</summary>
     public const string Robustness = "robustness";
+
+    /// <summary>The random-entry null stage of a robust run (CF-07), after the robustness stage.</summary>
+    public const string Nulls = "nulls";
 
     /// <summary>How often the watcher looks at the run's progress.</summary>
     private static readonly TimeSpan WatchTick = TimeSpan.FromMilliseconds(100);
@@ -231,6 +235,7 @@ internal sealed class LabRunner(
         var statsRows = new List<VariantStatsRow> { LabVariantStats.Of(run.StrategyId, run.Id, run.StrategyHash, TradeMoments.Of(oosR), run.Method, time.GetUtcNow()) };
         var lastStage = FullTest;
         DelaySignals? delay = null;
+        NullsOutcome? nullsOutcome = null;
         if (string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal))
         {
             ownerToken.ThrowIfCancellationRequested();
@@ -250,6 +255,19 @@ internal sealed class LabRunner(
             statsRows.AddRange(robust.Value.VariantStats);
             delay = robust.Value.Delay;
             lastStage = Robustness;
+
+            // CF-07: the random-entry null of the out-of-sample trades, one more stage that reads the stored bars of the development window and writes nothing until the end
+            if (nulls is { IsOn: true })
+            {
+                ownerToken.ThrowIfCancellationRequested();
+                log.Finish(Robustness, 0, time.GetUtcNow());
+                var developmentEnd = await DevelopmentEndAsync(run, ownerToken);
+                var nullSteps = LabNulls.Steps(full, developmentEnd);
+                watch.Set(Nulls, nullSteps);
+                await BeginAsync(run, log, Nulls, 0, nullSteps, throttle, ownerToken);
+                nullsOutcome = await nulls.RunAsync(run, time.GetUtcNow(), template, full, developmentEnd, counter, ownerToken);
+                lastStage = Nulls;
+            }
         }
 
         // CF-05: the cost stress and the delay test beside the outcome; reads one stored sheet, writes nothing, and the outcome moves only if the owner has turned Enforce on
@@ -257,6 +275,13 @@ internal sealed class LabRunner(
         if (costStress is { IsOn: true } && string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal) && sheetUsed is not null)
         {
             verdict = costStress.Apply(verdict, full.OosTrades, sheetUsed.Id, sheetUsed.Checked is not null, delay, sheetUsed.RatesSha256);
+        }
+
+        // CF-07: the random-entry null beside the outcome; the outcome moves only if the owner has turned Enforce on, and the family-level null is one more look in the ledger (written with the sweep rows below)
+        if (nullsOutcome is not null && nulls is not null)
+        {
+            verdict = nulls.Apply(verdict, nullsOutcome.View);
+            sweepRows.Add(nullsOutcome.Row);
         }
 
         // CF-03: beside the factor; reads the stored trial statistics and writes nothing, and the outcome is not touched
@@ -307,6 +332,18 @@ internal sealed class LabRunner(
         var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
         LabRunLog.Finished(logger, run.Id, keys[0][..12], full.Trades, 0, elapsedMs);
         return new LabFinish(run.Id, LabRunState.Succeeded, lastStage, keys, counts, problems, log.Snapshot(), null, time.GetUtcNow());
+    }
+
+    /// <summary>The last session the random-entry null may read (CF-07, ADR 0208): the run's own end, or the day before the hold-out block when the run's window reaches it. <see cref="LabHoldOutGuard.Cut"/> shortens only a default window, so an explicit window can end inside the block; the null never follows it there.</summary>
+    private async ValueTask<DateOnly> DevelopmentEndAsync(LabRun run, CancellationToken cancellationToken)
+    {
+        if (holdOutGuard is null || await holdOutGuard.HistoryAsync(cancellationToken) is not { } history || await holdOutGuard.EnsureAsync(history.First, history.Last, cancellationToken) is not { } block)
+        {
+            return run.To;
+        }
+
+        var before = block.Start.AddDays(-1);
+        return before < run.To ? before : run.To;
     }
 
     private static async Task<bool> HoldOutKeptAsync(LabHoldOutGuard guard, CancellationToken cancellationToken) =>
