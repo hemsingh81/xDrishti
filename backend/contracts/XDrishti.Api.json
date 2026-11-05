@@ -44644,6 +44644,59 @@
         },
         "description": "Counts by MFE: one bin between each pair of edges, then the open bin at or above the last edge."
       },
+      "MirrorView": {
+        "required": [
+          "trades",
+          "mirrorMeanR",
+          "realMeanR",
+          "threshold",
+          "comparison",
+          "status",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "trades": {
+            "type": "integer",
+            "description": "Real trades that got a mirror trade.",
+            "format": "int32"
+          },
+          "mirrorMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Mean net R of the mirror trades; null when unavailable.",
+            "format": "double"
+          },
+          "realMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Mean net R of the real trades, beside it.",
+            "format": "double"
+          },
+          "threshold": {
+            "type": "number",
+            "description": "0.",
+            "format": "double"
+          },
+          "comparison": {
+            "type": "string",
+            "description": "How the value is read against the threshold (`&lt;=`)."
+          },
+          "status": {
+            "type": "string",
+            "description": "`pass`, `fail` or `unavailable`."
+          },
+          "reason": {
+            "type": "string",
+            "description": "One sentence for the reading."
+          }
+        },
+        "description": "The mirror gate of one Lab verdict (CF-07, D3): the net expectancy of the real trades taken the other way round with the same costs must be at most double MirrorView.Threshold (0). A positive mirror reads \"mostly drift\". `unavailable` is never a pass."
+      },
       "MissingMinute": {
         "required": [
           "date",
@@ -45193,9 +45246,31 @@
               "type": "string"
             },
             "description": "The limits of the figure and the reasons trades were left out."
+          },
+          "placebos": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The rank of the strategy among the 20 placebo shapes (CF-07 part B); null in a result stored before it or when `Confidence:Nulls:Placebos` is off.",
+                "$ref": "#/components/schemas/PlaceboSetView"
+              }
+            ]
+          },
+          "mirror": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The mirror gate (CF-07 part B); null as Placebos.",
+                "$ref": "#/components/schemas/MirrorView"
+              }
+            ]
           }
         },
-        "description": "The chance tests of a Lab verdict (CF-07, ADR 0208), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a null that is not a pass caps a PASS at MARGINAL and never raises an outcome. The placebo set, the mirror\ngate and the plateau gate of the spec are not built yet and have no field here."
+        "description": "The chance tests of a Lab verdict (CF-07, ADRs 0208 and 0209), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a null, a placebo set or a mirror gate that is not a pass caps a PASS at MARGINAL and never raises an outcome.\nThe plateau gate of the spec is not built yet and has no field here."
       },
       "OfficialDailyCheck": {
         "required": [
@@ -47695,6 +47770,138 @@
           }
         },
         "description": "A pivot of two dimensions by one figure: the row and column values and every cell of the grid, row by row, empty cells included so no gap reads as a zero."
+      },
+      "PlaceboRowView": {
+        "required": [
+          "shape",
+          "trades",
+          "meanR",
+          "rank",
+          "comparable",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "shape": {
+            "type": "string",
+            "description": "The shape name (`mirror`, `shift_+15`, `date_shift_-3`, `instrument_roll_2`, ...)."
+          },
+          "trades": {
+            "type": "integer",
+            "description": "Real trades that got a placebo trade of this shape.",
+            "format": "int32"
+          },
+          "meanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Mean net R of those placebo trades after the same charges; null when none.",
+            "format": "double"
+          },
+          "rank": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Its place among the strategy and the comparable placebos, 1 the best; null when it is not comparable.",
+            "format": "int32"
+          },
+          "comparable": {
+            "type": "boolean",
+            "description": "True when enough trades were placed for it to be ranked."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why it is not comparable; null when it is."
+          }
+        },
+        "description": "One placebo shape in the ranking of a Lab verdict (CF-07, D2)."
+      },
+      "PlaceboSetView": {
+        "required": [
+          "shapes",
+          "comparable",
+          "minComparable",
+          "realMeanR",
+          "realRank",
+          "pValue",
+          "threshold",
+          "comparison",
+          "status",
+          "reason",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "shapes": {
+            "type": "integer",
+            "description": "Shapes asked for.",
+            "format": "int32"
+          },
+          "comparable": {
+            "type": "integer",
+            "description": "Shapes that could be compared.",
+            "format": "int32"
+          },
+          "minComparable": {
+            "type": "integer",
+            "description": "The fewest comparable shapes for a conclusive reading.",
+            "format": "int32"
+          },
+          "realMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Mean net R of the real trades that were restated.",
+            "format": "double"
+          },
+          "realRank": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The strategy's rank among the comparable placebos and itself; null when unavailable.",
+            "format": "int32"
+          },
+          "pValue": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "`RealRank / (Comparable + 1)`; null when unavailable.",
+            "format": "double"
+          },
+          "threshold": {
+            "type": "number",
+            "description": "The level of the test.",
+            "format": "double"
+          },
+          "comparison": {
+            "type": "string",
+            "description": "How the value is read against the threshold (`&lt;=`)."
+          },
+          "status": {
+            "type": "string",
+            "description": "`pass`, `fail` or `unavailable`."
+          },
+          "reason": {
+            "type": "string",
+            "description": "One sentence for the reading."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaceboRowView"
+            },
+            "description": "One row per shape, in the fixed order; empty when nothing could be walked."
+          }
+        },
+        "description": "The placebo set of one Lab verdict (CF-07, D2): the real strategy against 20 fixed shapes (the mirror, entries 15 to 60 minutes later, the same clock time on sessions 1 to 5 away either side, the signals reassigned to the next 1 to 5 instruments). The strategy must rank\nfirst: double? PlaceboSetView.PValue is `rank / (comparable + 1)` against double PlaceboSetView.Threshold; with fewer than int PlaceboSetView.MinComparable comparable placebos the reading is `unavailable` (inconclusive) and never a pass."
       },
       "PlanAlertsView": {
         "required": [

@@ -176,7 +176,7 @@ public static class RandomEntryWalker
     }
 
     /// <summary>The bars of each wanted session, adjusted on a copy as the replay adjusts them; a date with no bar is absent.</summary>
-    private static Dictionary<DateOnly, Bar[]> SessionsOf(InstrumentReplayInput input, HashSet<DateOnly> wanted)
+    internal static Dictionary<DateOnly, Bar[]> SessionsOf(InstrumentReplayInput input, HashSet<DateOnly> wanted)
     {
         var found = new Dictionary<DateOnly, List<Bar>>();
         foreach (var bar in input.RawBars)

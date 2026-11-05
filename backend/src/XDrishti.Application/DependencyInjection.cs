@@ -740,6 +740,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<UnlockHoldOutCommand, LabRunView>, UnlockHoldOutHandler>();
         services.AddScoped<IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>, GetHoldOutHandler>();
         services.AddScoped<LabNulls>(); // the random-entry null beside the outcome and its ledger row (CF-07, ADR 0208)
+        services.AddScoped<LabPlacebos>(); // the placebo set and the mirror gate beside it, and their ledger row (CF-07 part B, ADR 0209)
         services.AddScoped<LabCostStress>(); // the cost stress gates and the delay test beside the outcome (CF-05, ADR 0206)
         services.AddScoped<LabDeflation>(); // the deflated Sharpe ratio beside the factor (CF-03, ADR 0205)
         services.AddSingleton<LabRunDispatcher>();
@@ -760,6 +761,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, RunSimulationHandler>();
         services.AddScoped<IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, RunSimulationHandler>();
         services.AddScoped<IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, RunSimulationHandler>(); // the random-entry walk of the Lab's chance test (CF-07, ADR 0208)
+        services.AddScoped<IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>, RunSimulationHandler>(); // the placebo walk of the Lab's chance tests (CF-07 part B, ADR 0209)
         services.AddScoped<IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>, BuildTradeCardsHandler>();
         services.AddScoped<ICommandHandler<LoadCostSheetCommand, LoadedCostSheet>, LoadCostSheetHandler>();
         services.AddScoped<IQueryHandler<ShowCostSheetQuery, Result<ShownCostSheet>>, ShowCostSheetHandler>();

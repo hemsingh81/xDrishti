@@ -38,7 +38,7 @@ internal sealed class ConfidenceSettings
     internal HoldOutOptions ToHoldOutOptions() => new(HoldOut.Enforce, HoldOut.AutoUnlock, HoldOut.MinMonths, HoldOut.SharePercent, HoldOut.MinTrades, HoldOut.Retention);
 
     /// <summary>The <c>Confidence:Nulls</c> subsection as the options of CF-07 (ADR 0208).</summary>
-    internal NullOptions ToNullOptions() => new(Nulls.Mode, Nulls.Enforce, Nulls.Draws, Nulls.Percentile, Nulls.Redraws);
+    internal NullOptions ToNullOptions() => new(Nulls.Mode, Nulls.Enforce, Nulls.Draws, Nulls.Percentile, Nulls.Redraws, Nulls.Placebos, Nulls.MinPlacebos);
 
     /// <summary>The <c>Confidence:CostStress</c> subsection as the options of CF-05 (ADR 0206).</summary>
     internal CostStressOptions ToCostStressOptions() => new(CostStress.Mode, CostStress.Enforce, CostStress.MidMultiplier, CostStress.MidFloorR, CostStress.HighMultiplier, CostStress.HighFloorR, CostStress.DelayMinutes, CostStress.DelayRetention);
@@ -170,6 +170,10 @@ internal sealed class ConfidenceSettings
         public double Percentile { get; set; } = 95;
 
         public int Redraws { get; set; } = 5;
+
+        public bool Placebos { get; set; } = true;
+
+        public int MinPlacebos { get; set; } = 19;
     }
 
     internal sealed class RegistrationSection

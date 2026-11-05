@@ -261,11 +261,11 @@ internal sealed class LabRunner(
             {
                 ownerToken.ThrowIfCancellationRequested();
                 log.Finish(Robustness, 0, time.GetUtcNow());
-                var developmentEnd = await DevelopmentEndAsync(run, ownerToken);
-                var nullSteps = LabNulls.Steps(full, developmentEnd);
+                var (developmentEnd, holdOutKept) = await DevelopmentEndAsync(run, ownerToken);
+                var nullSteps = nulls.Steps(full, developmentEnd);
                 watch.Set(Nulls, nullSteps);
                 await BeginAsync(run, log, Nulls, 0, nullSteps, throttle, ownerToken);
-                nullsOutcome = await nulls.RunAsync(run, time.GetUtcNow(), template, full, developmentEnd, counter, ownerToken);
+                nullsOutcome = await nulls.RunAsync(run, time.GetUtcNow(), template, full, developmentEnd, holdOutKept, counter, ownerToken);
                 lastStage = Nulls;
             }
         }
@@ -277,11 +277,11 @@ internal sealed class LabRunner(
             verdict = costStress.Apply(verdict, full.OosTrades, sheetUsed.Id, sheetUsed.Checked is not null, delay, sheetUsed.RatesSha256);
         }
 
-        // CF-07: the random-entry null beside the outcome; the outcome moves only if the owner has turned Enforce on, and the family-level null is one more look in the ledger (written with the sweep rows below)
+        // CF-07: the random-entry null beside the outcome; the outcome moves only if the owner has turned Enforce on, and the family-level nulls (the random-entry null and the placebo set) are one more look each in the ledger (written with the sweep rows below)
         if (nullsOutcome is not null && nulls is not null)
         {
             verdict = nulls.Apply(verdict, nullsOutcome.View);
-            sweepRows.Add(nullsOutcome.Row);
+            sweepRows.AddRange(nullsOutcome.Rows);
         }
 
         // CF-03: beside the factor; reads the stored trial statistics and writes nothing, and the outcome is not touched
@@ -334,16 +334,16 @@ internal sealed class LabRunner(
         return new LabFinish(run.Id, LabRunState.Succeeded, lastStage, keys, counts, problems, log.Snapshot(), null, time.GetUtcNow());
     }
 
-    /// <summary>The last session the random-entry null may read (CF-07, ADR 0208): the run's own end, or the day before the hold-out block when the run's window reaches it. <see cref="LabHoldOutGuard.Cut"/> shortens only a default window, so an explicit window can end inside the block; the null never follows it there.</summary>
-    private async ValueTask<DateOnly> DevelopmentEndAsync(LabRun run, CancellationToken cancellationToken)
+    /// <summary>The last session the random-entry null and the placebo set may read (CF-07, ADR 0208), and whether a hold-out block is kept: the run's own end, or the day before the hold-out block when the run's window reaches it. <see cref="LabHoldOutGuard.Cut"/> shortens only a default window, so an explicit window can end inside the block; the nulls never follow it there.</summary>
+    private async ValueTask<(DateOnly End, bool Kept)> DevelopmentEndAsync(LabRun run, CancellationToken cancellationToken)
     {
         if (holdOutGuard is null || await holdOutGuard.HistoryAsync(cancellationToken) is not { } history || await holdOutGuard.EnsureAsync(history.First, history.Last, cancellationToken) is not { } block)
         {
-            return run.To;
+            return (run.To, false);
         }
 
         var before = block.Start.AddDays(-1);
-        return before < run.To ? before : run.To;
+        return (before < run.To ? before : run.To, true);
     }
 
     private static async Task<bool> HoldOutKeptAsync(LabHoldOutGuard guard, CancellationToken cancellationToken) =>

@@ -28,8 +28,8 @@ public sealed class LabNullTrialKindMigrationTests(ApiFactory factory)
         return (long)(await command.ExecuteScalarAsync(Ct))!;
     }
 
-    private static string Insert(string kind) =>
-        $"INSERT INTO lab.test_ledger (strategy_id, version, strategy_hash, lab_run_id, run_key, universe_label, window_from, window_to, method, created_at, trial_kind) VALUES ('NUL', 1, '{new string('a', 64)}', '{Guid.NewGuid()}', '{new string('b', 64)}', 'u', '2025-01-01', '2025-06-30', 'null', now(), '{kind}')";
+    private static string Insert(string kind, string method = "null") =>
+        $"INSERT INTO lab.test_ledger (strategy_id, version, strategy_hash, lab_run_id, run_key, universe_label, window_from, window_to, method, created_at, trial_kind) VALUES ('NUL', 1, '{new string('a', 64)}', '{Guid.NewGuid()}', '{new string('b', 64)}', 'u', '2025-01-01', '2025-06-30', '{method}', now(), '{kind}')";
 
     [Fact]
     public async Task The_migration_accepts_the_null_kind_and_refuses_an_unknown_one_and_agrees_with_the_model()
@@ -48,6 +48,25 @@ public sealed class LabNullTrialKindMigrationTests(ApiFactory factory)
         var model = db.GetService<Microsoft.EntityFrameworkCore.Metadata.IDesignTimeModel>().Model.GetEntityTypes().Single(e => e.GetTableName() == "holdout_unlocks");
         model.GetIndexes().Select(i => i.GetDatabaseName()).Order().ToList().ShouldBe(["ix_holdout_unlocks_block", "uq_holdout_unlocks_fresh", "uq_holdout_unlocks_version"]);
         (await CountAsync(connection, "SELECT count(*) FROM pg_indexes WHERE schemaname = 'lab' AND tablename = 'holdout_unlocks' AND indexname IN ('ix_holdout_unlocks_block', 'uq_holdout_unlocks_fresh', 'uq_holdout_unlocks_version')")).ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task The_placebo_set_look_is_a_row_of_kind_null_with_method_placebo_so_it_needs_no_migration_and_Down_removes_it_with_the_other_null_rows()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_null_placebo_probe", Ct);
+        using var scope = scratch.Host.Services.CreateScope();
+        var migrator = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>().GetService<IMigrator>();
+        await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+        await connection.OpenAsync(Ct);
+
+        (await ExecuteAsync(connection, Insert("null", "null"))).ShouldBe(1);
+        (await ExecuteAsync(connection, Insert("null", "placebo"))).ShouldBe(1);
+        await Should.ThrowAsync<PostgresException>(() => ExecuteAsync(connection, Insert("placebo", "placebo")));
+        (await CountAsync(connection, "SELECT count(*) FROM lab.test_ledger WHERE trial_kind = 'null' AND method = 'placebo'")).ShouldBe(1);
+
+        await migrator.MigrateAsync(Before, Ct);
+
+        (await CountAsync(connection, "SELECT count(*) FROM lab.test_ledger")).ShouldBe(0, "Down removes every row of kind null, whatever its method");
     }
 
     [Fact]

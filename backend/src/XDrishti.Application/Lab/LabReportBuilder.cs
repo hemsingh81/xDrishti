@@ -157,6 +157,31 @@ internal static class LabReportBuilder
             {
                 w.Add(new ReportWarningView("random_entry", "The random-entry null is unavailable and is not a pass: " + e.Reason.Replace("unavailable: ", string.Empty, StringComparison.Ordinal) + (nulls.Enforce ? "." : " (report only: the outcome is not changed).")));
             }
+
+            var tail = nulls.Enforce ? "." : " (report only: the outcome is not changed).";
+            if (nulls.Placebos is { } set)
+            {
+                if (set.Status == "fail")
+                {
+                    w.Add(new ReportWarningView("placebo", $"Placebo shapes do as well as the strategy: it ranks {set.RealRank} of {set.Comparable + 1}, p = {P(set.PValue ?? double.NaN)} against {P(set.Threshold)}" + tail));
+                }
+                else if (set.Status == "unavailable")
+                {
+                    w.Add(new ReportWarningView("placebo", "The placebo set is unavailable and is not a pass: " + set.Reason.Replace("unavailable: ", string.Empty, StringComparison.Ordinal) + tail));
+                }
+            }
+
+            if (nulls.Mirror is { } mirror)
+            {
+                if (mirror.Status == "fail")
+                {
+                    w.Add(new ReportWarningView("mirror", $"Mostly drift: the mirror earns {F(mirror.MirrorMeanR ?? double.NaN)} R, above 0, against {F(mirror.RealMeanR ?? double.NaN)} R for the strategy" + tail));
+                }
+                else if (mirror.Status == "unavailable")
+                {
+                    w.Add(new ReportWarningView("mirror", "The mirror gate is unavailable and is not a pass: " + mirror.Reason.Replace("unavailable: ", string.Empty, StringComparison.Ordinal) + tail));
+                }
+            }
         }
 
         return w;
