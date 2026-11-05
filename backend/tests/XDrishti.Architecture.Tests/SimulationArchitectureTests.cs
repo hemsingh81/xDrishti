@@ -163,10 +163,10 @@ public sealed class SimulationArchitectureTests
     public void The_replay_namespace_holds_the_documented_types_and_the_canonical_json_writer_is_internal()
     {
         TypeNamesIn("XDrishti.Simulation.Replay").Where(n => !n.Contains('+', StringComparison.Ordinal) && !n.Contains('<', StringComparison.Ordinal)).Select(n => n["XDrishti.Simulation.Replay.".Length..]).Order().ShouldBe(
-            ["BarSegment", "BuiltInBuild", "BuiltInEntry", "BuiltInStrategies", "DefinitionJson", "Discontinuity", "ExitChoices", "InstrumentReplayer", "PreparedBuild", "PreparedMember", "PreparedStrategy", "RanSession", "RandomEntryWalker", "ReplayBars", "SessionScan", "StoredCheck", "StoredDescription", "StoredInspection", "StoredIssue", "StoredStrategies", "StrategyPreparation"]);
+            ["BarSegment", "BuiltInBuild", "BuiltInEntry", "BuiltInStrategies", "DefinitionJson", "Discontinuity", "ExitChoices", "InstrumentReplayer", "PlaceboWalker", "PreparedBuild", "PreparedMember", "PreparedStrategy", "RanSession", "RandomEntryWalker", "ReplayBars", "SessionScan", "StoredCheck", "StoredDescription", "StoredInspection", "StoredIssue", "StoredStrategies", "StrategyPreparation"]);
         Simulation.GetType("XDrishti.Simulation.Replay.DefinitionJson")!.IsPublic.ShouldBeFalse();
         Simulation.GetExportedTypes().Where(t => t.Namespace == "XDrishti.Simulation.Replay").Select(t => t.Name).Order().ShouldBe(
-            ["BuiltInBuild", "BuiltInStrategies", "InstrumentReplayer", "PreparedBuild", "PreparedMember", "PreparedStrategy", "RandomEntryWalker", "StoredCheck", "StoredDescription", "StoredInspection", "StoredIssue", "StoredStrategies", "StrategyPreparation"]);
+            ["BuiltInBuild", "BuiltInStrategies", "InstrumentReplayer", "PlaceboWalker", "PreparedBuild", "PreparedMember", "PreparedStrategy", "RandomEntryWalker", "StoredCheck", "StoredDescription", "StoredInspection", "StoredIssue", "StoredStrategies", "StrategyPreparation"]);
     }
 
     [Fact]

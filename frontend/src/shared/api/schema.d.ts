@@ -14323,6 +14323,35 @@ export interface components {
        */
       aboveCount: number;
     };
+    /** @description The mirror gate of one Lab verdict (CF-07, D3): the net expectancy of the real trades taken the other way round with the same costs must be at most double MirrorView.Threshold (0). A positive mirror reads "mostly drift". `unavailable` is never a pass. */
+    MirrorView: {
+      /**
+       * Format: int32
+       * @description Real trades that got a mirror trade.
+       */
+      trades: number;
+      /**
+       * Format: double
+       * @description Mean net R of the mirror trades; null when unavailable.
+       */
+      mirrorMeanR: null | number;
+      /**
+       * Format: double
+       * @description Mean net R of the real trades, beside it.
+       */
+      realMeanR: null | number;
+      /**
+       * Format: double
+       * @description 0.
+       */
+      threshold: number;
+      /** @description How the value is read against the threshold (`&lt;=`). */
+      comparison: string;
+      /** @description `pass`, `fail` or `unavailable`. */
+      status: string;
+      /** @description One sentence for the reading. */
+      reason: string;
+    };
     /** @description A missing minute: the India date and the minute (`HH:mm`). */
     MissingMinute: {
       /** Format: date */
@@ -14530,8 +14559,8 @@ export interface components {
       confirmed: null | string;
     };
     /**
-     * @description The chance tests of a Lab verdict (CF-07, ADR 0208), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a null that is not a pass caps a PASS at MARGINAL and never raises an outcome. The placebo set, the mirror
-     *     gate and the plateau gate of the spec are not built yet and have no field here.
+     * @description The chance tests of a Lab verdict (CF-07, ADRs 0208 and 0209), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a null, a placebo set or a mirror gate that is not a pass caps a PASS at MARGINAL and never raises an outcome.
+     *     The plateau gate of the spec is not built yet and has no field here.
      */
     NullsView: {
       /** @description The mode when it was computed. */
@@ -14550,6 +14579,8 @@ export interface components {
       basis: string;
       /** @description The limits of the figure and the reasons trades were left out. */
       notes: string[];
+      placebos?: null | components['schemas']['PlaceboSetView'];
+      mirror?: null | components['schemas']['MirrorView'];
     };
     /** @description The comparison of the derived daily bar with the broker's official daily candle: not available until official daily candles are fetched. */
     OfficialDailyCheck: {
@@ -15606,6 +15637,79 @@ export interface components {
       nonAdditive: boolean;
       /** @description The evidence of the report. */
       evidence: components['schemas']['ReportEvidenceView'];
+    };
+    /** @description One placebo shape in the ranking of a Lab verdict (CF-07, D2). */
+    PlaceboRowView: {
+      /** @description The shape name (`mirror`, `shift_+15`, `date_shift_-3`, `instrument_roll_2`, ...). */
+      shape: string;
+      /**
+       * Format: int32
+       * @description Real trades that got a placebo trade of this shape.
+       */
+      trades: number;
+      /**
+       * Format: double
+       * @description Mean net R of those placebo trades after the same charges; null when none.
+       */
+      meanR: null | number;
+      /**
+       * Format: int32
+       * @description Its place among the strategy and the comparable placebos, 1 the best; null when it is not comparable.
+       */
+      rank: null | number;
+      /** @description True when enough trades were placed for it to be ranked. */
+      comparable: boolean;
+      /** @description Why it is not comparable; null when it is. */
+      reason: null | string;
+    };
+    /**
+     * @description The placebo set of one Lab verdict (CF-07, D2): the real strategy against 20 fixed shapes (the mirror, entries 15 to 60 minutes later, the same clock time on sessions 1 to 5 away either side, the signals reassigned to the next 1 to 5 instruments). The strategy must rank
+     *     first: double? PlaceboSetView.PValue is `rank / (comparable + 1)` against double PlaceboSetView.Threshold; with fewer than int PlaceboSetView.MinComparable comparable placebos the reading is `unavailable` (inconclusive) and never a pass.
+     */
+    PlaceboSetView: {
+      /**
+       * Format: int32
+       * @description Shapes asked for.
+       */
+      shapes: number;
+      /**
+       * Format: int32
+       * @description Shapes that could be compared.
+       */
+      comparable: number;
+      /**
+       * Format: int32
+       * @description The fewest comparable shapes for a conclusive reading.
+       */
+      minComparable: number;
+      /**
+       * Format: double
+       * @description Mean net R of the real trades that were restated.
+       */
+      realMeanR: null | number;
+      /**
+       * Format: int32
+       * @description The strategy's rank among the comparable placebos and itself; null when unavailable.
+       */
+      realRank: null | number;
+      /**
+       * Format: double
+       * @description `RealRank / (Comparable + 1)`; null when unavailable.
+       */
+      pValue: null | number;
+      /**
+       * Format: double
+       * @description The level of the test.
+       */
+      threshold: number;
+      /** @description How the value is read against the threshold (`&lt;=`). */
+      comparison: string;
+      /** @description `pass`, `fail` or `unavailable`. */
+      status: string;
+      /** @description One sentence for the reading. */
+      reason: string;
+      /** @description One row per shape, in the fixed order; empty when nothing could be walked. */
+      rows: components['schemas']['PlaceboRowView'][];
     };
     /**
      * @description The alerts of a plan. `enabled` is the setting `Planning:TicketAlerts:Enabled`; when false the lists are empty. `mutedItems` are the tickets whose further crossings the owner stopped. Armed means watched; every text ends with

@@ -831,6 +831,16 @@ public sealed class LabRunnerTests
 
     private readonly IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>> _walks = Substitute.For<IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>>();
 
+    private readonly IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>> _placeboWalks = Substitute.For<IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>>();
+
+    /// <summary>The placebo walk answers every placed (signal, shape) pair with a loss of 9 R.</summary>
+    private void AnswerPlacebos() =>
+        _placeboWalks.HandleAsync(Arg.Any<RunPlaceboWalkQuery>(), Arg.Any<CancellationToken>()).Returns(ci =>
+        {
+            var plan = ci.Arg<RunPlaceboWalkQuery>().Plan;
+            return Result.Success(new PlaceboWalkRun([.. plan.Signals.SelectMany(s => PlaceboShapes.All.Select((shape, i) => (s, i, p: PlaceboShapes.Place(shape, s, plan.RollOrder))).Where(x => x.p is not null)).Select(x => new PlaceboOutcome(x.s.Id, x.i, -9, null))]));
+        });
+
     /// <summary>A comparison with one costed intraday trade on every weekday of a year and a sheet in force over all of it, so the walk-forward has out-of-sample trades to give the null (the first test window starts after nine months).</summary>
     private void ArrangeYearOfTrades()
     {
@@ -870,9 +880,10 @@ public sealed class LabRunnerTests
         _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<IReadOnlyList<VariantStatsRow>>().Count);
         _walks.HandleAsync(Arg.Any<RunNullWalkQuery>(), Arg.Any<CancellationToken>()).Returns(ci =>
             Result.Success(new NullWalkRun([.. ci.Arg<RunNullWalkQuery>().Plan.Trades.Select(t => new NullTradeDraws(t.Id, new double[ci.Arg<RunNullWalkQuery>().Plan.Draws], 0, null))])));
+        AnswerPlacebos();
         var options = new HoldOutOptions();
         return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
-            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, null, options, new XDrishti.Application.Lab.LabHoldOutGuard(store, bars, options, _time), nulls: new LabNulls(_walks, new NullOptions(), LabSettings.Default));
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, null, options, new XDrishti.Application.Lab.LabHoldOutGuard(store, bars, options, _time), nulls: new LabNulls(_walks, new LabPlacebos(_placeboWalks, new NullOptions()), new NullOptions(), LabSettings.Default));
     }
 
     [Fact]
@@ -899,6 +910,14 @@ public sealed class LabRunnerTests
             query.Request.To.ShouldBeLessThan(blockStart, "no bar at or after the block start is requested");
             query.Plan.Trades.ShouldAllBe(t => t.Date < blockStart, "no trade on or after the block start is restated");
         }
+
+        _placeboWalks.ReceivedCalls().ShouldNotBeEmpty("the placebo walk was sent");
+        foreach (var call in _placeboWalks.ReceivedCalls())
+        {
+            var query = call.GetArguments()[0].ShouldBeOfType<RunPlaceboWalkQuery>();
+            query.Request.To.ShouldBeLessThan(blockStart, "no bar at or after the block start is requested by the placebo walk either");
+            query.Plan.Signals.ShouldAllBe(t => t.Date < blockStart, "no signal on or after the block start is restated");
+        }
     }
 
     [Fact]
@@ -923,8 +942,9 @@ public sealed class LabRunnerTests
         _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<IReadOnlyList<VariantStatsRow>>().Count);
         _walks.HandleAsync(Arg.Any<RunNullWalkQuery>(), Arg.Any<CancellationToken>()).Returns(ci =>
             Result.Success(new NullWalkRun([.. ci.Arg<RunNullWalkQuery>().Plan.Trades.Select(t => new NullTradeDraws(t.Id, new double[ci.Arg<RunNullWalkQuery>().Plan.Draws], 0, null))])));
+        AnswerPlacebos();
         return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
-            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, nulls: new LabNulls(_walks, options, LabSettings.Default));
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, nulls: new LabNulls(_walks, new LabPlacebos(_placeboWalks, options), options, LabSettings.Default));
     }
 
     [Fact]
@@ -966,7 +986,7 @@ public sealed class LabRunnerTests
     }
 
     [Fact]
-    public async Task The_null_is_one_ledger_row_of_kind_null_written_with_the_sweep_rows_after_the_last_cancel_check_and_before_the_result()
+    public async Task The_nulls_are_one_ledger_row_each_of_kind_null_written_with_the_sweep_rows_after_the_last_cancel_check_and_before_the_result()
     {
         ArrangeFullTest();
         var calls = new List<string>();
@@ -991,9 +1011,9 @@ public sealed class LabRunnerTests
 
         await RunnerWithNulls(new NullOptions()).ExecuteAsync(run, Ct);
 
-        rows.Count(r => r.TrialKind == "null").ShouldBe(1);
+        rows.Count(r => r.TrialKind == "null").ShouldBe(2, "the random-entry null and the placebo set are one look each");
         rows.Count(r => r.TrialKind == "run").ShouldBe(4, "the four sweep points");
-        rows.Single(r => r.TrialKind == "null").Method.ShouldBe("null");
+        rows.Where(r => r.TrialKind == "null").Select(r => r.Method).Order().ShouldBe(["null", "placebo"]);
         calls.IndexOf("ledger").ShouldBeGreaterThan(calls.LastIndexOf("cancel-check"));
         calls.Last().ShouldBe("result");
     }
@@ -1007,6 +1027,49 @@ public sealed class LabRunnerTests
         await RunnerWithNulls(new NullOptions()).ExecuteAsync(RobustRun(), Ct);
 
         _finishes.Single().State.ShouldBe(LabRunState.Cancelled);
+        await _ledger.DidNotReceive().AppendAsync(Arg.Any<LedgerRow>(), Arg.Any<CancellationToken>());
+        await _store.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+        await _results.DidNotReceiveWithAnyArgs().AppendAsync(default, default!, default!, default!, default, Ct);
+    }
+
+    [Fact]
+    public async Task A_cancel_during_the_random_entry_walk_stores_no_null_row_no_run_and_no_result()
+    {
+        ArrangeYearOfTrades();
+        var runner = RunnerWithNulls(new NullOptions());
+        using var cts = new CancellationTokenSource();
+        _walks.HandleAsync(Arg.Any<RunNullWalkQuery>(), Arg.Any<CancellationToken>()).Returns<Result<NullWalkRun>>(_ =>
+        {
+            cts.Cancel();
+            throw new OperationCanceledException(cts.Token);
+        });
+
+        await runner.ExecuteAsync(RobustRun() with { From = new DateOnly(2025, 5, 1) }, cts.Token);
+
+        _walks.ReceivedCalls().ShouldNotBeEmpty("the walk was reached and cancelled");
+        _finishes.ShouldBeEmpty("the host was stopping: the run stays running");
+        await _ledger.DidNotReceive().AppendAsync(Arg.Any<LedgerRow>(), Arg.Any<CancellationToken>());
+        await _store.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+        await _results.DidNotReceiveWithAnyArgs().AppendAsync(default, default!, default!, default!, default, Ct);
+        await _placeboWalks.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task A_cancel_during_the_placebo_walk_stores_no_null_row_no_run_and_no_result()
+    {
+        ArrangeYearOfTrades();
+        var runner = RunnerWithNulls(new NullOptions());
+        using var cts = new CancellationTokenSource();
+        _placeboWalks.HandleAsync(Arg.Any<RunPlaceboWalkQuery>(), Arg.Any<CancellationToken>()).Returns<Result<PlaceboWalkRun>>(_ =>
+        {
+            cts.Cancel();
+            throw new OperationCanceledException(cts.Token);
+        });
+
+        await runner.ExecuteAsync(RobustRun() with { From = new DateOnly(2025, 5, 1) }, cts.Token);
+
+        _placeboWalks.ReceivedCalls().ShouldNotBeEmpty("the placebo walk was reached and cancelled");
+        _finishes.ShouldBeEmpty("the host was stopping: the run stays running");
         await _ledger.DidNotReceive().AppendAsync(Arg.Any<LedgerRow>(), Arg.Any<CancellationToken>());
         await _store.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
         await _results.DidNotReceiveWithAnyArgs().AppendAsync(default, default!, default!, default!, default, Ct);

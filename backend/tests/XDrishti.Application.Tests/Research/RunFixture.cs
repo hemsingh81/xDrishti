@@ -74,7 +74,7 @@ internal sealed class RunFixture
         Store.ForbidMerge = true;
     }
 
-    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, EventSnapshots, FilingTimes, SurpriseReader, Time, Log, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IRandomEntryEngine>());
+    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, EventSnapshots, FilingTimes, SurpriseReader, Time, Log, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IRandomEntryEngine>(), NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IPlaceboEngine>());
 
     /// <summary>Registers an instrument with a row (the tick is in paise, as the master has it) and its stored bars.</summary>
     public Guid Add(string symbol, IEnumerable<Bar>? bars = null, decimal? tickPaise = 5m, Guid? id = null)

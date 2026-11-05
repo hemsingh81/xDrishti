@@ -109,8 +109,8 @@ public sealed partial class CostArchitectureTests
     [Fact]
     public void The_replayer_is_the_only_code_of_the_simulation_library_that_calls_the_applier()
     {
-        // the second caller is the random-entry walk of CF-07 (ADR 0208), which costs a random trade exactly as the replay costs a real one and returns only its net R
-        CallersOfTheApplier(Simulation).ShouldBe(["XDrishti.Simulation.Replay.InstrumentReplayer", "XDrishti.Simulation.Replay.RandomEntryWalker"]);
+        // the second and third callers are the random-entry walk of CF-07 (ADR 0208) and the placebo walk of its part B (ADR 0209), which cost a random or placebo trade exactly as the replay costs a real one and return only its net R
+        CallersOfTheApplier(Simulation).ShouldBe(["XDrishti.Simulation.Replay.InstrumentReplayer", "XDrishti.Simulation.Replay.PlaceboWalker", "XDrishti.Simulation.Replay.RandomEntryWalker"]);
     }
 
     [Fact]

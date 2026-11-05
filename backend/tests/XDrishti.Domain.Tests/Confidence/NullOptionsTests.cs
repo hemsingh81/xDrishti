@@ -10,7 +10,7 @@ public sealed class NullOptionsTests
     {
         var options = new NullOptions();
 
-        (options.Mode, options.Enforce, options.Draws, options.Percentile, options.Redraws).ShouldBe((ConfidenceMode.ReportOnly, false, 1000, 95d, 5));
+        (options.Mode, options.Enforce, options.Draws, options.Percentile, options.Redraws, options.Placebos, options.MinPlacebos).ShouldBe((ConfidenceMode.ReportOnly, false, 1000, 95d, 5, true, 19));
         options.IsOn.ShouldBeTrue();
         options.Alpha.ShouldBe(0.05);
         options.Problems().ShouldBeEmpty();
@@ -28,6 +28,28 @@ public sealed class NullOptionsTests
     public void A_value_out_of_range_is_a_problem(ConfidenceMode mode, int draws, double percentile, int redraws)
     {
         new NullOptions(mode, false, draws, percentile, redraws).Problems().ShouldNotBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(10)]
+    [InlineData(18)]
+    [InlineData(21)]
+    public void The_fewest_comparable_placebos_must_be_nineteen_or_twenty(int min)
+    {
+        new NullOptions(MinPlacebos: min).Problems().ShouldContain(p => p.Contains("MinPlacebos", StringComparison.Ordinal));
+        new NullOptions(MinPlacebos: 19).Problems().ShouldBeEmpty();
+        new NullOptions(MinPlacebos: 20).Problems().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void The_placebo_switch_and_the_minimum_are_part_of_the_key_text_and_the_hash()
+    {
+        var on = new NullOptions();
+
+        new NullOptions(Placebos: false).KeyText().ShouldContain("placebos=off");
+        on.KeyText().ShouldEndWith("placebos=on/minPlacebos=19");
+        new NullOptions(MinPlacebos: 18).SnapshotHash().ShouldNotBe(on.SnapshotHash());
+        new NullOptions(Placebos: false).SnapshotHash().ShouldNotBe(on.SnapshotHash());
     }
 
     [Fact]

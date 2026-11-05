@@ -259,6 +259,20 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         entry.GetProperty("threshold").GetDouble().ShouldBe(0.05);
         entry.GetProperty("draws").GetInt32().ShouldBe(1000);
         (await CountAsync("SELECT count(*) FROM lab.test_ledger WHERE trial_kind = 'null' AND method = 'null'")).ShouldBe(1);
+
+        // CF-07 part B: the placebo set and the mirror gate sit beside it, unavailable for the same reason (no out-of-sample trade), and are one more look of kind null in the ledger
+        var placebos = nulls.GetProperty("placebos");
+        placebos.GetProperty("status").GetString().ShouldBe("unavailable");
+        placebos.GetProperty("reason").GetString().ShouldStartWith("unavailable: ");
+        placebos.GetProperty("pValue").ValueKind.ShouldBe(JsonValueKind.Null);
+        placebos.GetProperty("shapes").GetInt32().ShouldBe(20);
+        placebos.GetProperty("minComparable").GetInt32().ShouldBe(19);
+        placebos.GetProperty("threshold").GetDouble().ShouldBe(0.05);
+        var mirror = nulls.GetProperty("mirror");
+        mirror.GetProperty("status").GetString().ShouldBe("unavailable");
+        mirror.GetProperty("threshold").GetDouble().ShouldBe(0);
+        mirror.GetProperty("mirrorMeanR").ValueKind.ShouldBe(JsonValueKind.Null);
+        (await CountAsync("SELECT count(*) FROM lab.test_ledger WHERE trial_kind = 'null' AND method = 'placebo'")).ShouldBe(1);
     }
 
     // P5-06
@@ -308,12 +322,17 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         report.GetProperty("robustness").ValueKind.ShouldBe(JsonValueKind.Object);
         report.GetProperty("nulls").GetProperty("randomEntry").GetProperty("status").GetString().ShouldBe("unavailable");
         report.GetProperty("warnings").EnumerateArray().Select(w => w.GetProperty("code").GetString()).ShouldContain("random_entry");
+        report.GetProperty("nulls").GetProperty("placebos").GetProperty("status").GetString().ShouldBe("unavailable");
+        report.GetProperty("warnings").EnumerateArray().Select(w => w.GetProperty("code").GetString()).ShouldContain("placebo");
+        report.GetProperty("warnings").EnumerateArray().Select(w => w.GetProperty("code").GetString()).ShouldContain("mirror");
         html.StatusCode.ShouldBe(HttpStatusCode.OK);
         html.Content.Headers.ContentType!.MediaType.ShouldBe("text/html");
         html.Headers.GetValues("Content-Security-Policy").Single().ShouldContain("default-src 'none'");
         var htmlText = await html.Content.ReadAsStringAsync(Ct);
         htmlText.ShouldNotContain("<script");
         htmlText.ShouldContain("Chance: random entry");
+        htmlText.ShouldContain("Chance: placebo set");
+        htmlText.ShouldContain("Chance: mirror");
         zip2.ShouldBe(zip1);
         (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'ReportExported' AND detail LIKE 'kind=lab-report-html format=html rows=0 bytes=%'")).ShouldBe(1);
         (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'ReportExported' AND detail LIKE 'kind=lab-report-folder format=zip rows=0 bytes=%'")).ShouldBe(2);

@@ -13,7 +13,7 @@ namespace XDrishti.Infrastructure.Research;
 /// and prepares it (<see cref="BuiltInStrategies.Prepare"/>, over <c>StrategyPreparation</c>), turning every located problem into a field error whose field is the path and whose code is the problem's; <see cref="Replay"/> hands the input to
 /// <see cref="InstrumentReplayer"/>. It is a singleton: the prepared strategy belongs to a run and no scoped service is injected here.
 /// </summary>
-internal sealed class SimulationEngineAdapter : ISimulationEngine, IRandomEntryEngine
+internal sealed class SimulationEngineAdapter : ISimulationEngine, IRandomEntryEngine, IPlaceboEngine
 {
     public string EngineVersion => SimulationEngine.Version;
 
@@ -105,6 +105,19 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine, IRandomEntryE
         }
 
         return RandomEntryWalker.Walk(handle.Strategy, input, plan, tradeDone, cancellationToken);
+    }
+
+    public PlaceboWalkResult WalkPlacebos(IPreparedStrategy strategy, InstrumentReplayInput input, PlaceboWalkPlan plan, IProgress<int>? pairDone, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(strategy);
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(plan);
+        if (strategy is not PreparedHandle handle)
+        {
+            throw new ArgumentException("The strategy was not prepared by this engine.", nameof(strategy));
+        }
+
+        return PlaceboWalker.Walk(handle.Strategy, input, plan, pairDone, cancellationToken);
     }
 
     private static Result<IPreparedStrategy> Refused(IReadOnlyList<LocatedProblem> problems) =>
