@@ -182,6 +182,19 @@ internal static class LabReportBuilder
                     w.Add(new ReportWarningView("mirror", "The mirror gate is unavailable and is not a pass: " + mirror.Reason.Replace("unavailable: ", string.Empty, StringComparison.Ordinal) + tail));
                 }
             }
+
+            if (nulls.Plateau is { } plateau)
+            {
+                var plateauTail = plateau.Enforce ? "." : " (report only: the outcome is not changed).";
+                if (plateau.Status == "fail")
+                {
+                    w.Add(new ReportWarningView("plateau", "The parameters are not on a plateau (in-sample sweep): " + string.Join("; ", plateau.Parameters.Where(p => p.Status == "fail").Select(p => p.Param + " (" + p.Reading + ")")) + plateauTail));
+                }
+                else if (plateau.Status == "unavailable")
+                {
+                    w.Add(new ReportWarningView("plateau", "The plateau gate is unavailable and is not a pass: " + plateau.Reason.Replace("unavailable: ", string.Empty, StringComparison.Ordinal) + plateauTail));
+                }
+            }
         }
 
         return w;
@@ -213,6 +226,10 @@ internal static class LabReportBuilder
         {
             l.Add(n.Basis);
             l.AddRange(n.Notes);
+            if (n.Plateau is { } p)
+            {
+                l.Add(p.Basis);
+            }
         }
 
         l.AddRange(v.Limits);

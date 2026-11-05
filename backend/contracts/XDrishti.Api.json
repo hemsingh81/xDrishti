@@ -45268,9 +45268,20 @@
                 "$ref": "#/components/schemas/MirrorView"
               }
             ]
+          },
+          "plateau": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The plateau gate on the swept parameters (CF-07 part C); null in a result stored before it or when `Confidence:Plateau:Mode` is Off.",
+                "$ref": "#/components/schemas/PlateauView"
+              }
+            ]
           }
         },
-        "description": "The chance tests of a Lab verdict (CF-07, ADRs 0208 and 0209), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a null, a placebo set or a mirror gate that is not a pass caps a PASS at MARGINAL and never raises an outcome.\nThe plateau gate of the spec is not built yet and has no field here."
+        "description": "The chance tests of a Lab verdict (CF-07, ADRs 0208 and 0209), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a null, a placebo set or a mirror gate that is not a pass caps a PASS at MARGINAL and never raises an outcome.\nThe plateau gate on parameters (CF-07 part C, ADR 0210) sits in the same block as `Plateau`, with a mode and an enforce switch of its own."
       },
       "OfficialDailyCheck": {
         "required": [
@@ -49218,6 +49229,250 @@
           }
         },
         "description": "Plan versus actual on the wire (P8-04)."
+      },
+      "PlateauParameterView": {
+        "required": [
+          "param",
+          "declared",
+          "validPoints",
+          "baseMeanR",
+          "lowerValue",
+          "lowerRetention",
+          "upperValue",
+          "upperRetention",
+          "median",
+          "centreValue",
+          "centreMeanR",
+          "reading",
+          "status",
+          "reason",
+          "points"
+        ],
+        "type": "object",
+        "properties": {
+          "param": {
+            "type": "string",
+            "description": "The parameter name."
+          },
+          "declared": {
+            "type": "number",
+            "description": "The declared value.",
+            "format": "double"
+          },
+          "validPoints": {
+            "type": "integer",
+            "description": "Valid points, the declared value included.",
+            "format": "int32"
+          },
+          "baseMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Net expectancy at the declared value.",
+            "format": "double"
+          },
+          "lowerValue": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The swept value just below the declared one.",
+            "format": "double"
+          },
+          "lowerRetention": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Its mean over the base mean.",
+            "format": "double"
+          },
+          "upperValue": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The swept value just above the declared one.",
+            "format": "double"
+          },
+          "upperRetention": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Its mean over the base mean.",
+            "format": "double"
+          },
+          "median": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Median net expectancy over the valid points.",
+            "format": "double"
+          },
+          "centreValue": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The value maximizing the mean of itself and its two neighbours.",
+            "format": "double"
+          },
+          "centreMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "That smoothed mean.",
+            "format": "double"
+          },
+          "reading": {
+            "type": "string",
+            "description": "plateau, spike, no_base_edge or inconclusive."
+          },
+          "status": {
+            "type": "string",
+            "description": "pass, fail or unavailable."
+          },
+          "reason": {
+            "type": "string",
+            "description": "One sentence for the reading."
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlateauPointView"
+            },
+            "description": "All points in value order."
+          }
+        },
+        "description": "The plateau reading of one swept parameter (CF-07, D4): the two points next to the declared value must each keep the retention of the base and the median over the valid points must be above 0. string PlateauParameterView.Reading is `plateau`, `spike`,\n`no_base_edge` or `inconclusive`; string PlateauParameterView.Status is `pass`, `fail` or `unavailable`. The centre is reported, never applied."
+      },
+      "PlateauPointView": {
+        "required": [
+          "value",
+          "declared",
+          "trades",
+          "meanR",
+          "retention",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "description": "The parameter value.",
+            "format": "double"
+          },
+          "declared": {
+            "type": "boolean",
+            "description": "True for the value the strategy declares (the base run)."
+          },
+          "trades": {
+            "type": "integer",
+            "description": "Trades of its in-sample run.",
+            "format": "int32"
+          },
+          "meanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Net expectancy of the run; null when it gave no trade or was refused.",
+            "format": "double"
+          },
+          "retention": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Its mean over the base mean; null when either cannot be read or the base is not above 0.",
+            "format": "double"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why the engine refused the run; null otherwise."
+          }
+        },
+        "description": "One point of a parameter's curve in the plateau gate (CF-07, D4): the declared value is marked."
+      },
+      "PlateauView": {
+        "required": [
+          "mode",
+          "enforce",
+          "settings",
+          "settingsHash",
+          "retention",
+          "minPoints",
+          "comparison",
+          "status",
+          "reason",
+          "capped",
+          "basis",
+          "parameters"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "The mode when it was computed."
+          },
+          "enforce": {
+            "type": "boolean",
+            "description": "Whether the gate could cap the outcome."
+          },
+          "settings": {
+            "type": "string",
+            "description": "The text of the settings that produced the figures."
+          },
+          "settingsHash": {
+            "type": "string",
+            "description": "SHA-256 of Settings."
+          },
+          "retention": {
+            "type": "number",
+            "description": "The share of the base each neighbour must keep (the threshold).",
+            "format": "double"
+          },
+          "minPoints": {
+            "type": "integer",
+            "description": "The fewest valid points of a parameter for a reading.",
+            "format": "int32"
+          },
+          "comparison": {
+            "type": "string",
+            "description": "How a neighbour's retention is read against the threshold (`&gt;=`)."
+          },
+          "status": {
+            "type": "string",
+            "description": "pass, fail or unavailable."
+          },
+          "reason": {
+            "type": "string",
+            "description": "One sentence for the reading."
+          },
+          "capped": {
+            "type": "boolean",
+            "description": "True when the outcome was capped at MARGINAL by the enforced gate."
+          },
+          "basis": {
+            "type": "string",
+            "description": "What the figure is made over: the in-sample sweep, its window and the exit."
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlateauParameterView"
+            },
+            "description": "One reading per swept parameter."
+          }
+        },
+        "description": "The plateau gate of a Lab verdict (CF-07 part C, ADR 0210), read from the stored points of the in-sample sweep (no new simulation): string PlateauView.Status is `pass` only when every swept parameter sits on a plateau, `fail` when one does not, and\n`unavailable` (never a pass) when one has no reading or the strategy sweeps none. Report-only beside PASS/MARGINAL/FAIL unless the owner turns `Plateau:Enforce` on."
       },
       "PooledFigureView": {
         "required": [

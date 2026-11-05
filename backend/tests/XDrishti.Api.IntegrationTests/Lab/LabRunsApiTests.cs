@@ -273,6 +273,20 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         mirror.GetProperty("threshold").GetDouble().ShouldBe(0);
         mirror.GetProperty("mirrorMeanR").ValueKind.ShouldBe(JsonValueKind.Null);
         (await CountAsync("SELECT count(*) FROM lab.test_ledger WHERE trial_kind = 'null' AND method = 'placebo'")).ShouldBe(1);
+
+        // CF-07 part C: the plateau gate reads the stored in-sample sweep (no simulation of its own), is report-only with its own switch, and adds no ledger row: the rows of kind null stay the two above
+        var plateau = nulls.GetProperty("plateau");
+        plateau.GetProperty("mode").GetString().ShouldBe("ReportOnly");
+        plateau.GetProperty("enforce").GetBoolean().ShouldBeFalse();
+        plateau.GetProperty("capped").GetBoolean().ShouldBeFalse();
+        plateau.GetProperty("retention").GetDouble().ShouldBe(0.70);
+        plateau.GetProperty("minPoints").GetInt32().ShouldBe(3);
+        plateau.GetProperty("comparison").GetString().ShouldBe(">=");
+        plateau.GetProperty("settingsHash").GetString()!.Length.ShouldBe(64);
+        plateau.GetProperty("basis").GetString()!.ShouldContain("in-sample sweep");
+        plateau.GetProperty("status").GetString().ShouldBeOneOf("pass", "fail", "unavailable");
+        plateau.GetProperty("parameters").GetArrayLength().ShouldBe(block.GetProperty("sensitivity").GetProperty("parameters").GetArrayLength());
+        (await CountAsync("SELECT count(*) FROM lab.test_ledger WHERE trial_kind = 'null'")).ShouldBe(2);
     }
 
     // P5-06
@@ -325,6 +339,7 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         report.GetProperty("nulls").GetProperty("placebos").GetProperty("status").GetString().ShouldBe("unavailable");
         report.GetProperty("warnings").EnumerateArray().Select(w => w.GetProperty("code").GetString()).ShouldContain("placebo");
         report.GetProperty("warnings").EnumerateArray().Select(w => w.GetProperty("code").GetString()).ShouldContain("mirror");
+        report.GetProperty("nulls").GetProperty("plateau").GetProperty("basis").GetString()!.ShouldContain("in-sample sweep");
         html.StatusCode.ShouldBe(HttpStatusCode.OK);
         html.Content.Headers.ContentType!.MediaType.ShouldBe("text/html");
         html.Headers.GetValues("Content-Security-Policy").Single().ShouldContain("default-src 'none'");
@@ -333,6 +348,7 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         htmlText.ShouldContain("Chance: random entry");
         htmlText.ShouldContain("Chance: placebo set");
         htmlText.ShouldContain("Chance: mirror");
+        htmlText.ShouldContain("Chance: plateau (in-sample sweep)");
         zip2.ShouldBe(zip1);
         (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'ReportExported' AND detail LIKE 'kind=lab-report-html format=html rows=0 bytes=%'")).ShouldBe(1);
         (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'ReportExported' AND detail LIKE 'kind=lab-report-folder format=zip rows=0 bytes=%'")).ShouldBe(2);

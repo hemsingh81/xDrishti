@@ -95,7 +95,7 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
             exits.Candidates[0].Id,
             ViewOf(baseResult),
             [.. judged.Select(j => new ParameterSensitivityView(j.Parameter, [.. j.Points.Select(ViewOf)], j.Verdict, j.Reason))],
-            plan.Count == 0 ? "the strategy declares no parameter to sweep" : "in-sample, one parameter at a time, plain runs of the default exit over the whole window; not evidence, not walk-forward");
+            plan.Count == 0 ? "the strategy declares no parameter to sweep" : "in-sample sweep, one parameter at a time, plain runs of the default exit over the whole window; not evidence, not walk-forward");
 
         var seed = SeededRandom.SeedOf(run.Key);
         var r = full.OosTrades.Select(t => t.R).ToList();
