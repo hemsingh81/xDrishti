@@ -53,6 +53,11 @@ public static class WalkForwardValidator
         var noted = 0;
         var fits = 0;
         var comparisons = candidates.Select(_ => new List<BaselineComparison>()).ToArray();
+        var ladder = options.Ladder is { IsOn: true } l0 ? l0 : null;
+        var width = ordered[0].Features.Length;
+        var signs = candidates.Select(_ => new List<int[]?>()).ToArray();
+        var shifts = new List<(int Fold, double?[] Psi)>();
+        ValidationRow[] lastTrainRows = [];
         foreach (var fold in cuts)
         {
             folds.Add(fold.Fold);
@@ -71,6 +76,11 @@ public static class WalkForwardValidator
                 if (s >= baselines.Length)
                 {
                     fits++;
+                }
+
+                if (ladder is not null && s >= baselines.Length && width > 0)
+                {
+                    signs[s - baselines.Length].Add(scorer is IExplainableScorer explainable ? ComplexityEvidence.FoldSigns(explainable, test, width, ladder.MinRows) : null);
                 }
 
                 if (scorer is IFitNote { Note: { } note })
@@ -96,6 +106,11 @@ public static class WalkForwardValidator
             pooledLabels.AddRange(labels);
             pooledDays.AddRange(test.Select(r => r.TradeDate));
             lastTrain = fold.Train.Length;
+            lastTrainRows = fold.Train;
+            if (ladder is not null && width > 0)
+            {
+                shifts.Add((fold.Fold.Index, ComplexityEvidence.FoldPsi(fold.Train, test, width, ladder)));
+            }
             for (var k = 0; k < candidates.Count; k++)
             {
                 comparisons[k].Add(new BaselineComparison(metrics[baselines.Length + k].Metrics, metrics[1].Metrics, metrics[2].Metrics));
@@ -118,7 +133,8 @@ public static class WalkForwardValidator
             verdicts.Add(EligibilityRule.Judge(candidates[k].Name, comparisons[k], p, lastTrain, options));
         }
 
-        return Result.Success(new ValidationReport(options, ordered.Length, from, to, folds, results, pooled, verdicts, LimitsOf(options, ordered.Length, from, to, results.Count, notes, noted, fits)));
+        var report = new ValidationReport(options, ordered.Length, from, to, folds, results, pooled, verdicts, LimitsOf(options, ordered.Length, from, to, results.Count, notes, noted, fits));
+        return Result.Success(ladder is null ? report : report with { Complexity = ComplexityEvidence.Build([.. candidates.Select(c => c.Name)], width, lastTrainRows, signs, shifts, ladder) });
     }
 
     /// <summary>The pooled result of a scorer; a candidate also gets its calibration error with an interval (CF-10 part 10a). The seed is made of the scorer name and the span, so a rerun on the same rows repeats. With the interval off nothing is added; when it cannot be computed the result says why.</summary>

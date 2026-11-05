@@ -26,8 +26,11 @@ public sealed record ValidationReport(
     IReadOnlyList<CandidateVerdict> Verdicts,
     IReadOnlyList<string> Limits)
 {
-    /// <summary>A fixed plain-text rendering; the same report gives the same text.</summary>
-    public string ToText()
+    /// <summary>The complexity evidence (CF-10 part 10b), or null when it was not asked for or the setting is off.</summary>
+    public ComplexityReport? Complexity { get; init; }
+
+    /// <summary>A fixed plain-text rendering; the same report gives the same text. <paramref name="featureNames"/> names the features in the complexity lines when they are the catalog's.</summary>
+    public string ToText(IReadOnlyList<string>? featureNames = null)
     {
         var c = CultureInfo.InvariantCulture;
         var t = new StringBuilder();
@@ -64,6 +67,11 @@ public sealed record ValidationReport(
             }
 
             t.Append('\n');
+        }
+
+        if (Complexity is not null)
+        {
+            t.Append(Complexity.ToText(featureNames));
         }
 
         foreach (var l in Limits)

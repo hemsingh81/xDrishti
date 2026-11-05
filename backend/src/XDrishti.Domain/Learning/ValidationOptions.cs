@@ -1,3 +1,5 @@
+using XDrishti.Domain.Confidence;
+
 namespace XDrishti.Domain.Learning;
 
 /// <summary>
@@ -16,6 +18,7 @@ namespace XDrishti.Domain.Learning;
 /// <param name="Trials">How many models and settings have been looked at, for <c>MultipleTesting.Factor</c>; widens the margins.</param>
 /// <param name="EceDraws">Day-cluster bootstrap resamples of the pooled calibration error of each candidate (CF-10 part 10a, ADR 0214); 0 gives no interval (100 to 20000 otherwise). The interval only reports: no verdict reads it.</param>
 /// <param name="EceLevel">The coverage of that interval (0.90).</param>
+/// <param name="Ladder">When set and on, the report also shows the complexity ladder, the events-per-variable cap and the feature stability checks (CF-10 part 10b, ADR 0215); null shows none. It reports only: no verdict reads it.</param>
 /// <param name="HoldOutStart">When set, any row on or after this date is refused: the hold-out is not used in development.</param>
 public sealed record ValidationOptions(
     int MinTrainMonths = 9,
@@ -31,7 +34,8 @@ public sealed record ValidationOptions(
     int Trials = 1,
     DateOnly? HoldOutStart = null,
     int EceDraws = 1000,
-    double EceLevel = 0.90)
+    double EceLevel = 0.90,
+    LadderOptions? Ladder = null)
 {
     /// <summary>The fewest folds a verdict is worth; a model judged on fewer cannot be champion (<see cref="ChampionRule"/>).</summary>
     public const int DefaultMinFolds = 6;
@@ -98,6 +102,11 @@ public sealed record ValidationOptions(
         if (Trials < 1)
         {
             problems.Add("trials must be at least 1");
+        }
+
+        if (Ladder is not null)
+        {
+            problems.AddRange(Ladder.Problems());
         }
 
         return problems;

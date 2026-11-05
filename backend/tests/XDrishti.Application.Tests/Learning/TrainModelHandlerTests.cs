@@ -5,6 +5,7 @@ using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Learning;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Research;
 using XDrishti.Tests.Shared;
@@ -36,7 +37,7 @@ public sealed class TrainModelHandlerTests
 
     private IReadOnlyList<ValidationRow>? _trainedOn;
 
-    private TrainModelHandler Handler(bool created = true)
+    private TrainModelHandler Handler(bool created = true, LadderOptions? ladder = null)
     {
         _trainer.Candidate.Returns(new ConstantScorer());
         _trainer.Parameters.Returns("fake");
@@ -44,7 +45,7 @@ public sealed class TrainModelHandlerTests
             Result.Success(new TrainedModel([1, 2, 3], new string('e', 64), "FastTree", null, TradeFeatureCatalog.Names.Count, 30, 10, [0.0, 1.0], [0.4, 0.6], [.. Enumerable.Repeat(0.1, TradeFeatureCatalog.Names.Count)])));
         _files.WriteAsync(Arg.Any<string>(), Arg.Any<byte[]>(), Ct).Returns(Result.Success());
         _registry.RegisterAsync(Arg.Do<ModelToRegister>(m => _registered = m), Ct).Returns(new RegisteredModel(7, created));
-        return new TrainModelHandler(_runs, _features, _sets, _trainer, _files, _registry, new FakeTimeProvider(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero)), NullLogger<TrainModelHandler>.Instance);
+        return new TrainModelHandler(_runs, _features, _sets, _trainer, _files, _registry, new FakeTimeProvider(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero)), NullLogger<TrainModelHandler>.Instance, ladder: ladder);
     }
 
     private static StoredRunHeader Header() =>
@@ -97,6 +98,27 @@ public sealed class TrainModelHandlerTests
         m.CreatedBy.ShouldBe("test");
         await _sets.Received(1).StoreAsync(Arg.Is<TrainingSetToStore>(s => s.Data.Id == m.TrainingSetId), Ct);
         await _files.Received(1).WriteAsync(new string('e', 64), Arg.Any<byte[]>(), Ct);
+    }
+
+    [Fact]
+    public async Task The_complexity_evidence_is_in_the_stored_report_only_when_the_setting_is_given_and_changes_no_verdict()
+    {
+        Run(60);
+
+        var without = await Handler().HandleAsync(Command(), Ct);
+        var withoutText = _registered.ShouldNotBeNull().ReportText;
+        var withoutParameters = _registered.Parameters;
+        var with = await Handler(ladder: new LadderOptions(MinRows: 5)).HandleAsync(Command(), Ct);
+        var withText = _registered.ShouldNotBeNull().ReportText;
+
+        withoutText.ShouldNotContain("complexity (evidence only");
+        withText.ShouldContain("complexity (evidence only, no verdict reads it)");
+        with.Value.Verdict.ShouldBe(without.Value.Verdict);
+        (await Handler(ladder: new LadderOptions(ConfidenceMode.Off)).HandleAsync(Command(), Ct)).IsSuccess.ShouldBeTrue();
+        _registered.ReportText.ShouldNotContain("complexity (evidence only");
+        withText.ShouldNotBe(withoutText);
+        _registered.Parameters.ShouldBe(withoutParameters);
+        with.Value.ModelId.ShouldBe(without.Value.ModelId);
     }
 
     [Fact]

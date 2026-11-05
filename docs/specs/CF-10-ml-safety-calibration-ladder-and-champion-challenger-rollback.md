@@ -81,9 +81,18 @@ Whether ML.NET already Platt-calibrates the raw score before the isotonic map. P
 - [x] UNVERIFIED resolved: the isotonic map received the raw margin, not ML.NET's Platt probability (ADR 0214)
 - [x] AC15 (part): no secrets or rows logged (no log event added); Architecture tests green; existing P6 tests unchanged, the calibrator default change documented in the ADR
 - [ ] **Owner to-do after 10a:** a champion trained before 10a reads as "no policy" in the meta-labelling evaluation (its stored trainer parameters differ); retrain and re-designate it (ADR 0214)
-- [ ] Left for 10b to 10d: AC11 as above; AC3 to AC14 (EPV cap, ladder, bootstrap oracle, sign test, uniqueness, PSI and stability, predicate, enforcement, promotion and rollback, auto versus manual, no-champion fallback, regime rule), the migration `AddMlSafety`, the `calibration_kind` column, the endpoints, the verbs and the Models-screen additions; the Done-when items above stay open for the whole spec
+- [ ] Left for 10b to 10d: AC11 as above; AC3 to AC14 (EPV cap, ladder, bootstrap oracle, sign test, uniqueness, PSI and stability, predicate, enforcement, promotion and rollback, auto versus manual, no-champion fallback, regime rule), the migration `AddMlSafety`, the `calibration_kind` column, the endpoints, the verbs and the Models-screen additions; the Done-when items above stay open for the whole spec (the 10b items are ticked below)
 
 ## Review fixes 2026-10-27
 1. **Cycle removed.** CF-10c owns `PairedDayBootstrap`; CF-12 is no longer in CF-10's Needs and uses the bootstrap from CF-10c. Build order: 10c, CF-12, 10d. D7's promotion rule reads CF-12's challenger-versus-champion comparison only once CF-12 exists (until then promotion stays manual with the P6-12 counterfactual).
 2. **Step-up, made consistent in D6, D7, D8, AC12:** `ml.influence.enabled` and `ml.auto_promote` need a fresh password; `ml.auto_rollback` needs the owner session and CSRF only (it lowers reliance on ML).
 3. **Promotion never sets `ml.influence.enabled`**, manual or auto.
+
+## Part 10b status (built 2026-11-05, ADR 0215)
+- [x] AC3 EPV cap (120 trades at 40 % wins: 48 events, cap 3 at EPV 15 and 4 at 10; 200 at 50 %: 100 events, cap 6; never above 8) - unit
+- [x] AC4 ladder (a rung below 0.95 refused with the reason; trees with 99 events refused; 5 features on 48 events refused for EPV; a missing probability refused, never a pass) - unit. The probability is an input; its source (the paired bootstrap) is 10c, so the harness report reads every rung above the base rate as "not available / not earned" until then
+- [x] AC8 PSI and stability (0.1695 "watch", equal shares 0; 3 flips of 6 folds drop a feature, 2 keep it) - unit; D3 evidence in the validation report (events, cap, ladder lines, worst-fold index per feature, direction per fold), report-only, `Confidence:Ladder` bound and validated at start
+- [x] AC15 (part): no log event added, no row or feature in a log; Architecture tests green (pure calculators, Planning / Selection / Autonomy and the verdict types do not name the new types, with a control)
+- [x] Not needed by 10b, so not built: the migration `AddMlSafety` and the `calibration_kind` column (nothing is stored; the evidence is in the stored report text), endpoints, verbs, screen
+- [ ] Deviations and interpretations (ADR 0215): fewer PSI bins on small samples (20 rows per bin); the direction of a feature is the sign of the correlation of its value and its contribution per fold (no permutation importance exists in the code); the trainer is not changed, so no feature is dropped
+- [ ] Left for 10c and 10d: AC5 (exact bootstrap oracle), AC6 (sign test, shown beside the bootstrap), AC7 (uniqueness weights), AC9, AC10 (predicate, `IMlInfluenceGate`, enforcement), AC11 to AC14, `AddMlSafety` and `calibration_kind`, the endpoints, verbs and Models-screen additions
