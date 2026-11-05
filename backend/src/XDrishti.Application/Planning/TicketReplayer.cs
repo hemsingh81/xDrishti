@@ -67,7 +67,7 @@ internal sealed class TicketReplayer(IStrategyStore strategies, IBasketQueries b
         // The engine cuts trades by the day of the DECISION. A ticket on a daily-or-longer timeframe is decided at the close of D (the session it was built on) and fills at the open of F, so its window starts on D; a ticket on an intraday
         // timeframe is decided on F, so its window starts on F. Only that one decision day is the ticket's (the grader checks). An intraday-style ticket is read to F, a swing ticket to the last closed session; nothing after the last closed
         // session is ever read. Only the counters the replayer cuts to its window (trades dropped by the sizing or cost rule, positions that cannot cross a discontinuity) are attributed to the decision day, by taking away a second run that starts the day after it (same end); flagged days and excluded sessions are read by date from the run record; no-trade reasons are not attributed.
-        var daily = Timeframes.TryParse(cell.Timeframe, out var timeframe) && timeframe >= Timeframe.D1;
+        var daily = IsDaily(cell);
         var information = Before(calendar, forDate);
         var decisionDay = daily ? information : forDate;
         var swing = string.Equals(cell.Style, "swing", StringComparison.OrdinalIgnoreCase);
@@ -96,6 +96,9 @@ internal sealed class TicketReplayer(IStrategyStore strategies, IBasketQueries b
         return new TicketReplay(result.Grade, result.Trade, main.Value.RunKey, result.PendingReason, main.Value.EngineVersion);
     }
 
+    /// <summary>Whether the cell decides at the close of the day before (a daily or longer timeframe) rather than on the session itself; the decision day of the trade key follows (the shadow record builds the same key before the session).</summary>
+    internal static bool IsDaily(CellId cell) => Timeframes.TryParse(cell.Timeframe, out var timeframe) && timeframe >= Timeframe.D1;
+
     private static TicketReplay Final(TicketGrade grade) => new(grade, null, null, null);
 
     private static TicketReplay Wait(string reason) => new(null, null, null, reason);
@@ -107,7 +110,7 @@ internal sealed class TicketReplayer(IStrategyStore strategies, IBasketQueries b
     /// The trading session before <paramref name="forDate"/> (the session the ticket was built on). Shortcut: when the calendar knows none within ten days (a long closure, or an empty calendar) the previous calendar day is used; the window
     /// then starts on a non-session and a daily decision at the close of the true D would be missed (the ticket reads as not triggered).
     /// </summary>
-    private static DateOnly Before(TradingCalendar calendar, DateOnly forDate)
+    internal static DateOnly Before(TradingCalendar calendar, DateOnly forDate)
     {
         for (var i = 1; i <= 10; i++)
         {
