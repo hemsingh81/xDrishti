@@ -10,6 +10,9 @@ internal static class LearnReportText
 
     public const string Unavailable = "unavailable";
 
+    /// <summary>The sentence that follows every unavailable figure.</summary>
+    public const string UnavailableNote = "Unavailable is not a finding and not a pass.";
+
     /// <summary>Control characters (a stored text is echoed to a terminal) become a space; nothing is cut.</summary>
     public static string Clean(string text) => string.Concat(text.Select(c => char.IsControl(c) ? ' ' : c));
 
