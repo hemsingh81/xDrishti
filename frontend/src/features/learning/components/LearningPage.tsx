@@ -15,6 +15,7 @@ const closed = {
   state: null,
   role: null,
   week: null,
+  strategy: null,
 };
 const ids = tabs.map((tab) => tab.id);
 const buttons: readonly ButtonTab<TabId>[] = tabs.map((tab) => ({
