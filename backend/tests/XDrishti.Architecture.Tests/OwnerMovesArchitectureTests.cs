@@ -17,7 +17,7 @@ public sealed partial class OwnerMovesArchitectureTests
         ["CloseLessonHandler"] = "4ce82b8eefdf94ef",
         ["DismissLessonHandler"] = "d0308363c316e068",
         ["MoveHypothesisHandler"] = "a596adb2d53896b8",
-        ["RevertChangelogHandler"] = "711ad93879b13024",
+        ["RevertChangelogHandler"] = "0e949178e04b721d", // CF-12 part 12b (ADR 0219): a revert refuses a pause that a kill proposal made (it is lifted only by the owner's re-enable); every other revert is as before
     };
 
     private static readonly string[] MoveCommands = ["LinkLessonCommand", "CloseLessonCommand", "DismissLessonCommand", "MoveHypothesisCommand", "RevertChangelogCommand"];

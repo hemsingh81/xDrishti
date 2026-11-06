@@ -12,5 +12,6 @@ public static class ApprovedReportWrites
         "POST /api/experiments/", "POST /api/experiments/jobs/{id:guid}/cancel", // P8-18 Part B (ADR 0129)
         "POST /api/lessons/{id:long}/link", "POST /api/lessons/{id:long}/close", "POST /api/lessons/{id:long}/dismiss", "POST /api/hypotheses/{id:long}/move", "POST /api/changelog/{id:long}/revert", // P8-19 (ADR 0130)
         "POST /api/exports/{kind}", // P8-20 (ADR 0131): a read that makes a file, a POST only because it is audited
+        "POST /api/learning/cells/{key}/re-enable", // CF-12 part 12b (ADR 0219): the owner's re-enable of a paused cell, with a fresh password; the route of the CF-12 spec, which the owner approved on 2026-11-03
     ];
 }

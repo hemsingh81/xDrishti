@@ -17,4 +17,7 @@ public interface ILearningChangelog
 
     /// <summary>Every row of a subject, oldest first: what a replay reads.</summary>
     ValueTask<IReadOnlyList<ChangelogEntry>> HistoryAsync(string subject, CancellationToken cancellationToken);
+
+    /// <summary>The cell keys that have at least one row and start with <paramref name="prefix"/> (for a strategy, <c>strategy|</c>), in key order. A cell with no row is in research and is not listed.</summary>
+    ValueTask<IReadOnlyList<string>> CellSubjectsAsync(string prefix, CancellationToken cancellationToken);
 }

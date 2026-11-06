@@ -1,4 +1,5 @@
 using System.Globalization;
+using XDrishti.Application.Abstractions.Confidence;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Shadow;
@@ -23,7 +24,9 @@ internal sealed class GetDecayReportHandler(
     ICostConfirmationFact confirmation,
     BacktestReferenceReader references,
     DecayOptions options,
-    SequentialOptions sequential) : IQueryHandler<GetDecayReportQuery, Result<DecayReportView>>
+    SequentialOptions sequential,
+    KillOptions kill,
+    IKillProposalReader proposals) : IQueryHandler<GetDecayReportQuery, Result<DecayReportView>>
 {
     private static readonly DriftOptions Drift = new();
 
@@ -47,11 +50,11 @@ internal sealed class GetDecayReportHandler(
         var reference = epoch is null ? Reference.None("there is no paper epoch yet, so there is no point in time to take the backtest reference at") : await ReadReferenceAsync(strategy, epoch.StartedOn, cancellationToken);
         var edge = await EdgeAsync(epoch?.Id, prefix, reference, rho, cancellationToken);
         var behavioural = await BehaviouralAsync(epoch?.Id, prefix, reference, rho, cancellationToken);
-        var kill = Kill(edge);
+        var killViews = await KillAsync(strategy, epoch?.Id, edge, cancellationToken);
         var view = new DecayReportView(
             strategy, epoch?.Id, edge.HasSeries || behavioural.Trades > 0,
             new DecaySettingsView(options.WindowTrades, options.Sigmas, options.QuarterFloorR, options.SnapshotHash(), options.KeyText(), rho, true),
-            reference.View, edge.View, behavioural, kill, Statements(options, reference), string.Empty);
+            reference.View, edge.View, behavioural, killViews, Statements(options, reference), string.Empty);
         return Result.Success(view with { Line = Line(view) });
     }
 
@@ -190,9 +193,13 @@ internal sealed class GetDecayReportHandler(
             report.WeakQuarterShare);
     }
 
-    private List<DecayKillView> Kill(EdgeRead edge)
+    private async ValueTask<List<DecayKillView>> KillAsync(string strategy, long? epochId, EdgeRead edge, CancellationToken cancellationToken)
     {
         var verdicts = new List<KillRuleVerdict>();
+
+        // the wait of review fix 3: 20 new trades since the rule last fired (a proposal records the series length it fired at, in the same paper epoch)
+        var lastFired = await proposals.LatestAsync(strategy, "cost_stress", epochId, cancellationToken);
+        int? sinceFired = lastFired is null ? null : Math.Max(0, edge.R.Count - lastFired.Proposal.SeriesTrades);
 
         // (a) cost stress needs the net R and the cost of each trade; a gross series has no charges in it, so there is nothing to stress
         if (edge.Gross || edge.Costs is null)
@@ -201,15 +208,14 @@ internal sealed class GetDecayReportHandler(
         }
         else
         {
-            // shortcut: c is the charges in R (gross R minus net R); the slippage of the modelled fill is inside both and is not recorded apart, so c is understated and the stress is lighter than CF-05's. There is also no store of when the rule last fired
-            // (part 12b), so the "20 new trades since it last fired" wait is not applied here.
-            var verdict = KillRules.CostStress([.. edge.Costs.Select(x => x.Net)], [.. edge.Costs.Select(x => x.Cost)]);
+            // shortcut: c is the charges in R (gross R minus net R); the slippage of the modelled fill is inside both and is not recorded apart, so c is understated and the stress is lighter than CF-05's.
+            var verdict = KillRules.CostStress([.. edge.Costs.Select(x => x.Net)], [.. edge.Costs.Select(x => x.Cost)], sinceFired, kill.StressMultiplier);
             verdicts.Add(verdict with { Text = verdict.Text + " (charges only: the slippage inside the modelled fill is not recorded apart)" });
         }
 
         // (b) drawdown needs the 95th percentile of the matched drawdown at the series' own n
         // shortcut: BacktestBand.Compute does give DrawdownP95 at the paper set's own n, but it matches draws by the cell of each trade and a shadow row records no cell (only the trade key strategy|symbol|side|date), so it cannot be asked for the edge series.
-        verdicts.Add(KillRules.Drawdown(edge.R, null) with { Text = "drawdown not evaluated: the shadow record has no cell for a trade, so the matched draws at the series' own n cannot be made (the P10-04 band code can give the 95th percentile at an arbitrary n once the cells are known)" });
+        verdicts.Add(KillRules.Drawdown(edge.R, null, kill.DrawdownFactor) with { Text = "drawdown not evaluated: the shadow record has no cell for a trade, so the matched draws at the series' own n cannot be made (the P10-04 band code can give the 95th percentile at an arbitrary n once the cells are known)" });
 
         // (c) decay twice in a row
         verdicts.Add(edge.Decay is null
@@ -245,7 +251,7 @@ internal sealed class GetDecayReportHandler(
         reference.View.State == "available"
             ? "The reference is the strategy's backtest trades before the epoch started, including in-sample trades (the Lab result's out-of-sample and hold-out trades are not available per strategy yet), which typically makes an alert earlier, not later."
             : "No reference: nothing is judged. unavailable is never read as fine.",
-        "Report only: this part proposes, pauses and changes nothing, and places no order. The kill rules are evaluations with their numbers; their proposals, the auto setting and re-enabling are later parts. Their thresholds are proposals of the spec.",
+        "Report only: reading this proposes, pauses and changes nothing, and places no order. The kill rules are evaluations with their numbers; proposals are written by the daily decay-monitor service, and a pause is the owner's act (or the automatic setting's, default OFF, and never for the CF-09 boundary). Their thresholds are proposals of the spec.",
     ];
 
     private static string Line(DecayReportView v)
@@ -258,7 +264,7 @@ internal sealed class GetDecayReportHandler(
         };
 
         var fires = v.Kill.Count(k => k.State == "fires");
-        return string.Create(CultureInfo.InvariantCulture, $"decay monitor of {v.Strategy} (report only): edge series {Part(v.Edge)}; behavioural series {Part(v.Behavioural)}; {fires} kill rule evaluation(s) firing (proposals only, none stored); settings {v.Settings.SettingsHash[..12]}");
+        return string.Create(CultureInfo.InvariantCulture, $"decay monitor of {v.Strategy} (report only): edge series {Part(v.Edge)}; behavioural series {Part(v.Behavioural)}; {fires} kill rule evaluation(s) firing (proposals are written by the daily service, not by this read); settings {v.Settings.SettingsHash[..12]}");
     }
 
     private sealed record Reference(ExpectancyBand? Band, DecayReferenceView View)

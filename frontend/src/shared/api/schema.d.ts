@@ -3712,6 +3712,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/confidence/kill-proposals': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The kill proposals, newest first (state proposed, applied or dismissed; strategy; limit 1 to 200, default 50), each with its rule, numbers, the cells it would pause and who applied it, with the automatic setting (default OFF) and the thresholds beside them. Read only. 400 paper.invalid */
+    get: operations['ListKillProposals'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/confidence/kill-proposals/{id}/apply': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Apply a kill proposal as the owner: every cell it names that is still Paper or Active moves to Paused through the lifecycle, with a changelog row carrying the rule, the numbers and the settings hash. Needs the owner's session and the CSRF token. Applying twice changes nothing twice. It places no order. 404 confidence.proposal_not_found, 409 confidence.proposal_closed */
+    post: operations['ApplyKillProposal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/confidence/kill-settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Switch confidence.kill.auto (OFF by default; no row means OFF) ON or OFF as the owner; appends an audited row with the owner as actor. ON lets the daily decay-monitor pause the cells of a strategy when a kill rule fires, recorded as actor auto with the setting row, never as an owner approval; the CF-09 failure boundary is never executed automatically. Needs a session, the CSRF token and the password in the body, checked on EVERY change. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.reason_invalid, 429 auth.rate_limited */
+    put: operations['ChangeKillSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/learning/cells/{key}/re-enable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Re-enable a paused cell (Paused to Paper; the key is the URL-encoded cell key) as the owner. Never automatic and never to Active. Needs a session, the CSRF token and a fresh password in the body. When a kill proposal paused the cell, every rule that fired must hold now and none may fire, else 409 confidence.rule_not_cleared (the spec's rule_cleared problem, named to read as what it says); a rule that cannot be evaluated is not a pass. The answer always warns that the CF-11 gates (R and S) are not enforcing yet. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 403 confidence.owner_only, 409 confidence.cell_not_paused, 400 confidence.reason_invalid, 422 learning.invalid */
+    post: operations['ReEnableCell'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/paper/sequential': {
     parameters: {
       query?: never;
@@ -6215,6 +6283,28 @@ export interface components {
       startedAt: string;
       /** Format: int64 */
       uptimeSeconds: number;
+    };
+    /** @description What applying did. */
+    ApplyKillOutcome: {
+      /**
+       * Format: int64
+       * @description The proposal.
+       */
+      proposalId: number;
+      /** @description Its strategy. */
+      strategy: string;
+      /** @description Its rule. */
+      rule: string;
+      /** @description The state of the proposal after this call (`applied`). */
+      state: string;
+      /** @description True when the proposal was applied before this call (nothing was changed now). */
+      alreadyApplied: boolean;
+      /** @description The cells this call paused. */
+      pausedCells: string[];
+      /** @description The cells that were no longer Paper or Active (already paused, retired or changed). */
+      skippedCells: string[];
+      /** @description Who applied it (the first time). */
+      actor: null | string;
     };
     /** @description Approve decisions of one kind (P8-04). */
     ApprovalCountView: {
@@ -13145,6 +13235,115 @@ export interface components {
       state: string;
     };
     JsonElement: unknown;
+    /** @description One kill proposal as the owner reads it. */
+    KillProposalView: {
+      /**
+       * Format: int64
+       * @description The proposal.
+       */
+      id: number;
+      /** @description The strategy. */
+      strategy: string;
+      /** @description `cost_stress`, `drawdown`, `decay_twice` or `failure_boundary`. */
+      rule: string;
+      /** @description True for the CF-09 failure boundary: the automatic setting never executes it, only the owner applies it. */
+      proposalOnly: boolean;
+      /**
+       * Format: double
+       * @description The figure judged.
+       */
+      value: null | number;
+      /**
+       * Format: double
+       * @description What it was judged against.
+       */
+      limit: null | number;
+      /**
+       * Format: int32
+       * @description Trades the figure is based on.
+       */
+      trades: number;
+      /** @description The words, with the numbers. */
+      text: string;
+      /** @description The cells it would pause (Paper or Active when proposed). */
+      cells: string[];
+      /** @description The SHA-256 of the settings that produced it. */
+      settingsHash: string;
+      /**
+       * Format: date
+       * @description The India date it was proposed.
+       */
+      proposedOn: string;
+      /**
+       * Format: date-time
+       * @description When it was proposed.
+       */
+      proposedAt: string;
+      /** @description `proposed`, `applied` or `dismissed`. */
+      state: string;
+      /** @description `owner:...` or `auto` once applied, else null. */
+      actor: null | string;
+      /**
+       * Format: date-time
+       * @description When it was decided, or null.
+       */
+      decidedAt: null | string;
+      /**
+       * Format: int64
+       * @description For an automatic decision, the switch row in force; else null.
+       */
+      autoSettingId: null | number;
+    };
+    /** @description The proposals and the settings beside them. */
+    KillProposalsView: {
+      /** @description The proposals, newest first. */
+      items: components['schemas']['KillProposalView'][];
+      /** @description The automatic setting and the thresholds. */
+      settings: components['schemas']['KillSettingsView'];
+      /** @description The honesty sentences. */
+      statements: string[];
+    };
+    /** @description The automatic setting and the thresholds as they stand. */
+    KillSettingsView: {
+      /** @description Whether an automatic demotion is allowed now (default OFF). */
+      auto: boolean;
+      /**
+       * Format: int64
+       * @description The row of the switch in force, or null when none was ever stored.
+       */
+      settingId: null | number;
+      /**
+       * Format: double
+       * @description The cost multiplier of rule (a).
+       */
+      stressMultiplier: number;
+      /**
+       * Format: double
+       * @description The factor of rule (b).
+       */
+      drawdownFactor: number;
+      /** @description The SHA-256 of the thresholds. */
+      settingsHash: string;
+    };
+    /** @description The body of the automatic kill switch. The owner is never part of it: the actor comes from the signed-in session. */
+    KillSwitchRequest: {
+      /** @description The new value of `confidence.kill.auto` (default OFF): ON lets the daily decay-monitor demote the cells of a strategy when a kill rule fires, except for the CF-09 failure boundary. */
+      auto: boolean;
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS change, ON or OFF. It is checked on every request (a step-up window opened earlier does not count); wrong ones count toward the sign-in lockout. Missing: 403 auth.step_up_required. */
+      password: null | string;
+    };
+    /** @description The answer of a switch change: the row and the new value. */
+    KillSwitched: {
+      /**
+       * Format: int64
+       * @description The row appended.
+       */
+      id: number;
+      /** @description The value now in force. */
+      auto: boolean;
+    };
     /** @description The counts of a finished run: the instruments asked for and replayed, the ones skipped, and the trades (closed and open at the end of the data). */
     LabCounts: {
       /** Format: int32 */
@@ -18092,6 +18291,29 @@ export interface components {
       low: number;
       /** Format: double */
       high: number;
+    };
+    /** @description What a re-enable did. */
+    ReEnableOutcome: {
+      /** @description The cell. */
+      cell: string;
+      /**
+       * Format: int64
+       * @description The changelog row written.
+       */
+      changelogId: number;
+      /** @description The state before (`paused`). */
+      from: string;
+      /** @description The state after (`paper`). */
+      to: string;
+      /** @description What the owner must know: the CF-11 gates are not enforcing yet, and whether any kill condition was there to clear. */
+      warnings: string[];
+    };
+    /** @description The body of a re-enable. The owner is never part of it: the actor comes from the signed-in session. */
+    ReEnableRequest: {
+      /** @description Why, 1 to 300 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS act. Missing: 403 auth.step_up_required; wrong: 401, counted toward the lockout. */
+      password: null | string;
     };
     /** @description Trades whose favourable excursion reached the level, and their share of the trades with a recorded excursion. */
     ReachedMfeView: {
@@ -30253,6 +30475,165 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['LoopReportView'];
+        };
+      };
+    };
+  };
+  ListKillProposals: {
+    parameters: {
+      query?: {
+        state?: string;
+        strategy?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KillProposalsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ApplyKillProposal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApplyKillOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ChangeKillSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['KillSwitchRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KillSwitched'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  ReEnableCell: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReEnableRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReEnableOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

@@ -369,6 +369,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, PaperCaptureService>(); // paper fills of armed tickets after the end-of-day run (P10-01); starts paused, no order
         services.AddSingleton<IScheduledService, ShadowWriteService>(); // the shadow record of every nightly candidate, written before the open (CF-08); starts paused, setting paper.shadow.enabled OFF, no order
         services.AddSingleton<IScheduledService, ShadowGradeService>(); // grades the shadow record after the close with the same replay as paper (CF-08 part B); starts paused, setting paper.shadow.enabled OFF, no order
+        services.AddSingleton<IScheduledService, DecayMonitorService>(); // the daily kill-rule evaluation of each strategy's forward series, after the shadow grading (CF-12 part 12b); starts paused, automatic demotion only with the owner's setting ON (default OFF), no order
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, BriefingService>(); // the daily briefing text after the suggestions (P9-06); starts paused, the model is used only under both switches
         services.AddSingleton<IScheduledService, WeeklyReviewService>(); // the weekly review text after the digest (P9-06); starts paused, applies nothing
@@ -719,6 +720,7 @@ public static class DependencyInjection
         services.TryAddSingleton(new MlInfluenceOptions()); // the thresholds of the MlMayInfluence predicate (CF-10 part 10c-2, ADR 0217): proposals of the spec; no mode, no switch; the host replaces it with its configuration (section Confidence:MlInfluence)
         services.TryAddSingleton(new SequentialOptions()); // the sequential failure test of the paper edge series (CF-09, ADR 0213): flags only, no mode; the host replaces it with its configuration (section Confidence:Sequential)
         services.TryAddSingleton(new DecayOptions()); // the decay monitor of a forward series (CF-12 part 12a, ADR 0218): report only, tighten-only; the host replaces it with its configuration (section Confidence:Decay)
+        services.TryAddSingleton(new KillOptions()); // the thresholds of the kill rules (CF-12 part 12b, ADR 0219): tighten-only, the automatic setting is stored state and not in here; the host replaces it with its configuration (section Confidence:Kill)
         services.TryAddSingleton(new LoopOptions()); // "is the learning loop helping?" (CF-12 part 12a, ADR 0218): report only, tighten-only; the host replaces it with its configuration (section Confidence:Loop)
         services.TryAddSingleton(new RegistrationOptions()); // pre-registration and the honest count of looks (CF-06, ADR 0207): enforcement and CountInFactor off; the host replaces it with its configuration (section Confidence:Registration)
         services.TryAddSingleton(new HoldOutOptions()); // the locked hold-out (CF-06, ADR 0207): enforcement and AutoUnlock off; the host replaces it with its configuration (section Confidence:HoldOut)
@@ -958,6 +960,15 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetDecayReportQuery, Result<DecayReportView>>, GetDecayReportHandler>(); // the decay monitor of a strategy's forward series and the kill-rule evaluations: report only, derived on request (CF-12 part 12a)
         services.AddScoped<IQueryHandler<GetLoopReportQuery, Result<LoopReportView>>, GetLoopReportHandler>(); // "is the learning loop helping?": report only, derived on request (CF-12 part 12a)
         services.AddSingleton<ILoopEvidence, NoLoopEvidence>(); // the one source of loop evidence: nothing is available yet (CF-12 part 12a)
+        services.AddScoped<StrategyCells>(); // where the cells of a strategy are, replayed from the changelog (CF-12 part 12b)
+        services.AddScoped<ICommandHandler<PauseCellCommand, ChangelogOutcome>, PauseCellHandler>(); // the pause of a cell: the one lifecycle move the automatic kill path can ask for (CF-12 part 12b, ADR 0219)
+        services.AddScoped<ICommandHandler<ProposeKillCommand, ProposeKillOutcome>, ProposeKillHandler>(); // one strategy's daily kill evaluation: a proposal per firing rule; applies only with the owner's setting ON (CF-12 part 12b)
+        services.AddScoped<ICommandHandler<ApplyKillCommand, ApplyKillOutcome>, ApplyKillHandler>(); // applies a kill proposal: demote first, then compare-and-set; owner or the automatic setting (CF-12 part 12b)
+        services.AddScoped<ICommandHandler<ReEnableCellCommand, ReEnableOutcome>, ReEnableCellHandler>(); // Paused to Paper: the owner's act only, never automatic (CF-12 part 12b)
+        services.AddScoped<ICommandHandler<ChangeKillSwitchCommand, KillSwitched>, ChangeKillSwitchHandler>(); // the owner's switch confidence.kill.auto (default OFF) (CF-12 part 12b)
+        services.AddScoped<ICommandHandler<EvaluateDecayCommand, DecayRunOutcome>, EvaluateDecayHandler>(); // the daily run over every strategy with shadow candidates (CF-12 part 12b)
+        services.AddScoped<IQueryHandler<GetKillProposalsQuery, Result<KillProposalsView>>, GetKillProposalsHandler>(); // the kill proposals and the switch beside them, read only (CF-12 part 12b)
+        services.AddScoped<IBellNoticeSource, KillProposalNotices>(); // the open kill proposals as bell notices, derived on read (CF-12 part 12b)
         services.AddScoped<IQueryHandler<VerifyShadowChainQuery, ShadowChainCheckView>, VerifyShadowChainHandler>(); // recomputes the digest chain from the stored rows (CF-08 part B)
         services.AddScoped<ICommandHandler<ChangeShadowSwitchCommand, ShadowSwitched>, ChangeShadowSwitchHandler>(); // the owner's switch, behind a fresh password in the endpoint (CF-08 part B)
         services.AddScoped<IQueryHandler<ListPaperEntriesQuery, Result<PaperEntryList>>, ListPaperEntriesHandler>();

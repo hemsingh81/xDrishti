@@ -11,6 +11,7 @@ using XDrishti.Application.Abstractions.Auth;
 using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Capabilities;
 using XDrishti.Application.Abstractions.ChargeSheet;
+using XDrishti.Application.Abstractions.Confidence;
 using XDrishti.Application.Abstractions.Depth;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
@@ -44,6 +45,7 @@ using XDrishti.Infrastructure.Audit;
 using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Capabilities;
+using XDrishti.Infrastructure.Confidence;
 using XDrishti.Infrastructure.Depth;
 using XDrishti.Infrastructure.Execution;
 using XDrishti.Infrastructure.Lab;
@@ -213,6 +215,13 @@ public static class DependencyInjection
         services.AddScoped<IShadowGradeStore, ShadowGradeStore>(); // insert-only grades of the shadow record, one per entry (CF-08 part B, ADR 0212)
         services.AddScoped<IShadowResultReader, ShadowResultReader>(); // the one read of shadow outcomes, for the summary only; no Planning, Selection or Autonomy type may name it (CF-08 part B)
         services.AddScoped<IShadowSwitchStore, ShadowSettings>(); // the owner's switch history and append, insert-only (CF-08 part B)
+        services.AddScoped<KillProposals>(); // confidence.kill_proposals: insert, and one conditional update of the decision columns (CF-12 part 12b, ADR 0219)
+        services.AddScoped<IKillProposalReader>(sp => sp.GetRequiredService<KillProposals>());
+        services.AddScoped<IKillProposalStore>(sp => sp.GetRequiredService<KillProposals>());
+        services.AddScoped<KillSettings>(); // confidence.kill.auto: the newest row of confidence.kill_settings, OFF when none (CF-12 part 12b)
+        services.AddScoped<IKillSettings>(sp => sp.GetRequiredService<KillSettings>());
+        services.AddScoped<IKillSwitchStore>(sp => sp.GetRequiredService<KillSettings>());
+        services.AddScoped<IDecayCheckStore, DecayChecks>(); // insert-only daily evaluations of the decay monitor (CF-12 part 12b)
         services.AddOptions<TicketAlertOptions>().Bind(configuration.GetSection(TicketAlertOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // price-crossing alerts and post-trade prompts, default OFF (P7-20, ADR 0115)
         services.AddSingleton<ITicketAlertSettings>(sp => new TicketAlertSettings(sp.GetRequiredService<IOptions<TicketAlertOptions>>().Value));
         services.AddScoped<ITicketAlertStore, TicketAlertStore>(); // insert-only alerts, prompts and the owner's acts (P7-20); no order, no ticket change

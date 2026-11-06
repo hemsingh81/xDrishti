@@ -21,6 +21,7 @@ public sealed class GetPlanNoticesHandlerTests
     private readonly IJournalStore _journal = Substitute.For<IJournalStore>();
     private readonly ITicketNoticeSource _tickets = Substitute.For<ITicketNoticeSource>();
     private readonly IComplianceStore _compliance = Substitute.For<IComplianceStore>();
+    private readonly List<IBellNoticeSource> _others = [];
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -40,7 +41,7 @@ public sealed class GetPlanNoticesHandlerTests
     private static PlanEventRow Approval(long item, DateTimeOffset? at = null) =>
         new(item, item, "proposed", "approved", "owner:me", "ok", 1, at ?? new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
 
-    private GetPlanNoticesHandler Handler() => new(_plans, _journal, _tickets, _compliance, Substitute.For<XDrishti.Application.Abstractions.Messaging.IQueryHandler<XDrishti.Application.LiveTrading.GetLiveNoticesQuery, IReadOnlyList<XDrishti.Application.LiveTrading.LiveNoticeView>>>(), _time);
+    private GetPlanNoticesHandler Handler() => new(_plans, _journal, _tickets, _compliance, Substitute.For<XDrishti.Application.Abstractions.Messaging.IQueryHandler<XDrishti.Application.LiveTrading.GetLiveNoticesQuery, IReadOnlyList<XDrishti.Application.LiveTrading.LiveNoticeView>>>(), _others, _time);
 
     private static PlanRow Row(long id, DateOnly? date = null, int version = 1, PlanState state = PlanState.Published) =>
         new(id, new NewPlan("k" + id, date ?? Session, Cutoff, version, Hash, "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, []), state, 1, 0, 0);
@@ -269,6 +270,23 @@ public sealed class GetPlanNoticesHandlerTests
         result.Items.Select(i => i.Id).ShouldBe(["crossing:5", "plan:review:1:info", "prompt:2"]);
         result.Items[0].ShouldBe(crossed);
         result.Items[2].Resolved.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task The_notices_of_another_module_are_carried_in_and_a_source_with_none_adds_nothing()
+    {
+        Store(Row(1), Item(1, 1, TicketState.Proposed));
+        var kill = new PlanNotice("kill:7", "kill_proposed", "warning", "a kill rule fires", "/learning", null, Cutoff, Cutoff);
+        var other = Substitute.For<IBellNoticeSource>();
+        other.ListAsync(Arg.Any<DateTimeOffset>(), Ct).Returns([kill]);
+        var quiet = Substitute.For<IBellNoticeSource>();
+        quiet.ListAsync(Arg.Any<DateTimeOffset>(), Ct).Returns([]);
+        _others.AddRange([other, quiet]);
+
+        var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
+
+        result.Items.Select(i => i.Id).ShouldContain("kill:7");
+        result.Items.Count.ShouldBe(2);
     }
 
     [Fact]

@@ -189,7 +189,7 @@ public sealed class ChangelogHandlersTests
         var view = (await new GetCellStateHandler(_log).HandleAsync(new GetCellStateQuery(Cell), Ct)).Value;
 
         view.State.ShouldBe("paper");
-        view.LegalNext.ShouldBe(["active"]);
+        view.LegalNext.ShouldBe(["active", "paused"]);
         view.Rows.ShouldBe(4);
         view.Problems.ShouldBeEmpty();
         view.PaperDaysBeforeActive.ShouldBe(20);
@@ -213,6 +213,67 @@ public sealed class ChangelogHandlersTests
         bad.Error.Fields!.Count.ShouldBe(2);
     }
 
+    [Fact]
+    public async Task A_pause_made_by_a_kill_proposal_is_not_reverted_and_any_other_pause_is()
+    {
+        await WalkToPaperAsync();
+        var other = await Record().HandleAsync(Move(CellState.Paused, null, "run:abc"), Ct);
+        var refusedByOther = await Revert().HandleAsync(new RevertChangelogCommand(other.Value.Id, "undo", "test"), Ct);
+        var killed = await Record().HandleAsync(Move(CellState.Paused, null, "kill-proposal:7"), Ct);
+        var rows = _log.Rows.Count;
+
+        var refused = await Revert().HandleAsync(new RevertChangelogCommand(killed.Value.Id, "undo", "test"), Ct);
+
+        refusedByOther.IsSuccess.ShouldBeTrue("a pause that no kill proposal made is a correction like any other, as before");
+        refused.Error.Code.ShouldBe(ChangelogErrors.NotRevertibleCode);
+        refused.Error.Message.ShouldContain("re-enable");
+        _log.Rows.Count.ShouldBe(rows, "nothing was written");
+    }
+
+    [Fact]
+    public async Task A_lifecycle_move_cannot_lift_a_kill_pause_only_the_owners_re_enable_does_and_other_pauses_move_as_before()
+    {
+        await WalkToPaperAsync();
+        await Record().HandleAsync(Move(CellState.Paused, null, "kill-proposal:7"), Ct);
+        var rows = _log.Rows.Count;
+
+        var refused = await Record().HandleAsync(Move(CellState.Paper), Ct);
+        var reEnabled = await Record().HandleAsync(Move(CellState.Paper) with { OwnerReEnable = true }, Ct);
+
+        refused.Error.Code.ShouldBe(ChangelogErrors.TransitionRefusedCode);
+        refused.Error.Message.ShouldContain("re-enable");
+        _log.Rows.Count.ShouldBe(rows + 1, "only the owner's re-enable wrote a row");
+        reEnabled.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_pause_restored_by_a_revert_is_still_the_kill_pause_that_was_first_made()
+    {
+        await WalkToPaperAsync();
+        await Record().HandleAsync(Move(CellState.Paused, null, "kill-proposal:7"), Ct);
+        var back = await Record().HandleAsync(Move(CellState.Paper) with { OwnerReEnable = true }, Ct);
+        var restored = await Revert().HandleAsync(new RevertChangelogCommand(back.Value.Id, "undo", "test"), Ct);
+
+        var refused = await Record().HandleAsync(Move(CellState.Paper), Ct);
+
+        restored.IsSuccess.ShouldBeTrue("a revert of a re-enable is a correction like any other");
+        refused.Error.Code.ShouldBe(ChangelogErrors.TransitionRefusedCode);
+        CellHistory.PauseOrigin(_log.Rows)!.Entry.EvidenceIds.ShouldBe(["kill-proposal:7"]);
+    }
+
+    [Fact]
+    public async Task The_pause_origin_is_null_when_the_cell_is_not_paused_and_the_latest_pause_after_a_re_pause()
+    {
+        await WalkToPaperAsync();
+        CellHistory.PauseOrigin(_log.Rows).ShouldBeNull();
+        await Record().HandleAsync(Move(CellState.Paused, null, "kill-proposal:7"), Ct);
+        await Record().HandleAsync(Move(CellState.Paper) with { OwnerReEnable = true }, Ct);
+        await Record().HandleAsync(Move(CellState.Paused, null, "run:abc"), Ct);
+
+        CellHistory.PauseOrigin(_log.Rows)!.Entry.EvidenceIds.ShouldBe(["run:abc"]);
+        (await Record().HandleAsync(Move(CellState.Paper), Ct)).IsSuccess.ShouldBeTrue("a pause that no kill proposal made moves as before");
+    }
+
     private async Task WalkToPaperAsync()
     {
         (await Record().HandleAsync(Move(CellState.Candidate), Ct)).IsSuccess.ShouldBeTrue();
@@ -220,7 +281,7 @@ public sealed class ChangelogHandlersTests
     }
 
     /// <summary>An in-memory changelog with the same append rules as the table: insert only, state and latest-row checks.</summary>
-    private sealed class FakeChangelog : ILearningChangelog
+    internal sealed class FakeChangelog : ILearningChangelog
     {
         private readonly List<ChangelogEntry> _rows = [];
 
@@ -268,5 +329,8 @@ public sealed class ChangelogHandlersTests
             Reads++;
             return ValueTask.FromResult<IReadOnlyList<ChangelogEntry>>([.. _rows.Where(r => r.Entry.Subject == subject)]);
         }
+
+        public ValueTask<IReadOnlyList<string>> CellSubjectsAsync(string prefix, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<string>>([.. _rows.Where(r => r.Entry.SubjectKind == "cell" && r.Entry.Subject.StartsWith(prefix, StringComparison.Ordinal)).Select(r => r.Entry.Subject).Distinct().Order(StringComparer.Ordinal)]);
     }
 }

@@ -73,6 +73,21 @@ internal sealed class LearningChangelog(NpgsqlDataSource dataSource) : ILearning
         return await ReadAllAsync(select, cancellationToken);
     }
 
+    public async ValueTask<IReadOnlyList<string>> CellSubjectsAsync(string prefix, CancellationToken cancellationToken)
+    {
+        // starts_with is a plain prefix test: a strategy id with an underscore or a percent sign is not a pattern here
+        await using var select = dataSource.CreateCommand("SELECT DISTINCT subject FROM research.learning_changelog WHERE subject_kind = 'cell' AND starts_with(subject, @p) ORDER BY subject");
+        select.Parameters.AddWithValue("p", NpgsqlDbType.Text, prefix);
+        await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+        var subjects = new List<string>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            subjects.Add(reader.GetString(0));
+        }
+
+        return subjects;
+    }
+
     private static async Task<IReadOnlyList<ChangelogEntry>> ReadAllAsync(NpgsqlCommand select, CancellationToken cancellationToken)
     {
         await using var reader = await select.ExecuteReaderAsync(cancellationToken);

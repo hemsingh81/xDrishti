@@ -37,6 +37,11 @@ internal sealed class RecordCellTransitionHandler(ILearningChangelog changelog, 
         }
 
         var refusals = new List<string>(CellLifecycle.Refusals(replay.State, command.To, command.Facts));
+        if (replay.State == CellState.Paused && !command.OwnerReEnable && CellHistory.PauseOrigin(history) is { } origin && KillEvidence.NamesProposal(origin.Entry.EvidenceIds))
+        {
+            refusals.Add("This pause was made by a kill proposal: it is lifted only by the owner's re-enable act (POST /api/learning/cells/{key}/re-enable, with a fresh password and the failing condition cleared), not by a lifecycle move.");
+        }
+
         if (refusals.Count == 0 && CellLifecycle.NeedsEvidence(replay.State, command.To) && command.EvidenceIds.Count == 0)
         {
             refusals.Add("This move needs at least one evidence id.");

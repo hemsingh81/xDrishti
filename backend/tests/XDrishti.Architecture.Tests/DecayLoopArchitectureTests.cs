@@ -20,7 +20,7 @@ public sealed class DecayLoopArchitectureTests
     private static readonly string[] CalculatorNames =
     [
         nameof(DecayMonitor), nameof(DecayTrade), nameof(DecayWindow), nameof(DecayQuarter), nameof(DecayReport),
-        nameof(KillRules), nameof(KillRuleVerdict), nameof(KillRuleState),
+        nameof(KillRules), nameof(KillRuleVerdict), nameof(KillRuleState), nameof(KillDecision),
         nameof(ThreeArmLoopTest), nameof(ThreeArmResult), nameof(ArmComparison), nameof(LoopCandidate), nameof(LoopVerdict),
         nameof(LearningCurve), nameof(LearningCurvePoint), nameof(CurveResult), nameof(CurveVerdict),
         nameof(ReliabilitySlope), nameof(ReliabilityResult), nameof(ReliabilityState),
@@ -32,7 +32,7 @@ public sealed class DecayLoopArchitectureTests
     // what a consumer must not name: the calculators, the settings, the handlers and their views, the evidence port and its one source
     private static readonly string[] Cf12Types =
     [
-        .. CalculatorTypes, typeof(DecayOptions).FullName!, typeof(LoopOptions).FullName!,
+        .. CalculatorTypes, typeof(DecayOptions).FullName!, typeof(LoopOptions).FullName!, typeof(KillOptions).FullName!,
         "XDrishti.Application.Confidence.GetDecayReportHandler", "XDrishti.Application.Confidence.GetDecayReportQuery", "XDrishti.Application.Confidence.DecayReportView",
         "XDrishti.Application.Confidence.GetLoopReportHandler", "XDrishti.Application.Confidence.GetLoopReportQuery", "XDrishti.Application.Confidence.LoopReportView",
         "XDrishti.Application.Confidence.NoLoopEvidence", typeof(ILoopEvidence).FullName!, typeof(LoopEvidence).FullName!, typeof(LoopArmsInput).FullName!,
@@ -133,7 +133,7 @@ public sealed class DecayLoopArchitectureTests
     [Fact]
     public void The_lifecycle_and_cell_state_moves_name_nothing_of_the_slice()
     {
-        // nothing in this part may move a cell: the lifecycle (P6-08) and the cell-state writer never read a decay or loop type; a pause on a decay alert is part 12b and must be added here in review
+        // the lifecycle (P6-08) and the cell-state writer never read a decay, kill-rule or loop calculator: the pause on a kill rule comes from the Confidence namespace through the pause handler (KillArchitectureTests), carrying only text and evidence ids
         var lifecycle = Types.InAssembly(Domain).That().HaveNameMatching("^(CellLifecycle|CellMove|CellState|CellStateExtensions|CellWindowExtensions|HypothesisLifecycle|LessonLifecycle)$").GetTypes().ToList();
         lifecycle.ShouldNotBeEmpty();
         Types.InAssembly(Domain).That().HaveNameMatching("^(CellLifecycle|CellMove|CellState|CellStateExtensions|CellWindowExtensions|HypothesisLifecycle|LessonLifecycle)$").Should().NotHaveDependencyOnAny(Cf12Types).GetResult().IsSuccessful.ShouldBeTrue();
@@ -173,6 +173,7 @@ public sealed class DecayLoopArchitectureTests
         {
             var result = Types.InAssembly(Application).That().HaveName(handler).Should().NotHaveDependencyOnAny(
                 "XDrishti.Application.Abstractions.Shadow.IShadowStore", "XDrishti.Application.Abstractions.Shadow.IShadowGradeStore", "XDrishti.Application.Abstractions.Shadow.IShadowSwitchStore", "XDrishti.Application.Abstractions.Shadow.IShadowSettings",
+                "XDrishti.Application.Abstractions.Confidence.IKillProposalStore", "XDrishti.Application.Abstractions.Confidence.IKillSwitchStore", "XDrishti.Application.Abstractions.Confidence.IDecayCheckStore", "XDrishti.Application.Abstractions.Confidence.IKillSettings",
                 "XDrishti.Application.Abstractions.Learning.ILearningChangelog", "XDrishti.Application.Abstractions.Learning.ICellStatsStore", "XDrishti.Application.Abstractions.Learning.IModelRegistry", "XDrishti.Application.Abstractions.Paper.IPaperStore",
                 "XDrishti.Application.Abstractions.Paper.IGovernanceStore", "XDrishti.Application.Abstractions.Lab.IHoldOutStore", "XDrishti.Application.Planning", "XDrishti.Application.Autonomy", "XDrishti.Application.Abstractions.Execution",
                 "XDrishti.Application.Abstractions.Messaging.ICommandHandler", "System.TimeProvider", "Microsoft.Extensions.Logging").GetResult();
@@ -205,7 +206,7 @@ public sealed class DecayLoopArchitectureTests
     }
 
     [Fact]
-    public void The_routes_only_read_and_the_slice_adds_no_kill_setting_proposal_or_migration()
+    public void The_read_routes_only_read_and_the_kill_writers_are_the_ones_pinned_in_the_kill_rules()
     {
         var source = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Endpoints", "ConfidenceEndpoints.cs"));
 
@@ -215,10 +216,8 @@ public sealed class DecayLoopArchitectureTests
             source.ShouldNotContain(verb);
         }
 
-        // part 12b owns the proposals, the auto setting and the migration; nothing of them exists yet
-        var settings = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Confidence", "ConfidenceSettings.cs"));
-        settings.ShouldNotContain("Kill");
-        Directory.GetFiles(Path.Combine(Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Persistence", "XDrishtiDbContext.cs"))!, "Migrations"), "*Decay*").ShouldBeEmpty();
-        Types.InAssembly(Application).That().HaveNameMatching("^.*(KillProposal|ApplyKill|ProposeKill|ReEnable).*$").GetTypes().ShouldBeEmpty();
+        // part 12b owns the proposals, the owner's switch and the migration (KillArchitectureTests pins who writes and who reads them); this endpoint file stays the two reads of part 12a
+        var names = Types.InAssembly(Application).That().HaveNameMatching("^.*(KillProposal|ApplyKill|ProposeKill|ReEnable).*$").GetTypes().Where(t => !t.Name.StartsWith('<')).Select(t => t.Name).Order(StringComparer.Ordinal).ToList();
+        names.ShouldBe(["ApplyKillCommand", "ApplyKillHandler", "ApplyKillOutcome", "GetKillProposalsHandler", "GetKillProposalsQuery", "IKillProposalReader", "IKillProposalStore", "KillProposalNotices", "KillProposalRow", "KillProposalView", "KillProposalsView", "NewKillProposal", "ProposeKillCommand", "ProposeKillHandler", "ProposeKillOutcome", "ReEnableCellCommand", "ReEnableCellHandler", "ReEnableOutcome"]);
     }
 }
