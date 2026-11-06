@@ -52,6 +52,8 @@ internal sealed record XdOptions(
           xd learn decay --strategy ID   the decay monitor, the kill-rule evaluations and the open kill proposals of one strategy (read only; unavailable and not_evaluated are never a pass)
           xd learn loop   is the learning loop helping? the three arms, the learning curve, the reliability slope, the lift (read only; today every section is unavailable and says why)
           xd learn curve   the learning-curve part of that report (read only)
+          xd learn influence MODEL-ID   whether the model may influence a decision, term by term with the reasons, the hold-out state, the champion flag and the three ML switches (read only; unavailable and refused are never a pass)
+          xd learn rollback   the rollback proposals, whether ml.auto_rollback is ON or OFF the champion now and the proposals that leave no qualifying previous champion (read only; applying a rollback stays the owner's act)
           xd select cells --date YYYY-MM-DD [--min-state candidate|paper|active]
           xd plan run [--date YYYY-MM-DD] [--dry-run]
           xd plan phase-check [--through YYYY-MM-DD]
