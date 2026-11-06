@@ -34,7 +34,29 @@ public sealed class ConfidenceSettingsApiTests(ApiFactory factory)
         host.Services.GetRequiredService<LoopOptions>().ShouldBe(new LoopOptions(MinDays: 30, HelpsAt: 0.975, SlopeSe: 1.5));
     }
 
+    [Fact]
+    public async Task The_kill_thresholds_default_to_the_specs_and_are_bound_and_the_automatic_setting_is_not_a_configuration_value()
+    {
+        factory.Services.GetRequiredService<KillOptions>().ShouldBe(new KillOptions());
+        using var host = factory.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Confidence:Kill:StressMultiplier", "2");
+            b.UseSetting("Confidence:Kill:DrawdownFactor", "1.5");
+            b.UseSetting("Confidence:Kill:Auto", "true"); // there is no such key: it is ignored, the switch is the owner's stored row
+        });
+
+        host.Services.GetRequiredService<KillOptions>().ShouldBe(new KillOptions(StressMultiplier: 2, DrawdownFactor: 1.5));
+        using var scope = host.Services.CreateScope();
+        (await scope.ServiceProvider.GetRequiredService<XDrishti.Application.Abstractions.Confidence.IKillSettings>().CurrentAsync(TestContext.Current.CancellationToken)).Auto.ShouldBeFalse();
+    }
+
     [Theory]
+    [InlineData("Kill:StressMultiplier", "1.49")]
+    [InlineData("Kill:StressMultiplier", "0")]
+    [InlineData("Kill:StressMultiplier", "3.01")]
+    [InlineData("Kill:DrawdownFactor", "2.01")]
+    [InlineData("Kill:DrawdownFactor", "0.99")]
+    [InlineData("Kill:DrawdownFactor", "0")]
     [InlineData("Decay:WindowTrades", "61")]
     [InlineData("Decay:WindowTrades", "19")]
     [InlineData("Decay:Sigmas", "1.6")]

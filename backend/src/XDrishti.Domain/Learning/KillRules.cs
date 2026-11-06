@@ -30,7 +30,8 @@ public static class KillRules
     /// <param name="netR">Net R of each trade.</param>
     /// <param name="costR">Charges plus the size of the slippage, in R, of each trade (same length).</param>
     /// <param name="tradesSinceLastFiring">Trades since this rule last fired, or null when it never did.</param>
-    public static KillRuleVerdict CostStress(IReadOnlyList<double> netR, IReadOnlyList<double> costR, int? tradesSinceLastFiring = null)
+    /// <param name="stressMultiplier">The multiplier of cost (default 1.5; <c>Confidence:Kill:StressMultiplier</c>, which can only be raised).</param>
+    public static KillRuleVerdict CostStress(IReadOnlyList<double> netR, IReadOnlyList<double> costR, int? tradesSinceLastFiring = null, double stressMultiplier = StressMultiplier)
     {
         ArgumentNullException.ThrowIfNull(netR);
         ArgumentNullException.ThrowIfNull(costR);
@@ -62,20 +63,20 @@ public static class KillRules
             c += costR[i];
         }
 
-        return CostStress(net1 / TrailingTrades, c / TrailingTrades, TrailingTrades, tradesSinceLastFiring);
+        return CostStress(net1 / TrailingTrades, c / TrailingTrades, TrailingTrades, tradesSinceLastFiring, stressMultiplier);
     }
 
     /// <summary>Rule (a) from the two means: <c>net(1.5) = net1 - 0.5 c</c>, fires when strictly below zero (a value within 1e-12 of zero is zero).</summary>
-    public static KillRuleVerdict CostStress(double net1, double c, int trades, int? tradesSinceLastFiring = null)
+    public static KillRuleVerdict CostStress(double net1, double c, int trades, int? tradesSinceLastFiring = null, double stressMultiplier = StressMultiplier)
     {
-        if (trades < TrailingTrades || !double.IsFinite(net1) || !double.IsFinite(c) || c < 0)
+        if (trades < TrailingTrades || !double.IsFinite(net1) || !double.IsFinite(c) || c < 0 || !double.IsFinite(stressMultiplier) || stressMultiplier < 1)
         {
             return NotEvaluated("cost_stress", trades, string.Create(CultureInfo.InvariantCulture, $"cost stress not evaluated: {trades} graded trades, {TrailingTrades} are needed, and the means must be numbers with a cost that is not negative"));
         }
 
-        var stressed = net1 - ((StressMultiplier - 1) * c);
+        var stressed = net1 - ((stressMultiplier - 1) * c);
         var negative = stressed < -Tie;
-        var text = string.Create(CultureInfo.InvariantCulture, $"net R at 1 times cost {net1:F4}, mean cost {c:F4} R, net R at {StressMultiplier:0.0} times cost {stressed:F4} on the last {trades} trades");
+        var text = string.Create(CultureInfo.InvariantCulture, $"net R at 1 times cost {net1:F4}, mean cost {c:F4} R, net R at {stressMultiplier:0.0#} times cost {stressed:F4} on the last {trades} trades");
         if (!negative)
         {
             return new KillRuleVerdict("cost_stress", KillRuleState.Holds, stressed, 0, trades, false, text + ": not below zero");

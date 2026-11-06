@@ -1,7 +1,7 @@
 namespace XDrishti.Domain.Learning;
 
 /// <summary>
-/// The lifecycle of a cell as a pure table (doc 09 section 7, spec P6-08, ADR 0073): the seven legal moves, and for each the facts the caller must state. Nothing here reads the clock, the database or a trade.
+/// The lifecycle of a cell as a pure table (doc 09 section 7, spec P6-08, ADR 0073): the eight legal moves (the seven of P6-08 and Paper to Paused of CF-12, ADR 0219), and for each the facts the caller must state. Nothing here reads the clock, the database or a trade.
 /// Nothing becomes <see cref="CellState.Active"/> without the paper period (doc 16 <c>paper_days_before_active</c>) and the owner; Paper and Active are records only until paper data exist (P10) and live exists (P7+).
 /// </summary>
 public static class CellLifecycle
@@ -15,6 +15,7 @@ public static class CellLifecycle
         (CellState.Candidate, CellState.Paper),
         (CellState.Paper, CellState.Active),
         (CellState.Active, CellState.Paused),
+        (CellState.Paper, CellState.Paused), // CF-12 part 12b (ADR 0219): a kill rule stops a cell that is only followed on paper; demotion lowers risk and needs no fact, only evidence
         (CellState.Paused, CellState.Paper),
         (CellState.Active, CellState.Retired),
         (CellState.Research, CellState.Retired),

@@ -12276,6 +12276,225 @@
         }
       }
     },
+    "/api/confidence/kill-proposals": {
+      "get": {
+        "tags": [
+          "Confidence"
+        ],
+        "summary": "The kill proposals, newest first (state proposed, applied or dismissed; strategy; limit 1 to 200, default 50), each with its rule, numbers, the cells it would pause and who applied it, with the automatic setting (default OFF) and the thresholds beside them. Read only. 400 paper.invalid",
+        "operationId": "ListKillProposals",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KillProposalsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/confidence/kill-proposals/{id}/apply": {
+      "post": {
+        "tags": [
+          "Confidence"
+        ],
+        "summary": "Apply a kill proposal as the owner: every cell it names that is still Paper or Active moves to Paused through the lifecycle, with a changelog row carrying the rule, the numbers and the settings hash. Needs the owner's session and the CSRF token. Applying twice changes nothing twice. It places no order. 404 confidence.proposal_not_found, 409 confidence.proposal_closed",
+        "operationId": "ApplyKillProposal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyKillOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/confidence/kill-settings": {
+      "put": {
+        "tags": [
+          "Confidence"
+        ],
+        "summary": "Switch confidence.kill.auto (OFF by default; no row means OFF) ON or OFF as the owner; appends an audited row with the owner as actor. ON lets the daily decay-monitor pause the cells of a strategy when a kill rule fires, recorded as actor auto with the setting row, never as an owner approval; the CF-09 failure boundary is never executed automatically. Needs a session, the CSRF token and the password in the body, checked on EVERY change. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.reason_invalid, 429 auth.rate_limited",
+        "operationId": "ChangeKillSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KillSwitchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KillSwitched"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/learning/cells/{key}/re-enable": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Re-enable a paused cell (Paused to Paper; the key is the URL-encoded cell key) as the owner. Never automatic and never to Active. Needs a session, the CSRF token and a fresh password in the body. When a kill proposal paused the cell, every rule that fired must hold now and none may fire, else 409 confidence.rule_not_cleared (the spec's rule_cleared problem, named to read as what it says); a rule that cannot be evaluated is not a pass. The answer always warns that the CF-11 gates (R and S) are not enforcing yet. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 403 confidence.owner_only, 409 confidence.cell_not_paused, 400 confidence.reason_invalid, 422 learning.invalid",
+        "operationId": "ReEnableCell",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReEnableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReEnableOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/paper/sequential": {
       "get": {
         "tags": [
@@ -21457,6 +21676,64 @@
             "format": "int64"
           }
         }
+      },
+      "ApplyKillOutcome": {
+        "required": [
+          "proposalId",
+          "strategy",
+          "rule",
+          "state",
+          "alreadyApplied",
+          "pausedCells",
+          "skippedCells",
+          "actor"
+        ],
+        "type": "object",
+        "properties": {
+          "proposalId": {
+            "type": "integer",
+            "description": "The proposal.",
+            "format": "int64"
+          },
+          "strategy": {
+            "type": "string",
+            "description": "Its strategy."
+          },
+          "rule": {
+            "type": "string",
+            "description": "Its rule."
+          },
+          "state": {
+            "type": "string",
+            "description": "The state of the proposal after this call (`applied`)."
+          },
+          "alreadyApplied": {
+            "type": "boolean",
+            "description": "True when the proposal was applied before this call (nothing was changed now)."
+          },
+          "pausedCells": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The cells this call paused."
+          },
+          "skippedCells": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The cells that were no longer Paper or Active (already paused, retired or changed)."
+          },
+          "actor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who applied it (the first time)."
+          }
+        },
+        "description": "What applying did."
       },
       "ApprovalCountView": {
         "required": [
@@ -40649,6 +40926,236 @@
         "description": "One ISO week of graded plan tickets."
       },
       "JsonElement": { },
+      "KillProposalView": {
+        "required": [
+          "id",
+          "strategy",
+          "rule",
+          "proposalOnly",
+          "value",
+          "limit",
+          "trades",
+          "text",
+          "cells",
+          "settingsHash",
+          "proposedOn",
+          "proposedAt",
+          "state",
+          "actor",
+          "decidedAt",
+          "autoSettingId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The proposal.",
+            "format": "int64"
+          },
+          "strategy": {
+            "type": "string",
+            "description": "The strategy."
+          },
+          "rule": {
+            "type": "string",
+            "description": "`cost_stress`, `drawdown`, `decay_twice` or `failure_boundary`."
+          },
+          "proposalOnly": {
+            "type": "boolean",
+            "description": "True for the CF-09 failure boundary: the automatic setting never executes it, only the owner applies it."
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The figure judged.",
+            "format": "double"
+          },
+          "limit": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "What it was judged against.",
+            "format": "double"
+          },
+          "trades": {
+            "type": "integer",
+            "description": "Trades the figure is based on.",
+            "format": "int32"
+          },
+          "text": {
+            "type": "string",
+            "description": "The words, with the numbers."
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The cells it would pause (Paper or Active when proposed)."
+          },
+          "settingsHash": {
+            "type": "string",
+            "description": "The SHA-256 of the settings that produced it."
+          },
+          "proposedOn": {
+            "type": "string",
+            "description": "The India date it was proposed.",
+            "format": "date"
+          },
+          "proposedAt": {
+            "type": "string",
+            "description": "When it was proposed.",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string",
+            "description": "`proposed`, `applied` or `dismissed`."
+          },
+          "actor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "`owner:...` or `auto` once applied, else null."
+          },
+          "decidedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was decided, or null.",
+            "format": "date-time"
+          },
+          "autoSettingId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "For an automatic decision, the switch row in force; else null.",
+            "format": "int64"
+          }
+        },
+        "description": "One kill proposal as the owner reads it."
+      },
+      "KillProposalsView": {
+        "required": [
+          "items",
+          "settings",
+          "statements"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KillProposalView"
+            },
+            "description": "The proposals, newest first."
+          },
+          "settings": {
+            "description": "The automatic setting and the thresholds.",
+            "$ref": "#/components/schemas/KillSettingsView"
+          },
+          "statements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honesty sentences."
+          }
+        },
+        "description": "The proposals and the settings beside them."
+      },
+      "KillSettingsView": {
+        "required": [
+          "auto",
+          "settingId",
+          "stressMultiplier",
+          "drawdownFactor",
+          "settingsHash"
+        ],
+        "type": "object",
+        "properties": {
+          "auto": {
+            "type": "boolean",
+            "description": "Whether an automatic demotion is allowed now (default OFF)."
+          },
+          "settingId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The row of the switch in force, or null when none was ever stored.",
+            "format": "int64"
+          },
+          "stressMultiplier": {
+            "type": "number",
+            "description": "The cost multiplier of rule (a).",
+            "format": "double"
+          },
+          "drawdownFactor": {
+            "type": "number",
+            "description": "The factor of rule (b).",
+            "format": "double"
+          },
+          "settingsHash": {
+            "type": "string",
+            "description": "The SHA-256 of the thresholds."
+          }
+        },
+        "description": "The automatic setting and the thresholds as they stand."
+      },
+      "KillSwitchRequest": {
+        "required": [
+          "auto",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "auto": {
+            "type": "boolean",
+            "description": "The new value of `confidence.kill.auto` (default OFF): ON lets the daily decay-monitor demote the cells of a strategy when a kill rule fires, except for the CF-09 failure boundary."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS change, ON or OFF. It is checked on every request (a step-up window opened earlier does not count); wrong ones count toward the sign-in lockout. Missing: 403 auth.step_up_required."
+          }
+        },
+        "description": "The body of the automatic kill switch. The owner is never part of it: the actor comes from the signed-in session."
+      },
+      "KillSwitched": {
+        "required": [
+          "id",
+          "auto"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row appended.",
+            "format": "int64"
+          },
+          "auto": {
+            "type": "boolean",
+            "description": "The value now in force."
+          }
+        },
+        "description": "The answer of a switch change: the row and the new value."
+      },
       "LabCounts": {
         "required": [
           "instruments",
@@ -53512,6 +54019,67 @@
           }
         },
         "description": "A rate with its sample and its Wilson 95 % interval (spec P9-09 AC 9: every rate is printed with its interval)."
+      },
+      "ReEnableOutcome": {
+        "required": [
+          "cell",
+          "changelogId",
+          "from",
+          "to",
+          "warnings"
+        ],
+        "type": "object",
+        "properties": {
+          "cell": {
+            "type": "string",
+            "description": "The cell."
+          },
+          "changelogId": {
+            "type": "integer",
+            "description": "The changelog row written.",
+            "format": "int64"
+          },
+          "from": {
+            "type": "string",
+            "description": "The state before (`paused`)."
+          },
+          "to": {
+            "type": "string",
+            "description": "The state after (`paper`)."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the owner must know: the CF-11 gates are not enforcing yet, and whether any kill condition was there to clear."
+          }
+        },
+        "description": "What a re-enable did."
+      },
+      "ReEnableRequest": {
+        "required": [
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 300 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS act. Missing: 403 auth.step_up_required; wrong: 401, counted toward the lockout."
+          }
+        },
+        "description": "The body of a re-enable. The owner is never part of it: the actor comes from the signed-in session."
       },
       "ReachedMfeView": {
         "required": [

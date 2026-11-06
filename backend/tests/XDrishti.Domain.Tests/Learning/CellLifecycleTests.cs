@@ -22,7 +22,7 @@ public sealed class CellLifecycleTests
     }
 
     [Fact]
-    public void The_table_has_exactly_the_seven_moves_of_the_state_diagram()
+    public void The_table_has_exactly_the_eight_moves_of_the_state_diagram()
     {
         CellLifecycle.Moves.ShouldBe(
         [
@@ -30,6 +30,7 @@ public sealed class CellLifecycleTests
             (CellState.Candidate, CellState.Paper),
             (CellState.Paper, CellState.Active),
             (CellState.Active, CellState.Paused),
+            (CellState.Paper, CellState.Paused),
             (CellState.Paused, CellState.Paper),
             (CellState.Active, CellState.Retired),
             (CellState.Research, CellState.Retired),
@@ -103,9 +104,18 @@ public sealed class CellLifecycleTests
     }
 
     [Fact]
+    public void A_paper_cell_can_be_paused_without_any_fact_and_the_pause_can_be_reverted_to_paper()
+    {
+        CellLifecycle.Refusals(CellState.Paper, CellState.Paused, new TransitionFacts()).ShouldBeEmpty();
+        CellLifecycle.NeedsEvidence(CellState.Paper, CellState.Paused).ShouldBeTrue();
+        CellLifecycle.Next(CellState.Paper).ShouldBe([CellState.Active, CellState.Paused]);
+        CellLifecycle.RevertRefusals(CellState.Paper, CellState.Paused).ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Evidence_is_needed_for_every_move_but_the_owners_approval()
     {
-        CellLifecycle.Moves.Where(m => CellLifecycle.NeedsEvidence(m.From, m.To)).Count().ShouldBe(6);
+        CellLifecycle.Moves.Where(m => CellLifecycle.NeedsEvidence(m.From, m.To)).Count().ShouldBe(7);
         CellLifecycle.NeedsEvidence(CellState.Candidate, CellState.Paper).ShouldBeFalse();
         CellLifecycle.NeedsEvidence(CellState.Research, CellState.Active).ShouldBeFalse();
     }

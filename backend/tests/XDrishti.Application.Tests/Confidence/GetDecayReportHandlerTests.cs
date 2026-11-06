@@ -1,5 +1,6 @@
 #pragma warning disable CA2012 // NSubstitute setup calls on ValueTask members are not awaited
 using NSubstitute;
+using XDrishti.Application.Abstractions.Confidence;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Research;
@@ -30,6 +31,7 @@ public sealed class GetDecayReportHandlerTests
     private readonly ICostConfirmationFact _costs = Substitute.For<ICostConfirmationFact>();
     private readonly ICellStatsStore _stats = Substitute.For<ICellStatsStore>();
     private readonly IRunStore _runs = Substitute.For<IRunStore>();
+    private readonly IKillProposalReader _proposals = Substitute.For<IKillProposalReader>();
 
     public GetDecayReportHandlerTests()
     {
@@ -40,8 +42,38 @@ public sealed class GetDecayReportHandlerTests
         _stats.ListLatestBeforeAsync(Start, null, null, Ct).Returns(ValueTask.FromResult<IReadOnlyList<StoredCellStats>>([]));
     }
 
-    private ValueTask<Result<DecayReportView>> RunAsync(string? strategy = "ORB", DecayOptions? options = null) =>
-        new GetDecayReportHandler(_reader, _ledger, _paper, _costs, new BacktestReferenceReader(_stats, _runs), options ?? new DecayOptions(), new SequentialOptions()).HandleAsync(new GetDecayReportQuery(strategy), Ct);
+    private ValueTask<Result<DecayReportView>> RunAsync(string? strategy = "ORB", DecayOptions? options = null, KillOptions? kill = null) =>
+        new GetDecayReportHandler(_reader, _ledger, _paper, _costs, new BacktestReferenceReader(_stats, _runs), options ?? new DecayOptions(), new SequentialOptions(), kill ?? new KillOptions(), _proposals).HandleAsync(new GetDecayReportQuery(strategy), Ct);
+
+    private static KillProposalRow Fired(int seriesTrades, long? epoch = 1) =>
+        new(9, new NewKillProposal("ORB", epoch, "cost_stress", false, -0.5, 0, 100, "t", ["ORB|15m|BUY|intraday|FIXED_RR|*"], new string('a', 64), seriesTrades), new DateOnly(2026, 11, 3), DateTimeOffset.UnixEpoch, "proposed", null, null, null);
+
+    [Fact]
+    public async Task The_cost_multiplier_of_the_settings_is_used_by_rule_a()
+    {
+        Reference(40);
+        Series(130, -0.5);
+
+        var kill = (await RunAsync(kill: new KillOptions(StressMultiplier: 2))).Value.Kill.Single(k => k.Rule == "cost_stress");
+
+        kill.Value!.Value.ShouldBe(-0.5 - 0.12, 1e-9);
+        kill.Text.ShouldContain("2.0 times cost");
+    }
+
+    [Fact]
+    public async Task A_rule_that_fired_with_fewer_than_twenty_new_trades_since_is_held_and_with_twenty_it_fires_again()
+    {
+        Reference(40);
+        Series(130, -0.5);
+        _proposals.LatestAsync("ORB", "cost_stress", 1, Ct).Returns(Fired(seriesTrades: 115), Fired(seriesTrades: 110));
+
+        var held = (await RunAsync()).Value.Kill.Single(k => k.Rule == "cost_stress");
+        var again = (await RunAsync()).Value.Kill.Single(k => k.Rule == "cost_stress");
+
+        held.State.ShouldBe("held");
+        held.Text.ShouldContain("15 new trades");
+        again.State.ShouldBe("fires");
+    }
 
     private static TradeCosting Costing(double rNet) =>
         new(CostSegment.IntradayEquity, "flat-10", 100, 1000m, 10000m, 10000m, LegCharges.Zero, LegCharges.Zero, 100m, 0.1, rNet);

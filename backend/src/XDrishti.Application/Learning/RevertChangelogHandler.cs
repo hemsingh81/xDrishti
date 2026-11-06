@@ -47,6 +47,11 @@ internal sealed class RevertChangelogHandler(ILearningChangelog changelog, TimeP
         else
         {
             reasons.AddRange(CellLifecycle.RevertRefusals(restored.Value, undone.Value));
+            if (undone == CellState.Paused && KillEvidence.NamesProposal(e.EvidenceIds))
+            {
+                reasons.Add("A pause made by a kill proposal is lifted only by the re-enable act (the owner, with a fresh password), not by a revert.");
+            }
+
             var history = await changelog.HistoryAsync(e.Subject, cancellationToken);
             if (history.Count == 0 || history[^1].Id != target.Id)
             {

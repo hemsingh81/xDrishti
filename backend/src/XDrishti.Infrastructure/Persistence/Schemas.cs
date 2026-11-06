@@ -36,4 +36,7 @@ public static class Schemas
 
     /// <summary>The point-in-time filing store (spec P15-02, ADR 0180): <c>filings</c>, <c>result_facts</c>, <c>shareholding</c>, <c>announcements</c> and <c>calendar</c>, raw SQL, no EF entity, all insert-only for the runtime role.</summary>
     public const string Filings = "filings";
+
+    /// <summary>The kill rules of the decay monitor (spec CF-12 part 12b, ADR 0219): <c>decay_checks</c> and <c>kill_settings</c>, insert-only for the runtime role, and <c>kill_proposals</c>, insert plus a conditional update of four decision columns. Raw SQL, no EF entity.</summary>
+    public const string Confidence = "confidence";
 }
