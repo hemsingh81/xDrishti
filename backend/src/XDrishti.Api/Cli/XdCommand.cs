@@ -124,6 +124,16 @@ internal static class XdCommand
             return await LearnLoopCommand.RunAsync([.. args.Skip(2)], services, console, args[1] == "curve", cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "learn" && args[1] == "influence")
+        {
+            return await LearnInfluenceCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
+        if (args.Count >= 2 && args[0] == "learn" && args[1] == "rollback")
+        {
+            return await LearnRollbackCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "select" && args[1] == "cells")
         {
             return await SelectCellsCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);

@@ -227,30 +227,62 @@ public sealed class DecayLoopArchitectureTests
     [Fact]
     public void The_cli_verbs_only_read_through_the_query_handlers_and_write_nothing()
     {
-        // part 12c-1: xd learn decay|loop|curve call the report handlers and the proposal list and nothing that writes, reads the clock, reaches the database layer or borrows another verb. The check reads the IL of the five types
+        // part 12c-1 and CF-10 part 10d-2a: xd learn decay|loop|curve|influence|rollback call the report handlers, the proposal lists and the influence view and nothing that writes, reads the clock, reaches the database layer or borrows another
+        // verb. The check reads the IL of the types of those verbs
         // and of everything nested in them (the state machines of the async methods and of the iterators, where the calls are): every type named by a call, a generic argument, a typeof, a field, a parameter or a local. NetArchTest's
         // dependency rule did not see a command handler resolved with GetService(typeof(...)) inside an async method (the sentinel below passed it), so the scan is Cecil's. A name matches by prefix, so `...Messaging.ICommandHandler` covers both generic arities.
         var api = Assembly.Load(new AssemblyName("XDrishti.Api"));
-        const string Verbs = "^Learn(Decay|Loop)(Command|Options)$|^LearnReportText$";
+        const string Verbs = "^Learn(Decay|Loop|Influence|Rollback)(Command|Options)$|^LearnReportText$";
 
         var named = TypesNamedBy(api, Verbs);
 
         Forbidden(named).ShouldBeEmpty();
 
-        // controls: the scan reaches the verbs' real reads inside their state machines, and the same rule flags a sentinel that holds an ICommandHandler<,> (in a state machine, resolved by typeof) and one that holds the clock
+        // controls: the scan reaches the verbs' real reads inside their state machines, and the same rule flags a sentinel that holds an ICommandHandler<,> (in a state machine, resolved by typeof), one that holds the clock and one that holds a switch port
         named.ShouldContain("XDrishti.Application.Confidence.GetDecayReportQuery");
         named.ShouldContain("XDrishti.Application.Confidence.GetKillProposalsQuery");
         named.ShouldContain("XDrishti.Application.Confidence.GetLoopReportQuery");
+        named.ShouldContain("XDrishti.Application.Learning.GetMlInfluenceQuery");
+        named.ShouldContain("XDrishti.Application.Learning.GetRollbackProposalsQuery");
         named.ShouldContain("XDrishti.Application.Abstractions.Messaging.IQueryHandler`2");
+        TypesNamedBy(api, "^LearnInfluenceCommand$").ShouldContain("XDrishti.Application.Learning.GetMlInfluenceQuery");
+        TypesNamedBy(api, "^LearnRollbackCommand$").ShouldContain("XDrishti.Application.Learning.GetRollbackProposalsQuery");
 
         var self = typeof(DecayLoopArchitectureTests).Assembly;
         Forbidden(TypesNamedBy(self, "^CliCommandHandlerSentinel$")).ShouldNotBeEmpty();
         Forbidden(TypesNamedBy(self, "^CliClockSentinel$")).ShouldNotBeEmpty();
+        Forbidden(TypesNamedBy(self, "^CliSwitchPortSentinel$")).ShouldNotBeEmpty();
+        Forbidden(TypesNamedBy(self, "^CliRollbackStoreSentinel$")).ShouldContain("XDrishti.Application.Abstractions.Learning.IRollbackProposalStore");
+
+        // the class of writer ports is found by name (control: it holds the ones that matter and many more) and each real verb, the 12c-1 verbs included, passes the same rule on its own and names something
+        WriterPorts.ShouldContain("XDrishti.Application.Abstractions.Learning.IRollbackProposalStore");
+        WriterPorts.ShouldContain("XDrishti.Application.Abstractions.Learning.IModelRegistry");
+        WriterPorts.ShouldContain("XDrishti.Application.Abstractions.Confidence.IKillProposalStore");
+        WriterPorts.Length.ShouldBeGreaterThan(30);
+        foreach (var verb in new[] { "LearnDecayCommand", "LearnLoopCommand", "LearnInfluenceCommand", "LearnRollbackCommand" })
+        {
+            var verbNames = TypesNamedBy(api, "^" + verb + "$");
+            verbNames.ShouldContain("XDrishti.Application.Abstractions.Messaging.IQueryHandler`2", verb);
+            Forbidden(verbNames).ShouldBeEmpty(verb);
+        }
+        Forbidden(["XDrishti.Api.Cli.LearnDesignateCommand"]).ShouldNotBeEmpty(); // LearnDesignateCommand is internal to the Api, so the control is the rule's own list
     }
 
+    // every writer port is forbidden as a class, not a hand-picked few: any interface under XDrishti.Application.Abstractions whose name ends in Store or Registry (they are the ports that write or hold state), the switch ports and the proposal reader.
+    // The verbs read only through the query handlers.
     private static string[] CliForbidden =>
     [
-        "XDrishti.Application.Abstractions.Messaging.ICommandHandler", "System.TimeProvider", "XDrishti.Infrastructure", "XDrishti.Api.Cli.LearnLifecycleCommand",
+        "XDrishti.Application.Abstractions.Messaging.ICommandHandler", "System.TimeProvider", "XDrishti.Infrastructure", "XDrishti.Api.Cli.LearnLifecycleCommand", "XDrishti.Api.Cli.LearnDesignateCommand",
+        "XDrishti.Application.Abstractions.Learning.IMlSwitchSettings", "XDrishti.Application.Abstractions.Learning.IMlInfluenceSwitch", "XDrishti.Application.Abstractions.Learning.IRollbackProposalReader",
+        .. WriterPorts,
+    ];
+
+    private static string[] WriterPorts =>
+    [
+        .. Application.GetTypes()
+            .Where(t => t.IsInterface && t.Namespace is { } ns && ns.StartsWith("XDrishti.Application.Abstractions", StringComparison.Ordinal))
+            .Where(t => t.Name.Split('`')[0] is { } n && (n.EndsWith("Store", StringComparison.Ordinal) || n.EndsWith("Registry", StringComparison.Ordinal)))
+            .Select(t => t.FullName!.Split('`')[0]).Distinct().Order(StringComparer.Ordinal),
     ];
 
     private static List<string> Forbidden(IEnumerable<string> names) =>
@@ -371,6 +403,18 @@ public sealed class DecayLoopArchitectureTests
             await Task.Yield();
             return handler is not null && !cancellationToken.IsCancellationRequested;
         }
+    }
+
+    /// <summary>Stands for a verb that reads the switches through their port instead of through the query handler.</summary>
+    internal sealed class CliSwitchPortSentinel(XDrishti.Application.Abstractions.Learning.IMlSwitchSettings switches)
+    {
+        public async Task<bool> OnAsync(CancellationToken cancellationToken) => (await switches.CurrentAsync(cancellationToken)).Influence.On;
+    }
+
+    /// <summary>Stands for a verb that holds the rollback proposal store (a writer port).</summary>
+    internal sealed class CliRollbackStoreSentinel(XDrishti.Application.Abstractions.Learning.IRollbackProposalStore store)
+    {
+        public XDrishti.Application.Abstractions.Learning.IRollbackProposalStore Store => store;
     }
 
     /// <summary>Stands for a verb that reads the clock.</summary>
