@@ -204,13 +204,14 @@ public sealed class ReadinessHandlersTests
     {
         var f = new ReadinessFixture();
         f.StrategyList = [new StoredStrategy("ORB", "intraday", false, DateTimeOffset.UnixEpoch, 1, 1), new StoredStrategy("ABC", "intraday", false, DateTimeOffset.UnixEpoch, 1, 1)];
-        f.Store.FailInsertWhen = s => s.StrategyId == "ABC";
+        f.Store.FailInsertWhen = s => s.StrategyId == "ORB";
 
         var result = await f.Snapshot.HandleAsync(new SnapshotScorecardsCommand(), Ct);
 
         result.Value.ShouldBe(new SnapshotRunOutcome(2, 2, 0, 1));
-        f.Store.Snapshots.Select(s => s.StrategyId).ShouldBe(["ORB", null]);
-        f.Store.Snapshots.Single(s => s.Subject == "system").Score.ShouldBe(100, 1e-9, "the card of ABC was built; only its insert failed");
+        f.Store.Snapshots.Select(s => s.StrategyId).ShouldBe(["ABC", null]);
+        // ORB scores 100 (it has a forward series) and ABC 0 (it has none): 50 means ORB counted with its real card; an unbuilt ORB would have made it 0
+        f.Store.Snapshots.Single(s => s.Subject == "system").Score.ShouldBe(50, 1e-9, "the card of ORB was built; only its insert failed");
     }
 
     [Fact]

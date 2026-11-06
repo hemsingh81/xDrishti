@@ -113,18 +113,6 @@ public sealed class MlRollbackArchitectureTests
         public static PromoteChallengerCommand Command(PromoteChallengerCommand command) => command with { Actor = "auto" };
     }
 
-    /// <summary>Stands for the first real source of challenger evidence.</summary>
-    internal sealed class ChallengerEvidenceSentinel : IChallengerEvidence
-    {
-        public ValueTask<ChallengerFigures> ReadAsync(StoredModel challenger, StoredModel? champion, CancellationToken cancellationToken) => ValueTask.FromResult(ChallengerFigures.None);
-    }
-
-    /// <summary>Stands for the first real source of the predicate's evidence.</summary>
-    internal sealed class InfluenceEvidenceSentinel : IMlInfluenceEvidence
-    {
-        public ValueTask<MlInfluenceEvidence> ReadAsync(StoredModel model, CancellationToken cancellationToken) => ValueTask.FromResult(MlInfluenceEvidence.None);
-    }
-
     /// <summary>Stands for a chooser that reads the rollback proposals.</summary>
     internal sealed class ProposalReaderSentinel(IRollbackProposalReader proposals)
     {

@@ -180,11 +180,11 @@ public sealed class ReadinessGateTests
     }
 
     [Fact]
-    public void Only_a_candidate_to_paper_and_a_paper_to_active_move_have_a_gate()
+    public void Only_a_candidate_to_paper_the_owners_re_enable_and_a_paper_to_active_move_have_a_gate()
     {
         ReadinessGateKinds.For(XDrishti.Domain.Learning.CellState.Candidate, XDrishti.Domain.Learning.CellState.Paper).ShouldBe(ReadinessGateKind.ResearchToPaper);
         ReadinessGateKinds.For(XDrishti.Domain.Learning.CellState.Paper, XDrishti.Domain.Learning.CellState.Active).ShouldBe(ReadinessGateKind.PaperToActive);
-        ReadinessGateKinds.For(XDrishti.Domain.Learning.CellState.Paused, XDrishti.Domain.Learning.CellState.Paper).ShouldBeNull();
+        ReadinessGateKinds.For(XDrishti.Domain.Learning.CellState.Paused, XDrishti.Domain.Learning.CellState.Paper).ShouldBe(ReadinessGateKind.ResearchToPaper);
         ReadinessGateKinds.For(XDrishti.Domain.Learning.CellState.Paper, XDrishti.Domain.Learning.CellState.Paused).ShouldBeNull();
         ReadinessGateKinds.For(XDrishti.Domain.Learning.CellState.Active, XDrishti.Domain.Learning.CellState.Paused).ShouldBeNull();
         ReadinessGateKinds.For(XDrishti.Domain.Learning.CellState.Research, XDrishti.Domain.Learning.CellState.Candidate).ShouldBeNull();

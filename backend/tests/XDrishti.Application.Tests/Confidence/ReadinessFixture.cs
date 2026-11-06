@@ -186,7 +186,7 @@ internal sealed class ReadinessFixture
 
     public LabEvidenceReader LabReader => new(Runs, Run, Registration, HoldOut, Confirmation);
 
-    public ForwardEvidenceReader ForwardReader => new(ForwardEdge, Decay, Sequential, Kills, Phase, Models, new StrategyCells(Log));
+    public ForwardEvidenceReader ForwardReader => new(ForwardEdge, Decay, Sequential, Kills, async cancellationToken => PaperPhaseVerdict.Met(await Phase.HandleAsync(new EvaluatePaperPhaseCheckQuery(null, null), cancellationToken)), Models, new StrategyCells(Log));
 
     public ScorecardReader Reader => new(LabReader, ForwardReader, Gaps, Strategies, StrategyDetails, Options);
 

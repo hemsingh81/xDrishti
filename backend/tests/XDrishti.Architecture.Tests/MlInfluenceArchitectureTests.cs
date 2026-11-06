@@ -108,17 +108,6 @@ public sealed class MlInfluenceArchitectureTests
         public static void Deconstruct(XDrishti.Application.Abstractions.Planning.PlanEvidence evidence) => evidence.Deconstruct(out _, out _, out _, out _, out _, out _, out _, out _, out _);
     }
 
-    /// <summary>Stands for a second switch of model influence.</summary>
-    internal sealed class SwitchSentinel : IMlInfluenceSwitch
-    {
-        public ValueTask<bool> IsOnAsync(CancellationToken cancellationToken) => ValueTask.FromResult(true);
-    }
-
-    /// <summary>Stands for a second source of evidence.</summary>
-    internal sealed class EvidenceSentinel : IMlInfluenceEvidence
-    {
-        public ValueTask<MlInfluenceEvidence> ReadAsync(StoredModel model, CancellationToken cancellationToken) => ValueTask.FromResult(MlInfluenceEvidence.None);
-    }
 
     /// <summary>Stands for a type that reads the switch.</summary>
     internal sealed class SwitchReaderSentinel(IMlInfluenceSwitch influenceSwitch)
@@ -283,7 +272,7 @@ public sealed class MlInfluenceArchitectureTests
         Implementations(Production, typeof(IMlInfluenceEvidence)).ShouldBe(["XDrishti.Application.Learning.NoMlInfluenceEvidence"], "no source of hold-out, forward or calibration figures exists yet, so no model can pass");
         Dependents(Production, typeof(IMlInfluenceEvidence))
             .ShouldBe(["XDrishti.Application.DependencyInjection", "XDrishti.Application.Learning.MlInfluenceEvaluator", "XDrishti.Application.Learning.NoMlInfluenceEvidence"]);
-        Implementations([typeof(EvidenceSentinel).Assembly], typeof(IMlInfluenceEvidence)).ShouldContain(typeof(EvidenceSentinel).FullName!);
+        Implementations([typeof(MlInfluenceEvidenceSentinel).Assembly], typeof(IMlInfluenceEvidence)).ShouldContain(typeof(MlInfluenceEvidenceSentinel).FullName!);
     }
 
     [Fact]

@@ -1041,6 +1041,7 @@ public static class DependencyInjection
         // The readiness scorecard, per strategy and for the system (CF-11 part 1, ADR 0221): derived and read only; the one route from the cell lifecycle to it is IReadinessGate; the owner's enforce switch is stored state (default OFF).
         services.AddScoped<LabEvidenceReader>(); // the stored Lab results of a strategy version, mapped to rows 1 to 12 of the checklist
         services.AddScoped<ForwardEdgeReader>(); // the forward edge series through the one shared series rule (EdgeSeries), read once per scope
+        services.AddScoped<PaperPhaseMetReader>(sp => async cancellationToken => PaperPhaseVerdict.Met(await sp.GetRequiredService<IQueryHandler<EvaluatePaperPhaseCheckQuery, Result<PaperPhaseCheckView>>>().HandleAsync(new EvaluatePaperPhaseCheckQuery(null, null), cancellationToken))); // the one word of the P10 phase check, built here so that the lifecycle's closure does not name the check's handler (CF-11, ADR 0221)
         services.AddScoped<ForwardEvidenceReader>(); // the forward evidence: edge series, decay report, sequential test, kill demotions, phase check, calibration
         services.AddScoped<ScorecardReader>(); // builds a scorecard and the system card from the evidence with the pure calculators
         services.AddSingleton<ReadinessOptionsView>();

@@ -1,7 +1,7 @@
 using System.Globalization;
+using XDrishti.Application.Abstractions.Confidence;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Messaging;
-using XDrishti.Application.Paper;
 using XDrishti.Application.Shadow;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
@@ -18,7 +18,7 @@ internal sealed class ForwardEvidenceReader(
     IQueryHandler<GetDecayReportQuery, Result<DecayReportView>> decay,
     IQueryHandler<GetSequentialStatusQuery, Result<SequentialStatusView>> sequential,
     IQueryHandler<GetKillProposalsQuery, Result<KillProposalsView>> kills,
-    IQueryHandler<EvaluatePaperPhaseCheckQuery, Result<PaperPhaseCheckView>> phase,
+    PaperPhaseMetReader phase,
     IModelRegistry models,
     StrategyCells cells)
 {
@@ -95,13 +95,7 @@ internal sealed class ForwardEvidenceReader(
             return _phase;
         }
 
-        var result = await phase.HandleAsync(new EvaluatePaperPhaseCheckQuery(null, null), cancellationToken);
-        _phase = result.IsFailure ? null : result.Value.Report.ExitVerdict switch
-        {
-            "MET" => true,
-            "NOT MET" => false,
-            _ => null,
-        };
+        _phase = await phase(cancellationToken);
         _phaseRead = true;
         return _phase;
     }
