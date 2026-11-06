@@ -525,8 +525,8 @@ public sealed class KillArchitectureTests
         source.ShouldContain("/kill-proposals/{id:long}/apply");
         source.ShouldContain("/{key}/re-enable");
         source.ShouldContain("/kill-settings");
-        source.Split("FreshOwnerAsync(").Length.ShouldBe(4, "the definition and the two acts that raise or allow risk");
-        source.ShouldContain("AuthErrors.StepUpRequired");
+        source.Split("OwnerAct.FreshAsync(").Length.ShouldBe(3, "the two acts that raise or allow risk, through the one shared step-up helper");
+        File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Endpoints", "OwnerAct.cs")).ShouldContain("AuthErrors.StepUpRequired"); // a missing password is 403 in the helper
         source.ShouldContain("OwnerAct.SessionOwner(http)"); // apply: the session's owner, no password (the safe direction)
         source.ShouldNotContain("request.Actor");
         source.ShouldNotContain("request.Owner");

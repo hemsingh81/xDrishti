@@ -96,6 +96,7 @@ using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Planning;
+using XDrishti.Domain.Readiness;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.Application;
@@ -708,6 +709,9 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<CancelLabRunCommand, LabRunView>, CancelLabRunHandler>();
         services.AddScoped<IQueryHandler<GetLabReportQuery, Result<LabReportView>>, GetLabReportHandler>(); // the report of a full or robust run (P5-06, ADR 0063)
         services.AddScoped<IQueryHandler<GetLedgerQuery, Result<LedgerView>>, GetLedgerHandler>(); // the test ledger (P5-03, ADR 0059)
+        services.AddScoped<LabHoldOutGuard>(); // the size, the block and the cut of the locked hold-out (CF-06)
+        services.AddScoped<IQueryHandler<GetRegistrationQuery, Result<RegistrationView>>, GetRegistrationHandler>(); // reads only the registration store; here, not in AddLabRunner, because the readiness gate (CF-11) of the lifecycle recorder reads it in every host that records a cell move
+        services.AddScoped<IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>, GetHoldOutHandler>(); // reads the hold-out store and the guard; here for the same reason
         services.TryAddSingleton(LabSettings.Default); // the host replaces it with its configuration
         services.TryAddSingleton(new ShrinkageOptions()); // shrinkage of expectancy toward the parent (CF-02, ADR 0204): ReportOnly; the host replaces it with its configuration (section Confidence:Shrinkage)
         services.TryAddSingleton(new DeflationOptions()); // the deflated Sharpe ratio of a Lab verdict (CF-03, ADR 0205): ReportOnly; the host replaces it with its configuration (section Confidence:Deflation)
@@ -748,13 +752,10 @@ public static class DependencyInjection
         services.AddScoped<LabRobustness>(); // the robustness checks of a robust run (P5-05, ADR 0062)
         services.AddScoped<LabFullTest>(); // the full test of a run (P5-04, ADR 0060)
         services.AddScoped<LabPreregistration>(); // the registration check, the extra exit looks and the plan freeze of a post (CF-06, ADR 0207)
-        services.AddScoped<LabHoldOutGuard>(); // the size, the block and the cut of the locked hold-out (CF-06)
         services.AddScoped<IHoldOutPass, HoldOutPass>(); // the only reader of the sessions inside the hold-out (CF-06); used by the unlock only
         services.AddScoped<HoldOutUnlocker>(); // the one look at the hold-out, by the owner or by the auto option (CF-06)
         services.AddScoped<ICommandHandler<RegisterStrategyCommand, RegistrationView>, RegisterStrategyHandler>();
-        services.AddScoped<IQueryHandler<GetRegistrationQuery, Result<RegistrationView>>, GetRegistrationHandler>();
         services.AddScoped<ICommandHandler<UnlockHoldOutCommand, LabRunView>, UnlockHoldOutHandler>();
-        services.AddScoped<IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>, GetHoldOutHandler>();
         services.AddScoped<LabPlateau>(); // the plateau gate beside the nulls, read from the stored sweep (CF-07 part C, ADR 0210)
         services.AddScoped<LabNulls>(); // the random-entry null beside the outcome and its ledger row (CF-07, ADR 0208)
         services.AddScoped<LabPlacebos>(); // the placebo set and the mirror gate beside it, and their ledger row (CF-07 part B, ADR 0209)
@@ -1036,5 +1037,22 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetBacktestVsPaperQuery, Result<BacktestVsPaperView>>, GetBacktestVsPaperHandler>(); // backtest vs paper, computed on read (P10-04, ADR 0122)
         services.AddScoped<ICommandHandler<JournalPlansCommand, JournalOutcome>, JournalPlansHandler>(); // auto-journal (P7-14, ADR 0093): reads stored fills, insert-only links, no order
         services.AddScoped<IQueryHandler<GetPlanJournalQuery, Result<PlanJournalView>>, GetPlanJournalHandler>();
+
+        // The readiness scorecard, per strategy and for the system (CF-11 part 1, ADR 0221): derived and read only; the one route from the cell lifecycle to it is IReadinessGate; the owner's enforce switch is stored state (default OFF).
+        services.AddScoped<LabEvidenceReader>(); // the stored Lab results of a strategy version, mapped to rows 1 to 12 of the checklist
+        services.AddScoped<ForwardEdgeReader>(); // the forward edge series through the one shared series rule (EdgeSeries), read once per scope
+        services.AddScoped<PaperPhaseMetReader>(sp => async cancellationToken => PaperPhaseVerdict.Met(await sp.GetRequiredService<IQueryHandler<EvaluatePaperPhaseCheckQuery, Result<PaperPhaseCheckView>>>().HandleAsync(new EvaluatePaperPhaseCheckQuery(null, null), cancellationToken))); // the one word of the P10 phase check, built here so that the lifecycle's closure does not name the check's handler (CF-11, ADR 0221)
+        services.AddScoped<ForwardEvidenceReader>(); // the forward evidence: edge series, decay report, sequential test, kill demotions, phase check, calibration
+        services.AddScoped<ScorecardReader>(); // builds a scorecard and the system card from the evidence with the pure calculators
+        services.AddSingleton<ReadinessOptionsView>();
+        services.AddSingleton<IReadinessGaps, UnavailableReadinessGaps>(); // the inputs that have no producer yet all say unavailable, with the reason (CF-11)
+        services.AddScoped<IReadinessGate, ReadinessGate>(); // the only route from the cell lifecycle to the scorecard: warns with the switch OFF, refuses with it ON (CF-11 D6)
+        services.AddScoped<IQueryHandler<GetScorecardQuery, Result<ScorecardView>>, GetScorecardHandler>();
+        services.AddScoped<IQueryHandler<ListScorecardsQuery, Result<ScorecardListView>>, ListScorecardsHandler>();
+        services.AddScoped<IQueryHandler<GetReadinessSettingsQuery, ReadinessSettingsView>, GetReadinessSettingsHandler>();
+        services.AddScoped<ICommandHandler<ChangeReadinessSwitchCommand, ReadinessSwitched>, ChangeReadinessSwitchHandler>(); // the owner's switch confidence.readiness.enforce (default OFF)
+        services.AddScoped<ICommandHandler<SnapshotScorecardsCommand, SnapshotRunOutcome>, SnapshotScorecardsHandler>(); // the daily insert-only snapshots
+        services.TryAddSingleton(new ReadinessOptions()); // the thresholds of the checklist and the label cut-offs (CF-11, ADR 0221): the spec's proposals, tighten-only; the host replaces it with its configuration (section Confidence:Readiness)
+        services.AddSingleton<IScheduledService, ReadinessSnapshotService>(); // the daily scorecard snapshots after the decay monitor (CF-11); starts paused, stores a derived score and moves nothing
     }
 }

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Learning;
+using XDrishti.Application.Tests.Confidence;
 using XDrishti.Domain.Learning;
 
 namespace XDrishti.Application.Tests.Learning;
@@ -17,7 +18,9 @@ public sealed class ChangelogHandlersTests
 
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero));
 
-    private RecordCellTransitionHandler Record() => new(_log, _time, NullLogger<RecordCellTransitionHandler>.Instance);
+    private readonly FakeReadinessGate _gate = new();
+
+    private RecordCellTransitionHandler Record() => new(_log, _gate, _time, NullLogger<RecordCellTransitionHandler>.Instance);
 
     private RevertChangelogHandler Revert() => new(_log, _time, NullLogger<RevertChangelogHandler>.Instance);
 

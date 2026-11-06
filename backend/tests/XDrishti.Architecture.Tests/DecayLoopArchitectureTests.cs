@@ -130,7 +130,8 @@ public sealed class DecayLoopArchitectureTests
         var readers = Types.InAssembly(Application).That().HaveDependencyOnAny(SharedSeries).GetTypes()
             .Select(t => t.Name.Split('`')[0]).Where(n => !n.StartsWith('<') && !SharedSeries.Any(f => f.EndsWith("." + n, StringComparison.Ordinal))).Distinct().Order(StringComparer.Ordinal).ToList();
 
-        readers.ShouldBe(["GetDecayReportHandler", "GetSequentialStatusHandler"]);
+        // CF-11 part 1 adds one reader, the readiness scorecard's forward-edge reader: it reads the same series through the same rule (and no chooser may name it: ReadinessArchitectureTests)
+        readers.ShouldBe(["ForwardEdgeReader", "GetDecayReportHandler", "GetSequentialStatusHandler"]);
     }
 
     [Fact]

@@ -81,7 +81,7 @@ internal sealed class KillEndpoints : IEndpointModule
         CancellationToken cancellationToken)
     {
         http.Response.Headers.CacheControl = "no-store";
-        var owner = await FreshOwnerAsync(http, passwordCheck, request.Password, cancellationToken);
+        var owner = await OwnerAct.FreshAsync(http, passwordCheck, request.Password, cancellationToken);
         if (owner.IsFailure)
         {
             return ProblemResults.From(owner.Error, http);
@@ -100,7 +100,7 @@ internal sealed class KillEndpoints : IEndpointModule
         CancellationToken cancellationToken)
     {
         http.Response.Headers.CacheControl = "no-store";
-        var owner = await FreshOwnerAsync(http, passwordCheck, request.Password, cancellationToken);
+        var owner = await OwnerAct.FreshAsync(http, passwordCheck, request.Password, cancellationToken);
         if (owner.IsFailure)
         {
             return ProblemResults.From(owner.Error, http);
@@ -115,22 +115,5 @@ internal sealed class KillEndpoints : IEndpointModule
         return result.Error.Code == LearningErrors.InvalidCode
             ? TypedResults.Problem(ProblemResults.Create(StatusCodes.Status422UnprocessableEntity, result.Error.Message, result.Error.Code))
             : ProblemResults.From(result.Error, http);
-    }
-
-    /// <summary>The owner after a fresh password for this act. No session is 401; a body without a password is 403 <c>auth.step_up_required</c> (nothing is checked or counted); a wrong one is the sign-in 401 or 423 with its lockout rules.</summary>
-    private static async Task<Result<string>> FreshOwnerAsync(HttpContext http, ICommandHandler<StepUpCommand, StepUpResult> passwordCheck, string? password, CancellationToken cancellationToken)
-    {
-        var session = OwnerAct.SessionOwner(http);
-        if (session.IsFailure)
-        {
-            return session;
-        }
-
-        if (string.IsNullOrEmpty(password))
-        {
-            return Result.Failure<string>(AuthErrors.StepUpRequired);
-        }
-
-        return await OwnerAct.AuthorizeAsync(http, passwordCheck, password, cancellationToken);
     }
 }

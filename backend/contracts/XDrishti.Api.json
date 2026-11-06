@@ -12276,6 +12276,157 @@
         }
       }
     },
+    "/api/confidence/scorecards": {
+      "get": {
+        "tags": [
+          "Confidence"
+        ],
+        "summary": "The readiness system card (the minimum of the integrity and the weighted mean of the strategy scores, equal weights labelled when the plan exposes no risk share) and one line per Lab strategy at its latest version, weakest first: score, label, weakest sub-score, rows passed of 15, hard fails, gates R and S. Derived on every read, no order. An input that does not exist is unavailable, which is never a pass.",
+        "operationId": "ListScorecards",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScorecardListView"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/confidence/scorecards/{strategyId}/versions/{version}": {
+      "get": {
+        "tags": [
+          "Confidence"
+        ],
+        "summary": "The scorecard of one strategy version: the 15-row edge checklist (value, threshold, producer, pass / fail / unavailable), the six sub-scores with what would move each, the hard fails by name, the label, gates R and S with the rows that stop them, what the card is waiting for, the settings hash and the newest daily snapshots. Derived on every read. 400 confidence.readiness_invalid, 404 confidence.scorecard_not_found",
+        "operationId": "GetScorecard",
+        "parameters": [
+          {
+            "name": "strategyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScorecardView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/confidence/readiness-settings": {
+      "get": {
+        "tags": [
+          "Confidence"
+        ],
+        "summary": "The readiness enforce switch (OFF when no row is stored) and the text and hash of the thresholds. Read only.",
+        "operationId": "GetReadinessSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessSettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Confidence"
+        ],
+        "summary": "Switch confidence.readiness.enforce (OFF by default; no row means OFF) as the owner; appends an audited row with the owner as actor. ON makes a failed readiness gate refuse the cell move it judges (Candidate to Paper, the owner's re-enable of a paused cell, Paper to Active) with 409 confidence.gate_failed and the failing rows; OFF only warns and records the result. Needs a session, the CSRF token and the password in the body, checked on EVERY change, ON and OFF alike (OFF removes a refusal). 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.reason_invalid, 429 auth.rate_limited",
+        "operationId": "ChangeReadinessSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadinessSwitchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessSwitched"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/confidence/kill-proposals": {
       "get": {
         "tags": [
@@ -54622,6 +54773,117 @@
         },
         "description": "Trades whose favourable excursion reached the level, and their share of the trades with a recorded excursion."
       },
+      "ReadinessGateView": {
+        "required": [
+          "gate",
+          "passed",
+          "labelOk",
+          "failing"
+        ],
+        "type": "object",
+        "properties": {
+          "gate": {
+            "type": "string",
+            "description": "`R` (Candidate to Paper) or `S` (Paper to Active)."
+          },
+          "passed": {
+            "type": "boolean",
+            "description": "Whether it passes now."
+          },
+          "labelOk": {
+            "type": "boolean",
+            "description": "For gate S, whether the label is \"Ready for the next phase\"; true for gate R."
+          },
+          "failing": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScorecardRowView"
+            },
+            "description": "The required rows that are not a pass."
+          }
+        },
+        "description": "One gate with what stops it."
+      },
+      "ReadinessSettingsView": {
+        "required": [
+          "enforce",
+          "switchId",
+          "settingsHash",
+          "settings"
+        ],
+        "type": "object",
+        "properties": {
+          "enforce": {
+            "type": "boolean",
+            "description": "Whether a failed gate refuses a lifecycle move (ON) or only warns (OFF, the default; no row means OFF)."
+          },
+          "switchId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The row of the switch in force, or null when none was ever stored.",
+            "format": "int64"
+          },
+          "settingsHash": {
+            "type": "string",
+            "description": "The SHA-256 of the thresholds."
+          },
+          "settings": {
+            "type": "string",
+            "description": "The text of the thresholds."
+          }
+        },
+        "description": "The readiness settings now: the owner's switch and the thresholds beside it."
+      },
+      "ReadinessSwitchRequest": {
+        "required": [
+          "enforce",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "enforce": {
+            "type": "boolean",
+            "description": "The new value of `confidence.readiness.enforce` (default OFF): ON makes a failed readiness gate refuse the lifecycle move it judges (Candidate to Paper, the re-enable of a paused cell, Paper to Active); OFF only warns."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS change, ON or OFF (turning it OFF removes a refusal). It is checked on every request; wrong ones count toward the sign-in lockout; missing: 403 auth.step_up_required."
+          }
+        },
+        "description": "The body of the readiness enforce switch. The owner is never part of it: the actor comes from the signed-in session."
+      },
+      "ReadinessSwitched": {
+        "required": [
+          "id",
+          "enforce"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row appended.",
+            "format": "int64"
+          },
+          "enforce": {
+            "type": "boolean",
+            "description": "The value now in force."
+          }
+        },
+        "description": "The answer of a switch change: the row and the new value."
+      },
       "ReasonCountView": {
         "required": [
           "code",
@@ -58087,6 +58349,332 @@
         },
         "description": "A Schedule as text: what the API sends and receives and what the database stores (JSON). `type` is daily · weekly · after · window · interval · continuous; times are\n`HH:mm` India time; `days` are mon … sun; `weekday` is one of them; `after` is a service id. Fields that do not belong to the type are left out (null)."
       },
+      "ScorecardListView": {
+        "required": [
+          "system",
+          "strategies",
+          "settings",
+          "statements"
+        ],
+        "type": "object",
+        "properties": {
+          "system": {
+            "description": "The system card.",
+            "$ref": "#/components/schemas/SystemScorecardView"
+          },
+          "strategies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScorecardSummaryView"
+            },
+            "description": "One line per strategy, weakest first."
+          },
+          "settings": {
+            "description": "The settings now.",
+            "$ref": "#/components/schemas/ReadinessSettingsView"
+          },
+          "statements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honesty sentences."
+          }
+        },
+        "description": "The system card and the strategy table (spec CF-11)."
+      },
+      "ScorecardPointView": {
+        "required": [
+          "id",
+          "date",
+          "score",
+          "label",
+          "settingsHash"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The snapshot, which a gate decision can cite.",
+            "format": "int64"
+          },
+          "date": {
+            "type": "string",
+            "description": "The India date.",
+            "format": "date"
+          },
+          "score": {
+            "type": "number",
+            "description": "The score then.",
+            "format": "double"
+          },
+          "label": {
+            "type": "string",
+            "description": "The label code then."
+          },
+          "settingsHash": {
+            "type": "string",
+            "description": "The settings hash it was computed with."
+          }
+        },
+        "description": "One stored daily snapshot of a strategy's score (the trend)."
+      },
+      "ScorecardRowView": {
+        "required": [
+          "number",
+          "name",
+          "producer",
+          "status",
+          "threshold",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "description": "1 to 15.",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "description": "The criterion."
+          },
+          "producer": {
+            "type": "string",
+            "description": "The slice or source that produces the input."
+          },
+          "status": {
+            "type": "string",
+            "description": "`pass`, `fail` or `unavailable`. Unavailable is never a pass."
+          },
+          "threshold": {
+            "type": "string",
+            "description": "The go threshold in words and numbers."
+          },
+          "value": {
+            "type": "string",
+            "description": "The figure it was judged on, or why it could not be."
+          }
+        },
+        "description": "One row of the 15-row edge checklist as the API sends it."
+      },
+      "ScorecardSummaryView": {
+        "required": [
+          "strategy",
+          "version",
+          "score",
+          "label",
+          "labelText",
+          "weakestSubScore",
+          "rowsPassed",
+          "hardFails",
+          "gateR",
+          "gateS"
+        ],
+        "type": "object",
+        "properties": {
+          "strategy": {
+            "type": "string",
+            "description": "The strategy id."
+          },
+          "version": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The version read.",
+            "format": "int32"
+          },
+          "score": {
+            "type": "number",
+            "description": "The score.",
+            "format": "double"
+          },
+          "label": {
+            "type": "string",
+            "description": "The label code."
+          },
+          "labelText": {
+            "type": "string",
+            "description": "The label in words."
+          },
+          "weakestSubScore": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The weakest sub-score by name."
+          },
+          "rowsPassed": {
+            "type": "integer",
+            "description": "Rows passing of 15.",
+            "format": "int32"
+          },
+          "hardFails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The hard fails by name."
+          },
+          "gateR": {
+            "type": "boolean",
+            "description": "Whether Gate R passes."
+          },
+          "gateS": {
+            "type": "boolean",
+            "description": "Whether Gate S passes."
+          }
+        },
+        "description": "One line of the strategy table."
+      },
+      "ScorecardView": {
+        "required": [
+          "strategy",
+          "version",
+          "score",
+          "rawMinimum",
+          "label",
+          "labelText",
+          "subScores",
+          "hardFails",
+          "notApplicable",
+          "weakestSubScore",
+          "whatWouldMoveIt",
+          "rows",
+          "rowsPassed",
+          "gateR",
+          "gateS",
+          "waiting",
+          "notes",
+          "enforce",
+          "settingsHash",
+          "settings",
+          "history"
+        ],
+        "type": "object",
+        "properties": {
+          "strategy": {
+            "type": "string",
+            "description": "The strategy id."
+          },
+          "version": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The strategy version the Lab results are read for; null when the strategy has none.",
+            "format": "int32"
+          },
+          "score": {
+            "type": "number",
+            "description": "0 to 100: the minimum of the applicable sub-scores, or 0 with a hard fail.",
+            "format": "double"
+          },
+          "rawMinimum": {
+            "type": "number",
+            "description": "The minimum before the hard fails.",
+            "format": "double"
+          },
+          "label": {
+            "type": "string",
+            "description": "The label code: `not_ready`, `building`, `usable` or `ready`."
+          },
+          "labelText": {
+            "type": "string",
+            "description": "The label in words."
+          },
+          "subScores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubScoreView"
+            },
+            "description": "The six sub-scores, in order."
+          },
+          "hardFails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Each hard fail by name."
+          },
+          "notApplicable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What was left out because it does not apply."
+          },
+          "weakestSubScore": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The weakest sub-score by name; null when none."
+          },
+          "whatWouldMoveIt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What would move the weakest sub-score; null when nothing is computed."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScorecardRowView"
+            },
+            "description": "The 15 checklist rows."
+          },
+          "rowsPassed": {
+            "type": "integer",
+            "description": "How many rows pass.",
+            "format": "int32"
+          },
+          "gateR": {
+            "description": "Gate R.",
+            "$ref": "#/components/schemas/ReadinessGateView"
+          },
+          "gateS": {
+            "description": "Gate S.",
+            "$ref": "#/components/schemas/ReadinessGateView"
+          },
+          "waiting": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the card is waiting for: the producers of the rows and sub-scores that are unavailable (unavailable is a fail, so this is the list of what to build or run)."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The honesty sentences: the basis of the figures and the interpretations."
+          },
+          "enforce": {
+            "type": "boolean",
+            "description": "Whether the owner's enforce switch is ON now."
+          },
+          "settingsHash": {
+            "type": "string",
+            "description": "The SHA-256 of the readiness settings."
+          },
+          "settings": {
+            "type": "string",
+            "description": "The text of those settings."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScorecardPointView"
+            },
+            "description": "The newest daily snapshots (the trend), newest first."
+          }
+        },
+        "description": "The scorecard of one strategy version (spec CF-11 D1 to D4): the 15-row checklist, the six sub-scores, the hard fails, the label, the two gates and what would move the weakest link. Derived on every read from stored results; read only: it raises no size and places no order."
+      },
       "SecretStatusView": {
         "required": [
           "name",
@@ -60696,6 +61284,46 @@
         },
         "description": "One stored version as the library shows it (spec P5-01): the text exactly as it was posted, its hash and lineage, and whether the text is free of errors under the rules of today."
       },
+      "SubScoreView": {
+        "required": [
+          "name",
+          "state",
+          "score",
+          "reading",
+          "whatWouldMoveIt"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The sub-score."
+          },
+          "state": {
+            "type": "string",
+            "description": "`scored`, `not_applicable` or `unavailable` (a hard fail)."
+          },
+          "score": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "0 to 100 when scored, else null.",
+            "format": "double"
+          },
+          "reading": {
+            "type": "string",
+            "description": "The figure it was computed from, or why it could not be."
+          },
+          "whatWouldMoveIt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The distance to the next anchor, computed from the anchors; null when already 100 or when it does not apply."
+          }
+        },
+        "description": "One of the six sub-scores as the API sends it."
+      },
       "SubscribeAck": {
         "required": [
           "subscribed",
@@ -61023,6 +61651,77 @@
           }
         },
         "description": "The refresh settings of an account and its latest run. Mode \"off\" or \"daily\"; NextRunAt is null when the mode is off. FirstImportDate is the date holdings\nget when they are imported without a date of their own; HasHoldings is true once the account has any holding (the first import has happened). Running is\ntrue while a sync or import of the account is in progress. The health (ADR 0027): `ConsecutiveFailedDays` are the days in a row whose last attempt failed (0 when the latest succeeded), `LastFailureReason` a code (`unavailable`, `rate_limited`,\n`interrupted`, `rejected`, `token_expired`, `token_refused`, `not_connected`, `unexpected`; null while healthy), `Attempts` the failed attempts of the day of the latest failure and `RetryAt` when the next quiet retry is due (null when none is pending)."
+      },
+      "SystemScorecardView": {
+        "required": [
+          "score",
+          "label",
+          "labelText",
+          "integrity",
+          "weightedMean",
+          "equalWeights",
+          "weakestStrategy",
+          "weakestSubScore",
+          "strategies",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "score": {
+            "type": "number",
+            "description": "0 to 100.",
+            "format": "double"
+          },
+          "label": {
+            "type": "string",
+            "description": "The label code."
+          },
+          "labelText": {
+            "type": "string",
+            "description": "The label in words."
+          },
+          "integrity": {
+            "type": "number",
+            "description": "100 when the integrity checks are clear, else 0 (an unreadable check is 0).",
+            "format": "double"
+          },
+          "weightedMean": {
+            "type": "number",
+            "description": "The weighted mean of the strategy scores.",
+            "format": "double"
+          },
+          "equalWeights": {
+            "type": "boolean",
+            "description": "True when the weights are equal because no plan risk share is available (labelled)."
+          },
+          "weakestStrategy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The strategy with the lowest score, or null when there is none."
+          },
+          "weakestSubScore": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Its weakest sub-score, or null."
+          },
+          "strategies": {
+            "type": "integer",
+            "description": "How many strategies were combined.",
+            "format": "int32"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why it is 0 when the cause is not a strategy (integrity, no strategy), else null."
+          }
+        },
+        "description": "The system card (spec CF-11 D5)."
       },
       "SystemStatusResponse": {
         "required": [

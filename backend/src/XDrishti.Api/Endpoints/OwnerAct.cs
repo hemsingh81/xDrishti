@@ -36,7 +36,7 @@ internal static class OwnerAct
     }
 
     /// <summary>
-    /// The owner after a fresh password for THIS act, with the order the step-up routes use (CF-10 part 10d-1): no session is 401; a body without a password is 403 <c>auth.step_up_required</c> (nothing is checked or counted); a wrong one is the sign-in 401 or 423 with its lockout
+    /// The owner after a fresh password for THIS act, with the order the step-up routes use (CF-10 part 10d-1; also the kill switch and the re-enable of CF-12 and the readiness switch of CF-11): no session is 401; a body without a password is 403 <c>auth.step_up_required</c> (nothing is checked or counted); a wrong one is the sign-in 401 or 423 with its lockout
     /// rules and audit; the step-up window is neither opened, extended nor used up.
     /// </summary>
     public static async Task<Result<string>> FreshAsync(HttpContext http, ICommandHandler<StepUpCommand, StepUpResult> passwordCheck, string? password, CancellationToken cancellationToken)

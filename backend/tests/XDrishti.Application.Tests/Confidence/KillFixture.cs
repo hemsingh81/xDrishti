@@ -102,7 +102,9 @@ internal sealed class KillFixture
 
     public Result<DecayReportView> ReportResult { get; set; } = Result.Success(View());
 
-    public RecordCellTransitionHandler Record => new(Log, Time, NullLogger<RecordCellTransitionHandler>.Instance);
+    public FakeReadinessGate Gate { get; } = new();
+
+    public RecordCellTransitionHandler Record => new(Log, Gate, Time, NullLogger<RecordCellTransitionHandler>.Instance);
 
     public PauseCellHandler Pause => new(Record);
 

@@ -3712,6 +3712,58 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/confidence/scorecards': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The readiness system card (the minimum of the integrity and the weighted mean of the strategy scores, equal weights labelled when the plan exposes no risk share) and one line per Lab strategy at its latest version, weakest first: score, label, weakest sub-score, rows passed of 15, hard fails, gates R and S. Derived on every read, no order. An input that does not exist is unavailable, which is never a pass. */
+    get: operations['ListScorecards'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/confidence/scorecards/{strategyId}/versions/{version}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The scorecard of one strategy version: the 15-row edge checklist (value, threshold, producer, pass / fail / unavailable), the six sub-scores with what would move each, the hard fails by name, the label, gates R and S with the rows that stop them, what the card is waiting for, the settings hash and the newest daily snapshots. Derived on every read. 400 confidence.readiness_invalid, 404 confidence.scorecard_not_found */
+    get: operations['GetScorecard'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/confidence/readiness-settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The readiness enforce switch (OFF when no row is stored) and the text and hash of the thresholds. Read only. */
+    get: operations['GetReadinessSettings'];
+    /** Switch confidence.readiness.enforce (OFF by default; no row means OFF) as the owner; appends an audited row with the owner as actor. ON makes a failed readiness gate refuse the cell move it judges (Candidate to Paper, the owner's re-enable of a paused cell, Paper to Active) with 409 confidence.gate_failed and the failing rows; OFF only warns and records the result. Needs a session, the CSRF token and the password in the body, checked on EVERY change, ON and OFF alike (OFF removes a refusal). 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.reason_invalid, 429 auth.rate_limited */
+    put: operations['ChangeReadinessSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/confidence/kill-proposals': {
     parameters: {
       query?: never;
@@ -18517,6 +18569,50 @@ export interface components {
        */
       share: number;
     };
+    /** @description One gate with what stops it. */
+    ReadinessGateView: {
+      /** @description `R` (Candidate to Paper) or `S` (Paper to Active). */
+      gate: string;
+      /** @description Whether it passes now. */
+      passed: boolean;
+      /** @description For gate S, whether the label is "Ready for the next phase"; true for gate R. */
+      labelOk: boolean;
+      /** @description The required rows that are not a pass. */
+      failing: components['schemas']['ScorecardRowView'][];
+    };
+    /** @description The readiness settings now: the owner's switch and the thresholds beside it. */
+    ReadinessSettingsView: {
+      /** @description Whether a failed gate refuses a lifecycle move (ON) or only warns (OFF, the default; no row means OFF). */
+      enforce: boolean;
+      /**
+       * Format: int64
+       * @description The row of the switch in force, or null when none was ever stored.
+       */
+      switchId: null | number;
+      /** @description The SHA-256 of the thresholds. */
+      settingsHash: string;
+      /** @description The text of the thresholds. */
+      settings: string;
+    };
+    /** @description The body of the readiness enforce switch. The owner is never part of it: the actor comes from the signed-in session. */
+    ReadinessSwitchRequest: {
+      /** @description The new value of `confidence.readiness.enforce` (default OFF): ON makes a failed readiness gate refuse the lifecycle move it judges (Candidate to Paper, the re-enable of a paused cell, Paper to Active); OFF only warns. */
+      enforce: boolean;
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS change, ON or OFF (turning it OFF removes a refusal). It is checked on every request; wrong ones count toward the sign-in lockout; missing: 403 auth.step_up_required. */
+      password: null | string;
+    };
+    /** @description The answer of a switch change: the row and the new value. */
+    ReadinessSwitched: {
+      /**
+       * Format: int64
+       * @description The row appended.
+       */
+      id: number;
+      /** @description The value now in force. */
+      enforce: boolean;
+    };
     /** @description A reserve reason and its count. */
     ReasonCountView: {
       /** @description The stable code. */
@@ -19717,6 +19813,146 @@ export interface components {
       /** Format: int32 */
       everyMinutes?: null | number;
     };
+    /** @description The system card and the strategy table (spec CF-11). */
+    ScorecardListView: {
+      /** @description The system card. */
+      system: components['schemas']['SystemScorecardView'];
+      /** @description One line per strategy, weakest first. */
+      strategies: components['schemas']['ScorecardSummaryView'][];
+      /** @description The settings now. */
+      settings: components['schemas']['ReadinessSettingsView'];
+      /** @description The honesty sentences. */
+      statements: string[];
+    };
+    /** @description One stored daily snapshot of a strategy's score (the trend). */
+    ScorecardPointView: {
+      /**
+       * Format: int64
+       * @description The snapshot, which a gate decision can cite.
+       */
+      id: number;
+      /**
+       * Format: date
+       * @description The India date.
+       */
+      date: string;
+      /**
+       * Format: double
+       * @description The score then.
+       */
+      score: number;
+      /** @description The label code then. */
+      label: string;
+      /** @description The settings hash it was computed with. */
+      settingsHash: string;
+    };
+    /** @description One row of the 15-row edge checklist as the API sends it. */
+    ScorecardRowView: {
+      /**
+       * Format: int32
+       * @description 1 to 15.
+       */
+      number: number;
+      /** @description The criterion. */
+      name: string;
+      /** @description The slice or source that produces the input. */
+      producer: string;
+      /** @description `pass`, `fail` or `unavailable`. Unavailable is never a pass. */
+      status: string;
+      /** @description The go threshold in words and numbers. */
+      threshold: string;
+      /** @description The figure it was judged on, or why it could not be. */
+      value: string;
+    };
+    /** @description One line of the strategy table. */
+    ScorecardSummaryView: {
+      /** @description The strategy id. */
+      strategy: string;
+      /**
+       * Format: int32
+       * @description The version read.
+       */
+      version: null | number;
+      /**
+       * Format: double
+       * @description The score.
+       */
+      score: number;
+      /** @description The label code. */
+      label: string;
+      /** @description The label in words. */
+      labelText: string;
+      /** @description The weakest sub-score by name. */
+      weakestSubScore: null | string;
+      /**
+       * Format: int32
+       * @description Rows passing of 15.
+       */
+      rowsPassed: number;
+      /** @description The hard fails by name. */
+      hardFails: string[];
+      /** @description Whether Gate R passes. */
+      gateR: boolean;
+      /** @description Whether Gate S passes. */
+      gateS: boolean;
+    };
+    /** @description The scorecard of one strategy version (spec CF-11 D1 to D4): the 15-row checklist, the six sub-scores, the hard fails, the label, the two gates and what would move the weakest link. Derived on every read from stored results; read only: it raises no size and places no order. */
+    ScorecardView: {
+      /** @description The strategy id. */
+      strategy: string;
+      /**
+       * Format: int32
+       * @description The strategy version the Lab results are read for; null when the strategy has none.
+       */
+      version: null | number;
+      /**
+       * Format: double
+       * @description 0 to 100: the minimum of the applicable sub-scores, or 0 with a hard fail.
+       */
+      score: number;
+      /**
+       * Format: double
+       * @description The minimum before the hard fails.
+       */
+      rawMinimum: number;
+      /** @description The label code: `not_ready`, `building`, `usable` or `ready`. */
+      label: string;
+      /** @description The label in words. */
+      labelText: string;
+      /** @description The six sub-scores, in order. */
+      subScores: components['schemas']['SubScoreView'][];
+      /** @description Each hard fail by name. */
+      hardFails: string[];
+      /** @description What was left out because it does not apply. */
+      notApplicable: string[];
+      /** @description The weakest sub-score by name; null when none. */
+      weakestSubScore: null | string;
+      /** @description What would move the weakest sub-score; null when nothing is computed. */
+      whatWouldMoveIt: null | string;
+      /** @description The 15 checklist rows. */
+      rows: components['schemas']['ScorecardRowView'][];
+      /**
+       * Format: int32
+       * @description How many rows pass.
+       */
+      rowsPassed: number;
+      /** @description Gate R. */
+      gateR: components['schemas']['ReadinessGateView'];
+      /** @description Gate S. */
+      gateS: components['schemas']['ReadinessGateView'];
+      /** @description What the card is waiting for: the producers of the rows and sub-scores that are unavailable (unavailable is a fail, so this is the list of what to build or run). */
+      waiting: string[];
+      /** @description The honesty sentences: the basis of the figures and the interpretations. */
+      notes: string[];
+      /** @description Whether the owner's enforce switch is ON now. */
+      enforce: boolean;
+      /** @description The SHA-256 of the readiness settings. */
+      settingsHash: string;
+      /** @description The text of those settings. */
+      settings: string;
+      /** @description The newest daily snapshots (the trend), newest first. */
+      history: components['schemas']['ScorecardPointView'][];
+    };
     /** @description Whether one of the owner's Dhan secrets is stored (encrypted) and when it last changed. Name is the request field name ("apiKey", "apiSecret"). The value itself is never returned. */
     SecretStatusView: {
       name: string;
@@ -20708,6 +20944,22 @@ export interface components {
       text: string;
       problemsFree: boolean;
     };
+    /** @description One of the six sub-scores as the API sends it. */
+    SubScoreView: {
+      /** @description The sub-score. */
+      name: string;
+      /** @description `scored`, `not_applicable` or `unavailable` (a hard fail). */
+      state: string;
+      /**
+       * Format: double
+       * @description 0 to 100 when scored, else null.
+       */
+      score: null | number;
+      /** @description The figure it was computed from, or why it could not be. */
+      reading: string;
+      /** @description The distance to the next anchor, computed from the anchors; null when already 100 or when it does not apply. */
+      whatWouldMoveIt: null | string;
+    };
     /**
      * @description The answer to `Subscribe`: how many instruments the connection now follows, whether the scope had more than the server follows per connection (1000 instruments, 1000 holding ids), in which case the rest get no pushes and the screen
      *     keeps their prices from its reads, and `failed` when the server could not read the scope (the database is unavailable): the connection then follows nothing and the screen should subscribe again later. After a good answer the server sends the
@@ -20836,6 +21088,41 @@ export interface components {
       attempts: number;
       /** Format: date-time */
       retryAt?: null | string;
+    };
+    /** @description The system card (spec CF-11 D5). */
+    SystemScorecardView: {
+      /**
+       * Format: double
+       * @description 0 to 100.
+       */
+      score: number;
+      /** @description The label code. */
+      label: string;
+      /** @description The label in words. */
+      labelText: string;
+      /**
+       * Format: double
+       * @description 100 when the integrity checks are clear, else 0 (an unreadable check is 0).
+       */
+      integrity: number;
+      /**
+       * Format: double
+       * @description The weighted mean of the strategy scores.
+       */
+      weightedMean: number;
+      /** @description True when the weights are equal because no plan risk share is available (labelled). */
+      equalWeights: boolean;
+      /** @description The strategy with the lowest score, or null when there is none. */
+      weakestStrategy: null | string;
+      /** @description Its weakest sub-score, or null. */
+      weakestSubScore: null | string;
+      /**
+       * Format: int32
+       * @description How many strategies were combined.
+       */
+      strategies: number;
+      /** @description Why it is 0 when the cause is not a strategy (integrity, no strategy), else null. */
+      reason: null | string;
     };
     SystemStatusResponse: {
       application: components['schemas']['ApplicationStatus'];
@@ -30730,6 +31017,129 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['LoopReportView'];
+        };
+      };
+    };
+  };
+  ListScorecards: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScorecardListView'];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetScorecard: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        strategyId: string;
+        version: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScorecardView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReadinessSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReadinessSettingsView'];
+        };
+      };
+    };
+  };
+  ChangeReadinessSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReadinessSwitchRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReadinessSwitched'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
         };
       };
     };

@@ -270,7 +270,7 @@ public sealed class KillProposalsApiTests(ApiFactory factory) : DataTestBase(fac
 
         result.Status.ShouldBe(HttpStatusCode.OK);
         result.Body.GetProperty("to").GetString().ShouldBe("paper");
-        result.Body.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()).ShouldContain(w => w!.Contains("CF-11", StringComparison.Ordinal) && w.Contains("NOT checked", StringComparison.Ordinal));
+        result.Body.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()).ShouldContain(w => w!.Contains("CF-11", StringComparison.Ordinal) && w.Contains("did NOT pass", StringComparison.Ordinal)); // gate R judged the re-enable (this strategy has no Lab result), and with the switch OFF it only warns
         (await ScalarAsync<string>("SELECT actor FROM research.learning_changelog WHERE subject = @s ORDER BY id DESC LIMIT 1", ("s", cell))).ShouldStartWith("owner:");
         (await ScalarAsync<string>("SELECT actor FROM research.learning_changelog WHERE subject = @s ORDER BY id DESC LIMIT 1", ("s", cell))).ShouldNotBeNull().ShouldNotContain("evil");
         (await ScalarAsync<string>("SELECT to_state FROM research.learning_changelog WHERE subject = @s ORDER BY id DESC LIMIT 1", ("s", cell))).ShouldBe("paper");

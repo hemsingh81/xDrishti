@@ -140,7 +140,8 @@ public sealed class OptionsPhaseCheckDatabaseTests(ResearchGrantsTests.Dedicated
     [Fact]
     public async Task The_phase_check_runs_as_a_select_only_role_finds_the_non_cash_plan_item_by_row_id_reads_the_verdict_and_writes_nothing()
     {
-        await StoreKit.ExecuteAsync(server.Owner, "TRUNCATE research.extension_evaluations; DELETE FROM trading.plan_items; DELETE FROM trading.plans", Ct);
+        // the switch tables are emptied too: the test that reads the newest switch rows leaves its own behind, and the order of the tests of a class is not fixed (CF-11 gate run: the first test saw its switch row)
+        await StoreKit.ExecuteAsync(server.Owner, "TRUNCATE research.extension_evaluations; DELETE FROM trading.plan_items; DELETE FROM trading.plans; DELETE FROM options.chain_recorder_switch; DELETE FROM options.backfill_switch", Ct);
         await SeedPlanItemAsync("p14-clean", 1, "strat|5m|BUY|style|exit|*"); // six parts: cash
         await SeedPlanItemAsync("p14-seven", 2, "strat|5m|BUY|style|exit|*|*"); // seven parts: a universe, still cash
         await SeedPlanItemAsync("p14-cash", 4, "strat|5m|BUY|style|exit|*|*|cash"); // an eighth part that says cash is not a non-cash expression
@@ -204,7 +205,8 @@ public sealed class OptionsPhaseCheckDatabaseTests(ResearchGrantsTests.Dedicated
     [Fact]
     public async Task A_missing_table_is_not_evaluable_not_an_error()
     {
-        await StoreKit.ExecuteAsync(server.Owner, "TRUNCATE research.extension_evaluations", Ct);
+        // no plan item is left either: a stored non-cash plan item of another test is a violation, which reads NOT MET before the missing table can read NOT EVALUABLE (the order of the tests of a class is not fixed)
+        await StoreKit.ExecuteAsync(server.Owner, "TRUNCATE research.extension_evaluations; DELETE FROM trading.plan_items; DELETE FROM trading.plans", Ct);
         var readerString = await ReaderConnectionAsync();
         await StoreKit.ExecuteAsync(server.Owner, "ALTER TABLE research.extension_evaluations RENAME TO extension_evaluations_hidden", Ct);
         try

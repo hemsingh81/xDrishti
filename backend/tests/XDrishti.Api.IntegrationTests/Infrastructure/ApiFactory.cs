@@ -225,6 +225,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM confidence.kill_proposals;
                 DELETE FROM confidence.decay_checks;
                 DELETE FROM confidence.kill_settings;
+                DELETE FROM readiness.scorecard_snapshots;
+                DELETE FROM readiness.settings;
                 DELETE FROM research.rollback_proposals;
                 DELETE FROM research.ml_monitor_checks;
                 DELETE FROM research.ml_switch_settings;
