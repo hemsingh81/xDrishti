@@ -49,6 +49,9 @@ internal sealed record XdOptions(
           xd data eod-probe|eod-load|eod-actions|eod-universe|eod-check ...   NSE daily files (CF-04 Part A; off by default, see ADR 0195): run xd data eod-probe with no dates for its usage
           xd learn features --run RUNKEY [--run ...]
           xd learn phase-check [--replay-seconds X]
+          xd learn decay --strategy ID   the decay monitor, the kill-rule evaluations and the open kill proposals of one strategy (read only; unavailable and not_evaluated are never a pass)
+          xd learn loop   is the learning loop helping? the three arms, the learning curve, the reliability slope, the lift (read only; today every section is unavailable and says why)
+          xd learn curve   the learning-curve part of that report (read only)
           xd select cells --date YYYY-MM-DD [--min-state candidate|paper|active]
           xd plan run [--date YYYY-MM-DD] [--dry-run]
           xd plan phase-check [--through YYYY-MM-DD]
