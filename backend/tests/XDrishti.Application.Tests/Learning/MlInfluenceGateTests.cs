@@ -27,7 +27,7 @@ public sealed class MlInfluenceGateTests
 
     private readonly MlInfluenceOptions _options = new();
 
-    private IMlInfluenceSwitch _switch = new MlInfluenceSwitchOff();
+    private IMlInfluenceSwitch _switch = new OffSwitch();
 
     private IMlInfluenceEvidence _evidence = new NoMlInfluenceEvidence();
 
@@ -178,10 +178,10 @@ public sealed class MlInfluenceGateTests
         result.Error.Code.ShouldBe(ModelErrors.NotFoundCode);
     }
 
-    [Fact]
-    public async Task The_only_switch_is_off()
+    /// <summary>The switch as it stands with no row stored: off. (The stored switch is tested against the real database; the gate only asks.)</summary>
+    private sealed class OffSwitch : IMlInfluenceSwitch
     {
-        (await new MlInfluenceSwitchOff().IsOnAsync(Ct)).ShouldBeFalse();
+        public ValueTask<bool> IsOnAsync(CancellationToken cancellationToken) => ValueTask.FromResult(false);
     }
 
     /// <summary>A fake source of every figure the predicate needs, so that the allow path of the gate is exercised; the model owns a fresh look at the block.</summary>

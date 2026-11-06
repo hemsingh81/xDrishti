@@ -222,6 +222,14 @@ public static class DependencyInjection
         services.AddScoped<IKillSettings>(sp => sp.GetRequiredService<KillSettings>());
         services.AddScoped<IKillSwitchStore>(sp => sp.GetRequiredService<KillSettings>());
         services.AddScoped<IDecayCheckStore, DecayChecks>(); // insert-only daily evaluations of the decay monitor (CF-12 part 12b)
+        services.AddScoped<MlSwitchSettings>(); // the three ML switches: the newest row of each name in research.ml_switch_settings, OFF when none (CF-10 part 10d-1, ADR 0220)
+        services.AddScoped<IMlSwitchSettings>(sp => sp.GetRequiredService<MlSwitchSettings>());
+        services.AddScoped<IMlSwitchStore>(sp => sp.GetRequiredService<MlSwitchSettings>());
+        services.AddScoped<IMlInfluenceSwitch>(sp => sp.GetRequiredService<MlSwitchSettings>()); // ml.influence.enabled: the one switch the predicate reads
+        services.AddScoped<RollbackProposals>(); // research.rollback_proposals: insert, and one conditional update of the decision columns (CF-10 part 10d-1)
+        services.AddScoped<IRollbackProposalReader>(sp => sp.GetRequiredService<RollbackProposals>());
+        services.AddScoped<IRollbackProposalStore>(sp => sp.GetRequiredService<RollbackProposals>());
+        services.AddScoped<IMlMonitorChecks, MlMonitorChecks>(); // insert-only daily evaluations of the champions (CF-10 part 10d-1)
         services.AddOptions<TicketAlertOptions>().Bind(configuration.GetSection(TicketAlertOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // price-crossing alerts and post-trade prompts, default OFF (P7-20, ADR 0115)
         services.AddSingleton<ITicketAlertSettings>(sp => new TicketAlertSettings(sp.GetRequiredService<IOptions<TicketAlertOptions>>().Value));
         services.AddScoped<ITicketAlertStore, TicketAlertStore>(); // insert-only alerts, prompts and the owner's acts (P7-20); no order, no ticket change

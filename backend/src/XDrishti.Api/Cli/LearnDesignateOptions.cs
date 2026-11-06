@@ -10,7 +10,7 @@ internal sealed record LearnDesignateOptions(long ModelId, ModelRole Role, strin
     public const string Usage = """
         usage:
           xd learn designate --model ID --role champion|challenger|retired --reason TEXT
-            appends a designation; only a model whose verdict is Eligible can be named champion, and naming one retires the previous champion
+            appends a designation; only a model whose verdict is Eligible can be named champion, and naming one retires the previous champion; a model that has a rollback proposal is not named champion here (use the promote route)
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
         """;

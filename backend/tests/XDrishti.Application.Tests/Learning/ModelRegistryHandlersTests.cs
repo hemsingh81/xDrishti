@@ -27,7 +27,7 @@ public sealed class ModelRegistryHandlersTests
 
     private DesignateModelHandler Designate()
     {
-        _registry.DesignateAsync(default, default, default!, default!, default, default).ReturnsForAnyArgs(true);
+        _registry.DesignateAsync(default, default, default!, default!, default, default!, default, default).ReturnsForAnyArgs(true);
         return new(_registry, _time, NullLogger<DesignateModelHandler>.Instance);
     }
 
@@ -42,7 +42,7 @@ public sealed class ModelRegistryHandlersTests
 
         result.Error.Code.ShouldBe(ModelErrors.NotEligibleCode);
         result.Error.Kind.ShouldBe(ErrorKind.Conflict);
-        await _registry.DidNotReceiveWithAnyArgs().DesignateAsync(default, default, default!, default!, default, Ct);
+        await _registry.DidNotReceiveWithAnyArgs().DesignateAsync(default, default, default!, default!, default, default!, default, Ct);
     }
 
     [Theory]
@@ -57,7 +57,7 @@ public sealed class ModelRegistryHandlersTests
 
         result.Error.Code.ShouldBe(ModelErrors.NotEligibleCode);
         result.Error.Message.ShouldContain(reason);
-        await _registry.DidNotReceiveWithAnyArgs().DesignateAsync(default, default, default!, default!, default, Ct);
+        await _registry.DidNotReceiveWithAnyArgs().DesignateAsync(default, default, default!, default!, default, default!, default, Ct);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class ModelRegistryHandlersTests
     {
         _registry.FindAsync(7, Ct).Returns(Stored(ValidationOutcome.Eligible));
         var handler = Designate();
-        _registry.DesignateAsync(7, ModelRole.Champion, "x", "test", Arg.Any<DateTimeOffset>(), Ct).Returns(false);
+        _registry.DesignateAsync(7, ModelRole.Champion, "x", "test", Arg.Any<DateTimeOffset>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<ModelRole?>(), Ct).Returns(false);
 
         var result = await handler.HandleAsync(new DesignateModelCommand(7, ModelRole.Champion, "x", "test"), Ct);
 
@@ -81,7 +81,7 @@ public sealed class ModelRegistryHandlersTests
 
         result.Value.Changed.ShouldBeTrue();
         result.Value.Role.ShouldBe("champion");
-        await _registry.Received(1).DesignateAsync(7, ModelRole.Champion, "proven", "test", _time.GetUtcNow(), Ct);
+        await _registry.Received(1).DesignateAsync(7, ModelRole.Champion, "proven", "test", _time.GetUtcNow(), Arg.Is<IReadOnlyList<string>>(e => e.Count == 0), null, Ct);
     }
 
     [Fact]
@@ -94,8 +94,8 @@ public sealed class ModelRegistryHandlersTests
 
         same.Value.Changed.ShouldBeFalse();
         retire.Value.Changed.ShouldBeTrue();
-        await _registry.Received(1).DesignateAsync(7, ModelRole.Retired, "set aside", "test", Arg.Any<DateTimeOffset>(), Ct);
-        await _registry.DidNotReceive().DesignateAsync(7, ModelRole.Challenger, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Ct);
+        await _registry.Received(1).DesignateAsync(7, ModelRole.Retired, "set aside", "test", Arg.Any<DateTimeOffset>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<ModelRole?>(), Ct);
+        await _registry.DidNotReceive().DesignateAsync(7, ModelRole.Challenger, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<IReadOnlyList<string>>(), Arg.Any<ModelRole?>(), Ct);
     }
 
     [Fact]

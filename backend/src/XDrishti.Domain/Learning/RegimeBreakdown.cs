@@ -22,7 +22,7 @@ public sealed record RegimeBreakdownResult(IReadOnlyList<RegimeBucket> Buckets, 
 public static class RegimeBreakdown
 {
     /// <summary>The trades a bucket needs to count as evidence (the same 30 as the cell statistics).</summary>
-    public const int MinTrades = 30;
+    public const int MinTrades = RegimeCellRule.StandAloneTrades;
 
     public static RegimeBreakdownResult Of(IReadOnlyList<(RegimeLabel Label, double R)> trades)
     {
