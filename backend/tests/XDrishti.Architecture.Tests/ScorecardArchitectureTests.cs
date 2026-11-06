@@ -325,7 +325,7 @@ public sealed class ScorecardArchitectureTests
 
         source.ShouldContain("/scorecards/{strategyId}/versions/{version:int}");
         source.ShouldContain("/readiness-settings");
-        source.Split("FreshOwnerAsync(").Length.ShouldBe(2, "one use, unconditional: a change either way needs the password (OFF removes a refusal)");
+        source.Split("OwnerAct.FreshAsync(").Length.ShouldBe(2, "one use, unconditional: a change either way needs the password (OFF removes a refusal)");
         source.ShouldNotContain("SessionOwner"); // no direction is the session alone
         source.ShouldNotContain("request.Enforce ?");
         source.ShouldNotContain("request.Actor");

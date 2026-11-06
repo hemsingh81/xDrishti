@@ -22,6 +22,8 @@ public interface IModelRegistry
 
     /// <summary>
     /// Appends a designation in one transaction, after checking again under the lock that the model does not already have the role (nothing is written then: false). Naming a champion also appends <see cref="ModelRole.Retired"/> for the model that was champion.
+    /// <paramref name="evidence"/> are extra evidence ids for the changelog row of the designation (for example the rollback proposal and the switch row of an automatic act); the model's own subject is always the first.
+    /// <paramref name="expectedCurrent"/>, when given, is the role the model must have <b>now</b>, checked under the same lock as the rest: any other role writes nothing (false), so a demotion decided on a stale read (the model was retired in between) can never move a retired model into the challenger pool.
     /// </summary>
-    ValueTask<bool> DesignateAsync(long id, ModelRole role, string reason, string actor, DateTimeOffset at, CancellationToken cancellationToken);
+    ValueTask<bool> DesignateAsync(long id, ModelRole role, string reason, string actor, DateTimeOffset at, IReadOnlyList<string> evidence, ModelRole? expectedCurrent, CancellationToken cancellationToken);
 }

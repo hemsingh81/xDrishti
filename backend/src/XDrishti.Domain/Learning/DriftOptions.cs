@@ -35,6 +35,10 @@ public sealed record DriftOptions(
     double MaxCalibrationGapPp = 5,
     double CalibrationZ = 2.5)
 {
+    /// <summary>The text of every value, culture independent, for a stored record that must say which settings produced it (CF-10 part 10d-1: the rollback proposals).</summary>
+    public string KeyText() => string.Create(System.Globalization.CultureInfo.InvariantCulture,
+        $"window={WindowTrades}/below={BelowBandChecks}/clear={ClearChecks}/every={CheckEveryTrades}/minRef={MinReferenceTrades}/bandZ={BandZ:R}/cusumK={CusumAllowance:R}/cusumH={CusumThreshold:R}/cusumClear={CusumClearFraction:R}/cusumCap={CusumCap:R}/calWindow={CalibrationWindow}/calEvery={CalibrationCheckEvery}/calChecks={CalibrationBreachChecks}/calGapPp={MaxCalibrationGapPp:R}/calZ={CalibrationZ:R}");
+
     /// <summary>The problems of the values, empty when they are usable.</summary>
     public IReadOnlyList<string> Problems()
     {

@@ -74,7 +74,7 @@ internal sealed class ReadinessEndpoints : IEndpointModule
         http.Response.Headers.CacheControl = "no-store";
 
         // Both directions need a fresh password: turning enforcement OFF removes a refusal, which raises risk (like confidence.kill.auto), and ON changes what the owner's own moves meet.
-        var owner = await OwnerAct.FreshOwnerAsync(http, passwordCheck, request.Password, cancellationToken);
+        var owner = await OwnerAct.FreshAsync(http, passwordCheck, request.Password, cancellationToken);
         if (owner.IsFailure)
         {
             return ProblemResults.From(owner.Error, http);

@@ -266,11 +266,11 @@ public sealed class MlInfluenceArchitectureTests
     }
 
     [Fact]
-    public void The_only_switch_in_this_version_is_off_and_only_the_evaluator_reads_it_in_any_project()
+    public void The_only_switch_is_the_stored_one_off_with_no_row_and_only_the_evaluator_reads_it_in_any_project()
     {
-        Implementations(Production, typeof(IMlInfluenceSwitch)).ShouldBe(["XDrishti.Application.Learning.MlInfluenceSwitchOff"], "nothing in this version can switch model influence on; the stored switch and the owner act are part 10d");
+        Implementations(Production, typeof(IMlInfluenceSwitch)).ShouldBe(["XDrishti.Infrastructure.Learning.MlSwitchSettings"], "one switch: the newest row of ml.influence.enabled in research.ml_switch_settings, OFF when there is none (part 10d-1, ADR 0220)");
         Dependents(Production, typeof(IMlInfluenceSwitch))
-            .ShouldBe(["XDrishti.Application.DependencyInjection", "XDrishti.Application.Learning.MlInfluenceEvaluator", "XDrishti.Application.Learning.MlInfluenceSwitchOff"]);
+            .ShouldBe(["XDrishti.Application.Learning.MlInfluenceEvaluator", "XDrishti.Infrastructure.DependencyInjection", "XDrishti.Infrastructure.Learning.MlSwitchSettings"]);
 
         // controls: the same scans see a second switch and a reader of it in the test assembly
         Implementations([typeof(SwitchSentinel).Assembly], typeof(IMlInfluenceSwitch)).ShouldContain(typeof(SwitchSentinel).FullName!);

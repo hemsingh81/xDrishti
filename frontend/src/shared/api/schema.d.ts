@@ -3755,7 +3755,7 @@ export interface paths {
     };
     /** The readiness enforce switch (OFF when no row is stored) and the text and hash of the thresholds. Read only. */
     get: operations['GetReadinessSettings'];
-    /** Switch confidence.readiness.enforce (OFF by default; no row means OFF) as the owner; appends an audited row with the owner as actor. ON makes a failed readiness gate refuse the cell move it judges (Candidate to Paper, Paper to Active) with 409 confidence.gate_failed and the failing rows; OFF only warns and records the result. Turning it ON needs a session, the CSRF token and the password in the body, checked on EVERY change; turning it OFF needs the session and the CSRF token only. 403 auth.step_up_required (ON without a password), 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.reason_invalid, 429 auth.rate_limited */
+    /** Switch confidence.readiness.enforce (OFF by default; no row means OFF) as the owner; appends an audited row with the owner as actor. ON makes a failed readiness gate refuse the cell move it judges (Candidate to Paper, the owner's re-enable of a paused cell, Paper to Active) with 409 confidence.gate_failed and the failing rows; OFF only warns and records the result. Needs a session, the CSRF token and the password in the body, checked on EVERY change, ON and OFF alike (OFF removes a refusal). 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.reason_invalid, 429 auth.rate_limited */
     put: operations['ChangeReadinessSettings'];
     post?: never;
     delete?: never;
@@ -3826,6 +3826,74 @@ export interface paths {
     put?: never;
     /** Re-enable a paused cell (Paused to Paper; the key is the URL-encoded cell key) as the owner. Never automatic and never to Active. Needs a session, the CSRF token and a fresh password in the body. When a kill proposal paused the cell, every rule that fired must hold now and none may fire, else 409 confidence.rule_not_cleared (the spec's rule_cleared problem, named to read as what it says); a rule that cannot be evaluated is not a pass. The answer always warns that the CF-11 gates (R and S) are not enforcing yet. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 403 confidence.owner_only, 409 confidence.cell_not_paused, 400 confidence.reason_invalid, 422 learning.invalid */
     post: operations['ReEnableCell'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/learning/rollback/proposals': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The rollback proposals, newest first (state proposed, applied or dismissed; modelId; limit 1 to 200, default 50), each with its trigger (the P6-09 calibration detector or rolling band detector), numbers, whether the previous champion still qualifies and who applied it, with the three ML switches (all default OFF) beside them. Read only. 422 learning.invalid */
+    get: operations['ListRollbackProposals'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/learning/rollback/{id}/apply': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Apply a rollback proposal as the owner: the champion moves to challenger (shadow) through the registry's designation, with a changelog row carrying the trigger, the numbers and the settings hash. Needs the owner's session and the CSRF token (it lowers reliance on ML). Applying twice changes nothing twice. It never re-promotes the previous champion: there is no champion until the owner names one. 404 learning.rollback_not_found, 409 learning.rollback_closed */
+    post: operations['ApplyRollbackProposal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/learning/ml-settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Change the ML switches ml.influence.enabled, ml.auto_promote and ml.auto_rollback (all OFF by default; no row means OFF) as the owner; each change appends an audited row with the owner as actor. A switch that is not given is left alone. Turning ml.influence.enabled or ml.auto_promote ON needs the session, the CSRF token and the password in the body, checked on EVERY such change (403 auth.step_up_required with no password, 401 auth.invalid_credentials, 423 auth.locked); ml.auto_rollback, and turning any switch OFF, needs the session and the CSRF token only. ON opens nothing alone: influence still needs the predicate's evidence terms, an automatic rollback is recorded as actor auto with the setting row, never as an owner approval, and an automatic promotion needs the promotion rule and the predicate without the switch. 400 learning.ml_settings_invalid, 429 auth.rate_limited */
+    put: operations['ChangeMlSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/learning/models/{id}/promote': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Promote a model to champion as the owner, with the P6-08 changelog row. A challenger needs 30 graded candidates over 4 weeks, the paired bootstrap against the champion at 0.95, a P6-12 counterfactual that is not FrozenBetter and the champion rule; a retired previous champion is re-promoted only if its latest evaluation still satisfies the predicate without the owner's switch. A figure that is not available is never a pass (the sources of the first three do not exist yet, so every promotion is refused with the reason). Promotion never turns ml.influence.enabled on. Needs a session, the CSRF token and a fresh password in the body. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 404 models.not_found, 409 learning.promotion_refused or learning.repromotion_refused or models.not_eligible, 422 learning.invalid */
+    post: operations['PromoteModel'];
     delete?: never;
     options?: never;
     head?: never;
@@ -6355,6 +6423,36 @@ export interface components {
       pausedCells: string[];
       /** @description The cells that were no longer Paper or Active (already paused, retired or changed). */
       skippedCells: string[];
+      /** @description Who applied it (the first time). */
+      actor: null | string;
+    };
+    /** @description What applying did. */
+    ApplyRollbackOutcome: {
+      /**
+       * Format: int64
+       * @description The proposal.
+       */
+      proposalId: number;
+      /**
+       * Format: int64
+       * @description The champion it concerned.
+       */
+      modelId: number;
+      /** @description Its trigger. */
+      trigger: string;
+      /** @description The state of the proposal after this call (`applied`). */
+      state: string;
+      /** @description True when the proposal was applied before this call (nothing was changed now). */
+      alreadyApplied: boolean;
+      /** @description True when this call moved the model from champion to challenger; false when it was not the champion any more. */
+      demoted: boolean;
+      /**
+       * Format: int64
+       * @description The champion this model replaced, or null.
+       */
+      previousChampionId: null | number;
+      /** @description Whether the previous champion's latest evaluation satisfied the predicate without the switch when the proposal was written. It is NOT re-promoted: with or without it there is no champion now, and only the owner can name one. */
+      previousQualifies: boolean;
       /** @description Who applied it (the first time). */
       actor: null | string;
     };
@@ -15252,6 +15350,69 @@ export interface components {
       /** @description A sentence. */
       text: string;
     };
+    /** @description The switches after a change. */
+    MlSettingsChanged: {
+      /** @description The three switches now in force. */
+      switches: components['schemas']['MlSwitches'];
+      /** @description The names of the switches this call changed. */
+      changed: string[];
+    };
+    /** @description The body of a change of the ML switches. The owner is never part of it: the actor comes from the signed-in session. A switch that is not given is left alone. */
+    MlSettingsRequest: {
+      /** @description `ml.influence.enabled` (default OFF): whether a model may influence a decision at all. ON needs a fresh password; it opens nothing alone (the predicate's other terms must hold too). */
+      influenceEnabled: null | boolean;
+      /** @description `ml.auto_promote` (default OFF): whether the daily run may promote a challenger whose promotion rule and predicate terms hold. ON needs a fresh password. */
+      autoPromote: null | boolean;
+      /** @description `ml.auto_rollback` (default OFF): whether the daily run may execute a rollback proposal. It lowers reliance on ML, so it needs the session and the CSRF token and no password. */
+      autoRollback: null | boolean;
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS change. Required when the change turns ml.influence.enabled or ml.auto_promote ON (missing: 403 auth.step_up_required; wrong: 401, counted toward the lockout); ignored otherwise. */
+      password: null | string;
+    };
+    /** @description The three ML switches as they stand (all default OFF). */
+    MlSettingsView: {
+      /** @description `ml.influence.enabled`. */
+      influenceEnabled: boolean;
+      /**
+       * Format: int64
+       * @description Its row in force, or null when none was ever stored.
+       */
+      influenceSettingId: null | number;
+      /** @description `ml.auto_promote`. */
+      autoPromote: boolean;
+      /**
+       * Format: int64
+       * @description Its row in force, or null.
+       */
+      autoPromoteSettingId: null | number;
+      /** @description `ml.auto_rollback`. */
+      autoRollback: boolean;
+      /**
+       * Format: int64
+       * @description Its row in force, or null.
+       */
+      autoRollbackSettingId: null | number;
+    };
+    /** @description One of the three ML switches as stored: the newest row of its name, OFF with no id when none exists. */
+    MlSwitchState: {
+      /**
+       * Format: int64
+       * @description The row in force, or null when none was ever stored.
+       */
+      id: null | number;
+      /** @description Whether the switch is ON. */
+      on: boolean;
+    };
+    /** @description The three ML switches as they stand (spec CF-10 D6 to D8): all default OFF. */
+    MlSwitches: {
+      /** @description `ml.influence.enabled`. */
+      influence: components['schemas']['MlSwitchState'];
+      /** @description `ml.auto_promote`. */
+      autoPromote: components['schemas']['MlSwitchState'];
+      /** @description `ml.auto_rollback`. */
+      autoRollback: components['schemas']['MlSwitchState'];
+    };
     /** @description One term of the influence predicate. */
     MlTermView: {
       /** @description The term (HoldOutBeatsNoMl, ForwardShadowOk, NoCalibrationAlarm, SwitchOn). */
@@ -17698,6 +17859,29 @@ export interface components {
        */
       wouldClose?: number;
     };
+    /** @description The body of a promotion. The owner is never part of it: the actor comes from the signed-in session. */
+    PromoteModelRequest: {
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS act. Missing: 403 auth.step_up_required; wrong: 401, counted toward the lockout. */
+      password: null | string;
+    };
+    /** @description What promoting did. */
+    PromotionOutcome: {
+      /**
+       * Format: int64
+       * @description The model.
+       */
+      modelId: number;
+      /** @description Its role now. */
+      role: string;
+      /** @description False when it was champion already and nothing was written. */
+      changed: boolean;
+      /** @description `promotion`, `re_promotion` or `already_champion`. */
+      kind: string;
+      /** @description Who promoted it. */
+      actor: string;
+    };
     /** @description The owner's request for the next mode. The actor is never taken from the body. */
     PromotionRequestBody: {
       toMode: null | string;
@@ -18412,11 +18596,11 @@ export interface components {
     };
     /** @description The body of the readiness enforce switch. The owner is never part of it: the actor comes from the signed-in session. */
     ReadinessSwitchRequest: {
-      /** @description The new value of `confidence.readiness.enforce` (default OFF): ON makes a failed readiness gate refuse the lifecycle move it judges (Candidate to Paper, Paper to Active); OFF only warns. */
+      /** @description The new value of `confidence.readiness.enforce` (default OFF): ON makes a failed readiness gate refuse the lifecycle move it judges (Candidate to Paper, the re-enable of a paused cell, Paper to Active); OFF only warns. */
       enforce: boolean;
       /** @description Why, 1 to 500 characters. */
       reason: null | string;
-      /** @description The owner's password, re-entered for THIS change when turning the switch ON (it is checked on every such request; wrong ones count toward the sign-in lockout; missing: 403 auth.step_up_required). Turning it OFF needs only the session and the CSRF token and ignores it. */
+      /** @description The owner's password, re-entered for THIS change, ON or OFF (turning it OFF removes a refusal). It is checked on every request; wrong ones count toward the sign-in lockout; missing: 403 auth.step_up_required. */
       password: null | string;
     };
     /** @description The answer of a switch change: the row and the new value. */
@@ -19404,6 +19588,77 @@ export interface components {
       data: components['schemas']['DataRoleView'];
       trading: components['schemas']['TradingRoleView'];
       portfolio: components['schemas']['PortfolioRoleView'];
+    };
+    /** @description One rollback proposal as the owner reads it. */
+    RollbackProposalView: {
+      /**
+       * Format: int64
+       * @description The proposal.
+       */
+      id: number;
+      /**
+       * Format: int64
+       * @description The champion it would demote to challenger (shadow).
+       */
+      modelId: number;
+      /** @description `calibration` (the P6-09 calibration detector) or `band` (the P6-09 rolling band detector). */
+      trigger: string;
+      /**
+       * Format: double
+       * @description The statistic of the alarm.
+       */
+      value: null | number;
+      /**
+       * Format: double
+       * @description What it was compared with.
+       */
+      limit: null | number;
+      /** @description The detector's words, with the numbers. */
+      text: string;
+      /** @description For the band trigger, the cells in alarm. */
+      cells: string[];
+      /**
+       * Format: int64
+       * @description The champion this model replaced, or null.
+       */
+      previousChampionId: null | number;
+      /** @description Whether that model's latest evaluation satisfied the predicate without the switch when the proposal was written. Information only: it is never re-promoted automatically. */
+      previousQualifies: boolean;
+      /** @description The SHA-256 of the thresholds that produced it. */
+      settingsHash: string;
+      /**
+       * Format: date
+       * @description The India date it was proposed.
+       */
+      proposedOn: string;
+      /**
+       * Format: date-time
+       * @description When it was proposed.
+       */
+      proposedAt: string;
+      /** @description `proposed`, `applied` or `dismissed`. */
+      state: string;
+      /** @description `owner:...` or `auto` once applied, else null. */
+      actor: null | string;
+      /**
+       * Format: date-time
+       * @description When it was decided, or null.
+       */
+      decidedAt: null | string;
+      /**
+       * Format: int64
+       * @description For an automatic decision, the row of the `ml.auto_rollback` switch in force; else null.
+       */
+      autoSettingId: null | number;
+    };
+    /** @description The proposals and the switches beside them. */
+    RollbackProposalsView: {
+      /** @description The proposals, newest first. */
+      items: components['schemas']['RollbackProposalView'][];
+      /** @description The three switches. */
+      settings: components['schemas']['MlSettingsView'];
+      /** @description The honesty sentences. */
+      statements: string[];
     };
     /** @description The outcome metric of a rule. */
     RuleOutcomeView: {
@@ -31035,6 +31290,174 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListRollbackProposals: {
+    parameters: {
+      query?: {
+        state?: string;
+        modelId?: number;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RollbackProposalsView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ApplyRollbackProposal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApplyRollbackOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ChangeMlSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MlSettingsRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MlSettingsChanged'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  PromoteModel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PromoteModelRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PromotionOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
       /** @description Conflict */

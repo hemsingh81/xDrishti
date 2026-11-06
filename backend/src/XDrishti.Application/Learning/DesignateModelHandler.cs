@@ -28,6 +28,11 @@ internal sealed class DesignateModelHandler(IModelRegistry registry, TimeProvide
             problems.Add(new FieldError("actor", "The actor is required and at most 100 characters."));
         }
 
+        if (command.Evidence is { } evidence && (evidence.Count > 10 || evidence.Any(e => string.IsNullOrWhiteSpace(e) || e.Length > 100)))
+        {
+            problems.Add(new FieldError("evidence", "At most 10 evidence ids of at most 100 characters."));
+        }
+
         if (problems.Count > 0)
         {
             ModelLog.Refused(logger, LearningErrors.InvalidCode);
@@ -54,11 +59,16 @@ internal sealed class DesignateModelHandler(IModelRegistry registry, TimeProvide
             return Result.Success(new DesignationOutcome(command.ModelId, command.Role.Code(), false));
         }
 
-        var changed = await registry.DesignateAsync(command.ModelId, command.Role, command.Reason.Trim(), command.Actor, time.GetUtcNow(), cancellationToken);
+        var changed = await registry.DesignateAsync(command.ModelId, command.Role, command.Reason.Trim(), command.Actor, time.GetUtcNow(), command.Evidence ?? [], command.ExpectedCurrentRole, cancellationToken);
         var code = command.Role.Code();
         if (changed)
         {
             ModelLog.Designated(logger, command.ModelId, code);
+        }
+        else if (command.ExpectedCurrentRole is not null)
+        {
+            // nothing was written because the model was not in the expected role any more: report the role it really has
+            code = ((await registry.FindAsync(command.ModelId, cancellationToken))?.Role ?? model.Role).Code();
         }
 
         return Result.Success(new DesignationOutcome(command.ModelId, code, changed));
