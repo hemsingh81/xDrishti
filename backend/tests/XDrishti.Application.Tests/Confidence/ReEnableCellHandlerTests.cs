@@ -39,12 +39,56 @@ public sealed class ReEnableCellHandlerTests
 
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : string.Empty);
         (result.Value.From, result.Value.To).ShouldBe(("paused", "paper"));
-        result.Value.Warnings.ShouldContain(ReEnableCellHandler.GateWarning);
+        result.Value.Warnings[0].ShouldStartWith(ReEnableCellHandler.GateWarning);
+        result.Value.Warnings[0].ShouldContain("was asked about this re-enable", customMessage: "the fake gate cited nothing on the row, and the warning says so");
+        f.Gate.Requests.Last().ShouldBe(new ReadinessGateRequest(KillFixture.Cell, ReadinessGateKind.ResearchToPaper, Owner));
         f.StateOf(KillFixture.Cell).ShouldBe(CellState.Paper);
         var row = f.Log.Rows[^1];
         (row.Entry.Actor, row.Entry.FromState, row.Entry.ToState).ShouldBe((Owner, "paused", "paper"));
         row.Entry.EvidenceIds.ShouldBe(["cleared-proposal:1"]);
         row.Entry.Reason.ShouldContain("it recovered");
+    }
+
+    [Fact]
+    public async Task With_enforce_ON_a_gate_R_that_does_not_pass_refuses_the_re_enable_and_the_cell_stays_paused()
+    {
+        var f = await PausedByKillAsync("cost_stress", "holds");
+        var rows = f.Log.Rows.Count;
+        f.Gate.Decision = new ReadinessGateDecision(false, true, true, "R", 5, [10, 14], "rows not passing: 10 Stability (unavailable)", ["readiness-snapshot:5", "readiness-gate-R:fail:enforce-on:rows-10.14"]);
+
+        var result = await f.ReEnable.HandleAsync(Command(), Ct);
+
+        result.Error.Code.ShouldBe("confidence.gate_failed");
+        result.Error.Kind.ShouldBe(ErrorKind.Conflict);
+        f.StateOf(KillFixture.Cell).ShouldBe(CellState.Paused);
+        f.Log.Rows.Count.ShouldBe(rows);
+    }
+
+    [Fact]
+    public async Task With_enforce_OFF_a_gate_R_that_does_not_pass_lets_the_re_enable_through_and_the_warning_and_the_row_carry_its_result()
+    {
+        var f = await PausedByKillAsync("cost_stress", "holds");
+        f.Gate.Decision = new ReadinessGateDecision(false, false, false, "R", 5, [10, 14], "rows not passing", ["readiness-snapshot:5", "readiness-gate-R:fail:enforce-off:rows-10.14"]);
+
+        var result = await f.ReEnable.HandleAsync(Command(), Ct);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : string.Empty);
+        result.Value.Warnings[0].ShouldStartWith(ReEnableCellHandler.GateWarning);
+        result.Value.Warnings[0].ShouldContain("did NOT pass");
+        result.Value.Warnings[0].ShouldContain("readiness-gate-R:fail:enforce-off:rows-10.14");
+        f.StateOf(KillFixture.Cell).ShouldBe(CellState.Paper);
+        f.Log.Rows[^1].Entry.EvidenceIds.ShouldBe(["cleared-proposal:1", "readiness-snapshot:5", "readiness-gate-R:fail:enforce-off:rows-10.14"]);
+    }
+
+    [Fact]
+    public async Task A_gate_R_that_passes_is_reported_as_passed()
+    {
+        var f = await PausedByKillAsync("cost_stress", "holds");
+        f.Gate.Decision = new ReadinessGateDecision(true, false, false, "R", 5, [], "passed", ["readiness-snapshot:5", "readiness-gate-R:pass:enforce-off:rows-none"]);
+
+        var result = await f.ReEnable.HandleAsync(Command(), Ct);
+
+        result.Value.Warnings[0].ShouldContain("passed for this re-enable");
     }
 
     [Theory]

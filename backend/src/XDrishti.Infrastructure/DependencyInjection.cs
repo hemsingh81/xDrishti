@@ -222,6 +222,12 @@ public static class DependencyInjection
         services.AddScoped<IKillSettings>(sp => sp.GetRequiredService<KillSettings>());
         services.AddScoped<IKillSwitchStore>(sp => sp.GetRequiredService<KillSettings>());
         services.AddScoped<IDecayCheckStore, DecayChecks>(); // insert-only daily evaluations of the decay monitor (CF-12 part 12b)
+        services.AddScoped<ReadinessSettings>(); // confidence.readiness.enforce: the newest row of readiness.settings, OFF when none (CF-11, ADR 0221)
+        services.AddScoped<IReadinessSettings>(sp => sp.GetRequiredService<ReadinessSettings>());
+        services.AddScoped<IReadinessSwitchStore>(sp => sp.GetRequiredService<ReadinessSettings>());
+        services.AddScoped<ReadinessSnapshots>(); // readiness.scorecard_snapshots: insert-only daily and gate snapshots of the scorecard (CF-11)
+        services.AddScoped<IReadinessSnapshotStore>(sp => sp.GetRequiredService<ReadinessSnapshots>());
+        services.AddScoped<IReadinessSnapshotReader>(sp => sp.GetRequiredService<ReadinessSnapshots>());
         services.AddOptions<TicketAlertOptions>().Bind(configuration.GetSection(TicketAlertOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // price-crossing alerts and post-trade prompts, default OFF (P7-20, ADR 0115)
         services.AddSingleton<ITicketAlertSettings>(sp => new TicketAlertSettings(sp.GetRequiredService<IOptions<TicketAlertOptions>>().Value));
         services.AddScoped<ITicketAlertStore, TicketAlertStore>(); // insert-only alerts, prompts and the owner's acts (P7-20); no order, no ticket change

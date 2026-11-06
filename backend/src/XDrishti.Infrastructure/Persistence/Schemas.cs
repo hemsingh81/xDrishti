@@ -39,4 +39,7 @@ public static class Schemas
 
     /// <summary>The kill rules of the decay monitor (spec CF-12 part 12b, ADR 0219): <c>decay_checks</c> and <c>kill_settings</c>, insert-only for the runtime role, and <c>kill_proposals</c>, insert plus a conditional update of four decision columns. Raw SQL, no EF entity.</summary>
     public const string Confidence = "confidence";
+
+    /// <summary>The readiness scorecard (spec CF-11 part 1, ADR 0221): <c>settings</c> (the owner's enforce switch) and <c>scorecard_snapshots</c>, both insert-only for the runtime role. Raw SQL, no EF entity. A schema of its own, so that the grants of the <c>confidence</c> schema are not touched.</summary>
+    public const string Readiness = "readiness";
 }

@@ -1,4 +1,5 @@
 using XDrishti.Domain.Confidence;
+using XDrishti.Domain.Readiness;
 
 namespace XDrishti.Api.Confidence;
 
@@ -48,6 +49,11 @@ internal sealed class ConfidenceSettings
     public RegistrationSection Registration { get; set; } = new();
 
     public HoldOutSection HoldOut { get; set; } = new();
+
+    public ReadinessSection Readiness { get; set; } = new();
+
+    /// <summary>The <c>Confidence:Readiness</c> subsection as the options of CF-11 part 1 (ADR 0221). The enforce switch is not here: it is stored state that only the owner changes.</summary>
+    internal ReadinessOptions ToReadinessOptions() => new(Readiness.MinNEff, Readiness.MinTradesPerCell, Readiness.ExpectancyR, Readiness.TStatistic, Readiness.MinQuarterShare, Readiness.MaxYearShare, Readiness.MaxInstrumentShare, Readiness.DrawdownBudgetR, Readiness.BuildingFrom, Readiness.UsableFrom, Readiness.ReadyFrom);
 
     /// <summary>The <c>Confidence:Registration</c> subsection as the options of CF-06 (ADR 0207).</summary>
     internal RegistrationOptions ToRegistrationOptions() => new(Registration.Enforce, Registration.CountInFactor);
@@ -339,6 +345,31 @@ internal sealed class ConfidenceSettings
         public int MinDays { get; set; } = 10;
 
         public double PromisingFrom { get; set; } = 0.90;
+    }
+
+    internal sealed class ReadinessSection
+    {
+        public double MinNEff { get; set; } = ReadinessOptions.DefaultMinNEff;
+
+        public int MinTradesPerCell { get; set; } = ReadinessOptions.DefaultMinTradesPerCell;
+
+        public double ExpectancyR { get; set; } = ReadinessOptions.DefaultExpectancyR;
+
+        public double TStatistic { get; set; } = ReadinessOptions.DefaultTStatistic;
+
+        public double MinQuarterShare { get; set; } = ReadinessOptions.DefaultMinQuarterShare;
+
+        public double MaxYearShare { get; set; } = ReadinessOptions.DefaultMaxYearShare;
+
+        public double MaxInstrumentShare { get; set; } = ReadinessOptions.DefaultMaxInstrumentShare;
+
+        public double DrawdownBudgetR { get; set; } = ReadinessOptions.DefaultDrawdownBudgetR;
+
+        public double BuildingFrom { get; set; } = ReadinessOptions.DefaultBuildingFrom;
+
+        public double UsableFrom { get; set; } = ReadinessOptions.DefaultUsableFrom;
+
+        public double ReadyFrom { get; set; } = ReadinessOptions.DefaultReadyFrom;
     }
 
     internal sealed class RegistrationSection

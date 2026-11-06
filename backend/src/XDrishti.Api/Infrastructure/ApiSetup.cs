@@ -120,6 +120,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, PaperReviewEndpoints>();
         services.AddSingleton<IEndpointModule, PaperCompareEndpoints>(); // backtest versus paper (P10-04): one GET, computed on read
         services.AddSingleton<IEndpointModule, ConfidenceEndpoints>(); // the decay monitor of a strategy and "is the learning loop helping?" (CF-12 part 12a): read only, nothing is proposed or changed
+        services.AddSingleton<IEndpointModule, ReadinessEndpoints>(); // the readiness scorecard per strategy and for the system, and the owner's enforce switch (CF-11 part 1): derived reads, the switch is the owner's act, no order
         services.AddSingleton<IEndpointModule, KillEndpoints>(); // the kill proposals, applying one, the owner's automatic setting and the re-enable of a paused cell (CF-12 part 12b): the owner's acts, no order
         services.AddSingleton<IEndpointModule, PaperSequentialEndpoints>(); // the sequential failure test of the paper edge series (CF-09): a flag, never a pass, read only
         services.AddSingleton<IEndpointModule, PaperShadowEndpoints>(); // the shadow record summary and the owner's switch (CF-08 part B): fresh password per change, insert-only
@@ -203,6 +204,7 @@ internal static class ApiSetup
             .Validate(s => s.ToDecayOptions().Problems().Count == 0, "Confidence:Decay: a value is out of range or looser than the spec's proposal (WindowTrades 20..60, Sigmas above 0 up to 1.5, QuarterFloorR -0.05..0; configuration can only tighten them).")
             .Validate(s => s.ToLoopOptions().Problems().Count == 0, "Confidence:Loop: a value is out of range or looser than the spec's proposal (MinDays 20..250 (a trade-off, not a tightening), Draws 2000..20000, Level 0.90..0.99, HelpsAt 0.95..0.999, MinSlopePer50Rows above 0 up to 0.1, TargetGain 0.001..0.1, SlopeLow 0.8 up to but not including 1, SlopeHigh above 1 up to 1.2, SlopeSe 1..2; the reliability window is fixed at 200 and the hurts bar at 0.95; configuration can only tighten the rest).")
             .Validate(s => s.ToKillOptions().Problems().Count == 0, "Confidence:Kill: a value is out of range or looser than the spec's proposal (StressMultiplier 1.5..3, it can only be raised; DrawdownFactor 1..2, it can only be lowered). The trailing 100 trades and the 20 new trades between firings are fixed, and the automatic setting confidence.kill.auto is stored state changed only by the owner, not a configuration value.")
+            .Validate(s => s.ToReadinessOptions().Problems().Count == 0, "Confidence:Readiness: a value is out of range or looser than the spec's proposal (MinNEff 300..100000, MinTradesPerCell 30..10000, ExpectancyR 0.15..2, TStatistic 2..10, MinQuarterShare 0.70..1, each of these can only be raised; MaxYearShare 0.20..0.60, MaxInstrumentShare 0.02..0.15, DrawdownBudgetR 1..20, each of these can only be lowered; BuildingFrom 40..99, UsableFrom 70..99.5, ReadyFrom 85..100, each can only be raised and they must increase). The enforce switch confidence.readiness.enforce is stored state changed only by the owner, not a configuration value.")
             .Validate(s => s.MlInfluence.HoldOutMinProbability >= s.Ladder.MinProbability, "Confidence:MlInfluence:HoldOutMinProbability must not be below Confidence:Ladder:MinProbability (the hold-out bar is never lower than the ladder's pass bar).")
             .Validate(s => new Domain.Learning.ValidationOptions(Ladder: s.ToLadderOptions(), Paired: s.ToPairedBootstrapOptions()).Problems().Count == 0, "Confidence:PairedBootstrap:PromisingFrom must not be above Confidence:Ladder:MinProbability (a probability between them reads promising, never pass).")
             .ValidateOnStart();
@@ -221,6 +223,7 @@ internal static class ApiSetup
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToDecayOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToKillOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToLoopOptions()));
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToReadinessOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToRegistrationOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToHoldOutOptions()));
     }
