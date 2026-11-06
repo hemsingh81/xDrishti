@@ -36,6 +36,23 @@ internal static class OwnerAct
     }
 
     /// <summary>
+    /// The owner after a fresh password for THIS act, with the order the step-up routes use (CF-10 part 10d-1): no session is 401; a body without a password is 403 <c>auth.step_up_required</c> (nothing is checked or counted); a wrong one is the sign-in 401 or 423 with its lockout
+    /// rules and audit; the step-up window is neither opened, extended nor used up.
+    /// </summary>
+    public static async Task<Result<string>> FreshAsync(HttpContext http, ICommandHandler<StepUpCommand, StepUpResult> passwordCheck, string? password, CancellationToken cancellationToken)
+    {
+        var session = SessionOwner(http);
+        if (session.IsFailure)
+        {
+            return session;
+        }
+
+        return string.IsNullOrEmpty(password)
+            ? Result.Failure<string>(AuthErrors.StepUpRequired)
+            : await AuthorizeAsync(http, passwordCheck, password, cancellationToken);
+    }
+
+    /// <summary>
     /// The owner actor of the signed-in session WITHOUT a password: only for the safe direction (switching a capability OFF, cancelling a job), where being slow would be the danger. Needs the verified session (and, by the CSRF middleware, the token).
     /// With no e-mail address there is no owner and the handler refuses an empty actor.
     /// </summary>

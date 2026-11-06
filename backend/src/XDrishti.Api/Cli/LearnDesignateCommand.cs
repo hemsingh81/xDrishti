@@ -24,8 +24,8 @@ internal static class LearnDesignateCommand
         try
         {
             await using var scope = services.CreateAsyncScope();
-            var result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<DesignateModelCommand, DesignationOutcome>>()
-                .HandleAsync(new DesignateModelCommand(options.ModelId, options.Role, options.Reason, "cli:xd"), cancellationToken);
+            var result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<OwnerDesignateModelCommand, DesignationOutcome>>()
+                .HandleAsync(new OwnerDesignateModelCommand(options.ModelId, options.Role, options.Reason, "cli:xd"), cancellationToken);
             if (result.IsFailure)
             {
                 await console.Error.WriteLineAsync(SimulateOptions.Show(result.Error.Code + ": " + result.Error.Message));

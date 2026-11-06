@@ -157,7 +157,7 @@ internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistr
         return rows;
     }
 
-    public async ValueTask<bool> DesignateAsync(long id, ModelRole role, string reason, string actor, DateTimeOffset at, CancellationToken cancellationToken)
+    public async ValueTask<bool> DesignateAsync(long id, ModelRole role, string reason, string actor, DateTimeOffset at, IReadOnlyList<string> evidence, ModelRole? expectedCurrent, CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -172,9 +172,9 @@ internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistr
         {
             current.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, id);
             before = await current.ExecuteScalarAsync(cancellationToken) as string ?? before;
-            if (before == role.Code())
+            if (before == role.Code() || (expectedCurrent is { } expected && before != expected.Code()))
             {
-                return false;
+                return false; // already has the role, or is not in the role the caller decided on (read under the same lock, so the answer cannot be stale)
             }
         }
 
@@ -199,7 +199,7 @@ internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistr
             foreach (var old in replaced)
             {
                 await AppendAsync(connection, transaction, old, ModelRole.Retired, why, actor, at, cancellationToken);
-                await LogAsync(connection, transaction, old, ModelRole.Champion.Code(), ModelRole.Retired.Code(), why, actor, at, string.Create(CultureInfo.InvariantCulture, $"model:{old}"), string.Create(CultureInfo.InvariantCulture, $"model:{id}"), cancellationToken);
+                await LogAsync(connection, transaction, old, ModelRole.Champion.Code(), ModelRole.Retired.Code(), why, actor, at, string.Create(CultureInfo.InvariantCulture, $"model:{old}"), string.Create(CultureInfo.InvariantCulture, $"model:{id}"), evidence, cancellationToken);
             }
         }
 
@@ -207,15 +207,15 @@ internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistr
 
         // The changelog row of a designation is written in the same transaction (spec P6-08): the champion record and the changelog cannot disagree.
         var replacedBy = replaced.Count > 0 ? string.Create(CultureInfo.InvariantCulture, $"model:{replaced[0]}") : null;
-        await LogAsync(connection, transaction, id, before, role.Code(), reason, actor, at, replacedBy, string.Create(CultureInfo.InvariantCulture, $"model:{id}"), cancellationToken);
+        await LogAsync(connection, transaction, id, before, role.Code(), reason, actor, at, replacedBy, string.Create(CultureInfo.InvariantCulture, $"model:{id}"), evidence, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;
     }
 
-    private static async Task LogAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, long id, string from, string to, string reason, string actor, DateTimeOffset at, string? beforeRef, string afterRef, CancellationToken cancellationToken)
+    private static async Task LogAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, long id, string from, string to, string reason, string actor, DateTimeOffset at, string? beforeRef, string afterRef, IReadOnlyList<string> evidence, CancellationToken cancellationToken)
     {
         var subject = string.Create(CultureInfo.InvariantCulture, $"model:{id}");
-        await LearningChangelogSql.InsertAsync(connection, transaction, new NewChangelogEntry("designation", "model", subject, from, to, reason, actor, [subject], beforeRef, afterRef, null, null, at), cancellationToken);
+        await LearningChangelogSql.InsertAsync(connection, transaction, new NewChangelogEntry("designation", "model", subject, from, to, reason, actor, [subject, .. evidence], beforeRef, afterRef, null, null, at), cancellationToken);
     }
 
     private static async Task AppendAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, long id, ModelRole role, string reason, string actor, DateTimeOffset at, CancellationToken cancellationToken)

@@ -370,6 +370,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, ShadowWriteService>(); // the shadow record of every nightly candidate, written before the open (CF-08); starts paused, setting paper.shadow.enabled OFF, no order
         services.AddSingleton<IScheduledService, ShadowGradeService>(); // grades the shadow record after the close with the same replay as paper (CF-08 part B); starts paused, setting paper.shadow.enabled OFF, no order
         services.AddSingleton<IScheduledService, DecayMonitorService>(); // the daily kill-rule evaluation of each strategy's forward series, after the shadow grading (CF-12 part 12b); starts paused, automatic demotion only with the owner's setting ON (default OFF), no order
+        services.AddSingleton<IScheduledService, MlMonitorService>(); // the daily rollback evaluation of each champion, after the decay monitor (CF-10 part 10d-1); starts paused, automatic acts only with the owner's settings ON (default OFF), no order
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, BriefingService>(); // the daily briefing text after the suggestions (P9-06); starts paused, the model is used only under both switches
         services.AddSingleton<IScheduledService, WeeklyReviewService>(); // the weekly review text after the digest (P9-06); starts paused, applies nothing
@@ -865,7 +866,19 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetModelQuery, Result<ModelDetailView>>, GetModelHandler>();
         services.AddScoped<IQueryHandler<ScoreWithModelQuery, Result<ModelScoreView>>, ScoreWithModelHandler>(); // for experiments and P7 (advisory)
         services.TryAddSingleton<IMlInfluenceEvidence, NoMlInfluenceEvidence>(); // the figures of the predicate: nothing is available until the hold-out scoring, the model id on shadow candidates and the stored calibration detector exist (CF-10 part 10c-2)
-        services.TryAddSingleton<IMlInfluenceSwitch, MlInfluenceSwitchOff>(); // the owner's switch ml.influence.enabled: always off until its store and owner act exist (CF-10 part 10d)
+        // the owner's switch ml.influence.enabled is IMlInfluenceSwitch, stored in research.ml_switch_settings (OFF with no row) and registered by Infrastructure with the other two switches (CF-10 part 10d-1, ADR 0220)
+        services.TryAddSingleton<IRollbackEvidence, NoRollbackEvidence>(); // the champion's scored outcomes and cells: no source exists, so the rollback triggers read unavailable (CF-10 part 10d-1)
+        services.TryAddSingleton<IChallengerEvidence, NoChallengerEvidence>(); // the paired comparison and the counterfactual of a challenger: no source exists, so promotion is refused with the reason (CF-10 part 10d-1)
+        services.AddScoped<ICommandHandler<ChangeMlSettingsCommand, MlSettingsChanged>, ChangeMlSettingsHandler>(); // the owner's three ML switches, all default OFF (CF-10 part 10d-1)
+        services.AddScoped<ICommandHandler<PromoteChallengerCommand, PromotionOutcome>, PromoteChallengerHandler>(); // promotion and re-promotion of a model: the owner, or auto when ml.auto_promote is ON (CF-10 part 10d-1, ADR 0220)
+        services.AddScoped<ICommandHandler<OwnerDesignateModelCommand, DesignationOutcome>, OwnerDesignateModelHandler>(); // the use case behind `xd learn designate`: the P6-07 designation, but a model with a rollback proposal is not named champion from the command line (CF-10 part 10d-1 review)
+        services.AddScoped<ICommandHandler<DemoteModelCommand, DesignationOutcome>, DemoteModelHandler>(); // the one registry move the rollback path may ask for: champion to challenger (CF-10 part 10d-1)
+        services.AddScoped<ICommandHandler<ProposeRollbackCommand, ProposeRollbackOutcome>, ProposeRollbackHandler>(); // one champion's daily rollback evaluation: a proposal per firing trigger; applies only with ml.auto_rollback ON (CF-10 part 10d-1)
+        services.AddScoped<ICommandHandler<ApplyRollbackCommand, ApplyRollbackOutcome>, ApplyRollbackHandler>(); // applies a rollback proposal: demote first, then compare-and-set; owner or the automatic setting (CF-10 part 10d-1)
+        services.AddScoped<ICommandHandler<EvaluateMlModelsCommand, MlRunOutcome>, EvaluateMlModelsHandler>(); // the daily run over the champions (and the challengers when ml.auto_promote is ON) (CF-10 part 10d-1)
+        services.AddScoped<IQueryHandler<GetRollbackProposalsQuery, Result<RollbackProposalsView>>, GetRollbackProposalsHandler>(); // the rollback proposals and the three switches beside them, read only (CF-10 part 10d-1)
+        services.AddScoped<IBellNoticeSource, PromotionNotices>(); // an automatic promotion stays on the bell for three days as a resolved notice (CF-10 part 10d-1)
+        services.AddScoped<IBellNoticeSource, RollbackProposalNotices>(); // the open rollback proposals as bell notices, derived on read (CF-10 part 10d-1)
         services.AddScoped<ModelHoldOutLooks>(); // the one look a model family takes at the locked hold-out (CF-10 part 10c-2, ADR 0217)
         services.AddScoped<MlInfluenceEvaluator>();
         services.AddScoped<IMlInfluenceGate, MlInfluenceGate>(); // the only way Planning, Selection and Autonomy may read a model score (CF-10 part 10c-2, AC10)

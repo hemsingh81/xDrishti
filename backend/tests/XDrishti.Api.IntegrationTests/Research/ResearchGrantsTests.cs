@@ -100,10 +100,11 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             }
         }
 
-        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "expression_legs", "expression_runs", "expression_trades", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "ml_influence_checks", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
+        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "digests", "exit_selection_folds", "exit_selections", "experiment_jobs", "experiments", "expression_legs", "expression_runs", "expression_trades", "extension_evaluations", "extension_extractions", "hypotheses", "learning_changelog", "learning_reports", "lessons", "ml_influence_checks", "ml_monitor_checks", "ml_switch_settings", "model_designations", "model_versions", "option_spread_buckets", "option_spread_models", "pair_formations", "pair_trades", "rollback_proposals", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "trade_features_ext", "training_sets"]);
         foreach (var name in names)
         {
-            foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
+            // a rollback proposal is inserted column by column (never as an already-decided row), so the role holds no table-level INSERT on it (RollbackGrantsTests covers its columns)
+            foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", name != "rollback_proposals"), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
             {
                 await using var check = new NpgsqlCommand("SELECT has_table_privilege('xd_app', @t, @p)", connection);
                 check.Parameters.AddWithValue("t", "research." + name);
@@ -217,7 +218,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(30);
+        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(33);
     }
 
     [Fact]
@@ -268,6 +269,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
     [InlineData("AddTradeFeaturesAndTrainingSets", new[] { "trade_features", "training_sets" })]
     [InlineData("AddModelRegistry", new[] { "model_versions", "model_designations" })]
     [InlineData("AddMlSafety", new[] { "ml_influence_checks" })]
+    [InlineData("AddMlRollback", new[] { "ml_switch_settings", "rollback_proposals", "ml_monitor_checks" })]
     [InlineData("AddExperiments", new[] { "experiments" })]
     [InlineData("AddLearningChangelog", new[] { "learning_changelog" })]
     [InlineData("AddHypotheses", new[] { "hypotheses" })]

@@ -144,8 +144,8 @@ public sealed class ModelRegistryApiTests(ApiFactory factory) : DataTestBase(fac
         var registry = scope.ServiceProvider.GetRequiredService<IModelRegistry>();
 
         var listed = (await registry.ListAsync(null, 10, Ct)).Single();
-        var first = await registry.DesignateAsync(id, ModelRole.Champion, "r", "t", DateTimeOffset.UtcNow, Ct);
-        var second = await registry.DesignateAsync(id, ModelRole.Champion, "r", "t", DateTimeOffset.UtcNow, Ct);
+        var first = await registry.DesignateAsync(id, ModelRole.Champion, "r", "t", DateTimeOffset.UtcNow, [], null, Ct);
+        var second = await registry.DesignateAsync(id, ModelRole.Champion, "r", "t", DateTimeOffset.UtcNow, [], null, Ct);
 
         listed.Model.ReportText.ShouldBeEmpty();
         listed.Model.Parameters.ShouldBeEmpty();

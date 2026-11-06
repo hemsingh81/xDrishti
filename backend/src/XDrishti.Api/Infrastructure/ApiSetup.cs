@@ -121,6 +121,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, PaperCompareEndpoints>(); // backtest versus paper (P10-04): one GET, computed on read
         services.AddSingleton<IEndpointModule, ConfidenceEndpoints>(); // the decay monitor of a strategy and "is the learning loop helping?" (CF-12 part 12a): read only, nothing is proposed or changed
         services.AddSingleton<IEndpointModule, KillEndpoints>(); // the kill proposals, applying one, the owner's automatic setting and the re-enable of a paused cell (CF-12 part 12b): the owner's acts, no order
+        services.AddSingleton<IEndpointModule, MlSafetyEndpoints>(); // the rollback proposals, applying one, the owner's three ML switches and the promotion of a model (CF-10 part 10d-1): the owner's acts, no order
         services.AddSingleton<IEndpointModule, PaperSequentialEndpoints>(); // the sequential failure test of the paper edge series (CF-09): a flag, never a pass, read only
         services.AddSingleton<IEndpointModule, PaperShadowEndpoints>(); // the shadow record summary and the owner's switch (CF-08 part B): fresh password per change, insert-only
         services.AddSingleton<IEndpointModule, PaperPhaseCheckEndpoints>(); // the paper phase check (P10-06): one GET, computed on read

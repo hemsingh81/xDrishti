@@ -8,4 +8,6 @@ namespace XDrishti.Application.Learning;
 /// <param name="Role">The role.</param>
 /// <param name="Reason">Why, at most 500 characters.</param>
 /// <param name="Actor">Who asks.</param>
-public sealed record DesignateModelCommand(long ModelId, ModelRole Role, string Reason, string Actor) : ICommand;
+/// <param name="Evidence">Extra evidence ids for the changelog row (CF-10 part 10d-1: the rollback proposal and the switch row of an automatic act); null for none. At most 10.</param>
+/// <param name="ExpectedCurrentRole">When given, the role the model must have at the moment of the write (checked under the registry's lock); any other role writes nothing and the answer says nothing changed. The demotion of a rollback sets it to the champion role.</param>
+public sealed record DesignateModelCommand(long ModelId, ModelRole Role, string Reason, string Actor, IReadOnlyList<string>? Evidence = null, ModelRole? ExpectedCurrentRole = null) : ICommand;
