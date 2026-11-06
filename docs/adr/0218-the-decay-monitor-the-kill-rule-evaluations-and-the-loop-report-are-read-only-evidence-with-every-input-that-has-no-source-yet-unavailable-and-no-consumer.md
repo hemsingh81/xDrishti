@@ -43,6 +43,9 @@ Spec CF-12 asks that the owner be told when a live-forward edge is wearing out, 
 - **Seeds** are made from the seed key the caller gives (sha256 inside the bootstrap); the loop handler takes the key from the evidence.
 - **Not built (12b and 12c):** kill proposals and their table, the apply and the auto setting, re-enable, the lifecycle change, the decay-monitor service, the `auto` changelog use, the migration `AddDecayAndKill`, the verbs `xd learn decay|loop|curve`, the Learning-screen tabs, the learning-curve refit loop.
 
+## Addendum: the verbs (part 12c-1, 2026-11-06)
+`xd learn decay --strategy ID`, `xd learn loop` and `xd learn curve` are read-only host steps over the same two handlers as the two GETs (and, for `decay`, over the kill-proposal list of ADR 0219 to show the strategy's open proposals and the automatic setting). They print plain wrapped text; a figure with no source reads `unavailable` and the reason, a kill rule that is `held` or `not_evaluated` is labelled "not a pass", and `curve` is the learning-curve section of the loop report (unavailable today: the refit loop is not built). `decay` needs `--strategy` (the brief wrote it optional, but the handler cannot answer without one, so a missing one is a usage error, exit 2); no series for the strategy prints the report and exits 1, as the route answers 404. No decision lives in the verbs, they read no clock and call no store or command handler (an architecture test scans their sources), and no consumer pin was widened.
+
 ## Open owner questions
 1. The three triggers and 2 times / 100 trades as written (spec question 1; 12b)? 2. Is a reference that includes in-sample backtest trades acceptable until a Lab-result out-of-sample port exists? 3. Should a shadow row record its cell (and, for the loop, the scoring model and its score) so that rule (b) and the arms have a source? 4. Is the "since it last fired" reading of the twenty new trades right?
 

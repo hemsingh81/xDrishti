@@ -1,6 +1,9 @@
 using System.Reflection;
+using Mono.Cecil;
 using NetArchTest.Rules;
 using XDrishti.Application.Abstractions.Confidence;
+using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Confidence;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
 
@@ -219,5 +222,160 @@ public sealed class DecayLoopArchitectureTests
         // part 12b owns the proposals, the owner's switch and the migration (KillArchitectureTests pins who writes and who reads them); this endpoint file stays the two reads of part 12a
         var names = Types.InAssembly(Application).That().HaveNameMatching("^.*(KillProposal|ApplyKill|ProposeKill|ReEnable).*$").GetTypes().Where(t => !t.Name.StartsWith('<')).Select(t => t.Name).Order(StringComparer.Ordinal).ToList();
         names.ShouldBe(["ApplyKillCommand", "ApplyKillHandler", "ApplyKillOutcome", "GetKillProposalsHandler", "GetKillProposalsQuery", "IKillProposalReader", "IKillProposalStore", "KillProposalNotices", "KillProposalRow", "KillProposalView", "KillProposalsView", "NewKillProposal", "ProposeKillCommand", "ProposeKillHandler", "ProposeKillOutcome", "ReEnableCellCommand", "ReEnableCellHandler", "ReEnableOutcome"]);
+    }
+
+    [Fact]
+    public void The_cli_verbs_only_read_through_the_query_handlers_and_write_nothing()
+    {
+        // part 12c-1: xd learn decay|loop|curve call the report handlers and the proposal list and nothing that writes, reads the clock, reaches the database layer or borrows another verb. The check reads the IL of the five types
+        // and of everything nested in them (the state machines of the async methods and of the iterators, where the calls are): every type named by a call, a generic argument, a typeof, a field, a parameter or a local. NetArchTest's
+        // dependency rule did not see a command handler resolved with GetService(typeof(...)) inside an async method (the sentinel below passed it), so the scan is Cecil's. A name matches by prefix, so `...Messaging.ICommandHandler` covers both generic arities.
+        var api = Assembly.Load(new AssemblyName("XDrishti.Api"));
+        const string Verbs = "^Learn(Decay|Loop)(Command|Options)$|^LearnReportText$";
+
+        var named = TypesNamedBy(api, Verbs);
+
+        Forbidden(named).ShouldBeEmpty();
+
+        // controls: the scan reaches the verbs' real reads inside their state machines, and the same rule flags a sentinel that holds an ICommandHandler<,> (in a state machine, resolved by typeof) and one that holds the clock
+        named.ShouldContain("XDrishti.Application.Confidence.GetDecayReportQuery");
+        named.ShouldContain("XDrishti.Application.Confidence.GetKillProposalsQuery");
+        named.ShouldContain("XDrishti.Application.Confidence.GetLoopReportQuery");
+        named.ShouldContain("XDrishti.Application.Abstractions.Messaging.IQueryHandler`2");
+
+        var self = typeof(DecayLoopArchitectureTests).Assembly;
+        Forbidden(TypesNamedBy(self, "^CliCommandHandlerSentinel$")).ShouldNotBeEmpty();
+        Forbidden(TypesNamedBy(self, "^CliClockSentinel$")).ShouldNotBeEmpty();
+    }
+
+    private static string[] CliForbidden =>
+    [
+        "XDrishti.Application.Abstractions.Messaging.ICommandHandler", "System.TimeProvider", "XDrishti.Infrastructure", "XDrishti.Api.Cli.LearnLifecycleCommand",
+    ];
+
+    private static List<string> Forbidden(IEnumerable<string> names) =>
+        [.. names.Where(n => CliForbidden.Any(f => n.StartsWith(f, StringComparison.Ordinal))).Order(StringComparer.Ordinal)];
+
+    /// <summary>The full names of every type that the code and the signatures of the matching types (and of the types nested in them) name, read from the IL.</summary>
+    private static HashSet<string> TypesNamedBy(Assembly assembly, string pattern)
+    {
+        var found = new HashSet<string>(StringComparer.Ordinal);
+
+        void Add(TypeReference? type)
+        {
+            if (type is null)
+            {
+                return;
+            }
+
+            found.Add(type.FullName);
+            if (type is GenericInstanceType generic)
+            {
+                foreach (var argument in generic.GenericArguments)
+                {
+                    Add(argument);
+                }
+            }
+
+            if (type is TypeSpecification specification)
+            {
+                Add(specification.ElementType);
+            }
+        }
+
+        void AddMethod(MethodReference method)
+        {
+            Add(method.DeclaringType);
+            Add(method.ReturnType);
+            foreach (var parameter in method.Parameters)
+            {
+                Add(parameter.ParameterType);
+            }
+
+            if (method is GenericInstanceMethod instance)
+            {
+                foreach (var argument in instance.GenericArguments)
+                {
+                    Add(argument);
+                }
+            }
+        }
+
+        using var module = ModuleDefinition.ReadModule(assembly.Location);
+        foreach (var type in module.GetTypes())
+        {
+            // a type matches when it, or a type it is nested in, has the name
+            var matches = false;
+            for (var t = type; t is not null; t = t.DeclaringType)
+            {
+                matches |= System.Text.RegularExpressions.Regex.IsMatch(t.Name, pattern);
+            }
+
+            if (!matches)
+            {
+                continue;
+            }
+
+            Add(type.BaseType);
+            foreach (var @interface in type.Interfaces)
+            {
+                Add(@interface.InterfaceType);
+            }
+
+            foreach (var field in type.Fields)
+            {
+                Add(field.FieldType);
+            }
+
+            foreach (var method in type.Methods)
+            {
+                AddMethod(method);
+                if (!method.HasBody)
+                {
+                    continue;
+                }
+
+                foreach (var variable in method.Body.Variables)
+                {
+                    Add(variable.VariableType);
+                }
+
+                foreach (var operand in method.Body.Instructions.Select(i => i.Operand))
+                {
+                    switch (operand)
+                    {
+                        case TypeReference reference:
+                            Add(reference);
+                            break;
+                        case MethodReference call:
+                            AddMethod(call);
+                            break;
+                        case FieldReference field:
+                            Add(field.DeclaringType);
+                            Add(field.FieldType);
+                            break;
+                    }
+                }
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>Stands for a verb that writes: it resolves a command handler in an async method (so the call sits in a state machine).</summary>
+    internal sealed class CliCommandHandlerSentinel(IServiceProvider services)
+    {
+        public async Task<bool> RunAsync(CancellationToken cancellationToken)
+        {
+            var handler = (ICommandHandler<ApplyKillCommand, ApplyKillOutcome>)services.GetService(typeof(ICommandHandler<ApplyKillCommand, ApplyKillOutcome>))!;
+            await Task.Yield();
+            return handler is not null && !cancellationToken.IsCancellationRequested;
+        }
+    }
+
+    /// <summary>Stands for a verb that reads the clock.</summary>
+    internal sealed class CliClockSentinel(TimeProvider clock)
+    {
+        public DateTimeOffset Now() => clock.GetUtcNow();
     }
 }
