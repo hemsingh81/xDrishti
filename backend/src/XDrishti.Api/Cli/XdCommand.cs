@@ -134,6 +134,11 @@ internal static class XdCommand
             return await LearnRollbackCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 1 && args[0] == "readiness")
+        {
+            return await ReadinessCliCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "select" && args[1] == "cells")
         {
             return await SelectCellsCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
