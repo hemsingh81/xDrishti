@@ -14,9 +14,6 @@ internal sealed class UnavailableReadinessGaps : IReadinessGaps
     public ValueTask<ReadinessReading<bool>> BenchmarkBeatenAsync(string strategy, int? version, CancellationToken cancellationToken) =>
         None<bool>("no same-universe benchmark producer exists (P8-07 baskets benchmarks give no risk-adjusted net comparison per strategy yet).");
 
-    public ValueTask<ReadinessReading<bool>> CapacityOkAsync(string strategy, int? version, CancellationToken cancellationToken) =>
-        None<bool>("the Lab verdict has no per-trade liquidity tier and no order size against the minute value (CF-05 capacity).");
-
     public ValueTask<ReadinessReading<bool>> TwentyTradeCheckPassedAsync(string strategy, CancellationToken cancellationToken) =>
         None<bool>("the P3-09 20-trade check is the owner's signed record and has no machine-readable store.");
 
@@ -24,7 +21,7 @@ internal sealed class UnavailableReadinessGaps : IReadinessGaps
         None<bool>("the list of P7 and P10 integrity checks is unverified, so no source reads them.");
 
     public ValueTask<ReadinessReading<bool>> TierCOnlyAsync(string strategy, CancellationToken cancellationToken) =>
-        None<bool>("no per-trade liquidity tier is stored, so it is not known whether the evidence is only from tier C.");
+        None<bool>("whether \"evidence only from tier C\" means the Lab trades or the forward trades is not decided (owner question, ADR 0223), so it is not known whether the evidence is only from tier C.");
 
     public ValueTask<ReadinessReading<double>> RiskShareAsync(string strategy, CancellationToken cancellationToken) =>
         None<double>("the plan does not expose a planned risk share per strategy; the system level uses equal weights and says so.");

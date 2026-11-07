@@ -91,13 +91,13 @@ public sealed class LabRunnerTests
             new LabDeflation(_ledger, _variantStats, options ?? new DeflationOptions()), _variantStats);
     }
 
-    private LabRunner RunnerWithStress(CostStressOptions options)
+    private LabRunner RunnerWithStress(CostStressOptions options, LabTiers? tiers = null)
     {
         _ledger.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
         _variantStats.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
         _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<IReadOnlyList<VariantStatsRow>>().Count);
         return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default, null, null, options), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
-            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, new LabCostStress(options));
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, new LabCostStress(options), tiers: tiers);
     }
 
     private LabRunner Runner(ConfidenceOptions? confidence = null) => new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, confidence), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance, new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats);
@@ -458,6 +458,28 @@ public sealed class LabRunnerTests
         block.Delay.ShouldNotBeNull();
         System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { CostStress = null }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]), "outcome, gates, reasons, limits, evidence and robustness are byte for byte the same");
         _finishes[1].SimRunKeys.ShouldBe(_finishes[0].SimRunKeys);
+    }
+
+    [Fact]
+    public async Task The_tier_block_is_added_to_the_cost_stress_and_moves_nothing_else_of_the_verdict_and_old_runs_have_none()
+    {
+        ArrangeFullTest();
+        var bars = Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarQueries>();
+        bars.ReadDailyBarsAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns([]);
+        var options = new CostStressOptions();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithStress(options).ExecuteAsync(RobustRun(), Ct);
+        await RunnerWithStress(options, new LabTiers(bars, options, NullLogger<LabTiers>.Instance)).ExecuteAsync(RobustRun(), Ct);
+
+        verdicts.Count.ShouldBe(2);
+        verdicts[0].CostStress!.Tiers.ShouldBeNull();
+        var tiers = verdicts[1].CostStress!.Tiers.ShouldNotBeNull();
+        tiers.Trades.ShouldBe(verdicts[1].Evidence.OosTrades);
+        tiers.TierUnavailable.ShouldBe(tiers.Trades, "no day bar is stored in the fixture, so no tier is claimed");
+        tiers.SettingsHash.ShouldBe(options.TierSnapshotHash());
+        System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { CostStress = verdicts[1].CostStress! with { Tiers = null } }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]), "outcome, gates, limits, evidence and the stress rows are byte for byte the same");
     }
 
     [Fact]

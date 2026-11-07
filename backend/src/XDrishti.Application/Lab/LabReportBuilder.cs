@@ -144,6 +144,11 @@ internal static class LabReportBuilder
             {
                 w.Add(new ReportWarningView("cost_stress", "The edge does not survive: " + string.Join("; ", missed) + (cs.Enforce ? "." : " (report only: the outcome is not changed).")));
             }
+
+            if (cs.Tiers is { } tiers && (tiers.TierC > 0 || tiers.CapacityBreaches > 0))
+            {
+                w.Add(new ReportWarningView("liquidity", $"Of {tiers.Trades} out-of-sample trades {tiers.TierC} are liquidity tier C and {tiers.CapacityBreaches} orders are over a participation cap (measured on day bars, the fill minute is not read; report only: the outcome is not changed)."));
+            }
         }
 
         if (v.Nulls is { } nulls)

@@ -48,4 +48,7 @@ internal static partial class LabRunLog
 
     [LoggerMessage(EventId = 7092, Level = LogLevel.Error, Message = "lab.holdout.audit_failed run {RunId} {Failure}")]
     public static partial void HoldOutAuditFailed(ILogger logger, Guid runId, string failure);
+
+    [LoggerMessage(EventId = 7096, Level = LogLevel.Warning, Message = "lab.tiers.bars_unread instrument {InstrumentId} trades {Trades}; its trades count as tier and capacity unavailable")]
+    public static partial void TiersBarsUnread(ILogger logger, Guid instrumentId, int trades, Exception exception);
 }

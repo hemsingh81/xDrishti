@@ -8686,6 +8686,59 @@ export interface components {
       reason: string;
     };
     /**
+     * @description The liquidity tier and the capacity check of the out-of-sample trades of a Lab verdict (CF-05 D2 and D4, ADR 0223), the evidence of row 14 of the readiness scorecard. Report-only: nothing in the verdict reads it. Counts only; no trade is named.
+     *     A trade with no usable 20-day median is int CostStressTiersView.TierUnavailable. The capacity is held against 0.5 % of the 20-day median (measured) and 1 % of the fill minute's traded value, which is not read from day bars, so without a breach
+     *     every capacity reading is int CostStressTiersView.CapacityUnavailable and none is a pass; int? CostStressTiersView.OrdersOverEntryDayShare is information only.
+     */
+    CostStressTiersView: {
+      /**
+       * Format: int32
+       * @description The out-of-sample trades judged (the sum of the four tier counts).
+       */
+      trades: number;
+      /**
+       * Format: int32
+       * @description Trades in tier A.
+       */
+      tierA: number;
+      /**
+       * Format: int32
+       * @description Trades in tier B.
+       */
+      tierB: number;
+      /**
+       * Format: int32
+       * @description Trades in tier C (excluded from edge claims, counted here).
+       */
+      tierC: number;
+      /**
+       * Format: int32
+       * @description Trades with no usable 20-day median traded value (or whose bars could not be read).
+       */
+      tierUnavailable: number;
+      /**
+       * Format: int32
+       * @description Trades whose order is over a cap that was measured (the 20-day median share).
+       */
+      capacityBreaches: number;
+      /**
+       * Format: int32
+       * @description Trades whose capacity could not be fully judged (the fill minute is not read, a traded value or the order value is missing, or the bars could not be read) and that are not already a breach.
+       */
+      capacityUnavailable: number;
+      /** @description The text of the tier and capacity settings that produced the counts. */
+      settings: string;
+      /** @description SHA-256 of Settings. */
+      settingsHash: string;
+      /** @description What is measured and what is not read. */
+      basis: string;
+      /**
+       * Format: int32
+       * @description Information only: orders over the capacity share of the entry day's traded value (about 375 times looser than the fill minute's); it can never make a pass. Null in a block produced before it.
+       */
+      ordersOverEntryDayShare?: null | number;
+    };
+    /**
      * @description The cost stress and the delay test of a Lab verdict (CF-05, ADR 0206), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a miss caps the outcome at MARGINAL and never raises it. Every settings figure used is in
      *     string CostStressView.Settings and its hash in string CostStressView.SettingsHash. string CostStressView.Tradable is the worst of the three multipliers. bool CostStressView.CostsChecked is false until `cost-sheet check` has recorded a bill check, and the rows are then unavailable.
      */
@@ -8715,6 +8768,7 @@ export interface components {
       limit: string;
       /** @description The hash of the sheet's rates the run was costed with, so a stored verdict says which numbers were checked. */
       sheetRatesSha256?: null | string;
+      tiers?: null | components['schemas']['CostStressTiersView'];
     };
     /** @description What undoing a cost batch did: its entries are voided (nothing is deleted). Undoing a batch again is a no-op (`AlreadyUndone`, `Voided` 0). */
     CostUndoResult: {

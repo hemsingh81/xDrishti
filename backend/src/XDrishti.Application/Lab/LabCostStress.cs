@@ -24,7 +24,8 @@ internal sealed class LabCostStress(CostStressOptions options)
     /// <param name="costsChecked">The sheet carries a bill check.</param>
     /// <param name="delay">The signals of the delay test; null when the run did not take it.</param>
     /// <param name="ratesSha256">The hash of the sheet's rates.</param>
-    public LabVerdictView Apply(LabVerdictView verdict, IReadOnlyList<SelectionTrade> oosTrades, string? sheetId, bool costsChecked, DelaySignals? delay, string? ratesSha256 = null)
+    /// <param name="tiers">The tier and capacity counts (ADR 0223), carried on the view and read by nothing here.</param>
+    public LabVerdictView Apply(LabVerdictView verdict, IReadOnlyList<SelectionTrade> oosTrades, string? sheetId, bool costsChecked, DelaySignals? delay, string? ratesSha256 = null, CostStressTiersView? tiers = null)
     {
         ArgumentNullException.ThrowIfNull(verdict);
         ArgumentNullException.ThrowIfNull(oosTrades);
@@ -56,7 +57,7 @@ internal sealed class LabCostStress(CostStressOptions options)
 
         var cap = options.Enforce && misses.Count > 0 && string.Equals(verdict.Outcome, "PASS", StringComparison.Ordinal);
         var view = new CostStressView(
-            options.Mode.ToString(), options.Enforce, options.KeyText(), options.SnapshotHash(), costsChecked, sheetId, rows, Word(tradable), delayView, cap, CostStress.Formula, CostStress.FirstOrderLimit, ratesSha256);
+            options.Mode.ToString(), options.Enforce, options.KeyText(), options.SnapshotHash(), costsChecked, sheetId, rows, Word(tradable), delayView, cap, CostStress.Formula, CostStress.FirstOrderLimit, ratesSha256, tiers);
         return cap
             ? verdict with { Outcome = "MARGINAL", Limits = [.. verdict.Limits, "capped at MARGINAL by the cost stress gates (enforced): " + string.Join(", ", misses)], CostStress = view }
             : verdict with { CostStress = view };

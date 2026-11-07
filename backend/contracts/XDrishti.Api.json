@@ -28341,6 +28341,79 @@
         },
         "description": "One row of the cost stress (CF-05): the multiplier, the out-of-sample trades restated, the mean stressed net R, the floor and its comparison, and the reading (`pass`, `fail` or `unavailable`, which is never a pass) with its reason."
       },
+      "CostStressTiersView": {
+        "required": [
+          "trades",
+          "tierA",
+          "tierB",
+          "tierC",
+          "tierUnavailable",
+          "capacityBreaches",
+          "capacityUnavailable",
+          "settings",
+          "settingsHash",
+          "basis"
+        ],
+        "type": "object",
+        "properties": {
+          "trades": {
+            "type": "integer",
+            "description": "The out-of-sample trades judged (the sum of the four tier counts).",
+            "format": "int32"
+          },
+          "tierA": {
+            "type": "integer",
+            "description": "Trades in tier A.",
+            "format": "int32"
+          },
+          "tierB": {
+            "type": "integer",
+            "description": "Trades in tier B.",
+            "format": "int32"
+          },
+          "tierC": {
+            "type": "integer",
+            "description": "Trades in tier C (excluded from edge claims, counted here).",
+            "format": "int32"
+          },
+          "tierUnavailable": {
+            "type": "integer",
+            "description": "Trades with no usable 20-day median traded value (or whose bars could not be read).",
+            "format": "int32"
+          },
+          "capacityBreaches": {
+            "type": "integer",
+            "description": "Trades whose order is over a cap that was measured (the 20-day median share).",
+            "format": "int32"
+          },
+          "capacityUnavailable": {
+            "type": "integer",
+            "description": "Trades whose capacity could not be fully judged (the fill minute is not read, a traded value or the order value is missing, or the bars could not be read) and that are not already a breach.",
+            "format": "int32"
+          },
+          "settings": {
+            "type": "string",
+            "description": "The text of the tier and capacity settings that produced the counts."
+          },
+          "settingsHash": {
+            "type": "string",
+            "description": "SHA-256 of Settings."
+          },
+          "basis": {
+            "type": "string",
+            "description": "What is measured and what is not read."
+          },
+          "ordersOverEntryDayShare": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Information only: orders over the capacity share of the entry day's traded value (about 375 times looser than the fill minute's); it can never make a pass. Null in a block produced before it.",
+            "format": "int32"
+          }
+        },
+        "description": "The liquidity tier and the capacity check of the out-of-sample trades of a Lab verdict (CF-05 D2 and D4, ADR 0223), the evidence of row 14 of the readiness scorecard. Report-only: nothing in the verdict reads it. Counts only; no trade is named.\nA trade with no usable 20-day median is int CostStressTiersView.TierUnavailable. The capacity is held against 0.5 % of the 20-day median (measured) and 1 % of the fill minute's traded value, which is not read from day bars, so without a breach\nevery capacity reading is int CostStressTiersView.CapacityUnavailable and none is a pass; int? CostStressTiersView.OrdersOverEntryDayShare is information only."
+      },
       "CostStressView": {
         "required": [
           "mode",
@@ -28425,6 +28498,17 @@
               "string"
             ],
             "description": "The hash of the sheet's rates the run was costed with, so a stored verdict says which numbers were checked."
+          },
+          "tiers": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The liquidity tier and capacity counts of the trades (CF-05 follow-up, ADR 0223); null in a verdict stored before it (\"produced before the tier and capacity check; re-run\"). Nothing in the verdict reads it.",
+                "$ref": "#/components/schemas/CostStressTiersView"
+              }
+            ]
           }
         },
         "description": "The cost stress and the delay test of a Lab verdict (CF-05, ADR 0206), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a miss caps the outcome at MARGINAL and never raises it. Every settings figure used is in\nstring CostStressView.Settings and its hash in string CostStressView.SettingsHash. string CostStressView.Tradable is the worst of the three multipliers. bool CostStressView.CostsChecked is false until `cost-sheet check` has recorded a bill check, and the rows are then unavailable."

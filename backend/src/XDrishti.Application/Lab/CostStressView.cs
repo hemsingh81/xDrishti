@@ -23,6 +23,7 @@ public sealed record CostStressDelayView(int Minutes, int Signals, int DelayedFi
 /// <param name="Formula">The stress formula.</param>
 /// <param name="Limit">The first-order limit of the formula.</param>
 /// <param name="SheetRatesSha256">The hash of the sheet's rates the run was costed with, so a stored verdict says which numbers were checked.</param>
+/// <param name="Tiers">The liquidity tier and capacity counts of the trades (CF-05 follow-up, ADR 0223); null in a verdict stored before it ("produced before the tier and capacity check; re-run"). Nothing in the verdict reads it.</param>
 public sealed record CostStressView(
     string Mode,
     bool Enforce,
@@ -36,4 +37,5 @@ public sealed record CostStressView(
     bool Capped,
     string Formula,
     string Limit,
-    string? SheetRatesSha256 = null);
+    string? SheetRatesSha256 = null,
+    CostStressTiersView? Tiers = null);

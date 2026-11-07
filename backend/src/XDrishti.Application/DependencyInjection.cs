@@ -760,6 +760,7 @@ public static class DependencyInjection
         services.AddScoped<LabNulls>(); // the random-entry null beside the outcome and its ledger row (CF-07, ADR 0208)
         services.AddScoped<LabPlacebos>(); // the placebo set and the mirror gate beside it, and their ledger row (CF-07 part B, ADR 0209)
         services.AddScoped<LabCostStress>(); // the cost stress gates and the delay test beside the outcome (CF-05, ADR 0206)
+        services.AddScoped<LabTiers>(); // the liquidity tier and capacity check of the out-of-sample trades, read by the Lab runner only (CF-05 follow-up, ADR 0223)
         services.AddScoped<LabDeflation>(); // the deflated Sharpe ratio beside the factor (CF-03, ADR 0205)
         services.AddSingleton<LabRunDispatcher>();
         return services;

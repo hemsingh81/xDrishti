@@ -47,6 +47,19 @@ public sealed class LabReportCostStressTests
     }
 
     [Fact]
+    public void Tier_C_trades_and_capacity_breaches_are_counted_in_a_report_only_warning_and_clean_tiers_add_none()
+    {
+        var dirty = Block(true) with { Tiers = new CostStressTiersView(400, 300, 70, 30, 0, 12, 0, "s", "h", "b") };
+        var clean = Block(true) with { Tiers = new CostStressTiersView(400, 300, 100, 0, 0, 0, 0, "s", "h", "b") };
+
+        var warning = LabReportBuilder.Build(Run(), Verdict(dirty), 6).Warnings.Single(w => w.Code == "liquidity");
+
+        warning.Text.ShouldContain("30 are liquidity tier C");
+        warning.Text.ShouldContain("12 orders are over a participation cap");
+        LabReportBuilder.Build(Run(), Verdict(clean), 6).Warnings.ShouldNotContain(w => w.Code == "liquidity");
+    }
+
+    [Fact]
     public void A_missed_stress_or_delay_gate_warns_and_says_it_is_report_only()
     {
         var w = LabReportBuilder.Build(Run(), Verdict(Block(true, "fail", "fail")), 6).Warnings.Single(x => x.Code == "cost_stress").Text;

@@ -41,7 +41,8 @@ internal sealed class LabRunner(
     LabHoldOutGuard? holdOutGuard = null,
     HoldOutUnlocker? unlocker = null,
     LabNulls? nulls = null,
-    LabPlateau? plateau = null) : ILabRunExecutor
+    LabPlateau? plateau = null,
+    LabTiers? tiers = null) : ILabRunExecutor
 {
     /// <summary>Who is recorded as the author of a stored run.</summary>
     public const string Actor = "lab:quick";
@@ -283,7 +284,9 @@ internal sealed class LabRunner(
         // Robust runs only: a plain full run keeps the document it always had (CF-05 criterion 7); the sheet is the one the run was costed with, read once at the start
         if (costStress is { IsOn: true } && string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal) && sheetUsed is not null)
         {
-            verdict = costStress.Apply(verdict, full.OosTrades, sheetUsed.Id, sheetUsed.Checked is not null, delay, sheetUsed.RatesSha256);
+            // ADR 0223: the liquidity tier and the capacity check of the same trades, from day bars; carried on the block, read by no gate
+            var tierCounts = tiers is null ? null : await tiers.ComputeAsync(full.OosSources, ownerToken);
+            verdict = costStress.Apply(verdict, full.OosTrades, sheetUsed.Id, sheetUsed.Checked is not null, delay, sheetUsed.RatesSha256, tierCounts);
         }
 
         // CF-07: the random-entry null beside the outcome; the outcome moves only if the owner has turned Enforce on, and the family-level nulls (the random-entry null and the placebo set) are one more look each in the ledger (written with the sweep rows below)

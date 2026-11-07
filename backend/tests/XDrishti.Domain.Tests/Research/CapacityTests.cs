@@ -41,6 +41,19 @@ public sealed class CapacityTests
     }
 
     [Fact]
+    public void An_order_over_a_known_cap_is_a_breach_even_when_the_other_cap_cannot_be_read_and_the_unread_cap_is_named()
+    {
+        var overMedian = Capacity.Check(60 * Lakh + 1, null, 120 * Crore, 0.01m, 0.005m);
+        var overMinute = Capacity.Check(Lakh, 4 * Lakh, null, 0.01m, 0.005m);
+        var inside = Capacity.Check(Lakh, null, 120 * Crore, 0.01m, 0.005m);
+
+        overMedian.Reason.ShouldBe("over the share of the 20-day median traded value");
+        overMinute.Reason.ShouldBe("over the share of the fill minute's traded value");
+        inside.Reason.ShouldBe("unavailable: the fill minute's traded value is not read");
+        Capacity.Check(Lakh, null, null, 0.01m, 0.005m).Reason.ShouldBe("unavailable: the fill minute's traded value is not read; the 20-day median traded value is not known");
+    }
+
+    [Fact]
     public void A_missing_traded_value_is_a_breach_with_an_unavailable_reason_never_a_pass()
     {
         Capacity.Check(Lakh, null, 120 * Crore, 0.01m, 0.005m).Breach.ShouldBeTrue();
