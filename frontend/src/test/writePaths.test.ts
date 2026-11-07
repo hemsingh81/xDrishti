@@ -18,6 +18,7 @@ const WRITER_FEATURES = new Set([
   'plans',
   'portfolio',
   'quality',
+  'readiness',
   'services',
   'settings',
   'suggestions',

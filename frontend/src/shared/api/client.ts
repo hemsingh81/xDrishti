@@ -52,6 +52,7 @@ const passwordCheckPaths = new Set<string>([
   '/api/live-trading/compliance',
   '/api/selection/event-filter',
   '/api/lab/runs/{id}/holdout-unlock',
+  '/api/confidence/readiness-settings',
 ]);
 
 api.use({
