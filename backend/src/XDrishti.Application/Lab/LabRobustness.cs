@@ -121,14 +121,16 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
         var regime = await RegimeAsync(full, cancellationToken);
         var view = new RobustnessView(
             sensitivity,
-            mc is null ? null : new MonteCarloView(mc.Trades, mc.Draws, mc.Seed.ToString(CultureInfo.InvariantCulture), mc.ObservedMeanR, mc.ObservedMaxDrawdownR, mc.MeanP05, mc.MeanP50, mc.MeanP95, mc.DrawdownP50, mc.DrawdownP95, mc.ShareNotPositive),
+            mc is null ? null : new MonteCarloView(mc.Trades, mc.Draws, mc.Seed.ToString(CultureInfo.InvariantCulture), mc.ObservedMeanR, mc.ObservedMaxDrawdownR, mc.MeanP05, mc.MeanP50, mc.MeanP95, mc.DrawdownP50, mc.DrawdownP95, mc.ShareNotPositive, mc.DrawdownP90),
             [.. YearBreakdown.Of(full.OosTrades).Select(y => new YearView(y.Year, y.Trades, y.MeanR, y.TotalR, y.ProfitFactor, y.Positive))],
             flip is null ? null : new SignFlipBaselineView("sign_flip", flip.Trades, flip.Draws, flip.Seed.ToString(CultureInfo.InvariantCulture), flip.ObservedMeanR, flip.NullMeanP95, flip.PValue, "each trade keeps its size, its sign is a coin flip; not a random-entry run"),
             regime?.Text ?? RegimeUnavailable,
             limits,
             regime is null ? null : [.. regime.Buckets.Select(b => new RegimeBucketView(b.Part, b.Basis, b.Trades, b.MeanR, b.TotalR, b.Enough))],
             regime is null ? null : [.. regime.Tally.UnavailableByReason.Select(r => new RegimeMissingView(r.Key, r.Value))],
-            BlockOf(full.OosTrades, seed ^ BlockSeedMask, draws, mc));
+            BlockOf(full.OosTrades, seed ^ BlockSeedMask, draws, mc),
+            [.. QuarterBreakdown.Of(full.OosTrades).Select(q => new QuarterView(q.Year, q.Quarter, q.Trades, q.MeanR))],
+            InstrumentShareOf(full));
         // CF-05: the fill-one-minute-later test, one more walk of the same signals (the default exit, the whole window); the verdict is not touched here
         DelaySignals? delay = null;
         if (costStress is { IsOn: true })
@@ -139,6 +141,19 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
         }
 
         return Result.Success(new RobustnessOutcome(view, rows, stats, delay));
+    }
+
+    /// <summary>
+    /// The largest instrument's share of the total R of the out-of-sample trades (SC-S1, ADR 0222); null when the simulated trades behind them were not kept, there is none, or they do not pair one to one with the trades (never a guess at which R belongs to which instrument).
+    /// </summary>
+    private static double? InstrumentShareOf(FullTestOutcome full)
+    {
+        if (full.OosSources is not { } sources || sources.Count != full.OosTrades.Count)
+        {
+            return null;
+        }
+
+        return InstrumentShare.Max([.. sources.Select((s, i) => (s.InstrumentId, full.OosTrades[i].R))]);
     }
 
     /// <summary>The same signals with the entry fill <paramref name="minutes"/> later, matched to the base run's trades by instrument, side and decision instant (CF-05, D3).</summary>

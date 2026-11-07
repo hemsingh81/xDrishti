@@ -80,15 +80,6 @@ public interface IReadinessGaps
     /// <summary>Row 15: the owner's 20-trade check (P3-09) passed. It is the owner's signed record, which has no machine-readable store.</summary>
     ValueTask<ReadinessReading<bool>> TwentyTradeCheckPassedAsync(string strategy, CancellationToken cancellationToken);
 
-    /// <summary>Row 10: the share of calendar quarters at or above the quarter floor (the Lab verdict has the years but not the quarters).</summary>
-    ValueTask<ReadinessReading<double>> QuarterShareAsync(string strategy, int? version, CancellationToken cancellationToken);
-
-    /// <summary>Row 10: the largest share of the total R that one instrument holds (the Lab verdict has no per-instrument table).</summary>
-    ValueTask<ReadinessReading<double>> MaxInstrumentShareAsync(string strategy, int? version, CancellationToken cancellationToken);
-
-    /// <summary>Row 11: the 90th percentile of the Monte Carlo drawdown (the Lab verdict stores the 50th and the 95th).</summary>
-    ValueTask<ReadinessReading<double>> McDrawdownP90Async(string strategy, int? version, CancellationToken cancellationToken);
-
     /// <summary>The hard fail "integrity fault": true when a P7 or P10 integrity check fails (the list of checks is unverified, so no source exists).</summary>
     ValueTask<ReadinessReading<bool>> IntegrityFaultAsync(CancellationToken cancellationToken);
 

@@ -149,7 +149,7 @@ internal static class ReportHtml
         Table(h, ["Parameter", "Verdict", "Reason"], b.Sensitivity.Parameters.Select(p => new[] { p.Param, p.Verdict, p.Reason }));
         if (b.MonteCarlo is { } m)
         {
-            Table(h, ["MC trades", "Draws", "Observed mean R", "Mean P05", "Mean P50", "Mean P95", "Drawdown P95", "Share not positive"], [[I(m.Trades), I(m.Draws), N(m.ObservedMeanR), N(m.MeanP05), N(m.MeanP50), N(m.MeanP95), N(m.DrawdownP95), N(m.ShareNotPositive)]]);
+            Table(h, ["MC trades", "Draws", "Observed mean R", "Mean P05", "Mean P50", "Mean P95", "Drawdown P90", "Drawdown P95", "Share not positive"], [[I(m.Trades), I(m.Draws), N(m.ObservedMeanR), N(m.MeanP05), N(m.MeanP50), N(m.MeanP95), N(m.DrawdownP90), N(m.DrawdownP95), N(m.ShareNotPositive)]]);
         }
 
         if (b.MonteCarloBlock is null)
@@ -163,6 +163,16 @@ internal static class ReportHtml
         }
 
         Table(h, ["Year", "Trades", "Mean R", "Total R", "Profit factor"], b.ByYear.Select(y => new[] { I(y.Year), I(y.Trades), N(y.MeanR), N(y.TotalR), N(y.ProfitFactor) }));
+        if (b.ByQuarter is { Count: > 0 } quarters)
+        {
+            Table(h, ["Quarter", "Trades", "Mean R"], quarters.Select(q => new[] { I(q.Year) + " Q" + I(q.Quarter), I(q.Trades), N(q.MeanR) }));
+        }
+
+        if (b.MaxInstrumentShare is { } share)
+        {
+            h.Append("<p>Largest instrument share of the total R: ").Append(N(share)).Append(".</p>\n");
+        }
+
         if (b.SignFlipBaseline is { } s)
         {
             h.Append("<p>").Append(Html.Text(s.Label)).Append(" p-value ").Append(N(s.PValue)).Append(".</p>\n");

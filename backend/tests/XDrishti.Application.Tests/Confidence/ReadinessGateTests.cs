@@ -40,6 +40,9 @@ public sealed class ReadinessGateTests
     {
         var f = new ReadinessFixture { Gaps = new UnavailableReadinessGaps() };
 
+        // a verdict stored before the scorecard sources existed: rows 10 and 11 have no figure, and no figure is a fail
+        f.Verdict = f.Verdict! with { Robustness = f.Verdict.Robustness! with { ByQuarter = null, MaxInstrumentShare = null, MonteCarlo = f.Verdict.Robustness.MonteCarlo! with { DrawdownP90 = null } } };
+
         var decision = await f.Gate.CheckAsync(R, Ct);
 
         decision.Passed.ShouldBeFalse();
