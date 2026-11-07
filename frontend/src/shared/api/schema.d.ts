@@ -15573,7 +15573,7 @@ export interface components {
       settings: string;
       note: string;
     };
-    /** @description The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number). */
+    /** @description The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number). `DrawdownP90` (SC-S1, ADR 0222) is null in a result stored before it. */
     MonteCarloView: {
       /** Format: int32 */
       trades: number;
@@ -15596,6 +15596,8 @@ export interface components {
       drawdownP95: number;
       /** Format: double */
       shareNotPositive: number;
+      /** Format: double */
+      drawdownP90?: null | number;
     };
     /** @description The body of a hypothesis move. */
     MoveHypothesisRequest: {
@@ -18244,6 +18246,17 @@ export interface components {
        */
       quantity: number;
     };
+    /** @description The out-of-sample trades of one calendar quarter that had at least one trade (SC-S1, ADR 0222). */
+    QuarterView: {
+      /** Format: int32 */
+      year: number;
+      /** Format: int32 */
+      quarter: number;
+      /** Format: int32 */
+      trades: number;
+      /** Format: double */
+      meanR: number;
+    };
     /** @description An accepted hypothesis waiting; nothing was applied. */
     QueueItem: {
       /**
@@ -19563,7 +19576,7 @@ export interface components {
       weeklyLossR: number;
       weeklyLossAction: string;
     };
-    /** @description The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it). */
+    /** @description The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it). Since SC-S1 (ADR 0222) `ByQuarter` (the quarters with a trade) and `MaxInstrumentShare` (the largest instrument's share of the total R, 1.0 when the total is not above 0) feed the readiness scorecard's row 10; both are null in a result stored before it, and nothing here changes the verdict. */
     RobustnessView: {
       sensitivity: components['schemas']['SensitivityView'];
       monteCarlo: null | components['schemas']['MonteCarloView'];
@@ -19574,6 +19587,9 @@ export interface components {
       byRegimeBuckets?: null | components['schemas']['RegimeBucketView'][];
       byRegimeUnavailable?: null | components['schemas']['RegimeMissingView'][];
       monteCarloBlock?: null | components['schemas']['MonteCarloBlockView'];
+      byQuarter?: null | components['schemas']['QuarterView'][];
+      /** Format: double */
+      maxInstrumentShare?: null | number;
     };
     RoleToggleInput: {
       enabled: boolean;

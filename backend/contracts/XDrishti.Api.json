@@ -47570,9 +47570,16 @@
           "shareNotPositive": {
             "type": "number",
             "format": "double"
+          },
+          "drawdownP90": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
           }
         },
-        "description": "The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number)."
+        "description": "The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number). `DrawdownP90` (SC-S1, ADR 0222) is null in a result stored before it."
       },
       "MoveHypothesisRequest": {
         "required": [
@@ -54098,6 +54105,34 @@
         },
         "description": "A lower size for one account of the ticket."
       },
+      "QuarterView": {
+        "required": [
+          "year",
+          "quarter",
+          "trades",
+          "meanR"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "quarter": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "meanR": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "The out-of-sample trades of one calendar quarter that had at least one trade (SC-S1, ADR 0222)."
+      },
       "QueueItem": {
         "required": [
           "hypothesisId",
@@ -57727,9 +57762,25 @@
                 "$ref": "#/components/schemas/MonteCarloBlockView"
               }
             ]
+          },
+          "byQuarter": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/QuarterView"
+            }
+          },
+          "maxInstrumentShare": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
           }
         },
-        "description": "The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it)."
+        "description": "The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it). Since SC-S1 (ADR 0222) `ByQuarter` (the quarters with a trade) and `MaxInstrumentShare` (the largest instrument's share of the total R, 1.0 when the total is not above 0) feed the readiness scorecard's row 10; both are null in a result stored before it, and nothing here changes the verdict."
       },
       "RoleToggleInput": {
         "required": [

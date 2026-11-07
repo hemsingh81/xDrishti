@@ -46,11 +46,13 @@ public sealed class ScorecardReaderTests
 
         var card = await CardAsync(f);
 
-        foreach (var row in new[] { 10, 11, 13, 14, 15 })
+        foreach (var row in new[] { 13, 14, 15 })
         {
             Status(card, row).ShouldBe("unavailable", $"row {row}");
         }
 
+        Status(card, 10).ShouldBe("pass", "rows 10 and 11 read the Lab verdict since SC-S1, not the gaps");
+        Status(card, 11).ShouldBe("pass");
         Status(card, 2).ShouldBe("pass");
         Status(card, 3).ShouldBe("pass");
         card.GateR.Passed.ShouldBeFalse();
@@ -131,6 +133,136 @@ public sealed class ScorecardReaderTests
         Status(card, 8).ShouldBe("fail");
         card.GateR.Passed.ShouldBeFalse();
         card.GateR.Failing.Select(r => r.Number).ShouldBe([8]);
+    }
+
+    // ---- rows 10 and 11 from the Lab verdict (SC-S1, ADR 0222) ----
+
+    private static readonly System.Text.Json.JsonSerializerOptions WebJson = new(System.Text.Json.JsonSerializerDefaults.Web);
+
+    private static QuarterView Q(int year, int quarter, double mean) => new(year, quarter, 50, mean);
+
+    private static ReadinessFixture WithRobustness(Func<RobustnessView, RobustnessView> change)
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { Robustness = change(f.Verdict!.Robustness!) };
+        return f;
+    }
+
+    [Fact]
+    public async Task Row_10_passes_with_quarters_years_and_instruments_inside_their_limits()
+    {
+        var card = await CardAsync(new ReadinessFixture());
+
+        var row = card.Rows.Single(r => r.Number == 10);
+
+        row.Status.ShouldBe("pass");
+        row.Value.ShouldContain("quarters 80 %");
+        row.Value.ShouldContain("largest instrument 10 %");
+    }
+
+    [Fact]
+    public async Task Row_10_fails_with_two_of_three_quarters_at_or_above_the_floor()
+    {
+        var f = WithRobustness(r => r with { ByQuarter = [Q(2025, 1, 0.1), Q(2025, 2, 0.2), Q(2025, 3, -0.4)] });
+
+        var card = await CardAsync(f);
+
+        Status(card, 10).ShouldBe("fail");
+        card.Rows.Single(r => r.Number == 10).Value.ShouldContain("quarters 67 %");
+    }
+
+    [Fact]
+    public async Task Row_10_passes_a_quarter_with_a_mean_of_exactly_minus_0_05()
+    {
+        var f = WithRobustness(r => r with { ByQuarter = [Q(2025, 1, 0.1), Q(2025, 2, -0.05)] });
+
+        var card = await CardAsync(f);
+
+        Status(card, 10).ShouldBe("pass");
+    }
+
+    [Fact]
+    public async Task Row_10_fails_with_one_instrument_over_its_limit()
+    {
+        var f = WithRobustness(r => r with { MaxInstrumentShare = 0.4 });
+
+        var card = await CardAsync(f);
+
+        Status(card, 10).ShouldBe("fail");
+    }
+
+    [Fact]
+    public async Task Row_10_is_unavailable_for_a_verdict_stored_before_the_figures_and_says_to_re_run()
+    {
+        var f = WithRobustness(r => r with { ByQuarter = null, MaxInstrumentShare = null });
+
+        var card = await CardAsync(f);
+
+        var row = card.Rows.Single(r => r.Number == 10);
+        row.Status.ShouldBe("unavailable");
+        row.Value.ShouldContain("produced before the scorecard sources existed; re-run");
+        card.Waiting.ShouldContain(w => w.Contains("row 10", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Row_10_is_unavailable_when_the_verdict_has_no_robustness_block()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { Robustness = null };
+
+        var card = await CardAsync(f);
+
+        Status(card, 10).ShouldBe("unavailable");
+        card.Rows.Single(r => r.Number == 10).Value.ShouldNotContain("re-run");
+    }
+
+    [Fact]
+    public async Task Row_11_passes_when_the_observed_fall_is_within_the_90th_percentile_and_the_95th_within_budget()
+    {
+        var card = await CardAsync(new ReadinessFixture());
+
+        var row = card.Rows.Single(r => r.Number == 11);
+
+        row.Status.ShouldBe("pass");
+        row.Value.ShouldContain("90th 9 R");
+    }
+
+    [Fact]
+    public async Task Row_11_fails_when_the_observed_fall_is_above_the_90th_percentile()
+    {
+        var f = WithRobustness(r => r with { MonteCarlo = r.MonteCarlo! with { DrawdownP90 = 4 } });
+
+        var card = await CardAsync(f);
+
+        Status(card, 11).ShouldBe("fail");
+    }
+
+    [Fact]
+    public async Task Row_11_is_unavailable_for_a_verdict_stored_before_the_90th_percentile_and_says_to_re_run()
+    {
+        var f = WithRobustness(r => r with { MonteCarlo = r.MonteCarlo! with { DrawdownP90 = null } });
+
+        var card = await CardAsync(f);
+
+        var row = card.Rows.Single(r => r.Number == 11);
+        row.Status.ShouldBe("unavailable");
+        row.Value.ShouldContain("produced before the scorecard sources existed; re-run");
+    }
+
+    [Fact]
+    public async Task An_old_stored_verdict_without_the_new_members_reads_as_unavailable()
+    {
+        const string Old = """{"sensitivity":{"timeframe":"15m","exit":"FIXED_RR","base":null,"parameters":[],"label":""},"monteCarlo":{"trades":330,"draws":1000,"seed":"s","observedMeanR":0.2,"observedMaxDrawdownR":5,"meanP05":0.1,"meanP50":0.2,"meanP95":0.3,"drawdownP50":4,"drawdownP95":12,"shareNotPositive":0.1},"byYear":[],"signFlipBaseline":null,"byRegime":"","limits":[]}""";
+        var old = System.Text.Json.JsonSerializer.Deserialize<RobustnessView>(Old, WebJson)!;
+        old.MonteCarlo!.DrawdownP90.ShouldBeNull();
+        old.ByQuarter.ShouldBeNull();
+        old.MaxInstrumentShare.ShouldBeNull();
+
+        var f = WithRobustness(_ => old);
+        var card = await CardAsync(f);
+
+        Status(card, 10).ShouldBe("unavailable");
+        Status(card, 11).ShouldBe("unavailable");
     }
 
     [Fact]

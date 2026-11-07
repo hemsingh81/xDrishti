@@ -29,12 +29,6 @@ internal sealed class PassingGaps : IReadinessGaps
 
     public ValueTask<ReadinessReading<bool>> TwentyTradeCheckPassedAsync(string strategy, CancellationToken cancellationToken) => Yes();
 
-    public ValueTask<ReadinessReading<double>> QuarterShareAsync(string strategy, int? version, CancellationToken cancellationToken) => Number(0.8);
-
-    public ValueTask<ReadinessReading<double>> MaxInstrumentShareAsync(string strategy, int? version, CancellationToken cancellationToken) => Number(0.10);
-
-    public ValueTask<ReadinessReading<double>> McDrawdownP90Async(string strategy, int? version, CancellationToken cancellationToken) => Number(9);
-
     public ValueTask<ReadinessReading<bool>> IntegrityFaultAsync(CancellationToken cancellationToken) => No();
 
     public ValueTask<ReadinessReading<bool>> TierCOnlyAsync(string strategy, CancellationToken cancellationToken) => No();
@@ -219,9 +213,11 @@ internal sealed class ReadinessFixture
         [], [], [new CellView("c", "15m", "BUY", "d", "d", null, true, string.Empty, 6, 6, 40, 0.2, 0.1)], [], [],
         new RobustnessView(
             new SensitivityView("15m", "FIXED_RR", null, [], string.Empty),
-            new MonteCarloView(330, 1000, "s", 0.2, 5, 0.1, 0.2, 0.3, 4, 12, 0.1),
+            new MonteCarloView(330, 1000, "s", 0.2, 5, 0.1, 0.2, 0.3, 4, 12, 0.1, 9),
             [new YearView(2024, 100, 0.2, 20, 1.3, true), new YearView(2025, 120, 0.2, 24, 1.3, true), new YearView(2026, 110, 0.2, 22, 1.3, true)],
-            null, string.Empty, []),
+            null, string.Empty, [], null, null, null,
+            [new QuarterView(2025, 1, 60, 0.2), new QuarterView(2025, 2, 60, 0.2), new QuarterView(2025, 3, 60, 0.2), new QuarterView(2025, 4, 60, -0.3), new QuarterView(2026, 1, 90, 0.2)],
+            0.10),
         new DeflatedSharpeView("ReportOnly", 2, 2, null, null, 0.2, 320, null, null, 0.99, 0.95, string.Empty, string.Empty, string.Empty),
         new CostStressView(
             "ReportOnly", false, string.Empty, string.Empty, true, "sheet-1",
