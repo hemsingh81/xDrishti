@@ -82,11 +82,13 @@ describe('Enforce switch', () => {
   ])('shows the refusal %s in the dialog and changes nothing', async (put, words) => {
     const seen = mountReadiness({ put });
     renderReadiness();
-    const dialog = await openDialog('Turn enforce ON');
-    await fill(dialog, 'bad');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Turn ON' }));
+    const first = await openDialog('Turn enforce ON');
+    await fill(first, 'bad');
+    await userEvent.click(within(first).getByRole('button', { name: 'Turn ON' }));
 
-    expect(await within(dialog).findByText(words)).toBeInTheDocument();
+    // The dialog is remounted after a refusal (its password is dropped), so it is looked up again.
+    expect(await screen.findByText(words)).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog');
     expect(seen.puts).toHaveLength(1);
     expect(screen.queryByText('Enforce is now ON.')).toBeNull();
     // A wrong password is an answer, not a sign-out: the screen and its switch are still there.
@@ -96,6 +98,25 @@ describe('Enforce switch', () => {
     });
     expect(within(await enforce()).getByText('OFF')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Readiness' })).toBeInTheDocument();
+  });
+
+  it('keeps the dialog open after a 401 with the refusal shown, an empty password field and no password in the cache', async () => {
+    const seen = mountReadiness({ put: 'wrong-password' });
+    const { client } = renderReadiness();
+    const first = await openDialog('Turn enforce ON');
+    await fill(first, 'wrong-horse');
+    await userEvent.click(within(first).getByRole('button', { name: 'Turn ON' }));
+
+    expect(await screen.findByText('The password is wrong.')).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Turn enforce ON' });
+    expect(within(dialog).getByLabelText(/Password/)).toHaveValue('');
+    expect(seen.puts).toEqual([{ enforce: true, reason: 'ready to refuse', password: 'wrong-horse' }]);
+    const variables = client
+      .getMutationCache()
+      .getAll()
+      .map((mutation) => JSON.stringify(mutation.state.variables ?? null));
+    expect(variables.join('')).not.toContain('wrong-horse');
+    expect(document.body.innerHTML).not.toContain('wrong-horse');
   });
 
   it('clears the typed fields when the dialog is closed and opened again', async () => {

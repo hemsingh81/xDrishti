@@ -104,6 +104,17 @@ describe('Readiness: a card with passing rows', () => {
     expect(screen.getByText(/10 of 15 checklist rows are not available/)).toBeInTheDocument();
   });
 
+  it('says an unknown sub-score state is not a pass and draws no bar for it', async () => {
+    const [first, ...rest] = scoredSubs();
+    mountReadiness({
+      cards: { 'orb@3': buildCard({ subScores: [{ ...first!, state: 'half_known', score: 50 }, ...rest] }) },
+    });
+    renderReadiness();
+    const subs = await screen.findByRole('table', { name: 'The six sub-scores' });
+    expect(within(subs).getByText('half known (not a pass)')).toBeInTheDocument();
+    expect(within(subs).getAllByRole('progressbar')).toHaveLength(5);
+  });
+
   it('does not print a non-finite score as a number', async () => {
     mountReadiness({ cards: { 'orb@3': buildCard({ score: Number.NaN, rawMinimum: Number.NaN }) } });
     renderReadiness();

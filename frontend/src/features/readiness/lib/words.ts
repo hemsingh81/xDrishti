@@ -34,7 +34,8 @@ export const subScoreStateWords = (state: string): string => {
     case 'unavailable':
       return 'Not available (a hard fail)';
     default:
-      return state.replaceAll('_', ' ');
+      // An unknown state is never read as a pass.
+      return `${state.replaceAll('_', ' ')} (not a pass)`;
   }
 };
 

@@ -19,9 +19,13 @@ export function EnforceCard() {
   // What the dialog will set, fixed when it opens (null = closed), so a refetch under it cannot flip the act.
   const [target, setTarget] = useState<boolean | null>(null);
   const [changed, setChanged] = useState<boolean | null>(null);
+  // The server's refusal of the last attempt, and a counter that remounts the dialog so a rejected password is not kept.
+  const [refusal, setRefusal] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
   const { reset } = change;
   const close = () => {
     setTarget(null);
+    setRefusal(null);
     reset();
   };
   useEffect(() => reset, [reset]);
@@ -68,6 +72,7 @@ export function EnforceCard() {
               variant="outlined"
               onClick={() => {
                 setChanged(null);
+                setRefusal(null);
                 setTarget(!query.data.enforce);
               }}
             >
@@ -79,11 +84,12 @@ export function EnforceCard() {
       {target !== null && (
         <Suspense fallback={null}>
           <PasswordReasonDialog
+            key={attempt}
             open
             title={`Turn enforce ${target ? 'ON' : 'OFF'}`}
             confirmLabel={`Turn ${target ? 'ON' : 'OFF'}`}
             pending={change.isPending}
-            error={change.error}
+            error={refusal}
             intro={
               <Typography variant="body2" sx={{ mb: 1 }}>
                 {target
@@ -92,12 +98,20 @@ export function EnforceCard() {
               </Typography>
             }
             onSubmit={({ password, reason }) => {
+              setRefusal(null);
               change.mutate(
                 { enforce: target, reason, password },
                 {
                   onSuccess: () => {
                     setChanged(target);
                     close();
+                  },
+                  onError: (error) => {
+                    // The refusal is kept as text-only state; the mutation (which holds the typed password in its variables) is
+                    // dropped at once and the dialog is remounted so its password field is empty. The dialog stays open.
+                    setRefusal(error);
+                    reset();
+                    setAttempt((n) => n + 1);
                   },
                 },
               );
