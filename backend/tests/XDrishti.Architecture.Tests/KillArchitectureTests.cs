@@ -338,6 +338,22 @@ public sealed class KillArchitectureTests
     }
 
     [Fact]
+    public void The_only_delegate_type_of_the_solution_in_the_closure_of_the_automatic_path_is_the_reviewed_one()
+    {
+        // A delegate built where the handler is registered hides an edge from this scan (CF-11 part 1 gave the readiness scorecard the P10 phase check that way, so that a pause, which never meets the gate, does not make every scheduled service reachable).
+        // Another delegate would hide another edge without anybody reading it, so the set of the solution's own delegate types in the closure is pinned: a second one needs a reviewed change of this list.
+        static bool IsDelegate(TypeDefinition type) => type.BaseType?.FullName is "System.MulticastDelegate" or "System.Delegate";
+        static List<string> DelegatesIn(HashSet<string> closure) => [.. closure.Where(n => Index.Value.Types.TryGetValue(n, out var type) && IsDelegate(type)).Order(StringComparer.Ordinal)];
+
+        DelegatesIn(Closure(AutoRoots)).ShouldBe([Name(typeof(XDrishti.Application.Abstractions.Confidence.PaperPhaseMetReader))], "the reviewed delegates of the closure of the automatic path");
+
+        // controls: the scan lists a delegate that a reachable type holds, whatever it is called, and the production delegates are found by their base type
+        DelegatesIn(Closure([Name(typeof(DelegateHolderSentinel))])).ShouldContain(Name(typeof(HiddenEdgeDelegate)));
+        Index.Value.Types.Values.Count(IsDelegate).ShouldBeGreaterThan(1);
+        IsDelegate(Index.Value.Types[Name(typeof(XDrishti.Application.Abstractions.Confidence.PaperPhaseMetReader))]).ShouldBeTrue();
+    }
+
+    [Fact]
     public void The_scan_catches_a_path_that_re_enables_or_moves_a_cell_itself()
     {
         var sentinel = Name(typeof(DirectLifecycleSentinel));

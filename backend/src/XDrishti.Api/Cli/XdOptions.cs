@@ -54,6 +54,8 @@ internal sealed record XdOptions(
           xd learn curve   the learning-curve part of that report (read only)
           xd learn influence MODEL-ID   whether the model may influence a decision, term by term with the reasons, the hold-out state, the champion flag and the three ML switches (read only; unavailable and refused are never a pass)
           xd learn rollback   the rollback proposals, whether ml.auto_rollback is ON or OFF the champion now and the proposals that leave no qualifying previous champion (read only; applying a rollback stays the owner's act)
+          xd readiness [system]   the system readiness card and one line per Lab strategy, weakest first, with the enforce setting (read only; unavailable is a fail and never a pass)
+          xd readiness STRATEGY [--version N]   the readiness scorecard of one strategy version: the score as the minimum of the sub-scores, the label, hard fails, the 15-row checklist with each input, gates R and S, the snapshot, the settings hash and the enforce setting (read only)
           xd select cells --date YYYY-MM-DD [--min-state candidate|paper|active]
           xd plan run [--date YYYY-MM-DD] [--dry-run]
           xd plan phase-check [--through YYYY-MM-DD]
