@@ -7,10 +7,25 @@ import { modelRoles, parseId } from '../lib/roleText';
 import { FilterBar } from './FilterBar';
 import { ModelDrawer } from './ModelDrawer';
 import { ModelRow } from './ModelRow';
+import { MlSwitchesPanel } from './MlSwitchesPanel';
 import { Panel } from './Panel';
+import { RollbackPanel } from './RollbackPanel';
 
-/** Models: the registered models (newest 50) with the role filter and the open model in the address. */
+/**
+ * Models: the registered models (newest 50) with the role filter and the open model in the address, then the ML switches and
+ * the rollback proposals (CF-10 10d-2b). The owner acts of the last two load only when asked for.
+ */
 export function ModelsTab() {
+  return (
+    <Box sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
+      <ModelList />
+      <MlSwitchesPanel />
+      <RollbackPanel />
+    </Box>
+  );
+}
+
+function ModelList() {
   const url = useUrlState();
   const role = url.choice('role', modelRoles, 'all');
   const open = parseId(url.text('model'));

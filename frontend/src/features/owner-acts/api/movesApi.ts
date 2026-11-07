@@ -48,7 +48,7 @@ export const autonomySettingsQuery = queryOptions({
  * One owner act (a write). The password is in the variables of the call: the mutation is dropped as soon as it ends (`gcTime` 0) and reset
  * on settle, and the caller clears the field. Whatever the answer, the records this act can have changed are read again.
  */
-function useAct<Input, Output>(call: (input: Input) => Promise<Output>) {
+export function useAct<Input, Output>(call: (input: Input) => Promise<Output>) {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     gcTime: 0,

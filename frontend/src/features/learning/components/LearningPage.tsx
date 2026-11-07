@@ -27,7 +27,9 @@ const buttons: readonly ButtonTab<TabId>[] = tabs.map((tab) => ({
 
 /**
  * Learning (P8-02): what the learning engine holds and which setups (cells) have enough evidence. Read only: the screen has
- * no control that changes a record, starts a job or places anything. The tab, window and open cell live in the URL.
+ * no control that changes a record, starts a job or places anything; the one exception is the Models tab's owner acts
+ * (ML switches, apply a rollback), which are lazy dialogs written by `owner-acts` (CF-10 10d-2b). The tab, window and open
+ * cell live in the URL.
  */
 export function LearningPage() {
   const url = useUrlState();

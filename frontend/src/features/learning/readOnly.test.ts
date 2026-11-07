@@ -11,8 +11,9 @@ const sources = import.meta.glob<string>(['./**/*.{ts,tsx}', '!./**/*.test.{ts,t
 
 // P8-18: the one allowed import of another feature: the switch hook, to draw a plain link to the replay screen.
 // P9-06: and the read-only briefing card, to show the week's review text beside the digest.
+// CF-10 10d-2b: and the two lazy loaders of the owner acts of the Models tab (ActDialogs.tsx draws them; the write is in owner-acts).
 const allowedImports =
-  /^import \{ useCapability \} from '@\/features\/owner-acts';$|^import \{ BriefingCard \} from '@\/features\/briefing';$/gm;
+  /^import \{ useCapability \} from '@\/features\/owner-acts';$|^import \{ BriefingCard \} from '@\/features\/briefing';$|^import \{ loadApplyRollbackDialog, loadMlSwitchDialog \} from '@\/features\/owner-acts';$/gm;
 
 /** The text with the one allowed import taken out, then asked for any other feature import. */
 const otherFeatureImports = (text: string): string[] =>
@@ -23,7 +24,14 @@ describe('the allow-list holds exactly one import', () => {
     expect(otherFeatureImports("import { useCapability } from '@/features/owner-acts';")).toEqual([]);
   });
 
+  it('lets the two Models-tab act loaders through', () => {
+    expect(
+      otherFeatureImports("import { loadApplyRollbackDialog, loadMlSwitchDialog } from '@/features/owner-acts';"),
+    ).toEqual([]);
+  });
+
   it.each([
+    "import { loadMovePage, loadMlSwitchDialog } from '@/features/owner-acts';",
     "import { OwnerActsPage } from '@/features/owner-acts';",
     "import { useCapability, loadExperimentPage } from '@/features/owner-acts';",
     "import { useCapability } from '@/features/owner-acts/api/capabilitiesApi';",
