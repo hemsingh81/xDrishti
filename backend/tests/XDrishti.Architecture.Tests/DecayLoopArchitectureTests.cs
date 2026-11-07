@@ -233,7 +233,7 @@ public sealed class DecayLoopArchitectureTests
         // and of everything nested in them (the state machines of the async methods and of the iterators, where the calls are): every type named by a call, a generic argument, a typeof, a field, a parameter or a local. NetArchTest's
         // dependency rule did not see a command handler resolved with GetService(typeof(...)) inside an async method (the sentinel below passed it), so the scan is Cecil's. A name matches by prefix, so `...Messaging.ICommandHandler` covers both generic arities.
         var api = Assembly.Load(new AssemblyName("XDrishti.Api"));
-        const string Verbs = "^Learn(Decay|Loop|Influence|Rollback)(Command|Options)$|^LearnReportText$";
+        const string Verbs = "^Learn(Decay|Loop|Influence|Rollback)(Command|Options)$|^LearnReportText$|^ReadinessCli(Command|Options)$"; // CF-11 part 2a adds xd readiness to the same rule
 
         var named = TypesNamedBy(api, Verbs);
 
@@ -248,19 +248,26 @@ public sealed class DecayLoopArchitectureTests
         named.ShouldContain("XDrishti.Application.Abstractions.Messaging.IQueryHandler`2");
         TypesNamedBy(api, "^LearnInfluenceCommand$").ShouldContain("XDrishti.Application.Learning.GetMlInfluenceQuery");
         TypesNamedBy(api, "^LearnRollbackCommand$").ShouldContain("XDrishti.Application.Learning.GetRollbackProposalsQuery");
+        TypesNamedBy(api, "^ReadinessCliCommand$").ShouldContain("XDrishti.Application.Confidence.GetScorecardQuery");
+        TypesNamedBy(api, "^ReadinessCliCommand$").ShouldContain("XDrishti.Application.Confidence.ListScorecardsQuery");
 
         var self = typeof(DecayLoopArchitectureTests).Assembly;
         Forbidden(TypesNamedBy(self, "^CliCommandHandlerSentinel$")).ShouldNotBeEmpty();
         Forbidden(TypesNamedBy(self, "^CliClockSentinel$")).ShouldNotBeEmpty();
         Forbidden(TypesNamedBy(self, "^CliSwitchPortSentinel$")).ShouldNotBeEmpty();
         Forbidden(TypesNamedBy(self, "^CliRollbackStoreSentinel$")).ShouldContain("XDrishti.Application.Abstractions.Learning.IRollbackProposalStore");
+        Forbidden(TypesNamedBy(self, "^CliReadinessSwitchSentinel$")).ShouldContain("XDrishti.Application.Abstractions.Confidence.IReadinessSwitchStore"); // a Store port, found as a class by its name
+        Forbidden(TypesNamedBy(self, "^CliReadinessGateSentinel$")).ShouldContain("XDrishti.Application.Abstractions.Confidence.IReadinessGate"); // the gate is the lifecycle's, never a verb's
+        Forbidden(TypesNamedBy(self, "^CliReadinessSettingsSentinel$")).ShouldContain("XDrishti.Application.Abstractions.Confidence.IReadinessSettings"); // the switch is read through the use case
+        WriterPorts.ShouldContain("XDrishti.Application.Abstractions.Confidence.IReadinessSwitchStore");
+        WriterPorts.ShouldContain("XDrishti.Application.Abstractions.Confidence.IReadinessSnapshotStore");
 
         // the class of writer ports is found by name (control: it holds the ones that matter and many more) and each real verb, the 12c-1 verbs included, passes the same rule on its own and names something
         WriterPorts.ShouldContain("XDrishti.Application.Abstractions.Learning.IRollbackProposalStore");
         WriterPorts.ShouldContain("XDrishti.Application.Abstractions.Learning.IModelRegistry");
         WriterPorts.ShouldContain("XDrishti.Application.Abstractions.Confidence.IKillProposalStore");
         WriterPorts.Length.ShouldBeGreaterThan(30);
-        foreach (var verb in new[] { "LearnDecayCommand", "LearnLoopCommand", "LearnInfluenceCommand", "LearnRollbackCommand" })
+        foreach (var verb in new[] { "LearnDecayCommand", "LearnLoopCommand", "LearnInfluenceCommand", "LearnRollbackCommand", "ReadinessCliCommand" })
         {
             var verbNames = TypesNamedBy(api, "^" + verb + "$");
             verbNames.ShouldContain("XDrishti.Application.Abstractions.Messaging.IQueryHandler`2", verb);
@@ -275,6 +282,7 @@ public sealed class DecayLoopArchitectureTests
     [
         "XDrishti.Application.Abstractions.Messaging.ICommandHandler", "System.TimeProvider", "XDrishti.Infrastructure", "XDrishti.Api.Cli.LearnLifecycleCommand", "XDrishti.Api.Cli.LearnDesignateCommand",
         "XDrishti.Application.Abstractions.Learning.IMlSwitchSettings", "XDrishti.Application.Abstractions.Learning.IMlInfluenceSwitch", "XDrishti.Application.Abstractions.Learning.IRollbackProposalReader",
+        "XDrishti.Application.Abstractions.Confidence.IReadinessGate", "XDrishti.Application.Abstractions.Confidence.IReadinessSettings", "XDrishti.Application.Abstractions.Confidence.IReadinessSnapshotReader", "XDrishti.Application.Abstractions.Confidence.IReadinessGaps",
         .. WriterPorts,
     ];
 
@@ -416,6 +424,24 @@ public sealed class DecayLoopArchitectureTests
     internal sealed class CliRollbackStoreSentinel(XDrishti.Application.Abstractions.Learning.IRollbackProposalStore store)
     {
         public XDrishti.Application.Abstractions.Learning.IRollbackProposalStore Store => store;
+    }
+
+    /// <summary>Stands for the readiness verb holding the owner's switch store (a writer port).</summary>
+    internal sealed class CliReadinessSwitchSentinel(XDrishti.Application.Abstractions.Confidence.IReadinessSwitchStore store)
+    {
+        public XDrishti.Application.Abstractions.Confidence.IReadinessSwitchStore Store => store;
+    }
+
+    /// <summary>Stands for the readiness verb asking the lifecycle's gate.</summary>
+    internal sealed class CliReadinessGateSentinel(XDrishti.Application.Abstractions.Confidence.IReadinessGate gate)
+    {
+        public XDrishti.Application.Abstractions.Confidence.IReadinessGate Gate => gate;
+    }
+
+    /// <summary>Stands for the readiness verb reading the enforce switch through its port.</summary>
+    internal sealed class CliReadinessSettingsSentinel(XDrishti.Application.Abstractions.Confidence.IReadinessSettings settings)
+    {
+        public async Task<bool> OnAsync(CancellationToken cancellationToken) => (await settings.CurrentAsync(cancellationToken)).Enforce;
     }
 
     /// <summary>Stands for a verb that reads the clock.</summary>
