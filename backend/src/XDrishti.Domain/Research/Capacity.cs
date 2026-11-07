@@ -21,22 +21,34 @@ public static class Capacity
     {
         decimal? minuteCap = minuteTradedValue is { } m && m >= 0 ? m * minuteShare : null;
         decimal? dailyCap = dailyMedianValue is { } d && d >= 0 ? d * dailyShare : null;
-        if (minuteCap is null || dailyCap is null)
-        {
-            return new CapacityCheck(true, minuteCap, dailyCap, "unavailable: " + (minuteCap is null ? "the fill minute's traded value" : "the 20-day median traded value") + " is not known");
-        }
-
+        // each cap that can be judged is judged: an order over a known cap is a breach even when the other cap cannot be read; with no breach, a cap that cannot be read makes the reading unavailable, never a pass
         var reasons = new List<string>(2);
-        if (orderValue > minuteCap)
+        if (minuteCap is { } mc && orderValue > mc)
         {
             reasons.Add("over the share of the fill minute's traded value");
         }
 
-        if (orderValue > dailyCap)
+        if (dailyCap is { } dc && orderValue > dc)
         {
             reasons.Add("over the share of the 20-day median traded value");
         }
 
-        return new CapacityCheck(reasons.Count > 0, minuteCap, dailyCap, string.Join("; ", reasons));
+        if (reasons.Count > 0)
+        {
+            return new CapacityCheck(true, minuteCap, dailyCap, string.Join("; ", reasons));
+        }
+
+        var missing = new List<string>(2);
+        if (minuteCap is null)
+        {
+            missing.Add("the fill minute's traded value is not read");
+        }
+
+        if (dailyCap is null)
+        {
+            missing.Add("the 20-day median traded value is not known");
+        }
+
+        return new CapacityCheck(missing.Count > 0, minuteCap, dailyCap, missing.Count > 0 ? "unavailable: " + string.Join("; ", missing) : string.Empty);
     }
 }

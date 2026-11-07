@@ -56,6 +56,39 @@ public sealed class LabCostStressTests
     }
 
     [Fact]
+    public void The_tier_counts_are_carried_on_the_block_and_move_no_outcome_gate_limit_or_row()
+    {
+        var o = new CostStressOptions(Enforce: true);
+        var tiers = new CostStressTiersView(2, 0, 0, 2, 0, 2, 0, o.TierKeyText(), o.TierSnapshotHash(), "basis");
+
+        var without = Apply(o, Verdict(), Good());
+        var with = new LabCostStress(o).Apply(Verdict(), Good(), "fixture-a", true, null, null, tiers);
+
+        with.CostStress!.Tiers.ShouldBe(tiers);
+        without.CostStress!.Tiers.ShouldBeNull();
+        with.Outcome.ShouldBe(without.Outcome);
+        with.Gates.ShouldBe(without.Gates);
+        with.Limits.ShouldBe(without.Limits);
+        JsonSerializer.Serialize(with with { CostStress = with.CostStress with { Tiers = null } }, Web).ShouldBe(JsonSerializer.Serialize(without, Web), "tier C everywhere and every order a breach change nothing the verdict says");
+    }
+
+    [Fact]
+    public void A_stored_block_without_the_tiers_member_reads_as_null_and_one_with_it_round_trips()
+    {
+        var o = new CostStressOptions();
+        var stored = JsonSerializer.Serialize(Apply(o, Verdict(), Good()), Web);
+        stored.ShouldContain("\"tiers\":null");
+        var old = stored.Replace(",\"tiers\":null", string.Empty, StringComparison.Ordinal);
+        old.ShouldNotContain("tiers");
+
+        JsonSerializer.Deserialize<LabVerdictView>(old, Web)!.CostStress!.Tiers.ShouldBeNull();
+
+        var tiers = new CostStressTiersView(3, 2, 1, 0, 0, 0, 0, "s", "h", "b");
+        var round = JsonSerializer.Deserialize<LabVerdictView>(JsonSerializer.Serialize(new LabCostStress(o).Apply(Verdict(), Good(), "fixture-a", true, null, null, tiers), Web), Web)!;
+        round.CostStress!.Tiers.ShouldBe(tiers);
+    }
+
+    [Fact]
     public void Report_only_changes_no_outcome_gate_evidence_or_limit_even_when_the_stress_fails()
     {
         var plain = Verdict("PASS");

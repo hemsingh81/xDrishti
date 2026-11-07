@@ -305,8 +305,51 @@ public sealed class ScorecardArchitectureTests
         source.ShouldContain("new ReadinessReading<T>(null, \"unavailable: \" + reason)");
         source.ShouldNotContain("true");
         source.ShouldNotContain("Result.Success");
-        typeof(IReadinessGaps).GetMethods().Length.ShouldBe(9);
-        source.Split("None<").Length.ShouldBe(9 + 2, "nine answers and the helper's definition");
+        typeof(IReadinessGaps).GetMethods().Length.ShouldBe(8);
+        source.Split("None<").Length.ShouldBe(8 + 2, "eight answers and the helper's definition");
+        typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("CapacityOkAsync", "row 14 has its producer (ADR 0223) and is read from the Lab verdict by the reader, not through the gaps");
+    }
+
+    // ---- (5b) row 14: the tier and capacity counts (ADR 0223) ----
+
+    /// <summary>Stands for a second caller of the tier computation and a reader of the stored counts that is not the scorecard's.</summary>
+    internal sealed class TierConsumerSentinel(XDrishti.Application.Lab.LabTiers tiers, XDrishti.Application.Lab.CostStressView view)
+    {
+        public ValueTask<XDrishti.Application.Lab.CostStressTiersView?> Compute() => tiers.ComputeAsync(null, CancellationToken.None);
+
+        public XDrishti.Application.Lab.CostStressTiersView? Read() => view.Tiers;
+    }
+
+    [Fact]
+    public void The_tier_and_capacity_counts_are_computed_only_by_the_lab_runner_and_read_only_by_the_scorecard_reader()
+    {
+        // computed in one place, after the verdict is judged
+        Callers(r => r.Name == "ComputeAsync" && r.DeclaringType?.FullName == "XDrishti.Application.Lab.LabTiers")
+            .ShouldBe(["XDrishti.Application.Lab.LabRunner", Sentinel(typeof(TierConsumerSentinel))]);
+
+        // read by the reader of row 14 and shown by the report (a display line); the verdict evaluator, the gates, the stress calculator and every chooser never name the member
+        Callers(r => r.Name == "get_Tiers" && r.DeclaringType?.FullName == "XDrishti.Application.Lab.CostStressView")
+            .Where(t => !t.Contains("JsonContext", StringComparison.Ordinal) && t != "XDrishti.Application.Lab.CostStressView")
+            .ShouldBe(["XDrishti.Application.Confidence.LabEvidenceReader", "XDrishti.Application.Lab.LabReportBuilder", Sentinel(typeof(TierConsumerSentinel))]);
+
+        Dependents(Application, "XDrishti.Application.Lab.LabTiers").ShouldBe(["XDrishti.Application.DependencyInjection", "XDrishti.Application.Lab.LabRunner", "XDrishti.Application.Lab.LabTiers"]);
+    }
+
+    [Fact]
+    public void The_tier_and_capacity_rules_are_pure_domain_and_the_lab_tiers_read_day_bars_and_never_minute_bars()
+    {
+        var pure = Types.InAssembly(Domain).That().ResideInNamespace("XDrishti.Domain.Research").And().HaveNameMatching("^(LiquidityTiers|Capacity|CapacityCheck|LiquidityTier)$");
+
+        pure.GetTypes().Count().ShouldBe(4, "control: the rule ran over the four types");
+        pure.Should().NotHaveDependencyOnAny(
+            "System.IO", "System.Net", "System.Data", "System.Threading.Tasks", "System.Diagnostics.Process", "System.TimeProvider", "System.Environment", "System.Random", "System.Text.Json", "Npgsql", "Microsoft.EntityFrameworkCore",
+            "XDrishti.Application", "XDrishti.Infrastructure").GetResult().IsSuccessful.ShouldBeTrue();
+        Types.InAssembly(Self).That().HaveName(nameof(ClockSentinel)).Should().NotHaveDependencyOnAny("System.TimeProvider").GetResult().IsSuccessful.ShouldBeFalse(); // control
+
+        // the daily-bar form: the only bar read of the tiers is the bounded day read
+        var tiers = Callers(r => r.DeclaringType?.FullName == "XDrishti.Application.Abstractions.Market.Bars.IBarQueries" && r.Name == "ReadDailyBarsAsync");
+        tiers.ShouldContain("XDrishti.Application.Lab.LabTiers");
+        Callers(r => r.DeclaringType?.FullName == "XDrishti.Application.Abstractions.Market.Bars.IBarQueries" && r.Name == "ReadBarsAsync").ShouldNotContain("XDrishti.Application.Lab.LabTiers");
     }
 
     // ---- (6) the routes ----

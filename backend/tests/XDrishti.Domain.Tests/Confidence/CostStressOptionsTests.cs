@@ -46,6 +46,70 @@ public sealed class CostStressOptionsTests
         new CostStressOptions((ConfidenceMode)7).Problems().ShouldNotBeEmpty();
     }
 
+    [Fact]
+    public void The_tier_and_capacity_defaults_are_the_spec_figures_and_in_rupees_the_cuts_are_crores()
+    {
+        var o = new CostStressOptions();
+
+        (o.TierACutCrore, o.TierBCutCrore, o.CapacityFillShare, o.CapacityDailyShare).ShouldBe((100m, 20m, 0.01m, 0.005m));
+        o.TierACut.ShouldBe(1_000_000_000m);
+        o.TierBCut.ShouldBe(200_000_000m);
+    }
+
+    [Fact]
+    public void The_tier_settings_have_their_own_text_and_hash_so_the_stress_hash_stored_with_earlier_verdicts_does_not_move()
+    {
+        var a = new CostStressOptions();
+        var changed = new[]
+        {
+            a with { TierACutCrore = 150m }, a with { TierBCutCrore = 25m }, a with { CapacityFillShare = 0.005m }, a with { CapacityDailyShare = 0.004m },
+        };
+
+        a.TierKeyText().ShouldBe("tierA>=100cr/tierB>=20cr/fill<=0.01/median<=0.005");
+        a.TierSnapshotHash().Length.ShouldBe(64);
+        changed.Select(o => o.TierSnapshotHash()).Append(a.TierSnapshotHash()).Distinct().Count().ShouldBe(5);
+        changed.ShouldAllBe(o => o.SnapshotHash() == a.SnapshotHash() && o.KeyText() == a.KeyText());
+    }
+
+    [Theory]
+    [InlineData(99.99, 20, 0.01, 0.005, "TierACutCrore")]
+    [InlineData(50, 20, 0.01, 0.005, "TierACutCrore")]
+    [InlineData(0, 20, 0.01, 0.005, "TierACutCrore")]
+    [InlineData(-5, 20, 0.01, 0.005, "TierACutCrore")]
+    [InlineData(100001, 20, 0.01, 0.005, "TierACutCrore")]
+    [InlineData(100, 19.99, 0.01, 0.005, "TierBCutCrore")]
+    [InlineData(100, 1, 0.01, 0.005, "TierBCutCrore")]
+    [InlineData(100, 0, 0.01, 0.005, "TierBCutCrore")]
+    [InlineData(100, 100, 0.01, 0.005, "TierBCutCrore")]
+    [InlineData(100, 150, 0.01, 0.005, "TierBCutCrore")]
+    [InlineData(100, 20, 0.0101, 0.005, "CapacityFillShare")]
+    [InlineData(100, 20, 0.1, 0.005, "CapacityFillShare")]
+    [InlineData(100, 20, 0, 0.005, "CapacityFillShare")]
+    [InlineData(100, 20, 0.01, 0.0051, "CapacityDailyShare")]
+    [InlineData(100, 20, 0.01, 0.1, "CapacityDailyShare")]
+    [InlineData(100, 20, 0.01, 0, "CapacityDailyShare")]
+    [InlineData(100, 20, 0.01, -0.001, "CapacityDailyShare")]
+    public void A_tier_or_capacity_value_that_would_loosen_the_gate_or_is_out_of_range_is_a_problem_the_host_refuses_to_start_on(double aCut, double bCut, double fill, double daily, string setting)
+    {
+        var problems = new CostStressOptions(TierACutCrore: (decimal)aCut, TierBCutCrore: (decimal)bCut, CapacityFillShare: (decimal)fill, CapacityDailyShare: (decimal)daily).Problems();
+
+        problems.ShouldNotBeEmpty();
+        problems.ShouldContain(p => p.StartsWith("CostStress:" + setting, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Tightening_a_tier_or_capacity_value_is_allowed_and_the_defaults_themselves_are_the_limits()
+    {
+        var a = new CostStressOptions();
+
+        a.Problems().ShouldBeEmpty();
+        (a with { TierACutCrore = 200m }).Problems().ShouldBeEmpty();
+        (a with { TierACutCrore = 100_000m, TierBCutCrore = 99_999m }).Problems().ShouldBeEmpty();
+        (a with { TierBCutCrore = 99.99m }).Problems().ShouldBeEmpty();
+        (a with { CapacityFillShare = 0.0001m, CapacityDailyShare = 0.0001m }).Problems().ShouldBeEmpty();
+        (CostStressOptions.DefaultTierACutCrore, CostStressOptions.DefaultTierBCutCrore, CostStressOptions.DefaultCapacityFillShare, CostStressOptions.DefaultCapacityDailyShare).ShouldBe((100m, 20m, 0.01m, 0.005m));
+    }
+
     [Theory]
     [InlineData(1.0, 2.0, 0.08, 0.0, 1, 0.7)]
     [InlineData(0.5, 2.0, 0.08, 0.0, 1, 0.7)]

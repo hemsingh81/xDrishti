@@ -14,8 +14,6 @@ internal sealed class SecondReadinessGapSentinel : IReadinessGaps
 
     public ValueTask<ReadinessReading<bool>> BenchmarkBeatenAsync(string strategy, int? version, CancellationToken cancellationToken) => Yes();
 
-    public ValueTask<ReadinessReading<bool>> CapacityOkAsync(string strategy, int? version, CancellationToken cancellationToken) => Yes();
-
     public ValueTask<ReadinessReading<bool>> TwentyTradeCheckPassedAsync(string strategy, CancellationToken cancellationToken) => Yes();
 
     public ValueTask<ReadinessReading<double>> QuarterShareAsync(string strategy, int? version, CancellationToken cancellationToken) => One();

@@ -75,7 +75,6 @@ internal sealed class ScorecardReader(
         var labEvidence = await lab.ReadAsync(strategy, version, cancellationToken);
         var forwardEvidence = await forward.ReadAsync(strategy, cancellationToken);
         var benchmark = await gaps.BenchmarkBeatenAsync(strategy, version, cancellationToken);
-        var capacity = await gaps.CapacityOkAsync(strategy, version, cancellationToken);
         var twenty = await gaps.TwentyTradeCheckPassedAsync(strategy, cancellationToken);
         var quarters = await gaps.QuarterShareAsync(strategy, version, cancellationToken);
         var instrument = await gaps.MaxInstrumentShareAsync(strategy, version, cancellationToken);
@@ -85,7 +84,6 @@ internal sealed class ScorecardReader(
 
         var rowNotes = new Dictionary<int, string>(labEvidence.Checklist.Notes);
         Add(rowNotes, 13, benchmark);
-        Add(rowNotes, 14, capacity);
         Add(rowNotes, 15, twenty);
         Add(rowNotes, 10, quarters);
         Add(rowNotes, 10, instrument);
@@ -93,7 +91,6 @@ internal sealed class ScorecardReader(
         var checklist = labEvidence.Checklist with
         {
             BenchmarkBeaten = benchmark.Value,
-            CapacityOk = capacity.Value,
             TwentyTradeCheckPassed = twenty.Value,
             QuarterShare = quarters.Value,
             MaxInstrumentShare = instrument.Value,

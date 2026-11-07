@@ -53,7 +53,7 @@ internal sealed class LabEvidenceReader(
         if (verdict is null)
         {
             notes.Add(why);
-            foreach (var row in new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 })
+            foreach (var row in new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14 })
             {
                 rowNotes[row] = why;
             }
@@ -79,8 +79,15 @@ internal sealed class LabEvidenceReader(
 
         var mc = verdict.Robustness?.MonteCarlo;
         double? p95 = mc is null ? null : Math.Max(mc.DrawdownP95, verdict.Robustness?.MonteCarloBlock?.DdP95 ?? double.MinValue);
+        var (capacityOk, capacityNote) = CapacityOf(verdict.CostStress);
+        if (capacityNote.Length > 0)
+        {
+            rowNotes[14] = capacityNote;
+        }
+
         checklist = checklist with
         {
+            CapacityOk = capacityOk,
             NEff = evidence.Dependence?.NEff,
             MinTradesPerCell = cells.Count == 0 ? null : cells.Min(),
             ExpectancyR = expectancy,
@@ -167,6 +174,51 @@ internal sealed class LabEvidenceReader(
 
         var confirmedOn = await confirmation.ConfirmedOnAsync(sheet, cancellationToken);
         return stress.CostsChecked && confirmedOn is not null ? FaultState.Clear : FaultState.Fault;
+    }
+
+    /// <summary>
+    /// Row 14 from the tier and capacity counts of the cost stress block (ADR 0223): pass only when every trade is tier A or B and no order is over a cap; any tier C or breach is a fail; a count that could not be made (no usable median, no traded value) is unavailable, which counts as a
+    /// fail wherever the gate reads it. A verdict without the block says so and is not re-run.
+    /// </summary>
+    private static (bool? Ok, string Note) CapacityOf(CostStressView? stress)
+    {
+        if (stress is null)
+        {
+            return (null, "the cost stress is not computed (Confidence:CostStress:Mode is Off), so there is no tier or capacity count.");
+        }
+
+        if (stress.Tiers is not { } t)
+        {
+            return (null, "unavailable: the verdict was produced before the tier and capacity check; re-run the robust test.");
+        }
+
+        if (t.Trades <= 0)
+        {
+            return (null, "unavailable: the verdict has no out-of-sample trade to give a tier or an order size.");
+        }
+
+        var failures = new List<string>();
+        if (t.TierC > 0)
+        {
+            failures.Add(string.Create(Inv, $"{t.TierC} of {t.Trades} trades are tier C"));
+        }
+
+        if (t.CapacityBreaches > 0)
+        {
+            failures.Add(string.Create(Inv, $"{t.CapacityBreaches} of {t.Trades} orders are over a participation cap"));
+        }
+
+        if (failures.Count > 0)
+        {
+            return (false, string.Join("; ", failures) + ".");
+        }
+
+        if (t.TierUnavailable > 0 || t.CapacityUnavailable > 0)
+        {
+            return (null, string.Create(Inv, $"unavailable: {t.TierUnavailable} of {t.Trades} trades have no usable 20-day median traded value and {t.CapacityUnavailable} have no complete capacity reading (the 0.5 % of the 20-day median cap is measured on day bars; the 1 % of the fill minute's traded value is not read yet, so it cannot pass); unavailable counts as a fail."));
+        }
+
+        return (true, string.Create(Inv, $"all {t.Trades} trades are tier A or B and no order is over a participation cap."));
     }
 
     private static RowStatus Word(string? status) => status switch

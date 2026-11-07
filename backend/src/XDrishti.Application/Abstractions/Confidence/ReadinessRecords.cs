@@ -74,9 +74,6 @@ public interface IReadinessGaps
     /// <summary>Row 13: the strategy beats the same-universe benchmark net, risk-adjusted (P8-07 baskets benchmarks).</summary>
     ValueTask<ReadinessReading<bool>> BenchmarkBeatenAsync(string strategy, int? version, CancellationToken cancellationToken);
 
-    /// <summary>Row 14: every trade is tier A or B and no order exceeds 1 % of the minute value (CF-05 capacity).</summary>
-    ValueTask<ReadinessReading<bool>> CapacityOkAsync(string strategy, int? version, CancellationToken cancellationToken);
-
     /// <summary>Row 15: the owner's 20-trade check (P3-09) passed. It is the owner's signed record, which has no machine-readable store.</summary>
     ValueTask<ReadinessReading<bool>> TwentyTradeCheckPassedAsync(string strategy, CancellationToken cancellationToken);
 
@@ -92,7 +89,7 @@ public interface IReadinessGaps
     /// <summary>The hard fail "integrity fault": true when a P7 or P10 integrity check fails (the list of checks is unverified, so no source exists).</summary>
     ValueTask<ReadinessReading<bool>> IntegrityFaultAsync(CancellationToken cancellationToken);
 
-    /// <summary>The hard fail "evidence only from tier C": true when all the evidence is tier C (no per-trade tier source exists).</summary>
+    /// <summary>The hard fail "evidence only from tier C": true when all the evidence is tier C (the Lab verdict now carries the tier counts of its trades, but whether this means the Lab or the forward trades is an open owner question, ADR 0223).</summary>
     ValueTask<ReadinessReading<bool>> TierCOnlyAsync(string strategy, CancellationToken cancellationToken);
 
     /// <summary>The planned risk share of a strategy, 0 to 1 (the plan does not expose it per strategy yet; the system level then uses equal weights, labelled).</summary>

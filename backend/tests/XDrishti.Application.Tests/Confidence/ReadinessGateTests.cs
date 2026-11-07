@@ -45,9 +45,9 @@ public sealed class ReadinessGateTests
         decision.Passed.ShouldBeFalse();
         decision.Enforced.ShouldBeFalse();
         decision.Refused.ShouldBeFalse();
-        decision.FailingRows.ShouldBe([10, 11, 14]);
+        decision.FailingRows.ShouldBe([10, 11], "row 14 is read from the Lab verdict's tier counts and passes in the fixture");
         decision.Message.ShouldContain("rows not passing");
-        decision.EvidenceIds[1].ShouldBe("readiness-gate-R:fail:enforce-off:rows-10.11.14");
+        decision.EvidenceIds[1].ShouldBe("readiness-gate-R:fail:enforce-off:rows-10.11");
         decision.SnapshotId.ShouldNotBeNull();
     }
 
@@ -61,7 +61,7 @@ public sealed class ReadinessGateTests
 
         decision.Enforced.ShouldBeTrue();
         decision.Refused.ShouldBeTrue();
-        decision.FailingRows.ShouldContain(14);
+        decision.FailingRows.ShouldContain(10);
         f.Store.Snapshots.ShouldHaveSingleItem("the refusal is cited too");
     }
 

@@ -46,11 +46,12 @@ public sealed class ScorecardReaderTests
 
         var card = await CardAsync(f);
 
-        foreach (var row in new[] { 10, 11, 13, 14, 15 })
+        foreach (var row in new[] { 10, 11, 13, 15 })
         {
             Status(card, row).ShouldBe("unavailable", $"row {row}");
         }
 
+        Status(card, 14).ShouldBe("pass", "row 14 is read from the Lab verdict's tier counts, not from the gaps (ADR 0223)");
         Status(card, 2).ShouldBe("pass");
         Status(card, 3).ShouldBe("pass");
         card.GateR.Passed.ShouldBeFalse();
@@ -64,6 +65,88 @@ public sealed class ScorecardReaderTests
         card.RawMinimum.ShouldBeGreaterThan(0, "the score without the faults is still shown");
     }
 
+    private static CostStressTiersView Tiers(int a = 300, int b = 30, int c = 0, int none = 0, int breaches = 0, int capacityNone = 0) =>
+        new(a + b + c + none, a, b, c, none, breaches, capacityNone, string.Empty, string.Empty, string.Empty);
+
+    private static ReadinessFixture WithTiers(CostStressTiersView? tiers)
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { Tiers = tiers } };
+        return f;
+    }
+
+    [Fact]
+    public async Task Row_14_passes_when_every_trade_is_tier_A_or_B_and_every_capacity_reading_is_complete_and_within_the_caps_which_needs_a_fill_minute_source_not_built_yet()
+    {
+        var card = await CardAsync(WithTiers(Tiers()));
+
+        Status(card, 14).ShouldBe("pass");
+        card.Rows.Single(r => r.Number == 14).Value.ShouldContain("within capacity");
+    }
+
+    [Theory]
+    [InlineData(1, 0, "tier C")]
+    [InlineData(0, 1, "participation cap")]
+    public async Task Row_14_fails_on_any_tier_C_trade_or_any_capacity_breach(int tierC, int breaches, string said)
+    {
+        var card = await CardAsync(WithTiers(Tiers(c: tierC, breaches: breaches)));
+
+        Status(card, 14).ShouldBe("fail");
+        card.Rows.Single(r => r.Number == 14).Value.ShouldContain(said);
+        card.GateR.Failing.Select(r => r.Number).ShouldContain(14);
+    }
+
+    [Fact]
+    public async Task Row_14_is_a_fail_when_a_definite_failure_comes_with_unavailable_readings()
+    {
+        var card = await CardAsync(WithTiers(Tiers(c: 2, none: 3)));
+
+        Status(card, 14).ShouldBe("fail");
+    }
+
+    [Theory]
+    [InlineData(1, 0)]
+    [InlineData(0, 1)]
+    public async Task Row_14_is_unavailable_never_a_pass_when_a_tier_or_a_capacity_reading_could_not_be_made(int none, int capacityNone)
+    {
+        var card = await CardAsync(WithTiers(Tiers(none: none, capacityNone: capacityNone)));
+
+        Status(card, 14).ShouldBe("unavailable");
+        card.GateR.Passed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Row_14_of_the_block_the_lab_writes_today_is_unavailable_because_the_fill_minute_is_not_read_and_a_breach_still_beats_it()
+    {
+        // every capacity reading unavailable (no fill minute), tiers A and B only, no measured breach: the block of a real run today
+        var today = await CardAsync(WithTiers(Tiers(capacityNone: 330)));
+        var breach = await CardAsync(WithTiers(Tiers(breaches: 1, capacityNone: 329)));
+
+        Status(today, 14).ShouldBe("unavailable");
+        today.Rows.Single(r => r.Number == 14).Value.ShouldContain("fill minute's traded value is not read yet");
+        today.GateR.Passed.ShouldBeFalse();
+        Status(breach, 14).ShouldBe("fail");
+    }
+
+    [Fact]
+    public async Task Row_14_of_a_verdict_stored_before_the_block_says_re_run_and_is_not_re_run()
+    {
+        var f = WithTiers(null);
+
+        var card = await CardAsync(f);
+
+        Status(card, 14).ShouldBe("unavailable");
+        card.Rows.Single(r => r.Number == 14).Value.ShouldContain("produced before the tier and capacity check; re-run");
+    }
+
+    [Fact]
+    public async Task Row_14_of_a_verdict_with_no_trade_is_unavailable()
+    {
+        var card = await CardAsync(WithTiers(new CostStressTiersView(0, 0, 0, 0, 0, 0, 0, string.Empty, string.Empty, string.Empty)));
+
+        Status(card, 14).ShouldBe("unavailable");
+    }
+
     [Fact]
     public async Task With_no_lab_run_the_lab_rows_are_unavailable_and_the_card_says_what_to_run()
     {
@@ -71,7 +154,7 @@ public sealed class ScorecardReaderTests
 
         var card = await CardAsync(f);
 
-        foreach (var row in new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 })
+        foreach (var row in new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14 })
         {
             Status(card, row).ShouldNotBe("pass", $"row {row}");
         }
