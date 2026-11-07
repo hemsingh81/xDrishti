@@ -78,6 +78,9 @@ const moveRoutes = [
   '/api/hypotheses/{id}/move',
   '/api/changelog/{id}/revert',
   '/api/autonomy/settings',
+  // CF-10 10d-2b: the ML switches and the rollback apply (the Models tab draws them; owner-acts writes them).
+  '/api/learning/ml-settings',
+  '/api/learning/rollback/{id}/apply',
 ];
 
 describe('the export route is written from exports only', () => {

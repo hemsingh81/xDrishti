@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { formatAsOf, NonValue } from '@/shared/analytics';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { modelQuery, type ModelDetail } from '../api/learningQueries';
+import { CalibrationFacts } from './CalibrationFacts';
 import { CalibrationTable } from './CalibrationTable';
+import { InfluenceSection } from './InfluenceSection';
 import { PreformattedText } from './PreformattedText';
 import { DrawerSection } from './DrawerSection';
 import { RecordDrawer } from './RecordDrawer';
@@ -38,7 +40,13 @@ function Body({ detail }: { detail: ModelDetail }) {
         <PreformattedText label="Trainer and validation settings" text={detail.parameters} />
       </DrawerSection>
       <DrawerSection title="Calibration">
-        <CalibrationTable points={detail.calibration} />
+        <Box sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
+          <CalibrationFacts model={detail.model} />
+          <CalibrationTable points={detail.calibration} />
+        </Box>
+      </DrawerSection>
+      <DrawerSection title="Influence">
+        <InfluenceSection id={detail.model.id} />
       </DrawerSection>
       <DrawerSection title="Feature importance">
         <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
