@@ -17,15 +17,6 @@ internal sealed class UnavailableReadinessGaps : IReadinessGaps
     public ValueTask<ReadinessReading<bool>> TwentyTradeCheckPassedAsync(string strategy, CancellationToken cancellationToken) =>
         None<bool>("the P3-09 20-trade check is the owner's signed record and has no machine-readable store.");
 
-    public ValueTask<ReadinessReading<double>> QuarterShareAsync(string strategy, int? version, CancellationToken cancellationToken) =>
-        None<double>("the Lab verdict has a by-year table but no by-quarter table.");
-
-    public ValueTask<ReadinessReading<double>> MaxInstrumentShareAsync(string strategy, int? version, CancellationToken cancellationToken) =>
-        None<double>("the Lab verdict has no per-instrument share of the total R.");
-
-    public ValueTask<ReadinessReading<double>> McDrawdownP90Async(string strategy, int? version, CancellationToken cancellationToken) =>
-        None<double>("the Lab verdict stores the 50th and the 95th percentile of the Monte Carlo drawdown, not the 90th.");
-
     public ValueTask<ReadinessReading<bool>> IntegrityFaultAsync(CancellationToken cancellationToken) =>
         None<bool>("the list of P7 and P10 integrity checks is unverified, so no source reads them.");
 

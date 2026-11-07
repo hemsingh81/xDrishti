@@ -8686,6 +8686,59 @@ export interface components {
       reason: string;
     };
     /**
+     * @description The liquidity tier and the capacity check of the out-of-sample trades of a Lab verdict (CF-05 D2 and D4, ADR 0223), the evidence of row 14 of the readiness scorecard. Report-only: nothing in the verdict reads it. Counts only; no trade is named.
+     *     A trade with no usable 20-day median is int CostStressTiersView.TierUnavailable. The capacity is held against 0.5 % of the 20-day median (measured) and 1 % of the fill minute's traded value, which is not read from day bars, so without a breach
+     *     every capacity reading is int CostStressTiersView.CapacityUnavailable and none is a pass; int? CostStressTiersView.OrdersOverEntryDayShare is information only.
+     */
+    CostStressTiersView: {
+      /**
+       * Format: int32
+       * @description The out-of-sample trades judged (the sum of the four tier counts).
+       */
+      trades: number;
+      /**
+       * Format: int32
+       * @description Trades in tier A.
+       */
+      tierA: number;
+      /**
+       * Format: int32
+       * @description Trades in tier B.
+       */
+      tierB: number;
+      /**
+       * Format: int32
+       * @description Trades in tier C (excluded from edge claims, counted here).
+       */
+      tierC: number;
+      /**
+       * Format: int32
+       * @description Trades with no usable 20-day median traded value (or whose bars could not be read).
+       */
+      tierUnavailable: number;
+      /**
+       * Format: int32
+       * @description Trades whose order is over a cap that was measured (the 20-day median share).
+       */
+      capacityBreaches: number;
+      /**
+       * Format: int32
+       * @description Trades whose capacity could not be fully judged (the fill minute is not read, a traded value or the order value is missing, or the bars could not be read) and that are not already a breach.
+       */
+      capacityUnavailable: number;
+      /** @description The text of the tier and capacity settings that produced the counts. */
+      settings: string;
+      /** @description SHA-256 of Settings. */
+      settingsHash: string;
+      /** @description What is measured and what is not read. */
+      basis: string;
+      /**
+       * Format: int32
+       * @description Information only: orders over the capacity share of the entry day's traded value (about 375 times looser than the fill minute's); it can never make a pass. Null in a block produced before it.
+       */
+      ordersOverEntryDayShare?: null | number;
+    };
+    /**
      * @description The cost stress and the delay test of a Lab verdict (CF-05, ADR 0206), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a miss caps the outcome at MARGINAL and never raises it. Every settings figure used is in
      *     string CostStressView.Settings and its hash in string CostStressView.SettingsHash. string CostStressView.Tradable is the worst of the three multipliers. bool CostStressView.CostsChecked is false until `cost-sheet check` has recorded a bill check, and the rows are then unavailable.
      */
@@ -8715,6 +8768,7 @@ export interface components {
       limit: string;
       /** @description The hash of the sheet's rates the run was costed with, so a stored verdict says which numbers were checked. */
       sheetRatesSha256?: null | string;
+      tiers?: null | components['schemas']['CostStressTiersView'];
     };
     /** @description What undoing a cost batch did: its entries are voided (nothing is deleted). Undoing a batch again is a no-op (`AlreadyUndone`, `Voided` 0). */
     CostUndoResult: {
@@ -15573,7 +15627,7 @@ export interface components {
       settings: string;
       note: string;
     };
-    /** @description The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number). */
+    /** @description The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number). `DrawdownP90` (SC-S1, ADR 0222) is null in a result stored before it. */
     MonteCarloView: {
       /** Format: int32 */
       trades: number;
@@ -15596,6 +15650,8 @@ export interface components {
       drawdownP95: number;
       /** Format: double */
       shareNotPositive: number;
+      /** Format: double */
+      drawdownP90?: null | number;
     };
     /** @description The body of a hypothesis move. */
     MoveHypothesisRequest: {
@@ -18244,6 +18300,17 @@ export interface components {
        */
       quantity: number;
     };
+    /** @description The out-of-sample trades of one calendar quarter that had at least one trade (SC-S1, ADR 0222). */
+    QuarterView: {
+      /** Format: int32 */
+      year: number;
+      /** Format: int32 */
+      quarter: number;
+      /** Format: int32 */
+      trades: number;
+      /** Format: double */
+      meanR: number;
+    };
     /** @description An accepted hypothesis waiting; nothing was applied. */
     QueueItem: {
       /**
@@ -19563,7 +19630,7 @@ export interface components {
       weeklyLossR: number;
       weeklyLossAction: string;
     };
-    /** @description The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it). */
+    /** @description The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it). Since SC-S1 (ADR 0222) `ByQuarter` (the quarters with a trade) and `MaxInstrumentShare` (the largest instrument's share of the total R, 1.0 when the total is not above 0) feed the readiness scorecard's row 10; both are null in a result stored before it, and nothing here changes the verdict. */
     RobustnessView: {
       sensitivity: components['schemas']['SensitivityView'];
       monteCarlo: null | components['schemas']['MonteCarloView'];
@@ -19574,6 +19641,9 @@ export interface components {
       byRegimeBuckets?: null | components['schemas']['RegimeBucketView'][];
       byRegimeUnavailable?: null | components['schemas']['RegimeMissingView'][];
       monteCarloBlock?: null | components['schemas']['MonteCarloBlockView'];
+      byQuarter?: null | components['schemas']['QuarterView'][];
+      /** Format: double */
+      maxInstrumentShare?: null | number;
     };
     RoleToggleInput: {
       enabled: boolean;

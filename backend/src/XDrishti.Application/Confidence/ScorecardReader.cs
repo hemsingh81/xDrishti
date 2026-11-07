@@ -76,25 +76,16 @@ internal sealed class ScorecardReader(
         var forwardEvidence = await forward.ReadAsync(strategy, cancellationToken);
         var benchmark = await gaps.BenchmarkBeatenAsync(strategy, version, cancellationToken);
         var twenty = await gaps.TwentyTradeCheckPassedAsync(strategy, cancellationToken);
-        var quarters = await gaps.QuarterShareAsync(strategy, version, cancellationToken);
-        var instrument = await gaps.MaxInstrumentShareAsync(strategy, version, cancellationToken);
-        var p90 = await gaps.McDrawdownP90Async(strategy, version, cancellationToken);
         var integrity = await gaps.IntegrityFaultAsync(cancellationToken);
         var tier = await gaps.TierCOnlyAsync(strategy, cancellationToken);
 
         var rowNotes = new Dictionary<int, string>(labEvidence.Checklist.Notes);
         Add(rowNotes, 13, benchmark);
         Add(rowNotes, 15, twenty);
-        Add(rowNotes, 10, quarters);
-        Add(rowNotes, 10, instrument);
-        Add(rowNotes, 11, p90);
         var checklist = labEvidence.Checklist with
         {
             BenchmarkBeaten = benchmark.Value,
             TwentyTradeCheckPassed = twenty.Value,
-            QuarterShare = quarters.Value,
-            MaxInstrumentShare = instrument.Value,
-            McDrawdownP90 = p90.Value,
             PhaseCheckMet = forwardEvidence.PhaseCheckMet,
             ForwardMeanR = forwardEvidence.ForwardMeanR,
             ForwardStandardError = forwardEvidence.ForwardStandardError,

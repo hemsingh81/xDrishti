@@ -146,6 +146,35 @@ public sealed class ScorecardArchitectureTests
         Types.InAssembly(Self).That().HaveName(nameof(ClockSentinel)).Should().NotHaveDependencyOnAny("System.TimeProvider").GetResult().IsSuccessful.ShouldBeFalse();
     }
 
+    [Fact]
+    public void The_lab_figures_behind_rows_10_and_11_are_pure_and_the_verdict_evaluator_does_not_read_them()
+    {
+        // SC-S1 (ADR 0222): the figures are computed at Lab run time by pure Domain types (the bootstrap draws only from the seeded generator) and the verdict never reads them
+        string[] names = [nameof(XDrishti.Domain.Lab.QuarterBreakdown), nameof(XDrishti.Domain.Lab.QuarterRow), nameof(XDrishti.Domain.Lab.InstrumentShare), nameof(XDrishti.Domain.Lab.MonteCarlo), nameof(XDrishti.Domain.Lab.MonteCarloResult)];
+        var pure = Types.InAssembly(Domain).That().ResideInNamespace("XDrishti.Domain.Lab").And().HaveNameMatching("^(" + string.Join("|", names) + ")$");
+
+        pure.GetTypes().Select(t => t.Name).Order(StringComparer.Ordinal).ShouldBe(names.Order(StringComparer.Ordinal), "control: the rule ran over exactly these types");
+        var result = pure.Should().NotHaveDependencyOnAny(
+            "System.IO", "System.Net", "System.Data", "System.Threading.Tasks", "System.Diagnostics.Process", "System.Diagnostics.Stopwatch", "System.TimeProvider", "System.Environment", "System.Random",
+            "System.Security.Cryptography", "System.Text.Json", "Npgsql", "Microsoft.EntityFrameworkCore", "XDrishti.Application", "XDrishti.Infrastructure", "XDrishti.Domain.Readiness").GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(string.Join(", ", result.FailingTypeNames ?? []));
+        foreach (var name in new[] { "QuarterBreakdown", "InstrumentShare" })
+        {
+            var source = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Domain", "Lab", name + ".cs"));
+            source.ShouldNotContain("DateTime", customMessage: name);
+            source.ShouldNotContain("Random", customMessage: name);
+        }
+
+        var verdict = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Domain", "Lab", "VerdictEvaluator.cs"));
+        foreach (var word in new[] { "QuarterBreakdown", "InstrumentShare", "DrawdownP90", "MonteCarlo", "Robustness" })
+        {
+            verdict.ShouldNotContain(word);
+        }
+
+        Types.InAssembly(Self).That().HaveName(nameof(ClockSentinel)).Should().NotHaveDependencyOnAny("System.TimeProvider").GetResult().IsSuccessful.ShouldBeFalse(); // control
+    }
+
     // ---- (2) nothing that chooses reads the slice ----
 
     [Fact]
@@ -305,8 +334,8 @@ public sealed class ScorecardArchitectureTests
         source.ShouldContain("new ReadinessReading<T>(null, \"unavailable: \" + reason)");
         source.ShouldNotContain("true");
         source.ShouldNotContain("Result.Success");
-        typeof(IReadinessGaps).GetMethods().Length.ShouldBe(8);
-        source.Split("None<").Length.ShouldBe(8 + 2, "eight answers and the helper's definition");
+        typeof(IReadinessGaps).GetMethods().Length.ShouldBe(5, "rows 10 and 11 left the port when the Lab verdict gained their figures (SC-S1, ADR 0222) and row 14 when it gained the tier counts (SC-S2, ADR 0223)");
+        source.Split("None<").Length.ShouldBe(5 + 2, "five answers and the helper's definition");
         typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("CapacityOkAsync", "row 14 has its producer (ADR 0223) and is read from the Lab verdict by the reader, not through the gaps");
     }
 

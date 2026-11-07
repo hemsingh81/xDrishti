@@ -3,6 +3,7 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Lab;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Lab;
 using XDrishti.Domain.Readiness;
 
 namespace XDrishti.Application.Confidence;
@@ -28,6 +29,9 @@ internal sealed class LabEvidenceReader(
     ICostConfirmationFact confirmation)
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+    /// <summary>Said beside rows 10 and 11 for a verdict stored before the figures were computed at run time (SC-S1, ADR 0222). The out-of-sample trades are not stored, so they cannot be derived later; only a new run fills them.</summary>
+    internal const string Before = "unavailable: produced before the scorecard sources existed; re-run";
 
     public async ValueTask<LabEvidence> ReadAsync(string strategy, int? version, CancellationToken cancellationToken)
     {
@@ -77,6 +81,7 @@ internal sealed class LabEvidenceReader(
             yearShare = total > 0 ? years.Max(y => y.TotalR) / total : 1.0;
         }
 
+        var quarters = verdict.Robustness?.ByQuarter;
         var mc = verdict.Robustness?.MonteCarlo;
         double? p95 = mc is null ? null : Math.Max(mc.DrawdownP95, verdict.Robustness?.MonteCarloBlock?.DdP95 ?? double.MinValue);
         var (capacityOk, capacityNote) = CapacityOf(verdict.CostStress);
@@ -103,6 +108,9 @@ internal sealed class LabEvidenceReader(
             MaxYearShare = yearShare,
             ObservedMaxDrawdownR = mc?.ObservedMaxDrawdownR,
             McDrawdownP95 = p95,
+            McDrawdownP90 = mc?.DrawdownP90,
+            QuarterShare = quarters is { Count: > 0 } ? QuarterBreakdown.Share([.. quarters.Select(q => q.MeanR)], EdgeChecklist.QuarterFloorR) : null,
+            MaxInstrumentShare = verdict.Robustness?.MaxInstrumentShare,
         };
         if (evidence.Dependence?.NEff is null)
         {
@@ -133,6 +141,22 @@ internal sealed class LabEvidenceReader(
         if (mc is null)
         {
             rowNotes[11] = "the verdict has no Monte Carlo block (run the robust method).";
+        }
+        else if (mc.DrawdownP90 is null)
+        {
+            rowNotes[11] = Before;
+        }
+
+        if (verdict.Robustness is not null)
+        {
+            var quarterNote = quarters is null ? Before : quarters.Count == 0 ? "the verdict has no out-of-sample trade, so no quarter." : null;
+            var instrumentNote = verdict.Robustness.MaxInstrumentShare is not null ? null : quarters is null ? Before : "the simulated trades behind the out-of-sample trades were not kept, there is none, or they did not match the trades one to one.";
+            var shareNotes = new[] { quarterNote, instrumentNote }.OfType<string>().Distinct(StringComparer.Ordinal).ToList();
+            if (shareNotes.Count > 0)
+            {
+                var text = string.Join(" ", shareNotes);
+                rowNotes[10] = rowNotes.TryGetValue(10, out var existing10) ? existing10 + " " + text : text;
+            }
         }
 
         notes.Add(string.Create(Inv, $"Lab results are read from the newest finished full run of version {v}. Rows 2, 3 and 6 are on the development out-of-sample trades (pre-hold-out); they are not recomputed with the hold-out trades, because the hold-out's effective n and spread are not stored."));

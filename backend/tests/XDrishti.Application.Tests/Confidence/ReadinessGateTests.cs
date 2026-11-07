@@ -35,19 +35,29 @@ public sealed class ReadinessGateTests
         f.Store.Snapshots[0].Body.ShouldContain("owner:me@x.test");
     }
 
+    /// <summary>The verdict of a run made before the scorecard sources existed (SC-S1 and SC-S2): no quarter, instrument or 90th-percentile figure and no tier block.</summary>
+    private static LabVerdictView Older(LabVerdictView v) => v with
+    {
+        Robustness = v.Robustness! with { ByQuarter = null, MaxInstrumentShare = null, MonteCarlo = v.Robustness.MonteCarlo! with { DrawdownP90 = null } },
+        CostStress = v.CostStress! with { Tiers = null },
+    };
+
     [Fact]
     public async Task With_enforce_OFF_a_failing_gate_is_a_warning_with_the_failing_rows_and_no_refusal()
     {
         var f = new ReadinessFixture { Gaps = new UnavailableReadinessGaps() };
+
+        // a verdict stored before the scorecard sources existed: rows 10, 11 and 14 have no figure, and no figure is a fail
+        f.Verdict = Older(f.Verdict!);
 
         var decision = await f.Gate.CheckAsync(R, Ct);
 
         decision.Passed.ShouldBeFalse();
         decision.Enforced.ShouldBeFalse();
         decision.Refused.ShouldBeFalse();
-        decision.FailingRows.ShouldBe([10, 11], "row 14 is read from the Lab verdict's tier counts and passes in the fixture");
+        decision.FailingRows.ShouldBe([10, 11, 14]);
         decision.Message.ShouldContain("rows not passing");
-        decision.EvidenceIds[1].ShouldBe("readiness-gate-R:fail:enforce-off:rows-10.11");
+        decision.EvidenceIds[1].ShouldBe("readiness-gate-R:fail:enforce-off:rows-10.11.14");
         decision.SnapshotId.ShouldNotBeNull();
     }
 
@@ -56,12 +66,13 @@ public sealed class ReadinessGateTests
     {
         var f = new ReadinessFixture { Gaps = new UnavailableReadinessGaps() };
         f.Store.Switch = new ReadinessSwitch(4, true);
+        f.Verdict = Older(f.Verdict!);
 
         var decision = await f.Gate.CheckAsync(R, Ct);
 
         decision.Enforced.ShouldBeTrue();
         decision.Refused.ShouldBeTrue();
-        decision.FailingRows.ShouldContain(10);
+        decision.FailingRows.ShouldContain(14);
         f.Store.Snapshots.ShouldHaveSingleItem("the refusal is cited too");
     }
 
@@ -120,6 +131,7 @@ public sealed class ReadinessGateTests
     {
         var f = new ReadinessFixture { Gaps = new UnavailableReadinessGaps() };
         f.Store.SettingsFailure = new InvalidOperationException("db down");
+        f.Verdict = Older(f.Verdict!);
 
         var decision = await f.Gate.CheckAsync(R, Ct);
 

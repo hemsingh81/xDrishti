@@ -52,7 +52,8 @@ public static class MonteCarlo
             Percentile(means, 0.95),
             Percentile(drawdowns, 0.50),
             Percentile(drawdowns, 0.95),
-            (double)means.Count(m => m <= 0) / draws);
+            (double)means.Count(m => m <= 0) / draws,
+            Percentile(drawdowns, 0.90));
     }
 
     /// <summary>The largest peak-to-trough fall of the cumulative sum, starting from 0.</summary>

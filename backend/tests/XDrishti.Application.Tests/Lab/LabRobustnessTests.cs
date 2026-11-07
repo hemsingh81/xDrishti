@@ -115,6 +115,60 @@ public sealed class LabRobustnessTests
         view.Limits.ShouldContain(l => l.Contains("sign-flip", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task The_block_carries_the_90th_percentile_the_quarters_and_the_instrument_share_for_the_scorecard()
+    {
+        var service = Service();
+        // 4 trades of +1 R in January 2026: one quarter with a mean of 1; instrument A made three of them, B one
+        var full = Full(1, 1, 1, 1) with
+        {
+            OosSources =
+            [
+                FabricatedRun.Trade(FabricatedRun.IdA, "NSE:AAA", Side.Buy, new DateOnly(2026, 1, 1)),
+                FabricatedRun.Trade(FabricatedRun.IdA, "NSE:AAA", Side.Buy, new DateOnly(2026, 1, 2)),
+                FabricatedRun.Trade(FabricatedRun.IdA, "NSE:AAA", Side.Buy, new DateOnly(2026, 1, 3)),
+                FabricatedRun.Trade(FabricatedRun.IdB, "NSE:M&M", Side.Buy, new DateOnly(2026, 1, 4)),
+            ],
+        };
+
+        var view = (await service.RunAsync(Run(), Now, service.Plan(Described()), Template(), full, null, Ct)).Value.View;
+
+        view.MonteCarlo!.DrawdownP90.ShouldNotBeNull();
+        view.MonteCarlo.DrawdownP90.Value.ShouldBeInRange(view.MonteCarlo.DrawdownP50, view.MonteCarlo.DrawdownP95);
+        view.ByQuarter.ShouldBe([new QuarterView(2026, 1, 4, 1)]);
+        view.MaxInstrumentShare.ShouldBe(0.75);
+    }
+
+    [Fact]
+    public async Task Simulated_trades_that_do_not_pair_one_to_one_with_the_trades_give_no_instrument_share()
+    {
+        var service = Service();
+        var full = Full(1, 1, 1) with
+        {
+            OosSources =
+            [
+                FabricatedRun.Trade(FabricatedRun.IdA, "NSE:AAA", Side.Buy, new DateOnly(2026, 1, 1)),
+                FabricatedRun.Trade(FabricatedRun.IdB, "NSE:M&M", Side.Buy, new DateOnly(2026, 1, 2)),
+            ],
+        };
+
+        var view = (await service.RunAsync(Run(), Now, service.Plan(Described()), Template(), full, null, Ct)).Value.View;
+
+        view.MaxInstrumentShare.ShouldBeNull();
+        view.ByQuarter.ShouldNotBeNull().Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Without_the_simulated_trades_there_is_no_instrument_share_but_the_quarters_are_there()
+    {
+        var service = Service();
+
+        var view = (await service.RunAsync(Run(), Now, service.Plan(Described()), Template(), Full(1, -1), null, Ct)).Value.View;
+
+        view.MaxInstrumentShare.ShouldBeNull();
+        view.ByQuarter.ShouldNotBeNull().Count.ShouldBe(1);
+    }
+
     private static IContextFigures Figures(Func<DateOnly, ContextRead> script)
     {
         var figures = Substitute.For<IContextFigures>();
