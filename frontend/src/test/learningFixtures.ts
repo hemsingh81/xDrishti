@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { Schemas } from '@/shared/api';
+import { mlHandlers, type MlFake } from './mlFixtures';
 import { problemResponse, server } from './server';
 
 type Cell = Schemas['CellStatsView'];
@@ -485,10 +486,13 @@ export interface RecordsFake {
   models?: Model[];
   modelDetails?: ModelDetail[];
   digests?: Digest[];
+  /** CF-10 10d-2b: the influence read, the rollback read and the two owner-act writes (default: nothing proposed, all OFF, every term refused). */
+  ml?: MlFake;
 }
 
-/** Mounts the record reads of P8-03: lists and details by id; an id not given answers 404. */
+/** Mounts the record reads of P8-03: lists and details by id; an id not given answers 404. Returns the state of the ML stand-in. */
 export function mountRecords(fake: RecordsFake = {}) {
+  const ml = mlHandlers(fake.ml);
   const byId = (rows: { id: number }[] | undefined, id: unknown, code: string) => {
     const found = (rows ?? []).find((r) => String(r.id) === String(id));
     return found ? HttpResponse.json(found) : problemResponse({ title: 'Not found.', code }, 404);
@@ -521,5 +525,7 @@ export function mountRecords(fake: RecordsFake = {}) {
         ? HttpResponse.json(found)
         : problemResponse({ title: 'No digest.', code: 'learning.digest_not_found' }, 404);
     }),
+    ...ml.handlers,
   );
+  return { ml: ml.state };
 }
