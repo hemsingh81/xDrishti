@@ -172,11 +172,13 @@ internal sealed class EvaluatePaperPhaseCheckHandler(
             var nights = runs[date].OrderBy(r => r.Id).ToList();
             var published = nights.Find(r => r.Run.Outcome == "published");
             int? primary = published?.Run.PlanId is { } planId && planRows.TryGetValue(planId, out var row) ? row.Primary : null;
-            var rows = captures[date].OrderBy(r => r.Id).ToList();
-            var newest = rows.Count == 0 ? null : rows[^1];
-            result.Add(new PhaseSessionFact(
-                date, published is not null, nights.Count(r => r.Run.Outcome == "failed_closed"), nights.Count(r => r.Run.Manual), primary, rows.Count,
-                newest is { Outcome: "done", Pending: 0 }, newest is { Pending: > 0 }, rows.Sum(r => r.Integrity)));
+            result.Add(CaptureSessionFacts.Of(date, captures[date]) with
+            {
+                PlanPublished = published is not null,
+                FailedClosedRuns = nights.Count(r => r.Run.Outcome == "failed_closed"),
+                ManualPlanRuns = nights.Count(r => r.Run.Manual),
+                PrimaryTickets = primary,
+            });
         }
 
         return result;

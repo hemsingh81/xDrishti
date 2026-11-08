@@ -15,6 +15,8 @@ namespace XDrishti.Application.Confidence;
 internal sealed class ScorecardReader(
     LabEvidenceReader lab,
     ForwardEvidenceReader forward,
+    ForwardTierReader forwardTiers,
+    ScorecardIntegrityReader integrityReader,
     IReadinessGaps gaps,
     IQueryHandler<ListStrategiesQuery, IReadOnlyList<StoredStrategy>> strategyList,
     IQueryHandler<GetStrategyQuery, Result<StrategyDetail>> strategyDetail,
@@ -76,8 +78,8 @@ internal sealed class ScorecardReader(
         var forwardEvidence = await forward.ReadAsync(strategy, cancellationToken);
         var benchmark = await gaps.BenchmarkBeatenAsync(strategy, version, cancellationToken);
         var twenty = await gaps.TwentyTradeCheckPassedAsync(strategy, cancellationToken);
-        var integrity = await gaps.IntegrityFaultAsync(cancellationToken);
-        var tier = await gaps.TierCOnlyAsync(strategy, cancellationToken);
+        var integrity = await integrityReader.ReadAsync(cancellationToken);
+        var (tierState, tierEvidence) = TierCEvidence.Judge(labEvidence.LabTiers, await forwardTiers.ReadAsync(strategy, cancellationToken));
 
         var rowNotes = new Dictionary<int, string>(labEvidence.Checklist.Notes);
         Add(rowNotes, 13, benchmark);
@@ -94,16 +96,20 @@ internal sealed class ScorecardReader(
         var scoreInputs = forwardEvidence.Score with { Folds = labEvidence.Folds, PositiveFolds = labEvidence.PositiveFolds };
         var faults = new HardFailInputs
         {
-            Integrity = Fault(integrity),
+            Integrity = integrity.State,
             CostSheet = labEvidence.CostSheet,
             FailureBoundary = forwardEvidence.FailureBoundary,
             HoldOutReused = labEvidence.HoldOutReused,
-            TierCOnly = Fault(tier),
+            TierCOnly = tierState,
             KillDemotion = forwardEvidence.KillDemotion,
         };
         var assessment = ReadinessAssessment.Of(checklist, scoreInputs, faults, options);
         var notes = new List<string>(labEvidence.Notes);
         notes.AddRange(forwardEvidence.Notes);
+
+        // the evidence behind the two hard fails, always shown (a fault, a clear term, a term that does not apply and an unavailable one each say why)
+        notes.Add($"Hard fail \"{ReadinessCalculator.IntegrityName}\": {integrity.Evidence}");
+        notes.Add($"Hard fail \"{ReadinessCalculator.TierName}\": {tierEvidence}");
         return Map(strategy, version, assessment, notes);
     }
 
@@ -118,17 +124,10 @@ internal sealed class ScorecardReader(
             strategies.Add(new StrategyReadiness(card.Strategy, card.Score, card.WeakestSubScore, share.Value));
         }
 
-        var integrity = Fault(await gaps.IntegrityFaultAsync(cancellationToken));
+        var integrity = (await integrityReader.ReadAsync(cancellationToken)).State;
         var system = SystemReadinessCalculator.Compute(strategies, integrity, options);
         return new SystemScorecardView(system.Score, ReadinessLabels.Code(system.Label), ReadinessLabels.Text(system.Label), system.Integrity, system.WeightedMean, system.EqualWeights, system.WeakestStrategy, system.WeakestSubScore, system.Strategies, system.Reason);
     }
-
-    private static FaultState Fault(ReadinessReading<bool> reading) => reading.Value switch
-    {
-        true => FaultState.Fault,
-        false => FaultState.Clear,
-        _ => FaultState.Unavailable,
-    };
 
     private static void Add<T>(Dictionary<int, string> notes, int row, ReadinessReading<T> reading)
         where T : struct

@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 
 namespace XDrishti.Application.Confidence;
 
-/// <summary>Structured log events of the readiness scorecard (CF-11 part 1; ids 7300 to 7307). Counts, gate letters and codes only: no trade rows, no figures of a strategy and no secrets.</summary>
+/// <summary>Structured log events of the readiness scorecard (CF-11 part 1; ids 7300 to 7310). Counts, gate letters and codes only: no trade rows, no figures of a strategy and no secrets.</summary>
 internal static partial class ReadinessLog
 {
     [LoggerMessage(EventId = 7300, Level = LogLevel.Information, Message = "confidence.readiness.snapshot: {Strategies} strateg(ies), {Stored} stored, {AlreadyDone} already done today, {Failed} failed")]
@@ -28,4 +28,13 @@ internal static partial class ReadinessLog
 
     [LoggerMessage(EventId = 7307, Level = LogLevel.Warning, Message = "confidence.readiness.refused {Code}")]
     public static partial void Refused(ILogger logger, string code);
+
+    [LoggerMessage(EventId = 7308, Level = LogLevel.Warning, Message = "confidence.readiness.integrity: the capture-integrity criterion could not be read ({ExceptionType}); the hard fail reads unavailable, which counts as a fail")]
+    public static partial void IntegrityUnreadable(ILogger logger, string exceptionType);
+
+    [LoggerMessage(EventId = 7309, Level = LogLevel.Warning, Message = "confidence.readiness.forward_tiers: the day bars of one instrument could not be read ({ExceptionType}); its {Trades} forward trade(s) count as tier unavailable")]
+    public static partial void ForwardBarsUnread(ILogger logger, string exceptionType, int trades);
+
+    [LoggerMessage(EventId = 7310, Level = LogLevel.Warning, Message = "confidence.readiness.forward_tiers: the forward trades could not be tiered ({ExceptionType}); the set reads unavailable, which counts as a fail")]
+    public static partial void ForwardTiersUnreadable(ILogger logger, string exceptionType);
 }

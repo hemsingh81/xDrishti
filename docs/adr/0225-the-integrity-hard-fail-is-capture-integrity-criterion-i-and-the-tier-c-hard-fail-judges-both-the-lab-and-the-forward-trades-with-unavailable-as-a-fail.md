@@ -1,0 +1,19 @@
+# 0225 — The integrity hard fail is capture integrity (criterion I) and the tier C hard fail judges both the Lab and the forward trades, with `unavailable` as a fail
+
+- **Status:** Proposed (built as scorecard-source slice S3, 2026-11-08). Becomes Accepted when the owner has read it. **Safety slice: no.** Both terms only read; nothing places an order or changes a verdict. They can only block an owner act that the owner's enforce switch (OFF by default, ADR 0221) already governs.
+- **Date:** 2026-11-08.
+- **Relation to other ADRs:** completes two of the seven hard fails of [0221](0221-the-readiness-scorecard-is-derived-and-read-only-unavailable-is-a-fail-and-the-owners-enforce-switch-off-by-default-makes-the-two-lifecycle-gates-refuse-instead-of-warn.md) that were always `unavailable`; uses the tier counts of [0223](0223-the-lab-verdict-counts-each-trades-liquidity-tier-and-capacity-breach-from-day-bars-report-only-and-readiness-row-14-reads-them-with-unavailable-as-a-fail.md). Records the owner's decisions of 2026-11-07.
+
+## Context
+The spec (CF-11 D3) named "an integrity fault (the P7 and P10 integrity checks; the list is unverified)" and "evidence only from tier C" without saying which evidence. Both were `unavailable` (a fail) because no source existed.
+
+## Decision
+1. **Integrity fault = P10 capture integrity, criterion I, only.** `PaperPhaseCheck.CaptureIntegrity(sessions)` is now public and `Evaluate` uses it, so the scorecard and the phase check cannot differ. A narrow query `GetCaptureIntegrityQuery` (not the whole check; the automatic pause path reaches the scorecard through the lifecycle gate and must not reach the check's handler) feeds `ScorecardIntegrityReader`, read once per scope. NOT MET = fault; MET = clear; NOT EVALUABLE (no capture run this epoch) = not applicable, never a pass and never a fault; any other word or a failed read = unavailable (a fail). The system card treats not applicable as integrity 100, as before.
+2. **Evidence only from tier C = both sets.** `TierCEvidence.Judge` takes the Lab out-of-sample set (from the verdict's tier block) and the forward set (`ForwardTierReader`: each graded forward trade of the epoch, tiered by the same pure `LiquidityTiers` rules from the day bars before its entry session; derived on request, nothing stored). It is a fault when either set has trades and all are tier C. An empty set is not tier C; an unavailable tier is never tier C; an unreadable set is unavailable. A fault wins; else any unavailable set makes the term unavailable (a fail); only when both sets are read and not tier C is it clear.
+3. **The card says why.** Each term adds a note with its state, the criterion or the counts and the set that triggered it.
+4. `IReadinessGaps` loses `IntegrityFaultAsync` and `TierCOnlyAsync` (three methods left); an architecture pin forbids their return. No API contract change, no migration.
+
+## Consequences
+With no forward trades yet the forward set is empty, which is not tier C, so the term is judged on the Lab set alone until forward trades exist; a Lab verdict without a tier block keeps it `unavailable`. Tests: pure judge table, criterion I mapping, the handler, the forward tier reader (fail-closed paths), and the scorecard cases (fault, clear, not applicable, unavailable).
+
+Both sets empty reads "clear" with no evidence (`TierCEvidence.Judge`). That is acceptable only because the trade-count rows of the scorecard fail on zero trades, so an empty card is never ready through this term. The behaviour is pinned by `No_trades_in_either_set_is_not_tier_C` (`ScorecardReaderTests`); if the count rows ever stop failing on zero trades, this term must become `unavailable` for two empty sets. The forward bar reads are cached per instrument for the scope (one read per instrument, in series): upgrade to parallel or monthly reads when the forward record grows.

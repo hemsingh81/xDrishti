@@ -77,12 +77,6 @@ public interface IReadinessGaps
     /// <summary>Row 15: the owner's 20-trade check (P3-09) passed. It is the owner's signed record, which has no machine-readable store.</summary>
     ValueTask<ReadinessReading<bool>> TwentyTradeCheckPassedAsync(string strategy, CancellationToken cancellationToken);
 
-    /// <summary>The hard fail "integrity fault": true when a P7 or P10 integrity check fails (the list of checks is unverified, so no source exists).</summary>
-    ValueTask<ReadinessReading<bool>> IntegrityFaultAsync(CancellationToken cancellationToken);
-
-    /// <summary>The hard fail "evidence only from tier C": true when all the evidence is tier C (the Lab verdict now carries the tier counts of its trades, but whether this means the Lab or the forward trades is an open owner question, ADR 0223).</summary>
-    ValueTask<ReadinessReading<bool>> TierCOnlyAsync(string strategy, CancellationToken cancellationToken);
-
     /// <summary>The planned risk share of a strategy, 0 to 1 (the plan does not expose it per strategy yet; the system level then uses equal weights, labelled).</summary>
     ValueTask<ReadinessReading<double>> RiskShareAsync(string strategy, CancellationToken cancellationToken);
 }

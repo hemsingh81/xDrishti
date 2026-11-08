@@ -70,7 +70,7 @@ public static class PaperPhaseCheck
             Count(facts, elapsed),
             Statistic("C3", "Expectancy within the backtest band, after costs", facts, facts.Exit?.Expectancy),
             Statistic("C4", "Drawdown within the 90th percentile of the backtest", facts, facts.Exit?.Drawdown),
-            Integrity(facts),
+            CaptureIntegrity(facts.Sessions),
         };
 
         var (verdict, label) = Overall(facts, epoch, elapsed, criteria, out var malformed);
@@ -195,11 +195,17 @@ public static class PaperPhaseCheck
         return new PhaseCriterion(id, title, verdict, verdict + ": " + label, [result.Label], blockers);
     }
 
-    private static PhaseCriterion Integrity(PaperPhaseFacts facts)
+    /// <summary>
+    /// Criterion I, capture integrity, from the capture facts of the epoch's sessions alone (spec P10-06): NOT EVALUABLE with no capture run, NOT MET when a replay disagreed with a stored entry or a pair stays pending too long, else MET. It is public so that the readiness scorecard
+    /// (CF-11, ADR 0224) reads this very criterion without evaluating the whole phase check; <see cref="Evaluate"/> uses the same function, so the two cannot differ. Pure.
+    /// </summary>
+    /// <param name="sessions">The trading sessions of the epoch, oldest first; only the capture fields are read.</param>
+    public static PhaseCriterion CaptureIntegrity(IReadOnlyList<PhaseSessionFact> sessions)
     {
+        ArgumentNullException.ThrowIfNull(sessions);
         const string title = "Capture integrity";
         var c = CultureInfo.InvariantCulture;
-        var runs = facts.Sessions.Sum(s => s.CaptureRuns);
+        var runs = sessions.Sum(s => s.CaptureRuns);
         if (runs == 0)
         {
             return new PhaseCriterion("I", title, No, No + ": no capture run of this epoch", ["0 capture runs"], ["the paper-capture service must run"]);
@@ -207,13 +213,13 @@ public static class PaperPhaseCheck
 
         var facing = new List<string> { string.Create(c, $"{runs} capture rows read") };
         // A mismatch row keeps this NOT MET for the whole epoch even after the pair is resolved: capture rows are insert-only and a later run does not retract one, so only a new epoch clears it (deliberately conservative).
-        var mismatched = facts.Sessions.Where(s => s.CaptureIntegrity > 0).ToList();
+        var mismatched = sessions.Where(s => s.CaptureIntegrity > 0).ToList();
         var stuck = new List<PhaseSessionFact>();
-        for (var i = 0; i < facts.Sessions.Count; i++)
+        for (var i = 0; i < sessions.Count; i++)
         {
-            if (facts.Sessions[i].CapturePending && facts.Sessions.Count - 1 - i > StuckAfterSessions)
+            if (sessions[i].CapturePending && sessions.Count - 1 - i > StuckAfterSessions)
             {
-                stuck.Add(facts.Sessions[i]);
+                stuck.Add(sessions[i]);
             }
         }
 
