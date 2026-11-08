@@ -364,8 +364,41 @@ public sealed class ScorecardArchitectureTests
         Dependents(Application, "XDrishti.Application.Lab.LabTiers").ShouldBe(["XDrishti.Application.DependencyInjection", "XDrishti.Application.Lab.LabRunner", "XDrishti.Application.Lab.LabTiers"]);
     }
 
+    /// <summary>Stands for a second reader of the fill-minute bar and a second user of its traded value.</summary>
+    internal sealed class MinuteReadSentinel(XDrishti.Application.Abstractions.Market.Bars.IBarQueries bars)
+    {
+        public ValueTask<IReadOnlyList<XDrishti.Application.Abstractions.Market.Bars.MinuteCloseVolume>> Read() => bars.ReadMinuteCloseVolumesAsync(Guid.Empty, [], CancellationToken.None);
+
+        public static decimal? Value() => XDrishti.Domain.Research.LiquidityTiers.MinuteTradedValue(1, 1);
+    }
+
     [Fact]
-    public void The_tier_and_capacity_rules_are_pure_domain_and_the_lab_tiers_read_day_bars_and_never_minute_bars()
+    public void The_fill_minute_is_read_by_the_lab_tiers_only_through_the_one_bounded_port_method_and_the_verdict_evaluator_names_none_of_it()
+    {
+        // ADR 0224: the only caller of the minute read and of the minute value rule is the Lab's tier check (the sentinel is the control that a second caller is seen)
+        Callers(r => r.Name == "ReadMinuteCloseVolumesAsync" && r.DeclaringType?.FullName == "XDrishti.Application.Abstractions.Market.Bars.IBarQueries")
+            .ShouldBe(["XDrishti.Application.Lab.LabTiers", Sentinel(typeof(MinuteReadSentinel))]);
+        Callers(r => r.Name == "MinuteTradedValue" && r.DeclaringType?.FullName == "XDrishti.Domain.Research.LiquidityTiers")
+            .ShouldBe(["XDrishti.Application.Lab.LabTiers", Sentinel(typeof(MinuteReadSentinel))]);
+
+        // the batch is bounded by the port: the implementation refuses more instants than the constant allows
+        XDrishti.Application.Abstractions.Market.Bars.IBarQueries.MaxMinuteStartsPerRead.ShouldBeLessThanOrEqualTo(1000);
+        File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Market", "Bars", "BarQueries.cs")).ShouldContain("ThrowIfGreaterThan(minuteStarts.Count, IBarQueries.MaxMinuteStartsPerRead)");
+
+        // the minute value is computed by the pure rule and the Domain types stay free of the bars port
+        var pure = Types.InAssembly(Domain).That().ResideInNamespace("XDrishti.Domain.Research").And().HaveNameMatching("^(LiquidityTiers|Capacity|CapacityCheck|LiquidityTier)$");
+        pure.Should().NotHaveDependencyOnAny("XDrishti.Application.Abstractions", "XDrishti.Infrastructure").GetResult().IsSuccessful.ShouldBeTrue();
+
+        // the verdict evaluator never names the tiers, the capacity or the fill minute
+        var verdict = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Domain", "Lab", "VerdictEvaluator.cs"));
+        foreach (var word in new[] { "LiquidityTiers", "Tiers", "Capacity", "FillMinute", "MinuteTradedValue", "MinuteCloseVolume" })
+        {
+            verdict.ShouldNotContain(word);
+        }
+    }
+
+    [Fact]
+    public void The_tier_and_capacity_rules_are_pure_domain_and_the_lab_tiers_read_day_bars_and_the_fill_minute_and_never_other_minute_bars()
     {
         var pure = Types.InAssembly(Domain).That().ResideInNamespace("XDrishti.Domain.Research").And().HaveNameMatching("^(LiquidityTiers|Capacity|CapacityCheck|LiquidityTier)$");
 

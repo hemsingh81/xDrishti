@@ -44,8 +44,8 @@ public sealed class ScorecardReaderTests
     {
         var f = new ReadinessFixture { Gaps = new UnavailableReadinessGaps() };
 
-        // the block a robust run writes today: tiers A and B, no measured breach, every capacity reading unavailable (the fill minute is not read)
-        f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { Tiers = Tiers(capacityNone: 330) } };
+        // the block an older run wrote: tiers A and B, no measured breach, every capacity reading unavailable (the fill minute was not read)
+        f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { Tiers = BlockBeforeS2b() } };
 
         var card = await CardAsync(f);
 
@@ -69,8 +69,13 @@ public sealed class ScorecardReaderTests
         card.RawMinimum.ShouldBeGreaterThan(0, "the score without the faults is still shown");
     }
 
-    private static CostStressTiersView Tiers(int a = 300, int b = 30, int c = 0, int none = 0, int breaches = 0, int capacityNone = 0) =>
-        new(a + b + c + none, a, b, c, none, breaches, capacityNone, string.Empty, string.Empty, string.Empty);
+    /// <summary>A block as a run writes it since S2b: every fill minute read unless <paramref name="minuteUnavailable"/> says otherwise.</summary>
+    private static CostStressTiersView Tiers(int a = 300, int b = 30, int c = 0, int none = 0, int breaches = 0, int capacityNone = 0, int minuteUnavailable = 0) =>
+        new(a + b + c + none, a, b, c, none, breaches, capacityNone, string.Empty, string.Empty, string.Empty, 0, a + b + c + none - minuteUnavailable, minuteUnavailable, 5000);
+
+    /// <summary>A block as the slice before S2b wrote it: no minute members, every capacity reading unavailable.</summary>
+    private static CostStressTiersView BlockBeforeS2b(int breaches = 0, int capacityNone = 330) =>
+        new(330, 300, 30, 0, 0, breaches, capacityNone, string.Empty, string.Empty, string.Empty, 0);
 
     private static ReadinessFixture WithTiers(CostStressTiersView? tiers)
     {
@@ -80,7 +85,7 @@ public sealed class ScorecardReaderTests
     }
 
     [Fact]
-    public async Task Row_14_passes_when_every_trade_is_tier_A_or_B_and_every_capacity_reading_is_complete_and_within_the_caps_which_needs_a_fill_minute_source_not_built_yet()
+    public async Task Row_14_passes_when_every_trade_is_tier_A_or_B_every_fill_minute_was_read_and_every_order_is_within_both_caps()
     {
         var card = await CardAsync(WithTiers(Tiers()));
 
@@ -120,16 +125,49 @@ public sealed class ScorecardReaderTests
     }
 
     [Fact]
-    public async Task Row_14_of_the_block_the_lab_writes_today_is_unavailable_because_the_fill_minute_is_not_read_and_a_breach_still_beats_it()
+    public async Task Row_14_of_a_block_written_before_S2b_is_unavailable_because_the_fill_minute_was_not_read_and_a_breach_still_beats_it()
     {
-        // every capacity reading unavailable (no fill minute), tiers A and B only, no measured breach: the block of a real run today
-        var today = await CardAsync(WithTiers(Tiers(capacityNone: 330)));
-        var breach = await CardAsync(WithTiers(Tiers(breaches: 1, capacityNone: 329)));
+        // every capacity reading unavailable (no fill minute), tiers A and B only, no measured breach: the block of a run before the fill-minute read
+        var before = await CardAsync(WithTiers(BlockBeforeS2b()));
+        var breach = await CardAsync(WithTiers(BlockBeforeS2b(breaches: 1, capacityNone: 329)));
 
-        Status(today, 14).ShouldBe("unavailable");
-        today.Rows.Single(r => r.Number == 14).Value.ShouldContain("fill minute's traded value is not read yet");
-        today.GateR.Passed.ShouldBeFalse();
+        Status(before, 14).ShouldBe("unavailable");
+        before.Rows.Single(r => r.Number == 14).Value.ShouldContain("before the fill minute's traded value was read");
+        before.GateR.Passed.ShouldBeFalse();
         Status(breach, 14).ShouldBe("fail");
+    }
+
+    [Fact]
+    public async Task Row_14_of_a_block_without_the_minute_members_never_passes_even_when_its_other_counts_look_complete()
+    {
+        // a block that has no unavailable count and no breach but never recorded a fill-minute read: the 1 % cap was not judged
+        var forged = new CostStressTiersView(330, 300, 30, 0, 0, 0, 0, string.Empty, string.Empty, string.Empty, 0);
+
+        var card = await CardAsync(WithTiers(forged));
+
+        Status(card, 14).ShouldBe("unavailable");
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(330)]
+    public async Task Row_14_is_unavailable_when_any_fill_minute_was_not_read_even_if_the_other_counts_are_clean(int minuteUnavailable)
+    {
+        var card = await CardAsync(WithTiers(Tiers(minuteUnavailable: minuteUnavailable)));
+
+        Status(card, 14).ShouldBe("unavailable");
+        card.Rows.Single(r => r.Number == 14).Value.ShouldContain($"{minuteUnavailable} have no readable fill minute");
+        card.GateR.Passed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Row_14_names_the_trades_over_the_fill_minute_bound()
+    {
+        var over = Tiers(minuteUnavailable: 30) with { MinuteReadLimit = 300 };
+
+        var card = await CardAsync(WithTiers(over));
+
+        card.Rows.Single(r => r.Number == 14).Value.ShouldContain("30 over the bound");
     }
 
     [Fact]

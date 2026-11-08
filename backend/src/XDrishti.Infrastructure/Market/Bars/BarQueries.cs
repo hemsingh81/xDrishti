@@ -179,6 +179,30 @@ internal sealed class BarQueries(NpgsqlDataSource dataSource) : IBarQueries
         return rows;
     }
 
+    public async ValueTask<IReadOnlyList<MinuteCloseVolume>> ReadMinuteCloseVolumesAsync(Guid instrumentId, IReadOnlyList<DateTimeOffset> minuteStarts, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(minuteStarts);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(minuteStarts.Count, IBarQueries.MaxMinuteStartsPerRead);
+        if (minuteStarts.Count == 0)
+        {
+            return [];
+        }
+
+        // a join of the instants to the primary key (instrument, bar start): one index lookup per instant (measured about 0.03 ms to 0.25 ms each on the local 60 million row table, ADR 0224); ANY(array) was 10 times slower
+        await using var command = dataSource.CreateCommand(
+            "SELECT b.ts, b.close, b.volume FROM unnest(@starts) AS u(ts) JOIN market.bars_1m b ON b.instrument_id = @id AND b.ts = u.ts");
+        command.Parameters.AddWithValue("id", instrumentId);
+        command.Parameters.Add(new NpgsqlParameter("starts", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.TimestampTz) { Value = minuteStarts.Select(s => s.ToUniversalTime()).ToArray() });
+        var rows = new List<MinuteCloseVolume>(minuteStarts.Count);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new MinuteCloseVolume(IndiaTime.ToIst(reader.GetFieldValue<DateTimeOffset>(0)), reader.GetDouble(1), reader.GetInt64(2)));
+        }
+
+        return rows;
+    }
+
     public async ValueTask<IReadOnlyList<BarRow>> ReadDailyBarsAsync(Guid instrumentId, DateOnly from, DateOnly toExclusive, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(

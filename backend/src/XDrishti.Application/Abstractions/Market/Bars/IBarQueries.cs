@@ -13,9 +13,21 @@ public sealed record AggregateTotals(IReadOnlyList<TimeframeStat> Timeframes, Da
 /// <summary>An instrument as the bars endpoint and the simulation need it. <paramref name="TickSize"/> is the master's tick in paise (null when the master has none); a run turns it into rupees with <c>TickSpec.FromMasterPaise</c>.</summary>
 public sealed record BarsInstrument(Guid Id, string Symbol, string Name, decimal? TickSize = null);
 
+/// <summary>The close and volume of the stored 1-minute bar that starts at <paramref name="Start"/> (raw, unadjusted): all the liquidity check of a fill minute needs.</summary>
+public sealed record MinuteCloseVolume(DateTimeOffset Start, double Close, long Volume);
+
 /// <summary>Reads of the stored bars and their coverage (all reads, no tracking).</summary>
 public interface IBarQueries
 {
+    /// <summary>The most minute starts one call of <see cref="ReadMinuteCloseVolumesAsync"/> takes.</summary>
+    const int MaxMinuteStartsPerRead = 1000;
+
+    /// <summary>
+    /// The close and volume of the stored 1-minute bars of one instrument that start at exactly the given instants (the fill minutes of trades; ADR 0224): one primary-key lookup per instant, no scan. A minute with no stored bar is missing from the result, which is not
+    /// an error. At most <see cref="MaxMinuteStartsPerRead"/> instants per call. The only caller is the Lab's liquidity tier check.
+    /// </summary>
+    ValueTask<IReadOnlyList<MinuteCloseVolume>> ReadMinuteCloseVolumesAsync(Guid instrumentId, IReadOnlyList<DateTimeOffset> minuteStarts, CancellationToken cancellationToken);
+
     /// <summary><paramref name="expectedStart"/> is the start (India midnight) of the last session that has closed: an instrument whose last bar is earlier is behind.</summary>
     ValueTask<BarTotals> GetBarTotalsAsync(DateTimeOffset expectedStart, CancellationToken cancellationToken);
 

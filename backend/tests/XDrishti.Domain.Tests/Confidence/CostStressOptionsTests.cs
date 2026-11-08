@@ -110,6 +110,38 @@ public sealed class CostStressOptionsTests
         (CostStressOptions.DefaultTierACutCrore, CostStressOptions.DefaultTierBCutCrore, CostStressOptions.DefaultCapacityFillShare, CostStressOptions.DefaultCapacityDailyShare).ShouldBe((100m, 20m, 0.01m, 0.005m));
     }
 
+    [Fact]
+    public void The_fill_minute_read_bounds_default_to_5000_trades_and_60_seconds_and_do_not_move_any_stored_hash()
+    {
+        var a = new CostStressOptions();
+
+        (a.FillMinuteMaxTrades, a.FillMinuteTimeoutSeconds).ShouldBe((5000, 60));
+        a.Problems().ShouldBeEmpty();
+        var changed = a with { FillMinuteMaxTrades = 10, FillMinuteTimeoutSeconds = 5 };
+        (changed.SnapshotHash(), changed.TierSnapshotHash()).ShouldBe((a.SnapshotHash(), a.TierSnapshotHash()), "the bounds are the cost of a read, not a figure the verdict was judged by; the block records the bound it used");
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 1)]
+    [InlineData(20_000, 600)]
+    public void A_bound_inside_its_range_is_allowed_in_both_directions_because_a_smaller_bound_only_adds_unavailable_readings(int maxTrades, int seconds)
+    {
+        new CostStressOptions(FillMinuteMaxTrades: maxTrades, FillMinuteTimeoutSeconds: seconds).Problems().ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(-1, 60, "FillMinuteMaxTrades")]
+    [InlineData(20_001, 60, "FillMinuteMaxTrades")]
+    [InlineData(int.MaxValue, 60, "FillMinuteMaxTrades")]
+    [InlineData(5000, 0, "FillMinuteTimeoutSeconds")]
+    [InlineData(5000, -1, "FillMinuteTimeoutSeconds")]
+    [InlineData(5000, 601, "FillMinuteTimeoutSeconds")]
+    public void A_bound_outside_its_range_is_a_problem_the_host_refuses_to_start_on(int maxTrades, int seconds, string setting)
+    {
+        new CostStressOptions(FillMinuteMaxTrades: maxTrades, FillMinuteTimeoutSeconds: seconds).Problems().ShouldContain(p => p.StartsWith("CostStress:" + setting, StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData(1.0, 2.0, 0.08, 0.0, 1, 0.7)]
     [InlineData(0.5, 2.0, 0.08, 0.0, 1, 0.7)]

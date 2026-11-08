@@ -42,7 +42,7 @@ public static class EdgeChecklist
             Drawdown(inputs, options),
             Judged(12, "Hold-out", "CF-06", "used once, at least 50 % of the development out-of-sample, above 0, at least 30 trades", inputs.HoldOut, inputs),
             Flag(13, "Benchmark", "P8-07 baskets benchmarks (no producer yet)", "beats the same-universe equal-weight / buy-and-hold net, risk-adjusted", inputs.BenchmarkBeaten, inputs, "beats", "does not beat"),
-            Flag(14, "Capacity and tier", "CF-05 (the Lab verdict's tier and capacity counts, ADR 0223)", "all trades tier A or B, every order at most 1 % of the fill minute's traded value (not read from day bars yet: unavailable) and at most 0.5 % of the 20-day median", inputs.CapacityOk, inputs, "within capacity", "outside capacity"),
+            Flag(14, "Capacity and tier", "CF-05 (the Lab verdict's tier and capacity counts, ADR 0223)", "all trades tier A or B, every order at most 1 % of the fill minute's traded value (the stored minute bar of the fill minute; unread is unavailable) and at most 0.5 % of the 20-day median", inputs.CapacityOk, inputs, "within capacity", "outside capacity"),
             PaperConfirm(inputs),
         ];
     }

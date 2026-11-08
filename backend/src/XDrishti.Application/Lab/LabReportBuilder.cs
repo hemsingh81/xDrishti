@@ -147,7 +147,7 @@ internal static class LabReportBuilder
 
             if (cs.Tiers is { } tiers && (tiers.TierC > 0 || tiers.CapacityBreaches > 0))
             {
-                w.Add(new ReportWarningView("liquidity", $"Of {tiers.Trades} out-of-sample trades {tiers.TierC} are liquidity tier C and {tiers.CapacityBreaches} orders are over a participation cap (measured on day bars, the fill minute is not read; report only: the outcome is not changed)."));
+                w.Add(new ReportWarningView("liquidity", $"Of {tiers.Trades} out-of-sample trades {tiers.TierC} are liquidity tier C and {tiers.CapacityBreaches} orders are over a participation cap (measured on stored day bars and fill-minute bars; report only: the outcome is not changed)."));
             }
         }
 
