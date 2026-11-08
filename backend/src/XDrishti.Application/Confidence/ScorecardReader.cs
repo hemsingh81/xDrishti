@@ -9,7 +9,7 @@ using XDrishti.Domain.Readiness;
 namespace XDrishti.Application.Confidence;
 
 /// <summary>
-/// Builds the scorecard of one strategy version from the stored results (spec CF-11 D1 to D4) and the system card (D5): the Lab evidence, the forward evidence and the inputs that have no producer yet (behind <see cref="IReadinessGaps"/>) are put into the pure calculators of
+/// Builds the scorecard of one strategy version from the stored results (spec CF-11 D1 to D4) and the system card (D5): the Lab evidence, the forward evidence and the one input that has no producer yet (the risk share, behind <see cref="IReadinessGaps"/>) are put into the pure calculators of
 /// <c>XDrishti.Domain.Readiness</c>. Derived on every call; it writes nothing and nothing that chooses what to approve may use it (an architecture test). An input that does not exist is unavailable, which is never a pass.
 /// </summary>
 internal sealed class ScorecardReader(
@@ -77,17 +77,14 @@ internal sealed class ScorecardReader(
     {
         var labEvidence = await lab.ReadAsync(strategy, version, cancellationToken);
         var forwardEvidence = await forward.ReadAsync(strategy, cancellationToken);
-        var benchmark = await gaps.BenchmarkBeatenAsync(strategy, version, cancellationToken);
         var twenty = await packGate.ReadAsync(strategy, version, cancellationToken);
         var integrity = await integrityReader.ReadAsync(cancellationToken);
         var (tierState, tierEvidence) = TierCEvidence.Judge(labEvidence.LabTiers, await forwardTiers.ReadAsync(strategy, cancellationToken));
 
         var rowNotes = new Dictionary<int, string>(labEvidence.Checklist.Notes);
-        Add(rowNotes, 13, benchmark);
         Add(rowNotes, 15, twenty);
         var checklist = labEvidence.Checklist with
         {
-            BenchmarkBeaten = benchmark.Value,
             TwentyTradeCheckPassed = twenty.Value,
             PhaseCheckMet = forwardEvidence.PhaseCheckMet,
             ForwardMeanR = forwardEvidence.ForwardMeanR,
