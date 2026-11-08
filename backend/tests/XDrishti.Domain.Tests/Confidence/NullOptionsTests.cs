@@ -30,6 +30,17 @@ public sealed class NullOptionsTests
         new NullOptions(mode, false, draws, percentile, redraws).Problems().ShouldNotBeEmpty();
     }
 
+    [Fact]
+    public void The_cap_on_a_posts_draws_defaults_to_5000_is_1000_to_20000_and_may_not_be_below_the_configured_draws()
+    {
+        new NullOptions().MaxDraws.ShouldBe(5000);
+        new NullOptions(MaxDraws: 20000, Draws: 5001).Problems().ShouldBeEmpty();
+        new NullOptions(MaxDraws: 999).Problems().ShouldContain(p => p.Contains("MaxDraws", StringComparison.Ordinal));
+        new NullOptions(MaxDraws: 20001).Problems().ShouldNotBeEmpty();
+        new NullOptions(Draws: 2000, MaxDraws: 1500).Problems().ShouldNotBeEmpty();
+        new NullOptions(MaxDraws: 1000).KeyText().ShouldBe(new NullOptions().KeyText(), "the cap changes no result, so not the snapshot");
+    }
+
     [Theory]
     [InlineData(10)]
     [InlineData(18)]

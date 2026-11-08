@@ -138,6 +138,20 @@ internal sealed class LabRunner(
             problems.Add(new LabProblem(Validate, "strategy", "lab.strategy_missing", "The stored version of the strategy is not found.", "error", null, null));
         }
 
+        if (LabRunOptions.Parse(run.RunOptions).NullsOff && string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal))
+        {
+            // queued before the owner turned an Enforce on: running it would skip the cap
+            if (nulls is { Enforced: true })
+            {
+                problems.Add(new LabProblem(Validate, "options.nulls", "lab.nulls_off_enforced", "This robust run was posted with `nulls: false`, which is refused while the nulls are enforced (Confidence:Nulls:Enforce); post it again.", "error", null, null));
+            }
+
+            if (plateau is { Enforced: true })
+            {
+                problems.Add(new LabProblem(Validate, "options.nulls", "lab.plateau_off_enforced", "This robust run was posted with `nulls: false`, which is refused while the plateau gate is enforced (Confidence:Plateau:Enforce); post it again.", "error", null, null));
+            }
+        }
+
         if (run.Universe.Instruments.Count == 0)
         {
             problems.Add(new LabProblem(Validate, "universe", "lab.empty_universe", "The universe has no instrument.", "error", null, null));
@@ -274,7 +288,7 @@ internal sealed class LabRunner(
             lastStage = Robustness;
 
             // CF-07: the random-entry null of the out-of-sample trades, one more stage that reads the stored bars of the development window and writes nothing until the end
-            if (nulls is { IsOn: true })
+            if (nulls is { IsOn: true } && !LabRunOptions.Parse(run.RunOptions).NullsOff)
             {
                 ownerToken.ThrowIfCancellationRequested();
                 log.Finish(Robustness, 0, time.GetUtcNow());
@@ -301,6 +315,11 @@ internal sealed class LabRunner(
         {
             // asked for, not done: said in the run's problems, never silently dropped
             problems.Add(new LabProblem(FullTest, "options.stress", "lab.stress_not_run", costStress is not { IsOn: true } ? "`stress: true` was asked for but the cost stress is Off (Confidence:CostStress:Mode), so no stress block was computed." : "`stress: true` was asked for but the run was not costed with a stored charge sheet, so no stress block was computed.", "warning", null, null));
+        }
+
+        if (runOptions.Draws is not null && string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal) && !runOptions.NullsOff && nulls is not { IsOn: true })
+        {
+            problems.Add(new LabProblem(Nulls, "options.draws", "lab.draws_not_run", "`draws` was asked for but the nulls are Off (Confidence:Nulls:Mode), so no random-entry null was computed.", "warning", null, null));
         }
 
         if (costStress is { IsOn: true } && runOptions.StressOn(string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal)) && sheetUsed is not null)

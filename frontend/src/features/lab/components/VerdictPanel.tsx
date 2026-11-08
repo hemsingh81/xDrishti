@@ -15,6 +15,7 @@ import {
 import { formatNumber } from '@/shared/lib/format';
 import type { LabVerdict } from '../api/runQueries';
 import { CostStressBlock } from './CostStressBlock';
+import { NullsBlock } from './NullsBlock';
 
 const outcomeSeverity: Record<string, 'success' | 'warning' | 'error' | undefined> = {
   PASS: 'success',
@@ -94,6 +95,7 @@ export function VerdictPanel({ verdict }: { verdict: LabVerdict }) {
       </Table>
       <DeflatedSharpeLine figure={verdict.deflatedSharpe} />
       <CostStressBlock block={verdict.costStress} />
+      <NullsBlock block={verdict.nulls} />
       <Alert severity="info" sx={{ mt: 1 }}>
         <Typography variant="subtitle2">Honest limits</Typography>
         {verdict.limits.length > 0 ? (

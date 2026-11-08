@@ -80,7 +80,15 @@ export interface StartRunInput {
   method: RunMethod;
   basketId: string | null;
   symbols: string[];
+  /** What-if options (CF-05, CF-07); omitted when left at the default. */
+  slippage?: 'conservative';
+  stress?: boolean;
+  nulls?: false;
+  draws?: number;
 }
+
+/** A run posted with options that differ from the default is a what-if and cannot be evidence. */
+export const isWhatIf = (run: LabRun): boolean => run.options?.isDefault === false;
 
 export async function startRun(input: StartRunInput) {
   return unwrap(
@@ -90,6 +98,10 @@ export async function startRun(input: StartRunInput) {
         version: input.version,
         method: input.method,
         universe: input.basketId ? { basketId: input.basketId } : { symbols: input.symbols },
+        ...(input.slippage ? { slippage: input.slippage } : {}),
+        ...(input.stress !== undefined ? { stress: input.stress } : {}),
+        ...(input.nulls === false ? { nulls: false } : {}),
+        ...(input.draws !== undefined ? { draws: input.draws } : {}),
       },
     }),
   );

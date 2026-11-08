@@ -14,6 +14,9 @@ internal sealed class LabPlateau(PlateauOptions options)
     /// <summary>True when the gate is computed.</summary>
     public bool IsOn => options.IsOn;
 
+    /// <summary>True when the owner has turned the plateau cap on and the gate is computed (ADR 0231: a post may not leave the gate out then).</summary>
+    public bool Enforced => options is { IsOn: true, Enforce: true };
+
     private static string Basis(DateOnly developmentEnd, DateOnly sweepEnd, string exit) =>
         "in-sample sweep, one parameter at a time, plain runs of the default exit (" + exit + ") over the run's window, read as stored; development window ending "
         + developmentEnd.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)

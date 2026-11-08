@@ -2,7 +2,7 @@ import { Chip, List, ListItemButton, ListItemText, Typography } from '@mui/mater
 import { useQuery } from '@tanstack/react-query';
 import { formatIstDateTime } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
-import { runsQuery } from '../api/runQueries';
+import { isWhatIf, runsQuery } from '../api/runQueries';
 
 interface RunsListProps {
   strategyId: string | null;
@@ -29,7 +29,7 @@ export function RunsList({ strategyId, poll, selectedId, onSelect }: RunsListPro
         >
           <ListItemText
             primary={`${r.strategy.id} v${r.strategy.version} · ${r.method}`}
-            secondary={`${r.state} · ${r.universe.label} · ${formatIstDateTime(r.createdAt)}`}
+            secondary={`${r.state} · ${r.universe.label} · ${formatIstDateTime(r.createdAt)}${isWhatIf(r) ? ' · what-if' : ''}`}
           />
           {r.verdict && <Chip size="small" variant="outlined" label={r.verdict.outcome} />}
         </ListItemButton>

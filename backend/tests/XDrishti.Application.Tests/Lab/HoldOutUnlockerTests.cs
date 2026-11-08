@@ -185,6 +185,8 @@ public sealed class HoldOutUnlockerTests
     [Theory]
     [InlineData("robust", "slippage=conservative")]
     [InlineData("robust", "stress=off")]
+    [InlineData("robust", "nulls=off")]
+    [InlineData("robust", "draws=300")]
     [InlineData("full", "stress=on")]
     public async Task A_what_if_run_cannot_take_the_hold_out_by_hand_or_by_the_auto_option(string method, string options)
     {

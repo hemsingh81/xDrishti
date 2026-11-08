@@ -1148,6 +1148,49 @@ public sealed class LabRunnerTests
     }
 
     [Fact]
+    public async Task A_robust_run_posted_with_nulls_off_runs_no_nulls_stage_and_stores_no_block()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithNulls(new NullOptions(), new PlateauOptions()).ExecuteAsync(RobustRun() with { RunOptions = "nulls=off" }, Ct);
+
+        _finishes[0].Stages.Select(s => s.Name).ShouldBe(["validate", "compile", "full_test", "robustness"]);
+        verdicts.Single().Nulls.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_queued_nulls_off_robust_run_fails_at_validate_while_the_nulls_or_the_plateau_are_enforced_and_runs_otherwise()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithNulls(new NullOptions(Enforce: true), new PlateauOptions()).ExecuteAsync(RobustRun() with { RunOptions = "nulls=off" }, Ct);
+        await RunnerWithNulls(new NullOptions(), new PlateauOptions(Enforce: true)).ExecuteAsync(RobustRun() with { RunOptions = "nulls=off" }, Ct);
+        await RunnerWithNulls(new NullOptions(), new PlateauOptions()).ExecuteAsync(RobustRun() with { RunOptions = "nulls=off" }, Ct);
+
+        _finishes[0].State.ShouldBe(LabRunState.Failed);
+        _finishes[0].Stage.ShouldBe("validate");
+        _finishes[0].Problems.ShouldContain(p => p.Code == "lab.nulls_off_enforced");
+        _finishes[1].State.ShouldBe(LabRunState.Failed);
+        _finishes[1].Problems.ShouldContain(p => p.Code == "lab.plateau_off_enforced");
+        _finishes[2].State.ShouldBe(LabRunState.Succeeded);
+        verdicts.Count.ShouldBe(1, "the two refused runs stored no verdict");
+    }
+
+    [Fact]
+    public async Task A_robust_run_with_own_draws_says_so_in_its_problems_when_the_nulls_went_off_after_the_post()
+    {
+        ArrangeFullTest();
+
+        await RunnerWithNulls(new NullOptions(ConfidenceMode.Off)).ExecuteAsync(RobustRun() with { RunOptions = "draws=300" }, Ct);
+
+        _finishes[0].Problems.ShouldContain(p => p.Code == "lab.draws_not_run" && p.Severity == "warning");
+    }
+
+    [Fact]
     public async Task The_null_in_report_only_adds_the_block_and_leaves_the_outcome_gates_evidence_and_limits_byte_for_byte_as_they_were()
     {
         ArrangeFullTest();

@@ -65,7 +65,7 @@ internal sealed class ConfidenceSettings
     internal HoldOutOptions ToHoldOutOptions() => new(HoldOut.Enforce, HoldOut.AutoUnlock, HoldOut.MinMonths, HoldOut.SharePercent, HoldOut.MinTrades, HoldOut.Retention);
 
     /// <summary>The <c>Confidence:Nulls</c> subsection as the options of CF-07 (ADR 0208).</summary>
-    internal NullOptions ToNullOptions() => new(Nulls.Mode, Nulls.Enforce, Nulls.Draws, Nulls.Percentile, Nulls.Redraws, Nulls.Placebos, Nulls.MinPlacebos);
+    internal NullOptions ToNullOptions() => new(Nulls.Mode, Nulls.Enforce, Nulls.Draws, Nulls.Percentile, Nulls.Redraws, Nulls.Placebos, Nulls.MinPlacebos, Nulls.MaxDraws);
 
     /// <summary>The <c>Confidence:Plateau</c> subsection as the options of CF-07 part C (ADR 0210).</summary>
     internal PlateauOptions ToPlateauOptions() => new(Plateau.Mode, Plateau.Enforce, Plateau.Retention, Plateau.MinPoints);
@@ -267,6 +267,8 @@ internal sealed class ConfidenceSettings
         public bool Placebos { get; set; } = true;
 
         public int MinPlacebos { get; set; } = 19;
+
+        public int MaxDraws { get; set; } = NullOptions.DefaultMaxDraws;
     }
 
     internal sealed class PlateauSection

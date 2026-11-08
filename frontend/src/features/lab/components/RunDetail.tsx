@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { formatIstDateTime } from '@/shared/lib/format';
 import { ErrorState, Facts, LoadingState } from '@/shared/ui';
 import { useToast } from '@/shared/ui/toastContext';
-import { cancelRun, isActive, runKeys, runQuery } from '../api/runQueries';
+import { cancelRun, isActive, isWhatIf, runKeys, runQuery } from '../api/runQueries';
 import { ReportPanel } from './ReportPanel';
 import { VerdictPanel } from './VerdictPanel';
 
@@ -100,6 +100,11 @@ export function RunDetail({ runId, poll }: RunDetailProps) {
             </Box>
           )}
         </Box>
+      )}
+      {isWhatIf(run) && (
+        <Alert severity="info">
+          What-if run: posted with options that differ from the default, so it cannot be evidence.
+        </Alert>
       )}
       {run.error && <Alert severity="error">{run.error}</Alert>}
       {run.problems.length > 0 && (

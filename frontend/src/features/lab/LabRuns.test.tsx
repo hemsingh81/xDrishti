@@ -204,6 +204,94 @@ describe('Lab runs', () => {
     });
   });
 
+  it('posts a robust run without the chance block or with its own seeds, and shows the server refusal', async () => {
+    const bodies: unknown[] = [];
+    const started = buildRun({ state: 'queued', stage: null, method: 'robust' });
+    setup(
+      [],
+      [
+        http.post('/api/lab/runs', async ({ request }) => {
+          const b = (await request.json()) as { draws?: number };
+          bodies.push(b);
+          if (b.draws === 5000) return problemResponse({ title: 'Seeds above the limit of 2000.' }, 422);
+          return HttpResponse.json(started, { status: 202 });
+        }),
+        http.get('/api/lab/runs/:id', () => HttpResponse.json(started)),
+      ],
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<LabPage />);
+    await openFamily(user);
+    expect(screen.queryByLabelText('Seeds')).toBeNull();
+    await user.click(screen.getByLabelText('Method'));
+    await user.click(await screen.findByRole('option', { name: 'Robust test' }));
+    await user.type(screen.getByLabelText('Symbols'), 'TCS');
+    await user.type(screen.getByLabelText('Seeds'), '100');
+    expect(screen.getByText('At least 200, a whole number.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run test' })).toBeDisabled();
+    await user.clear(screen.getByLabelText('Seeds'));
+    await user.type(screen.getByLabelText('Seeds'), '5000');
+    await user.click(screen.getByRole('button', { name: 'Run test' }));
+    expect((await screen.findAllByText('Seeds above the limit of 2000.')).length).toBeGreaterThan(0);
+
+    await user.click(screen.getByLabelText('Skip chance block (what-if)'));
+    expect(screen.getByLabelText('Seeds')).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Run test' }));
+    await waitFor(() => {
+      expect(bodies).toHaveLength(2);
+    });
+    expect(bodies[0]).toMatchObject({ draws: 5000 });
+    expect(bodies[1]).toMatchObject({ nulls: false });
+    expect(bodies[1]).not.toHaveProperty('draws');
+  });
+
+  it('posts conservative slippage, and the cost stress option only for a full test', async () => {
+    const bodies: unknown[] = [];
+    const started = buildRun({ state: 'queued', stage: null });
+    setup(
+      [],
+      [
+        http.post('/api/lab/runs', async ({ request }) => {
+          bodies.push(await request.json());
+          return HttpResponse.json(started, { status: 202 });
+        }),
+        http.get('/api/lab/runs/:id', () => HttpResponse.json(started)),
+      ],
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<LabPage />);
+    await openFamily(user);
+    expect(screen.queryByLabelText('Cost stress block (what-if)')).toBeNull();
+    await user.click(screen.getByLabelText('Method'));
+    await user.click(await screen.findByRole('option', { name: 'Full test' }));
+    await user.type(screen.getByLabelText('Symbols'), 'TCS');
+    await user.click(screen.getByLabelText('Conservative slippage (what-if)'));
+    await user.click(screen.getByLabelText('Cost stress block (what-if)'));
+    await user.click(screen.getByRole('button', { name: 'Run test' }));
+    await waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]).toMatchObject({ method: 'full', slippage: 'conservative', stress: true });
+
+    await user.click(screen.getByLabelText('Method'));
+    await user.click(await screen.findByRole('option', { name: 'Robust test' }));
+    expect(screen.queryByLabelText('Cost stress block (what-if)')).toBeNull();
+  });
+
+  it('marks a run posted with non-default options as a what-if', async () => {
+    const done = buildRun({
+      state: 'succeeded',
+      stage: null,
+      method: 'full',
+      options: { slippage: 'conservative', stress: false, isDefault: false, nulls: true },
+    });
+    setup([done], [http.get('/api/lab/runs/:id', () => HttpResponse.json(done))]);
+    const user = userEvent.setup();
+    renderWithProviders(<LabPage />);
+    await openRun(user, /MY_ORB v2 · full/);
+    expect(await screen.findByText(/What-if run/)).toBeInTheDocument();
+  });
+
   it('keeps Run test off until a stored version is open and shows the server refusal', async () => {
     setup(
       [],
