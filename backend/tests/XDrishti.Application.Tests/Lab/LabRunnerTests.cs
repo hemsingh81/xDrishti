@@ -615,6 +615,21 @@ public sealed class LabRunnerTests
     }
 
     [Fact]
+    public async Task A_strategy_that_names_min_turnover_carries_the_blocked_count_the_threshold_and_a_limit_line()
+    {
+        ArrangeFullTest();
+        _checker.Check("the text").Returns(new StrategyCheck(new StrategyDescription("LAB_TEST", "intraday", Hash, "{}", [Timeframe.M15], [Side.Buy], [new KeyValuePair<string, double>("period", 10)], true), 1, []));
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await Runner().ExecuteAsync(FullRun(), Ct);
+
+        var view = verdicts.Single().TurnoverExclusion.ShouldNotBeNull();
+        view.ThresholdCrore.ShouldBe(20m);
+        verdicts.Single().Limits.ShouldContain(l => l.StartsWith("min_turnover:", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_run_without_conservative_options_carries_no_tier_exclusion_and_default_fills()
     {
         ArrangeFullTest();
@@ -624,6 +639,7 @@ public sealed class LabRunnerTests
         await Runner().ExecuteAsync(FullRun(), Ct);
 
         verdicts.Single().TierExclusion.ShouldBeNull();
+        verdicts.Single().TurnoverExclusion.ShouldBeNull("the filter is not named: the stored verdict JSON is unchanged");
         _comparisons.ReceivedCalls().Select(c => ((RunComparisonQuery)c.GetArguments()[0]!).Request.Fills!).ShouldAllBe(f => !f.ConservativeSlippage && f.BarRangeFrac == FillRules.Default.Slippage.BarRangeFrac);
     }
 

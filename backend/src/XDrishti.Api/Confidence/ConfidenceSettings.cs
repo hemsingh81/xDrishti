@@ -1,5 +1,6 @@
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Readiness;
+using XDrishti.Domain.Research;
 
 namespace XDrishti.Api.Confidence;
 
@@ -97,7 +98,7 @@ internal sealed class ConfidenceSettings
     internal bool PlateauEnforcedWithoutNulls() => Plateau.Enforce && Nulls.Mode == ConfidenceMode.Off;
 
     /// <summary>The <c>Confidence:CostStress</c> subsection as the options of CF-05 (ADR 0206).</summary>
-    internal CostStressOptions ToCostStressOptions() => new(CostStress.Mode, CostStress.Enforce, CostStress.MidMultiplier, CostStress.MidFloorR, CostStress.HighMultiplier, CostStress.HighFloorR, CostStress.DelayMinutes, CostStress.DelayRetention, CostStress.TierACutCrore, CostStress.TierBCutCrore, CostStress.CapacityFillShare, CostStress.CapacityDailyShare, CostStress.FillMinuteMaxTrades, CostStress.FillMinuteTimeoutSeconds);
+    internal CostStressOptions ToCostStressOptions() => new(CostStress.Mode, CostStress.Enforce, CostStress.MidMultiplier, CostStress.MidFloorR, CostStress.HighMultiplier, CostStress.HighFloorR, CostStress.DelayMinutes, CostStress.DelayRetention, CostStress.TierACutCrore, CostStress.TierBCutCrore, CostStress.CapacityFillShare, CostStress.CapacityDailyShare, CostStress.FillMinuteMaxTrades, CostStress.FillMinuteTimeoutSeconds, CostStress.TierABps, CostStress.TierBBps, CostStress.RangeFraction, CostStress.MinTurnoverCrore);
 
     /// <summary>The <c>Confidence:Deflation</c> subsection as the options of CF-03 (ADR 0205).</summary>
     internal DeflationOptions ToDeflationOptions() => new(Deflation.Mode, Deflation.MinProbability, Deflation.AssumedTrialSrSd, Deflation.TBasis);
@@ -241,6 +242,14 @@ internal sealed class ConfidenceSettings
         public int FillMinuteMaxTrades { get; set; } = CostStressOptions.DefaultFillMinuteMaxTrades;
 
         public int FillMinuteTimeoutSeconds { get; set; } = CostStressOptions.DefaultFillMinuteTimeoutSeconds;
+
+        public decimal TierABps { get; set; } = TieredSlippage.TierABps;
+
+        public decimal TierBBps { get; set; } = TieredSlippage.TierBBps;
+
+        public double RangeFraction { get; set; } = TieredSlippage.BarRangeFrac;
+
+        public decimal MinTurnoverCrore { get; set; } = CostStressOptions.DefaultMinTurnoverCrore;
     }
 
     internal sealed class NullsSection

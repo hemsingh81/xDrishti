@@ -320,6 +320,23 @@ public sealed class BuildTradeCardsHandlerTests
     }
 
     [Fact]
+    public async Task A_strategy_that_names_min_turnover_or_a_conservative_run_gets_its_lookups_in_the_card_replay()
+    {
+        var world = new World();
+        Reproduce(world);
+        world.Engine.ReadsTurnover = true;
+        var tiers = NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IEntryTierSource>();
+        tiers.TurnoverForAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(new Func<DateOnly, decimal?>(_ => 1m));
+        tiers.ForAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(new Func<DateOnly, XDrishti.Domain.Research.LiquidityTier>(_ => XDrishti.Domain.Research.LiquidityTier.A));
+        var basis = Basis(world) with { Tiers = tiers, Conservative = true };
+
+        var result = await world.Handler().HandleAsync(new BuildTradeCardsQuery(world.Run, world.Keys(0, 2), basis), Ct);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : string.Empty);
+        world.Engine.Explains.ShouldAllBe(e => e.Input.TurnoverOn != null && e.Input.TierOn != null);
+    }
+
+    [Fact]
     public async Task Without_a_basis_nothing_is_recomputed_and_the_cards_have_no_explanation()
     {
         var world = new World();

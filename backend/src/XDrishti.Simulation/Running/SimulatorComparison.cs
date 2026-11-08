@@ -73,7 +73,7 @@ public sealed class SimulatorComparison
 
     /// <summary>Scans the minutes of one instrument once per side and walks every entry candidate under every member. Same arguments and same refusals as <see cref="Simulator.Run"/>.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<ComparisonResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null)
+    public Result<ComparisonResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
@@ -119,7 +119,7 @@ public sealed class SimulatorComparison
             scans.Add(scanner.Counters);
             for (var k = 0; k < _members.Length; k++)
             {
-                var walked = _members[k].WalkSide(_members[k].SideRuns[s], scanner, bars, tick, calendar, quantity, gated: false, events, series, tierOn);
+                var walked = _members[k].WalkSide(_members[k].SideRuns[s], scanner, bars, tick, calendar, quantity, gated: false, events, series, tierOn, turnoverOn);
                 if (walked.IsFailure)
                 {
                     return Result.Failure<ComparisonResult>(walked.Error);

@@ -57,6 +57,9 @@ public sealed class Simulator
     /// <summary>Some side names the filter <c>not_event_day</c>: <see cref="Run"/> needs a results-calendar snapshot and a trading calendar, and a run is refused with <c>simulation.filter_not_available</c> without them (P15-06, ADR 0182).</summary>
     public bool ReadsEvents => _sides.Any(s => s.Compiled.NeedsEventCalendar);
 
+    /// <summary>A side names the filter <c>min_turnover</c> (CF-05, ADR 0230): the fill rules must carry its threshold, and a run gives the replay the turnover lookup.</summary>
+    public bool ReadsTurnover => _sides.Any(s => s.Compiled.NeedsTurnover);
+
     /// <summary>Some side names <c>days_to_results</c>, <c>days_since_results</c>, <c>results_sue_q</c> or <c>results_car3_q</c>, or lists the <c>event_exit</c> overlay (P15-09): <see cref="Run"/> needs the results-days inputs and a trading calendar, and a run is refused with <c>simulation.filter_not_available</c> without them (P15-05, ADR 0185).</summary>
     public bool ReadsResultsDays => _sides.Any(s => ResultsDaysScan.Reads(s.Compiled));
 
@@ -166,9 +169,10 @@ public sealed class Simulator
     /// <param name="context">The daily market context the context features read (P3-lift, ADR 0145); required when a side reads it (<see cref="ReadsContext"/>), ignored otherwise.</param>
     /// <param name="events">The results-calendar snapshot the filter <c>not_event_day</c> reads (P15-06); required, with a <paramref name="calendar"/>, when a side names the filter (<see cref="ReadsEvents"/>), ignored otherwise.</param>
     /// <param name="resultsDays">What the features <c>days_to_results</c> and <c>days_since_results</c> read (P15-05); required, with a <paramref name="calendar"/>, when a side names either (<see cref="ReadsResultsDays"/>), ignored otherwise.</param>
+    /// <param name="turnoverOn">The 20-day median traded value in rupees on an entry date (CF-05, ADR 0230); read when a side names <c>min_turnover</c>; null or a null answer blocks the entry.</param>
     /// <param name="tierOn">The liquidity tier of the instrument on an entry date (CF-05, D2); read only when the fill rules ask for conservative slippage, and null then excludes every trade.</param>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null)
+    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
@@ -213,7 +217,7 @@ public sealed class Simulator
             scans.Add(scanner.Counters);
 
             // D11: a swing side keeps one open position at a time, so its candidates go through the gate; an intraday trade leaves on its entry date and is not gated.
-            var walked = WalkSide(side, scanner, bars, tick, calendar, quantity, HoldsOvernight, events, series, tierOn);
+            var walked = WalkSide(side, scanner, bars, tick, calendar, quantity, HoldsOvernight, events, series, tierOn, turnoverOn);
             if (walked.IsFailure)
             {
                 return Result.Failure<SimulationResult>(walked.Error);
@@ -257,9 +261,15 @@ public sealed class Simulator
     /// Walks every candidate of a scanned side under this simulator's one exit (P4-05: the scanner may belong to another simulator of a comparison, whose tape holds the features of every candidate; the column of this exit is found by name).
     /// With <paramref name="gated"/> the candidates go through the <see cref="PositionGate"/>, else every candidate is walked.
     /// </summary>
-    internal Result<IReadOnlyList<CandidateOutcome>> WalkSide(SideRun side, EntryScanner scanner, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, bool gated, EventCalendarSnapshot? events = null, ResultsDaysScan? series = null, Func<DateOnly, LiquidityTier>? tierOn = null)
+    internal Result<IReadOnlyList<CandidateOutcome>> WalkSide(SideRun side, EntryScanner scanner, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, bool gated, EventCalendarSnapshot? events = null, ResultsDaysScan? series = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null)
     {
-        var rules = RulesOf(side, _fills, tick, calendar, series, tierOn);
+        if (side.Compiled.NeedsTurnover && _fills.MinTurnoverCrore is null)
+        {
+            // never run a side that names the filter without its threshold: that would take every entry as if the filter passed
+            return Result.Failure<IReadOnlyList<CandidateOutcome>>(Error.Validation(SimulatorCodes.FilterNotAvailable, "the filter min_turnover has no threshold in the fill rules (CF-05, ADR 0230)"));
+        }
+
+        var rules = RulesOf(side, _fills, tick, calendar, series, tierOn, turnoverOn);
         if (rules.IsFailure)
         {
             return Result.Failure<IReadOnlyList<CandidateOutcome>>(rules.Error);
@@ -301,11 +311,11 @@ public sealed class Simulator
     internal IReadOnlyList<SideRun> SideRuns => _sides;
 
     /// <summary>The one place the rules of a walk are built: the exit rules of the side, the fill rules, the tick of the instrument and, for a swing side, the hold counted with the calendar.</summary>
-    private static Result<WalkRules> RulesOf(SideRun side, FillRules fills, TickSpec tick, TradingCalendar? calendar, ResultsDaysScan? series, Func<DateOnly, LiquidityTier>? tierOn)
+    private static Result<WalkRules> RulesOf(SideRun side, FillRules fills, TickSpec tick, TradingCalendar? calendar, ResultsDaysScan? series, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn)
     {
         if (side.MaxHoldSessions is not { } sessions)
         {
-            return Result.Success(new WalkRules(side.RewardRisk, side.SquareOffMinute, fills, tick, TierOn: tierOn));
+            return Result.Success(new WalkRules(side.RewardRisk, side.SquareOffMinute, fills, tick, TierOn: tierOn, TurnoverOn: turnoverOn));
         }
 
         var hold = SwingHold.Create(sessions, calendar);
@@ -317,7 +327,7 @@ public sealed class Simulator
         // P15-09: the event_exit overlay reads days_to_results of the instrument's series at the close of each session; a side that lists it is never run without the series (Run refuses that first).
         var overlay = side.Compiled.Overlays.FirstOrDefault(o => o.Kind == OverlayKind.EventExit);
         var plan = overlay is not null && series is not null ? new EventExitPlan((int)overlay.Values["days_before_results"][0], series.DaysToResultsAt) : null;
-        return Result.Success(new WalkRules(side.RewardRisk, WalkRules.NoSquareOff, fills, tick, plan is null ? hold.Value : hold.Value with { EventExit = plan }, tierOn));
+        return Result.Success(new WalkRules(side.RewardRisk, WalkRules.NoSquareOff, fills, tick, plan is null ? hold.Value : hold.Value with { EventExit = plan }, tierOn, turnoverOn));
     }
 
     private static Result<IReadOnlyList<CandidateOutcome>> WalkAll(IReadOnlyList<EntryCandidate> candidates, Func<EntryCandidate, Result<WalkOutcome>> walk)
@@ -371,7 +381,7 @@ public sealed class Simulator
         foreach (var filter in side.Filters.Where(f => !CompiledSide.IsEvaluatedFilter(f)))
         {
             var at = Math.Max(0, definition.Filters.ToList().IndexOf(filter));
-            problems.Add(Refusal("filters[" + at + "]", SimulatorCodes.FilterNotAvailable, "The filter `" + filter + "` is not evaluated yet (there is no liquidity data of the universe layer, doc 10 §2); the simulator refuses to run a strategy that names one rather than ignore it."));
+            problems.Add(Refusal("filters[" + at + "]", SimulatorCodes.FilterNotAvailable, "The filter `" + filter + "` is not evaluated yet (it is not one the simulator knows how to evaluate); the simulator refuses to run a strategy that names one rather than ignore it."));
         }
 
         if (side.NeedsExpiryDays)

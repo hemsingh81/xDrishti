@@ -43,6 +43,49 @@ public static class LiquidityTiers
     public static LiquidityTier Of(decimal? medianValue, decimal aCut, decimal bCut) =>
         medianValue is not { } v ? LiquidityTier.Unavailable : v >= aCut ? LiquidityTier.A : v >= bCut ? LiquidityTier.B : LiquidityTier.C;
 
+    /// <summary>
+    /// The median for the filter <c>min_turnover</c> (ADR 0230), stricter than <see cref="Median"/>: the 20 sessions must be the 20 consecutive trading sessions of the <paramref name="calendar"/> strictly before <paramref name="entryDate"/>, each with a day bar of positive volume and a usable close. Any missing session, zero volume or unusable bar makes it null (unknown, never a pass), so a gap cannot draw on older bars.
+    /// </summary>
+    public static decimal? ConsecutiveMedian(IReadOnlyList<DailyBar> dayBars, DateOnly entryDate, Market.Calendar.TradingCalendar calendar)
+    {
+        ArgumentNullException.ThrowIfNull(dayBars);
+        ArgumentNullException.ThrowIfNull(calendar);
+        var byDate = new Dictionary<DateOnly, DailyBar>();
+        foreach (var bar in dayBars)
+        {
+            byDate[bar.Date] = bar;
+        }
+
+        var values = new List<decimal>(MedianSessions);
+        var day = entryDate;
+        for (var back = 0; back < 120 && values.Count < MedianSessions; back++)
+        {
+            day = day.AddDays(-1);
+            if (!calendar.IsTradingDay(day))
+            {
+                continue;
+            }
+
+            if (!byDate.TryGetValue(day, out var bar) || bar.Volume <= 0)
+            {
+                return null;
+            }
+
+            var v = TradedValue(bar);
+            if (v < 0)
+            {
+                return null;
+            }
+
+            values.Add(v);
+        }
+
+        return values.Count < MedianSessions ? null : Median(values);
+    }
+
+    /// <summary>The filter <c>min_turnover</c> (CF-05, ADR 0230): true only when the median is known and at least the threshold (equality passes). An unknown median (missing bars, under 20 sessions, missing volume) is never a pass.</summary>
+    public static bool PassesTurnover(decimal? medianValue, decimal thresholdRupees) => medianValue is { } v && v >= thresholdRupees;
+
     /// <summary>The traded value of a day bar in rupees, close times volume; -1 when the bar cannot give one (a close that is not a finite number, or a negative close or volume), which <see cref="Median"/> reads as no value.</summary>
     public static decimal TradedValue(DailyBar bar)
     {

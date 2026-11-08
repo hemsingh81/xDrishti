@@ -18,7 +18,7 @@ public sealed class RunNullWalkTests
     private readonly IRandomEntryEngine _engine = Substitute.For<IRandomEntryEngine>();
 
     private RunSimulationHandler Handler(IRandomEntryEngine engine) =>
-        new(_fixture.Store, _fixture.BarQueries, _fixture.Baskets, _fixture.Factors, _fixture.Actions, _fixture.Calendar, _fixture.Engine, _fixture.Strategies, _fixture.CostSheets, _fixture.ContextDays, _fixture.EventSnapshots, _fixture.FilingTimes, _fixture.SurpriseReader, _fixture.Time, _fixture.Log, engine, Substitute.For<IPlaceboEngine>());
+        new(_fixture.Store, _fixture.BarQueries, _fixture.Baskets, _fixture.Factors, _fixture.Actions, _fixture.Calendar, _fixture.Engine, _fixture.Strategies, _fixture.CostSheets, _fixture.ContextDays, _fixture.EventSnapshots, _fixture.FilingTimes, _fixture.SurpriseReader, _fixture.Time, _fixture.Log, engine, Substitute.For<IPlaceboEngine>(), _fixture.EntryTiers);
 
     private static NullTradeSpec Spec(int id, Guid instrument, DateOnly date) => new(id, instrument, date, Side.Buy, 0.01, 2, CostSegment.IntradayEquity);
 
@@ -34,6 +34,25 @@ public sealed class RunNullWalkTests
 
                 return new NullWalkResult([.. mine.Select(t => new NullTradeDraws(t.Id, [0.1, -0.2], 1, null))]);
             });
+
+    [Fact]
+    public async Task A_strategy_that_names_min_turnover_gets_the_threshold_in_its_fills_and_the_lookup_in_the_walk_input_and_keeps_a_delay()
+    {
+        var a = _fixture.Add("NSE:AAA", RunFixture.ThreeDays());
+        _fixture.Engine.ReadsTurnover = true;
+        var tiers = NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IEntryTierSource>();
+        tiers.TurnoverForAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(new Func<DateOnly, decimal?>(_ => 1m));
+        _fixture.EntryTiers = tiers;
+        Answer();
+        var plan = new NullWalkPlan([Spec(0, a, RunFixture.D2)], 2, 5, 7);
+        var fills = new FillRulesInput(0.1, 2, 0.10, 2, EntryDelayMinutes: 2);
+
+        var result = await Handler(_engine).HandleAsync(new RunNullWalkQuery(RunFixture.List([a], RunFixture.D1, RunFixture.D2) with { Fills = fills }, plan, null), Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        var prepared = _fixture.Engine.Prepared.Last().Fills.ShouldNotBeNull();
+        (prepared.MinTurnoverCrore, prepared.EntryDelayMinutes).ShouldBe((20m, 2), "the threshold is added and the delay of a delay or hold-out request is kept");
+    }
 
     [Fact]
     public async Task Only_the_instruments_of_the_plan_are_read_over_the_window_of_the_request_and_nothing_is_replayed()

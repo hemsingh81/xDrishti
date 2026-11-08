@@ -32,16 +32,16 @@ public sealed class EventFilterSimulatorTests
     }
 
     [Fact]
-    public void A_strategy_that_names_the_filter_is_no_longer_refused_and_min_turnover_still_is_with_a_message_that_does_not_mention_the_calendar()
+    public void A_strategy_that_names_either_filter_is_no_longer_refused()
     {
         var named = Simulator.Create(Intraday, Timeframe.M15);
         var turnover = Simulator.Create(TestStrategies.OrbBuyOnly() with { Filters = ["min_turnover"] }, Timeframe.M15);
 
         named.Simulator.ShouldNotBeNull(string.Join("; ", named.Problems.Select(p => p.Path + " " + p.Problem.Code)));
         named.Simulator.ReadsEvents.ShouldBeTrue();
-        turnover.Simulator.ShouldBeNull();
-        var refusal = turnover.Problems.Single(p => p.Problem.Code == "simulation.filter_not_available");
-        (refusal.Path, refusal.Problem.Message.Contains("calendar", StringComparison.OrdinalIgnoreCase)).ShouldBe(("filters[0]", false));
+        turnover.Simulator.ShouldNotBeNull(string.Join("; ", turnover.Problems.Select(p => p.Path + " " + p.Problem.Code)));
+        turnover.Simulator.ReadsTurnover.ShouldBeTrue();
+        turnover.Simulator.ReadsEvents.ShouldBeFalse();
     }
 
     [Fact]

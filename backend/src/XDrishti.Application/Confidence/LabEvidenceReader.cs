@@ -179,10 +179,15 @@ internal sealed class LabEvidenceReader(
     /// <summary>The Lab set from the tier counts of the cost stress block (ADR 0223): no block (cost stress Off, or a verdict produced before it) is unavailable, never tier C.</summary>
     private static TierSet LabTierSet(LabVerdictView verdict) => verdict.TierExclusion is not null
         ? TierSet.Unreadable(LabSetName, ConservativeRun)
-        : LabTierSet(verdict.CostStress);
+        : verdict.TurnoverExclusion is not null
+            ? TierSet.Unreadable(LabSetName, TurnoverSurvivors)
+            : LabTierSet(verdict.CostStress);
 
     /// <summary>The reason beside a restricted set: a conservative run left tier C and unavailable trades out, so its survivors are not clean tier evidence.</summary>
     internal const string ConservativeRun = "conservative run";
+
+    /// <summary>The reason beside a set whose strategy names <c>min_turnover</c> (ADR 0230): its trades are the survivors of a liquidity filter, so the tier count is not a clean sample; fail closed, like a conservative run.</summary>
+    internal const string TurnoverSurvivors = "min_turnover survivors";
 
     private static TierSet LabTierSet(CostStressView? stress) => stress switch
     {
@@ -232,6 +237,11 @@ internal sealed class LabEvidenceReader(
         if (verdict.TierExclusion is { } excluded)
         {
             return (null, string.Create(Inv, $"unavailable: {ConservativeRun}: {excluded.TierExcluded} of {excluded.Candidates} candidates were left out as tier C or unavailable, so the trades left are not clean tier evidence."));
+        }
+
+        if (verdict.TurnoverExclusion is { } blocked)
+        {
+            return (null, string.Create(Inv, $"unavailable: {TurnoverSurvivors}: {blocked.Blocked} of {blocked.Candidates} candidates were blocked by the filter min_turnover, so the trades left are not clean tier evidence."));
         }
 
         if (stress is null)

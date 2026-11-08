@@ -44,7 +44,8 @@ internal sealed class LabRunner(
     LabPlateau? plateau = null,
     LabTiers? tiers = null,
     LabBenchmark? benchmark = null,
-    PboOptions? pboOptions = null) : ILabRunExecutor
+    PboOptions? pboOptions = null,
+    CostStressOptions? stressOptions = null) : ILabRunExecutor
 {
     /// <summary>Who is recorded as the author of a stored run.</summary>
     public const string Actor = "lab:quick";
@@ -436,7 +437,7 @@ internal sealed class LabRunner(
     {
         var sheet = await sheets.FindAsync(settings.CostSheetId, cancellationToken);
         var costs = sheet.IsSuccess && sheet.Value.Schedules[0].EffectiveFrom <= run.From ? CostChoice.Sheet(sheet.Value.Id) : CostChoice.Gross;
-        var fills = LabFills.For(run);
+        var fills = LabFills.For(run, stressOptions);
         var timeframe = DefaultTimeframe(run.StrategyId, description);
         var request = new SimulationRequest(run.StrategyId, new Dictionary<string, double>(), timeframe.ToCode(), run.From, run.To, [.. run.Universe.Instruments.Select(i => i.Id)], null, costs, false, null, fills, null, null, run.StrategyHash);
         return (request, costs is CostChoice.SheetChoice && sheet.IsSuccess ? sheet.Value : null);

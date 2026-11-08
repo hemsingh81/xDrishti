@@ -75,6 +75,23 @@ public sealed class PlaceboWalkerTests
     }
 
     [Fact]
+    public void A_strategy_that_names_min_turnover_has_its_mirror_blocked_without_the_lookup_and_unchanged_with_it()
+    {
+        var named = Rep.Prepare(OrbV1.Create(), fills: FillRules.Create(0.1, SlippageConfig.Default, 0, false, 3m, 8m, 20m).Value);
+        var input = Input(Sessions(8, 3));
+        var signal = Signal();
+
+        var blocked = Of(Walk(input with { TurnoverOn = _ => 1m }, Plan(signal), named), "mirror");
+        var passed = Of(Walk(input with { TurnoverOn = _ => 100m * LiquidityTiers.Crore }, Plan(signal), named), "mirror");
+        var none = Of(Walk(input, Plan(signal), named), "mirror");
+
+        blocked.NetR.ShouldBeNull();
+        none.NetR.ShouldBeNull("no lookup never passes");
+        passed.NetR.ShouldNotBeNull();
+        passed.NetR.ShouldBe(Of(Walk(input, Plan(signal), Rep.Prepare(OrbV1.Create(), fills: FillRules.Create(0.1, SlippageConfig.Default).Value)), "mirror").NetR, "the filter at its threshold changes nothing else");
+    }
+
+    [Fact]
     public void The_mirror_is_the_other_side_at_the_real_decision_minute_with_the_same_risk_fraction_and_target()
     {
         var input = Input(Sessions(8, 3));

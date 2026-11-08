@@ -61,4 +61,18 @@ public sealed class LabEvidenceOptionsTests
         evidence.Checklist.CapacityOk.ShouldBeNull();
         evidence.Checklist.Notes[14].ShouldContain("conservative run");
     }
+
+    [Fact]
+    public async Task A_verdict_whose_strategy_names_min_turnover_fails_closed_for_row_14_and_the_tier_set()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { TurnoverExclusion = new TurnoverExclusionView(1000, 300, 20m) };
+
+        var evidence = await f.LabReader.ReadAsync(ReadinessFixture.Strategy, 1, Ct);
+
+        evidence.LabTiers.State.ShouldBe(TierSetState.Unavailable);
+        evidence.LabTiers.Reason.ShouldBe("min_turnover survivors");
+        evidence.Checklist.CapacityOk.ShouldBeNull();
+        evidence.Checklist.Notes[14].ShouldContain("min_turnover survivors");
+    }
 }

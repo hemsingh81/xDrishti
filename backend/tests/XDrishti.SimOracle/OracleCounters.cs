@@ -98,6 +98,8 @@ public sealed record OracleCounters
     /// <summary>CF-05: candidates excluded by conservative tiered slippage (tier C or an unavailable tier). Always 0 here.</summary>
     public int TierExcluded { get; init; }
 
+    public int TurnoverBlocked { get; init; }
+
     /// <summary>The sum of two counter sets, property by property.</summary>
     public OracleCounters Plus(OracleCounters other) => new()
     {
@@ -146,5 +148,6 @@ public sealed record OracleCounters
         EventExitUnavailable = EventExitUnavailable + other.EventExitUnavailable,
         EventExitUnavailableTrades = EventExitUnavailableTrades + other.EventExitUnavailableTrades,
         TierExcluded = TierExcluded + other.TierExcluded,
+        TurnoverBlocked = TurnoverBlocked + other.TurnoverBlocked,
     };
 }

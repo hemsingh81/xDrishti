@@ -242,11 +242,18 @@ public static class TradeWalker
 
         var risk = Math.Abs(entry - stop);
         decimal? target = multiple is { } k ? (isBuy ? entry + (k * risk) : entry - (k * risk)) : null;
+        if (rules.Fills.MinTurnoverCrore is { } minCrore
+            && !LiquidityTiers.PassesTurnover(rules.TurnoverOn is { } turnoverOn ? turnoverOn(entryDate) : null, minCrore * LiquidityTiers.Crore))
+        {
+            // CF-05, ADR 0230: the filter min_turnover; an unknown turnover is never a pass
+            return WalkResults.NoTrade(NoTradeReason.TurnoverBlocked, 1, zeroMinutes);
+        }
+
         decimal? tierBps = null;
         if (rules.Fills.ConservativeSlippage)
         {
             // CF-05, D2: tier C is not priced and an unavailable tier is never priced as A; the trade is excluded and counted
-            tierBps = TieredSlippage.BpsOf(rules.TierOn is { } tierOn ? tierOn(entryDate) : LiquidityTier.Unavailable);
+            tierBps = rules.Fills.BpsOf(rules.TierOn is { } tierOn ? tierOn(entryDate) : LiquidityTier.Unavailable);
             if (tierBps is null)
             {
                 return WalkResults.NoTrade(NoTradeReason.TierExcluded, 1, zeroMinutes);

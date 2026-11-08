@@ -20,6 +20,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="OrderPendingAtEnd">No-trade: see <see cref="NoTradeReason.OrderPendingAtEnd"/> (ADR 0043, D3).</param>
 /// <param name="EventBlocked">No-trade: see <see cref="NoTradeReason.EventBlocked"/> (P15-06; the run record's <c>event_filter_blocked</c>).</param>
 /// <param name="EventUnavailable">No-trade: see <see cref="NoTradeReason.EventUnavailable"/> (P15-06; the run record's <c>event_filter_unavailable</c>).</param>
+/// <param name="TurnoverBlocked">No-trade: see <see cref="NoTradeReason.TurnoverBlocked"/> (CF-05, ADR 0230); 0 for a run whose strategy does not name <c>min_turnover</c>.</param>
 /// <param name="TierExcluded">No-trade: see <see cref="NoTradeReason.TierExcluded"/> (CF-05, ADR 0229); 0 for a run without conservative slippage.</param>
 /// <param name="SkippedCost">Trades dated in the window whose charge in R was above <c>max_cost_R</c> (ADR 0042, D13), after the quantity check. Always 0 in a gross run.</param>
 public sealed record RunFates(
@@ -38,7 +39,8 @@ public sealed record RunFates(
     long OrderPendingAtEnd = 0,
     long EventBlocked = 0,
     long EventUnavailable = 0,
-    long TierExcluded = 0)
+    long TierExcluded = 0,
+    long TurnoverBlocked = 0)
 {
     /// <summary>All zeros: the identity of <see cref="Add"/>.</summary>
     public static RunFates Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -47,7 +49,7 @@ public sealed record RunFates(
     public long Total => EntriesSuppressed + TradesBeforeWindow + OpenAtEnd + Trades + NoTrade + ExcludedAcrossDiscontinuity + SkippedQuantity + SkippedCost;
 
     /// <summary>The walker no-trades, all reasons.</summary>
-    public long NoTrade => NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached + PositionOpen + OrderPendingAtEnd + EventBlocked + EventUnavailable + TierExcluded;
+    public long NoTrade => NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached + PositionOpen + OrderPendingAtEnd + EventBlocked + EventUnavailable + TierExcluded + TurnoverBlocked;
 
     /// <summary>The field-by-field sum.</summary>
     public RunFates Add(RunFates other)
@@ -69,6 +71,7 @@ public sealed record RunFates(
             OrderPendingAtEnd + other.OrderPendingAtEnd,
             EventBlocked + other.EventBlocked,
             EventUnavailable + other.EventUnavailable,
-            TierExcluded + other.TierExcluded);
+            TierExcluded + other.TierExcluded,
+            TurnoverBlocked + other.TurnoverBlocked);
     }
 }

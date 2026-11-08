@@ -72,6 +72,18 @@ public sealed class LabReportCostStressTests
     }
 
     [Fact]
+    public void A_min_turnover_verdict_warns_how_many_candidates_the_filter_blocked_and_a_verdict_without_it_does_not()
+    {
+        var verdict = Verdict(Block(true)) with { TurnoverExclusion = new TurnoverExclusionView(1000, 300, 20m) };
+
+        var warning = LabReportBuilder.Build(Run(), verdict, 6).Warnings.Single(w => w.Code == "turnover_blocked");
+
+        warning.Text.ShouldContain("300 of 1000 candidates");
+        warning.Text.ShouldContain("20 crore");
+        LabReportBuilder.Build(Run(), Verdict(Block(true)), 6).Warnings.ShouldNotContain(w => w.Code == "turnover_blocked");
+    }
+
+    [Fact]
     public void A_missed_stress_or_delay_gate_warns_and_says_it_is_report_only()
     {
         var w = LabReportBuilder.Build(Run(), Verdict(Block(true, "fail", "fail")), 6).Warnings.Single(x => x.Code == "cost_stress").Text;

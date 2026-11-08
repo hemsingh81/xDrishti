@@ -83,7 +83,7 @@ public static class SimExportJson
             return;
         }
 
-        foreach (var property in typeInfo.Properties.Where(p => string.Equals(p.Name, "tier_excluded", StringComparison.Ordinal)))
+        foreach (var property in typeInfo.Properties.Where(p => (string.Equals(p.Name, "tier_excluded", StringComparison.Ordinal) || string.Equals(p.Name, "turnover_blocked", StringComparison.Ordinal))))
         {
             property.ShouldSerialize = static (_, value) => value is not 0L;
         }

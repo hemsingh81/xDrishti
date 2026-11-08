@@ -62,6 +62,9 @@ internal sealed class RunFixture
     /// <summary>The tier source given to the handler (CF-05, ADR 0229); null, as in a host without it, until a test sets it.</summary>
     public IEntryTierSource? EntryTiers { get; set; }
 
+    /// <summary>The CF-05 settings given to the handler; null, as in a host without them (the defaults).</summary>
+    public XDrishti.Domain.Confidence.CostStressOptions? CostStress { get; set; }
+
     public FakeTimeProvider Time { get; } = new();
 
     public StructuredLogger<RunSimulationHandler> Log { get; } = new();
@@ -77,7 +80,7 @@ internal sealed class RunFixture
         Store.ForbidMerge = true;
     }
 
-    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, EventSnapshots, FilingTimes, SurpriseReader, Time, Log, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IRandomEntryEngine>(), NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IPlaceboEngine>(), EntryTiers);
+    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, EventSnapshots, FilingTimes, SurpriseReader, Time, Log, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IRandomEntryEngine>(), NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IPlaceboEngine>(), EntryTiers, CostStress is null ? null : new Settings(CostStress));
 
     /// <summary>Registers an instrument with a row (the tick is in paise, as the master has it) and its stored bars.</summary>
     public Guid Add(string symbol, IEnumerable<Bar>? bars = null, decimal? tickPaise = 5m, Guid? id = null)
@@ -129,5 +132,10 @@ internal sealed class RunFixture
         Actions.ReceivedCalls().ShouldBeEmpty();
         BarQueries.ReceivedCalls().ShouldBeEmpty();
         Engine.Replays.ShouldBeEmpty();
+    }
+
+    private sealed class Settings(XDrishti.Domain.Confidence.CostStressOptions options) : XDrishti.Application.Abstractions.Research.ICostStressSettings
+    {
+        public XDrishti.Domain.Confidence.CostStressOptions Current => options;
     }
 }

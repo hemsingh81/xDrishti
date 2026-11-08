@@ -26,6 +26,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="ContextNote">Why there are no <paramref name="ContextDays"/> for a strategy that reads the context (<c>no_context</c>); null otherwise.</param>
 /// <param name="Events">The results-calendar snapshot of the run (P15-06, ADR 0182), shared by every instrument; given only when the strategy names <c>not_event_day</c>, otherwise null. A decision reads only the rows visible at its own instant.</param>
 /// <param name="ResultsDays">What the results-days features read (P15-05, ADR 0185), shared by every instrument; given only when the strategy names <c>days_to_results</c> or <c>days_since_results</c>, otherwise null. The replay builds the instrument's per-date series from it.</param>
+/// <param name="TurnoverOn">The 20-day median traded value in rupees of the instrument on an entry date (CF-05, ADR 0230); given only for a run whose strategy names <c>min_turnover</c>, otherwise null. With the filter named and no lookup, every entry is blocked and counted.</param>
 /// <param name="TierOn">The liquidity tier of the instrument on an entry date (CF-05, D2, ADR 0229); given only for a run with conservative slippage, otherwise null. A run with conservative slippage and no lookup excludes every trade (an unknown tier is never tier A).</param>
 /// <param name="Costs">How the trades are sized and charged after the window cut (ADR 0042, D1 and D2); null for a gross replay. The handler of P3-04a passes none: a run through it is gross until P3-03f.</param>
 public sealed record InstrumentReplayInput(
@@ -46,7 +47,8 @@ public sealed record InstrumentReplayInput(
     string? ContextNote = null,
     EventCalendarSnapshot? Events = null,
     ResultsDayInputs? ResultsDays = null,
-    Func<DateOnly, LiquidityTier>? TierOn = null)
+    Func<DateOnly, LiquidityTier>? TierOn = null,
+    Func<DateOnly, decimal?>? TurnoverOn = null)
 {
     /// <summary>The results-days inputs carry the surprise numbers a quintile feature needs (P15-09).</summary>
     public bool HasSurpriseInputs() => ResultsDays?.HasSurprises ?? false;
