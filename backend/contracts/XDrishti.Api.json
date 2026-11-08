@@ -12427,6 +12427,57 @@
         }
       }
     },
+    "/api/confidence/pack-gate-results": {
+      "post": {
+        "tags": [
+          "Confidence"
+        ],
+        "summary": "Record, as the owner, the result of a verify-pack --gate run for a strategy version (insert only; the owner is the actor). Row 15's P3-09 20-trade term reads the newest record: PASS over at least 20 trades is a pass, any other status is a fail, no record is unavailable (a fail). Needs a session, the CSRF token and the password in the body. 403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.readiness_invalid or confidence.reason_invalid, 404 confidence.scorecard_not_found, 429 auth.rate_limited",
+        "operationId": "RecordPackGateResult",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PackGateResultRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackGateRecorded"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/confidence/kill-proposals": {
       "get": {
         "tags": [
@@ -28388,7 +28439,7 @@
           },
           "capacityUnavailable": {
             "type": "integer",
-            "description": "Trades whose capacity could not be fully judged (the fill minute is not read, a traded value or the order value is missing, or the bars could not be read) and that are not already a breach.",
+            "description": "Trades whose capacity could not be fully judged (the fill minute was not read, a traded value or the order value is missing, or the bars could not be read) and that are not already a breach.",
             "format": "int32"
           },
           "settings": {
@@ -28410,9 +28461,33 @@
             ],
             "description": "Information only: orders over the capacity share of the entry day's traded value (about 375 times looser than the fill minute's); it can never make a pass. Null in a block produced before it.",
             "format": "int32"
+          },
+          "minuteReads": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Trades whose fill minute has a stored bar with a usable traded value (the 1 % cap was judged). Null in a block produced before the fill-minute read (S2b): that block has no judged minute cap and row 14 reads it as unavailable.",
+            "format": "int32"
+          },
+          "minuteUnavailable": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Trades whose fill minute traded value was not read (int? CostStressTiersView.MinuteReads plus this is int CostStressTiersView.Trades). Null before S2b.",
+            "format": "int32"
+          },
+          "minuteReadLimit": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The most trades of the run whose fill minute may be read (the setting at the time); trades beyond it are in int? CostStressTiersView.MinuteUnavailable. Null before S2b.",
+            "format": "int32"
           }
         },
-        "description": "The liquidity tier and the capacity check of the out-of-sample trades of a Lab verdict (CF-05 D2 and D4, ADR 0223), the evidence of row 14 of the readiness scorecard. Report-only: nothing in the verdict reads it. Counts only; no trade is named.\nA trade with no usable 20-day median is int CostStressTiersView.TierUnavailable. The capacity is held against 0.5 % of the 20-day median (measured) and 1 % of the fill minute's traded value, which is not read from day bars, so without a breach\nevery capacity reading is int CostStressTiersView.CapacityUnavailable and none is a pass; int? CostStressTiersView.OrdersOverEntryDayShare is information only."
+        "description": "The liquidity tier and the capacity check of the out-of-sample trades of a Lab verdict (CF-05 D2 and D4, ADR 0223), the evidence of row 14 of the readiness scorecard. Report-only: nothing in the verdict reads it. Counts only; no trade is named.\nA trade with no usable 20-day median is int CostStressTiersView.TierUnavailable. The capacity is held against 0.5 % of the 20-day median (measured on day bars) and 1 % of the fill minute's traded value (the stored minute bar of the fill minute, ADR 0224). A trade whose fill minute\ncould not be read (over the run's bound, a failed or timed-out read, no stored bar, no volume) has no complete capacity reading: int CostStressTiersView.CapacityUnavailable, never a pass. int? CostStressTiersView.OrdersOverEntryDayShare is information only."
       },
       "CostStressView": {
         "required": [
@@ -48613,6 +48688,90 @@
           }
         },
         "description": "The body of a lesson close or dismiss and of a changelog revert (P8-19). The actor, a state and any number are never part of it: a field the server does not read is ignored."
+      },
+      "PackGateRecorded": {
+        "required": [
+          "id",
+          "status",
+          "countsAsPass"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row appended.",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "description": "The status stored."
+          },
+          "countsAsPass": {
+            "type": "boolean",
+            "description": "Whether row 15's P3-09 term now reads pass (newest record, PASS, at least 20 trades)."
+          }
+        },
+        "description": "The answer of a record: the row and whether it counts as a pass for row 15."
+      },
+      "PackGateResultRequest": {
+        "required": [
+          "strategyId",
+          "version",
+          "packId",
+          "status",
+          "tradeCount",
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "strategyId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The strategy the pack was run for."
+          },
+          "version": {
+            "type": "integer",
+            "description": "The strategy version.",
+            "format": "int32"
+          },
+          "packId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The pack folder's id as the gate printed it (1 to 100 characters)."
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The gate's status in its own spelling: PASS, PASS_WITH_DATA_FINDINGS, RERUN_NEEDED, DATA_REPAIR_NEEDED or BLOCKED_DEFECT. Only PASS over at least 20 trades counts."
+          },
+          "tradeCount": {
+            "type": "integer",
+            "description": "The trades the pack held.",
+            "format": "int32"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "A note, 1 to 500 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS record. Missing: 403 auth.step_up_required; wrong: 401 auth.invalid_credentials."
+          }
+        },
+        "description": "The body of the owner's record of a `verify-pack --gate` result. The owner is never part of it: the actor comes from the signed-in session."
       },
       "PairFormationList": {
         "required": [

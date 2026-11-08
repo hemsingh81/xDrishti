@@ -74,9 +74,28 @@ public interface IReadinessGaps
     /// <summary>Row 13: the strategy beats the same-universe benchmark net, risk-adjusted (P8-07 baskets benchmarks).</summary>
     ValueTask<ReadinessReading<bool>> BenchmarkBeatenAsync(string strategy, int? version, CancellationToken cancellationToken);
 
-    /// <summary>Row 15: the owner's 20-trade check (P3-09) passed. It is the owner's signed record, which has no machine-readable store.</summary>
-    ValueTask<ReadinessReading<bool>> TwentyTradeCheckPassedAsync(string strategy, CancellationToken cancellationToken);
-
     /// <summary>The planned risk share of a strategy, 0 to 1 (the plan does not expose it per strategy yet; the system level then uses equal weights, labelled).</summary>
     ValueTask<ReadinessReading<double>> RiskShareAsync(string strategy, CancellationToken cancellationToken);
+}
+
+/// <summary>The owner's newest record of a <c>verify-pack --gate</c> result for a strategy version.</summary>
+/// <param name="Id">The row.</param>
+/// <param name="PackId">The pack folder's id as the gate printed it.</param>
+/// <param name="Status">The gate's status, in its own spelling.</param>
+/// <param name="TradeCount">The trades the pack held.</param>
+/// <param name="RecordedAt">When it was stored (the database clock).</param>
+public sealed record PackGateResultRow(long Id, string PackId, string Status, int TradeCount, DateTimeOffset RecordedAt);
+
+/// <summary>Appends the owner's record of a gate result (insert only). Only the owner's handler calls it.</summary>
+public interface IPackGateResultStore
+{
+    /// <summary>Appends a row (the database stamps its id in commit order and its time) and returns the id.</summary>
+    ValueTask<long> AppendAsync(string strategyId, int version, string packId, string status, int tradeCount, string actor, string reason, CancellationToken cancellationToken);
+}
+
+/// <summary>Reads the owner's records of gate results. Read only.</summary>
+public interface IPackGateResultReader
+{
+    /// <summary>The newest record of the strategy version, or null when none exists. May throw when the store cannot be read (the scorecard reads that as unavailable).</summary>
+    ValueTask<PackGateResultRow?> LatestAsync(string strategyId, int version, CancellationToken cancellationToken);
 }

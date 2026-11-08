@@ -18,6 +18,7 @@ internal sealed class ScorecardReader(
     ForwardTierReader forwardTiers,
     ScorecardIntegrityReader integrityReader,
     IReadinessGaps gaps,
+    PackGateResultReader packGate,
     IQueryHandler<ListStrategiesQuery, IReadOnlyList<StoredStrategy>> strategyList,
     IQueryHandler<GetStrategyQuery, Result<StrategyDetail>> strategyDetail,
     ReadinessOptions options)
@@ -77,7 +78,7 @@ internal sealed class ScorecardReader(
         var labEvidence = await lab.ReadAsync(strategy, version, cancellationToken);
         var forwardEvidence = await forward.ReadAsync(strategy, cancellationToken);
         var benchmark = await gaps.BenchmarkBeatenAsync(strategy, version, cancellationToken);
-        var twenty = await gaps.TwentyTradeCheckPassedAsync(strategy, cancellationToken);
+        var twenty = await packGate.ReadAsync(strategy, version, cancellationToken);
         var integrity = await integrityReader.ReadAsync(cancellationToken);
         var (tierState, tierEvidence) = TierCEvidence.Judge(labEvidence.LabTiers, await forwardTiers.ReadAsync(strategy, cancellationToken));
 

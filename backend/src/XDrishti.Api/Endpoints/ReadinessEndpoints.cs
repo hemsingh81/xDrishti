@@ -37,6 +37,12 @@ internal sealed class ReadinessEndpoints : IEndpointModule
             .WithName("ChangeReadinessSettings")
             .WithSummary("Switch confidence.readiness.enforce (OFF by default; no row means OFF) as the owner; appends an audited row with the owner as actor. ON makes a failed readiness gate refuse the cell move it judges (Candidate to Paper, the owner's re-enable of a paused cell, Paper to Active) with 409 confidence.gate_failed and the failing rows; OFF only warns and records the result. Needs a session, the CSRF token and the password in the body, checked on EVERY change, ON and OFF alike (OFF removes a refusal). 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.reason_invalid, 429 auth.rate_limited")
             .ProducesRejections(conflict: false, notFound: false);
+
+        group.MapPost("/pack-gate-results", RecordPackGateAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy) // a password is checked here, so the sign-in limit applies
+            .WithName("RecordPackGateResult")
+            .WithSummary("Record, as the owner, the result of a verify-pack --gate run for a strategy version (insert only; the owner is the actor). Row 15's P3-09 20-trade term reads the newest record: PASS over at least 20 trades is a pass, any other status is a fail, no record is unavailable (a fail). Needs a session, the CSRF token and the password in the body. 403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.readiness_invalid or confidence.reason_invalid, 404 confidence.scorecard_not_found, 429 auth.rate_limited")
+            .ProducesRejections(conflict: false);
     }
 
     private static async Task<Results<Ok<ScorecardListView>, ProblemHttpResult>> ListAsync(
@@ -81,6 +87,26 @@ internal sealed class ReadinessEndpoints : IEndpointModule
         }
 
         var result = await handler.HandleAsync(new ChangeReadinessSwitchCommand(owner.Value, request.Enforce, request.Reason ?? string.Empty), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<PackGateRecorded>, ProblemHttpResult>> RecordPackGateAsync(
+        PackGateResultRequest request,
+        HttpContext http,
+        ICommandHandler<StepUpCommand, StepUpResult> passwordCheck,
+        ICommandHandler<RecordPackGateResultCommand, PackGateRecorded> handler,
+        CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var owner = await OwnerAct.FreshAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(
+            new RecordPackGateResultCommand(owner.Value, request.StrategyId ?? string.Empty, request.Version, request.PackId ?? string.Empty, request.Status ?? string.Empty, request.TradeCount, request.Reason ?? string.Empty),
+            cancellationToken);
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 }

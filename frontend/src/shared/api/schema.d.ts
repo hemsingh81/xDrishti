@@ -3764,6 +3764,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/confidence/pack-gate-results': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Record, as the owner, the result of a verify-pack --gate run for a strategy version (insert only; the owner is the actor). Row 15's P3-09 20-trade term reads the newest record: PASS over at least 20 trades is a pass, any other status is a fail, no record is unavailable (a fail). Needs a session, the CSRF token and the password in the body. 403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked, 400 confidence.readiness_invalid or confidence.reason_invalid, 404 confidence.scorecard_not_found, 429 auth.rate_limited */
+    post: operations['RecordPackGateResult'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/confidence/kill-proposals': {
     parameters: {
       query?: never;
@@ -8687,8 +8704,8 @@ export interface components {
     };
     /**
      * @description The liquidity tier and the capacity check of the out-of-sample trades of a Lab verdict (CF-05 D2 and D4, ADR 0223), the evidence of row 14 of the readiness scorecard. Report-only: nothing in the verdict reads it. Counts only; no trade is named.
-     *     A trade with no usable 20-day median is int CostStressTiersView.TierUnavailable. The capacity is held against 0.5 % of the 20-day median (measured) and 1 % of the fill minute's traded value, which is not read from day bars, so without a breach
-     *     every capacity reading is int CostStressTiersView.CapacityUnavailable and none is a pass; int? CostStressTiersView.OrdersOverEntryDayShare is information only.
+     *     A trade with no usable 20-day median is int CostStressTiersView.TierUnavailable. The capacity is held against 0.5 % of the 20-day median (measured on day bars) and 1 % of the fill minute's traded value (the stored minute bar of the fill minute, ADR 0224). A trade whose fill minute
+     *     could not be read (over the run's bound, a failed or timed-out read, no stored bar, no volume) has no complete capacity reading: int CostStressTiersView.CapacityUnavailable, never a pass. int? CostStressTiersView.OrdersOverEntryDayShare is information only.
      */
     CostStressTiersView: {
       /**
@@ -8723,7 +8740,7 @@ export interface components {
       capacityBreaches: number;
       /**
        * Format: int32
-       * @description Trades whose capacity could not be fully judged (the fill minute is not read, a traded value or the order value is missing, or the bars could not be read) and that are not already a breach.
+       * @description Trades whose capacity could not be fully judged (the fill minute was not read, a traded value or the order value is missing, or the bars could not be read) and that are not already a breach.
        */
       capacityUnavailable: number;
       /** @description The text of the tier and capacity settings that produced the counts. */
@@ -8737,6 +8754,21 @@ export interface components {
        * @description Information only: orders over the capacity share of the entry day's traded value (about 375 times looser than the fill minute's); it can never make a pass. Null in a block produced before it.
        */
       ordersOverEntryDayShare?: null | number;
+      /**
+       * Format: int32
+       * @description Trades whose fill minute has a stored bar with a usable traded value (the 1 % cap was judged). Null in a block produced before the fill-minute read (S2b): that block has no judged minute cap and row 14 reads it as unavailable.
+       */
+      minuteReads?: null | number;
+      /**
+       * Format: int32
+       * @description Trades whose fill minute traded value was not read (int? CostStressTiersView.MinuteReads plus this is int CostStressTiersView.Trades). Null before S2b.
+       */
+      minuteUnavailable?: null | number;
+      /**
+       * Format: int32
+       * @description The most trades of the run whose fill minute may be read (the setting at the time); trades beyond it are in int? CostStressTiersView.MinuteUnavailable. Null before S2b.
+       */
+      minuteReadLimit?: null | number;
     };
     /**
      * @description The cost stress and the delay test of a Lab verdict (CF-05, ADR 0206), shown beside PASS/MARGINAL/FAIL: report-only unless the owner turns `Enforce` on, then a miss caps the outcome at MARGINAL and never raises it. Every settings figure used is in
@@ -15938,6 +15970,41 @@ export interface components {
       /** @description Why, 1 to 500 characters. */
       reason: null | string;
       /** @description The owner's password, typed again for THIS act and checked on every request (an earlier step-up window does not count and is not used up). */
+      password: null | string;
+    };
+    /** @description The answer of a record: the row and whether it counts as a pass for row 15. */
+    PackGateRecorded: {
+      /**
+       * Format: int64
+       * @description The row appended.
+       */
+      id: number;
+      /** @description The status stored. */
+      status: string;
+      /** @description Whether row 15's P3-09 term now reads pass (newest record, PASS, at least 20 trades). */
+      countsAsPass: boolean;
+    };
+    /** @description The body of the owner's record of a `verify-pack --gate` result. The owner is never part of it: the actor comes from the signed-in session. */
+    PackGateResultRequest: {
+      /** @description The strategy the pack was run for. */
+      strategyId: null | string;
+      /**
+       * Format: int32
+       * @description The strategy version.
+       */
+      version: number;
+      /** @description The pack folder's id as the gate printed it (1 to 100 characters). */
+      packId: null | string;
+      /** @description The gate's status in its own spelling: PASS, PASS_WITH_DATA_FINDINGS, RERUN_NEEDED, DATA_REPAIR_NEEDED or BLOCKED_DEFECT. Only PASS over at least 20 trades counts. */
+      status: null | string;
+      /**
+       * Format: int32
+       * @description The trades the pack held.
+       */
+      tradeCount: number;
+      /** @description A note, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS record. Missing: 403 auth.step_up_required; wrong: 401 auth.invalid_credentials. */
       password: null | string;
     };
     /** @description The stored formations whose window overlaps the range, oldest quarter first; State is `unavailable` with the reason `no_runs` when none is stored. Truncated is true when more than 400 formations overlap the range: the oldest 400 are listed. */
@@ -31210,6 +31277,48 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  RecordPackGateResult: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PackGateResultRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PackGateRecorded'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

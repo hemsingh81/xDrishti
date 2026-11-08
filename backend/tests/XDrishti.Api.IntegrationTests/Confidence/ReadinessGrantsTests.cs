@@ -60,7 +60,7 @@ public sealed class ReadinessGrantsTests(ResearchGrantsTests.DedicatedServer ser
             }
         }
 
-        names.ShouldBe(["scorecard_snapshots", "settings"]);
+        names.ShouldBe(["pack_gate_results", "scorecard_snapshots", "settings"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false), ("REFERENCES", false), ("TRIGGER", false) })

@@ -147,6 +147,25 @@ public sealed record ChangeReadinessSwitchCommand(string Actor, bool Enforce, st
 /// <param name="Enforce">The value now in force.</param>
 public sealed record ReadinessSwitched(long Id, bool Enforce);
 
+/// <summary>
+/// The owner's record of a <c>verify-pack --gate</c> result for a strategy version (spec CF-11 row 15, ADR 0226): the actor must be <c>owner:...</c>, from the authenticated identity after a fresh password. Appends one row, never an update. Only a PASS over at least 20 trades
+/// counts toward row 15; any other status is stored and counts as a fail. It moves nothing and places no order.
+/// </summary>
+/// <param name="Actor">The owner, <c>owner:...</c>.</param>
+/// <param name="StrategyId">The strategy.</param>
+/// <param name="Version">The strategy version the pack was run for.</param>
+/// <param name="PackId">The pack folder's id as the gate printed it.</param>
+/// <param name="Status">The gate's status in its own spelling (<c>PASS</c>, <c>PASS_WITH_DATA_FINDINGS</c>, <c>RERUN_NEEDED</c>, <c>DATA_REPAIR_NEEDED</c>, <c>BLOCKED_DEFECT</c>).</param>
+/// <param name="TradeCount">The trades the pack held.</param>
+/// <param name="Reason">A note, 1 to 500 characters.</param>
+public sealed record RecordPackGateResultCommand(string Actor, string StrategyId, int Version, string PackId, string Status, int TradeCount, string Reason) : ICommand;
+
+/// <summary>The answer of a record: the row and whether it counts as a pass for row 15.</summary>
+/// <param name="Id">The row appended.</param>
+/// <param name="Status">The status stored.</param>
+/// <param name="CountsAsPass">Whether row 15's P3-09 term now reads pass (newest record, PASS, at least 20 trades).</param>
+public sealed record PackGateRecorded(long Id, string Status, bool CountsAsPass);
+
 /// <summary>The daily run: store one snapshot per strategy and one for the system (idempotent per day).</summary>
 public sealed record SnapshotScorecardsCommand : ICommand;
 

@@ -29,7 +29,7 @@ public sealed class ScorecardArchitectureTests
     [
         nameof(ReadinessOptions), nameof(RowStatus), nameof(ChecklistRow), nameof(ChecklistInputs), nameof(EdgeChecklist), nameof(GateResult), nameof(ReadinessGates), nameof(ReadinessLabel), nameof(ReadinessLabels),
         nameof(ScoreAnchors), nameof(SubScoreState), nameof(SubScore), nameof(BandPosition), nameof(ScoreInputs), nameof(FaultState), nameof(HardFailInputs), nameof(ReadinessScore), nameof(ReadinessCalculator),
-        nameof(StrategyReadiness), nameof(SystemReadiness), nameof(SystemReadinessCalculator), nameof(ReadinessAssessment), nameof(TierCounts), nameof(TierSet), nameof(TierSetState), nameof(TierCEvidence),
+        nameof(StrategyReadiness), nameof(SystemReadiness), nameof(SystemReadinessCalculator), nameof(ReadinessAssessment), nameof(TierCounts), nameof(TierSet), nameof(TierSetState), nameof(TierCEvidence), nameof(PackGateStatuses),
     ];
 
     private static readonly string[] DomainTypes = [.. DomainNames.Select(n => "XDrishti.Domain.Readiness." + n)];
@@ -42,12 +42,12 @@ public sealed class ScorecardArchitectureTests
         {
             "ScorecardReader", "LabEvidenceReader", "ForwardEvidenceReader", "ForwardEdgeReader", "ForwardEdge", "ForwardEvidence", "LabEvidence", "GetScorecardHandler", "GetScorecardQuery", "ListScorecardsHandler", "ListScorecardsQuery",
             "GetReadinessSettingsHandler", "GetReadinessSettingsQuery", "ChangeReadinessSwitchHandler", "ChangeReadinessSwitchCommand", "SnapshotScorecardsHandler", "SnapshotScorecardsCommand", "ReadinessSnapshotService", "ReadinessGate",
-            "UnavailableReadinessGaps", "ScorecardView", "ScorecardListView", "ReadinessSettingsView", "ReadinessErrors", "ReadinessOptionsView",
+            "UnavailableReadinessGaps", "ScorecardView", "ScorecardListView", "ReadinessSettingsView", "ReadinessErrors", "ReadinessOptionsView", "PackGateResultReader", "RecordPackGateResultHandler", "RecordPackGateResultCommand", "PackGateRecorded",
         }.Select(n => "XDrishti.Application.Confidence." + n),
         .. new[]
         {
             "IReadinessGate", "ReadinessGateKinds", "ReadinessGateKind", "ReadinessGateRequest", "ReadinessGateDecision", "IReadinessGaps", "IReadinessSettings", "IReadinessSwitchStore", "IReadinessSnapshotStore", "IReadinessSnapshotReader",
-            "ReadinessSwitch", "NewReadinessSnapshot",
+            "ReadinessSwitch", "NewReadinessSnapshot", "IPackGateResultStore", "IPackGateResultReader", "PackGateResultRow",
         }.Select(n => "XDrishti.Application.Abstractions.Confidence." + n),
     ];
 
@@ -70,7 +70,7 @@ public sealed class ScorecardArchitectureTests
     {
         public ValueTask<long> Write() => store.AppendAsync(true, "owner:x", "y", CancellationToken.None);
 
-        public ValueTask<ReadinessReading<bool>> Read() => gaps.TwentyTradeCheckPassedAsync("x", CancellationToken.None);
+        public ValueTask<ReadinessReading<bool>> Read() => gaps.BenchmarkBeatenAsync("x", 1, CancellationToken.None);
     }
 
     /// <summary>Stands for a calculator that reads the clock.</summary>
@@ -334,11 +334,12 @@ public sealed class ScorecardArchitectureTests
         source.ShouldContain("new ReadinessReading<T>(null, \"unavailable: \" + reason)");
         source.ShouldNotContain("true");
         source.ShouldNotContain("Result.Success");
-        typeof(IReadinessGaps).GetMethods().Length.ShouldBe(3, "rows 10 and 11 left the port when the Lab verdict gained their figures (SC-S1, ADR 0222), row 14 when it gained the tier counts (SC-S2, ADR 0223) and the integrity and tier C hard fails when they gained their sources (SC-S3, ADR 0224)");
-        source.Split("None<").Length.ShouldBe(3 + 2, "three answers and the helper's definition");
+        typeof(IReadinessGaps).GetMethods().Length.ShouldBe(2, "row 15 left the port when the owner's verify-pack --gate record gained its table (SC-S4a, ADR 0226), rows 10 and 11 left the port when the Lab verdict gained their figures (SC-S1, ADR 0222), row 14 when it gained the tier counts (SC-S2, ADR 0223) and the integrity and tier C hard fails when they gained their sources (SC-S3, ADR 0224)");
+        source.Split("None<").Length.ShouldBe(2 + 2, "two answers and the helper's definition");
         typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("CapacityOkAsync", "row 14 has its producer (ADR 0223) and is read from the Lab verdict by the reader, not through the gaps");
         typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("IntegrityFaultAsync", "the integrity hard fail is criterion I of the phase check, read by ScorecardIntegrityReader (ADR 0225)");
         typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("TierCOnlyAsync", "the tier C hard fail is judged on the Lab and the forward trades (ADR 0225)");
+        typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("TwentyTradeCheckPassedAsync", "row 15's P3-09 term is the owner's pack gate record, read by PackGateResultReader (ADR 0226)");
     }
 
     // ---- (5c) the integrity and tier C hard fails (ADR 0224) ----
@@ -474,14 +475,16 @@ public sealed class ScorecardArchitectureTests
 
         source.Split("MapGet(").Length.ShouldBe(4, "the list, one scorecard and the settings");
         source.Split("MapPut(").Length.ShouldBe(2, "the switch");
-        foreach (var verb in new[] { "MapPost", "MapDelete", "MapPatch", "MapMethods" })
+        source.Split("MapPost(").Length.ShouldBe(2, "the owner's pack gate record (ADR 0226)");
+        foreach (var verb in new[] { "MapDelete", "MapPatch", "MapMethods" })
         {
             source.ShouldNotContain(verb);
         }
 
         source.ShouldContain("/scorecards/{strategyId}/versions/{version:int}");
         source.ShouldContain("/readiness-settings");
-        source.Split("OwnerAct.FreshAsync(").Length.ShouldBe(2, "one use, unconditional: a change either way needs the password (OFF removes a refusal)");
+        source.Split("OwnerAct.FreshAsync(").Length.ShouldBe(3, "two uses, both unconditional: a switch change either way (OFF removes a refusal) and a pack gate record need the password");
+        source.ShouldContain("/pack-gate-results");
         source.ShouldNotContain("SessionOwner"); // no direction is the session alone
         source.ShouldNotContain("request.Enforce ?");
         source.ShouldNotContain("request.Actor");

@@ -46,7 +46,7 @@ public sealed class ScorecardReaderTests
     [Fact]
     public async Task The_real_gaps_say_unavailable_so_the_rows_without_a_producer_fail_and_the_card_is_not_ready()
     {
-        var f = new ReadinessFixture { Gaps = new UnavailableReadinessGaps() };
+        var f = new ReadinessFixture { Gaps = new UnavailableReadinessGaps(), PackGateRow = null };
 
         // the block an older run wrote: tiers A and B, no measured breach, every capacity reading unavailable (the fill minute was not read)
         f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { Tiers = BlockBeforeS2b() } };
