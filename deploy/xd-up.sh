@@ -61,6 +61,11 @@ if [ ! -d ../data/history-probe ]; then
   (umask 077; mkdir -p ../data/history-probe)
 fi
 
+# 1e) The shadow digest log folder (CF-08, ADR 0232), 0700; mounted into xd-api (Shadow__DigestFolder).
+if [ ! -d "${XD_SHADOW_DIGEST_DIR:-../data/shadow-digest}" ]; then
+  (umask 077; mkdir -p "${XD_SHADOW_DIGEST_DIR:-../data/shadow-digest}")
+fi
+
 # 2) Secrets: macOS Keychain is the source of truth.
 secret() { # secret <keychain-service> → prints the value, creating it on first use
   local service="$1" value

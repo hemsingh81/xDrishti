@@ -283,13 +283,15 @@ public sealed class PaperShadowGuardsTests(ResearchGrantsTests.DedicatedServer s
         (await SessionAsync(session)).ShouldBeNull();
         (await EntryAsync(session, plan, items[0])).ShouldBeNull();
         var entry = await ScalarAsync<long>(server.Owner, "SELECT id FROM paper.shadow_entries");
-        const string Grade = "INSERT INTO paper.shadow_grades (entry_id, status, r_sim, r_basis, engine_version, graded_at) VALUES (@e, @s, @r, @b, 'sim-6', '2000-01-01')";
+        const string Grade = "INSERT INTO paper.shadow_grades (entry_id, status, r_sim, r_basis, r_gross, engine_version, graded_at) VALUES (@e, @s, @r, @b, @r, 'sim-6', '2000-01-01')";
 
         (await SqlStateAsync(Grade, ("e", entry), ("s", "graded"), ("r", 1.5), ("b", "net"))).ShouldBe(PostgresErrorCodes.CheckViolation); // before the open
 
         await SetClockAsync(Utc(2026, 11, 11, 11, 0));
         (await SqlStateAsync(Grade, ("e", entry), ("s", "graded"), ("r", DBNull.Value), ("b", "net"))).ShouldBe(PostgresErrorCodes.CheckViolation); // graded needs an R
         (await SqlStateAsync(Grade, ("e", entry), ("s", "graded"), ("r", 1.5), ("b", "other"))).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await SqlStateAsync("INSERT INTO paper.shadow_grades (entry_id, status, r_sim, r_basis, engine_version, graded_at) VALUES (@e, 'graded', 1.5, 'net', 'sim-6', '2000-01-01')", ("e", entry))).ShouldBe(PostgresErrorCodes.CheckViolation); // graded needs the gross R too (ADR 0232)
+        (await SqlStateAsync("INSERT INTO paper.shadow_grades (entry_id, status, r_gross, engine_version, graded_at) VALUES (@e, 'not_triggered', 1.5, 'sim-6', '2000-01-01')", ("e", entry))).ShouldBe(PostgresErrorCodes.CheckViolation); // and only a graded row has one
         (await SqlStateAsync(Grade, ("e", entry), ("s", "graded"), ("r", 1.5), ("b", "net"))).ShouldBeNull();
         (await SqlStateAsync(Grade, ("e", entry), ("s", "graded"), ("r", 2.5), ("b", "net"))).ShouldBe(PostgresErrorCodes.UniqueViolation); // a graded entry is never rewritten
 
@@ -312,7 +314,7 @@ public sealed class PaperShadowGuardsTests(ResearchGrantsTests.DedicatedServer s
         await StoreKit.ExecuteAsync(server.Owner, "UPDATE paper.shadow_entries SET edge_epoch = 4 WHERE trade_key <> 'ORB|s2|Buy|2026-11-12'", Ct);
         await SetClockAsync(Utc(2026, 11, 12, 11, 0));
         var first = await ScalarAsync<long>(server.Owner, "SELECT id FROM paper.shadow_entries WHERE trade_key = 'ORB|s0|Buy|2026-11-12'");
-        (await SqlStateAsync("INSERT INTO paper.shadow_grades (entry_id, status, r_sim, r_basis, engine_version, graded_at) VALUES (@e, 'graded', -1.0, 'gross', 'sim-6', '2000-01-01')", ("e", first))).ShouldBeNull();
+        (await SqlStateAsync("INSERT INTO paper.shadow_grades (entry_id, status, r_sim, r_basis, r_gross, engine_version, graded_at) VALUES (@e, 'graded', -1.0, 'gross', -1.0, 'sim-6', '2000-01-01')", ("e", first))).ShouldBeNull();
         await using var source = NpgsqlDataSource.Create(server.App);
 
         var rows = await new XDrishti.Infrastructure.Paper.ShadowResultReader(source).ResultsAsync(Ct);

@@ -6266,6 +6266,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("shadow_grades", "paper", t =>
                         {
+                            t.HasCheckConstraint("ck_shadow_grades_gross", "(status = 'graded') = (r_gross IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_shadow_grades_shape", "status IN ('graded', 'not_triggered', 'not_gradable') AND ((status = 'graded') = (r_sim IS NOT NULL)) AND ((status = 'graded') = (r_basis IS NOT NULL)) AND (r_basis IS NULL OR r_basis IN ('net', 'gross')) AND (exit_at IS NULL OR entry_at IS NULL OR exit_at >= entry_at) AND length(btrim(engine_version)) > 0");
                         });
                 });

@@ -123,5 +123,8 @@ export const buildPhase = (over: Partial<Schemas['PaperPhaseReport']> = {}): Vie
 });
 
 export function mountPhase(view: View = buildPhase()) {
-  server.use(http.get('/api/paper/phase-check', () => HttpResponse.json(view)));
+  server.use(
+    http.get('/api/paper/phase-check', () => HttpResponse.json(view)),
+    http.get('/api/paper/sequential', () => HttpResponse.json({ title: 'not found' }, { status: 404 })),
+  );
 }

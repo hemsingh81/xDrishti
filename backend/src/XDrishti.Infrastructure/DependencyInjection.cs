@@ -37,6 +37,7 @@ using XDrishti.Application.Execution;
 using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Application.Planning;
 using XDrishti.Application.Reporting;
+using XDrishti.Application.Shadow;
 using XDrishti.Domain.Accounts;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Ai.Assistant;
@@ -211,6 +212,9 @@ public static class DependencyInjection
         services.AddSingleton<IPlanningSettingsReader, PlanningSettingsReader>();
         services.AddScoped<IPaperStore, PaperStore>(); // insert-only paper record (P10-01, ADR 0116)
         services.AddScoped<IShadowStore, ShadowStore>(); // forward-only, insert-only, chained shadow record of every nightly candidate (CF-08, ADR 0211)
+        services.AddOptions<ShadowOptions>().Bind(configuration.GetSection(ShadowOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // Shadow:DigestFolder, Shadow:MaxResumeGapSessions (CF-08, ADR 0232)
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ShadowOptions>>().Value));
+        services.AddSingleton<IShadowDigestSink, ShadowDigestFile>(); // the weekly digest log outside the database (CF-08 review fix 4)
         services.AddScoped<IShadowSettings, ShadowSettings>(); // paper.shadow.enabled: the newest row of paper.shadow_settings, OFF when none (CF-08)
         services.AddScoped<IShadowGradeStore, ShadowGradeStore>(); // insert-only grades of the shadow record, one per entry (CF-08 part B, ADR 0212)
         services.AddScoped<IShadowResultReader, ShadowResultReader>(); // the one read of shadow outcomes, for the summary only; no Planning, Selection or Autonomy type may name it (CF-08 part B)

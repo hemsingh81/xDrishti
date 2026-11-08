@@ -27,6 +27,10 @@ set -euo pipefail
 source "$(dirname "$0")/_env.sh"
 export DOTNET_ENVIRONMENT=Development
 export Models__Folder="$ROOT/data/models"
+# the weekly shadow digest log (ADR 0232); XD_SHADOW_DIGEST_DIR is resolved against the repository's deploy/ folder like compose does
+shadow_digest_dir="${XD_SHADOW_DIGEST_DIR:-$ROOT/data/shadow-digest}"
+case "$shadow_digest_dir" in /*) ;; *) shadow_digest_dir="$ROOT/deploy/$shadow_digest_dir" ;; esac
+export Shadow__DigestFolder="$shadow_digest_dir"
 if password="$(security find-generic-password -a xdrishti -s xdrishti/db/app -w 2>/dev/null)"; then
   export Database__Password="$password"
 elif [[ "${1:-} ${2:-}" != "strategy validate" ]]; then

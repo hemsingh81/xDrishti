@@ -21,6 +21,8 @@ public sealed class PaperShadowMigrationTests(ApiFactory factory)
 
     private const string Third = "20261105075405_AddShadowGradeGross";
 
+    private const string Fourth = "20261108221407_AddShadowGradeGrossCheck";
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private static async Task<long> CountAsync(NpgsqlConnection connection, string sql)
@@ -108,6 +110,31 @@ public sealed class PaperShadowMigrationTests(ApiFactory factory)
         await migrator.MigrateAsync(Third, Ct);
 
         (await CountAsync(connection, Column)).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_fourth_migration_adds_the_gross_check_and_its_Down_removes_only_that_constraint()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_paper_shadow_grosscheck_probe", Ct);
+        using var scope = scratch.Host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>();
+        var migrator = db.GetService<IMigrator>();
+        await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+        await connection.OpenAsync(Ct);
+        const string Check = "SELECT count(*) FROM pg_constraint WHERE conname = 'ck_shadow_grades_gross'";
+        const string Shape = "SELECT count(*) FROM pg_constraint WHERE conname = 'ck_shadow_grades_shape'";
+
+        db.Database.HasPendingModelChanges().ShouldBeFalse("the migration and the model snapshot agree");
+        (await CountAsync(connection, Check)).ShouldBe(1);
+
+        await migrator.MigrateAsync(Third, Ct);
+
+        (await CountAsync(connection, Check)).ShouldBe(0);
+        (await CountAsync(connection, Shape)).ShouldBe(1);
+
+        await migrator.MigrateAsync(Fourth, Ct);
+
+        (await CountAsync(connection, Check)).ShouldBe(1);
     }
 
     private static async Task<string> ScalarTextAsync(NpgsqlConnection connection, string sql)

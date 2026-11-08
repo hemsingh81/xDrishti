@@ -60,9 +60,13 @@ internal sealed class ShadowGradeRecordConfiguration : IEntityTypeConfiguration<
 {
     public void Configure(EntityTypeBuilder<ShadowGradeRecord> builder)
     {
-        builder.ToTable("shadow_grades", Schemas.Paper, t => t.HasCheckConstraint(
+        builder.ToTable("shadow_grades", Schemas.Paper, t =>
+        {
+            t.HasCheckConstraint(
             "ck_shadow_grades_shape",
-            "status IN ('graded', 'not_triggered', 'not_gradable') AND ((status = 'graded') = (r_sim IS NOT NULL)) AND ((status = 'graded') = (r_basis IS NOT NULL)) AND (r_basis IS NULL OR r_basis IN ('net', 'gross')) AND (exit_at IS NULL OR entry_at IS NULL OR exit_at >= entry_at) AND length(btrim(engine_version)) > 0"));
+            "status IN ('graded', 'not_triggered', 'not_gradable') AND ((status = 'graded') = (r_sim IS NOT NULL)) AND ((status = 'graded') = (r_basis IS NOT NULL)) AND (r_basis IS NULL OR r_basis IN ('net', 'gross')) AND (exit_at IS NULL OR entry_at IS NULL OR exit_at >= entry_at) AND length(btrim(engine_version)) > 0");
+            t.HasCheckConstraint("ck_shadow_grades_gross", "(status = 'graded') = (r_gross IS NOT NULL)");
+        });
         builder.HasKey(x => x.Id).HasName("pk_shadow_grades");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.Property(x => x.Status).HasMaxLength(16).IsRequired();

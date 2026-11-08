@@ -3941,7 +3941,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The shadow record of every nightly candidate (written before the open, graded after the close by the paper replay): raw n and effective n with the correlation used (and whether it is the placeholder), the mean R with a 90% interval and the hit rate for all and by group (primary, reserve, rejected), the behavioural count of P10 and the edge count side by side, the pace once 10 trades are graded, the chain head (sessions, gaps, last digest) and the charge-sheet basis (gross unless the sheet is confirmed). Always says: modelled fills; no queue, no latency, and that this is a separate count (the P10 exit criterion is untouched). Says so when there are no rows. Read only; no order exists */
+    /** The shadow record of every nightly candidate (written before the open, graded after the close by the paper replay): raw n and effective n with the correlation used (and whether it is the placeholder), the mean R with a 90% interval and the hit rate for all and by group (primary, reserve, rejected), the behavioural count of P10 and the edge count side by side, the pace once 10 trades are graded, the chain head (sessions, gaps, last digest) and the charge-sheet basis (gross unless the sheet is confirmed), and the sequential failure test line (CF-09: states of the edge and behavioural series and one text line; a flag, never a pass). Always says: modelled fills; no queue, no latency, and that this is a separate count (the P10 exit criterion is untouched). Says so when there are no rows. Read only; no order exists */
     get: operations['GetShadowSummary'];
     put?: never;
     post?: never;
@@ -3959,7 +3959,7 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Switch the shadow record (paper.shadow.enabled, OFF by default) ON or OFF as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). ON only allows the services shadow-write and shadow-grade (which also start paused). 401 auth.invalid_credentials, 423 auth.locked, 403 paper.shadow_owner_only, 400 paper.shadow_reason_invalid, 429 auth.rate_limited */
+    /** Switch the shadow record (paper.shadow.enabled, OFF by default) ON or OFF as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). ON only allows the services shadow-write and shadow-grade (which also start paused). 401 auth.invalid_credentials, 423 auth.locked, 403 paper.shadow_owner_only, 400 paper.shadow_reason_invalid, 409 paper.shadow_gap (turning ON over missed sessions without acknowledgeGap), 409 paper.shadow_digest_unwritable (turning ON while the digest folder cannot be written), 429 auth.rate_limited */
     put: operations['ChangeShadowSettings'];
     post?: never;
     delete?: never;
@@ -20760,6 +20760,19 @@ export interface components {
       /** @description The share of trades with R above 0. */
       hitRate: components['schemas']['MetricView'];
     };
+    /** @description The sequential failure test beside the shadow figures (spec CF-09 D7, ADR 0232): the same answer as `GET /api/paper/sequential` for the system scope, as a state and one line. A flag only, never a pass. */
+    ShadowSequentialView: {
+      /** @description Whether a shadow edge series exists in the current paper epoch (false: the other fields are null and Note says why). */
+      available: boolean;
+      /** @description Why there is no test yet; null when available. */
+      note: null | string;
+      /** @description `monitoring`, `on_track`, `caution` or `failure` of the edge series; null when not available. */
+      edgeState: null | string;
+      /** @description The same for the P10 behavioural series beside it; null when not available. */
+      behaviouralState: null | string;
+      /** @description The one report line (never a pass; the fixed P10 gates decide); null when not available. */
+      line: null | string;
+    };
     /** @description The shadow summary (criterion 10). */
     ShadowSummaryView: {
       /** @description Whether `paper.shadow.enabled` is ON. */
@@ -20782,6 +20795,8 @@ export interface components {
       costs: components['schemas']['ShadowCostView'];
       /** @description The chain head. */
       chain: components['schemas']['ShadowChainView'];
+      /** @description The sequential failure test line (CF-09). */
+      sequential: components['schemas']['ShadowSequentialView'];
     };
     /** @description The body of the shadow-record switch. The owner is never part of it: the actor comes from the signed-in session. */
     ShadowSwitchRequest: {
@@ -20791,6 +20806,11 @@ export interface components {
       reason: null | string;
       /** @description The owner's password, re-entered for THIS change, ON or OFF. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
       password: null | string;
+      /**
+       * @description Accepts that every trading session missed since the chain's newest one becomes a gap row (never back-filled); needed to turn ON when more were missed than `Shadow:MaxResumeGapSessions`, else 409 `paper.shadow_gap`.
+       * @default false
+       */
+      acknowledgeGap: boolean;
     };
     /** @description The answer of a switch change: the row and the new value. */
     ShadowSwitched: {
@@ -31894,6 +31914,51 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

@@ -68,7 +68,8 @@ Whether duplicates and not-eligible candidates are persisted before the plan rec
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [x] Contract regenerated (`scripts/gen-api.sh`); migrations `AddPaperShadow`, `StampShadowSettingInCommitOrder` and `AddShadowGradeGross` added and tested up and down
 - [x] Design docs/ADR updated (docs 09, 18; ADRs 0211, 0212); `scripts/build-docs.sh` not run on request (docs/site only on the owner's ask)
-- [ ] Open follow-up: the weekly digest into the Reports export and to a file outside the database (review fix 4); the `/paper` Shadow tab
+- [x] Leftovers built 2026-11-09 (ADR 0232): the weekly digest copy to a log outside the database (service `shadow-digest`, `Shadow:DigestFolder`; hash-chained lines, checked against the chain, `paper.shadow_digest_diverged`; not into the Reports export), 409 `paper.shadow_gap` on a switch-ON over missed sessions without `acknowledgeGap` (`Shadow:MaxResumeGapSessions`, default 0), `CHECK ((status='graded') = (r_gross IS NOT NULL))` (migration `AddShadowGradeGrossCheck`)
+- [ ] Open follow-up: the `/paper` Shadow tab is a frontend slice built separately
 
 ## Part B (built 2026-11-05)
 `GradeShadowHandler`, `ShadowGradeService` (`shadow-grade`), `GetShadowSummaryHandler`, `ChangeShadowSwitchHandler`, `VerifyShadowChainHandler`, the ports `IShadowGradeStore`, `IShadowSwitchStore` and the `IShadowResultReader` adapter; `GET /api/paper/shadow/summary`, `PUT /api/paper/shadow/settings`; `xd paper shadow verify|summary`. ADR 0212.
@@ -77,5 +78,5 @@ Whether duplicates and not-eligible candidates are persisted before the plan rec
 1. **Cut-off** is 09:00 IST (03:30 UTC), not 09:15 (arming runs at 09:10). AC2 uses 09:01 (refused) and 08:59 (accepted).
 2. **Trigger** also requires `written_at >= plan.stored_at`; `row_hash` includes `plan_id`.
 3. **Provenance of features and p_win:** they must come from the stored plan record. If the plan holds none, features are null; the row still has `counts_for_edge = true` but is excluded from CF-10 and CF-12 scoring.
-4. **Chain digest** is also written weekly into the Reports export (P8-20) and to a file outside the database, so a database owner cannot rewrite the chain unseen.
+4. **Chain digest** is also written weekly to a file outside the database, so a database owner cannot rewrite the chain unseen. Built as ADR 0232: a hash-chained log checked against the chain on every export and by `xd paper shadow verify`; it is **not** in the Reports export (P8-20; see the ADR), and cutting lines off the log's tail is seen only with an offsite copy.
 5. **AC7 extended:** Planning, Selection and Autonomy must not depend on `IMlInfluenceGate`'s shadow terms either; model scores stay advisory-only until P12.

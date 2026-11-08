@@ -28,6 +28,9 @@ public interface IServiceRunStore
     /// <summary>The runs of the service, newest first.</summary>
     ValueTask<IReadOnlyList<ServiceRun>> ListAsync(string serviceId, int skip, int take, CancellationToken cancellationToken);
 
+    /// <summary>Whether the service has any succeeded run whose message starts with <paramref name="messagePrefix"/> (one existence query, not a window of the history).</summary>
+    ValueTask<bool> AnySucceededAsync(string serviceId, string messagePrefix, CancellationToken cancellationToken);
+
     ValueTask<int> CountAsync(string serviceId, CancellationToken cancellationToken);
 
     /// <summary>

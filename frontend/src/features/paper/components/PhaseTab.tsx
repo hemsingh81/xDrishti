@@ -5,6 +5,7 @@ import { ErrorState, LoadingState } from '@/shared/ui';
 import { paperPhaseQuery, type PaperPhaseReport, type PhaseCriterion } from '../api/phaseQueries';
 import { BasisNote } from './BasisNote';
 import { PhasePrinted } from './PhasePrinted';
+import { SequentialLine } from './SequentialLine';
 import { PhaseTables } from './PhaseTables';
 
 const words: Record<string, Verdict> = { MET: 'met', 'NOT MET': 'not_met', 'NOT EVALUABLE': 'not_evaluable' };
@@ -52,6 +53,7 @@ function Body({ report }: { report: PaperPhaseReport }) {
           ))}
         </Stack>
       </Box>
+      <SequentialLine />
       <PhaseTables report={report} />
       <PhasePrinted printed={report.printed} />
     </Stack>

@@ -9,7 +9,8 @@ namespace XDrishti.Application.Shadow;
 /// <param name="Actor">The owner, <c>owner:...</c>.</param>
 /// <param name="Enabled">The new value of <c>paper.shadow.enabled</c>.</param>
 /// <param name="Reason">Why, 1 to 500 characters.</param>
-public sealed record ChangeShadowSwitchCommand(string Actor, bool Enabled, string Reason) : ICommand;
+/// <param name="AcknowledgeGap">Turning ON while more trading sessions than <see cref="ShadowOptions.MaxResumeGapSessions"/> have opened since the chain's newest session is refused (409 <c>paper.shadow_gap</c>) unless the owner accepts that each becomes a gap row, never back-filled (ADR 0232).</param>
+public sealed record ChangeShadowSwitchCommand(string Actor, bool Enabled, string Reason, bool AcknowledgeGap = false) : ICommand;
 
 /// <summary>The answer of a switch change: the row and the new value.</summary>
 /// <param name="Id">The row appended.</param>

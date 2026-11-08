@@ -1,7 +1,9 @@
 using NSubstitute;
+using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Shadow;
 using XDrishti.Application.Shadow;
+using XDrishti.Domain.Common;
 using XDrishti.Domain.Paper;
 using XDrishti.Domain.Shadow;
 
@@ -22,6 +24,8 @@ public sealed class GetShadowSummaryHandlerTests
 
     private readonly ICostConfirmationFact _costs = Substitute.For<ICostConfirmationFact>();
 
+    private readonly IQueryHandler<GetSequentialStatusQuery, Result<SequentialStatusView>> _sequential = Substitute.For<IQueryHandler<GetSequentialStatusQuery, Result<SequentialStatusView>>>();
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     public GetShadowSummaryHandlerTests()
@@ -29,7 +33,15 @@ public sealed class GetShadowSummaryHandlerTests
         _switch.IsEnabledAsync(Ct).Returns(true);
         _ledger.EpochAsync(null, Ct).Returns(new EpochRow(1, Start, DateTimeOffset.UnixEpoch, "first", "default", "system"));
         _paper.ReadAsync(1, Ct).Returns(new PaperCompareData([], 0, null));
+        Sequential(false);
         _reader.ChainAsync(Ct).Returns(new ShadowChainTotals(3, 1, Start.AddDays(2), new string('e', 64)));
+    }
+
+    private void Sequential(bool hasSeries)
+    {
+        var series = new SequentialSeriesView("b", null, "caution", "words", -1, 5, 3, 4, Start, null, null, 0, null, new SequentialPathView(-1, 4, 1.5));
+        var view = new SequentialStatusView("system", null, 1, hasSeries, new SequentialBoundariesView(-2, -3, 0, 5, 19), 0.3, true, new string('a', 64), "k", series, series with { State = "monitoring" }, [], "the CF-09 line");
+        _sequential.HandleAsync(Arg.Any<GetSequentialStatusQuery>(), Ct).Returns(Result.Success(view));
     }
 
     /// <summary>Each of <paramref name="sessions"/> sessions has <paramref name="perSession"/> candidates that count for edge, all graded, with R alternating +1 and -0.5 (primary, reserve, rejected in turn). A net row also carries a gross R 0.2 above its net one.</summary>
@@ -49,7 +61,42 @@ public sealed class GetShadowSummaryHandlerTests
         _reader.ResultsAsync(Ct).Returns(rows);
     }
 
-    private Task<ShadowSummaryView> ReadAsync() => new GetShadowSummaryHandler(_switch, _reader, _ledger, _paper, _costs).HandleAsync(new GetShadowSummaryQuery(), Ct).AsTask();
+    private Task<ShadowSummaryView> ReadAsync() => new GetShadowSummaryHandler(_switch, _reader, _ledger, _paper, _costs, _sequential).HandleAsync(new GetShadowSummaryQuery(), Ct).AsTask();
+
+    [Fact]
+    public async Task The_sequential_line_and_both_states_of_the_system_scope_ride_on_the_summary()
+    {
+        Candidates(2, 2);
+        Sequential(true);
+
+        var view = await ReadAsync();
+
+        view.Sequential.ShouldBe(new ShadowSequentialView(true, null, "caution", "monitoring", "the CF-09 line"));
+        await _sequential.Received().HandleAsync(Arg.Is<GetSequentialStatusQuery>(q => q.Scope == "system" && q.Strategy == null), Ct);
+    }
+
+    [Fact]
+    public async Task A_failing_sequential_query_is_a_note_not_a_failure_of_the_summary()
+    {
+        Candidates(1, 1);
+        _sequential.HandleAsync(Arg.Any<GetSequentialStatusQuery>(), Ct).Returns(Result.Failure<SequentialStatusView>(Error.Validation("paper.invalid", "bad scope")));
+
+        var view = await ReadAsync();
+
+        view.Sequential.ShouldBe(new ShadowSequentialView(false, "bad scope", null, null, null));
+    }
+
+    [Fact]
+    public async Task Without_a_series_the_sequential_part_says_so_and_carries_no_line()
+    {
+        Candidates(1, 1);
+
+        var view = await ReadAsync();
+
+        view.Sequential.Available.ShouldBeFalse();
+        view.Sequential.Line.ShouldBeNull();
+        view.Sequential.Note.ShouldNotBeNull();
+    }
 
     [Fact]
     public async Task Raw_240_over_40_sessions_of_6_candidates_is_96_effective_with_the_placeholder_rho_said_so()

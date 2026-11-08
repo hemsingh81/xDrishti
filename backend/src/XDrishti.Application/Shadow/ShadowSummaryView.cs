@@ -52,6 +52,14 @@ public sealed record ShadowCostView(string Basis, bool Gross, IReadOnlyList<stri
 /// <param name="LastDigest">Its digest.</param>
 public sealed record ShadowChainView(int Sessions, int Gaps, DateOnly? LastSession, string? LastDigest);
 
+/// <summary>The sequential failure test beside the shadow figures (spec CF-09 D7, ADR 0232): the same answer as <c>GET /api/paper/sequential</c> for the system scope, as a state and one line. A flag only, never a pass.</summary>
+/// <param name="Available">Whether a shadow edge series exists in the current paper epoch (false: the other fields are null and <paramref name="Note"/> says why).</param>
+/// <param name="Note">Why there is no test yet; null when available.</param>
+/// <param name="EdgeState"><c>monitoring</c>, <c>on_track</c>, <c>caution</c> or <c>failure</c> of the edge series; null when not available.</param>
+/// <param name="BehaviouralState">The same for the P10 behavioural series beside it; null when not available.</param>
+/// <param name="Line">The one report line (never a pass; the fixed P10 gates decide); null when not available.</param>
+public sealed record ShadowSequentialView(bool Available, string? Note, string? EdgeState, string? BehaviouralState, string? Line);
+
 /// <summary>The shadow summary (criterion 10).</summary>
 /// <param name="Enabled">Whether <c>paper.shadow.enabled</c> is ON.</param>
 /// <param name="HasRows">Whether any shadow row is stored.</param>
@@ -63,4 +71,16 @@ public sealed record ShadowChainView(int Sessions, int Gaps, DateOnly? LastSessi
 /// <param name="Groups">Overall (<c>all</c>), then primary, reserve and rejected.</param>
 /// <param name="Costs">What the R is net of.</param>
 /// <param name="Chain">The chain head.</param>
-public sealed record ShadowSummaryView(bool Enabled, bool HasRows, string? Note, string Statement, string SeparateCount, ShadowCountsView Counts, ShadowEdgeView Edge, IReadOnlyList<ShadowGroupView> Groups, ShadowCostView Costs, ShadowChainView Chain);
+/// <param name="Sequential">The sequential failure test line (CF-09).</param>
+public sealed record ShadowSummaryView(
+    bool Enabled,
+    bool HasRows,
+    string? Note,
+    string Statement,
+    string SeparateCount,
+    ShadowCountsView Counts,
+    ShadowEdgeView Edge,
+    IReadOnlyList<ShadowGroupView> Groups,
+    ShadowCostView Costs,
+    ShadowChainView Chain,
+    ShadowSequentialView Sequential);

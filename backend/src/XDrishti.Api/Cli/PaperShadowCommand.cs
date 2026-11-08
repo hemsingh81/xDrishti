@@ -16,7 +16,7 @@ internal static class PaperShadowCommand
           xd paper shadow summary
             raw n and effective n (with the correlation used and whether it is the placeholder), mean R with a 90% interval and the hit rate by group, the behavioural count of P10 beside the edge count, the pace, the chain head
             every figure is modelled (no queue, no latency); the R is labelled gross unless the charge sheet is confirmed as yours; nothing is written
-        exit codes: 0 done (verify: the chain is intact), 4 verify: the chain is broken, 2 wrong command line, 3 failure, 130 cancelled
+        exit codes: 0 done (verify: the chain is intact and the digest log agrees with it), 4 verify: the chain is broken or the digest log disagrees with it, 2 wrong command line, 3 failure, 130 cancelled
 
         """;
 
@@ -37,7 +37,7 @@ internal static class PaperShadowCommand
             {
                 var check = await scope.ServiceProvider.GetRequiredService<IQueryHandler<VerifyShadowChainQuery, ShadowChainCheckView>>().HandleAsync(new VerifyShadowChainQuery(), cancellationToken);
                 await console.Out.WriteLineAsync(VerifyLine(check));
-                return check.Intact ? XdCommand.Done : XdCommand.NotPassing;
+                return check.Intact && check.LogProblem is null ? XdCommand.Done : XdCommand.NotPassing;
             }
 
             var view = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView>>().HandleAsync(new GetShadowSummaryQuery(), cancellationToken);
@@ -61,6 +61,9 @@ internal static class PaperShadowCommand
     }
 
     internal static string VerifyLine(ShadowChainCheckView c) =>
+        (c.LogProblem is null ? string.Empty : "digest log DIVERGED: " + c.LogProblem + " ") + VerifyChainLine(c);
+
+    private static string VerifyChainLine(ShadowChainCheckView c) =>
         c.Intact
             ? string.Create(CultureInfo.InvariantCulture, $"shadow chain intact: {c.Sessions} session(s), {c.Rows} row(s); last session {c.LastSession?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "none"}, last digest {c.LastDigest ?? "none"}")
             : string.Create(CultureInfo.InvariantCulture, $"shadow chain BROKEN from session {c.FirstBroken:yyyy-MM-dd}: a row or a digest from that session on does not recompute from the stored rows; {c.Sessions} session(s), {c.Rows} row(s)");
@@ -85,6 +88,7 @@ internal static class PaperShadowCommand
         }
 
         yield return string.Create(CultureInfo.InvariantCulture, $"chain: {v.Chain.Sessions} session(s), {v.Chain.Gaps} gap(s); last {v.Chain.LastSession?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "none"}, digest {v.Chain.LastDigest ?? "none"}");
+        yield return v.Sequential.Line ?? "sequential failure test: " + v.Sequential.Note;
     }
 
     private static string Show(MetricView m) =>
