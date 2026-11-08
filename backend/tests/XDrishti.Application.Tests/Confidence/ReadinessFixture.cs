@@ -31,8 +31,6 @@ internal sealed class PassingGaps : IReadinessGaps
 {
     public ValueTask<ReadinessReading<bool>> BenchmarkBeatenAsync(string strategy, int? version, CancellationToken cancellationToken) => Yes();
 
-    public ValueTask<ReadinessReading<bool>> TwentyTradeCheckPassedAsync(string strategy, CancellationToken cancellationToken) => Yes();
-
     public ValueTask<ReadinessReading<double>> RiskShareAsync(string strategy, CancellationToken cancellationToken) => Number(1);
 
     private static ValueTask<ReadinessReading<bool>> Yes() => ValueTask.FromResult(new ReadinessReading<bool>(true, string.Empty));
@@ -167,6 +165,19 @@ internal sealed class ReadinessFixture
 
     public IReadinessGaps Gaps { get; set; } = new PassingGaps();
 
+    /// <summary>The owner's newest pack gate record the reader finds; a PASS over 20 trades unless a test says otherwise (null = none recorded).</summary>
+    public PackGateResultRow? PackGateRow { get; set; } = new(1, "pack-1", "PASS", 20, DateTimeOffset.UnixEpoch);
+
+    public Exception? PackGateFailure { get; set; }
+
+    public PackGateResultReader PackGate => new(new FakePackGateResults(this), NullLogger<PackGateResultReader>.Instance);
+
+    private sealed class FakePackGateResults(ReadinessFixture owner) : IPackGateResultReader
+    {
+        public ValueTask<PackGateResultRow?> LatestAsync(string strategyId, int version, CancellationToken cancellationToken) =>
+            owner.PackGateFailure is { } failure ? throw failure : ValueTask.FromResult(owner.PackGateRow);
+    }
+
     public ReadinessOptions Options { get; set; } = new();
 
     // ---- scripted producers a test may spoil ----
@@ -250,7 +261,7 @@ internal sealed class ReadinessFixture
 
     public ScorecardIntegrityReader IntegrityReader => new(Integrity, NullLogger<ScorecardIntegrityReader>.Instance);
 
-    public ScorecardReader Reader => new(LabReader, ForwardReader, ForwardTiers, IntegrityReader, Gaps, Strategies, StrategyDetails, Options);
+    public ScorecardReader Reader => new(LabReader, ForwardReader, ForwardTiers, IntegrityReader, Gaps, PackGate, Strategies, StrategyDetails, Options);
 
     public ReadinessGate Gate => new(Reader, Store, Store, Options, Time, NullLogger<ReadinessGate>.Instance);
 

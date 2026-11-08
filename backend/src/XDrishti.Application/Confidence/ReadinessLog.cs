@@ -37,4 +37,10 @@ internal static partial class ReadinessLog
 
     [LoggerMessage(EventId = 7310, Level = LogLevel.Warning, Message = "confidence.readiness.forward_tiers: the forward trades could not be tiered ({ExceptionType}); the set reads unavailable, which counts as a fail")]
     public static partial void ForwardTiersUnreadable(ILogger logger, string exceptionType);
+
+    [LoggerMessage(EventId = 7311, Level = LogLevel.Information, Message = "confidence.readiness.pack_gate: row {Row} appended, status {Status}, {Trades} trade(s)")]
+    public static partial void PackGateRecorded(ILogger logger, long row, string status, int trades);
+
+    [LoggerMessage(EventId = 7312, Level = LogLevel.Warning, Message = "confidence.readiness.pack_gate: the owner's record could not be read ({ExceptionType}); row 15's 20-trade term reads unavailable, which counts as a fail")]
+    public static partial void PackGateUnreadable(ILogger logger, string exceptionType);
 }

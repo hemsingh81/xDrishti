@@ -228,6 +228,9 @@ public static class DependencyInjection
         services.AddScoped<ReadinessSnapshots>(); // readiness.scorecard_snapshots: insert-only daily and gate snapshots of the scorecard (CF-11)
         services.AddScoped<IReadinessSnapshotStore>(sp => sp.GetRequiredService<ReadinessSnapshots>());
         services.AddScoped<IReadinessSnapshotReader>(sp => sp.GetRequiredService<ReadinessSnapshots>());
+        services.AddScoped<PackGateResults>(); // readiness.pack_gate_results: the owner's insert-only record of verify-pack --gate results, read by row 15 (CF-11, ADR 0226)
+        services.AddScoped<IPackGateResultStore>(sp => sp.GetRequiredService<PackGateResults>());
+        services.AddScoped<IPackGateResultReader>(sp => sp.GetRequiredService<PackGateResults>());
         services.AddScoped<MlSwitchSettings>(); // the three ML switches: the newest row of each name in research.ml_switch_settings, OFF when none (CF-10 part 10d-1, ADR 0220)
         services.AddScoped<IMlSwitchSettings>(sp => sp.GetRequiredService<MlSwitchSettings>());
         services.AddScoped<IMlSwitchStore>(sp => sp.GetRequiredService<MlSwitchSettings>());

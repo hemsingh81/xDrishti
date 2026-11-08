@@ -337,6 +337,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ReadinessSettingsView))]
 [JsonSerializable(typeof(ReadinessSwitched))]
 [JsonSerializable(typeof(ReadinessSwitchRequest))]
+[JsonSerializable(typeof(PackGateRecorded))]
+[JsonSerializable(typeof(PackGateResultRequest))]
 [JsonSerializable(typeof(RollbackProposalsView))]
 [JsonSerializable(typeof(ApplyRollbackOutcome))]
 [JsonSerializable(typeof(MlSettingsChanged))]

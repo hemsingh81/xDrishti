@@ -1050,6 +1050,8 @@ public static class DependencyInjection
         services.AddScoped<ScorecardReader>(); // builds a scorecard and the system card from the evidence with the pure calculators
         services.AddSingleton<ReadinessOptionsView>();
         services.AddSingleton<IReadinessGaps, UnavailableReadinessGaps>(); // the inputs that have no producer yet all say unavailable, with the reason (CF-11)
+        services.AddScoped<PackGateResultReader>(); // row 15's P3-09 term: the owner's newest verify-pack --gate record; none or unreadable = unavailable (CF-11, ADR 0226)
+        services.AddScoped<ICommandHandler<RecordPackGateResultCommand, PackGateRecorded>, RecordPackGateResultHandler>(); // the owner's record of a gate result (insert only)
         services.AddScoped<IReadinessGate, ReadinessGate>(); // the only route from the cell lifecycle to the scorecard: warns with the switch OFF, refuses with it ON (CF-11 D6)
         services.AddScoped<IQueryHandler<GetScorecardQuery, Result<ScorecardView>>, GetScorecardHandler>();
         services.AddScoped<IQueryHandler<ListScorecardsQuery, Result<ScorecardListView>>, ListScorecardsHandler>();
