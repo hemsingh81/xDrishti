@@ -70,6 +70,8 @@ public sealed partial class SimulateDatabaseTests(ApiFactory factory) : DataTest
 
         public ValueTask<IReadOnlyList<BarRow>> ReadDailyBarsAsync(Guid instrumentId, DateOnly from, DateOnly toExclusive, CancellationToken cancellationToken) => Record<IReadOnlyList<BarRow>>(nameof(ReadDailyBarsAsync));
 
+        public ValueTask<IReadOnlyList<MinuteCloseVolume>> ReadMinuteCloseVolumesAsync(Guid instrumentId, IReadOnlyList<DateTimeOffset> minuteStarts, CancellationToken cancellationToken) => Record<IReadOnlyList<MinuteCloseVolume>>(nameof(ReadMinuteCloseVolumesAsync));
+
         private ValueTask<T> Record<T>(string name)
         {
             Calls.Add(name);

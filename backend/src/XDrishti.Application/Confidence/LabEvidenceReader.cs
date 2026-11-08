@@ -237,9 +237,15 @@ internal sealed class LabEvidenceReader(
             return (false, string.Join("; ", failures) + ".");
         }
 
-        if (t.TierUnavailable > 0 || t.CapacityUnavailable > 0)
+        // a block written before the fill-minute read (ADR 0224) never judged the 1 % cap: it cannot pass, whatever its other counts say
+        if (t.MinuteReads is not { } minuteReads || t.MinuteUnavailable is not { } minuteUnavailable)
         {
-            return (null, string.Create(Inv, $"unavailable: {t.TierUnavailable} of {t.Trades} trades have no usable 20-day median traded value and {t.CapacityUnavailable} have no complete capacity reading (the 0.5 % of the 20-day median cap is measured on day bars; the 1 % of the fill minute's traded value is not read yet, so it cannot pass); unavailable counts as a fail."));
+            return (null, "unavailable: the verdict was produced before the fill minute's traded value was read (the 1 % cap was not judged); re-run the robust test.");
+        }
+
+        if (t.TierUnavailable > 0 || t.CapacityUnavailable > 0 || minuteUnavailable > 0 || minuteReads < t.Trades)
+        {
+            return (null, string.Create(Inv, $"unavailable: {t.TierUnavailable} of {t.Trades} trades have no usable 20-day median traded value, {t.CapacityUnavailable} have no complete capacity reading and {minuteUnavailable} have no readable fill minute traded value (the 1 % cap; read for at most {t.MinuteReadLimit?.ToString(Inv) ?? "an unrecorded number of"} trades per run{(t.MinuteReadLimit is { } limit && t.Trades > limit ? string.Create(Inv, $", {t.Trades - limit} over the bound") : string.Empty)}); unavailable counts as a fail."));
         }
 
         return (true, string.Create(Inv, $"all {t.Trades} trades are tier A or B and no order is over a participation cap."));

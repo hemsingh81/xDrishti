@@ -174,4 +174,48 @@ public sealed class LiquidityTiersAssessTests
         LiquidityTiers.TradedValue(new DailyBar(Entry, 1, 1, 1, 250.5, 1_000)).ShouldBe(250_500m);
         LiquidityTiers.TradedValue(new DailyBar(Entry, 1, 1, 1, double.PositiveInfinity, 1)).ShouldBe(-1m);
     }
+
+    [Fact]
+    public void The_traded_value_of_a_minute_is_close_times_volume_the_same_definition_as_a_day_bar()
+    {
+        LiquidityTiers.MinuteTradedValue(250.5, 1_000).ShouldBe(250_500m);
+        LiquidityTiers.MinuteTradedValue(250.5, 1_000).ShouldBe(LiquidityTiers.TradedValue(new DailyBar(Entry, 1, 1, 1, 250.5, 1_000)));
+    }
+
+    [Theory]
+    [InlineData(100.0, 0L)]
+    [InlineData(100.0, -1L)]
+    [InlineData(0.0, 1000L)]
+    [InlineData(-5.0, 1000L)]
+    [InlineData(double.NaN, 1000L)]
+    [InlineData(double.PositiveInfinity, 1000L)]
+    [InlineData(1e300, long.MaxValue)]
+    public void A_minute_that_cannot_give_a_value_is_null_never_zero_so_the_cap_reads_unavailable(double close, long volume)
+    {
+        LiquidityTiers.MinuteTradedValue(close, volume).ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(40_000, false)] // exactly 1 % of the Rs 40 lakh minute
+    [InlineData(40_001, true)] // one rupee over
+    [InlineData(100_000, true)] // CF-05 AC6: Rs 1 lakh in a Rs 40 lakh minute is 2.5 %
+    public void With_a_fill_minute_value_the_one_percent_cap_is_judged_and_a_pass_is_reachable(decimal order, bool breach)
+    {
+        var minute = LiquidityTiers.MinuteTradedValue(100, 40_000); // Rs 40 lakh
+
+        var r = Assess(order, Series(450 * Crore, 1000 * Crore), minute);
+
+        r.Tier.ShouldBe(LiquidityTier.A);
+        r.Capacity.Breach.ShouldBe(breach);
+        (r.Capacity.Reason.Length > 0 && !r.Capacity.Reason.StartsWith("unavailable", StringComparison.Ordinal)).ShouldBe(breach);
+    }
+
+    [Fact]
+    public void A_minute_of_Rs_2_crore_holds_an_order_of_Rs_1_lakh_at_half_a_percent()
+    {
+        var r = Assess(100_000m, Series(450 * Crore, 1000 * Crore), LiquidityTiers.MinuteTradedValue(100, 200_000));
+
+        r.Capacity.Breach.ShouldBeFalse();
+        r.Capacity.Reason.ShouldBeEmpty();
+    }
 }

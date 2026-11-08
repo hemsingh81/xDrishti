@@ -51,9 +51,16 @@ public static class LiquidityTiers
     }
 
     /// <summary>
+    /// The traded value of one stored minute bar in rupees, close times volume: the same definition as <see cref="TradedValue"/> of a day bar (ADR 0224). Null when the minute cannot give a usable figure, which the capacity check reads as unavailable
+    /// and never as a pass: a close that is not a finite positive number, or a volume of zero or less (a minute with no volume has no value to hold an order against). Pure.
+    /// </summary>
+    public static decimal? MinuteTradedValue(double close, long volume) =>
+        double.IsFinite(close) && close > 0 && volume > 0 && close < (double)(decimal.MaxValue / volume) ? (decimal)close * volume : null;
+
+    /// <summary>
     /// The tier and the capacity check of one order from day bars (CF-05, D2 and D4, ADR 0223): the tier is of the 20-day median traded value of the sessions strictly before <paramref name="entryDate"/> (what was known at the entry; unavailable
     /// with fewer than 20 usable sessions). The capacity holds the order against <paramref name="dailyShare"/> of that median, and against <paramref name="fillShare"/> of <paramref name="fillMinuteValue"/>, the fill minute's traded value, which no day bar can give: it is
-    /// null until a slice reads the fill minute, and the minute cap then reads unavailable (fail closed, never a pass), while a breach of the median cap is still a breach. The entry day's traded value is only returned as information
+    /// null when the fill minute could not be read (ADR 0224: <see cref="MinuteTradedValue"/> of the stored minute bar), and the minute cap then reads unavailable (fail closed, never a pass), while a breach of the median cap is still a breach. The entry day's traded value is only returned as information
     /// (<c>OverEntryDayShare</c>: the order against <paramref name="fillShare"/> of the day, about 375 times looser than the minute); it can never make a pass. Pure.
     /// </summary>
     /// <param name="orderValue">Quantity times the entry price in rupees; null when not known.</param>
@@ -63,7 +70,7 @@ public static class LiquidityTiers
     /// <param name="bCut">The tier B cut in rupees.</param>
     /// <param name="fillShare">The share of the fill minute's traded value an order may be.</param>
     /// <param name="dailyShare">The share of the 20-day median an order may be.</param>
-    /// <param name="fillMinuteValue">The fill minute's traded value in rupees; null when it is not read (every caller today).</param>
+    /// <param name="fillMinuteValue">The fill minute's traded value in rupees; null when it is not read.</param>
     public static (LiquidityTier Tier, CapacityCheck Capacity, bool? OverEntryDayShare) Assess(decimal? orderValue, IReadOnlyList<DailyBar> bars, DateOnly entryDate, decimal aCut, decimal bCut, decimal fillShare, decimal dailyShare, decimal? fillMinuteValue = null)
     {
         ArgumentNullException.ThrowIfNull(bars);

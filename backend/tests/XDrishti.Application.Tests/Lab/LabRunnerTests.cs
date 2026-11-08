@@ -471,7 +471,7 @@ public sealed class LabRunnerTests
         _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
 
         await RunnerWithStress(options).ExecuteAsync(RobustRun(), Ct);
-        await RunnerWithStress(options, new LabTiers(bars, options, NullLogger<LabTiers>.Instance)).ExecuteAsync(RobustRun(), Ct);
+        await RunnerWithStress(options, new LabTiers(bars, options, _time, NullLogger<LabTiers>.Instance)).ExecuteAsync(RobustRun(), Ct);
 
         verdicts.Count.ShouldBe(2);
         verdicts[0].CostStress!.Tiers.ShouldBeNull();

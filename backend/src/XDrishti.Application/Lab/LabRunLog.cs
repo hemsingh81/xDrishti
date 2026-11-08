@@ -51,4 +51,10 @@ internal static partial class LabRunLog
 
     [LoggerMessage(EventId = 7096, Level = LogLevel.Warning, Message = "lab.tiers.bars_unread instrument {InstrumentId} trades {Trades}; its trades count as tier and capacity unavailable")]
     public static partial void TiersBarsUnread(ILogger logger, Guid instrumentId, int trades, Exception exception);
+
+    [LoggerMessage(EventId = 7097, Level = LogLevel.Warning, Message = "lab.tiers.minutes_unread instrument {InstrumentId} trades {Trades}; their fill minutes count as unavailable")]
+    public static partial void TiersMinutesUnread(ILogger logger, Guid instrumentId, int trades, Exception exception);
+
+    [LoggerMessage(EventId = 7098, Level = LogLevel.Warning, Message = "lab.tiers.minutes_timeout after {Seconds} s; the fill minutes not yet read count as unavailable")]
+    public static partial void TiersMinutesTimeout(ILogger logger, int seconds);
 }

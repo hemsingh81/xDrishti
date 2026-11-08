@@ -16,8 +16,10 @@ namespace XDrishti.Domain.Confidence;
 /// <param name="DelayRetention">Expectancy per signal at the delay must be at least this share of the base (default 0.70; 0.1..1).</param>
 /// <param name="TierACutCrore">Tier A: the 20-day median traded value is at least this many crore rupees (default 100, CF-05 D2). Tighten-only in both directions: raising it puts names into lower tiers and can only fail more of row 14, and a value below the default is refused at start-up, so configuration cannot loosen the gate (loosening is a change of this file and an ADR).</param>
 /// <param name="TierBCutCrore">Tier B: at least this many crore and below the A cut (default 20; at least the default, below the A cut). Below it is tier C. Tighten-only like the A cut.</param>
-/// <param name="CapacityFillShare">The most an order may be of the fill minute's traded value (default 0.01, CF-05 D4). Today no source reads the fill minute, so this cap reads unavailable (ADR 0223) and the figure only travels with the settings. Lowering it is stricter; a value above the default is refused.</param>
+/// <param name="CapacityFillShare">The most an order may be of the fill minute's traded value (default 0.01, CF-05 D4), read from the stored minute bar of each trade's fill minute (ADR 0224). Lowering it is stricter; a value above the default is refused.</param>
 /// <param name="CapacityDailyShare">The most an order may be of the 20-day median traded value (default 0.005). Lowering it is stricter; a value above the default is refused.</param>
+/// <param name="FillMinuteMaxTrades">The most out-of-sample trades of one Lab run whose fill minute is read (default 5000; 0..20000). The trades beyond it keep an unavailable capacity reading, which counts as a fail at the gate, never a pass. Not a threshold of the gate, so it is bounded by range only: lowering it can only turn readings into unavailable (a fail), raising it only reads more minutes at a cost of time; neither can make a pass that the stored figures do not support.</param>
+/// <param name="FillMinuteTimeoutSeconds">The most seconds one Lab run spends reading fill minutes (default 60; 1..600). When it runs out, the minutes not yet read stay unavailable and the run goes on.</param>
 public sealed record CostStressOptions(
     ConfidenceMode Mode = ConfidenceMode.ReportOnly,
     bool Enforce = false,
@@ -30,8 +32,22 @@ public sealed record CostStressOptions(
     decimal TierACutCrore = CostStressOptions.DefaultTierACutCrore,
     decimal TierBCutCrore = CostStressOptions.DefaultTierBCutCrore,
     decimal CapacityFillShare = CostStressOptions.DefaultCapacityFillShare,
-    decimal CapacityDailyShare = CostStressOptions.DefaultCapacityDailyShare)
+    decimal CapacityDailyShare = CostStressOptions.DefaultCapacityDailyShare,
+    int FillMinuteMaxTrades = CostStressOptions.DefaultFillMinuteMaxTrades,
+    int FillMinuteTimeoutSeconds = CostStressOptions.DefaultFillMinuteTimeoutSeconds)
 {
+    /// <summary>The default most trades whose fill minute is read in one run.</summary>
+    public const int DefaultFillMinuteMaxTrades = 5000;
+
+    /// <summary>The most the setting may be: it bounds the cost of the read (about 0.25 s per 1,000 trades measured, ADR 0224).</summary>
+    public const int MaxFillMinuteMaxTrades = 20_000;
+
+    /// <summary>The default seconds a run may spend reading fill minutes.</summary>
+    public const int DefaultFillMinuteTimeoutSeconds = 60;
+
+    /// <summary>The most seconds the setting may be.</summary>
+    public const int MaxFillMinuteTimeoutSeconds = 600;
+
     /// <summary>The spec's tier A cut in crore rupees; the least the setting may be.</summary>
     public const decimal DefaultTierACutCrore = 100m;
 
@@ -124,6 +140,17 @@ public sealed record CostStressOptions(
         if (CapacityDailyShare is <= 0 or > DefaultCapacityDailyShare)
         {
             problems.Add("CostStress:CapacityDailyShare must be above 0 and at most 0.005 (it can be lowered, not raised)");
+        }
+
+        // bounds of the cost of the fill-minute read, not thresholds of the gate (ADR 0224): a smaller bound only turns readings into unavailable
+        if (FillMinuteMaxTrades is < 0 or > MaxFillMinuteMaxTrades)
+        {
+            problems.Add("CostStress:FillMinuteMaxTrades must be 0 to 20000");
+        }
+
+        if (FillMinuteTimeoutSeconds is < 1 or > MaxFillMinuteTimeoutSeconds)
+        {
+            problems.Add("CostStress:FillMinuteTimeoutSeconds must be 1 to 600");
         }
 
         return problems.AsReadOnly();

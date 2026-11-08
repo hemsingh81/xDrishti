@@ -220,7 +220,7 @@ internal sealed class ReadinessFixture
         new CostStressView(
             "ReportOnly", false, string.Empty, string.Empty, true, "sheet-1",
             [new CostStressRowView(1.0, 330, 0.2, 0, ">", "pass", string.Empty), new CostStressRowView(1.5, 330, 0.15, 0.08, ">=", "pass", string.Empty), new CostStressRowView(2.0, 330, 0.1, 0, ">", "pass", string.Empty)],
-            "pass", new CostStressDelayView(1, 100, 90, 0.2, 0.18, 0.9, 0.7, "pass", string.Empty, string.Empty), false, string.Empty, string.Empty, null, new CostStressTiersView(330, 300, 30, 0, 0, 0, 0, string.Empty, string.Empty, string.Empty)),
+            "pass", new CostStressDelayView(1, 100, 90, 0.2, 0.18, 0.9, 0.7, "pass", string.Empty, string.Empty), false, string.Empty, string.Empty, null, new CostStressTiersView(330, 300, 30, 0, 0, 0, 0, string.Empty, string.Empty, string.Empty, 0, 330, 0, 5000)),
         null,
         new NullsView(
             "ReportOnly", false, string.Empty, string.Empty,

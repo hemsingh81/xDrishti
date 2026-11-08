@@ -105,6 +105,8 @@ public sealed class EventsPhaseCheckDatabaseTests(ResearchGrantsTests.DedicatedS
         public ValueTask<IReadOnlyList<BarRow>> ReadBarsAsync(Guid instrumentId, Timeframe timeframe, int take, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public ValueTask<IReadOnlyList<BarRow>> ReadDailyBarsAsync(Guid instrumentId, DateOnly from, DateOnly toExclusive, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask<IReadOnlyList<MinuteCloseVolume>> ReadMinuteCloseVolumesAsync(Guid instrumentId, IReadOnlyList<DateTimeOffset> minuteStarts, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private async Task<long> CountAsync(string table)
