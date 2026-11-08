@@ -22,5 +22,9 @@
   <ItemGroup>
     <PackageReference Include="NetArchTest.Rules" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Caps parallel test classes: every rule re-reads assemblies with Mono.Cecil, so unbounded parallelism costs gigabytes. Tune maxParallelThreads in the file. -->
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
   <Import Project="..\Tests.props" />
 </Project>
