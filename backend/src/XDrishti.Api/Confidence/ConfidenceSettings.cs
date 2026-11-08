@@ -24,6 +24,8 @@ internal sealed class ConfidenceSettings
 
     public BootstrapSection Bootstrap { get; set; } = new();
 
+    public PboSection Pbo { get; set; } = new();
+
     public CostStressSection CostStress { get; set; } = new();
 
     public NullsSection Nulls { get; set; } = new();
@@ -102,6 +104,9 @@ internal sealed class ConfidenceSettings
 
     /// <summary>The <c>Confidence:Bootstrap</c> subsection as the options of CF-03 (ADR 0205).</summary>
     internal BootstrapOptions ToBootstrapOptions() => new(Bootstrap.Mode, Bootstrap.Draws, Bootstrap.BlockLength);
+
+    /// <summary>The <c>Confidence:Pbo</c> subsection as the options of CF-03 part B (ADR 0228). <c>Mode</c> Gate is config, tighten-only (it can only cap a PASS at MARGINAL) and is recorded with the figure (its settings text).</summary>
+    internal PboOptions ToPboOptions() => new(Pbo.Mode, Pbo.Blocks, Pbo.MinVariants, Pbo.MaxPbo, Pbo.Metric);
 
     /// <summary>The <c>Confidence:Shrinkage</c> subsection as the options of CF-02 (ADR 0204).</summary>
     internal ShrinkageOptions ToShrinkageOptions() => new(
@@ -192,6 +197,19 @@ internal sealed class ConfidenceSettings
         public int? Draws { get; set; }
 
         public int BlockLength { get; set; }
+    }
+
+    internal sealed class PboSection
+    {
+        public ConfidenceMode Mode { get; set; } = ConfidenceMode.ReportOnly;
+
+        public int Blocks { get; set; } = 8;
+
+        public int MinVariants { get; set; } = 10;
+
+        public double MaxPbo { get; set; } = 0.5;
+
+        public PboMetric Metric { get; set; } = PboMetric.Mean;
     }
 
     internal sealed class CostStressSection

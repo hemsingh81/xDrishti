@@ -50044,6 +50044,81 @@
         },
         "description": "A parameter of a service with its schema: `kind` integer · number · boolean, the bounds of a number, the current value and the default."
       },
+      "PboView": {
+        "required": [
+          "mode",
+          "variants",
+          "blocks",
+          "splits",
+          "pbo",
+          "medianLogit",
+          "maxPbo",
+          "metric",
+          "capped",
+          "settings",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "The mode when it was computed."
+          },
+          "variants": {
+            "type": "integer",
+            "description": "The variants compared: the base run and the sweep points that ran at least one trade.",
+            "format": "int32"
+          },
+          "blocks": {
+            "type": "integer",
+            "description": "S, the blocks the window was cut into.",
+            "format": "int32"
+          },
+          "splits": {
+            "type": "integer",
+            "description": "The splits tried, `C(S, S/2)`; 0 when unavailable.",
+            "format": "int32"
+          },
+          "pbo": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The share of splits in which the in-sample best variant is at or below the out-of-sample median.",
+            "format": "double"
+          },
+          "medianLogit": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The median logit of the out-of-sample rank over the splits (below 0: the winner tends to fall below the median).",
+            "format": "double"
+          },
+          "maxPbo": {
+            "type": "number",
+            "description": "The limit the Gate compares with; it decides nothing outside Gate mode.",
+            "format": "double"
+          },
+          "metric": {
+            "type": "string",
+            "description": "`Mean` or `Sharpe`: what picks and ranks the best variant."
+          },
+          "capped": {
+            "type": "boolean",
+            "description": "True when a PASS was capped at MARGINAL by this figure (Gate mode only)."
+          },
+          "settings": {
+            "type": "string",
+            "description": "The settings that produced the figure."
+          },
+          "note": {
+            "type": "string",
+            "description": "The reading and the honest limits, or the unavailable reason."
+          }
+        },
+        "description": "The probability of backtest overfitting of the sweep (CF-03 part B, ADR 0228), shown beside the verdict. Every figure is null when it could not be computed and string PboView.Note then starts with `unavailable:`; an unavailable figure never moves an outcome.\n`Capped` is true only when the owner's Gate mode capped a PASS at MARGINAL because of it."
+      },
       "PendingChangeView": {
         "required": [
           "key",
@@ -58079,9 +58154,29 @@
               "number"
             ],
             "format": "double"
+          },
+          "pbo": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PboView"
+              }
+            ]
+          },
+          "variantSeries": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VariantSeriesView"
+              }
+            ]
           }
         },
-        "description": "The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it). Since SC-S1 (ADR 0222) `ByQuarter` (the quarters with a trade) and `MaxInstrumentShare` (the largest instrument's share of the total R, 1.0 when the total is not above 0) feed the readiness scorecard's row 10; both are null in a result stored before it, and nothing here changes the verdict."
+        "description": "The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it). Since SC-S1 (ADR 0222) `ByQuarter` (the quarters with a trade) and `MaxInstrumentShare` (the largest instrument's share of the total R, 1.0 when the total is not above 0) feed the readiness scorecard's row 10; both are null in a result stored before it, and nothing here changes the verdict. Since CF-03 part B (ADR 0228) `Pbo` (the probability of backtest overfitting of the sweep) and `VariantSeries` (the daily series it came from) are null in a result stored before it or with the PBO mode Off; they change the outcome only in the owner's Gate mode."
       },
       "RoleToggleInput": {
         "required": [
@@ -64541,6 +64636,49 @@
           }
         },
         "description": "Body of `POST /api/lab/validate`: the strategy text and its format (only `yaml`; omitted means yaml)."
+      },
+      "VariantSeriesRowView": {
+        "required": [
+          "label",
+          "values"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        },
+        "description": "One variant's daily series (net R by exit date, rounded to 4 places) and who it is: `base` or the swept parameter and value."
+      },
+      "VariantSeriesView": {
+        "required": [
+          "dates",
+          "variants"
+        ],
+        "type": "object",
+        "properties": {
+          "dates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VariantSeriesRowView"
+            }
+          }
+        },
+        "description": "The daily series PBO was computed from (CF-03 part B): one value per variant per date, so the figure can be recomputed from the stored document. Null when the PBO mode is Off or a daily value was not finite."
       },
       "VersionSummary": {
         "required": [

@@ -192,6 +192,7 @@ internal static class ApiSetup
             .Validate(s => s.ToShrinkageOptions().Problems().Count == 0, "Confidence:Shrinkage: a value is out of range or the mode is not offered (Mode Off or ReportOnly, TauSquaredFloor 0.0001..1, MinTradesForSibling 3..30, MinParentTrades 10..200, StrengthMin and StrengthMax 1..1000 with Min not above Max, QuantileLevel 0.01..0.25, SigmaPoolStrength 1..1000).")
             .Validate(s => s.ToDeflationOptions().Problems().Count == 0, "Confidence:Deflation: a value is out of range or the mode is not offered (Mode Off or ReportOnly, MinProbability 0.5..0.999, AssumedTrialSrSd 0.001..1, TBasis NEff or Raw).")
             .Validate(s => s.ToBootstrapOptions().Problems().Count == 0, "Confidence:Bootstrap: a value is out of range (Mode Off or ReportOnly, Draws 100..20000, BlockLength 0 or 2..60).")
+            .Validate(s => s.ToPboOptions().Problems().Count == 0, "Confidence:Pbo: a value is out of range (Mode Off, ReportOnly or Gate, Blocks an even number 4..16, MinVariants 6..100, MaxPbo 0.1..0.9, Metric Mean or Sharpe).")
             .Validate(s => s.ToHoldOutOptions().Problems().Count == 0, "Confidence:HoldOut: a value is out of range (MinMonths 1..60, SharePercent 5..50, MinTrades 5..1000, Retention 0.1..1).")
             .Validate(s => s.ToCostStressOptions().Problems().Count == 0, "Confidence:CostStress: a value is out of range (Mode Off or ReportOnly, MidMultiplier above 1 up to 5, HighMultiplier above MidMultiplier up to 5, MidFloorR and HighFloorR -1..1, DelayMinutes 1..5, DelayRetention 0.1..1, TierACutCrore 100..100000, TierBCutCrore at least 20 and below TierACutCrore, CapacityFillShare above 0 up to 0.01, CapacityDailyShare above 0 up to 0.005: the tier and capacity values can only be tightened; FillMinuteMaxTrades 0..20000 and FillMinuteTimeoutSeconds 1..600 bound the cost of the fill-minute read).")
             .Validate(s => s.ToNullOptions().Problems().Count == 0, "Confidence:Nulls: a value is out of range (Mode Off or ReportOnly and not Enforce with Mode Off, Draws 200..5000, Percentile 90..99, Redraws 0..20, MinPlacebos 19..20).")
@@ -213,6 +214,7 @@ internal static class ApiSetup
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToShrinkageOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToDeflationOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToBootstrapOptions()));
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToPboOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToCostStressOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToNullOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToPlateauOptions()));
