@@ -16626,6 +16626,52 @@ export interface components {
       description: null | string;
       unit: null | string;
     };
+    /**
+     * @description The probability of backtest overfitting of the sweep (CF-03 part B, ADR 0228), shown beside the verdict. Every figure is null when it could not be computed and string PboView.Note then starts with `unavailable:`; an unavailable figure never moves an outcome.
+     *     `Capped` is true only when the owner's Gate mode capped a PASS at MARGINAL because of it.
+     */
+    PboView: {
+      /** @description The mode when it was computed. */
+      mode: string;
+      /**
+       * Format: int32
+       * @description The variants compared: the base run and the sweep points that ran at least one trade.
+       */
+      variants: number;
+      /**
+       * Format: int32
+       * @description S, the blocks the window was cut into.
+       */
+      blocks: number;
+      /**
+       * Format: int32
+       * @description The splits tried, `C(S, S/2)`; 0 when unavailable.
+       */
+      splits: number;
+      /**
+       * Format: double
+       * @description The share of splits in which the in-sample best variant is at or below the out-of-sample median.
+       */
+      pbo: null | number;
+      /**
+       * Format: double
+       * @description The median logit of the out-of-sample rank over the splits (below 0: the winner tends to fall below the median).
+       */
+      medianLogit: null | number;
+      /**
+       * Format: double
+       * @description The limit the Gate compares with; it decides nothing outside Gate mode.
+       */
+      maxPbo: number;
+      /** @description `Mean` or `Sharpe`: what picks and ranks the best variant. */
+      metric: string;
+      /** @description True when a PASS was capped at MARGINAL by this figure (Gate mode only). */
+      capped: boolean;
+      /** @description The settings that produced the figure. */
+      settings: string;
+      /** @description The reading and the honest limits, or the unavailable reason. */
+      note: string;
+    };
     /** @description A difference the next capture would see. */
     PendingChangeView: {
       /** @description The key. */
@@ -19728,7 +19774,7 @@ export interface components {
       weeklyLossR: number;
       weeklyLossAction: string;
     };
-    /** @description The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it). Since SC-S1 (ADR 0222) `ByQuarter` (the quarters with a trade) and `MaxInstrumentShare` (the largest instrument's share of the total R, 1.0 when the total is not above 0) feed the readiness scorecard's row 10; both are null in a result stored before it, and nothing here changes the verdict. */
+    /** @description The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. `ByRegime` is the one-line text; since P6-02 `ByRegimeBuckets` and `ByRegimeUnavailable` carry the numbers (null in a result stored before it). Since SC-S1 (ADR 0222) `ByQuarter` (the quarters with a trade) and `MaxInstrumentShare` (the largest instrument's share of the total R, 1.0 when the total is not above 0) feed the readiness scorecard's row 10; both are null in a result stored before it, and nothing here changes the verdict. Since CF-03 part B (ADR 0228) `Pbo` (the probability of backtest overfitting of the sweep) and `VariantSeries` (the daily series it came from) are null in a result stored before it or with the PBO mode Off; they change the outcome only in the owner's Gate mode. */
     RobustnessView: {
       sensitivity: components['schemas']['SensitivityView'];
       monteCarlo: null | components['schemas']['MonteCarloView'];
@@ -19742,6 +19788,8 @@ export interface components {
       byQuarter?: null | components['schemas']['QuarterView'][];
       /** Format: double */
       maxInstrumentShare?: null | number;
+      pbo?: null | components['schemas']['PboView'];
+      variantSeries?: null | components['schemas']['VariantSeriesView'];
     };
     RoleToggleInput: {
       enabled: boolean;
@@ -22185,6 +22233,16 @@ export interface components {
     ValidateStrategyRequest: {
       text: string;
       format?: null | string;
+    };
+    /** @description One variant's daily series (net R by exit date, rounded to 4 places) and who it is: `base` or the swept parameter and value. */
+    VariantSeriesRowView: {
+      label: string;
+      values: number[];
+    };
+    /** @description The daily series PBO was computed from (CF-03 part B): one value per variant per date, so the figure can be recomputed from the stored document. Null when the PBO mode is Off or a daily value was not finite. */
+    VariantSeriesView: {
+      dates: string[];
+      variants: components['schemas']['VariantSeriesRowView'][];
     };
     /** @description A stored version in the list of a family: number, hash, parent hash, note and creation time. */
     VersionSummary: {

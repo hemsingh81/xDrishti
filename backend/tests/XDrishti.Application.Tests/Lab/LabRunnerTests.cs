@@ -91,6 +91,15 @@ public sealed class LabRunnerTests
             new LabDeflation(_ledger, _variantStats, options ?? new DeflationOptions()), _variantStats);
     }
 
+    private LabRunner RunnerWithPbo(PboOptions options)
+    {
+        _ledger.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _variantStats.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<IReadOnlyList<VariantStatsRow>>().Count);
+        return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default, null, null, null, options), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, pboOptions: options);
+    }
+
     private LabRunner RunnerWithStress(CostStressOptions options, LabTiers? tiers = null)
     {
         _ledger.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
@@ -640,6 +649,29 @@ public sealed class LabRunnerTests
         verdicts[0].DeflatedSharpe.ShouldBeNull();
         verdicts[1].DeflatedSharpe.ShouldNotBeNull().Mode.ShouldBe("ReportOnly");
         System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { DeflatedSharpe = null }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]), "outcome, six gates, reasons, limits, evidence and robustness are byte for byte the same");
+    }
+
+    [Fact]
+    public async Task The_PBO_in_report_only_or_gate_mode_with_too_few_variants_changes_no_outcome_gate_evidence_limit_or_existing_figure()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithPbo(new PboOptions(ConfidenceMode.Off)).ExecuteAsync(RobustRun(), Ct);
+        await RunnerWithPbo(new PboOptions()).ExecuteAsync(RobustRun(), Ct);
+        await RunnerWithPbo(new PboOptions(ConfidenceMode.Gate)).ExecuteAsync(RobustRun(), Ct);
+
+        verdicts.Count.ShouldBe(3);
+        verdicts[0].Robustness!.Pbo.ShouldBeNull();
+        verdicts[0].Robustness!.VariantSeries.ShouldBeNull();
+        foreach (var shown in verdicts.Skip(1))
+        {
+            shown.Robustness!.Pbo.ShouldNotBeNull().Note.ShouldStartWith("unavailable: needs at least 10 variants (have 5)");
+            shown.Robustness.VariantSeries.ShouldNotBeNull().Variants.Count.ShouldBe(5);
+            shown.Outcome.ShouldBe(verdicts[0].Outcome);
+            System.Text.Json.JsonSerializer.Serialize(shown with { Robustness = shown.Robustness with { Pbo = null, VariantSeries = null } }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]), "outcome, six gates, reasons, limits, evidence and every existing figure are byte for byte the same");
+        }
     }
 
     [Fact]

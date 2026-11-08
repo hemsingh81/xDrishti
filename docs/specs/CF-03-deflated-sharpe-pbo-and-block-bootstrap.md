@@ -100,4 +100,7 @@ Status stays Draft; size 6.5 -> **7 agent-days** (+0.5 power arm). Amends the te
 7. **Dependency.** `Phi` and `Phi^-1` come from CF-01's `NormalDistribution`.
 
 ## Build note 2026-11-04 (Part A)
-Part A is built ([ADR 0205](../adr/README.md)): deflated Sharpe, the stationary block bootstrap, `lab.variant_stats` (Part A, not B), the settings `Confidence:Deflation` and `Confidence:Bootstrap`. `Gate` is refused for DSR because the power arm of AC 6 fails (null 0.25 %, power 10.5 %). Part B (CSCV, PBO, the series in the document, `Pbo:*`) is not built.
+Part A is built ([ADR 0205](../adr/README.md)): deflated Sharpe, the stationary block bootstrap, `lab.variant_stats` (Part A, not B), the settings `Confidence:Deflation` and `Confidence:Bootstrap`. `Gate` is refused for DSR because the power arm of AC 6 fails (null 0.25 %, power 10.5 %). Part B was built on 2026-11-08 (see the next note).
+
+## Build note 2026-11-08 (Part B)
+Part B is built ([ADR 0228](../adr/README.md)): per-variant daily series (`variantSeries`), pure `Cscv`, PBO in the robustness view, the PBO gate (`Pbo:Mode = Gate`, config, tighten-only, default `ReportOnly`) and the `Pbo:*` settings. The power check (`PboSimulationTests`): noise is above the 0.5 limit in 54.5 % of families, a real edge is capped by mistake in 5.5 %, so `Gate` is offered. PBO gates nothing unless the owner sets `Gate`; then it only lowers a PASS to MARGINAL. With fewer than 10 variants (the usual single-parameter sweep) it reads `unavailable` and changes nothing. Status of the spec's Part B scope: done.

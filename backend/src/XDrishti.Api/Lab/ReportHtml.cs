@@ -162,6 +162,16 @@ internal static class ReportHtml
             h.Append("<p>").Append(Html.Text(k.Note)).Append("</p>\n");
         }
 
+        if (b.Pbo is null)
+        {
+            h.Append("<p>Probability of backtest overfitting: not computed.</p>\n");
+        }
+        else if (b.Pbo is { } o)
+        {
+            Table(h, ["PBO variants", "Blocks", "Splits", "PBO", "Median logit", "Limit", "Capped"], [[I(o.Variants), I(o.Blocks), I(o.Splits), N(o.Pbo), N(o.MedianLogit), N(o.MaxPbo), o.Capped ? "yes" : "no"]]);
+            h.Append("<p>").Append(Html.Text(o.Note)).Append("</p>\n");
+        }
+
         Table(h, ["Year", "Trades", "Mean R", "Total R", "Profit factor"], b.ByYear.Select(y => new[] { I(y.Year), I(y.Trades), N(y.MeanR), N(y.TotalR), N(y.ProfitFactor) }));
         if (b.ByQuarter is { Count: > 0 } quarters)
         {

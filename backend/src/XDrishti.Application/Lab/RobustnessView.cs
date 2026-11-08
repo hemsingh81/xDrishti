@@ -48,7 +48,7 @@ public sealed record RegimeBucketView(string Regime, string Basis, int Trades, d
 /// <summary>Out-of-sample trades with no regime label, by reason (P6-02).</summary>
 public sealed record RegimeMissingView(string Reason, int Trades);
 
-/// <summary>The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. <c>ByRegime</c> is the one-line text; since P6-02 <c>ByRegimeBuckets</c> and <c>ByRegimeUnavailable</c> carry the numbers (null in a result stored before it). Since SC-S1 (ADR 0222) <c>ByQuarter</c> (the quarters with a trade) and <c>MaxInstrumentShare</c> (the largest instrument's share of the total R, 1.0 when the total is not above 0) feed the readiness scorecard's row 10; both are null in a result stored before it, and nothing here changes the verdict.</summary>
+/// <summary>The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. <c>ByRegime</c> is the one-line text; since P6-02 <c>ByRegimeBuckets</c> and <c>ByRegimeUnavailable</c> carry the numbers (null in a result stored before it). Since SC-S1 (ADR 0222) <c>ByQuarter</c> (the quarters with a trade) and <c>MaxInstrumentShare</c> (the largest instrument's share of the total R, 1.0 when the total is not above 0) feed the readiness scorecard's row 10; both are null in a result stored before it, and nothing here changes the verdict. Since CF-03 part B (ADR 0228) <c>Pbo</c> (the probability of backtest overfitting of the sweep) and <c>VariantSeries</c> (the daily series it came from) are null in a result stored before it or with the PBO mode Off; they change the outcome only in the owner's Gate mode.</summary>
 public sealed record RobustnessView(
     SensitivityView Sensitivity,
     MonteCarloView? MonteCarlo,
@@ -60,4 +60,6 @@ public sealed record RobustnessView(
     IReadOnlyList<RegimeMissingView>? ByRegimeUnavailable = null,
     MonteCarloBlockView? MonteCarloBlock = null,
     IReadOnlyList<QuarterView>? ByQuarter = null,
-    double? MaxInstrumentShare = null);
+    double? MaxInstrumentShare = null,
+    PboView? Pbo = null,
+    VariantSeriesView? VariantSeries = null);

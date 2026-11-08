@@ -219,6 +219,10 @@ internal static class LabReportBuilder
             l.Add("The sign-flip baseline is lenient: it tests the mean R against 0 given the trade sizes, not a re-run with random entries.");
             l.Add("The sensitivity sweep is in-sample on the whole window.");
             l.AddRange(v.Robustness.Limits);
+            if (v.Robustness.Pbo is not null)
+            {
+                l.Add("Probability of backtest overfitting: " + LabPbo.LimitsText);
+            }
         }
 
         if (v.CostStress is not null)
@@ -300,6 +304,7 @@ internal static class LabReportBuilder
             },
             ByRegime = S(v.Robustness.ByRegime),
             Limits = [.. v.Robustness.Limits.Select(S)],
+            VariantSeries = null, // CF-03 part B: the daily series stay in the run's document; the report prints the figure they gave
         },
     };
 }

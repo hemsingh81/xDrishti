@@ -9,6 +9,7 @@ using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
 using XDrishti.Domain.Learning;
+using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Lab;
@@ -25,8 +26,10 @@ internal sealed record DelaySignals(int Minutes, IReadOnlyList<(double BaseR, do
 /// The robustness checks of a <c>robust</c> run (spec P5-05, ADR 0062): a one-at-a-time sensitivity sweep (each point a plain run of the default exit, in-sample), a seeded Monte Carlo and a sign-flip baseline over the out-of-sample trades of the full test,
 /// and the same trades by year. Nothing is written here and the verdict is not touched.
 /// </summary>
-internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<SimulationRun>> simulation, LabSettings settings, IContextFigures? contextFigures = null, BootstrapOptions? bootstrap = null, CostStressOptions? costStress = null)
+internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<SimulationRun>> simulation, LabSettings settings, IContextFigures? contextFigures = null, BootstrapOptions? bootstrap = null, CostStressOptions? costStress = null, PboOptions? pbo = null)
 {
+    private readonly PboOptions _pbo = pbo ?? new PboOptions();
+
     /// <summary>Said in the block when there is no source of regime labels at all (P6-02: with one, the text names the reason of each missing label).</summary>
     public const string RegimeUnavailable = "unavailable: no market-context source is available";
 
@@ -72,12 +75,23 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
         var results = new List<SweepResult>();
         var rows = new List<LedgerRow>();
         var stats = new List<VariantStatsRow>();
+        var pboVariants = new List<PboVariant>();
+        if (baseRun.Daily is { Count: > 0 } baseDaily)
+        {
+            pboVariants.Add(new PboVariant("base", baseDaily));
+        }
+
         for (var i = 0; i < plan.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var point = plan[i];
             var ran = await PointAsync(template, exit, point, new Dictionary<string, double> { [point.Parameter] = point.Value }, progress, i + 1, instruments, cancellationToken);
             results.Add(ran.Result);
+            if (ran.Daily is { Count: > 0 } daily)
+            {
+                pboVariants.Add(new PboVariant(point.Parameter + "=" + point.Value.ToString("R", CultureInfo.InvariantCulture), daily));
+            }
+
             var row = LedgerRowOf(run, point, now);
             rows.Add(row);
             // every point gets a row, also one that ran no trade or failed (n = 0, figures null), so the coverage of the ledger's variants is honest
@@ -119,6 +133,10 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
         }
 
         var regime = await RegimeAsync(full, cancellationToken);
+
+        // CF-03 part B: PBO of the base and the sweep points as daily series; nothing here moves the outcome (the Gate, if the owner set it, is applied by the runner)
+        // shortcut: the stored series has no size bound (variants x trade days in the run's document); move it to a side table or compress it when runs grow
+        var (pboView, series) = LabPbo.Compute(_pbo, pboVariants, 1 + plan.Count - pboVariants.Count);
         var view = new RobustnessView(
             sensitivity,
             mc is null ? null : new MonteCarloView(mc.Trades, mc.Draws, mc.Seed.ToString(CultureInfo.InvariantCulture), mc.ObservedMeanR, mc.ObservedMaxDrawdownR, mc.MeanP05, mc.MeanP50, mc.MeanP95, mc.DrawdownP50, mc.DrawdownP95, mc.ShareNotPositive, mc.DrawdownP90),
@@ -130,7 +148,9 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
             regime is null ? null : [.. regime.Tally.UnavailableByReason.Select(r => new RegimeMissingView(r.Key, r.Value))],
             BlockOf(full.OosTrades, seed ^ BlockSeedMask, draws, mc),
             [.. QuarterBreakdown.Of(full.OosTrades).Select(q => new QuarterView(q.Year, q.Quarter, q.Trades, q.MeanR))],
-            InstrumentShareOf(full));
+            InstrumentShareOf(full),
+            pboView,
+            series);
         // CF-05: the fill-one-minute-later test, one more walk of the same signals (the default exit, the whole window); the verdict is not touched here
         DelaySignals? delay = null;
         if (costStress is { IsOn: true })
@@ -258,7 +278,7 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
     }
 
     /// <summary>A sweep point's result and the moments of its trades (null when it ran no trade or failed).</summary>
-    private sealed record PointRun(SweepResult Result, TradeMoments? Moments, IReadOnlyList<SimTrade>? Trades = null);
+    private sealed record PointRun(SweepResult Result, TradeMoments? Moments, IReadOnlyList<SimTrade>? Trades = null, IReadOnlyList<(DateOnly Date, double R)>? Daily = null);
 
     private async ValueTask<PointRun> PointAsync(SimulationRequest template, ExitChoice exit, SweepPoint point, Dictionary<string, double> parameters, IProgress<int>? progress, int index, int instruments, CancellationToken cancellationToken, bool keepTrades = false)
     {
@@ -277,7 +297,9 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
 
         var gains = r.Where(v => v > 0).Sum();
         var losses = -r.Where(v => v < 0).Sum();
-        return new PointRun(new SweepResult(point, r.Count, r.Average(), losses > 0 ? gains / losses : null, r.Sum(), null), TradeMoments.Of(r), keepTrades ? [.. ran.Value.Trades.Select(t => t.Trade)] : null);
+        // CF-03 part B: the net R of each trade on the India date of its exit, for the daily series of PBO
+        var daily = _pbo.IsOn ? ran.Value.Trades.Select((t, i) => (SessionClock.DateOf(t.Trade.ExitEpochSeconds), r[i])).ToList() : null;
+        return new PointRun(new SweepResult(point, r.Count, r.Average(), losses > 0 ? gains / losses : null, r.Sum(), null), TradeMoments.Of(r), keepTrades ? [.. ran.Value.Trades.Select(t => t.Trade)] : null, daily);
     }
 
     private static SweepPointView ViewOf(SweepResult r) => new SweepPointView(r.Point.Parameter, r.Point.Value, r.Trades, r.MeanR, r.ProfitFactor, r.TotalR, r.Error);

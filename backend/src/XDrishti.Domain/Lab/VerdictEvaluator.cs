@@ -79,6 +79,21 @@ public static class VerdictEvaluator
         return new Verdict(outcome, results, n, f, limits, NotesOf(dep, evidence.OosTrades, minTrades, gateOnEffective), dep is null ? null : dep with { EnoughByNEff = effective.HasValue ? effective.Value >= minTrades : null });
     }
 
+    /// <summary>
+    /// The PBO gate of CF-03 part B (ADR 0228). Only with <see cref="PboOptions.IsGate"/> (the owner's act) and a PASS: a PBO above <see cref="PboOptions.MaxPbo"/> (equal is allowed) caps it at MARGINAL with the reason. It never raises an outcome, never touches MARGINAL or
+    /// FAIL, and a PBO that is unavailable (<paramref name="pbo"/> null, for example fewer variants than the minimum) changes nothing, as the spec's criterion 14 says. In <see cref="ConfidenceMode.ReportOnly"/> and Off the outcome is returned as it came.
+    /// </summary>
+    public static PboCap CapByPbo(VerdictOutcome outcome, PboOptions options, double? pbo)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (!options.IsGate || outcome != VerdictOutcome.Pass || pbo is not { } p || !double.IsFinite(p) || !(p > options.MaxPbo))
+        {
+            return new PboCap(outcome, null);
+        }
+
+        return new PboCap(VerdictOutcome.Marginal, $"capped at MARGINAL by the probability of backtest overfitting {Num(p, 4)}, above the limit {Num(options.MaxPbo, 4)} (Gate mode)");
+    }
+
     // CF-01: remarks only (never a limit, so the outcome is the one it was without them)
     private static List<string>? NotesOf(DependenceAssessment? dep, int trades, double minTrades, bool gateOnEffective)
     {

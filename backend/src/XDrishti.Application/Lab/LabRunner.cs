@@ -43,7 +43,8 @@ internal sealed class LabRunner(
     LabNulls? nulls = null,
     LabPlateau? plateau = null,
     LabTiers? tiers = null,
-    LabBenchmark? benchmark = null) : ILabRunExecutor
+    LabBenchmark? benchmark = null,
+    PboOptions? pboOptions = null) : ILabRunExecutor
 {
     /// <summary>Who is recorded as the author of a stored run.</summary>
     public const string Actor = "lab:quick";
@@ -303,6 +304,9 @@ internal sealed class LabRunner(
         {
             verdict = verdict with { Benchmark = await benchmark.ComputeAsync(run.Universe, full.OosTrades, ownerToken) };
         }
+
+        // CF-03 part B: the PBO gate. Only with the Gate mode (config, tighten-only: it can only cap a PASS at MARGINAL) does a PASS above the limit become MARGINAL (with the reason); ReportOnly and Off return the verdict as it came, and an unavailable PBO never moves it
+        verdict = LabPbo.Apply(pboOptions ?? new PboOptions(), verdict);
 
         // CF-03: beside the factor; reads the stored trial statistics and writes nothing, and the outcome is not touched
         verdict = verdict with { DeflatedSharpe = await deflation.ComputeAsync(run.StrategyId, verdict, oosR, statsRows, ownerToken) };
