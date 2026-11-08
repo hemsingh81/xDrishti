@@ -371,6 +371,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, PaperCaptureService>(); // paper fills of armed tickets after the end-of-day run (P10-01); starts paused, no order
         services.AddSingleton<IScheduledService, ShadowWriteService>(); // the shadow record of every nightly candidate, written before the open (CF-08); starts paused, setting paper.shadow.enabled OFF, no order
         services.AddSingleton<IScheduledService, ShadowGradeService>(); // grades the shadow record after the close with the same replay as paper (CF-08 part B); starts paused, setting paper.shadow.enabled OFF, no order
+        services.AddSingleton<IScheduledService, ShadowDigestService>(); // copies the newest chain digest to a log outside the database every week (CF-08 review fix 4, ADR 0232); starts paused, nothing exported while paper.shadow.enabled is OFF
         services.AddSingleton<IScheduledService, DecayMonitorService>(); // the daily kill-rule evaluation of each strategy's forward series, after the shadow grading (CF-12 part 12b); starts paused, automatic demotion only with the owner's setting ON (default OFF), no order
         services.AddSingleton<IScheduledService, MlMonitorService>(); // the daily rollback evaluation of each champion, after the decay monitor (CF-10 part 10d-1); starts paused, automatic acts only with the owner's settings ON (default OFF), no order
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
@@ -974,6 +975,8 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ExplainChangeCommand, ExplainOutcome>, ExplainChangeHandler>(); // owner note, CLI only (P10-05)
         services.AddScoped<ICommandHandler<CapturePaperFillsCommand, PaperCaptureOutcome>, CapturePaperFillsHandler>(); // paper fills of armed tickets: insert-only, replayed on stored bars, no order (P10-01)
         services.AddScoped<ICommandHandler<WriteShadowCommand, ShadowWriteOutcome>, WriteShadowHandler>(); // the shadow record: forward-only, insert-only, switch OFF by default, no order (CF-08)
+        services.TryAddSingleton(new ShadowOptions()); // Shadow:MaxResumeGapSessions and Shadow:DigestFolder (ADR 0232); the host replaces it with its configuration
+        services.AddScoped<ICommandHandler<ExportShadowDigestCommand, ShadowDigestExported>, ExportShadowDigestHandler>(); // the weekly digest copy outside the database (CF-08 review fix 4)
         services.AddScoped<ICommandHandler<GradeShadowCommand, ShadowGradeOutcome>, GradeShadowHandler>(); // grades the shadow record through the one replay path, insert-only (CF-08 part B)
         services.AddScoped<IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView>, GetShadowSummaryHandler>(); // the shadow summary: raw and effective n, labelled gross unless the sheet is confirmed (CF-08 part B)
         services.AddScoped<IQueryHandler<GetSequentialStatusQuery, Result<SequentialStatusView>>, GetSequentialStatusHandler>(); // the sequential failure test: flags only, never a pass, derived on request (CF-09)

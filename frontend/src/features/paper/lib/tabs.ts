@@ -22,6 +22,11 @@ const entries: readonly { id: string; label: string; Component: ComponentType }[
     label: 'Phase check',
     Component: lazy(() => import('../components/PhaseTab').then((m) => ({ default: m.PhaseTab }))),
   },
+  {
+    id: 'shadow',
+    label: 'Shadow',
+    Component: lazy(() => import('../components/ShadowTab').then((m) => ({ default: m.ShadowTab }))),
+  },
 ];
 
 export type TabId = string;

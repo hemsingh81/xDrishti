@@ -1,9 +1,13 @@
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
+using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Shadow;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Market;
+using XDrishti.Domain.Shadow;
 
 namespace XDrishti.Application.Shadow;
 
@@ -11,13 +15,24 @@ namespace XDrishti.Application.Shadow;
 /// The owner's act of switching the shadow record (spec CF-08 part B, D7, ADR 0212). Refuses a non-owner actor and a missing or over-long reason before anything is written; appends one row (never an update) and then one account event <c>ShadowRecordSwitched</c> in its
 /// own unit of work (its failure is logged and does not undo the row: the rows are insert-only). The endpoint is responsible for the session, the CSRF token and the fresh password. Starts nothing itself: the services follow the switch at their next run.
 /// </summary>
-internal sealed class ChangeShadowSwitchHandler(IShadowSwitchStore store, IAccountEventLog events, IAccountUnitOfWork unitOfWork, TimeProvider clock, ILogger<ChangeShadowSwitchHandler> logger) : ICommandHandler<ChangeShadowSwitchCommand, ShadowSwitched>
+internal sealed class ChangeShadowSwitchHandler(
+    IShadowSwitchStore store,
+    IQueryHandler<VerifyShadowChainQuery, ShadowChainCheckView> chain,
+    IShadowDigestSink digestSink,
+    ITradingCalendar calendars,
+    ShadowOptions options,
+    IAccountEventLog events,
+    IAccountUnitOfWork unitOfWork,
+    TimeProvider clock,
+    ILogger<ChangeShadowSwitchHandler> logger) : ICommandHandler<ChangeShadowSwitchCommand, ShadowSwitched>
 {
     public const int MaxReasonLength = 500;
 
     public const string OwnerOnlyCode = "paper.shadow_owner_only";
 
     public const string ReasonInvalidCode = "paper.shadow_reason_invalid";
+
+    public const string GapCode = "paper.shadow_gap";
 
     public async ValueTask<Result<ShadowSwitched>> HandleAsync(ChangeShadowSwitchCommand command, CancellationToken cancellationToken)
     {
@@ -33,13 +48,29 @@ internal sealed class ChangeShadowSwitchHandler(IShadowSwitchStore store, IAccou
             return Result.Failure<ShadowSwitched>(Error.Validation(ReasonInvalidCode, "A change needs a reason of 1 to 500 characters."));
         }
 
+        var missed = 0;
+        if (command.Enabled)
+        {
+            if (await digestSink.CheckWritableAsync(cancellationToken) is { } unwritable)
+            {
+                return Result.Failure<ShadowSwitched>(Error.Conflict(ExportShadowDigestHandler.UnwritableCode, unwritable + " The record is not switched on: the weekly digest could not be kept."));
+            }
+
+            missed = await MissedSessionsAsync(cancellationToken);
+        }
+
+        if (command.Enabled && !command.AcknowledgeGap && missed > options.MaxResumeGapSessions)
+        {
+            return Result.Failure<ShadowSwitched>(Error.Conflict(GapCode, string.Create(CultureInfo.InvariantCulture, $"{missed} trading session(s) have opened since the newest session of the shadow chain; each would become a gap row and is never back-filled. Repeat the change with acknowledgeGap to accept that.")));
+        }
+
         var id = await store.AppendAsync(command.Enabled, actor, reason, cancellationToken);
         var logged = (int)Math.Min(id, int.MaxValue);
         var on = command.Enabled ? 1 : 0;
         ShadowLog.SwitchChanged(logger, logged, on);
         try
         {
-            events.Record(AccountEvent.Record(AccountEventType.ShadowRecordSwitched, null, $"switch={id} shadow_record={(command.Enabled ? "on" : "off")}", actor, clock.GetUtcNow()));
+            events.Record(AccountEvent.Record(AccountEventType.ShadowRecordSwitched, null, $"switch={id} shadow_record={(command.Enabled ? "on" : "off")}{(command.Enabled && command.AcknowledgeGap && missed > options.MaxResumeGapSessions ? $" gap_acknowledged missed={missed}" : string.Empty)}", actor, clock.GetUtcNow()));
             await unitOfWork.TrySaveChangesAsync(CancellationToken.None);
         }
 #pragma warning disable CA1031 // The row stands; the audit cross-index is a second write, and nothing of its failure is logged but that it happened.
@@ -50,5 +81,27 @@ internal sealed class ChangeShadowSwitchHandler(IShadowSwitchStore store, IAccou
         }
 
         return Result.Success(new ShadowSwitched(id, command.Enabled));
+    }
+
+    private async Task<int> MissedSessionsAsync(CancellationToken cancellationToken)
+    {
+        var head = (await chain.HandleAsync(new VerifyShadowChainQuery(), cancellationToken)).LastSession;
+        if (head is null)
+        {
+            return 0; // a first start has no history to be a gap in
+        }
+
+        var now = clock.GetUtcNow();
+        var calendar = await calendars.GetAsync(cancellationToken);
+        var missed = 0;
+        for (var day = head.Value.AddDays(1); day <= IndiaTime.Today(now); day = day.AddDays(1))
+        {
+            if (calendar.IsTradingDay(day) && ShadowCutoff.IsOpened(day, now))
+            {
+                missed++;
+            }
+        }
+
+        return missed;
     }
 }

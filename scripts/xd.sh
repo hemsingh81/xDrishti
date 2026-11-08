@@ -27,6 +27,7 @@ set -euo pipefail
 source "$(dirname "$0")/_env.sh"
 export DOTNET_ENVIRONMENT=Development
 export Models__Folder="$ROOT/data/models"
+export Shadow__DigestFolder="$ROOT/data/shadow-digest"
 if password="$(security find-generic-password -a xdrishti -s xdrishti/db/app -w 2>/dev/null)"; then
   export Database__Password="$password"
 elif [[ "${1:-} ${2:-}" != "strategy validate" ]]; then

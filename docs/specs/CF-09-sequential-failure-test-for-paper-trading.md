@@ -86,3 +86,6 @@ The design-effect estimator (CF-01). That CF-08 provides the ordering and the da
 ## Review fixes 2026-11-05 (build review)
 1. Criterion 10 holds only if a shown path cannot be rewritten by a late grade: the edge series is the longest run of complete sessions from the start of the epoch (it stops at the first session with a candidate still without a grade; later graded trades are held back and counted in the view and the note). A charge-sheet confirmation that flips the series between gross and net R is named, next to a setting change, as something that can change what is read (ADR 0213).
 2. A strategy id holding `|` is refused (400 `paper.invalid`); the report line beside the phase check never changes the phase check's exit code (a failing sequential read is one stderr note).
+
+## Leftover built 2026-11-09 (ADR 0232)
+The sequential line is on the shadow summary (`GET /api/paper/shadow/summary` field `sequential`, and `xd paper shadow summary`). The `/paper` phase tab reads it from `GET /api/paper/sequential`. The frontend line on the Shadow tab is a separate frontend slice.

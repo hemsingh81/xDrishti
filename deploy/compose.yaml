@@ -154,6 +154,8 @@ services:
       Assistant__Mcp__Url: http://xd-mcp:8080/mcp
       # The eval files (P9-09, ADR 0143), read only: the status of the accepted eval run compares their hashes. xd-api holds no eval token and cannot reach the eval's tool server.
       Eval__Folder: /data/eval-files
+      # The weekly copy of the shadow chain digest outside the database (CF-08, ADR 0232): an append-only log on the host.
+      Shadow__DigestFolder: /data/shadow-digest
     # The 1-minute CSV files (ADR 0016): read-only, the API never writes there. deploy/xd-up.sh creates the folder when it is missing.
     volumes:
       - ${XD_CSV_DIR:-../data/Stocks_CSV}:/data/csv:ro
@@ -163,6 +165,8 @@ services:
       # The history probe folder (CF-04, ADR 0195), read-write. deploy/xd-up.sh creates it 0700 when missing.
       - ../data/history-probe:/data/history-probe
       - ../eval:/data/eval-files:ro
+      # The shadow digest log (ADR 0232), read-write; XD_SHADOW_DIGEST_DIR can point it at another disk (the owner should, so that the database role cannot write it). deploy/xd-up.sh creates the default 0700 when missing.
+      - ${XD_SHADOW_DIGEST_DIR:-../data/shadow-digest}:/data/shadow-digest
     secrets:
       - source: db_app_password
         target: Database__Password

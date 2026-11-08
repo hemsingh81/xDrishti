@@ -145,12 +145,50 @@ public sealed class PaperShadowSwitchApiTests(ApiFactory factory) : DataTestBase
         view.GetProperty("statement").GetString().ShouldBe("modelled fills; no queue, no latency");
         view.GetProperty("counts").GetProperty("edgeRaw").GetInt32().ShouldBe(0);
         view.GetProperty("edge").GetProperty("rhoIsPlaceholder").GetBoolean().ShouldBeTrue();
+        var sequential = view.GetProperty("sequential");
+        sequential.GetProperty("available").GetBoolean().ShouldBeFalse();
+        sequential.GetProperty("note").GetString().ShouldNotBeNull();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("not-the-password")]
+    public async Task Acknowledging_the_gap_does_not_skip_the_password_and_writes_nothing(string? password)
+    {
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(connection, "INSERT INTO paper.shadow_sessions (session_date, n_rows, status, digest) VALUES ('2020-01-06', 0, 'gap', repeat('d', 64))");
+        }
+
+        using var response = await Client.PutAsJsonAsync(Settings, new { enabled = true, reason = "resume", password, acknowledgeGap = true }, Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await RowsAsync()).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Turning_on_after_missed_sessions_is_409_paper_shadow_gap_until_the_owner_acknowledges_the_gap()
+    {
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(connection, "INSERT INTO paper.shadow_sessions (session_date, n_rows, status, digest) VALUES ('2020-01-06', 0, 'gap', repeat('d', 64))");
+        }
+
+        var refused = await PutAsync(Factory.OwnerPassword);
+        using var accepted = await Client.PutAsJsonAsync(Settings, new { enabled = true, reason = "resume", password = Factory.OwnerPassword, acknowledgeGap = true }, Ct);
+        var off = await PutAsync(Factory.OwnerPassword, enabled: false);
+
+        refused.Status.ShouldBe(HttpStatusCode.Conflict);
+        refused.Body.GetProperty("code").GetString().ShouldBe("paper.shadow_gap");
+        accepted.StatusCode.ShouldBe(HttpStatusCode.OK);
+        off.Status.ShouldBe(HttpStatusCode.OK);
+        (await RowsAsync()).ShouldBe(2);
     }
 
     [Fact]
     public async Task The_two_services_are_listed_paused_by_default()
     {
-        foreach (var id in new[] { "shadow-write", "shadow-grade" })
+        foreach (var id in new[] { "shadow-write", "shadow-grade", "shadow-digest" })
         {
             var service = await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/services/" + id, UriKind.Relative), Ct);
 

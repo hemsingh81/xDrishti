@@ -3,6 +3,7 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Shadow;
 using XDrishti.Application.Reporting;
+using XDrishti.Domain.Common;
 using XDrishti.Domain.Paper;
 using XDrishti.Domain.Shadow;
 
@@ -18,7 +19,8 @@ internal sealed class GetShadowSummaryHandler(
     IShadowResultReader reader,
     IPaperLedgerData ledger,
     IBacktestPaperData paperData,
-    ICostConfirmationFact confirmation) : IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView>
+    ICostConfirmationFact confirmation,
+    IQueryHandler<GetSequentialStatusQuery, Result<SequentialStatusView>> sequential) : IQueryHandler<GetShadowSummaryQuery, ShadowSummaryView>
 {
     private const int TargetEffectiveN = 60;
 
@@ -64,7 +66,21 @@ internal sealed class GetShadowSummaryHandler(
 
         return new ShadowSummaryView(
             enabled, rows.Count > 0, rows.Count > 0 ? null : NoRows(enabled), ShadowWording.ModelledFills, ShadowWording.SeparateCount, counts, edgeView, groups, costs,
-            new ShadowChainView(chain.Sessions, chain.Gaps, chain.LastSession, chain.LastDigest));
+            new ShadowChainView(chain.Sessions, chain.Gaps, chain.LastSession, chain.LastDigest), await SequentialAsync(cancellationToken));
+    }
+
+    private async ValueTask<ShadowSequentialView> SequentialAsync(CancellationToken cancellationToken)
+    {
+        var result = await sequential.HandleAsync(new GetSequentialStatusQuery(GetSequentialStatusQuery.SystemScope, null), cancellationToken);
+        if (result.IsFailure)
+        {
+            return new ShadowSequentialView(false, result.Error.Message, null, null, null);
+        }
+
+        var v = result.Value;
+        return v.HasSeries
+            ? new ShadowSequentialView(true, null, v.Edge.State, v.Behavioural.State, v.Line)
+            : new ShadowSequentialView(false, "No shadow candidate of the current paper epoch counts for edge: there is no series to test yet.", null, null, null);
     }
 
     private static string NoRows(bool enabled) =>
