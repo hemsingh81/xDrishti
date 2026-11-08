@@ -58,7 +58,7 @@ internal sealed class LabEvidenceReader(
         if (verdict is null)
         {
             notes.Add(why);
-            foreach (var row in new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14 })
+            foreach (var row in new[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14 })
             {
                 rowNotes[row] = why;
             }
@@ -112,7 +112,9 @@ internal sealed class LabEvidenceReader(
             McDrawdownP90 = mc?.DrawdownP90,
             QuarterShare = quarters is { Count: > 0 } ? QuarterBreakdown.Share([.. quarters.Select(q => q.MeanR)], EdgeChecklist.QuarterFloorR) : null,
             MaxInstrumentShare = verdict.Robustness?.MaxInstrumentShare,
+            BenchmarkBeaten = verdict.Benchmark is { } benchmark ? BenchmarkComparison.Beats(benchmark.StrategySharpe, benchmark.HoldSharpe) : null,
         };
+        rowNotes[13] = BenchmarkNote(verdict.Benchmark);
         if (evidence.Dependence?.NEff is null)
         {
             rowNotes[2] = "the effective n is not computed (Confidence:EffectiveN:Mode is Off, or there are too few trades).";
@@ -262,6 +264,14 @@ internal sealed class LabEvidenceReader(
 
         return (true, string.Create(Inv, $"all {t.Trades} trades are tier A or B and no order is over a participation cap."));
     }
+
+    /// <summary>The note beside row 13: the two Sharpe ratios, or why there are none (a verdict stored before the block says to re-run).</summary>
+    private static string BenchmarkNote(BenchmarkComparisonView? b) => b switch
+    {
+        null => "unavailable: the verdict was produced before the benchmark comparison existed; re-run the full test.",
+        { StrategySharpe: { } s, HoldSharpe: { } h } => string.Create(Inv, $"daily Sharpe {s:0.####} for the strategy against {h:0.####} for the buy-and-hold of its {b.Members} instruments over {b.Days} days; it must be strictly greater."),
+        _ => "unavailable: " + b.Reason,
+    };
 
     private static RowStatus Word(string? status) => status switch
     {

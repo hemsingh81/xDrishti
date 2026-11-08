@@ -29,11 +29,7 @@ namespace XDrishti.Application.Tests.Confidence;
 /// <summary>The gaps with an answer for every input that has no producer, so that a test can show a card whose every row passes. The real source says unavailable for all of them.</summary>
 internal sealed class PassingGaps : IReadinessGaps
 {
-    public ValueTask<ReadinessReading<bool>> BenchmarkBeatenAsync(string strategy, int? version, CancellationToken cancellationToken) => Yes();
-
     public ValueTask<ReadinessReading<double>> RiskShareAsync(string strategy, CancellationToken cancellationToken) => Number(1);
-
-    private static ValueTask<ReadinessReading<bool>> Yes() => ValueTask.FromResult(new ReadinessReading<bool>(true, string.Empty));
 
     private static ValueTask<ReadinessReading<double>> Number(double value) => ValueTask.FromResult(new ReadinessReading<double>(value, string.Empty));
 }
@@ -309,7 +305,8 @@ internal sealed class ReadinessFixture
             false, string.Empty, [],
             new PlaceboSetView(21, 20, 19, 0.2, 1, 0.04, 0.05, "<=", "pass", string.Empty, []),
             new MirrorView(330, -0.2, 0.2, 0, "<=", "pass", string.Empty),
-            new PlateauView("ReportOnly", false, string.Empty, string.Empty, 0.7, 3, ">=", "pass", string.Empty, false, string.Empty, [])));
+            new PlateauView("ReportOnly", false, string.Empty, string.Empty, 0.7, 3, ">=", "pass", string.Empty, false, string.Empty, [])),
+        new BenchmarkComparisonView(250, 20, 0.12, 0.05, string.Empty, string.Empty));
 
     /// <summary>A clean decay report: a net reference of 40 trades at +0.1 R, sigma 1, and no CUSUM alarm.</summary>
     public static DecayReportView DecayView(bool alarm = false) => new(

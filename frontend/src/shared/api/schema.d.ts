@@ -6969,6 +6969,36 @@ export interface components {
       accountId: null | string;
       accountName: null | string;
     };
+    /**
+     * @description The strategy against the buy-and-hold of the same universe over the same days (CF-11 row 13, ADR 0227), measured when a full Lab run ends and carried on its verdict. Report-only: nothing that judges the verdict reads it; only the readiness scorecard's row 13 does. It carries the two daily
+     *     Sharpe ratios, not a verdict: the row passes only when the strategy's is strictly greater (`BenchmarkComparison.Beats`). Null on the verdict of a run stored before it.
+     */
+    BenchmarkComparisonView: {
+      /**
+       * Format: int32
+       * @description The days compared (sessions on which every member has a close, from the first to the last exit of the out-of-sample trades).
+       */
+      days: number;
+      /**
+       * Format: int32
+       * @description The instruments of the run's universe.
+       */
+      members: number;
+      /**
+       * Format: double
+       * @description The daily Sharpe of the out-of-sample net R summed by exit day; null when not measured.
+       */
+      strategySharpe: null | number;
+      /**
+       * Format: double
+       * @description The daily Sharpe of the equal-weight hold of the members over the same days; null when not measured.
+       */
+      holdSharpe: null | number;
+      /** @description Why there is no comparison (too few days, a member left out, no variance, a failed read); empty when there is one. */
+      reason: string;
+      /** @description What is measured and what is not. */
+      basis: string;
+    };
     /** @description The evidence of a benchmark read: it has no runs or trades, so it states its basis, the instruments behind it, its range, its limits and what is unavailable. */
     BenchmarkEvidenceView: {
       /** @description Always `price return, dividends not included`. */
@@ -13729,7 +13759,7 @@ export interface components {
       /** Format: int64 */
       seed: null | number;
     };
-    /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. `Trials` (CF-06) is the count of looks with its parts as of the judgement; null in a result stored before it. `Nulls` (CF-07) is the random-entry null beside the outcome; null in a result stored before it, in a run that is not robust or when its mode is Off. */
+    /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. `Trials` (CF-06) is the count of looks with its parts as of the judgement; null in a result stored before it. `Nulls` (CF-07) is the random-entry null beside the outcome; null in a result stored before it, in a run that is not robust or when its mode is Off. `Benchmark` (CF-11 row 13, ADR 0227) is the daily Sharpe of the strategy against its universe's buy-and-hold; null in a result stored before it. */
     LabVerdictView: {
       outcome: string;
       /** Format: int32 */
@@ -13747,6 +13777,7 @@ export interface components {
       costStress?: null | components['schemas']['CostStressView'];
       trials?: null | components['schemas']['TrialsView'];
       nulls?: null | components['schemas']['NullsView'];
+      benchmark?: null | components['schemas']['BenchmarkComparisonView'];
     };
     /** @description The India dates a run replays, inclusive. */
     LabWindow: {

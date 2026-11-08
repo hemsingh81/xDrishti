@@ -11,9 +11,6 @@ internal sealed class UnavailableReadinessGaps : IReadinessGaps
     private static ValueTask<ReadinessReading<T>> None<T>(string reason)
         where T : struct => ValueTask.FromResult(new ReadinessReading<T>(null, "unavailable: " + reason));
 
-    public ValueTask<ReadinessReading<bool>> BenchmarkBeatenAsync(string strategy, int? version, CancellationToken cancellationToken) =>
-        None<bool>("no same-universe benchmark producer exists (P8-07 baskets benchmarks give no risk-adjusted net comparison per strategy yet).");
-
     public ValueTask<ReadinessReading<double>> RiskShareAsync(string strategy, CancellationToken cancellationToken) =>
         None<double>("the plan does not expose a planned risk share per strategy; the system level uses equal weights and says so.");
 }

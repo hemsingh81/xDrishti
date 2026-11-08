@@ -482,6 +482,40 @@ public sealed class LabRunnerTests
         System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { CostStress = verdicts[1].CostStress! with { Tiers = null } }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]), "outcome, gates, limits, evidence and the stress rows are byte for byte the same");
     }
 
+    private LabRunner RunnerWithBenchmark(LabBenchmark? benchmark)
+    {
+        _ledger.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _variantStats.ListAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([]);
+        _variantStats.AppendAsync(Arg.Any<IReadOnlyList<VariantStatsRow>>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<IReadOnlyList<VariantStatsRow>>().Count);
+        return new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default, new ConfidenceOptions()), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance,
+            new LabDeflation(_ledger, _variantStats, new DeflationOptions(ConfidenceMode.Off)), _variantStats, benchmark: benchmark);
+    }
+
+    [Fact]
+    public async Task A_benchmark_whose_read_fails_is_unavailable_and_moves_nothing_else_of_the_verdict_and_no_benchmark_leaves_none()
+    {
+        ArrangeFullTest();
+        var bars = Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IBarQueries>();
+        bars.ReadDailyBarsAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).ThrowsAsync(new InvalidOperationException("db down"));
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithBenchmark(null).ExecuteAsync(RobustRun(), Ct);
+        await RunnerWithBenchmark(new LabBenchmark(bars, new XDrishti.Application.Reporting.ReportBenchmarkOptions(), NullLogger<LabBenchmark>.Instance)).ExecuteAsync(RobustRun(), Ct);
+
+        verdicts.Count.ShouldBe(2);
+        verdicts[0].Benchmark.ShouldBeNull();
+        var benchmark = verdicts[1].Benchmark.ShouldNotBeNull();
+        benchmark.Reason.ShouldNotBeNullOrWhiteSpace();
+        benchmark.StrategySharpe.ShouldBeNull();
+        verdicts[1].Outcome.ShouldBe(verdicts[0].Outcome);
+        System.Text.Json.JsonSerializer.Serialize(verdicts[1].Gates).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0].Gates));
+        System.Text.Json.JsonSerializer.Serialize(verdicts[1].Limits).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0].Limits));
+        System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { Benchmark = null }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]));
+        _finishes.Count.ShouldBe(2);
+        _finishes.ShouldAllBe(f => f.State == LabRunState.Succeeded);
+    }
+
     [Fact]
     public async Task A_bill_check_on_the_sheet_removes_the_label_and_the_rows_are_judged()
     {

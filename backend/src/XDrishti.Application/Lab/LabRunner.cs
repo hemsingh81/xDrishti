@@ -42,7 +42,8 @@ internal sealed class LabRunner(
     HoldOutUnlocker? unlocker = null,
     LabNulls? nulls = null,
     LabPlateau? plateau = null,
-    LabTiers? tiers = null) : ILabRunExecutor
+    LabTiers? tiers = null,
+    LabBenchmark? benchmark = null) : ILabRunExecutor
 {
     /// <summary>Who is recorded as the author of a stored run.</summary>
     public const string Actor = "lab:quick";
@@ -295,6 +296,12 @@ internal sealed class LabRunner(
             verdict = nulls.Apply(verdict, plateauView is null ? nullsOutcome.View : nullsOutcome.View with { Plateau = plateauView });
             verdict = plateau?.Apply(verdict) ?? verdict;
             sweepRows.AddRange(nullsOutcome.Rows);
+        }
+
+        // CF-11 row 13: the daily Sharpe of the out-of-sample net R against the buy-and-hold of the universe; report-only, read by the scorecard alone
+        if (benchmark is not null)
+        {
+            verdict = verdict with { Benchmark = await benchmark.ComputeAsync(run.Universe, full.OosTrades, ownerToken) };
         }
 
         // CF-03: beside the factor; reads the stored trial statistics and writes nothing, and the outcome is not touched

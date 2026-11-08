@@ -77,3 +77,7 @@ None. The default benchmark is Nifty 50 until the owner picks another in Portfol
 
 ## Built 2026-10-25
 Branch feature/p8-07, [ADR 0102](../adr/0102-basket-benchmarks-are-an-equal-weight-price-return-hold-over-members-as-of-one-stated-date-with-every-exclusion-named.md). Deviations: `Compute` takes the window (`from`, `to`) as parameters; the default window is the run headers' windows of the default run set (runs with closed trades), not the trades' first entry / last exit; a portfolio (system) basket is 404 because only `IBasketQueries` is used; p95 not measured.
+
+## Reused 2026-11-08
+`BuyAndHold` is also the inclusion rule of the readiness scorecard's row 13 (CF-11 S4b, [ADR 0227](../adr/0227-readiness-row-13-compares-the-daily-sharpe-of-the-lab-out-of-sample-net-returns-with-the-universes-buy-and-hold-over-the-same-days-strictly-greater-passes-and-anything-unmeasurable-is-unavailable.md)): `BuyAndHoldDaily` asks it which members count and then builds the daily series; the P8-07 endpoint is unchanged.
+

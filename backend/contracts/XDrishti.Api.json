@@ -23684,6 +23684,54 @@
         },
         "description": "A basket. `purpose`: trading · long_term · watch. `position` = place among the active baskets (0 first; the system baskets count on their own, in their group).\n`memberCount` = instruments in it now. `archivedAt` is null for an active basket (archived ones are only listed on request).\n`kind`: manual (the owner's) · portfolio (an account's portfolio bucket, ADR 0014); `system` = true for the latter: read-only, never archived, its members are the\nbucket's current holdings. `accountId`/`accountName` are set for the default bucket of an account."
       },
+      "BenchmarkComparisonView": {
+        "required": [
+          "days",
+          "members",
+          "strategySharpe",
+          "holdSharpe",
+          "reason",
+          "basis"
+        ],
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "The days compared (sessions on which every member has a close, from the first to the last exit of the out-of-sample trades).",
+            "format": "int32"
+          },
+          "members": {
+            "type": "integer",
+            "description": "The instruments of the run's universe.",
+            "format": "int32"
+          },
+          "strategySharpe": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The daily Sharpe of the out-of-sample net R summed by exit day; null when not measured.",
+            "format": "double"
+          },
+          "holdSharpe": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The daily Sharpe of the equal-weight hold of the members over the same days; null when not measured.",
+            "format": "double"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why there is no comparison (too few days, a member left out, no variance, a failed read); empty when there is one."
+          },
+          "basis": {
+            "type": "string",
+            "description": "What is measured and what is not."
+          }
+        },
+        "description": "The strategy against the buy-and-hold of the same universe over the same days (CF-11 row 13, ADR 0227), measured when a full Lab run ends and carried on its verdict. Report-only: nothing that judges the verdict reads it; only the readiness scorecard's row 13 does. It carries the two daily\nSharpe ratios, not a verdict: the row passes only when the strategy's is strictly greater (`BenchmarkComparison.Beats`). Null on the verdict of a run stored before it."
+      },
       "BenchmarkEvidenceView": {
         "required": [
           "basis",
@@ -42421,9 +42469,19 @@
                 "$ref": "#/components/schemas/NullsView"
               }
             ]
+          },
+          "benchmark": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BenchmarkComparisonView"
+              }
+            ]
           }
         },
-        "description": "The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. `Trials` (CF-06) is the count of looks with its parts as of the judgement; null in a result stored before it. `Nulls` (CF-07) is the random-entry null beside the outcome; null in a result stored before it, in a run that is not robust or when its mode is Off."
+        "description": "The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. `DeflatedSharpe` (CF-03) is the probability beside the heuristic factor; null in a result stored before it or when its mode is Off. `CostStress` (CF-05) is the cost stress and the delay test beside the outcome; null in a result stored before it or when its mode is Off. `Trials` (CF-06) is the count of looks with its parts as of the judgement; null in a result stored before it. `Nulls` (CF-07) is the random-entry null beside the outcome; null in a result stored before it, in a run that is not robust or when its mode is Off. `Benchmark` (CF-11 row 13, ADR 0227) is the daily Sharpe of the strategy against its universe's buy-and-hold; null in a result stored before it."
       },
       "LabWindow": {
         "required": [

@@ -29,7 +29,7 @@ public sealed class ScorecardArchitectureTests
     [
         nameof(ReadinessOptions), nameof(RowStatus), nameof(ChecklistRow), nameof(ChecklistInputs), nameof(EdgeChecklist), nameof(GateResult), nameof(ReadinessGates), nameof(ReadinessLabel), nameof(ReadinessLabels),
         nameof(ScoreAnchors), nameof(SubScoreState), nameof(SubScore), nameof(BandPosition), nameof(ScoreInputs), nameof(FaultState), nameof(HardFailInputs), nameof(ReadinessScore), nameof(ReadinessCalculator),
-        nameof(StrategyReadiness), nameof(SystemReadiness), nameof(SystemReadinessCalculator), nameof(ReadinessAssessment), nameof(TierCounts), nameof(TierSet), nameof(TierSetState), nameof(TierCEvidence), nameof(PackGateStatuses),
+        nameof(StrategyReadiness), nameof(SystemReadiness), nameof(SystemReadinessCalculator), nameof(ReadinessAssessment), nameof(TierCounts), nameof(BenchmarkComparison), nameof(TierSet), nameof(TierSetState), nameof(TierCEvidence), nameof(PackGateStatuses),
     ];
 
     private static readonly string[] DomainTypes = [.. DomainNames.Select(n => "XDrishti.Domain.Readiness." + n)];
@@ -70,7 +70,7 @@ public sealed class ScorecardArchitectureTests
     {
         public ValueTask<long> Write() => store.AppendAsync(true, "owner:x", "y", CancellationToken.None);
 
-        public ValueTask<ReadinessReading<bool>> Read() => gaps.BenchmarkBeatenAsync("x", 1, CancellationToken.None);
+        public ValueTask<ReadinessReading<double>> Read() => gaps.RiskShareAsync("x", CancellationToken.None);
     }
 
     /// <summary>Stands for a calculator that reads the clock.</summary>
@@ -334,11 +334,12 @@ public sealed class ScorecardArchitectureTests
         source.ShouldContain("new ReadinessReading<T>(null, \"unavailable: \" + reason)");
         source.ShouldNotContain("true");
         source.ShouldNotContain("Result.Success");
-        typeof(IReadinessGaps).GetMethods().Length.ShouldBe(2, "row 15 left the port when the owner's verify-pack --gate record gained its table (SC-S4a, ADR 0226), rows 10 and 11 left the port when the Lab verdict gained their figures (SC-S1, ADR 0222), row 14 when it gained the tier counts (SC-S2, ADR 0223) and the integrity and tier C hard fails when they gained their sources (SC-S3, ADR 0224)");
-        source.Split("None<").Length.ShouldBe(2 + 2, "two answers and the helper's definition");
+        typeof(IReadinessGaps).GetMethods().Length.ShouldBe(1, "one method is left, the risk share; row 13 left the port when the Lab verdict gained the benchmark comparison (SC-S4b, ADR 0227), row 15 left the port when the owner's verify-pack --gate record gained its table (SC-S4a, ADR 0226), rows 10 and 11 left the port when the Lab verdict gained their figures (SC-S1, ADR 0222), row 14 when it gained the tier counts (SC-S2, ADR 0223) and the integrity and tier C hard fails when they gained their sources (SC-S3, ADR 0224)");
+        source.Split("None<").Length.ShouldBe(1 + 2, "one answer and the helper's definition");
         typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("CapacityOkAsync", "row 14 has its producer (ADR 0223) and is read from the Lab verdict by the reader, not through the gaps");
         typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("IntegrityFaultAsync", "the integrity hard fail is criterion I of the phase check, read by ScorecardIntegrityReader (ADR 0225)");
         typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("TierCOnlyAsync", "the tier C hard fail is judged on the Lab and the forward trades (ADR 0225)");
+        typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("BenchmarkBeatenAsync", "row 13 is the Lab verdict's benchmark comparison (daily Sharpe against the universe's buy-and-hold), read by LabEvidenceReader (ADR 0227)");
         typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("TwentyTradeCheckPassedAsync", "row 15's P3-09 term is the owner's pack gate record, read by PackGateResultReader (ADR 0226)");
     }
 
@@ -414,6 +415,30 @@ public sealed class ScorecardArchitectureTests
             .ShouldBe(["XDrishti.Application.Confidence.LabEvidenceReader", "XDrishti.Application.Lab.LabReportBuilder", Sentinel(typeof(TierConsumerSentinel))]);
 
         Dependents(Application, "XDrishti.Application.Lab.LabTiers").ShouldBe(["XDrishti.Application.DependencyInjection", "XDrishti.Application.Lab.LabRunner", "XDrishti.Application.Lab.LabTiers"]);
+    }
+
+    // ---- (5c) row 13: the benchmark comparison (ADR 0227) ----
+
+    /// <summary>Stands for a second caller of the benchmark computation and a reader of the stored comparison that is not the scorecard's.</summary>
+    internal sealed class BenchmarkConsumerSentinel(XDrishti.Application.Lab.LabBenchmark benchmark, XDrishti.Application.Lab.LabVerdictView view)
+    {
+        public ValueTask<XDrishti.Application.Lab.BenchmarkComparisonView> Compute() => benchmark.ComputeAsync(null!, null!, CancellationToken.None);
+
+        public XDrishti.Application.Lab.BenchmarkComparisonView? Read() => view.Benchmark;
+    }
+
+    [Fact]
+    public void The_benchmark_is_computed_only_by_the_lab_runner_and_read_only_by_the_scorecard_reader()
+    {
+        Callers(r => r.Name == "ComputeAsync" && r.DeclaringType?.FullName == "XDrishti.Application.Lab.LabBenchmark")
+            .ShouldBe(["XDrishti.Application.Lab.LabRunner", Sentinel(typeof(BenchmarkConsumerSentinel))]);
+
+        // report-only: the verdict evaluator, the gates and every chooser never name the member
+        Callers(r => r.Name == "get_Benchmark" && r.DeclaringType?.FullName == "XDrishti.Application.Lab.LabVerdictView")
+            .Where(t => !t.Contains("JsonContext", StringComparison.Ordinal) && t != "XDrishti.Application.Lab.LabVerdictView")
+            .ShouldBe(["XDrishti.Application.Confidence.LabEvidenceReader", Sentinel(typeof(BenchmarkConsumerSentinel))]);
+
+        Dependents(Application, "XDrishti.Application.Lab.LabBenchmark").ShouldBe(["XDrishti.Application.DependencyInjection", "XDrishti.Application.Lab.LabBenchmark", "XDrishti.Application.Lab.LabRunner"]);
     }
 
     /// <summary>Stands for a second reader of the fill-minute bar and a second user of its traded value.</summary>

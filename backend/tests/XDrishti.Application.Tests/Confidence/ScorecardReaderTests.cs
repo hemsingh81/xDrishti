@@ -53,11 +53,12 @@ public sealed class ScorecardReaderTests
 
         var card = await CardAsync(f);
 
-        foreach (var row in new[] { 13, 14, 15 })
+        foreach (var row in new[] { 14, 15 })
         {
             Status(card, row).ShouldBe("unavailable", $"row {row}");
         }
 
+        Status(card, 13).ShouldBe("pass", "row 13 reads the Lab verdict's benchmark comparison since SC-S4b, not the gaps");
         Status(card, 10).ShouldBe("pass", "rows 10 and 11 read the Lab verdict since SC-S1, not the gaps");
         Status(card, 11).ShouldBe("pass");
         Status(card, 2).ShouldBe("pass");
@@ -65,8 +66,7 @@ public sealed class ScorecardReaderTests
         card.GateR.Passed.ShouldBeFalse();
         card.GateS.Passed.ShouldBeFalse();
         card.HardFails.ShouldBeEmpty("the integrity and tier C hard fails have their sources since SC-S3 (ADR 0224) and read clear here");
-        card.Waiting.ShouldContain(w => w.Contains("row 13", StringComparison.Ordinal));
-        card.Rows.Single(r => r.Number == 13).Value.ShouldContain("no same-universe benchmark producer");
+        card.Waiting.ShouldNotContain(w => w.Contains("row 13", StringComparison.Ordinal));
         card.RawMinimum.ShouldBeGreaterThan(0, "the score without the faults is still shown");
     }
 
@@ -865,6 +865,72 @@ public sealed class ScorecardReaderTests
         card.SettingsHash.ShouldBe(f.Options.SnapshotHash());
         card.Settings.ShouldContain("nEff=400");
         Status(card, 2).ShouldBe("fail", "n_eff is 320 in the verdict, which is under the raised bar of 400");
+    }
+
+    // ---- row 13: the benchmark comparison on the Lab verdict (SC-S4b, ADR 0227) ----
+
+    private static string RowValue(ScorecardView card, int row) => card.Rows.Single(r => r.Number == row).Value;
+
+    [Fact]
+    public async Task Row_13_passes_only_when_the_strategys_daily_sharpe_is_strictly_greater()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { Benchmark = new BenchmarkComparisonView(250, 20, 0.12, 0.05, string.Empty, string.Empty) };
+        Status(await CardAsync(f), 13).ShouldBe("pass");
+
+        f.Verdict = f.Verdict with { Benchmark = f.Verdict.Benchmark! with { StrategySharpe = 0.05 } };
+        var equal = await CardAsync(f);
+        Status(equal, 13).ShouldBe("fail", "an equal Sharpe does not beat the hold");
+        equal.GateS.Passed.ShouldBeFalse();
+
+        f.Verdict = f.Verdict with { Benchmark = f.Verdict.Benchmark! with { StrategySharpe = 0.0499999 } };
+        Status(await CardAsync(f), 13).ShouldBe("fail");
+    }
+
+    [Fact]
+    public async Task Row_13_is_unavailable_when_the_block_has_no_figures_and_says_why()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { Benchmark = new BenchmarkComparisonView(0, 20, null, null, "3 of 20 members cannot be used for the buy-and-hold", string.Empty) };
+
+        var card = await CardAsync(f);
+
+        Status(card, 13).ShouldBe("unavailable");
+        card.Notes.Concat(card.Rows.Select(r => r.Value)).ShouldContain(n => n.Contains("3 of 20 members", StringComparison.Ordinal));
+        card.Waiting.ShouldContain(w => w.Contains("row 13", StringComparison.Ordinal));
+        card.GateS.Passed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Row_13_is_unavailable_when_one_sharpe_is_missing()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { Benchmark = new BenchmarkComparisonView(250, 20, 0.12, null, "no variance", string.Empty) };
+
+        Status(await CardAsync(f), 13).ShouldBe("unavailable");
+    }
+
+    [Fact]
+    public async Task Row_13_is_unavailable_for_a_verdict_stored_before_the_comparison_existed()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { Benchmark = null };
+
+        var card = await CardAsync(f);
+
+        Status(card, 13).ShouldBe("unavailable");
+        RowValue(card, 13).ShouldContain("before the benchmark comparison existed");
+    }
+
+    [Fact]
+    public async Task Row_13_is_unavailable_when_the_strategy_has_no_lab_run()
+    {
+        var f = new ReadinessFixture { Verdict = null };
+
+        var card = await CardAsync(f);
+
+        Status(card, 13).ShouldBe("unavailable");
+        card.Waiting.ShouldContain(w => w.Contains("row 13", StringComparison.Ordinal));
     }
 
     private static async Task Walk(ReadinessFixture f, string cell, params CellState[] states)

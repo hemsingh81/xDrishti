@@ -71,9 +71,6 @@ public sealed record ReadinessReading<T>(T? Value, string Reason)
 /// </summary>
 public interface IReadinessGaps
 {
-    /// <summary>Row 13: the strategy beats the same-universe benchmark net, risk-adjusted (P8-07 baskets benchmarks).</summary>
-    ValueTask<ReadinessReading<bool>> BenchmarkBeatenAsync(string strategy, int? version, CancellationToken cancellationToken);
-
     /// <summary>The planned risk share of a strategy, 0 to 1 (the plan does not expose it per strategy yet; the system level then uses equal weights, labelled).</summary>
     ValueTask<ReadinessReading<double>> RiskShareAsync(string strategy, CancellationToken cancellationToken);
 }

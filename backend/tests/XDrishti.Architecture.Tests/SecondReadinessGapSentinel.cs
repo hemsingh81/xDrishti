@@ -8,11 +8,7 @@ namespace XDrishti.Architecture.Tests;
 /// </summary>
 internal sealed class SecondReadinessGapSentinel : IReadinessGaps
 {
-    private static ValueTask<ReadinessReading<bool>> Yes() => ValueTask.FromResult(new ReadinessReading<bool>(true, string.Empty));
-
     private static ValueTask<ReadinessReading<double>> One() => ValueTask.FromResult(new ReadinessReading<double>(1, string.Empty));
-
-    public ValueTask<ReadinessReading<bool>> BenchmarkBeatenAsync(string strategy, int? version, CancellationToken cancellationToken) => Yes();
 
     public ValueTask<ReadinessReading<double>> RiskShareAsync(string strategy, CancellationToken cancellationToken) => One();
 }
