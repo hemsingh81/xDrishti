@@ -74,6 +74,11 @@ internal sealed class ShadowDigestFile(IOptions<ShadowOptions> options) : IShado
             var probe = System.IO.Path.Combine(folder, ".probe-" + Guid.NewGuid().ToString("N"));
             File.WriteAllText(probe, "probe");
             File.Delete(probe);
+            if (File.Exists(Path))
+            {
+                using var append = new FileStream(Path, FileMode.Append, FileAccess.Write, FileShare.Read); // the log itself must be appendable (a file the folder lets us create in may still be read-only)
+            }
+
             return ValueTask.FromResult<string?>(null);
         }
         catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)
@@ -113,7 +118,7 @@ internal sealed class ShadowDigestFile(IOptions<ShadowOptions> options) : IShado
 
         var prev = Zero;
         var number = 0;
-        foreach (var raw in text.TrimEnd('\n').Split('\n'))
+        foreach (var raw in text[..^1].Split('\n'))
         {
             number++;
             var parsed = TryParse(raw);

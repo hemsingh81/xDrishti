@@ -110,6 +110,18 @@ public sealed class PaperShadowCommandTests
         output.ToString().ShouldContain("BROKEN from session 2026-11-05");
     }
 
+    [Fact]
+    public async Task Verify_exits_4_when_the_chain_is_intact_but_the_digest_log_diverges()
+    {
+        var (services, output, error) = Rig(new ShadowChainCheckView(2, 3, true, null, Day, new string('c', 64), 0, null, "The digest of the session 2026-11-05 in the log differs from the stored one."));
+        await using var _ = services;
+
+        var code = await PaperShadowCommand.RunAsync(["shadow", "verify"], services, new SimulateConsole(output, error), Ct);
+
+        code.ShouldBe(XdCommand.NotPassing);
+        output.ToString().ShouldContain("digest log DIVERGED");
+    }
+
     [Theory]
     [InlineData("shadow")]
     [InlineData("shadow", "verify", "extra")]

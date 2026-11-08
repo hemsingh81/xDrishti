@@ -239,6 +239,14 @@ internal sealed class InMemoryServiceData : IServiceScheduleStore, IServiceRunSt
         }
     }
 
+    public ValueTask<bool> AnySucceededAsync(string serviceId, string messagePrefix, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            return ValueTask.FromResult(Runs.Any(r => r.ServiceId == serviceId && r.Status == ServiceRunStatus.Succeeded && (r.Message?.StartsWith(messagePrefix, StringComparison.Ordinal) ?? false)));
+        }
+    }
+
     public ValueTask<int> CountAsync(string serviceId, CancellationToken cancellationToken)
     {
         lock (_gate)

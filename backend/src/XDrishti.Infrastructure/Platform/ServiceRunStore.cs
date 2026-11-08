@@ -74,6 +74,12 @@ internal sealed class ServiceRunStore(XDrishtiDbContext db) : IServiceRunStore
         return (await db.ServiceRuns.AsNoTracking().Where(x => x.Status == running).Select(x => x.ServiceId).ToListAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
     }
 
+    public async ValueTask<bool> AnySucceededAsync(string serviceId, string messagePrefix, CancellationToken cancellationToken)
+    {
+        var succeeded = ServiceRunStatus.Succeeded;
+        return await db.ServiceRuns.AsNoTracking().AnyAsync(x => x.ServiceId == serviceId && x.Status == succeeded && x.Message != null && x.Message.StartsWith(messagePrefix), cancellationToken);
+    }
+
     public async ValueTask<IReadOnlyList<ServiceRun>> ListAsync(string serviceId, int skip, int take, CancellationToken cancellationToken) =>
         await db.ServiceRuns.AsNoTracking().Where(x => x.ServiceId == serviceId).OrderByDescending(x => x.StartedAt).ThenByDescending(x => x.Id).Skip(skip).Take(take).ToListAsync(cancellationToken);
 

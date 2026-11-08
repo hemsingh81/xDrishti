@@ -1,7 +1,6 @@
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Shadow;
-using XDrishti.Domain.Platform.Services;
 using XDrishti.Domain.Shadow;
 
 namespace XDrishti.Application.Shadow;
@@ -32,7 +31,7 @@ internal sealed class VerifyShadowChainHandler(IShadowStore store, IShadowDigest
         var last = chain.OrderBy(s => s.SessionDate).LastOrDefault();
         var digests = chain.ToDictionary(s => s.SessionDate, s => s.Digest);
         var log = await sink.ReadAsync(cancellationToken);
-        var earlier = (await runs.ListAsync(ShadowDigestService.Id, 0, 100, cancellationToken)).Any(r => r.Status == ServiceRunStatus.Succeeded && (r.Message?.StartsWith(ShadowDigestExported.ExportedPrefix, StringComparison.Ordinal) ?? false));
+        var earlier = await runs.AnySucceededAsync(ShadowDigestService.Id, ShadowDigestExported.ExportedPrefix, cancellationToken);
         return new ShadowChainCheckView(chain.Count, chain.Sum(s => s.Entries.Count), broken is null, broken, last?.SessionDate, last?.Digest, chain.Count(s => s.Status == "gap"), digests, ShadowDigestLogCheck.Problem(log, digests, earlier));
     }
 }

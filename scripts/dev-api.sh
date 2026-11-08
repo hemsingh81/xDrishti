@@ -16,7 +16,10 @@ export ExecHandover__Key
 export Data__CsvFolder="$ROOT/data/Stocks_CSV"
 # The model files (P6-07, ADR 0070), named by their SHA-256.
 export Models__Folder="$ROOT/data/models"
-export Shadow__DigestFolder="$ROOT/data/shadow-digest"
+# the weekly shadow digest log (ADR 0232); XD_SHADOW_DIGEST_DIR is resolved against the repository's deploy/ folder like compose does
+shadow_digest_dir="${XD_SHADOW_DIGEST_DIR:-$ROOT/data/shadow-digest}"
+case "$shadow_digest_dir" in /*) ;; *) shadow_digest_dir="$ROOT/deploy/$shadow_digest_dir" ;; esac
+export Shadow__DigestFolder="$shadow_digest_dir"
 export Serilog__WriteTo__1__Name=Seq Serilog__WriteTo__1__Args__serverUrl=http://localhost:5341
 cd "$ROOT/backend"
 exec dotnet watch --project src/XDrishti.Api/XDrishti.Api.csproj

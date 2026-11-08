@@ -35,7 +35,7 @@ public sealed class VerifyShadowChainHandlerTests
     private VerifyShadowChainHandler Handler(IShadowStore store)
     {
         _sink.ReadAsync(Ct).Returns(new ShadowDigestLogRead(false, [], null));
-        _runs.ListAsync(ShadowDigestService.Id, 0, 100, Ct).Returns([]);
+        _runs.AnySucceededAsync(ShadowDigestService.Id, ShadowDigestExported.ExportedPrefix, Ct).Returns(false);
         return new VerifyShadowChainHandler(store, _sink, _runs);
     }
 
@@ -99,7 +99,7 @@ public sealed class VerifyShadowChainHandlerTests
         (await handler.HandleAsync(new VerifyShadowChainQuery(), Ct)).LogProblem.ShouldBeNull();
         var run = ServiceRun.Start(ShadowDigestService.Id, ServiceRunTrigger.Scheduled, 1, DateTimeOffset.UnixEpoch);
         run.Succeed(DateTimeOffset.UnixEpoch, ShadowDigestExported.ExportedPrefix + "2026-11-02 appended to the log outside the database.");
-        _runs.ListAsync(ShadowDigestService.Id, 0, 100, Ct).Returns([run]);
+        _runs.AnySucceededAsync(ShadowDigestService.Id, ShadowDigestExported.ExportedPrefix, Ct).Returns(true);
 
         (await handler.HandleAsync(new VerifyShadowChainQuery(), Ct)).LogProblem.ShouldNotBeNull().ShouldContain("deleted or emptied");
     }

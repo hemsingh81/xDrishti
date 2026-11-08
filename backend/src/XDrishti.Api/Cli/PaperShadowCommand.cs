@@ -16,7 +16,7 @@ internal static class PaperShadowCommand
           xd paper shadow summary
             raw n and effective n (with the correlation used and whether it is the placeholder), mean R with a 90% interval and the hit rate by group, the behavioural count of P10 beside the edge count, the pace, the chain head
             every figure is modelled (no queue, no latency); the R is labelled gross unless the charge sheet is confirmed as yours; nothing is written
-        exit codes: 0 done (verify: the chain is intact), 4 verify: the chain is broken, 2 wrong command line, 3 failure, 130 cancelled
+        exit codes: 0 done (verify: the chain is intact and the digest log agrees with it), 4 verify: the chain is broken or the digest log disagrees with it, 2 wrong command line, 3 failure, 130 cancelled
 
         """;
 
