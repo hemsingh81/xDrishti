@@ -46,7 +46,8 @@ public sealed record LabRun(
     bool CancelRequested,
     DateTimeOffset CreatedAt,
     DateTimeOffset? StartedAt,
-    DateTimeOffset? FinishedAt);
+    DateTimeOffset? FinishedAt,
+    string? RunOptions = null);
 
 /// <summary>What a post inserts: everything that identifies the run and the labels it carries from the start.</summary>
 public sealed record NewLabRun(
@@ -62,7 +63,8 @@ public sealed record NewLabRun(
     string ConfigHash,
     string EngineVersion,
     IReadOnlyList<string> Labels,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? RunOptions = null);
 
 /// <summary>The run a post ended with and whether it was made now (false: the run of the same key that already held it).</summary>
 public sealed record InsertedLabRun(LabRun Run, bool Created);

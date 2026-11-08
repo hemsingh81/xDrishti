@@ -109,6 +109,43 @@ public sealed class CostStressFillTests
         }
     }
 
+    private static FillRules Tiered => FillRules.Create(0.1, Conservative, 0, conservativeSlippage: true).Value;
+
+    private static Hand TierHand() => Hand.Buy("tier", 1000.00, 990.00).Rows(Row("10:00", 1000.00, 1004.00, 999.95, 1000.00));
+
+    [Fact]
+    public void Conservative_slippage_prices_a_tier_A_entry_at_the_tier_floor_above_the_open()
+    {
+        var plain = TierHand().Walk(FillRules.Create(0.1, Conservative, 0).Value).Trade.ShouldNotBeNull();
+        var tiered = TierHand().Walk(Tiered, _ => LiquidityTier.A).Trade.ShouldNotBeNull();
+
+        plain.EntryFilledPrice.ShouldBe(1000.50, "0.05 + 0.10 x 4.05 = 0.455, up to the grid");
+        tiered.EntryFilledPrice.ShouldBe(1000.75, "max(0.05, 3 bps x 1,000 = 0.30) + 0.405 = 0.705, up to the grid");
+    }
+
+    [Fact]
+    public void Conservative_slippage_excludes_tier_C_unavailable_and_a_missing_lookup_and_counts_them()
+    {
+        foreach (Func<DateOnly, LiquidityTier>? tierOn in new Func<DateOnly, LiquidityTier>?[] { _ => LiquidityTier.C, _ => LiquidityTier.Unavailable, null })
+        {
+            var outcome = TierHand().Walk(Tiered, tierOn);
+
+            outcome.Trade.ShouldBeNull();
+            outcome.NoTrade.ShouldBe(NoTradeReason.TierExcluded);
+            outcome.ToCounters().TierExcluded.ShouldBe(1);
+        }
+    }
+
+    [Fact]
+    public void Without_the_option_the_tier_lookup_is_never_read()
+    {
+        var read = false;
+        var trade = TierHand().Walk(FillRules.Create(0.1, Conservative, 0).Value, _ => { read = true; return LiquidityTier.C; });
+
+        trade.Trade.ShouldNotBeNull();
+        read.ShouldBeFalse();
+    }
+
     private static string Row(string time, double open, double high, double low, double close) =>
         string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{time} {open}/{high}/{low}/{close}");
 

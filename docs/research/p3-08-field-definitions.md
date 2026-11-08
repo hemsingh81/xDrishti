@@ -102,6 +102,7 @@ Not a field but compared with them: **the no-trade reason** (`NoTradeReason`): A
 | 42 | `ExitsEventExit` | P15-09: trades that left with the `event_exit` overlay at the close of a session (the oracle has no results calendar and counts 0; the overlay is tested on its own hand table) | SPEC ONLY | ADR 0187 |
 | 43 | `EventExitUnavailable` | P15-09: session closes at which an open position found no results date, so the overlay could not fire and did not (never "no event"; 0 in the oracle) | SPEC ONLY | ADR 0187 |
 | 44 | `EventExitUnavailableTrades` | P15-09: trades with at least one such session close (0 in the oracle) | SPEC ONLY | ADR 0187 |
+| 45 | `TierExcluded` | CF-05: candidates excluded by conservative tiered slippage (tier C or an unavailable tier; never priced as tier A; 0 in the oracle) | SPEC ONLY | ADR 0229 |
 
 `WalkOutcome.HoldEndEpochSeconds` (the gate's input, compared as a list, section D) and the booleans of `WalkOutcome` are the same facts as the counters above.
 

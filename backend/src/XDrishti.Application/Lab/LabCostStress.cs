@@ -18,6 +18,9 @@ internal sealed class LabCostStress(CostStressOptions options)
     /// <summary>True when the stress is computed.</summary>
     public bool IsOn => options.IsOn;
 
+    /// <summary>True when a missed stress gate caps a PASS (the owner's switch).</summary>
+    public bool Enforce => options.Enforce;
+
     /// <param name="verdict">The verdict as judged, for the existing expectancy gate, the outcome and the limits.</param>
     /// <param name="oosTrades">The out-of-sample trades the verdict was judged on.</param>
     /// <param name="sheetId">The charge sheet the trades were costed with; null when none is known.</param>

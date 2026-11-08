@@ -157,4 +157,22 @@ public sealed class HoldOutPassTests
         result.Error.Code.ShouldBe(LabErrors.HoldOutUnavailableCode);
         result.Error.Message.ShouldContain("not among the candidates");
     }
+
+    [Fact]
+    public async Task A_conservative_run_is_judged_on_conservative_fills_and_a_default_run_on_default_fills()
+    {
+        await FreezeAsync();
+        var conservative = Run() with { RunOptions = "slippage=conservative" };
+        var cell = Verdict(Cell("15m", "BUY", DefaultId()));
+
+        (await Pass().RunAsync(conservative, cell, Block, Ct)).IsSuccess.ShouldBeTrue();
+        (await Pass().RunAsync(Run(), cell, Block, Ct)).IsSuccess.ShouldBeTrue();
+
+        var fills = _asked[0].Request.Fills.ShouldNotBeNull();
+        fills.ConservativeSlippage.ShouldBeTrue("the hold-out must be judged on the fills the development was");
+        fills.BarRangeFrac.ShouldBe(TieredSlippage.BarRangeFrac);
+        var plain = _asked[1].Request.Fills.ShouldNotBeNull();
+        plain.ConservativeSlippage.ShouldBeFalse();
+        plain.BarRangeFrac.ShouldBe(FillRules.Default.Slippage.BarRangeFrac);
+    }
 }

@@ -18,7 +18,7 @@ public static class FillCostComparison
     /// <summary>The direction of the candidate's slippage against the baseline's, or a conflict when the rules cannot be read, differ in more than the slippage, or do not differ at all.</summary>
     public static Result<FillCostChange> Compare(string baselineFills, string candidateFills)
     {
-        if (!TryRead(baselineFills, out var a, out var aGap, out var aEntry) || !TryRead(candidateFills, out var b, out var bGap, out var bEntry))
+        if (!TryRead(baselineFills, out var a, out var aGap, out var aEntry, out var aTiers) || !TryRead(candidateFills, out var b, out var bGap, out var bEntry, out var bTiers))
         {
             return Fail("the fill rules of a run cannot be read, so the slippage cannot be compared");
         }
@@ -26,6 +26,11 @@ public static class FillCostComparison
         if (aEntry != bEntry || !string.Equals(aGap, bGap, StringComparison.Ordinal))
         {
             return Fail("more than the slippage (the entry limit or the gap rule)");
+        }
+
+        if (!string.Equals(aTiers, bTiers, StringComparison.Ordinal))
+        {
+            return Fail("the slippage tiers (conservative tiered slippage is a different rule, not a different amount)");
         }
 
         var lower = 0;
@@ -47,8 +52,9 @@ public static class FillCostComparison
     private static Result<FillCostChange> Fail(string what) =>
         Result.Failure<FillCostChange>(Error.Conflict(Code, string.Create(CultureInfo.InvariantCulture, $"The two runs differ in {what}; an experiment changes one knob, and a changed cost assumption could win unseen.")));
 
-    private static bool TryRead(string json, out double[] components, out string gap, out double entry)
+    private static bool TryRead(string json, out double[] components, out string gap, out double entry, out string tiers)
     {
+        tiers = string.Empty;
         components = new double[Components.Length];
         gap = string.Empty;
         entry = 0;
@@ -64,6 +70,7 @@ public static class FillCostComparison
             }
 
             gap = g.GetString()!;
+            tiers = root.TryGetProperty("slippage_tiers", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString()! : string.Empty;
             for (var i = 0; i < Components.Length; i++)
             {
                 if (!s.TryGetProperty(Components[i], out var c) || !c.TryGetDouble(out components[i]) || !double.IsFinite(components[i]))

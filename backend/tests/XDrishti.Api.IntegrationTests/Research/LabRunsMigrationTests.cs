@@ -46,7 +46,7 @@ public sealed class LabRunsMigrationTests(ApiFactory factory)
                 C("method", "text"), C("config_hash", "character"), C("engine_version", "text"), C("state", "text"), C("stage", "text", true), C("progress_done", "integer"), C("progress_total", "integer"),
                 C("sim_run_keys", "ARRAY"), C("counts", "jsonb", true), C("problems", "jsonb"), C("stages", "jsonb"), C("labels", "jsonb"), C("error", "text", true), C("host", "text", true),
                 C("cancel_requested", "boolean"), C("created_at", "timestamp with time zone"), C("started_at", "timestamp with time zone", true), C("finished_at", "timestamp with time zone", true),
-                C("updated_at", "timestamp with time zone"),
+                C("updated_at", "timestamp with time zone"), C("run_options", "text", true),
             }.Order(StringComparer.Ordinal));
         (await ListAsync(connection, "SELECT conname FROM pg_constraint WHERE conrelid = 'lab.lab_runs'::regclass AND contype <> 'n' ORDER BY 1")).ShouldBe(
             ["ck_lab_runs_key", "ck_lab_runs_progress", "ck_lab_runs_state", "ck_lab_runs_window", "fk_lab_runs_strategy_version", "pk_lab_runs"]);

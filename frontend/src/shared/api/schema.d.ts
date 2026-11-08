@@ -13684,6 +13684,12 @@ export interface components {
       runId: string;
       state: string;
     };
+    /** @description The options a run was posted with, as the effective values (CF-05, ADR 0229): `slippage` is `default` or `conservative`; `stress` is whether the cost stress block was wanted (on for `robust` unless posted off, off for the others unless posted on). `IsDefault` is true when both are what a post without options gets; only such a run may be the scorecard's evidence basis. */
+    LabRunOptionsView: {
+      slippage: string;
+      stress: boolean;
+      isDefault: boolean;
+    };
     /** @description Client event `labRunProgress` (spec P5-02, D5): a run entered a stage or advanced in it. `done` and `total` count instruments in the quick test and are 0 elsewhere. */
     LabRunProgress: {
       /** Format: uuid */
@@ -13725,6 +13731,7 @@ export interface components {
       /** Format: date-time */
       finishedAt: null | string;
       verdict: null | components['schemas']['LabVerdictView'];
+      options?: null | components['schemas']['LabRunOptionsView'];
     };
     /** @description One entry of the stage log: when a stage began and ended and how many problems it found. */
     LabStageLog: {
@@ -13778,6 +13785,7 @@ export interface components {
       trials?: null | components['schemas']['TrialsView'];
       nulls?: null | components['schemas']['NullsView'];
       benchmark?: null | components['schemas']['BenchmarkComparisonView'];
+      tierExclusion?: null | components['schemas']['TierExclusionView'];
     };
     /** @description The India dates a run replays, inclusive. */
     LabWindow: {
@@ -21016,7 +21024,7 @@ export interface components {
       reason: null | string;
       brokerKillSwitch: null | boolean;
     };
-    /** @description Body of `POST /api/lab/runs` (spec P5-02): a stored strategy version (the latest when `version` is omitted), the universe, the method (`quick`) and optionally the window (default: the last year of stored data). */
+    /** @description Body of `POST /api/lab/runs` (spec P5-02): a stored strategy version (the latest when `version` is omitted), the universe, the method (`quick`) and optionally the window (default: the last year of stored data), `slippage` (`default` or `conservative`: tiered floors, tier C excluded; CF-05) and `stress` (the cost stress block; default on for `robust`, off for `quick` and `full`). */
     StartLabRunRequest: {
       strategyId?: null | string;
       /** Format: int32 */
@@ -21024,6 +21032,8 @@ export interface components {
       universe?: null | components['schemas']['StartLabRunUniverse'];
       method?: null | string;
       window?: null | components['schemas']['StartLabRunWindow'];
+      slippage?: null | string;
+      stress?: null | boolean;
     };
     /** @description The universe of a posted run: exactly one of a basket and a list of symbols. */
     StartLabRunUniverse: {
@@ -21590,6 +21600,27 @@ export interface components {
       refused: number;
       /** Format: double */
       medianMinutes: null | number;
+    };
+    /**
+     * @description What conservative slippage left out of a Lab verdict (CF-05, ADR 0229): the candidates whose instrument was liquidity tier C or had no usable tier on the entry date have no trade, so the trades behind the verdict are the survivors of the filter and not a clean sample.
+     *     Present only on a run posted with `slippage: conservative`. Counts only; the candidates are those of the first (default) exit of every timeframe, which every exit candidate shares.
+     */
+    TierExclusionView: {
+      /**
+       * Format: int64
+       * @description Candidates dated in the window, summed over the timeframes.
+       */
+      candidates: number;
+      /**
+       * Format: int64
+       * @description Candidates left out because the tier was C or unavailable.
+       */
+      tierExcluded: number;
+      /**
+       * Format: double
+       * @description The share of the candidates left out; 0 when there were none.
+       */
+      share?: number;
     };
     /** @description The aggregates of one timeframe compared with the recomputed ones: `compared` buckets (stored or recomputed), `differences` among them. */
     TimeframeCheck: {

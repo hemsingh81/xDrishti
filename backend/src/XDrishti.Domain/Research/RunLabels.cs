@@ -31,6 +31,12 @@ public static class RunLabels
 
     private const string Fills = "fills: modelled";
 
+    /// <summary>The label of a Lab run posted with conservative slippage (CF-05, ADR 0229): what the option does and what it leaves out.</summary>
+    public const string ConservativeSlippage = "slippage: conservative (tier C and unavailable excluded)";
+
+    /// <summary>The label of a Lab run posted with the cost stress explicitly off (CF-05, ADR 0229).</summary>
+    public const string StressOff = "stress: off";
+
     private const string SurvivorshipNote = "; survivorship is bounded and disclosed, not avoided (ISS-22)";
 
     private const string TickLabel = "tick: today's master tick; rounding to the grid is approximate";

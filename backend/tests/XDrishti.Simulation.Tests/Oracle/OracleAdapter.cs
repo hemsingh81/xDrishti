@@ -227,6 +227,7 @@ internal static class OracleAdapter
         ExitsEventExit = Int(w.ExitsEventExit),
         EventExitUnavailable = Int(w.EventExitUnavailable),
         EventExitUnavailableTrades = Int(w.EventExitUnavailableTrades),
+        TierExcluded = Int(w.TierExcluded),
     };
 
     private static int Int(long value) => checked((int)value);

@@ -242,7 +242,18 @@ public static class TradeWalker
 
         var risk = Math.Abs(entry - stop);
         decimal? target = multiple is { } k ? (isBuy ? entry + (k * risk) : entry - (k * risk)) : null;
-        var slip = Slip.Of(rules.Fills.Slippage, tick);
+        decimal? tierBps = null;
+        if (rules.Fills.ConservativeSlippage)
+        {
+            // CF-05, D2: tier C is not priced and an unavailable tier is never priced as A; the trade is excluded and counted
+            tierBps = TieredSlippage.BpsOf(rules.TierOn is { } tierOn ? tierOn(entryDate) : LiquidityTier.Unavailable);
+            if (tierBps is null)
+            {
+                return WalkResults.NoTrade(NoTradeReason.TierExcluded, 1, zeroMinutes);
+            }
+        }
+
+        var slip = Slip.Of(rules.Fills.Slippage, tick, tierBps);
         var entryFilled = kind == EntryFill.AtOpen ? slip.Entry(isBuy, entry, limit, fill.High - fill.Low) : entry;
         var position = new Position(
             candidate, fillBar.EpochSeconds, isBuy, entry, entryFilled, kind, stop, target, risk, slip,

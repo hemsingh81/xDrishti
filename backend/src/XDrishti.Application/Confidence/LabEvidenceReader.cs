@@ -85,7 +85,7 @@ internal sealed class LabEvidenceReader(
         var quarters = verdict.Robustness?.ByQuarter;
         var mc = verdict.Robustness?.MonteCarlo;
         double? p95 = mc is null ? null : Math.Max(mc.DrawdownP95, verdict.Robustness?.MonteCarloBlock?.DdP95 ?? double.MinValue);
-        var (capacityOk, capacityNote) = CapacityOf(verdict.CostStress);
+        var (capacityOk, capacityNote) = CapacityOf(verdict);
         if (capacityNote.Length > 0)
         {
             rowNotes[14] = capacityNote;
@@ -170,13 +170,20 @@ internal sealed class LabEvidenceReader(
         }
 
         var costSheet = await CostSheetAsync(verdict, cancellationToken);
-        return new LabEvidence(checklist with { Notes = rowNotes }, evidence.Folds, evidence.PositiveFolds, costSheet, reused, notes, LabTierSet(verdict.CostStress));
+        return new LabEvidence(checklist with { Notes = rowNotes }, evidence.Folds, evidence.PositiveFolds, costSheet, reused, notes, LabTierSet(verdict));
     }
 
     /// <summary>The name of the Lab set beside the hard fail.</summary>
     internal const string LabSetName = "Lab out-of-sample trades";
 
     /// <summary>The Lab set from the tier counts of the cost stress block (ADR 0223): no block (cost stress Off, or a verdict produced before it) is unavailable, never tier C.</summary>
+    private static TierSet LabTierSet(LabVerdictView verdict) => verdict.TierExclusion is not null
+        ? TierSet.Unreadable(LabSetName, ConservativeRun)
+        : LabTierSet(verdict.CostStress);
+
+    /// <summary>The reason beside a restricted set: a conservative run left tier C and unavailable trades out, so its survivors are not clean tier evidence.</summary>
+    internal const string ConservativeRun = "conservative run";
+
     private static TierSet LabTierSet(CostStressView? stress) => stress switch
     {
         null => TierSet.Unreadable(LabSetName, "the cost stress is not computed (Confidence:CostStress:Mode is Off), so there is no tier count"),
@@ -193,7 +200,8 @@ internal sealed class LabEvidenceReader(
             return (null, "The Lab runs could not be read.");
         }
 
-        var pick = listed.Value.Where(r => r.Strategy.Version == version && LabSettings.RunsFullTest(r.Method)).OrderByDescending(r => r.FinishedAt ?? r.CreatedAt).FirstOrDefault();
+        // only a run posted without options (or spelling the defaults) may be the evidence basis: a conservative or stress-changed run is a what-if, never the scorecard's reading (ADR 0229)
+        var pick = listed.Value.Where(r => r.Strategy.Version == version && LabSettings.RunsFullTest(r.Method) && r.Options is null or { IsDefault: true }).OrderByDescending(r => r.FinishedAt ?? r.CreatedAt).FirstOrDefault();
         if (pick is null)
         {
             return (null, none);
@@ -218,8 +226,14 @@ internal sealed class LabEvidenceReader(
     /// Row 14 from the tier and capacity counts of the cost stress block (ADR 0223): pass only when every trade is tier A or B and no order is over a cap; any tier C or breach is a fail; a count that could not be made (no usable median, no traded value) is unavailable, which counts as a
     /// fail wherever the gate reads it. A verdict without the block says so and is not re-run.
     /// </summary>
-    private static (bool? Ok, string Note) CapacityOf(CostStressView? stress)
+    private static (bool? Ok, string Note) CapacityOf(LabVerdictView verdict)
     {
+        var stress = verdict.CostStress;
+        if (verdict.TierExclusion is { } excluded)
+        {
+            return (null, string.Create(Inv, $"unavailable: {ConservativeRun}: {excluded.TierExcluded} of {excluded.Candidates} candidates were left out as tier C or unavailable, so the trades left are not clean tier evidence."));
+        }
+
         if (stress is null)
         {
             return (null, "the cost stress is not computed (Confidence:CostStress:Mode is Off), so there is no tier or capacity count.");

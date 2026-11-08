@@ -51,6 +51,12 @@ internal sealed class HoldOutUnlocker(
             return Result.Failure<UnlockPlan>(LabErrors.NoReport(state, run.Method));
         }
 
+        // a what-if run (conservative slippage, or stress changed from the method's default) never spends the version's single look and never sets scorecard row 12
+        if (LabRunOptions.Parse(run.RunOptions).KeyText(string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal)) is not null)
+        {
+            return Result.Failure<UnlockPlan>(LabErrors.HoldOutUnavailable("This run was posted with non-default options (conservative slippage or a changed stress setting); it is a what-if and cannot take the hold-out. Unlock a run posted with the default options."));
+        }
+
         if (await store.GetUnlockAsync(run.StrategyId, run.Version, StrategyKind, cancellationToken) is not null)
         {
             return Result.Failure<UnlockPlan>(LabErrors.HoldOutUsed(run.StrategyId, run.Version));

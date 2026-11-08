@@ -29,6 +29,7 @@ internal sealed class LabRunRowConfiguration : IEntityTypeConfiguration<LabRunRo
         builder.Property(x => x.WindowFrom).HasColumnType("date").IsRequired();
         builder.Property(x => x.WindowTo).HasColumnType("date").IsRequired();
         builder.Property(x => x.Method).HasColumnType("text").IsRequired();
+        builder.Property(x => x.RunOptions).HasColumnType("text");
         builder.Property(x => x.ConfigHash).HasColumnType("character(64)").IsRequired();
         builder.Property(x => x.EngineVersion).HasColumnType("text").IsRequired();
         builder.Property(x => x.State).HasColumnType("text").IsRequired();

@@ -216,7 +216,7 @@ public sealed class SwingReplayTests
     {
         // A reflection over the enum: a reason added later cannot be dropped silently (the routine of the replayer throws on a reason it does not know).
         var reasons = Enum.GetValues<NoTradeReason>();
-        reasons.ShouldBe([NoTradeReason.NoFillBar, NoTradeReason.AfterSquareOff, NoTradeReason.EntryThroughStop, NoTradeReason.LimitNotReached, NoTradeReason.PositionOpen, NoTradeReason.OrderPendingAtEnd, NoTradeReason.EventBlocked, NoTradeReason.EventUnavailable]);
+        reasons.ShouldBe([NoTradeReason.NoFillBar, NoTradeReason.AfterSquareOff, NoTradeReason.EntryThroughStop, NoTradeReason.LimitNotReached, NoTradeReason.PositionOpen, NoTradeReason.OrderPendingAtEnd, NoTradeReason.EventBlocked, NoTradeReason.EventUnavailable, NoTradeReason.TierExcluded]);
 
         var seen = new HashSet<string>();
         foreach (var reason in reasons)

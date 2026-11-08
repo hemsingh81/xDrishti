@@ -59,9 +59,9 @@ public sealed class StartLabRunHandlerTests
     }
 
     private static LabRun ToRun(NewLabRun n) => new(
-        n.Id, n.Key, n.StrategyId, n.Version, n.StrategyHash, n.Universe, n.From, n.To, n.Method, n.ConfigHash, n.EngineVersion, LabRunState.Queued, null, 0, 0, [], null, [], [], n.Labels, null, false, n.CreatedAt, null, null);
+        n.Id, n.Key, n.StrategyId, n.Version, n.StrategyHash, n.Universe, n.From, n.To, n.Method, n.ConfigHash, n.EngineVersion, LabRunState.Queued, null, 0, 0, [], null, [], [], n.Labels, null, false, n.CreatedAt, null, null, n.RunOptions);
 
-    private StartLabRunHandler Handler() => new(_runs, _ledger, _strategies, _resolver, _baskets, _bars, _engine, _sheets, LabSettings.Default, new FakeTimeProvider(new DateTimeOffset(2026, 10, 22, 6, 0, 0, TimeSpan.Zero)), NullLogger<StartLabRunHandler>.Instance);
+    private StartLabRunHandler Handler(XDrishti.Domain.Confidence.CostStressOptions? costStress = null) => new(_runs, _ledger, _strategies, _resolver, _baskets, _bars, _engine, _sheets, LabSettings.Default, new FakeTimeProvider(new DateTimeOffset(2026, 10, 22, 6, 0, 0, TimeSpan.Zero)), NullLogger<StartLabRunHandler>.Instance, costStress: costStress);
 
     private static ResolveResult Matched(int count) =>
         new([.. Enumerable.Range(1, count).Select(i => new ResolvedInstrument("S" + i, new Guid(i, 0, 0, [0, 0, 0, 0, 0, 0, 0, 1]), "S" + i, "Name " + i, "EQUITY", null, false, true))], [], count, 0);
@@ -324,5 +324,93 @@ public sealed class StartLabRunHandlerTests
         await Handler().HandleAsync(BySymbols(), Ct);
 
         await _ledger.DidNotReceiveWithAnyArgs().AppendAsync(default!, Ct);
+    }
+
+    private async Task<Result<StartedLabRun>> Post(string method, string? slippage = null, bool? stress = null, XDrishti.Domain.Confidence.CostStressOptions? costStress = null)
+    {
+        _sheets.FindAsync(LabSettings.Default.CostSheetId, Arg.Any<CancellationToken>()).Returns(Result.Success(FixtureSheet.Sheet));
+        _resolver.HandleAsync(Arg.Any<ResolveInstrumentsQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Matched(2)));
+        var window = (new DateOnly(2026, 2, 1), new DateOnly(2026, 4, 30));
+        return await Handler(costStress).HandleAsync(new StartLabRunCommand("LAB_TEST", null, null, ["S1"], method, window.Item1, window.Item2, slippage, stress), Ct);
+    }
+
+    [Fact]
+    public async Task The_default_options_keep_every_key_and_a_spelled_default_is_the_same_run()
+    {
+        var plain = (await Post("robust")).Value.Run.Key;
+
+        (await Post("robust", "default", true)).Value.Run.Key.ShouldBe(plain, "stress defaults to on for robust and slippage to default");
+        (await Post("full", "default", false)).Value.Run.Key.ShouldBe((await Post("full")).Value.Run.Key);
+    }
+
+    [Fact]
+    public async Task Conservative_slippage_and_a_non_default_stress_are_other_runs_that_remember_their_options()
+    {
+        var plain = (await Post("robust")).Value.Run.Key;
+        var plainOptions = _inserted[0].RunOptions;
+        var conservative = (await Post("robust", "conservative")).Value.Run.Key;
+        var conservativeOptions = _inserted[0].RunOptions;
+        var noStress = (await Post("robust", null, false)).Value.Run.Key;
+        var noStressOptions = _inserted[0].RunOptions;
+        var fullPlain = (await Post("full")).Value.Run.Key;
+        var fullStress = (await Post("full", null, true)).Value.Run.Key;
+        var fullStressOptions = _inserted[0].RunOptions;
+
+        conservative.ShouldNotBe(plain);
+        noStress.ShouldNotBe(plain);
+        fullStress.ShouldNotBe(fullPlain);
+        plainOptions.ShouldBeNull();
+        conservativeOptions.ShouldBe("slippage=conservative");
+        noStressOptions.ShouldBe("stress=off");
+        fullStressOptions.ShouldBe("stress=on");
+    }
+
+    [Fact]
+    public async Task An_unknown_slippage_and_a_stress_on_a_quick_run_are_refused()
+    {
+        (await Post("robust", "aggressive")).Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+        (await Post("quick", null, true)).Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+        (await Post("quick", "conservative")).IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Stress_off_on_a_robust_run_is_refused_while_the_cost_stress_is_enforced_and_allowed_otherwise()
+    {
+        var enforced = new XDrishti.Domain.Confidence.CostStressOptions(Enforce: true);
+
+        var refused = await Post("robust", null, false, enforced);
+
+        refused.IsFailure.ShouldBeTrue();
+        refused.Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+        refused.Error.Message.ShouldContain("enforced");
+        (await Post("robust", null, false, new XDrishti.Domain.Confidence.CostStressOptions())).IsSuccess.ShouldBeTrue("report only: nothing is capped");
+        (await Post("robust", null, true, enforced)).IsSuccess.ShouldBeTrue();
+        (await Post("robust", null, null, enforced)).IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task The_options_are_said_in_the_labels_of_the_run_and_a_run_without_them_has_neither_line()
+    {
+        await Post("robust");
+        var plain = _inserted[0].Labels;
+        await Post("robust", "conservative", false);
+        var optioned = _inserted[0].Labels;
+
+        plain.ShouldNotContain(RunLabels.ConservativeSlippage);
+        plain.ShouldNotContain(RunLabels.StressOff);
+        optioned.ShouldContain("slippage: conservative (tier C and unavailable excluded)");
+        optioned.ShouldContain("stress: off");
+    }
+
+    [Fact]
+    public async Task The_served_run_says_its_options_and_whether_they_are_the_defaults()
+    {
+        var plain = (await Post("robust")).Value.Run.Options.ShouldNotBeNull();
+        var conservative = (await Post("robust", "conservative")).Value.Run.Options.ShouldNotBeNull();
+        var stressedFull = (await Post("full", null, true)).Value.Run.Options.ShouldNotBeNull();
+
+        plain.ShouldBe(new LabRunOptionsView("default", true, true));
+        conservative.ShouldBe(new LabRunOptionsView("conservative", true, false));
+        stressedFull.ShouldBe(new LabRunOptionsView("default", true, false));
     }
 }

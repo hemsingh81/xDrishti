@@ -43,7 +43,8 @@ internal sealed class InstrumentInputReader(IBarStore bars, IBarQueries barQueri
         IReadOnlyList<ContextDayRecord>? contextDays = null,
         string? contextNote = null,
         EventCalendarSnapshot? events = null,
-        ResultsDayInputs? resultsDays = null)
+        ResultsDayInputs? resultsDays = null,
+        Func<DateOnly, LiquidityTier>? tierOn = null)
     {
         var tick = TickSpec.FromMasterPaise(instrument.TickSize);
         var twice = !acknowledgeCsvAdjusted && AdjustsCsvTwice(raw, factors, csvThrough, id);
@@ -71,7 +72,8 @@ internal sealed class InstrumentInputReader(IBarStore bars, IBarQueries barQueri
             contextDays,
             contextNote,
             events,
-            resultsDays);
+            resultsDays,
+            tierOn);
     }
 
     /// <summary>The guard of ADR 0017 §5: an applied action that changes the bars read and falls on or before the date the loaded CSV files reach would adjust their prices a second time.</summary>

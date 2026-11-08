@@ -8,8 +8,10 @@ using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Lab;
 
@@ -30,7 +32,8 @@ internal sealed class StartLabRunHandler(
     TimeProvider time,
     ILogger<StartLabRunHandler> logger,
     LabPreregistration? preregistration = null,
-    LabHoldOutGuard? holdOut = null) : ICommandHandler<StartLabRunCommand, StartedLabRun>
+    LabHoldOutGuard? holdOut = null,
+    CostStressOptions? costStress = null) : ICommandHandler<StartLabRunCommand, StartedLabRun>
 {
     public async ValueTask<Result<StartedLabRun>> HandleAsync(StartLabRunCommand command, CancellationToken cancellationToken)
     {
@@ -87,7 +90,10 @@ internal sealed class StartLabRunHandler(
 
         var robust = string.Equals(command.Method, LabSettings.RobustMethod, StringComparison.Ordinal);
         var method = robust ? LabSettings.RobustMethod : full ? LabSettings.FullMethod : LabSettings.QuickMethod;
-        var configHash = LabRunIdentity.Sha256(robust ? settings.RobustConfigText(basis) : full ? settings.FullConfigText(basis) : settings.ConfigText(basis));
+        var options = new LabRunOptions(string.Equals(command.Slippage, "conservative", StringComparison.Ordinal), command.Stress);
+        var keyOptions = options.KeyText(robust);
+        // CF-05: the key changes only when an option differs from the method's default, so every existing run keeps its key
+        var configHash = LabRunIdentity.Sha256((robust ? settings.RobustConfigText(basis) : full ? settings.FullConfigText(basis) : settings.ConfigText(basis)) + (keyOptions is null ? string.Empty : ";" + keyOptions));
         var key = LabRunIdentity.Key(version.Hash, universe.Value.Label, [.. universe.Value.Instruments.Select(i => i.Id)], from, to, method, configHash, engine.EngineVersion);
         var labels = full ? FullLabels(universe.Value, from, to, firstSession, lastSession, basisLabel, robust) : Labels(universe.Value, from, to, firstSession, lastSession, basisLabel);
         if (holdOutNote is not null)
@@ -95,9 +101,19 @@ internal sealed class StartLabRunHandler(
             labels = [.. labels, holdOutNote];
         }
 
+        if (options.ConservativeSlippage)
+        {
+            labels = [.. labels, RunLabels.ConservativeSlippage];
+        }
+
+        if (options.Stress == false)
+        {
+            labels = [.. labels, RunLabels.StressOff];
+        }
+
         var now = time.GetUtcNow();
         var inserted = await runs.InsertOrGetAsync(
-            new NewLabRun(Guid.NewGuid(), key, version.StrategyId, version.Version, version.Hash, universe.Value, from, to, method, configHash, engine.EngineVersion, labels, now),
+            new NewLabRun(Guid.NewGuid(), key, version.StrategyId, version.Version, version.Hash, universe.Value, from, to, method, configHash, engine.EngineVersion, labels, now, options.ToText()),
             cancellationToken);
         // one look at the family, counted whatever becomes of the run (spec P5-03, D1). Also for a run that already holds the key: the append is idempotent by run id, so a run whose first append failed is healed by the next post.
         var run = inserted.Run;
@@ -121,7 +137,7 @@ internal sealed class StartLabRunHandler(
         return Result.Success(new StartedLabRun(LabRunView.Of(inserted.Run), inserted.Created));
     }
 
-    private static Error? CheckInput(StartLabRunCommand command)
+    private Error? CheckInput(StartLabRunCommand command)
     {
         if (string.IsNullOrWhiteSpace(command.StrategyId))
         {
@@ -131,6 +147,21 @@ internal sealed class StartLabRunHandler(
         if (!string.Equals(command.Method, LabSettings.QuickMethod, StringComparison.Ordinal) && !LabSettings.RunsFullTest(command.Method))
         {
             return LabErrors.InvalidInput("`method` must be `quick`, `full` or `robust`; the other methods are later slices.");
+        }
+
+        if (command.Slippage is not null && !string.Equals(command.Slippage, "default", StringComparison.Ordinal) && !string.Equals(command.Slippage, "conservative", StringComparison.Ordinal))
+        {
+            return LabErrors.InvalidInput("`slippage` must be `default` or `conservative`.");
+        }
+
+        if (command.Stress == true && !LabSettings.RunsFullTest(command.Method))
+        {
+            return LabErrors.InvalidInput("`stress` needs the out-of-sample trades of a `full` or `robust` run; a `quick` run has none.");
+        }
+
+        if (command.Stress == false && string.Equals(command.Method, LabSettings.RobustMethod, StringComparison.Ordinal) && costStress is { IsOn: true, Enforce: true })
+        {
+            return LabErrors.InvalidInput("`stress: false` is refused on a `robust` run while the cost stress is enforced (Confidence:CostStress:Enforce): it would skip the cap the gates apply.");
         }
 
         if (command.Version is < 1)

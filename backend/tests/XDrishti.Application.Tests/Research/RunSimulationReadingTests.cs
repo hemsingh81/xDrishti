@@ -218,4 +218,22 @@ public sealed class RunSimulationReadingTests
         result.Value.Instruments.Count.ShouldBe(2_000);
         await fixture.Actions.Received(1).ListCsvAdjustedThroughAsync(Arg.Is<IReadOnlyCollection<Guid>>(c => c.Count == 2_000), Arg.Any<CancellationToken>());
     }
+
+    [Theory]
+    [InlineData(true, 1)]
+    [InlineData(false, 0)]
+    public async Task The_tier_source_is_asked_for_each_instrument_only_when_the_fills_are_conservative(bool conservative, int asked)
+    {
+        var fixture = new RunFixture();
+        var tiers = NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.Bars.IEntryTierSource>();
+        tiers.ForAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(new Func<DateOnly, LiquidityTier>(_ => LiquidityTier.A));
+        fixture.EntryTiers = tiers;
+        var abb = fixture.Add("NSE:ABB", RunFixture.ThreeDays());
+        var fills = new FillRulesInput(0.1, 2, 0.10, 2, 0, conservative);
+
+        var result = await fixture.RunAsync(RunFixture.List([abb]) with { Fills = fills }, Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        await tiers.Received(asked).ForAsync(abb, RunFixture.D1, RunFixture.D3, Arg.Any<CancellationToken>());
+    }
 }

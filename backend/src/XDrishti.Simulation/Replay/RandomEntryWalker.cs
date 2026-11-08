@@ -140,7 +140,7 @@ public static class RandomEntryWalker
             return Refused("the session has no minute inside the entry window");
         }
 
-        var rules = new WalkRules(spec.RewardRisk, squareOff, strategy.Fills, input.Tick);
+        var rules = new WalkRules(spec.RewardRisk, squareOff, strategy.Fills, input.Tick, TierOn: input.TierOn);
         var results = new SimTrade?[plan.Draws];
         var redraws = 0;
         var tradeSeed = new SeededRandom(plan.Seed ^ ((ulong)(spec.Id + 1) * TradeMix)).NextBits();

@@ -95,6 +95,9 @@ public sealed record OracleCounters
     /// <summary>P15-09: trades with at least one such session close. Always 0 here.</summary>
     public int EventExitUnavailableTrades { get; init; }
 
+    /// <summary>CF-05: candidates excluded by conservative tiered slippage (tier C or an unavailable tier). Always 0 here.</summary>
+    public int TierExcluded { get; init; }
+
     /// <summary>The sum of two counter sets, property by property.</summary>
     public OracleCounters Plus(OracleCounters other) => new()
     {
@@ -142,5 +145,6 @@ public sealed record OracleCounters
         ExitsEventExit = ExitsEventExit + other.ExitsEventExit,
         EventExitUnavailable = EventExitUnavailable + other.EventExitUnavailable,
         EventExitUnavailableTrades = EventExitUnavailableTrades + other.EventExitUnavailableTrades,
+        TierExcluded = TierExcluded + other.TierExcluded,
     };
 }

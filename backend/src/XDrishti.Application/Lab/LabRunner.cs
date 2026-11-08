@@ -142,6 +142,17 @@ internal sealed class LabRunner(
             problems.Add(new LabProblem(Validate, "universe", "lab.empty_universe", "The universe has no instrument.", "error", null, null));
         }
 
+        if (LabRunOptions.Parse(run.RunOptions).Unknown is { } unknownOption)
+        {
+            problems.Add(new LabProblem(Validate, "options", "lab.run_options_unknown", $"The stored run options contain `{unknownOption}`, which this version does not know; the run is not guessed at.", "error", null, null));
+        }
+
+        if (LabRunOptions.Parse(run.RunOptions).Stress == false && string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal) && costStress is { IsOn: true, Enforce: true })
+        {
+            // queued before the owner turned Enforce on: running it would skip the cap
+            problems.Add(new LabProblem(Validate, "options.stress", "lab.stress_off_enforced", "This robust run was posted with `stress: false`, which is refused while the cost stress is enforced; post it again.", "error", null, null));
+        }
+
         log.Finish(Validate, problems.Count, time.GetUtcNow());
         if (problems.Count > 0 || version is null)
         {
@@ -284,7 +295,14 @@ internal sealed class LabRunner(
 
         // CF-05: the cost stress and the delay test beside the outcome; reads one stored sheet, writes nothing, and the outcome moves only if the owner has turned Enforce on
         // Robust runs only: a plain full run keeps the document it always had (CF-05 criterion 7); the sheet is the one the run was costed with, read once at the start
-        if (costStress is { IsOn: true } && string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal) && sheetUsed is not null)
+        var runOptions = LabRunOptions.Parse(run.RunOptions);
+        if (runOptions.Stress == true && !(costStress is { IsOn: true } && sheetUsed is not null))
+        {
+            // asked for, not done: said in the run's problems, never silently dropped
+            problems.Add(new LabProblem(FullTest, "options.stress", "lab.stress_not_run", costStress is not { IsOn: true } ? "`stress: true` was asked for but the cost stress is Off (Confidence:CostStress:Mode), so no stress block was computed." : "`stress: true` was asked for but the run was not costed with a stored charge sheet, so no stress block was computed.", "warning", null, null));
+        }
+
+        if (costStress is { IsOn: true } && runOptions.StressOn(string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal)) && sheetUsed is not null)
         {
             // ADR 0223: the liquidity tier and the capacity check of the same trades, from day bars; carried on the block, read by no gate
             var tierCounts = tiers is null ? null : await tiers.ComputeAsync(full.OosSources, ownerToken);
@@ -418,8 +436,7 @@ internal sealed class LabRunner(
     {
         var sheet = await sheets.FindAsync(settings.CostSheetId, cancellationToken);
         var costs = sheet.IsSuccess && sheet.Value.Schedules[0].EffectiveFrom <= run.From ? CostChoice.Sheet(sheet.Value.Id) : CostChoice.Gross;
-        var rules = FillRules.Default;
-        var fills = new FillRulesInput(rules.EntryLimitPercent, rules.Slippage.Ticks, rules.Slippage.BarRangeFrac, rules.Slippage.StopExitExtraTicks);
+        var fills = LabFills.For(run);
         var timeframe = DefaultTimeframe(run.StrategyId, description);
         var request = new SimulationRequest(run.StrategyId, new Dictionary<string, double>(), timeframe.ToCode(), run.From, run.To, [.. run.Universe.Instruments.Select(i => i.Id)], null, costs, false, null, fills, null, null, run.StrategyHash);
         return (request, costs is CostChoice.SheetChoice && sheet.IsSuccess ? sheet.Value : null);

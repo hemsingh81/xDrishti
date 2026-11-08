@@ -590,6 +590,82 @@ public sealed class LabRunnerTests
         System.Text.Json.JsonSerializer.Serialize(verdicts[0]).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[1]));
     }
 
+    [Fact]
+    public async Task A_stored_conservative_run_sends_conservative_fills_with_a_range_fraction_of_a_tenth_from_the_quick_test_to_the_full_test_and_the_sweep()
+    {
+        await Runner().ExecuteAsync(Run() with { RunOptions = "slippage=conservative" }, Ct);
+
+        var quick = ((RunSimulationQuery)_simulation.ReceivedCalls().Single().GetArguments()[0]!).Request.Fills.ShouldNotBeNull();
+        quick.ConservativeSlippage.ShouldBeTrue();
+        quick.BarRangeFrac.ShouldBe(0.10);
+
+        _simulation.ClearReceivedCalls();
+        _comparisons.ClearReceivedCalls();
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await RunnerWithStress(new CostStressOptions()).ExecuteAsync(RobustRun() with { RunOptions = "slippage=conservative" }, Ct);
+
+        var asked = _comparisons.ReceivedCalls().Select(c => ((RunComparisonQuery)c.GetArguments()[0]!).Request.Fills!).Concat(_simulation.ReceivedCalls().Select(c => ((RunSimulationQuery)c.GetArguments()[0]!).Request.Fills!)).ToList();
+        asked.ShouldNotBeEmpty();
+        asked.ShouldAllBe(f => f.ConservativeSlippage && f.BarRangeFrac == 0.10);
+        verdicts.Single().TierExclusion.ShouldNotBeNull("a conservative verdict says what the filter left out");
+        verdicts.Single().Limits.ShouldContain(l => l.StartsWith("conservative slippage:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_run_without_conservative_options_carries_no_tier_exclusion_and_default_fills()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await Runner().ExecuteAsync(FullRun(), Ct);
+
+        verdicts.Single().TierExclusion.ShouldBeNull();
+        _comparisons.ReceivedCalls().Select(c => ((RunComparisonQuery)c.GetArguments()[0]!).Request.Fills!).ShouldAllBe(f => !f.ConservativeSlippage && f.BarRangeFrac == FillRules.Default.Slippage.BarRangeFrac);
+    }
+
+    [Fact]
+    public async Task A_stored_option_text_this_code_does_not_know_fails_the_run_at_validate_and_runs_nothing()
+    {
+        await Runner().ExecuteAsync(Run() with { RunOptions = "slippage=conservative;speed=fast" }, Ct);
+
+        var finish = _finishes.Single();
+        finish.State.ShouldBe(LabRunState.Failed);
+        finish.Stage.ShouldBe("validate");
+        finish.Problems.ShouldContain(p => p.Code == "lab.run_options_unknown" && p.Message.Contains("speed=fast", StringComparison.Ordinal));
+        _simulation.ReceivedCalls().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_queued_stress_off_robust_run_fails_at_validate_once_the_stress_is_enforced_and_runs_when_it_is_not()
+    {
+        ArrangeFullTest();
+
+        await RunnerWithStress(new CostStressOptions(Enforce: true)).ExecuteAsync(RobustRun() with { RunOptions = "stress=off" }, Ct);
+        await RunnerWithStress(new CostStressOptions()).ExecuteAsync(RobustRun() with { RunOptions = "stress=off" }, Ct);
+
+        _finishes[0].State.ShouldBe(LabRunState.Failed);
+        _finishes[0].Stage.ShouldBe("validate");
+        _finishes[0].Problems.ShouldContain(p => p.Code == "lab.stress_off_enforced");
+        _finishes[1].State.ShouldBe(LabRunState.Succeeded);
+    }
+
+    [Fact]
+    public async Task Stress_asked_for_but_not_run_is_said_in_the_problems_and_a_run_that_did_it_has_no_such_line()
+    {
+        ArrangeFullTest();
+
+        await RunnerWithStress(new CostStressOptions(ConfidenceMode.Off)).ExecuteAsync(FullRun() with { RunOptions = "stress=on" }, Ct);
+        await RunnerWithStress(new CostStressOptions()).ExecuteAsync(FullRun() with { RunOptions = "stress=on" }, Ct);
+
+        _finishes[0].State.ShouldBe(LabRunState.Succeeded);
+        _finishes[0].Problems.ShouldContain(p => p.Code == "lab.stress_not_run" && p.Severity == "warning");
+        _finishes[1].Problems.ShouldNotContain(p => p.Code == "lab.stress_not_run");
+    }
+
     /// <summary>A simulation handler whose answer is a function of the token it was given.</summary>
     private sealed class Scripted(Func<CancellationToken, ValueTask<Result<SimulationRun>>> answer) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>
     {

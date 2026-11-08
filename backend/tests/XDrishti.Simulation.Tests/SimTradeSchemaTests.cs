@@ -89,7 +89,7 @@ public sealed class SimTradeSchemaTests
         Enum.GetNames<ChargeRounding>().ShouldBe(["HalfAwayFromZero", "HalfEven", "Down"]);
         Enum.GetNames<TradeSkip>().ShouldBe(["QuantityBelowOne", "CostAboveMax"]);
         Enum.GetNames<Side>().ShouldBe(["Buy", "Sell"]);
-        Enum.GetNames<NoTradeReason>().ShouldBe(["NoFillBar", "AfterSquareOff", "EntryThroughStop", "LimitNotReached", "PositionOpen", "OrderPendingAtEnd", "EventBlocked", "EventUnavailable"]);
+        Enum.GetNames<NoTradeReason>().ShouldBe(["NoFillBar", "AfterSquareOff", "EntryThroughStop", "LimitNotReached", "PositionOpen", "OrderPendingAtEnd", "EventBlocked", "EventUnavailable", "TierExcluded"]);
     }
 
     [Fact]
@@ -128,9 +128,9 @@ public sealed class SimTradeSchemaTests
     {
         var names = typeof(WalkCounters).GetConstructors().Single().GetParameters();
 
-        names.Length.ShouldBe(44);
+        names.Length.ShouldBe(45);
         names.Take(20).Last().Name.ShouldBe("RiskUnderFourTicks");
-        names.Skip(20).Select(p => p.Name).ShouldBe(["PositionOpen", "ExitsMaxHold", "MaxHoldAtLastClose", "OvernightStopGaps", "OvernightTargetGaps", "SessionsHeld", "SessionsUnseen", "OvernightEntries", "OrderPendingAtEnd", "LegsTotal", "LegsMerged", "StopLoosenIgnored", "ExitsEmaExit", "ExitsTimeStop", "TimeStopAtLastClose", "AddsTaken", "AddsMissed", "AddsSkippedRisk", "AddsSkippedQuantity", "EventBlocked", "EventUnavailable", "ExitsEventExit", "EventExitUnavailable", "EventExitUnavailableTrades"]);
+        names.Skip(20).Select(p => p.Name).ShouldBe(["PositionOpen", "ExitsMaxHold", "MaxHoldAtLastClose", "OvernightStopGaps", "OvernightTargetGaps", "SessionsHeld", "SessionsUnseen", "OvernightEntries", "OrderPendingAtEnd", "LegsTotal", "LegsMerged", "StopLoosenIgnored", "ExitsEmaExit", "ExitsTimeStop", "TimeStopAtLastClose", "AddsTaken", "AddsMissed", "AddsSkippedRisk", "AddsSkippedQuantity", "EventBlocked", "EventUnavailable", "ExitsEventExit", "EventExitUnavailable", "EventExitUnavailableTrades", "TierExcluded"]);
         names.Skip(20).ShouldAllBe(p => p.HasDefaultValue && Equals(p.DefaultValue, 0L));
     }
 
@@ -139,7 +139,7 @@ public sealed class SimTradeSchemaTests
     {
         // Criterion 27: a field appended later cannot be left out of Add, because each property gets its own distinct value and the sum must double it.
         var counterProperties = typeof(WalkCounters).GetProperties().Where(p => p.PropertyType == typeof(long) && p.GetMethod!.IsPublic && p.DeclaringType == typeof(WalkCounters) && p.Name != "Empty").ToList();
-        counterProperties.Count.ShouldBe(44);
+        counterProperties.Count.ShouldBe(45);
         var counters = (WalkCounters)ConstructWithDistinctValues(typeof(WalkCounters));
         var counterSum = counters.Add(counters);
         foreach (var property in counterProperties)
@@ -148,7 +148,7 @@ public sealed class SimTradeSchemaTests
         }
 
         var fateProperties = typeof(RunFates).GetProperties().Where(p => p.PropertyType == typeof(long) && p.DeclaringType == typeof(RunFates) && p.Name is not ("Total" or "NoTrade")).ToList();
-        fateProperties.Count.ShouldBe(15);
+        fateProperties.Count.ShouldBe(16);
         var fates = (RunFates)ConstructWithDistinctValues(typeof(RunFates));
         var fateSum = fates.Add(fates);
         foreach (var property in fateProperties)
@@ -162,11 +162,11 @@ public sealed class SimTradeSchemaTests
     {
         var parameters = typeof(RunFates).GetConstructors().Single().GetParameters();
 
-        parameters.Select(p => p.Name).ShouldBe(["EntriesSuppressed", "TradesBeforeWindow", "OpenAtEnd", "Trades", "NoFillBar", "AfterSquareOff", "EntryThroughStop", "LimitNotReached", "ExcludedAcrossDiscontinuity", "PositionOpen", "SkippedQuantity", "SkippedCost", "OrderPendingAtEnd", "EventBlocked", "EventUnavailable"]);
+        parameters.Select(p => p.Name).ShouldBe(["EntriesSuppressed", "TradesBeforeWindow", "OpenAtEnd", "Trades", "NoFillBar", "AfterSquareOff", "EntryThroughStop", "LimitNotReached", "ExcludedAcrossDiscontinuity", "PositionOpen", "SkippedQuantity", "SkippedCost", "OrderPendingAtEnd", "EventBlocked", "EventUnavailable", "TierExcluded"]);
         parameters.Skip(8).ShouldAllBe(p => p.HasDefaultValue && Equals(p.DefaultValue, 0L), "appended with default 0, so that no positional use moves");
-        new RunFates(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15).Total.ShouldBe(120, "every one of the 15 fates once: PositionOpen, OrderPendingAtEnd and the two event fates are inside the no-trades and are not counted twice");
-        new RunFates(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15).NoTrade.ShouldBe(5 + 6 + 7 + 8 + 10 + 13 + 14 + 15);
-        RunFates.Empty.ShouldBe(new RunFates(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        new RunFates(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16).Total.ShouldBe(136, "every one of the 16 fates once: PositionOpen, OrderPendingAtEnd and the two event fates are inside the no-trades and are not counted twice");
+        new RunFates(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16).NoTrade.ShouldBe(5 + 6 + 7 + 8 + 10 + 13 + 14 + 15 + 16);
+        RunFates.Empty.ShouldBe(new RunFates(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
     }
 
     [Fact]

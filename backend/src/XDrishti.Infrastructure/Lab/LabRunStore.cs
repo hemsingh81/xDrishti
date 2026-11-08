@@ -14,7 +14,7 @@ namespace XDrishti.Infrastructure.Lab;
 /// </summary>
 internal sealed class LabRunStore(NpgsqlDataSource dataSource) : ILabRunStore
 {
-    private const string Columns = "id, key, strategy_id, version, strategy_hash, universe, window_from, window_to, method, config_hash, engine_version, state, stage, progress_done, progress_total, sim_run_keys, counts, problems, stages, labels, error, cancel_requested, created_at, started_at, finished_at";
+    private const string Columns = "id, key, strategy_id, version, strategy_hash, universe, window_from, window_to, method, config_hash, engine_version, state, stage, progress_done, progress_total, sim_run_keys, counts, problems, stages, labels, error, cancel_requested, created_at, started_at, finished_at, run_options";
 
     private const int MaxInsertAttempts = 3;
 
@@ -26,8 +26,8 @@ internal sealed class LabRunStore(NpgsqlDataSource dataSource) : ILabRunStore
         for (var attempt = 0; attempt < MaxInsertAttempts; attempt++)
         {
             await using var insert = dataSource.CreateCommand($"""
-                INSERT INTO lab.lab_runs (id, key, strategy_id, version, strategy_hash, universe, window_from, window_to, method, config_hash, engine_version, state, progress_done, progress_total, sim_run_keys, problems, stages, labels, cancel_requested, created_at, updated_at)
-                VALUES (@id, @key, @strategy_id, @version, @strategy_hash, @universe, @from, @to, @method, @config_hash, @engine_version, 'queued', 0, 0, ARRAY[]::text[], '[]', '[]', @labels, false, @now, @now)
+                INSERT INTO lab.lab_runs (id, key, strategy_id, version, strategy_hash, universe, window_from, window_to, method, config_hash, engine_version, state, progress_done, progress_total, sim_run_keys, problems, stages, labels, cancel_requested, created_at, updated_at, run_options)
+                VALUES (@id, @key, @strategy_id, @version, @strategy_hash, @universe, @from, @to, @method, @config_hash, @engine_version, 'queued', 0, 0, ARRAY[]::text[], '[]', '[]', @labels, false, @now, @now, @run_options)
                 ON CONFLICT (key) WHERE state IN ('queued', 'running', 'succeeded') DO NOTHING
                 RETURNING {Columns}
                 """);
@@ -43,6 +43,7 @@ internal sealed class LabRunStore(NpgsqlDataSource dataSource) : ILabRunStore
             insert.Parameters.AddWithValue("config_hash", NpgsqlDbType.Char, run.ConfigHash);
             insert.Parameters.AddWithValue("engine_version", NpgsqlDbType.Text, run.EngineVersion);
             insert.Parameters.AddWithValue("labels", NpgsqlDbType.Jsonb, JsonSerializer.Serialize(run.Labels, Json));
+            insert.Parameters.AddWithValue("run_options", NpgsqlDbType.Text, (object?)run.RunOptions ?? DBNull.Value);
             insert.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, run.CreatedAt);
             await using (var reader = await insert.ExecuteReaderAsync(cancellationToken))
             {
@@ -216,5 +217,6 @@ internal sealed class LabRunStore(NpgsqlDataSource dataSource) : ILabRunStore
         r.GetBoolean(21),
         r.GetFieldValue<DateTimeOffset>(22),
         r.IsDBNull(23) ? null : r.GetFieldValue<DateTimeOffset>(23),
-        r.IsDBNull(24) ? null : r.GetFieldValue<DateTimeOffset>(24));
+        r.IsDBNull(24) ? null : r.GetFieldValue<DateTimeOffset>(24),
+        r.IsDBNull(25) ? null : r.GetString(25));
 }

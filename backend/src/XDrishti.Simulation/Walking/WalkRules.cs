@@ -7,8 +7,9 @@ namespace XDrishti.Simulation.Walking;
 /// <param name="SquareOffMinute">Minute of the India day at which the position leaves at the open of the first minute that holds a trade: 915 for 15:15. <see cref="WalkRules.NoSquareOff"/> (0) for a swing walk, which has none.</param>
 /// <param name="Fills">The entry limit percent and the slippage; built with <see cref="FillRules.Create"/>. A value that bypassed it (null) is refused by the walker.</param>
 /// <param name="Tick">The instrument's tick size in rupees; built with <see cref="TickSpec.FromMasterPaise"/> or <see cref="TickSpec.FromRupees"/>. A null value is refused by the walker.</param>
+/// <param name="TierOn">The liquidity tier of the instrument on an entry date, read only when <see cref="FillRules.ConservativeSlippage"/> is set (CF-05, D2); null then means every trade is excluded.</param>
 /// <param name="Hold">The longest hold in sessions and the calendar that counts them; null for the intraday walk of ADR 0038, which ends at the square-off. A walk with a hold is a swing walk (X7 to X9) and its square-off must be <see cref="WalkRules.NoSquareOff"/>.</param>
-public readonly record struct WalkRules(double? RewardRisk, int SquareOffMinute, FillRules Fills, TickSpec Tick, SwingHold? Hold = null)
+public readonly record struct WalkRules(double? RewardRisk, int SquareOffMinute, FillRules Fills, TickSpec Tick, SwingHold? Hold = null, Func<DateOnly, LiquidityTier>? TierOn = null)
 {
     /// <summary>The square-off minute of a swing walk: there is none (X7).</summary>
     public const int NoSquareOff = 0;

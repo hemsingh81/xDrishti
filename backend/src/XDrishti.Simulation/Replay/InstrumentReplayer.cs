@@ -391,13 +391,13 @@ public static class InstrumentReplayer
         var context = strategy.ReadsContext ? ContextReader.Of(input.ContextDays) : null;   // the replay has already skipped an instrument whose strategy has no context
         if (strategy.Comparison is { } comparison)
         {
-            var many = comparison.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays);
+            var many = comparison.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays, input.TierOn);
             return many.IsFailure
                 ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + many.Error.Code + ": " + many.Error.Message)
                 : many.Value;
         }
 
-        var run = strategy.Simulator.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays);
+        var run = strategy.Simulator.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays, input.TierOn);
         return run.IsFailure
             ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + run.Error.Code + ": " + run.Error.Message)
             : new ComparisonResult([run.Value], run.Value.Scans);
@@ -469,6 +469,7 @@ public static class InstrumentReplayer
         NoTradeReason.OrderPendingAtEnd => RunFates.Empty with { OrderPendingAtEnd = 1 },
         NoTradeReason.EventBlocked => RunFates.Empty with { EventBlocked = 1 },
         NoTradeReason.EventUnavailable => RunFates.Empty with { EventUnavailable = 1 },
+        NoTradeReason.TierExcluded => RunFates.Empty with { TierExcluded = 1 },
         _ => throw new InvalidOperationException("A candidate outcome of instrument " + symbol + " is neither a trade nor a known no-trade reason."),
     };
 

@@ -66,8 +66,8 @@ internal sealed class HoldOutPass(
             return Result.Failure<HoldOutFigures>(LabErrors.HoldOutUnavailable("The candidate exits are not usable: " + string.Join("; ", errors)));
         }
 
-        var rules = FillRules.Default;
-        var fills = new FillRulesInput(rules.EntryLimitPercent, rules.Slippage.Ticks, rules.Slippage.BarRangeFrac, rules.Slippage.StopExitExtraTicks);
+        // the hold-out is judged on the fills the development was (a conservative run is not judged on default fills)
+        var fills = LabFills.For(run);
         var timeframes = description.Timeframes.Count == 0 ? [Timeframe.M15] : description.Timeframes;
         var r = new List<double>();
         foreach (var timeframe in timeframes)
