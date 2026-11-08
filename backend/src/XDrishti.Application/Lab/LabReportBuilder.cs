@@ -151,6 +151,11 @@ internal static class LabReportBuilder
             }
         }
 
+        if (v.TierExclusion is { } excluded)
+        {
+            w.Add(new ReportWarningView("tier_excluded", $"Conservative slippage left out {excluded.TierExcluded} of {excluded.Candidates} candidates ({P(excluded.Share)}) because the instrument was liquidity tier C or had no usable tier on the entry date: the trades judged are the survivors of that filter, not a clean sample."));
+        }
+
         if (v.Nulls is { } nulls)
         {
             var e = nulls.RandomEntry;

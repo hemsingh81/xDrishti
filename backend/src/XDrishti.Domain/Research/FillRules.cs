@@ -11,8 +11,9 @@ public sealed record FillRules
     /// <summary>The most minutes the entry fill may be delayed (CF-05): the fill window itself is five minutes.</summary>
     public const int MaxEntryDelayMinutes = 5;
 
-    private FillRules(double entryLimitPercent, SlippageConfig slippage, int entryDelayMinutes = 0)
+    private FillRules(double entryLimitPercent, SlippageConfig slippage, int entryDelayMinutes = 0, bool conservativeSlippage = false)
     {
+        ConservativeSlippage = conservativeSlippage;
         EntryLimitPercent = entryLimitPercent;
         Slippage = slippage;
         EntryDelayMinutes = entryDelayMinutes;
@@ -25,6 +26,9 @@ public sealed record FillRules
     /// <summary>Minutes the entry fill is delayed (CF-05, D3): 0, the default, is the rule of P3-03b; N makes the fill minute the N-th minute that holds a trade after the first one, the rule being otherwise unchanged. Part of the canonical text only when above 0, so a run without it keeps its text and its key.</summary>
     public int EntryDelayMinutes { get; }
 
+    /// <summary>Conservative tiered slippage (CF-05, D2, ADR 0229): market-type fills pay at least the bps of the instrument's liquidity tier on the entry date (<see cref="TieredSlippage"/>), and a tier C or unavailable instrument has no trade. False, the default, is the rule of P3-03b. Part of the canonical text only when true, so a run without it keeps its text and its key.</summary>
+    public bool ConservativeSlippage { get; }
+
     /// <summary>Doc 07 §2 "limit +0.1 % max" and the doc 16 slippage defaults.</summary>
     public static FillRules Default { get; } = new(0.1, SlippageConfig.Default);
 
@@ -34,9 +38,9 @@ public sealed record FillRules
     /// <summary>The stable text stored with a run: invariant culture, fixed key order, no white space, shortest round-trip numbers.</summary>
     public string ToCanonicalJson() =>
         string.Create(CultureInfo.InvariantCulture,
-            $"{{\"entry_limit_percent\":{Number(EntryLimitPercent)},\"slippage\":{{\"ticks\":{Number(Slippage.Ticks)},\"bar_range_frac\":{Number(Slippage.BarRangeFrac)},\"stop_exit_extra_ticks\":{Number(Slippage.StopExitExtraTicks)},\"gap_fill\":\"at_open\"}}{(EntryDelayMinutes > 0 ? $",\"entry_delay_minutes\":{EntryDelayMinutes}" : string.Empty)}}}");
+            $"{{\"entry_limit_percent\":{Number(EntryLimitPercent)},\"slippage\":{{\"ticks\":{Number(Slippage.Ticks)},\"bar_range_frac\":{Number(Slippage.BarRangeFrac)},\"stop_exit_extra_ticks\":{Number(Slippage.StopExitExtraTicks)},\"gap_fill\":\"at_open\"}}{(EntryDelayMinutes > 0 ? $",\"entry_delay_minutes\":{EntryDelayMinutes}" : string.Empty)}{(ConservativeSlippage ? ",\"slippage_tiers\":\"conservative\"" : string.Empty)}}}");
 
-    public static Result<FillRules> Create(double entryLimitPercent, SlippageConfig slippage, int entryDelayMinutes = 0)
+    public static Result<FillRules> Create(double entryLimitPercent, SlippageConfig slippage, int entryDelayMinutes = 0, bool conservativeSlippage = false)
     {
         if (entryDelayMinutes is < 0 or > MaxEntryDelayMinutes)
         {
@@ -54,7 +58,7 @@ public sealed record FillRules
         }
 
         // -0.0 passes the range check and is a different double: it would print as "-0" in the canonical JSON. Zero is always +0.
-        return Result.Success(new FillRules(entryLimitPercent == 0 ? 0 : entryLimitPercent, slippage, entryDelayMinutes));
+        return Result.Success(new FillRules(entryLimitPercent == 0 ? 0 : entryLimitPercent, slippage, entryDelayMinutes, conservativeSlippage));
     }
 
     private static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);

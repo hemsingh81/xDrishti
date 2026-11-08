@@ -67,6 +67,8 @@ internal sealed class LabFullTest(
         var instruments = 0;
         var instrumentsRun = 0;
         var defaultTrades = 0;
+        long candidatesSeen = 0;
+        long tierExcluded = 0;
         for (var i = 0; i < timeframes.Count; i++)
         {
             var request = template with { EvaluationTimeframe = timeframes[i], Exits = exits };
@@ -81,6 +83,8 @@ internal sealed class LabFullTest(
             instruments = comparison.Candidates[0].Run.Totals.Instruments;
             instrumentsRun = Math.Max(instrumentsRun, comparison.Candidates[0].Run.Totals.InstrumentsRun);
             defaultTrades += comparison.Candidates[0].Run.Trades.Count;
+            candidatesSeen += comparison.Candidates[0].Run.Totals.CandidatesInWindow;
+            tierExcluded += comparison.Candidates[0].Run.Totals.Fates.TierExcluded;
             var costed = comparison.Report.Unit == "RNet";
             var all = new List<(SimTrade Trade, string Candidate)>();
             foreach (var candidate in comparison.Candidates)
@@ -136,6 +140,12 @@ internal sealed class LabFullTest(
             limits.Add("no trades in any cell");
         }
 
+        var exclusion = template.Fills?.ConservativeSlippage == true ? new TierExclusionView(candidatesSeen, tierExcluded) : null;
+        if (exclusion is not null)
+        {
+            limits.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"conservative slippage: {exclusion.TierExcluded} of {exclusion.Candidates} candidates ({exclusion.Share * 100:0.#} %) were left out because the instrument was liquidity tier C or had no usable tier on the entry date; the trades judged are the survivors of that filter, not a clean sample. This goes beyond the tier C rule of the spec and awaits the owner's view."));
+        }
+
         var cellList = cellViews.Select(c => CellOf(c.Timeframe, c.Side, c.Selection, c.Input)).ToList();
         var view = new LabVerdictView(
             verdict.Outcome.ToString().ToUpperInvariant(),
@@ -151,7 +161,8 @@ internal sealed class LabFullTest(
                 "The full-period figures are " + ExplorationLabel + ".",
                 "The candidate exits are a fixed list; the strategy's own exit is not a candidate.",
             ],
-            Trials: TrialsView.Of(parts, honest, settings.MultipleTesting));
+            Trials: TrialsView.Of(parts, honest, settings.MultipleTesting),
+            TierExclusion: exclusion);
         var oos = OosEvidenceBuilder.Trades(cells);
         return Result.Success(new FullTestOutcome(runs, view, instruments, instrumentsRun, defaultTrades, oos, [.. oos.Select(t => sources[t])]));
     }

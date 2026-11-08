@@ -26,7 +26,13 @@ public static class SimExportJson
 
     private static readonly JsonSerializerOptions RecordOptions = new(SimExportJsonContext.Default.Options)
     {
-        TypeInfoResolver = SimExportJsonContext.Default.WithAddedModifier(WithoutTrades),
+        TypeInfoResolver = SimExportJsonContext.Default.WithAddedModifier(WithoutTrades).WithAddedModifier(WithoutZeroTierExcluded),
+    };
+
+    /// <summary>The export options: the context's, with the counter of CF-05 left out while it is 0.</summary>
+    private static readonly JsonSerializerOptions ExportOptions = new(SimExportJsonContext.Default.Options)
+    {
+        TypeInfoResolver = SimExportJsonContext.Default.WithAddedModifier(WithoutZeroTierExcluded),
     };
 
     /// <summary>Writes <c>run.json</c> to the sink.</summary>
@@ -45,7 +51,7 @@ public static class SimExportJson
 
         var envelope = new RunEnvelope(new ExportHeader(format, Schema), new LabelsView(labels.Lines, labels.NotModelled, RunLabels.IsVerified(run.EngineVersion)), run);
         using var writer = new Utf8JsonWriter(sink, WriterOptions);
-        JsonSerializer.Serialize(writer, envelope, SimExportJsonContext.Default.RunEnvelope);
+        JsonSerializer.Serialize(writer, envelope, (JsonTypeInfo<RunEnvelope>)ExportOptions.GetTypeInfo(typeof(RunEnvelope)));
         writer.Flush();
     }
 
@@ -65,6 +71,22 @@ public static class SimExportJson
         using var writer = new Utf8JsonWriter(sink, WriterOptions);
         JsonSerializer.Serialize(writer, run, (JsonTypeInfo<SimulationRun>)RecordOptions.GetTypeInfo(typeof(SimulationRun)));
         writer.Flush();
+    }
+
+    /// <summary>
+    /// CF-05 (ADR 0229): the <c>tier_excluded</c> counter of the fates and of the walk counters is written only when it is above 0, so the record text, and with it the record hash, of a run without conservative slippage is what it was before the counter existed.
+    /// </summary>
+    private static void WithoutZeroTierExcluded(JsonTypeInfo typeInfo)
+    {
+        if (typeInfo.Type != typeof(RunFates) && typeInfo.Type != typeof(WalkCounters))
+        {
+            return;
+        }
+
+        foreach (var property in typeInfo.Properties.Where(p => string.Equals(p.Name, "tier_excluded", StringComparison.Ordinal)))
+        {
+            property.ShouldSerialize = static (_, value) => value is not 0L;
+        }
     }
 
     private static void WithoutTrades(JsonTypeInfo typeInfo)

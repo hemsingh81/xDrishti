@@ -14,7 +14,7 @@ namespace XDrishti.Api.IntegrationTests.Research;
 [Collection(ApiTestSuite.Name)]
 public sealed class LabRunStoreTests(ApiFactory factory, ResearchGrantsTests.DedicatedServer server) : IClassFixture<ResearchGrantsTests.DedicatedServer>
 {
-    private static readonly string[] IdentityColumns = ["id", "key", "strategy_id", "version", "strategy_hash", "universe", "window_from", "window_to", "method", "config_hash", "engine_version", "labels", "created_at"];
+    private static readonly string[] IdentityColumns = ["id", "key", "strategy_id", "version", "strategy_hash", "universe", "window_from", "window_to", "method", "config_hash", "engine_version", "labels", "created_at", "run_options"];
 
     private static readonly string[] StateColumns = ["state", "stage", "progress_done", "progress_total", "sim_run_keys", "counts", "problems", "stages", "error", "host", "cancel_requested", "started_at", "finished_at", "updated_at"];
 
@@ -109,6 +109,19 @@ public sealed class LabRunStoreTests(ApiFactory factory, ResearchGrantsTests.Ded
         (await SqlStateAsync(server.App, "TRUNCATE lab.lab_runs")).ShouldBe(PostgresErrorCodes.InsufficientPrivilege);
         (await SqlStateAsync(server.App, $"UPDATE lab.lab_runs SET state = 'paused' WHERE id = '{id}'")).ShouldBe(PostgresErrorCodes.CheckViolation);
         (await StoreKit.CountAsync(server.App, "SELECT count(*) FROM lab.lab_runs WHERE state = 'running'", Ct)).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_run_options_are_stored_with_the_run_and_read_back_and_a_run_without_options_has_none()
+    {
+        await ResetAsync();
+        await using var host = Host();
+
+        var plain = await WithStoreAsync(host, s => s.InsertOrGetAsync(New(Key('7')), Ct).AsTask());
+        var optioned = await WithStoreAsync(host, s => s.InsertOrGetAsync(New(Key('8')) with { RunOptions = "slippage=conservative;stress=off" }, Ct).AsTask());
+
+        (await WithStoreAsync(host, s => s.GetAsync(plain.Run.Id, Ct).AsTask()))!.RunOptions.ShouldBeNull();
+        (await WithStoreAsync(host, s => s.GetAsync(optioned.Run.Id, Ct).AsTask()))!.RunOptions.ShouldBe("slippage=conservative;stress=off");
     }
 
     [Fact]

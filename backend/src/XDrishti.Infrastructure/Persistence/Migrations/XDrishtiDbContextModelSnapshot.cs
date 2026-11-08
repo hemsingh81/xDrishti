@@ -9319,6 +9319,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(0)
                         .HasColumnName("progress_total");
 
+                    b.Property<string>("RunOptions")
+                        .HasColumnType("text")
+                        .HasColumnName("run_options");
+
                     b.PrimitiveCollection<string[]>("SimRunKeys")
                         .IsRequired()
                         .HasColumnType("text[]")

@@ -124,12 +124,12 @@ internal sealed class Hand
         return Cand.Make(Side, index, Decision, Stop, "09:45", (TriggerClose, TriggerClose, TriggerClose, TriggerClose));
     }
 
-    public WalkRules Rules(FillRules fills) => new(RewardRisk, SquareOffMinute, fills, TickSpec.FromRupees(Tick).Value);
+    public WalkRules Rules(FillRules fills, Func<DateOnly, LiquidityTier>? tierOn = null) => new(RewardRisk, SquareOffMinute, fills, TickSpec.FromRupees(Tick).Value, TierOn: tierOn);
 
-    public WalkOutcome Walk(FillRules fills)
+    public WalkOutcome Walk(FillRules fills, Func<DateOnly, LiquidityTier>? tierOn = null)
     {
         var bars = Bars();
-        var result = TradeWalker.Walk(Candidate(bars), bars, Rules(fills));
+        var result = TradeWalker.Walk(Candidate(bars), bars, Rules(fills, tierOn));
         result.IsSuccess.ShouldBeTrue(Name + ": " + (result.IsFailure ? result.Error.Code : string.Empty));
         return result.Value;
     }

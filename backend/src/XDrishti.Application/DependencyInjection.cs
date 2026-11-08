@@ -10,6 +10,7 @@ using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.LiveTrading;
+using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.OptionBackfill;
@@ -779,6 +780,7 @@ public static class DependencyInjection
     /// <summary>Research (P3-04a): running a strategy over the stored bars. The engine behind <see cref="ISimulationEngine"/> is an adapter in Infrastructure (ADR 0039).</summary>
     private static void AddResearch(this IServiceCollection services)
     {
+        services.AddScoped<IEntryTierSource, EntryTiers>(); // the tier of an instrument on an entry date for conservative slippage (CF-05, ADR 0229)
         services.AddScoped<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, RunSimulationHandler>();
         services.AddScoped<IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, RunSimulationHandler>();
         services.AddScoped<IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, RunSimulationHandler>(); // the random-entry walk of the Lab's chance test (CF-07, ADR 0208)

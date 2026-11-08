@@ -25,6 +25,9 @@ internal sealed class LabRunRow
 
     public string EngineVersion { get; set; } = string.Empty;
 
+    /// <summary>The optional choices of the post that change the run (CF-05, ADR 0229), e.g. <c>slippage=conservative;stress=off</c>; null when none was made.</summary>
+    public string? RunOptions { get; set; }
+
     public string State { get; set; } = string.Empty;
 
     public string? Stage { get; set; }

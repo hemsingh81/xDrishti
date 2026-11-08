@@ -60,6 +60,18 @@ public sealed class LabReportCostStressTests
     }
 
     [Fact]
+    public void A_conservative_verdict_warns_how_many_candidates_the_tier_filter_left_out_and_a_default_verdict_does_not()
+    {
+        var verdict = Verdict(Block(true)) with { TierExclusion = new TierExclusionView(1000, 250) };
+
+        var warning = LabReportBuilder.Build(Run(), verdict, 6).Warnings.Single(w => w.Code == "tier_excluded");
+
+        warning.Text.ShouldContain("250 of 1000 candidates");
+        warning.Text.ShouldContain("survivors");
+        LabReportBuilder.Build(Run(), Verdict(Block(true)), 6).Warnings.ShouldNotContain(w => w.Code == "tier_excluded");
+    }
+
+    [Fact]
     public void A_missed_stress_or_delay_gate_warns_and_says_it_is_report_only()
     {
         var w = LabReportBuilder.Build(Run(), Verdict(Block(true, "fail", "fail")), 6).Warnings.Single(x => x.Code == "cost_stress").Text;

@@ -45,4 +45,18 @@ public sealed class FillCostComparisonTests
         FillCostComparison.Compare(Fills(), bad).IsFailure.ShouldBeTrue();
         FillCostComparison.Compare(bad, Fills(2)).IsFailure.ShouldBeTrue();
     }
+
+    [Fact]
+    public void Rules_that_differ_in_the_slippage_tiers_are_not_compared_even_when_the_amounts_differ()
+    {
+        var plain = FillRules.Default.ToCanonicalJson();
+        var conservative = FillRules.Create(0.1, SlippageConfig.Create(1, 0.1, 1).Value, 0, true).Value.ToCanonicalJson();
+
+        var result = FillCostComparison.Compare(plain, conservative);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(FillCostComparison.Code);
+        result.Error.Message.ShouldContain("slippage tiers");
+        FillCostComparison.Compare(conservative, plain).IsFailure.ShouldBeTrue();
+    }
 }

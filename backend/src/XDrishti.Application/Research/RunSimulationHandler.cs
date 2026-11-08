@@ -44,7 +44,8 @@ internal sealed class RunSimulationHandler(
     TimeProvider time,
     ILogger<RunSimulationHandler> logger,
     IRandomEntryEngine randomEntries,
-    IPlaceboEngine placeboEngine) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>
+    IPlaceboEngine placeboEngine,
+    IEntryTierSource? entryTiers = null) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>
 {
     private readonly InstrumentInputReader _reader = new(bars, barQueries, adjustments);
 
@@ -395,7 +396,7 @@ internal sealed class RunSimulationHandler(
             return Result.Failure<FillRules?>(slippage.Error);
         }
 
-        var rules = FillRules.Create(input.EntryLimitPercent, slippage.Value, input.EntryDelayMinutes);
+        var rules = FillRules.Create(input.EntryLimitPercent, slippage.Value, input.EntryDelayMinutes, input.ConservativeSlippage);
         return rules.IsFailure ? Result.Failure<FillRules?>(rules.Error) : Result.Success<FillRules?>(rules.Value);
     }
 
@@ -473,7 +474,8 @@ internal sealed class RunSimulationHandler(
 
         var request = context.Request;
         var (raw, factors) = await _reader.ReadAsync(id, request.To, cancellationToken);
-        return InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"), context.Events, context.ResultsDays);
+        return InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"), context.Events, context.ResultsDays,
+            request.Fills?.ConservativeSlippage == true && entryTiers is not null ? await entryTiers.ForAsync(id, request.From, request.To, cancellationToken) : null);
     }
 
     private sealed record Universe(UniverseKind Kind, Guid? BasketId, string? BasketName, string Label, IReadOnlyList<Guid> Ids, IReadOnlyDictionary<Guid, BarsInstrument>? Known);

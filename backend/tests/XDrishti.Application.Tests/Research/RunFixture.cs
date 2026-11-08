@@ -59,6 +59,9 @@ internal sealed class RunFixture
 
     public ISurpriseInputsReader SurpriseReader { get; } = Substitute.For<ISurpriseInputsReader>();
 
+    /// <summary>The tier source given to the handler (CF-05, ADR 0229); null, as in a host without it, until a test sets it.</summary>
+    public IEntryTierSource? EntryTiers { get; set; }
+
     public FakeTimeProvider Time { get; } = new();
 
     public StructuredLogger<RunSimulationHandler> Log { get; } = new();
@@ -74,7 +77,7 @@ internal sealed class RunFixture
         Store.ForbidMerge = true;
     }
 
-    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, EventSnapshots, FilingTimes, SurpriseReader, Time, Log, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IRandomEntryEngine>(), NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IPlaceboEngine>());
+    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, EventSnapshots, FilingTimes, SurpriseReader, Time, Log, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IRandomEntryEngine>(), NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IPlaceboEngine>(), EntryTiers);
 
     /// <summary>Registers an instrument with a row (the tick is in paise, as the master has it) and its stored bars.</summary>
     public Guid Add(string symbol, IEnumerable<Bar>? bars = null, decimal? tickPaise = 5m, Guid? id = null)

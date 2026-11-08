@@ -37,4 +37,9 @@ public enum NoTradeReason
     /// The filter <c>not_event_day</c> found no visible results entry for the instrument at the decision instant (P15-06): nothing is known, so there is no entry. Never a pass.
     /// </summary>
     EventUnavailable,
+
+    /// <summary>
+    /// The run asked for conservative tiered slippage (CF-05, D2, ADR 0229) and the instrument is tier C (not priced) or its tier is unavailable at the entry date: the trade is excluded and counted, never priced as tier A. Produced by the walker before the fill is priced.
+    /// </summary>
+    TierExcluded,
 }

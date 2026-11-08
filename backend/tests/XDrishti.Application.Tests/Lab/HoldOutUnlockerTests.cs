@@ -182,6 +182,36 @@ public sealed class HoldOutUnlockerTests
         _store.Unlocks.ShouldBeEmpty();
     }
 
+    [Theory]
+    [InlineData("robust", "slippage=conservative")]
+    [InlineData("robust", "stress=off")]
+    [InlineData("full", "stress=on")]
+    public async Task A_what_if_run_cannot_take_the_hold_out_by_hand_or_by_the_auto_option(string method, string options)
+    {
+        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
+        var run = Run(method: method);
+        _runs.GetAsync(run.Id, Arg.Any<CancellationToken>()).Returns(run with { RunOptions = options });
+
+        var manual = await Unlocker().UnlockAsync(run.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct);
+        var auto = await Unlocker(new HoldOutOptions(AutoUnlock: true)).TryAutoAsync(run.Id, Verdict(), Ct);
+
+        manual.Error.Code.ShouldBe(LabErrors.HoldOutUnavailableCode);
+        manual.Error.Message.ShouldContain("what-if");
+        auto.ShouldBeNull();
+        _store.Unlocks.ShouldBeEmpty("the single look is not spent");
+        _pass.Calls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_spelled_default_is_still_a_default_run_and_may_take_the_hold_out()
+    {
+        _pass.Figures = new HoldOutFigures(45, 0.12, new DateOnly(2026, 5, 1), new DateOnly(2026, 10, 30));
+        var run = Run();
+        _runs.GetAsync(run.Id, Arg.Any<CancellationToken>()).Returns(run with { RunOptions = "stress=on" });
+
+        (await Unlocker().UnlockAsync(run.Id, HoldOutUnlocker.OwnerMode, "owner:x", Ct)).IsSuccess.ShouldBeTrue();
+    }
+
     [Fact]
     public async Task The_auto_option_off_never_runs_and_on_it_runs_once_recorded_as_auto_when_every_development_row_passes()
     {
