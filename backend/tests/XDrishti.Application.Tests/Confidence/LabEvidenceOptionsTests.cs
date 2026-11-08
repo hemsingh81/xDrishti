@@ -35,6 +35,24 @@ public sealed class LabEvidenceOptionsTests
     }
 
     [Fact]
+    public async Task A_newer_run_without_the_nulls_block_or_with_its_own_draws_is_skipped()
+    {
+        var oldDefault = Guid.NewGuid();
+        var f = new ReadinessFixture();
+        f.Runs.HandleAsync(Arg.Any<ListLabRunsQuery>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(Result.Success<IReadOnlyList<LabRunView>>(
+        [
+            RunOf(oldDefault, DateTimeOffset.UnixEpoch.AddDays(1), new LabRunOptionsView("default", true, true)),
+            RunOf(Guid.NewGuid(), DateTimeOffset.UnixEpoch.AddDays(2), new LabRunOptionsView("default", true, false, false, null)),
+            RunOf(Guid.NewGuid(), DateTimeOffset.UnixEpoch.AddDays(3), new LabRunOptionsView("default", true, false, true, 2000)),
+        ])));
+
+        await f.LabReader.ReadAsync(ReadinessFixture.Strategy, 1, Ct);
+
+        await f.Run.Received(1).HandleAsync(Arg.Is<GetLabRunQuery>(q => q.Id == oldDefault), Arg.Any<CancellationToken>());
+        await f.Run.DidNotReceive().HandleAsync(Arg.Is<GetLabRunQuery>(q => q.Id != oldDefault), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Only_non_default_runs_leave_the_scorecard_without_a_lab_verdict()
     {
         var f = new ReadinessFixture();

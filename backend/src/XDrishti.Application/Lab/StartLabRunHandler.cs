@@ -33,7 +33,9 @@ internal sealed class StartLabRunHandler(
     ILogger<StartLabRunHandler> logger,
     LabPreregistration? preregistration = null,
     LabHoldOutGuard? holdOut = null,
-    CostStressOptions? costStress = null) : ICommandHandler<StartLabRunCommand, StartedLabRun>
+    CostStressOptions? costStress = null,
+    NullOptions? nullOptions = null,
+    PlateauOptions? plateauOptions = null) : ICommandHandler<StartLabRunCommand, StartedLabRun>
 {
     public async ValueTask<Result<StartedLabRun>> HandleAsync(StartLabRunCommand command, CancellationToken cancellationToken)
     {
@@ -90,7 +92,9 @@ internal sealed class StartLabRunHandler(
 
         var robust = string.Equals(command.Method, LabSettings.RobustMethod, StringComparison.Ordinal);
         var method = robust ? LabSettings.RobustMethod : full ? LabSettings.FullMethod : LabSettings.QuickMethod;
-        var options = new LabRunOptions(string.Equals(command.Slippage, "conservative", StringComparison.Ordinal), command.Stress);
+        // CF-07, ADR 0231: `nulls: true` and a `draws` equal to the configured number are the default and are not stored; only a real difference changes the key
+        var configuredDraws = (nullOptions ?? new NullOptions()).Draws;
+        var options = new LabRunOptions(string.Equals(command.Slippage, "conservative", StringComparison.Ordinal), command.Stress, null, command.Nulls == false, command.Draws is { } asked && asked != configuredDraws ? asked : null);
         var keyOptions = options.KeyText(robust);
         // CF-05, ADR 0230: a setting that changes what a run computes enters the key when it is used and differs from its default, so changing it cannot reuse an old result
         var stress = costStress ?? new CostStressOptions();
@@ -123,6 +127,16 @@ internal sealed class StartLabRunHandler(
         if (options.Stress == false)
         {
             labels = [.. labels, RunLabels.StressOff];
+        }
+
+        if (options.NullsOff)
+        {
+            labels = [.. labels, RunLabels.NullsOff];
+        }
+
+        if (options.Draws is { } ownDraws)
+        {
+            labels = [.. labels, RunLabels.Draws(ownDraws)];
         }
 
         var now = time.GetUtcNow();
@@ -176,6 +190,37 @@ internal sealed class StartLabRunHandler(
         if (command.Stress == false && string.Equals(command.Method, LabSettings.RobustMethod, StringComparison.Ordinal) && costStress is { IsOn: true, Enforce: true })
         {
             return LabErrors.InvalidInput("`stress: false` is refused on a `robust` run while the cost stress is enforced (Confidence:CostStress:Enforce): it would skip the cap the gates apply.");
+        }
+
+        if ((command.Nulls is not null || command.Draws is not null) && !string.Equals(command.Method, LabSettings.RobustMethod, StringComparison.Ordinal))
+        {
+            return LabErrors.InvalidInput("`nulls` and `draws` belong to the chance and plateau block of a `robust` run.");
+        }
+
+        if (command.Nulls == false && command.Draws is not null)
+        {
+            return LabErrors.InvalidInput("`draws` has no meaning with `nulls: false`.");
+        }
+
+        var nullCfg = nullOptions ?? new NullOptions();
+        if (command.Draws is { } draws && (draws < NullOptions.MinRequestDraws || draws > nullCfg.MaxDraws))
+        {
+            return LabErrors.InvalidInput($"`draws` is {NullOptions.MinRequestDraws.ToString(CultureInfo.InvariantCulture)} to {nullCfg.MaxDraws.ToString(CultureInfo.InvariantCulture)} (Confidence:Nulls:MaxDraws).");
+        }
+
+        if (command.Nulls == false && nullCfg is { IsOn: true, Enforce: true })
+        {
+            return LabErrors.InvalidInput("`nulls: false` is refused on a `robust` run while the nulls are enforced (Confidence:Nulls:Enforce): it would skip the cap the gates apply.");
+        }
+
+        if (command.Nulls == false && plateauOptions is { IsOn: true, Enforce: true })
+        {
+            return LabErrors.InvalidInput("`nulls: false` is refused on a `robust` run while the plateau gate is enforced (Confidence:Plateau:Enforce): the gate lives in the same block and leaving it out would skip the cap.");
+        }
+
+        if (command.Draws is not null && !nullCfg.IsOn)
+        {
+            return LabErrors.InvalidInput("`draws` is refused while the nulls are switched off (Confidence:Nulls:Mode).");
         }
 
         if (command.Version is < 1)

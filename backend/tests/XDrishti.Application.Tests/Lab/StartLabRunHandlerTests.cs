@@ -61,7 +61,7 @@ public sealed class StartLabRunHandlerTests
     private static LabRun ToRun(NewLabRun n) => new(
         n.Id, n.Key, n.StrategyId, n.Version, n.StrategyHash, n.Universe, n.From, n.To, n.Method, n.ConfigHash, n.EngineVersion, LabRunState.Queued, null, 0, 0, [], null, [], [], n.Labels, null, false, n.CreatedAt, null, null, n.RunOptions);
 
-    private StartLabRunHandler Handler(XDrishti.Domain.Confidence.CostStressOptions? costStress = null) => new(_runs, _ledger, _strategies, _resolver, _baskets, _bars, _engine, _sheets, LabSettings.Default, new FakeTimeProvider(new DateTimeOffset(2026, 10, 22, 6, 0, 0, TimeSpan.Zero)), NullLogger<StartLabRunHandler>.Instance, costStress: costStress);
+    private StartLabRunHandler Handler(XDrishti.Domain.Confidence.CostStressOptions? costStress = null, XDrishti.Domain.Confidence.NullOptions? nulls = null, XDrishti.Domain.Confidence.PlateauOptions? plateau = null) => new(_runs, _ledger, _strategies, _resolver, _baskets, _bars, _engine, _sheets, LabSettings.Default, new FakeTimeProvider(new DateTimeOffset(2026, 10, 22, 6, 0, 0, TimeSpan.Zero)), NullLogger<StartLabRunHandler>.Instance, costStress: costStress, nullOptions: nulls, plateauOptions: plateau);
 
     private static ResolveResult Matched(int count) =>
         new([.. Enumerable.Range(1, count).Select(i => new ResolvedInstrument("S" + i, new Guid(i, 0, 0, [0, 0, 0, 0, 0, 0, 0, 1]), "S" + i, "Name " + i, "EQUITY", null, false, true))], [], count, 0);
@@ -326,12 +326,12 @@ public sealed class StartLabRunHandlerTests
         await _ledger.DidNotReceiveWithAnyArgs().AppendAsync(default!, Ct);
     }
 
-    private async Task<Result<StartedLabRun>> Post(string method, string? slippage = null, bool? stress = null, XDrishti.Domain.Confidence.CostStressOptions? costStress = null)
+    private async Task<Result<StartedLabRun>> Post(string method, string? slippage = null, bool? stress = null, XDrishti.Domain.Confidence.CostStressOptions? costStress = null, bool? nulls = null, int? draws = null, XDrishti.Domain.Confidence.NullOptions? nullOptions = null, XDrishti.Domain.Confidence.PlateauOptions? plateau = null)
     {
         _sheets.FindAsync(LabSettings.Default.CostSheetId, Arg.Any<CancellationToken>()).Returns(Result.Success(FixtureSheet.Sheet));
         _resolver.HandleAsync(Arg.Any<ResolveInstrumentsQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Matched(2)));
         var window = (new DateOnly(2026, 2, 1), new DateOnly(2026, 4, 30));
-        return await Handler(costStress).HandleAsync(new StartLabRunCommand("LAB_TEST", null, null, ["S1"], method, window.Item1, window.Item2, slippage, stress), Ct);
+        return await Handler(costStress, nullOptions, plateau).HandleAsync(new StartLabRunCommand("LAB_TEST", null, null, ["S1"], method, window.Item1, window.Item2, slippage, stress, nulls, draws), Ct);
     }
 
     [Fact]
@@ -393,6 +393,60 @@ public sealed class StartLabRunHandlerTests
         conservativeOptions.ShouldBe("slippage=conservative");
         noStressOptions.ShouldBe("stress=off");
         fullStressOptions.ShouldBe("stress=on");
+    }
+
+    [Fact]
+    public async Task Nulls_and_draws_that_differ_from_the_defaults_are_other_labelled_runs_and_spelled_defaults_are_the_same_run()
+    {
+        var plain = (await Post("robust")).Value.Run.Key;
+        var spelled = (await Post("robust", nulls: true, draws: 1000)).Value.Run;
+        var spelledOptions = _inserted[0].RunOptions;
+        var off = (await Post("robust", nulls: false)).Value.Run.Key;
+        var offOptions = _inserted[0].RunOptions;
+        var offLabels = _inserted[0].Labels;
+        var own = (await Post("robust", draws: 2000)).Value.Run.Key;
+        var ownOptions = _inserted[0].RunOptions;
+        var ownLabels = _inserted[0].Labels;
+
+        spelled.Key.ShouldBe(plain);
+        spelledOptions.ShouldBeNull();
+        off.ShouldNotBe(plain);
+        own.ShouldNotBe(plain);
+        own.ShouldNotBe(off);
+        offOptions.ShouldBe("nulls=off");
+        ownOptions.ShouldBe("draws=2000");
+        offLabels.ShouldContain(RunLabels.NullsOff);
+        ownLabels.ShouldContain(RunLabels.Draws(2000));
+        spelled.Options!.IsDefault.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Draws_are_bounded_by_the_settings_cap_and_nulls_and_draws_need_a_robust_run()
+    {
+        var capped = new XDrishti.Domain.Confidence.NullOptions(MaxDraws: 3000);
+
+        (await Post("robust", draws: 199)).Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+        (await Post("robust", draws: 5001)).Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+        (await Post("robust", draws: 3001, nullOptions: capped)).Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+        (await Post("robust", draws: 3000, nullOptions: capped)).IsSuccess.ShouldBeTrue();
+        (await Post("robust", draws: 200)).IsSuccess.ShouldBeTrue();
+        (await Post("full", nulls: false)).Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+        (await Post("quick", draws: 500)).Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+        (await Post("robust", nulls: false, draws: 500)).Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+    }
+
+    [Fact]
+    public async Task Nulls_false_is_refused_while_enforced_and_draws_while_the_nulls_are_off()
+    {
+        var enforced = new XDrishti.Domain.Confidence.NullOptions(Enforce: true);
+        var off = new XDrishti.Domain.Confidence.NullOptions(Mode: XDrishti.Domain.Confidence.ConfidenceMode.Off);
+
+        (await Post("robust", nulls: false, nullOptions: enforced)).Error.Message.ShouldContain("enforced");
+        (await Post("robust", nulls: false)).IsSuccess.ShouldBeTrue();
+        (await Post("robust", draws: 500, nullOptions: off)).IsFailure.ShouldBeTrue();
+        var plateau = await Post("robust", nulls: false, plateau: new XDrishti.Domain.Confidence.PlateauOptions(Enforce: true));
+        plateau.Error.Message.ShouldContain("plateau");
+        (await Post("robust", nulls: true, plateau: new XDrishti.Domain.Confidence.PlateauOptions(Enforce: true))).IsSuccess.ShouldBeTrue();
     }
 
     [Fact]

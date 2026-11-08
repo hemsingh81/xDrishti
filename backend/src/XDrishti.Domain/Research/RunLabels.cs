@@ -37,6 +37,12 @@ public static class RunLabels
     /// <summary>The label of a Lab run posted with the cost stress explicitly off (CF-05, ADR 0229).</summary>
     public const string StressOff = "stress: off";
 
+    /// <summary>The label of a robust Lab run posted with the chance and plateau block left out (<c>nulls: false</c>, CF-07, ADR 0231).</summary>
+    public const string NullsOff = "nulls: off (no random-entry null, placebo set, mirror or plateau)";
+
+    /// <summary>The label of a robust Lab run posted with its own number of random-entry seeds (CF-07, ADR 0231): a what-if, never scorecard evidence.</summary>
+    public static string Draws(int draws) => "draws: " + draws.ToString(System.Globalization.CultureInfo.InvariantCulture) + " random-entry seeds (not the configured number)";
+
     private const string SurvivorshipNote = "; survivorship is bounded and disclosed, not avoided (ISS-22)";
 
     private const string TickLabel = "tick: today's master tick; rounding to the grid is approximate";

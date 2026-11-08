@@ -42111,9 +42111,20 @@
           },
           "isDefault": {
             "type": "boolean"
+          },
+          "nulls": {
+            "type": "boolean",
+            "default": true
+          },
+          "draws": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         },
-        "description": "The options a run was posted with, as the effective values (CF-05, ADR 0229): `slippage` is `default` or `conservative`; `stress` is whether the cost stress block was wanted (on for `robust` unless posted off, off for the others unless posted on). `IsDefault` is true when both are what a post without options gets; only such a run may be the scorecard's evidence basis."
+        "description": "The options a run was posted with, as the effective values (CF-05, ADR 0229): `slippage` is `default` or `conservative`; `stress` is whether the cost stress block was wanted (on for `robust` unless posted off, off for the others unless posted on). `Nulls` is false when the chance and plateau block was posted left out (CF-07, ADR 0231) and `Draws` is the posted number of random-entry seeds (null: the configured number). `IsDefault` is true when all are what a post without options gets; only such a run may be the scorecard's evidence basis."
       },
       "LabRunProgress": {
         "required": [
@@ -61337,9 +61348,22 @@
               "null",
               "boolean"
             ]
+          },
+          "nulls": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "draws": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
           }
         },
-        "description": "Body of `POST /api/lab/runs` (spec P5-02): a stored strategy version (the latest when `version` is omitted), the universe, the method (`quick`) and optionally the window (default: the last year of stored data), `slippage` (`default` or `conservative`: tiered floors, tier C excluded; CF-05) and `stress` (the cost stress block; default on for `robust`, off for `quick` and `full`)."
+        "description": "Body of `POST /api/lab/runs` (spec P5-02): a stored strategy version (the latest when `version` is omitted), the universe, the method (`quick`) and optionally the window (default: the last year of stored data), `slippage` (`default` or `conservative`: tiered floors, tier C excluded; CF-05) and `stress` (the cost stress block; default on for `robust`, off for `quick` and `full`), `nulls` (`false` leaves the chance and plateau block out of a `robust` run; default true) and `draws` (random-entry seeds, 200 to `Confidence:Nulls:MaxDraws`, default the configured 1000); either makes the run a labelled what-if (CF-07, ADR 0231)."
       },
       "StartLabRunUniverse": {
         "type": "object",

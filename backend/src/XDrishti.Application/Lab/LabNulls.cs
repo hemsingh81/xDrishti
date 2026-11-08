@@ -46,6 +46,9 @@ internal sealed class LabNulls(IQueryHandler<RunNullWalkQuery, Result<NullWalkRu
     /// <summary>True when the null is computed.</summary>
     public bool IsOn => options.IsOn;
 
+    /// <summary>True when the owner has turned the nulls cap on and the block is computed (ADR 0231: a post may not leave the block out then).</summary>
+    public bool Enforced => options is { IsOn: true, Enforce: true };
+
     /// <summary>The steps of the stage, for the progress total: the trades to restate with random entries, then (when the placebo set is on) the placebo pairs that have a placement.</summary>
     public int Steps(FullTestOutcome full, DateOnly developmentEnd)
     {
@@ -68,6 +71,9 @@ internal sealed class LabNulls(IQueryHandler<RunNullWalkQuery, Result<NullWalkRu
         ArgumentNullException.ThrowIfNull(run);
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(full);
+        // CF-07, ADR 0231: a post's own number of seeds replaces the configured one for this run only (validated at the post and again here)
+        var own = LabRunOptions.Parse(run.RunOptions).Draws;
+        var opts = own is { } d && d >= NullOptions.MinRequestDraws && d <= options.MaxDraws ? options with { Draws = d } : options;
         var restated = Replicable(full, developmentEnd);
         var oos = full.OosTrades.Count;
         var notes = new List<string>
@@ -77,6 +83,11 @@ internal sealed class LabNulls(IQueryHandler<RunNullWalkQuery, Result<NullWalkRu
             "The out-of-sample trades are winners of an exit selection, so selection bias is not nulled by this test.",
             "Intraday strategies with a fixed reward-to-risk exit only; other trades are left out and counted.",
         };
+        if (own is { } asked && opts.Draws != asked)
+        {
+            notes.Add("the posted " + asked.ToString(CultureInfo.InvariantCulture) + " draws are outside 200 to the cap of " + options.MaxDraws.ToString(CultureInfo.InvariantCulture) + " (Confidence:Nulls:MaxDraws) and the configured " + opts.Draws.ToString(CultureInfo.InvariantCulture) + " were used");
+        }
+
         var beyond = full.OosSources?.Count(t => t.TradeDate > developmentEnd) ?? 0;
         if (beyond > 0)
         {
@@ -86,7 +97,7 @@ internal sealed class LabNulls(IQueryHandler<RunNullWalkQuery, Result<NullWalkRu
         // the request both walks send: the first candidate exit, no parameters, ending at the development end (so no bar of the hold-out block is read)
         var request = FirstExit() is { } exit ? template with { Parameters = new Dictionary<string, double>(), Exits = exit, To = developmentEnd < template.To ? developmentEnd : template.To } : null;
         var allPastEnd = beyond == oos && oos > 0;
-        var (entry, basis) = await RandomEntryAsync(run, restated, oos, request, allPastEnd, notes, progress, cancellationToken);
+        var (entry, basis) = await RandomEntryAsync(run, opts, restated, oos, request, allPastEnd, notes, progress, cancellationToken);
         var rows = new List<LedgerRow> { LedgerRowOf(run, now, "null", Method) };
         PlaceboSetView? set = null;
         MirrorView? mirror = null;
@@ -108,11 +119,11 @@ internal sealed class LabNulls(IQueryHandler<RunNullWalkQuery, Result<NullWalkRu
             }
         }
 
-        return new NullsOutcome(new NullsView(options.Mode.ToString(), options.Enforce, options.KeyText(), options.SnapshotHash(), entry, false, BasisOf(developmentEnd, run.To, holdOutKept), notes, set, mirror), rows);
+        return new NullsOutcome(new NullsView(opts.Mode.ToString(), opts.Enforce, opts.KeyText(), opts.SnapshotHash(), entry, false, BasisOf(developmentEnd, run.To, holdOutKept), notes, set, mirror), rows);
     }
 
     /// <summary>The random-entry null itself (CF-07 part A): the figure for the block, and the trades it compared (all restated trades when the walk gave none); the notes list is added to as the walk learns what it must say.</summary>
-    private async ValueTask<(RandomEntryView View, List<Restated> Used)> RandomEntryAsync(LabRun run, List<Restated> restated, int oos, SimulationRequest? request, bool allPastEnd, List<string> notes, IProgress<int>? progress, CancellationToken cancellationToken)
+    private async ValueTask<(RandomEntryView View, List<Restated> Used)> RandomEntryAsync(LabRun run, NullOptions opts, List<Restated> restated, int oos, SimulationRequest? request, bool allPastEnd, List<string> notes, IProgress<int>? progress, CancellationToken cancellationToken)
     {
         var seed = SeededRandom.SeedOf(run.Key + SeedSalt);
         var seedText = seed.ToString(CultureInfo.InvariantCulture);
@@ -120,14 +131,14 @@ internal sealed class LabNulls(IQueryHandler<RunNullWalkQuery, Result<NullWalkRu
         var basis = restated;
 
         (RandomEntryView, List<Restated>) Missing(string reason, int trades = 0, double? real = null, int redraws = 0, double dropped = 0) =>
-            (new(oos, trades, options.Draws, 0, real, null, null, null, null, null, options.Percentile, null, 0, null, options.Alpha, "<=", "unavailable", "unavailable: " + reason, dropped, redraws, seedText), basis);
+            (new(oos, trades, opts.Draws, 0, real, null, null, null, null, null, opts.Percentile, null, 0, null, opts.Alpha, "<=", "unavailable", "unavailable: " + reason, dropped, redraws, seedText), basis);
 
         if (restated.Count == 0)
         {
             return Missing(NoTradeReason(allPastEnd));
         }
 
-        var plan = new NullWalkPlan([.. restated.Select(r => r.Spec)], options.Draws, options.Redraws, seed);
+        var plan = new NullWalkPlan([.. restated.Select(r => r.Spec)], opts.Draws, opts.Redraws, seed);
         if (request is null)
         {
             return Missing("the candidate exits are not usable");
@@ -140,7 +151,7 @@ internal sealed class LabNulls(IQueryHandler<RunNullWalkQuery, Result<NullWalkRu
         }
 
         var byId = ran.Value.Trades.ToDictionary(t => t.TradeId);
-        var used = restated.Where(r => byId.TryGetValue(r.Spec.Id, out var d) && d.Unavailable is null && d.NetR.Count == options.Draws).ToList();
+        var used = restated.Where(r => byId.TryGetValue(r.Spec.Id, out var d) && d.Unavailable is null && d.NetR.Count == opts.Draws).ToList();
         foreach (var reason in ran.Value.Trades.Where(t => t.Unavailable is not null).Select(t => t.Unavailable!).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Take(3))
         {
             notes.Add("left out: " + reason);
@@ -159,9 +170,9 @@ internal sealed class LabNulls(IQueryHandler<RunNullWalkQuery, Result<NullWalkRu
         }
 
         var realMean = used.Average(r => r.Source.Costing!.RNet);
-        var means = new List<double>(options.Draws);
+        var means = new List<double>(opts.Draws);
         long dropped = 0;
-        for (var d = 0; d < options.Draws; d++)
+        for (var d = 0; d < opts.Draws; d++)
         {
             double sum = 0;
             var n = 0;
@@ -186,9 +197,9 @@ internal sealed class LabNulls(IQueryHandler<RunNullWalkQuery, Result<NullWalkRu
         }
 
         var redraws = used.Sum(r => byId[r.Spec.Id].Redraws);
-        var droppedShare = (double)dropped / ((double)used.Count * options.Draws);
-        var result = RandomEntryNull.Evaluate(realMean, used.Count, options.Draws, means, droppedShare, options);
-        notes.Add("dropped " + dropped.ToString(CultureInfo.InvariantCulture) + " of " + ((long)used.Count * options.Draws).ToString(CultureInfo.InvariantCulture) + " random entries after the redraws (" + redraws.ToString(CultureInfo.InvariantCulture) + " redraws in all)");
+        var droppedShare = (double)dropped / ((double)used.Count * opts.Draws);
+        var result = RandomEntryNull.Evaluate(realMean, used.Count, opts.Draws, means, droppedShare, opts);
+        notes.Add("dropped " + dropped.ToString(CultureInfo.InvariantCulture) + " of " + ((long)used.Count * opts.Draws).ToString(CultureInfo.InvariantCulture) + " random entries after the redraws (" + redraws.ToString(CultureInfo.InvariantCulture) + " redraws in all)");
         return (new RandomEntryView(
             oos, result.Trades, result.Draws, result.ValidSeeds, result.RealMeanR, result.RandomMeanR, result.P05, result.P50, result.P95, result.P99, result.PercentileLevel, result.PercentileValue, result.CountAtLeast, result.PValue,
             result.Threshold, "<=", Word(result.Status), result.Reason, droppedShare, redraws, seedText), used);

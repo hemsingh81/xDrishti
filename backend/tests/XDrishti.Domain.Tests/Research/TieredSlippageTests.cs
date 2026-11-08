@@ -67,10 +67,22 @@ public sealed class TieredSlippageTests
     {
         LabRunOptions.None.ToText().ShouldBeNull();
         LabRunOptions.Parse(null).ShouldBe(LabRunOptions.None);
-        foreach (var options in new[] { new LabRunOptions(true, null), new LabRunOptions(false, false), new LabRunOptions(true, true) })
+        foreach (var options in new[] { new LabRunOptions(true, null), new LabRunOptions(false, false), new LabRunOptions(true, true), new LabRunOptions(false, null, null, true), new LabRunOptions(true, false, null, true, 2000), new LabRunOptions(false, null, null, false, 250) })
         {
             LabRunOptions.Parse(options.ToText()).ShouldBe(options);
         }
+    }
+
+    [Fact]
+    public void Nulls_and_draws_options_are_in_the_key_text_and_a_bad_token_is_unknown()
+    {
+        new LabRunOptions(false, null, null, true).KeyText(robust: true).ShouldBe("nulls=off");
+        new LabRunOptions(false, null, null, false, 2000).KeyText(robust: true).ShouldBe("draws=2000");
+        LabRunOptions.Parse("draws=0").Unknown.ShouldBe("draws=0");
+        LabRunOptions.Parse("draws=01").Unknown.ShouldBe("draws=01");
+        LabRunOptions.Parse("draws=5;draws=6").Unknown.ShouldBe("draws=6");
+        LabRunOptions.Parse("nulls=off;nulls=off").Unknown.ShouldBe("nulls=off");
+        LabRunOptions.Parse("nulls=off;draws=300").ShouldBe(new LabRunOptions(false, null, null, true, 300));
     }
 
     [Fact]

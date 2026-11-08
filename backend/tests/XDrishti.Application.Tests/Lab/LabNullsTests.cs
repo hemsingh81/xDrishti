@@ -133,6 +133,47 @@ public sealed class LabNullsTests
         outcome.View.SettingsHash.ShouldBe(new NullOptions().SnapshotHash());
     }
 
+    [Theory]
+    [InlineData(9, "pass", 10)]
+    [InlineData(10, "fail", 11)]
+    public async Task With_200_own_draws_nine_seeds_at_or_above_the_real_mean_pass_and_ten_fail_by_hand(int atOrAbove, string status, int numerator)
+    {
+        var real = Full().OosTrades.Average(t => t.R);
+        var (nulls, _) = Make(new NullOptions(), Means(d => d < atOrAbove ? real + 0.01 : real - 0.01));
+
+        var e = (await nulls.RunAsync(Run with { RunOptions = "draws=200" }, DateTimeOffset.UnixEpoch, Template, Full(), Run.To, true, null, Ct)).View.RandomEntry;
+
+        e.CountAtLeast.ShouldBe(atOrAbove);
+        e.PValue!.Value.ShouldBe(numerator / 201.0, 1e-12);
+        e.Status.ShouldBe(status);
+    }
+
+    [Fact]
+    public async Task A_stored_draws_above_the_cap_is_said_in_the_notes_when_it_falls_back()
+    {
+        var (nulls, _) = Make(new NullOptions(), Means(d => d * 0.0001));
+
+        var view = (await nulls.RunAsync(Run with { RunOptions = "draws=5001" }, DateTimeOffset.UnixEpoch, Template, Full(), Run.To, true, null, Ct)).View;
+
+        view.Notes.ShouldContain(n => n.Contains("5001 draws are outside", StringComparison.Ordinal) && n.Contains("1000", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_posts_own_draws_replace_the_configured_number_for_that_run_and_say_so_in_the_settings_text()
+    {
+        var (nulls, seen) = Make(new NullOptions(), Means(d => d * 0.0001));
+
+        var own = await nulls.RunAsync(Run with { RunOptions = "draws=300" }, DateTimeOffset.UnixEpoch, Template, Full(), Run.To, true, null, Ct);
+        var tooMany = await nulls.RunAsync(Run with { RunOptions = "draws=5001" }, DateTimeOffset.UnixEpoch, Template, Full(), Run.To, true, null, Ct);
+
+        seen[0].Plan.Draws.ShouldBe(300);
+        own.View.RandomEntry.Draws.ShouldBe(300);
+        own.View.Settings.ShouldContain("draws=300");
+        own.View.SettingsHash.ShouldNotBe(new NullOptions().SnapshotHash());
+        seen[1].Plan.Draws.ShouldBe(1000, "a stored number above the cap is not followed");
+        tooMany.View.SettingsHash.ShouldBe(new NullOptions().SnapshotHash());
+    }
+
     [Fact]
     public async Task A_real_mean_inside_the_seed_means_fails()
     {

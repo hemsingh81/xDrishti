@@ -79,7 +79,7 @@ internal sealed class LabRunsEndpoints : IEndpointModule
     {
         var universe = request.Universe;
         var result = await handler.HandleAsync(
-            new StartLabRunCommand(request.StrategyId, request.Version, universe?.BasketId, universe?.Symbols, request.Method, request.Window?.From, request.Window?.To, request.Slippage, request.Stress),
+            new StartLabRunCommand(request.StrategyId, request.Version, universe?.BasketId, universe?.Symbols, request.Method, request.Window?.From, request.Window?.To, request.Slippage, request.Stress, request.Nulls, request.Draws),
             cancellationToken);
         if (result.IsFailure)
         {

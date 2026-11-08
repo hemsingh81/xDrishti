@@ -13684,11 +13684,15 @@ export interface components {
       runId: string;
       state: string;
     };
-    /** @description The options a run was posted with, as the effective values (CF-05, ADR 0229): `slippage` is `default` or `conservative`; `stress` is whether the cost stress block was wanted (on for `robust` unless posted off, off for the others unless posted on). `IsDefault` is true when both are what a post without options gets; only such a run may be the scorecard's evidence basis. */
+    /** @description The options a run was posted with, as the effective values (CF-05, ADR 0229): `slippage` is `default` or `conservative`; `stress` is whether the cost stress block was wanted (on for `robust` unless posted off, off for the others unless posted on). `Nulls` is false when the chance and plateau block was posted left out (CF-07, ADR 0231) and `Draws` is the posted number of random-entry seeds (null: the configured number). `IsDefault` is true when all are what a post without options gets; only such a run may be the scorecard's evidence basis. */
     LabRunOptionsView: {
       slippage: string;
       stress: boolean;
       isDefault: boolean;
+      /** @default true */
+      nulls: boolean;
+      /** Format: int32 */
+      draws?: null | number;
     };
     /** @description Client event `labRunProgress` (spec P5-02, D5): a run entered a stage or advanced in it. `done` and `total` count instruments in the quick test and are 0 elsewhere. */
     LabRunProgress: {
@@ -21025,7 +21029,7 @@ export interface components {
       reason: null | string;
       brokerKillSwitch: null | boolean;
     };
-    /** @description Body of `POST /api/lab/runs` (spec P5-02): a stored strategy version (the latest when `version` is omitted), the universe, the method (`quick`) and optionally the window (default: the last year of stored data), `slippage` (`default` or `conservative`: tiered floors, tier C excluded; CF-05) and `stress` (the cost stress block; default on for `robust`, off for `quick` and `full`). */
+    /** @description Body of `POST /api/lab/runs` (spec P5-02): a stored strategy version (the latest when `version` is omitted), the universe, the method (`quick`) and optionally the window (default: the last year of stored data), `slippage` (`default` or `conservative`: tiered floors, tier C excluded; CF-05) and `stress` (the cost stress block; default on for `robust`, off for `quick` and `full`), `nulls` (`false` leaves the chance and plateau block out of a `robust` run; default true) and `draws` (random-entry seeds, 200 to `Confidence:Nulls:MaxDraws`, default the configured 1000); either makes the run a labelled what-if (CF-07, ADR 0231). */
     StartLabRunRequest: {
       strategyId?: null | string;
       /** Format: int32 */
@@ -21035,6 +21039,9 @@ export interface components {
       window?: null | components['schemas']['StartLabRunWindow'];
       slippage?: null | string;
       stress?: null | boolean;
+      nulls?: null | boolean;
+      /** Format: int32 */
+      draws?: null | number;
     };
     /** @description The universe of a posted run: exactly one of a basket and a list of symbols. */
     StartLabRunUniverse: {

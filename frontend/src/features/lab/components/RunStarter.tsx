@@ -1,4 +1,4 @@
-import { Alert, Button, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Button, Checkbox, FormControlLabel, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useToast } from '@/shared/ui/toastContext';
@@ -28,9 +28,17 @@ export function RunStarter({ target, onStarted }: RunStarterProps) {
   const [method, setMethod] = useState<RunMethod>('quick');
   const [basketId, setBasketId] = useState('');
   const [symbolsText, setSymbolsText] = useState('');
+  const [conservative, setConservative] = useState(false);
+  const [stress, setStress] = useState(false);
+  const [skipNulls, setSkipNulls] = useState(false);
+  const [seedsText, setSeedsText] = useState('');
+  const robust = method === 'robust';
+  const full = method === 'full';
+  const seeds = robust && !skipNulls && seedsText.trim() !== '' ? Number(seedsText) : undefined;
+  const seedsBad = seeds !== undefined && (!Number.isInteger(seeds) || seeds < 200);
   const symbols = symbolsText.split(/[\s,;]+/).filter((s) => s !== '');
   const usingSymbols = basketId === '';
-  const ready = target !== null && (usingSymbols ? symbols.length > 0 : true);
+  const ready = target !== null && !seedsBad && (usingSymbols ? symbols.length > 0 : true);
 
   const start = useMutation({
     mutationFn: () => {
@@ -41,6 +49,11 @@ export function RunStarter({ target, onStarted }: RunStarterProps) {
         method,
         basketId: basketId || null,
         symbols,
+        ...(conservative ? { slippage: 'conservative' as const } : {}),
+        // stress is already on for robust and refused for quick; only a full test takes it when asked
+        ...(full && stress ? { stress: true } : {}),
+        ...(robust && skipNulls ? { nulls: false as const } : {}),
+        ...(seeds !== undefined ? { draws: seeds } : {}),
       });
     },
     onSuccess: (run) => {
@@ -110,6 +123,61 @@ export function RunStarter({ target, onStarted }: RunStarterProps) {
           multiline
           minRows={2}
         />
+      )}
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={conservative}
+            onChange={(e) => {
+              setConservative(e.target.checked);
+            }}
+          />
+        }
+        label="Conservative slippage (what-if)"
+      />
+      {full && (
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={stress}
+              onChange={(e) => {
+                setStress(e.target.checked);
+              }}
+            />
+          }
+          label="Cost stress block (what-if)"
+        />
+      )}
+      {robust && (
+        <>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={skipNulls}
+                onChange={(e) => {
+                  setSkipNulls(e.target.checked);
+                }}
+              />
+            }
+            label="Skip chance block (what-if)"
+          />
+          <TextField
+            label="Seeds"
+            type="number"
+            value={seedsText}
+            disabled={skipNulls}
+            onChange={(e) => {
+              setSeedsText(e.target.value);
+            }}
+            error={seedsBad}
+            helperText={
+              seedsBad
+                ? 'At least 200, a whole number.'
+                : 'Random-entry seeds (what-if): 200 up to the server limit; empty uses the configured number.'
+            }
+            slotProps={{ htmlInput: { min: 200, step: 1 } }}
+          />
+        </>
       )}
       {start.error && <Alert severity="error">{start.error.message}</Alert>}
       <Button type="submit" variant="contained" disabled={!ready || start.isPending}>
