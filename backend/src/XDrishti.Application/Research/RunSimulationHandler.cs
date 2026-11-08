@@ -9,6 +9,7 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Filings;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Actions;
@@ -45,7 +46,8 @@ internal sealed class RunSimulationHandler(
     ILogger<RunSimulationHandler> logger,
     IRandomEntryEngine randomEntries,
     IPlaceboEngine placeboEngine,
-    IEntryTierSource? entryTiers = null) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>
+    IEntryTierSource? entryTiers = null,
+    ICostStressSettings? costStress = null) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>
 {
     private readonly InstrumentInputReader _reader = new(bars, barQueries, adjustments);
 
@@ -150,7 +152,8 @@ internal sealed class RunSimulationHandler(
             return Result.Failure<Executed>(SimulationErrors.Invalid(errors.Items));
         }
 
-        var fills = BuildFills(request.Fills);
+        var stress = costStress?.Current ?? new CostStressOptions();
+        var fills = BuildFills(request.Fills, stress);
         if (fills.IsFailure)
         {
             return Result.Failure<Executed>(fills.Error);
@@ -161,6 +164,25 @@ internal sealed class RunSimulationHandler(
         {
             // The port contract already caps the list at 20; this is a guard for an engine that does not.
             return Result.Failure<Executed>(prepared.Error.Fields is { Count: > SimulationErrors.MaxStrategyProblems } fields ? SimulationErrors.StrategyInvalid(fields) : prepared.Error);
+        }
+
+        // CF-05, ADR 0230: a strategy that names `min_turnover` carries the threshold in its fill rules, so the run key changes with it; a strategy that does not keeps its rules and its key.
+        var finalFills = fills.Value;
+        if (prepared.Value.ReadsTurnover)
+        {
+            var basis = finalFills ?? FillRules.Default;
+            var withThreshold = FillRules.Create(basis.EntryLimitPercent, basis.Slippage, basis.EntryDelayMinutes, basis.ConservativeSlippage, basis.TierABps, basis.TierBBps, stress.MinTurnoverCrore);
+            if (withThreshold.IsFailure)
+            {
+                return Result.Failure<Executed>(withThreshold.Error);
+            }
+
+            finalFills = withThreshold.Value;
+            prepared = await PrepareStrategyAsync(request, timeframe, finalFills, cancellationToken);
+            if (prepared.IsFailure)
+            {
+                return Result.Failure<Executed>(prepared.Error);
+            }
         }
 
         // (4) only then the ports: the charge sheet first (a gross choice reads nothing), then the rest.
@@ -238,10 +260,10 @@ internal sealed class RunSimulationHandler(
         var days = readsContext ? await contextDays.ListAsync(cancellationToken) : null;
         if (basisSink is not null)
         {
-            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough, days, events, resultsDays);
+            basisSink.Basis = new ExplainBasis(prepared.Value, calendar, csvThrough, days, events, resultsDays, entryTiers, request.Fills?.ConservativeSlippage == true);
         }
 
-        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext, days, events, resultsDays);
+        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext, days, events, resultsDays, prepared.Value.ReadsTurnover);
         var readTime = time.GetElapsedTime(started);
         var replayTime = TimeSpan.Zero;
         var candidates = prepared.Value.Candidates;
@@ -308,7 +330,7 @@ internal sealed class RunSimulationHandler(
                 request.To,
                 context.Options,
                 request.AcknowledgeCsvAdjusted,
-                (fills.Value ?? FillRules.Default).ToCanonicalJson(),
+                (finalFills ?? FillRules.Default).ToCanonicalJson(),
                 universeRecord,
                 calendar,
                 costContext is null ? null : CostRecord.Of(costContext),
@@ -383,7 +405,7 @@ internal sealed class RunSimulationHandler(
         Result.Failure<IPreparedStrategy>(SimulationErrors.StrategyInvalid([new FieldError(path, message, null, code)]));
 
     /// <summary>The fill rules of the request: null when it gave none (the engine then uses <see cref="FillRules.Default"/>), otherwise built with <c>Create</c> so that an invalid number comes back as the P3-03b code.</summary>
-    private static Result<FillRules?> BuildFills(FillRulesInput? input)
+    private static Result<FillRules?> BuildFills(FillRulesInput? input, CostStressOptions stress)
     {
         if (input is null)
         {
@@ -396,7 +418,7 @@ internal sealed class RunSimulationHandler(
             return Result.Failure<FillRules?>(slippage.Error);
         }
 
-        var rules = FillRules.Create(input.EntryLimitPercent, slippage.Value, input.EntryDelayMinutes, input.ConservativeSlippage);
+        var rules = FillRules.Create(input.EntryLimitPercent, slippage.Value, input.EntryDelayMinutes, input.ConservativeSlippage, stress.TierABps, stress.TierBBps);
         return rules.IsFailure ? Result.Failure<FillRules?>(rules.Error) : Result.Success<FillRules?>(rules.Value);
     }
 
@@ -475,7 +497,8 @@ internal sealed class RunSimulationHandler(
         var request = context.Request;
         var (raw, factors) = await _reader.ReadAsync(id, request.To, cancellationToken);
         return InstrumentInputReader.Build(id, instrument, raw, factors, request.AcknowledgeCsvAdjusted, context.Calendar, context.CsvThrough, context.Options, request.From, request.To, context.Costs, context.ContextDays, context.ContextDays is { Count: > 0 } ? null : (context.ContextDays is null ? null : "no_context"), context.Events, context.ResultsDays,
-            request.Fills?.ConservativeSlippage == true && entryTiers is not null ? await entryTiers.ForAsync(id, request.From, request.To, cancellationToken) : null);
+            request.Fills?.ConservativeSlippage == true && entryTiers is not null ? await entryTiers.ForAsync(id, request.From, request.To, cancellationToken) : null,
+            context.ReadsTurnover && entryTiers is not null ? await entryTiers.TurnoverForAsync(id, request.From, request.To, cancellationToken) : null);
     }
 
     private sealed record Universe(UniverseKind Kind, Guid? BasketId, string? BasketName, string Label, IReadOnlyList<Guid> Ids, IReadOnlyDictionary<Guid, BarsInstrument>? Known);
@@ -489,5 +512,6 @@ internal sealed class RunSimulationHandler(
         CostContext? Costs,
         IReadOnlyList<ContextDayRecord>? ContextDays,
         EventCalendarSnapshot? Events,
-        ResultsDayInputs? ResultsDays = null);
+        ResultsDayInputs? ResultsDays = null,
+        bool ReadsTurnover = false);
 }

@@ -32,6 +32,29 @@ public sealed class EntryTiersTests
     }
 
     [Fact]
+    public void The_turnover_median_needs_twenty_consecutive_trading_sessions_each_with_volume()
+    {
+        var calendar = new XDrishti.Domain.Market.Calendar.TradingCalendar();
+        var median = EntryTiers.MedianOf(Bars(60, 30), calendar);
+
+        median(Start.AddDays(28)).ShouldBe(30m * LiquidityTiers.Crore, "28 days = 20 weekdays before the entry");
+        median(Start.AddDays(25)).ShouldBeNull("fewer than 20 sessions of bars before it");
+        EntryTiers.MedianOf([], calendar)(Start).ShouldBeNull();
+
+        var gap = Bars(60, 30);
+        gap.RemoveAt(15);
+        EntryTiers.MedianOf(gap, calendar)(Start.AddDays(30)).ShouldBeNull("a missing session inside the window; older bars are not drawn on");
+
+        var zero = Bars(60, 30);
+        zero[21] = new DailyBar(Start.AddDays(21), 100, 100, 100, 100, 0);
+        EntryTiers.MedianOf(zero, calendar)(Start.AddDays(30)).ShouldBeNull("zero volume is unknown");
+        EntryTiers.MedianOf(zero, calendar)(Start.AddDays(50)).ShouldBe(30m * LiquidityTiers.Crore, "once the zero day is outside the window");
+        var weekendGap = Bars(60, 30);
+        weekendGap.RemoveAt(5);
+        EntryTiers.MedianOf(weekendGap, calendar)(Start.AddDays(30)).ShouldBe(30m * LiquidityTiers.Crore, "a missing Saturday is not a trading session");
+    }
+
+    [Fact]
     public void The_entry_day_itself_is_not_read()
     {
         var bars = Bars(20, 5);

@@ -143,7 +143,8 @@ public static class StoredStrategies
             json,
             definition.Timeframes,
             definition.Sides,
-            [.. definition.Params.Select(p => new KeyValuePair<string, double>(p.Name, p.Value))]);
+            [.. definition.Params.Select(p => new KeyValuePair<string, double>(p.Name, p.Value))],
+            definition.Filters.Contains("min_turnover"));
     }
 
     /// <summary>Prepares the stored text for a run: the values replace the declared parameters (a name not declared is <c>simulation.unknown_parameter</c>), the compile judges them.</summary>

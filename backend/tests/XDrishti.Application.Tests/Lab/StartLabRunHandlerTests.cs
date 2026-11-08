@@ -335,6 +335,36 @@ public sealed class StartLabRunHandlerTests
     }
 
     [Fact]
+    public async Task Tier_settings_that_differ_from_their_defaults_change_the_key_of_a_conservative_run_only()
+    {
+        var wide = new XDrishti.Domain.Confidence.CostStressOptions() with { TierABps = 4m };
+        var defaults = new XDrishti.Domain.Confidence.CostStressOptions();
+
+        var conservative = (await Post("robust", "conservative", null, defaults)).Value.Run.Key;
+        (await Post("robust", "conservative", null, wide)).Value.Run.Key.ShouldNotBe(conservative, "another floor is another run");
+        (await Post("robust", "conservative", null, defaults with { RangeFraction = 0.15 })).Value.Run.Key.ShouldNotBe(conservative);
+        (await Post("robust", null, null, wide)).Value.Run.Key.ShouldBe((await Post("robust", null, null, defaults)).Value.Run.Key, "the floors are not used without the option");
+    }
+
+    [Fact]
+    public async Task The_threshold_of_min_turnover_changes_the_key_only_for_a_strategy_whose_parsed_definition_names_the_filter()
+    {
+        var description = new StrategyDescription("LAB_TEST", "intraday", Hash, "{}", [], [], [], true);
+        var defaults = new XDrishti.Domain.Confidence.CostStressOptions();
+
+        _engine.Describe(Arg.Any<string>()).Returns(Result.Success(description));
+        var named20 = (await Post("robust", null, null, defaults)).Value.Run.Key;
+        var named30 = (await Post("robust", null, null, defaults with { MinTurnoverCrore = 30m })).Value.Run.Key;
+        _engine.Describe(Arg.Any<string>()).Returns(Result.Success(description with { ReadsTurnover = false }));
+        var plain20 = (await Post("robust", null, null, defaults)).Value.Run.Key;
+        var plain30 = (await Post("robust", null, null, defaults with { MinTurnoverCrore = 30m })).Value.Run.Key;
+
+        named30.ShouldNotBe(named20, "another threshold is another run");
+        plain30.ShouldBe(plain20, "a text that only mentions the filter in a comment, or not at all, does not read the setting");
+        named20.ShouldNotBe(plain20);
+    }
+
+    [Fact]
     public async Task The_default_options_keep_every_key_and_a_spelled_default_is_the_same_run()
     {
         var plain = (await Post("robust")).Value.Run.Key;

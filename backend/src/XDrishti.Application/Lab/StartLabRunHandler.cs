@@ -92,6 +92,20 @@ internal sealed class StartLabRunHandler(
         var method = robust ? LabSettings.RobustMethod : full ? LabSettings.FullMethod : LabSettings.QuickMethod;
         var options = new LabRunOptions(string.Equals(command.Slippage, "conservative", StringComparison.Ordinal), command.Stress);
         var keyOptions = options.KeyText(robust);
+        // CF-05, ADR 0230: a setting that changes what a run computes enters the key when it is used and differs from its default, so changing it cannot reuse an old result
+        var stress = costStress ?? new CostStressOptions();
+        var settingsKey = new List<string>(2);
+        if (options.ConservativeSlippage && (stress.TierABps != TieredSlippage.TierABps || stress.TierBBps != TieredSlippage.TierBBps || stress.RangeFraction != TieredSlippage.BarRangeFrac))
+        {
+            settingsKey.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"tiers={stress.TierABps:0.####}/{stress.TierBBps:0.####}/{stress.RangeFraction:0.####}"));
+        }
+
+        if (engine.Describe(version.SourceText) is { IsSuccess: true, Value.ReadsTurnover: true })
+        {
+            settingsKey.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"min_turnover={stress.MinTurnoverCrore:0.####}cr"));
+        }
+
+        keyOptions = settingsKey.Count == 0 ? keyOptions : string.Join(';', keyOptions is null ? settingsKey : [keyOptions, .. settingsKey]);
         // CF-05: the key changes only when an option differs from the method's default, so every existing run keeps its key
         var configHash = LabRunIdentity.Sha256((robust ? settings.RobustConfigText(basis) : full ? settings.FullConfigText(basis) : settings.ConfigText(basis)) + (keyOptions is null ? string.Empty : ";" + keyOptions));
         var key = LabRunIdentity.Key(version.Hash, universe.Value.Label, [.. universe.Value.Instruments.Select(i => i.Id)], from, to, method, configHash, engine.EngineVersion);

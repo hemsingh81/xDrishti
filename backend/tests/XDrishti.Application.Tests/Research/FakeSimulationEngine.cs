@@ -35,6 +35,9 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
     /// <summary>Whether the prepared strategies name the filter <c>not_event_day</c> (P15-06).</summary>
     public bool ReadsEvents { get; set; }
 
+    /// <summary>Whether the prepared strategies name the filter <c>min_turnover</c> (CF-05, ADR 0230).</summary>
+    public bool ReadsTurnover { get; set; }
+
     /// <summary>Whether the prepared strategies name <c>days_to_results</c> or <c>days_since_results</c> (P15-05).</summary>
     public bool ReadsResultsDays { get; set; }
 
@@ -58,7 +61,8 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
             ReadsContext,
             ReadsEvents,
             ReadsResultsDays,
-            ReadsSurprise));
+            ReadsSurprise,
+            ReadsTurnover));
     }
 
     /// <summary>What <see cref="PrepareStored"/> was asked, in order: the text, the hash the store held for it and the parameters.</summary>
@@ -77,7 +81,8 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
             ReadsContext,
             ReadsEvents,
             ReadsResultsDays,
-            ReadsSurprise));
+            ReadsSurprise,
+            ReadsTurnover));
     }
 
     public Result<StrategyDescription> Describe(string sourceText) => throw new NotSupportedException("the handler tests do not describe a text");
@@ -145,7 +150,7 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
             2.0, 0, 100.5, 105.5, EntryFill.AtLimit, false, 1, 0);
     }
 
-    private sealed class FakePrepared(StrategyRecord record, IReadOnlyList<FieldError> warnings, ExitChoice? exits, bool readsContext = false, bool readsEvents = false, bool readsResultsDays = false, bool readsSurprise = false) : IPreparedStrategy
+    private sealed class FakePrepared(StrategyRecord record, IReadOnlyList<FieldError> warnings, ExitChoice? exits, bool readsContext = false, bool readsEvents = false, bool readsResultsDays = false, bool readsSurprise = false, bool readsTurnover = false) : IPreparedStrategy
     {
         public StrategyRecord Record => record;
 
@@ -162,6 +167,8 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
         public bool ReadsResultsDays => readsResultsDays;
 
         public bool ReadsSurprise => readsSurprise;
+
+        public bool ReadsTurnover => readsTurnover;
 
         public IReadOnlyList<FieldError> Warnings => warnings;
     }

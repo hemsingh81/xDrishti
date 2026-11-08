@@ -53,7 +53,7 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine, IRandomEntryE
         ArgumentNullException.ThrowIfNull(sourceText);
         var inspection = StoredStrategies.Inspect(sourceText);
         return inspection.Description is { } d
-            ? Result.Success(new StrategyDescription(d.Id, d.Style, d.Hash, d.CanonicalJson, d.Timeframes, d.Sides, d.Parameters))
+            ? Result.Success(new StrategyDescription(d.Id, d.Style, d.Hash, d.CanonicalJson, d.Timeframes, d.Sides, d.Parameters, d.ReadsTurnover))
             : Result.Failure<StrategyDescription>(SimulationErrors.StrategyInvalid(Fields(inspection.Problems)));
     }
 
@@ -141,6 +141,8 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine, IRandomEntryE
         public bool ReadsContext => Strategy.ReadsContext;
 
         public bool ReadsEvents => Strategy.ReadsEvents;
+
+        public bool ReadsTurnover => Strategy.ReadsTurnover;
 
         public bool ReadsResultsDays => Strategy.ReadsResultsDays;
 

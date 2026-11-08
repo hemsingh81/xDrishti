@@ -30,4 +30,14 @@ public sealed class TierExcludedExportTests
         var excluded = run with { Totals = run.Totals with { Walk = run.Totals.Walk with { TierExcluded = 3 }, Fates = run.Totals.Fates with { TierExcluded = 3 } } };
         Json(excluded).Split("\"tier_excluded\":3").Length.ShouldBe(3, "once in the walk counters and once in the fates");
     }
+
+    [Fact]
+    public void The_turnover_blocked_counter_is_left_out_while_it_is_zero_and_written_when_set_ADR_0230()
+    {
+        var run = FabricatedRun.Standard();
+        string Record(SimulationRun r) => Sinks.Render(sink => SimExportJson.WriteRecord(sink, r));
+
+        Record(run).ShouldNotContain("turnover_blocked");
+        Record(run with { Totals = run.Totals with { Walk = run.Totals.Walk with { TurnoverBlocked = 4 } } }).ShouldContain("\"turnover_blocked\":4");
+    }
 }

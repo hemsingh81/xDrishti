@@ -65,7 +65,6 @@ public sealed class SwingCreateTests
     /// <summary>The refusals that stay: a definition, the code, the path of the field and a word the message names.</summary>
     public static TheoryData<string, StrategyDefinition, Timeframe, string, string> Refusals => new()
     {
-        { "a filter", TestStrategies.Swing1h() with { Filters = ["min_turnover"] }, Timeframe.H1, "simulation.filter_not_available", "filters[0]" },
         { "an expiry read", Buy(b => b with { Trigger = TestStrategies.All("close > or_high(60) and is_expiry_day == 0") }), Timeframe.H1, "simulation.needs_expiry_days", "buy" },
         { "entry stop_above_high", Buy(b => b with { Entry = new EntrySpec(EntryKind.StopAboveHigh) }), Timeframe.H1, "simulation.unsupported_entry", "buy.entry" },
         { "entry limit_pullback", Buy(b => b with { Entry = new EntrySpec(EntryKind.LimitPullback) }), Timeframe.H1, "simulation.unsupported_entry", "buy.entry" },

@@ -42,4 +42,9 @@ public enum NoTradeReason
     /// The run asked for conservative tiered slippage (CF-05, D2, ADR 0229) and the instrument is tier C (not priced) or its tier is unavailable at the entry date: the trade is excluded and counted, never priced as tier A. Produced by the walker before the fill is priced.
     /// </summary>
     TierExcluded,
+
+    /// <summary>
+    /// The filter <c>min_turnover</c> blocked the entry (CF-05, ADR 0230): the 20-day median traded value before the entry date is under the threshold, or it cannot be known (missing bars, under 20 sessions, missing volume). Never a pass. Produced by the walker.
+    /// </summary>
+    TurnoverBlocked,
 }

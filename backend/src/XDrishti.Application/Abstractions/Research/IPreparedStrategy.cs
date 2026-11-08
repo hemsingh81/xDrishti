@@ -24,6 +24,9 @@ public interface IPreparedStrategy
     /// <summary>The strategy names the filter <c>not_event_day</c> (P15-06): a run gives the replay a results-calendar snapshot, is refused with <c>simulation.filter_not_available</c> when the window has no calendar row at all, and an instrument is skipped with <c>event_calendar_unavailable</c> when it is given none.</summary>
     bool ReadsEvents { get; }
 
+    /// <summary>The strategy names the filter <c>min_turnover</c> (CF-05, ADR 0230): the run prepares it again with the threshold in the fill rules (so the threshold is part of the run key) and gives the replay the median traded value before each entry date.</summary>
+    bool ReadsTurnover => false;
+
     /// <summary>The strategy names <c>days_to_results</c> or <c>days_since_results</c> (P15-05, ADR 0185): a run gives the replay the results-calendar snapshot and the results filing times, and is refused with <c>simulation.filter_not_available</c> when the window has neither a calendar row nor a filing.</summary>
     bool ReadsResultsDays { get; }
 

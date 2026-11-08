@@ -156,6 +156,11 @@ internal static class LabReportBuilder
             w.Add(new ReportWarningView("tier_excluded", $"Conservative slippage left out {excluded.TierExcluded} of {excluded.Candidates} candidates ({P(excluded.Share)}) because the instrument was liquidity tier C or had no usable tier on the entry date: the trades judged are the survivors of that filter, not a clean sample."));
         }
 
+        if (v.TurnoverExclusion is { } blocked)
+        {
+            w.Add(new ReportWarningView("turnover_blocked", $"The filter min_turnover blocked {blocked.Blocked} of {blocked.Candidates} candidates ({P(blocked.Share)}) because the 20-day median traded value was under Rs {blocked.ThresholdCrore:0.####} crore or could not be known: the trades judged are the survivors of that filter, and the liquidity tier and capacity evidence (readiness row 14) is unavailable."));
+        }
+
         if (v.Nulls is { } nulls)
         {
             var e = nulls.RandomEntry;

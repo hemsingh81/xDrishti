@@ -11,7 +11,7 @@ internal sealed class StrategyChecker : IStrategyChecker
     {
         ArgumentNullException.ThrowIfNull(text);
         var check = StoredStrategies.Check(text);
-        var description = check.Description is { } d ? new StrategyDescription(d.Id, d.Style, d.Hash, d.CanonicalJson, d.Timeframes, d.Sides, d.Parameters) : null;
+        var description = check.Description is { } d ? new StrategyDescription(d.Id, d.Style, d.Hash, d.CanonicalJson, d.Timeframes, d.Sides, d.Parameters, d.ReadsTurnover) : null;
         return new StrategyCheck(description, check.Version, [.. check.Issues.Select(i => new StrategyIssue(i.Path, i.Code, i.Message, i.Severity, i.Line, i.Column, i.EndLine, i.EndColumn, i.Start, i.Length, i.Suggestion))]);
     }
 

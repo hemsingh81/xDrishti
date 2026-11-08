@@ -31,4 +31,5 @@ public sealed record LabVerdictView(
     TrialsView? Trials = null,
     NullsView? Nulls = null,
     BenchmarkComparisonView? Benchmark = null,
-    TierExclusionView? TierExclusion = null);
+    TierExclusionView? TierExclusion = null,
+    TurnoverExclusionView? TurnoverExclusion = null);

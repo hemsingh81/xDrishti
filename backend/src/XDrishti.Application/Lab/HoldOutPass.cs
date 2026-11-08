@@ -1,3 +1,4 @@
+using XDrishti.Domain.Confidence;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
@@ -28,7 +29,8 @@ internal sealed class HoldOutPass(
     ICostSheetStore sheets,
     LabSettings settings,
     LabPreregistration preregistration,
-    IPlanFreezeStore freezes) : IHoldOutPass
+    IPlanFreezeStore freezes,
+    CostStressOptions? stressOptions = null) : IHoldOutPass
 {
     public async ValueTask<Result<HoldOutFigures>> RunAsync(LabRun run, LabVerdictView verdict, HoldOutBlock block, CancellationToken cancellationToken)
     {
@@ -67,7 +69,7 @@ internal sealed class HoldOutPass(
         }
 
         // the hold-out is judged on the fills the development was (a conservative run is not judged on default fills)
-        var fills = LabFills.For(run);
+        var fills = LabFills.For(run, stressOptions);
         var timeframes = description.Timeframes.Count == 0 ? [Timeframe.M15] : description.Timeframes;
         var r = new List<double>();
         foreach (var timeframe in timeframes)

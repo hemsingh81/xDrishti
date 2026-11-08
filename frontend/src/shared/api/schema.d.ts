@@ -13786,6 +13786,7 @@ export interface components {
       nulls?: null | components['schemas']['NullsView'];
       benchmark?: null | components['schemas']['BenchmarkComparisonView'];
       tierExclusion?: null | components['schemas']['TierExclusionView'];
+      turnoverExclusion?: null | components['schemas']['TurnoverExclusionView'];
     };
     /** @description The India dates a run replays, inclusive. */
     LabWindow: {
@@ -22176,6 +22177,32 @@ export interface components {
       factorUsed: number;
       honestCountApplied: boolean;
       text: string;
+    };
+    /**
+     * @description What the filter `min_turnover` left out of a Lab verdict (CF-05, ADR 0230): candidates whose 20-day median traded value was under the threshold or unknown have no trade, so the trades behind the verdict are the survivors of a liquidity filter, not a clean tier sample.
+     *     Present only for a strategy that names the filter (null otherwise, so the stored JSON of every other verdict is unchanged). Counts only; the candidates are those of the first exit of every timeframe, which every exit candidate shares.
+     */
+    TurnoverExclusionView: {
+      /**
+       * Format: int64
+       * @description Candidates dated in the window, summed over the timeframes.
+       */
+      candidates: number;
+      /**
+       * Format: int64
+       * @description Candidates blocked by the filter (under the threshold or unknown).
+       */
+      blocked: number;
+      /**
+       * Format: double
+       * @description The threshold the run used, in crore rupees.
+       */
+      thresholdCrore: number;
+      /**
+       * Format: double
+       * @description The share of the candidates blocked; 0 when there were none.
+       */
+      share?: number;
     };
     /** @description One underlying of the option archive: recorded and usable chain sessions, the first and last recorded date, the gaps by outcome, the backfill keys and the half-spread model state. Counts and dates only; no price, IV or Greek. */
     UnderlyingArchiveSummary: {

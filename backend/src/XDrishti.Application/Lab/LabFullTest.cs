@@ -25,7 +25,8 @@ internal sealed class LabFullTest(
     ITestLedger ledger,
     LabSettings settings,
     ConfidenceOptions? confidence = null,
-    RegistrationOptions? registration = null)
+    RegistrationOptions? registration = null,
+    ICostStressSettings? costStress = null)
 {
     /// <summary>Said of every cell and every verdict: what the full-period figures are.</summary>
     public const string ExplorationLabel = "exploration: in-sample on the data shown, not evidence";
@@ -69,6 +70,7 @@ internal sealed class LabFullTest(
         var defaultTrades = 0;
         long candidatesSeen = 0;
         long tierExcluded = 0;
+        long turnoverBlocked = 0;
         for (var i = 0; i < timeframes.Count; i++)
         {
             var request = template with { EvaluationTimeframe = timeframes[i], Exits = exits };
@@ -85,6 +87,7 @@ internal sealed class LabFullTest(
             defaultTrades += comparison.Candidates[0].Run.Trades.Count;
             candidatesSeen += comparison.Candidates[0].Run.Totals.CandidatesInWindow;
             tierExcluded += comparison.Candidates[0].Run.Totals.Fates.TierExcluded;
+            turnoverBlocked += comparison.Candidates[0].Run.Totals.Fates.TurnoverBlocked;
             var costed = comparison.Report.Unit == "RNet";
             var all = new List<(SimTrade Trade, string Candidate)>();
             foreach (var candidate in comparison.Candidates)
@@ -146,6 +149,12 @@ internal sealed class LabFullTest(
             limits.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"conservative slippage: {exclusion.TierExcluded} of {exclusion.Candidates} candidates ({exclusion.Share * 100:0.#} %) were left out because the instrument was liquidity tier C or had no usable tier on the entry date; the trades judged are the survivors of that filter, not a clean sample. This goes beyond the tier C rule of the spec and awaits the owner's view."));
         }
 
+        var turnover = description.ReadsTurnover ? new TurnoverExclusionView(candidatesSeen, turnoverBlocked, (costStress?.Current ?? new CostStressOptions()).MinTurnoverCrore) : null;
+        if (turnover is not null)
+        {
+            limits.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"min_turnover: {turnover.Blocked} of {turnover.Candidates} candidates ({turnover.Share * 100:0.#} %) were blocked because the 20-day median traded value was under Rs {turnover.ThresholdCrore:0.####} crore or could not be known on the entry date; the trades judged are the survivors of that filter."));
+        }
+
         var cellList = cellViews.Select(c => CellOf(c.Timeframe, c.Side, c.Selection, c.Input)).ToList();
         var view = new LabVerdictView(
             verdict.Outcome.ToString().ToUpperInvariant(),
@@ -162,7 +171,7 @@ internal sealed class LabFullTest(
                 "The candidate exits are a fixed list; the strategy's own exit is not a candidate.",
             ],
             Trials: TrialsView.Of(parts, honest, settings.MultipleTesting),
-            TierExclusion: exclusion);
+            TierExclusion: exclusion, TurnoverExclusion: turnover);
         var oos = OosEvidenceBuilder.Trades(cells);
         return Result.Success(new FullTestOutcome(runs, view, instruments, instrumentsRun, defaultTrades, oos, [.. oos.Select(t => sources[t])]));
     }

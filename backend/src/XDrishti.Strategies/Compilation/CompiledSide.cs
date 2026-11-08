@@ -109,8 +109,11 @@ public sealed class CompiledSide
     /// <summary>The side names the filter <c>not_event_day</c>: a run needs the results-calendar snapshot (P15-06, ADR 0182).</summary>
     public bool NeedsEventCalendar => Filters.Contains(FilterNames.NotEventDay);
 
-    /// <summary>Whether the simulator evaluates the filter of this name (only <c>not_event_day</c>); any other filter a strategy names is refused rather than ignored.</summary>
-    public static bool IsEvaluatedFilter(string name) => string.Equals(name, FilterNames.NotEventDay, StringComparison.Ordinal);
+    /// <summary>The side names the filter <c>min_turnover</c>: a run needs the threshold in its fill rules and the daily turnover of the instrument (CF-05, ADR 0230).</summary>
+    public bool NeedsTurnover => Filters.Contains(FilterNames.MinTurnover);
+
+    /// <summary>Whether the simulator evaluates the filter of this name (<c>not_event_day</c> and, since ADR 0230, <c>min_turnover</c>); any other filter a strategy names is refused rather than ignored.</summary>
+    public static bool IsEvaluatedFilter(string name) => string.Equals(name, FilterNames.NotEventDay, StringComparison.Ordinal) || string.Equals(name, FilterNames.MinTurnover, StringComparison.Ordinal);
 
     /// <summary>The distinct features the frame is created from, in this order: the handle of each is its position.</summary>
     public IReadOnlyList<FeatureSpec> Features { get; }

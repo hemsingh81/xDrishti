@@ -92,6 +92,7 @@ internal static class ReplayBaselineReader
     }
 
     // The fill rules are rebuilt from their numbers and must give back the stored canonical text: a gap rule or a field this reader does not know fails here, not in a replay.
+    // shortcut: only the entry limit and the slippage are rebuilt, so a stored run with a delay, conservative tiers or a min_turnover threshold does not rebuild to its text and is refused as a baseline (fail closed, ADR 0230); read those fields too when a baseline with them is wanted.
     private static Result<FillRules> ReadFills(string text, string headerFills)
     {
         using var doc = JsonDocument.Parse(text);

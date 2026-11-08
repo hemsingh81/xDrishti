@@ -1,4 +1,6 @@
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Market.Calendar;
+using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Actions;
@@ -10,7 +12,7 @@ namespace XDrishti.Application.Research;
 /// The liquidity tier of an instrument on an entry date for a run with conservative slippage (CF-05, D2, ADR 0229): the 20-day median of close x volume over the sessions strictly before the date (what was known at the entry), against the cuts of
 /// <see cref="CostStressOptions"/>. Fewer than 20 usable sessions is <see cref="LiquidityTier.Unavailable"/>, which the walker excludes and counts, never prices as tier A. Same rule as the tier block of the Lab verdict.
 /// </summary>
-internal sealed class EntryTiers(IBarQueries bars, CostStressOptions options) : IEntryTierSource
+internal sealed class EntryTiers(IBarQueries bars, CostStressOptions options, ITradingCalendar calendars) : IEntryTierSource
 {
     /// <summary>Calendar days read before the window: 20 sessions fit in about 28 calendar days; the rest is room for holidays and halts.</summary>
     private const int LookBackDays = 60;
@@ -20,6 +22,32 @@ internal sealed class EntryTiers(IBarQueries bars, CostStressOptions options) : 
     {
         var rows = await bars.ReadDailyBarsAsync(instrumentId, from.AddDays(-LookBackDays), to.AddDays(1), cancellationToken);
         return Of([.. rows.Select(r => new DailyBar(IndiaTime.Today(r.Ts), r.Open, r.High, r.Low, r.Close, r.Volume))], options);
+    }
+
+    /// <summary>Reads the day bars of the instrument around the window and returns its median traded value lookup (the strict rule of <see cref="LiquidityTiers.ConsecutiveMedian"/>).</summary>
+    public async ValueTask<Func<DateOnly, decimal?>> TurnoverForAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        var rows = await bars.ReadDailyBarsAsync(instrumentId, from.AddDays(-LookBackDays), to.AddDays(1), cancellationToken);
+        var calendar = await calendars.GetAsync(cancellationToken);
+        return MedianOf([.. rows.Select(r => new DailyBar(IndiaTime.Today(r.Ts), r.Open, r.High, r.Low, r.Close, r.Volume))], calendar);
+    }
+
+    /// <summary>The median traded value before each date over day bars: the 20 consecutive trading sessions before it, all present with volume; otherwise null. The tier rule (<see cref="Of"/>) is unchanged.</summary>
+    public static Func<DateOnly, decimal?> MedianOf(IReadOnlyList<DailyBar> dayBars, TradingCalendar calendar)
+    {
+        ArgumentNullException.ThrowIfNull(dayBars);
+        ArgumentNullException.ThrowIfNull(calendar);
+        var cache = new Dictionary<DateOnly, decimal?>();
+        return date =>
+        {
+            if (!cache.TryGetValue(date, out var median))
+            {
+                median = LiquidityTiers.ConsecutiveMedian(dayBars, date, calendar);
+                cache[date] = median;
+            }
+
+            return median;
+        };
     }
 
     /// <summary>The tier lookup over day bars (oldest first); each date is judged once.</summary>

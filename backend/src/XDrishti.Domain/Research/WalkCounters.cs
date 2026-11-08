@@ -45,6 +45,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="AddsSkippedQuantity">Adds whose quantity <c>floor(Q x share)</c> is 0 (P4-04, D3); only in a costed run, which knows <c>Q</c>.</param>
 /// <param name="EventBlocked">No-trade: see <see cref="NoTradeReason.EventBlocked"/> (P15-06); 0 for a strategy that does not name <c>not_event_day</c>.</param>
 /// <param name="EventUnavailable">No-trade: see <see cref="NoTradeReason.EventUnavailable"/> (P15-06); 0 for a strategy that does not name <c>not_event_day</c>.</param>
+/// <param name="TurnoverBlocked">No-trade: see <see cref="NoTradeReason.TurnoverBlocked"/> (CF-05, ADR 0230); 0 for a run whose strategy does not name <c>min_turnover</c>.</param>
 /// <param name="TierExcluded">No-trade: see <see cref="NoTradeReason.TierExcluded"/> (CF-05, ADR 0229); 0 for a run without conservative slippage.</param>
 /// <param name="ExitsEventExit">Trades that ended with the <c>event_exit</c> overlay (P15-09).</param>
 /// <param name="EventExitUnavailable">Session closes at which an open position found no results date for the <c>event_exit</c> overlay, so it could not fire and did not (P15-09): unavailable is never "no event".</param>
@@ -95,7 +96,8 @@ public sealed record WalkCounters(
     long ExitsEventExit = 0,
     long EventExitUnavailable = 0,
     long EventExitUnavailableTrades = 0,
-    long TierExcluded = 0)
+    long TierExcluded = 0,
+    long TurnoverBlocked = 0)
 {
     /// <summary>All zeros: the identity of <see cref="Add"/>.</summary>
     public static WalkCounters Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -149,6 +151,7 @@ public sealed record WalkCounters(
             ExitsEventExit + other.ExitsEventExit,
             EventExitUnavailable + other.EventExitUnavailable,
             EventExitUnavailableTrades + other.EventExitUnavailableTrades,
-            TierExcluded + other.TierExcluded);
+            TierExcluded + other.TierExcluded,
+            TurnoverBlocked + other.TurnoverBlocked);
     }
 }

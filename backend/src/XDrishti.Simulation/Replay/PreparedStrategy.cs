@@ -46,6 +46,9 @@ public sealed class PreparedStrategy
     /// <summary>The strategy names the filter <c>not_event_day</c>: the replay needs the results-calendar snapshot of the run and skips with <c>event_calendar_unavailable</c> when it has none (P15-06, ADR 0182).</summary>
     public bool ReadsEvents => Simulator.ReadsEvents;
 
+    /// <summary>The strategy names the filter <c>min_turnover</c> (CF-05, ADR 0230): the fill rules carry its threshold and the replay needs the turnover lookup; without it every entry is blocked and counted.</summary>
+    public bool ReadsTurnover => Simulator.ReadsTurnover;
+
     /// <summary>The strategy names <c>days_to_results</c>, <c>days_since_results</c> or lists <c>event_exit</c> (P15-09): the replay needs the results-days inputs of the run and skips with <c>event_calendar_unavailable</c> when it has none (P15-05, ADR 0185).</summary>
     public bool ReadsResultsDays => Simulator.ReadsResultsDays;
 

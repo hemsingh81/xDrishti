@@ -37,7 +37,6 @@ public sealed class SimulatorCreateTests
         { "a pyramid with a second candidate", Buy(b => b with { Exits = [Rr(2), new ExitSpec(ExitPolicy.Pyramid, [new ExitParameter("initial_pct", [Quantity.Of(50)]), new ExitParameter("add_at_rr", [Quantity.Of(1), Quantity.Of(2)]), new ExitParameter("add_pct", [Quantity.Of(30), Quantity.Of(20)]), new ExitParameter("max_adds", [Quantity.Of(2)]), new ExitParameter("trail_atr_mult", [Quantity.Of(2)])])] }), "simulation.unsupported_exit", "buy.exits", "PYRAMID" },
         { "several rr values", Sell(s => s with { Exits = [Rr(1.5, 2, 3)] }), "simulation.unsupported_exit", "sell.exits", "rr" },
         { "an overlay event_exit", Buy(b => b with { Overlays = [new OverlaySpec(OverlayKind.EventExit, [new ExitParameter("days_before_results", [Quantity.Of(1)])])] }), "simulation.unsupported_exit", "buy.overlays[0]", "event_exit" },
-        { "a filter", OrbV1.Create() with { Filters = ["min_turnover"] }, "simulation.filter_not_available", "filters[0]", "min_turnover" },
         { "expiry dates", WithTrigger("close > or_high(or_min) and close[1] <= or_high(or_min) and is_expiry_day == 0"), "simulation.needs_expiry_days", "buy", "expiry" },
     };
 
@@ -72,14 +71,14 @@ public sealed class SimulatorCreateTests
     }
 
     [Fact]
-    public void A_filter_that_is_not_evaluated_is_refused_at_its_own_index_and_not_event_day_is_not_refused()
+    public void Both_known_filters_are_evaluated_and_none_is_refused()
     {
         var definition = OrbV1.Create() with { Filters = ["not_event_day", "min_turnover"] };
 
         var build = Simulator.Create(definition, Timeframe.M15);
 
-        build.Problems.Where(p => p.Problem.Code == "simulation.filter_not_available").Select(p => p.Path).ShouldBe(["filters[1]"]);
-        build.Problems.Single(p => p.Problem.Code == "simulation.filter_not_available").Problem.Message.ShouldNotContain("calendar", Case.Insensitive);
+        build.Simulator.ShouldNotBeNull();
+        build.Problems.Where(p => p.Problem.Code == "simulation.filter_not_available").ShouldBeEmpty();
     }
 
     [Fact]

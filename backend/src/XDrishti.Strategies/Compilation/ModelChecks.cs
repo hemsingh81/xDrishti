@@ -116,8 +116,9 @@ internal sealed class ModelChecks(ProblemSink sink)
                 known.Add(name);
                 if (name == FilterNames.MinTurnover)
                 {
-                    sink.Warning(path, ModelCodes.FilterNotEvaluated, "The filter `min_turnover` is not evaluated: there is no liquidity data of the universe layer yet (doc 10 §2).");
+                    sink.Warning(path, ModelCodes.FilterNotEvaluated, "The filter `min_turnover` is the liquidity filter of CF-05 (ADR 0230): an entry needs a 20-day median traded value of at least Confidence:CostStress:MinTurnoverCrore, and one with fewer than 20 sessions, missing bars or missing volume is blocked and counted, never passed.");
                 }
+
             }
         }
 

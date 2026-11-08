@@ -29,6 +29,40 @@ public sealed class TieredSlippageTests
     }
 
     [Fact]
+    public void The_tier_bps_and_the_threshold_enter_the_canonical_text_only_when_used()
+    {
+        var plain = FillRules.Create(0.1, SlippageConfig.Default).Value.ToCanonicalJson();
+        var defaults = FillRules.Create(0.1, SlippageConfig.Default, 0, true, 3m, 8m).Value.ToCanonicalJson();
+        var wider = FillRules.Create(0.1, SlippageConfig.Default, 0, true, 4m, 8m).Value;
+        var ignored = FillRules.Create(0.1, SlippageConfig.Default, 0, false, 5m, 15m).Value.ToCanonicalJson();
+        var filtered20 = FillRules.Create(0.1, SlippageConfig.Default, 0, false, 3m, 8m, 20m).Value.ToCanonicalJson();
+        var filtered30 = FillRules.Create(0.1, SlippageConfig.Default, 0, false, 3m, 8m, 30m).Value.ToCanonicalJson();
+
+        defaults.ShouldBe(plain[..^1] + ",\"slippage_tiers\":\"conservative\"}", "default bps leave the text of a conservative run as it was");
+        wider.ToCanonicalJson().ShouldContain("\"tier_a_bps\":4,\"tier_b_bps\":8");
+        ignored.ShouldBe(plain, "bps do not matter without the option");
+        filtered20.ShouldBe(plain[..^1] + ",\"min_turnover_crore\":20}");
+        filtered30.ShouldNotBe(filtered20, "another threshold is another run");
+        wider.BpsOf(LiquidityTier.A).ShouldBe(4m);
+        FillRules.Create(0.1, SlippageConfig.Default, 0, false, 3m, 8m, 0m).IsFailure.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(20, 20, true)]
+    [InlineData(20, 19.99, false)]
+    [InlineData(20, 20.01, true)]
+    public void Turnover_at_the_threshold_passes_and_just_under_it_does_not(double thresholdCrore, double medianCrore, bool passes) =>
+        LiquidityTiers.PassesTurnover((decimal)medianCrore * LiquidityTiers.Crore, (decimal)thresholdCrore * LiquidityTiers.Crore).ShouldBe(passes);
+
+    [Fact]
+    public void An_unknown_median_never_passes_and_a_blocked_entry_is_a_no_trade_fate()
+    {
+        LiquidityTiers.PassesTurnover(null, 0m).ShouldBeFalse();
+        (RunFates.Empty with { TurnoverBlocked = 3 }).NoTrade.ShouldBe(3);
+        (RunFates.Empty with { TurnoverBlocked = 3 }).Total.ShouldBe(3);
+    }
+
+    [Fact]
     public void Run_options_write_nothing_for_the_defaults_and_read_back_what_they_wrote()
     {
         LabRunOptions.None.ToText().ShouldBeNull();

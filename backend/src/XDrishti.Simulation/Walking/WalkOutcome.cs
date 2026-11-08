@@ -102,6 +102,7 @@ public readonly record struct WalkOutcome(
             ExitsEventExit: exit == ExitReason.EventExit ? 1 : 0,
             EventExitUnavailable: EventExitUnavailable,
             EventExitUnavailableTrades: Trade is not null && EventExitUnavailable > 0 ? 1 : 0,
-            TierExcluded: NoTrade == NoTradeReason.TierExcluded ? 1 : 0);
+            TierExcluded: NoTrade == NoTradeReason.TierExcluded ? 1 : 0,
+            TurnoverBlocked: NoTrade == NoTradeReason.TurnoverBlocked ? 1 : 0);
     }
 }

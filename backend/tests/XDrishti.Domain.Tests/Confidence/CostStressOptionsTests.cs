@@ -16,6 +16,21 @@ public sealed class CostStressOptionsTests
         o.Problems().ShouldBeEmpty();
     }
 
+    [Theory]
+    [InlineData(3, 8, 0.10, 20, true)]
+    [InlineData(5, 15, 0.20, 50, true)]
+    [InlineData(2.9, 8, 0.10, 20, false)]
+    [InlineData(5.1, 8, 0.10, 20, false)]
+    [InlineData(3, 7.9, 0.10, 20, false)]
+    [InlineData(3, 15.1, 0.10, 20, false)]
+    [InlineData(3, 8, 0.09, 20, false)]
+    [InlineData(3, 8, 0.21, 20, false)]
+    [InlineData(3, 8, double.NaN, 20, false)]
+    [InlineData(3, 8, 0.10, 19.9, false)]
+    [InlineData(3, 8, 0.10, 50.1, false)]
+    public void The_judgment_call_settings_can_only_be_tightened_inside_their_range(double a, double b, double frac, double crore, bool valid) =>
+        (new CostStressOptions(TierABps: (decimal)a, TierBBps: (decimal)b, RangeFraction: frac, MinTurnoverCrore: (decimal)crore).Problems().Count == 0).ShouldBe(valid);
+
     [Fact]
     public void The_snapshot_hash_is_stable_and_changes_with_any_value()
     {

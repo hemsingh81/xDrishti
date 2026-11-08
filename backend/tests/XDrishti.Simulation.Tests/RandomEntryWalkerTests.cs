@@ -46,6 +46,22 @@ public sealed class RandomEntryWalkerTests
     }
 
     [Fact]
+    public void A_strategy_that_names_min_turnover_has_every_draw_blocked_without_the_lookup_and_none_with_enough_turnover()
+    {
+        var named = Rep.Prepare(OrbV1.Create(), fills: FillRules.Create(0.1, SlippageConfig.Default, 0, false, 3m, 8m, 20m).Value);
+        var input = Input(Bars());
+        var spec = Spec();
+
+        var blocked = RandomEntryWalker.RandomTrades(named, input, Plan(draws: 10, trades: spec), spec);
+        var thin = RandomEntryWalker.RandomTrades(named, input with { TurnoverOn = _ => 1m }, Plan(draws: 10, trades: spec), spec);
+        var passed = RandomEntryWalker.RandomTrades(named, input with { TurnoverOn = _ => 100m * LiquidityTiers.Crore }, Plan(draws: 10, trades: spec), spec);
+
+        blocked.Trades.OfType<SimTrade>().ShouldBeEmpty("an unknown turnover is never a pass");
+        thin.Trades.OfType<SimTrade>().ShouldBeEmpty();
+        passed.Trades.OfType<SimTrade>().ShouldNotBeEmpty();
+    }
+
+    [Fact]
     public void The_draws_of_a_trade_do_not_depend_on_the_other_trades_of_the_plan()
     {
         var input = Input(Bars());

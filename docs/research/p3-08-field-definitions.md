@@ -103,6 +103,7 @@ Not a field but compared with them: **the no-trade reason** (`NoTradeReason`): A
 | 43 | `EventExitUnavailable` | P15-09: session closes at which an open position found no results date, so the overlay could not fire and did not (never "no event"; 0 in the oracle) | SPEC ONLY | ADR 0187 |
 | 44 | `EventExitUnavailableTrades` | P15-09: trades with at least one such session close (0 in the oracle) | SPEC ONLY | ADR 0187 |
 | 45 | `TierExcluded` | CF-05: candidates excluded by conservative tiered slippage (tier C or an unavailable tier; never priced as tier A; 0 in the oracle) | SPEC ONLY | ADR 0229 |
+| 46 | `TurnoverBlocked` | CF-05: candidates blocked by the filter min_turnover (20-day median traded value under the threshold or unknown; never a pass; 0 in the oracle) | SPEC ONLY | ADR 0230 |
 
 `WalkOutcome.HoldEndEpochSeconds` (the gate's input, compared as a list, section D) and the booleans of `WalkOutcome` are the same facts as the counters above.
 

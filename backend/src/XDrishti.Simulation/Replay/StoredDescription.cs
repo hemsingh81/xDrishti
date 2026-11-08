@@ -11,4 +11,5 @@ public sealed record StoredDescription(
     string CanonicalJson,
     IReadOnlyList<Timeframe> Timeframes,
     IReadOnlyList<Side> Sides,
-    IReadOnlyList<KeyValuePair<string, double>> Parameters);
+    IReadOnlyList<KeyValuePair<string, double>> Parameters,
+    bool ReadsTurnover = false);

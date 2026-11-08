@@ -140,7 +140,10 @@ internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQuer
         if (basis is not null)
         {
             // P3-04d: the same input the run had, gross, replayed once with the chosen trades asked for; the answer must be the recorded trades.
-            var input = InstrumentInputReader.Build(record.InstrumentId, instrument, raw, factors, run.AcknowledgeCsvAdjusted, basis.Calendar, basis.CsvThrough, run.Options, run.From, run.To, null, basis.ContextDays, basis.ContextDays is { Count: > 0 } ? null : "no_context", basis.Events, basis.ResultsDays);
+            // the lookups are read before the input is built, so that no filings-typed value is held across an await (the layering test of the event filter)
+            var tierOn = basis.Conservative && basis.Tiers is not null ? await basis.Tiers.ForAsync(record.InstrumentId, run.From, run.To, cancellationToken) : null;
+            var turnoverOn = basis.Strategy.ReadsTurnover && basis.Tiers is not null ? await basis.Tiers.TurnoverForAsync(record.InstrumentId, run.From, run.To, cancellationToken) : null;
+            var input = InstrumentInputReader.Build(record.InstrumentId, instrument, raw, factors, run.AcknowledgeCsvAdjusted, basis.Calendar, basis.CsvThrough, run.Options, run.From, run.To, null, basis.ContextDays, basis.ContextDays is { Count: > 0 } ? null : "no_context", basis.Events, basis.ResultsDays, tierOn, turnoverOn);
             var requests = trades.Select(t => new ExplainRequest(t.Trade.Key, t.Trade.DecisionEpochSeconds, t.Trade.Side)).ToList();
             var answer = engine.Explain(basis.Strategy, input, requests);
             var mismatch = Verify(record.Symbol, trades, answer);
