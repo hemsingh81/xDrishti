@@ -115,7 +115,7 @@ public sealed class AssistantDraftApiTests(ApiFactory factory)
     private Task<int> ExecuteAsync(string sql) => factory.WithDbAsync(async db => await db.Database.ExecuteSqlRawAsync(sql, Ct));
 
     private Task<int> SettingsAsync(bool enabled, bool allowConfirm, bool autoQuick = false) =>
-        ExecuteAsync($"DELETE FROM ai.settings; INSERT INTO ai.settings (enabled, portfolio_context, max_tool_calls, changed_by, reason, allow_draft_confirm, auto_lab_quick_test) VALUES ({(enabled ? "true" : "false")}, false, 6, '{Owner}', 'test setup', {(allowConfirm ? "true" : "false")}, {(autoQuick ? "true" : "false")})");
+        ExecuteAsync($"DELETE FROM ai.tool_calls; DELETE FROM ai.messages; DELETE FROM ai.conversations; DELETE FROM ai.model_calls; DELETE FROM ai.settings; INSERT INTO ai.settings (enabled, portfolio_context, max_tool_calls, changed_by, reason, allow_draft_confirm, auto_lab_quick_test) VALUES ({(enabled ? "true" : "false")}, false, 6, '{Owner}', 'test setup', {(allowConfirm ? "true" : "false")}, {(autoQuick ? "true" : "false")})");
 
     private static string BasketName() => "Bk" + new string([.. Guid.NewGuid().ToByteArray().Take(10).Select(b => (char)('a' + (b % 26)))]);
 

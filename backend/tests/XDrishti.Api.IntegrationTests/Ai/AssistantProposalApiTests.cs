@@ -59,7 +59,7 @@ public sealed class AssistantProposalApiTests(ApiFactory factory)
     private Task<int> ExecuteAsync(string sql) => factory.WithDbAsync(async db => await db.Database.ExecuteSqlRawAsync(sql, Ct));
 
     private Task<int> SettingsAsync(bool allowAccept) =>
-        ExecuteAsync($"DELETE FROM ai.settings; INSERT INTO ai.settings (enabled, portfolio_context, max_tool_calls, changed_by, reason, allow_proposal_accept) VALUES (true, false, 6, '{Owner}', 'test setup', {(allowAccept ? "true" : "false")})");
+        ExecuteAsync($"DELETE FROM ai.tool_calls; DELETE FROM ai.messages; DELETE FROM ai.conversations; DELETE FROM ai.model_calls; DELETE FROM ai.settings; INSERT INTO ai.settings (enabled, portfolio_context, max_tool_calls, changed_by, reason, allow_proposal_accept) VALUES (true, false, 6, '{Owner}', 'test setup', {(allowAccept ? "true" : "false")})");
 
 #pragma warning disable EF1002 // the values are constants and generated hex of these tests
     private async Task<long> SeedAsync()
