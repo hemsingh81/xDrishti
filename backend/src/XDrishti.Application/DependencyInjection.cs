@@ -1043,6 +1043,9 @@ public static class DependencyInjection
         services.AddScoped<LabEvidenceReader>(); // the stored Lab results of a strategy version, mapped to rows 1 to 12 of the checklist
         services.AddScoped<ForwardEdgeReader>(); // the forward edge series through the one shared series rule (EdgeSeries), read once per scope
         services.AddScoped<PaperPhaseMetReader>(sp => async cancellationToken => PaperPhaseVerdict.Met(await sp.GetRequiredService<IQueryHandler<EvaluatePaperPhaseCheckQuery, Result<PaperPhaseCheckView>>>().HandleAsync(new EvaluatePaperPhaseCheckQuery(null, null), cancellationToken))); // the one word of the P10 phase check, built here so that the lifecycle's closure does not name the check's handler (CF-11, ADR 0221)
+        services.AddScoped<IQueryHandler<GetCaptureIntegrityQuery, CaptureIntegrityView>, GetCaptureIntegrityHandler>(); // criterion I of the paper phase check on its own, for the integrity hard fail (CF-11, ADR 0225)
+        services.AddScoped<ScorecardIntegrityReader>(); // the hard fail "integrity fault": criterion I NOT MET is a fault, NOT EVALUABLE is not applicable, unreadable is unavailable
+        services.AddScoped<ForwardTierReader>(); // the forward trades by liquidity tier from day bars, derived on request, for the hard fail "evidence only from tier C"
         services.AddScoped<ForwardEvidenceReader>(); // the forward evidence: edge series, decay report, sequential test, kill demotions, phase check, calibration
         services.AddScoped<ScorecardReader>(); // builds a scorecard and the system card from the evidence with the pure calculators
         services.AddSingleton<ReadinessOptionsView>();

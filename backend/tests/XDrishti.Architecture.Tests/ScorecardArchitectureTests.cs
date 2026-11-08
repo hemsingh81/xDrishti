@@ -29,7 +29,7 @@ public sealed class ScorecardArchitectureTests
     [
         nameof(ReadinessOptions), nameof(RowStatus), nameof(ChecklistRow), nameof(ChecklistInputs), nameof(EdgeChecklist), nameof(GateResult), nameof(ReadinessGates), nameof(ReadinessLabel), nameof(ReadinessLabels),
         nameof(ScoreAnchors), nameof(SubScoreState), nameof(SubScore), nameof(BandPosition), nameof(ScoreInputs), nameof(FaultState), nameof(HardFailInputs), nameof(ReadinessScore), nameof(ReadinessCalculator),
-        nameof(StrategyReadiness), nameof(SystemReadiness), nameof(SystemReadinessCalculator), nameof(ReadinessAssessment),
+        nameof(StrategyReadiness), nameof(SystemReadiness), nameof(SystemReadinessCalculator), nameof(ReadinessAssessment), nameof(TierCounts), nameof(TierSet), nameof(TierSetState), nameof(TierCEvidence),
     ];
 
     private static readonly string[] DomainTypes = [.. DomainNames.Select(n => "XDrishti.Domain.Readiness." + n)];
@@ -70,7 +70,7 @@ public sealed class ScorecardArchitectureTests
     {
         public ValueTask<long> Write() => store.AppendAsync(true, "owner:x", "y", CancellationToken.None);
 
-        public ValueTask<ReadinessReading<bool>> Read() => gaps.IntegrityFaultAsync(CancellationToken.None);
+        public ValueTask<ReadinessReading<bool>> Read() => gaps.TwentyTradeCheckPassedAsync("x", CancellationToken.None);
     }
 
     /// <summary>Stands for a calculator that reads the clock.</summary>
@@ -334,9 +334,60 @@ public sealed class ScorecardArchitectureTests
         source.ShouldContain("new ReadinessReading<T>(null, \"unavailable: \" + reason)");
         source.ShouldNotContain("true");
         source.ShouldNotContain("Result.Success");
-        typeof(IReadinessGaps).GetMethods().Length.ShouldBe(5, "rows 10 and 11 left the port when the Lab verdict gained their figures (SC-S1, ADR 0222) and row 14 when it gained the tier counts (SC-S2, ADR 0223)");
-        source.Split("None<").Length.ShouldBe(5 + 2, "five answers and the helper's definition");
+        typeof(IReadinessGaps).GetMethods().Length.ShouldBe(3, "rows 10 and 11 left the port when the Lab verdict gained their figures (SC-S1, ADR 0222), row 14 when it gained the tier counts (SC-S2, ADR 0223) and the integrity and tier C hard fails when they gained their sources (SC-S3, ADR 0224)");
+        source.Split("None<").Length.ShouldBe(3 + 2, "three answers and the helper's definition");
         typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("CapacityOkAsync", "row 14 has its producer (ADR 0223) and is read from the Lab verdict by the reader, not through the gaps");
+        typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("IntegrityFaultAsync", "the integrity hard fail is criterion I of the phase check, read by ScorecardIntegrityReader (ADR 0225)");
+        typeof(IReadinessGaps).GetMethods().Select(m => m.Name).ShouldNotContain("TierCOnlyAsync", "the tier C hard fail is judged on the Lab and the forward trades (ADR 0225)");
+    }
+
+    // ---- (5c) the integrity and tier C hard fails (ADR 0224) ----
+
+    [Fact]
+    public void The_integrity_hard_fail_reads_criterion_I_through_its_own_narrow_query_not_the_phase_check_handler_a_delegate_or_a_write()
+    {
+        // the scorecard (which the lifecycle gate, and so the automatic pause path, can reach) names the narrow query; nothing but the reader and the handler names it
+        Dependents(Application, "XDrishti.Application.Paper.GetCaptureIntegrityQuery").ShouldBe(
+            ["XDrishti.Application.Confidence.ScorecardIntegrityReader", "XDrishti.Application.DependencyInjection", "XDrishti.Application.Paper.GetCaptureIntegrityHandler", "XDrishti.Application.Paper.GetCaptureIntegrityQuery"]);
+        Dependents(Application, "XDrishti.Application.Confidence.ScorecardIntegrityReader").ShouldBe(["XDrishti.Application.Confidence.ScorecardIntegrityReader", "XDrishti.Application.Confidence.ScorecardReader", "XDrishti.Application.DependencyInjection"]);
+
+        // neither the reader nor the handler names the whole check, the schedule reader, the delegate, a command or a store that writes
+        string[] forbidden =
+        [
+            "XDrishti.Application.Paper.EvaluatePaperPhaseCheckHandler", "XDrishti.Application.Paper.EvaluatePaperPhaseCheckQuery", "XDrishti.Application.Abstractions.Platform.IServiceScheduleReader", "XDrishti.Application.Abstractions.Confidence.PaperPhaseMetReader",
+            "XDrishti.Application.Abstractions.Messaging.ICommand", "XDrishti.Application.Abstractions.Paper.IPaperStore", "XDrishti.Application.Abstractions.Planning.IPlanStore", "XDrishti.Application.Abstractions.Learning.ILearningChangelog",
+            "XDrishti.Application.Learning.RecordCellTransitionCommand",
+        ];
+        foreach (var name in new[] { "GetCaptureIntegrityHandler", "ScorecardIntegrityReader" })
+        {
+            var result = Types.InAssembly(Application).That().HaveName(name).Should().NotHaveDependencyOnAny(forbidden).GetResult();
+
+            result.IsSuccessful.ShouldBeTrue(name + ": " + string.Join(", ", result.FailingTypeNames ?? []));
+        }
+
+        Types.InAssembly(Application).That().HaveName("GetCaptureIntegrityHandler").Should().HaveDependencyOn(typeof(XDrishti.Domain.Paper.PaperPhaseCheck).FullName!).GetResult().IsSuccessful.ShouldBeTrue("control: it judges with the phase check's own function");
+        Types.InAssembly(Application).That().HaveName("EvaluatePaperPhaseCheckHandler").Should().NotHaveDependencyOnAny(forbidden[2]).GetResult().IsSuccessful.ShouldBeFalse("control: the whole check does name the schedule reader");
+
+        // the criterion itself is the Domain function the whole check uses
+        Callers(r => r.Name == "CaptureIntegrity" && r.DeclaringType?.FullName == typeof(XDrishti.Domain.Paper.PaperPhaseCheck).FullName)
+            .ShouldBe(["XDrishti.Application.Paper.GetCaptureIntegrityHandler", "XDrishti.Domain.Paper.PaperPhaseCheck"]);
+    }
+
+    [Fact]
+    public void The_forward_tiers_read_only_day_bars_and_the_slice_adds_no_table_or_write()
+    {
+        var dayReaders = Callers(r => r.DeclaringType?.FullName == "XDrishti.Application.Abstractions.Market.Bars.IBarQueries" && r.Name == "ReadDailyBarsAsync");
+        dayReaders.ShouldContain("XDrishti.Application.Confidence.ForwardTierReader");
+        Callers(r => r.DeclaringType?.FullName == "XDrishti.Application.Abstractions.Market.Bars.IBarQueries" && r.Name == "ReadBarsAsync").ShouldNotContain("XDrishti.Application.Confidence.ForwardTierReader");
+
+        // the tier rules are the pure Domain ones, not copies
+        Callers(r => r.Name == "Assess" && r.DeclaringType?.FullName == "XDrishti.Domain.Research.LiquidityTiers").ShouldBe(["XDrishti.Application.Confidence.ForwardTierReader", "XDrishti.Application.Lab.LabTiers"]);
+
+        // the forward reader is read only: no command, no store, no changelog
+        var result = Types.InAssembly(Application).That().HaveName("ForwardTierReader").Should().NotHaveDependencyOnAny(
+            "XDrishti.Application.Abstractions.Messaging.ICommand", "XDrishti.Application.Abstractions.Paper.IPaperStore", "XDrishti.Application.Abstractions.Learning.ILearningChangelog", "XDrishti.Application.Learning.RecordCellTransitionCommand").GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(string.Join(", ", result.FailingTypeNames ?? []));
     }
 
     // ---- (5b) row 14: the tier and capacity counts (ADR 0223) ----

@@ -18,7 +18,7 @@ internal sealed class ForwardEdgeReader(IShadowResultReader reader, IPaperLedger
 
     private bool _epochRead;
 
-    public async ValueTask<ForwardEdge> ReadAsync(string strategy, CancellationToken cancellationToken)
+    private async ValueTask<EdgeSelection> SelectAsync(string strategy, CancellationToken cancellationToken)
     {
         if (!_epochRead)
         {
@@ -28,7 +28,32 @@ internal sealed class ForwardEdgeReader(IShadowResultReader reader, IPaperLedger
 
         // shortcut: every shadow row of every epoch is read and filtered in memory, as the sequential test and the decay report do; filter in SQL when the record grows.
         _rows ??= await reader.ResultsAsync(cancellationToken);
-        var selection = EdgeSeries.Select(_rows, _epoch, strategy + "|");
+        return EdgeSeries.Select(_rows, _epoch, strategy + "|");
+    }
+
+    /// <summary>
+    /// The graded forward trades of the strategy in the current epoch (the same selection as the edge series, before any figure is asked for): the symbol and the session of each, for the liquidity tier of the hard fail "evidence only from tier C" (ADR 0224). The shadow rows
+    /// cover every ticket of the paper record (one key for both), so these are the shadow and paper trades. A key without a symbol gives a trade with a null symbol, whose tier is then unavailable.
+    /// </summary>
+    public async ValueTask<IReadOnlyList<ForwardTrade>> GradedTradesAsync(string strategy, CancellationToken cancellationToken)
+    {
+        var selection = await SelectAsync(strategy, cancellationToken);
+        var prefixLength = strategy.Length + 1;
+        return
+        [
+            .. selection.Graded.Select(r =>
+            {
+                var rest = r.TradeKey.Length > prefixLength ? r.TradeKey[prefixLength..] : string.Empty;
+                var end = rest.IndexOf('|', StringComparison.Ordinal);
+                var symbol = end > 0 ? rest[..end] : null;
+                return new ForwardTrade(symbol, r.SessionDate);
+            }),
+        ];
+    }
+
+    public async ValueTask<ForwardEdge> ReadAsync(string strategy, CancellationToken cancellationToken)
+    {
+        var selection = await SelectAsync(strategy, cancellationToken);
         var costs = await ShadowCostBasis.ReadAsync(selection.Graded, confirmation, cancellationToken);
         var figures = EdgeSeries.Figures(selection, costs);
         var trades = figures.Trades;

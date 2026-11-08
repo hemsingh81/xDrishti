@@ -4,19 +4,25 @@ using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Confidence;
 using XDrishti.Application.Abstractions.Learning;
+using XDrishti.Application.Abstractions.Market;
+using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.Shadow;
 using XDrishti.Application.Confidence;
 using XDrishti.Application.Lab;
+using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Paper;
 using XDrishti.Application.Shadow;
 using XDrishti.Application.Tests.Learning;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Learning;
+using XDrishti.Domain.Market;
 using XDrishti.Domain.Paper;
 using XDrishti.Domain.Readiness;
+using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Tests.Confidence;
 
@@ -27,15 +33,9 @@ internal sealed class PassingGaps : IReadinessGaps
 
     public ValueTask<ReadinessReading<bool>> TwentyTradeCheckPassedAsync(string strategy, CancellationToken cancellationToken) => Yes();
 
-    public ValueTask<ReadinessReading<bool>> IntegrityFaultAsync(CancellationToken cancellationToken) => No();
-
-    public ValueTask<ReadinessReading<bool>> TierCOnlyAsync(string strategy, CancellationToken cancellationToken) => No();
-
     public ValueTask<ReadinessReading<double>> RiskShareAsync(string strategy, CancellationToken cancellationToken) => Number(1);
 
     private static ValueTask<ReadinessReading<bool>> Yes() => ValueTask.FromResult(new ReadinessReading<bool>(true, string.Empty));
-
-    private static ValueTask<ReadinessReading<bool>> No() => ValueTask.FromResult(new ReadinessReading<bool>(false, string.Empty));
 
     private static ValueTask<ReadinessReading<double>> Number(double value) => ValueTask.FromResult(new ReadinessReading<double>(value, string.Empty));
 }
@@ -103,6 +103,21 @@ internal sealed class ReadinessFixture
         Sequential.HandleAsync(Arg.Any<GetSequentialStatusQuery>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(SequentialResult));
         Kills.HandleAsync(Arg.Any<GetKillProposalsQuery>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(KillsResult));
         Phase.HandleAsync(Arg.Any<EvaluatePaperPhaseCheckQuery>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult(PhaseResult));
+        Integrity.HandleAsync(Arg.Any<GetCaptureIntegrityQuery>(), Arg.Any<CancellationToken>()).Returns(_ => IntegrityFailure is { } failure ? ValueTask.FromException<CaptureIntegrityView>(failure) : ValueTask.FromResult(IntegrityView));
+        Instruments.FindForResolveAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>()).Returns(call =>
+            ValueTask.FromResult<IReadOnlyList<ResolveCandidate>>([.. call.ArgAt<IReadOnlyCollection<string>>(0).Where(s => !Unresolved.Contains(s)).SelectMany(s => Enumerable.Range(0, s == Ambiguous ? 2 : 1).Select(_ => new ResolveCandidate(IdOf(s), s, s, "share", null, false, true)))]));
+        BarQueries.ReadDailyBarsAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            var id = call.Arg<Guid>();
+            if (UnreadableBars.Contains(id))
+            {
+                throw new InvalidOperationException("the bars cannot be read");
+            }
+
+            var from = call.ArgAt<DateOnly>(1);
+            var to = call.ArgAt<DateOnly>(2);
+            return ValueTask.FromResult<IReadOnlyList<BarRow>>([.. Enumerable.Range(0, Math.Max(0, to.DayNumber - from.DayNumber)).Select(i => DayBar(from.AddDays(i), TradedValue(id)))]);
+        });
         Models.ListAsync(Arg.Any<ModelRole?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult<IReadOnlyList<StoredModel>>(Champions));
         Strategies.HandleAsync(Arg.Any<ListStrategiesQuery>(), Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromResult<IReadOnlyList<StoredStrategy>>(StrategyList));
         StrategyDetails.HandleAsync(Arg.Any<GetStrategyQuery>(), Arg.Any<CancellationToken>()).Returns(call => ValueTask.FromResult(StrategyList.FirstOrDefault(s => s.Id == call.Arg<GetStrategyQuery>().Id) is { } s
@@ -133,6 +148,12 @@ internal sealed class ReadinessFixture
     public IQueryHandler<GetKillProposalsQuery, Result<KillProposalsView>> Kills { get; } = Substitute.For<IQueryHandler<GetKillProposalsQuery, Result<KillProposalsView>>>();
 
     public IQueryHandler<EvaluatePaperPhaseCheckQuery, Result<PaperPhaseCheckView>> Phase { get; } = Substitute.For<IQueryHandler<EvaluatePaperPhaseCheckQuery, Result<PaperPhaseCheckView>>>();
+
+    public IQueryHandler<GetCaptureIntegrityQuery, CaptureIntegrityView> Integrity { get; } = Substitute.For<IQueryHandler<GetCaptureIntegrityQuery, CaptureIntegrityView>>();
+
+    public IInstrumentQueries Instruments { get; } = Substitute.For<IInstrumentQueries>();
+
+    public IBarQueries BarQueries { get; } = Substitute.For<IBarQueries>();
 
     public IModelRegistry Models { get; } = Substitute.For<IModelRegistry>();
 
@@ -168,7 +189,37 @@ internal sealed class ReadinessFixture
 
     public Result<PaperPhaseCheckView> PhaseResult { get; set; } = Result.Success(new PaperPhaseCheckView(new PaperPhaseReport(null, default, 0, [], "MET", "MET", [], [], null!, []), "text"));
 
+    /// <summary>Criterion I of the phase check as the narrow query says it: MET by default (clear).</summary>
+    public CaptureIntegrityView IntegrityView { get; set; } = new("MET", "MET: no replay disagreed with a stored entry and nothing stays pending", 40, new DateOnly(2026, 11, 6), []);
+
+    /// <summary>When set, the narrow read of criterion I throws it.</summary>
+    public Exception? IntegrityFailure { get; set; }
+
+    /// <summary>When set, the shadow rows read that the forward tier reader makes (and only that one) throws.</summary>
+    public Exception? TierShadowFailure { get; set; }
+
+    /// <summary>The 20-day median traded value (rupees) the day bars of an instrument give; tier A (Rs 200 crore) by default. A test sets it per symbol with <see cref="ValueBySymbol"/>.</summary>
+    public decimal DefaultTradedValue { get; set; } = 200m * LiquidityTiers.Crore;
+
+    public Dictionary<string, decimal> ValueBySymbol { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Symbols the master list does not know.</summary>
+    public HashSet<string> Unresolved { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>The one symbol the master list names twice (ambiguous).</summary>
+    public string? Ambiguous { get; set; }
+
+    /// <summary>Instruments whose day bars cannot be read.</summary>
+    public HashSet<Guid> UnreadableBars { get; } = [];
+
     public IReadOnlyList<StoredModel> Champions { get; set; } = [];
+
+    /// <summary>A stable instrument id for a symbol (its first 16 characters as bytes).</summary>
+    public static Guid IdOf(string symbol) => new(System.Text.Encoding.UTF8.GetBytes(symbol.PadRight(16, '_')[..16]));
+
+    private decimal TradedValue(Guid id) => ValueBySymbol.Where(p => IdOf(p.Key) == id).Select(p => (decimal?)p.Value).FirstOrDefault() ?? DefaultTradedValue;
+
+    private static BarRow DayBar(DateOnly date, decimal value) => new(new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset), 100, 100, 100, 100, (long)(value / 100m), 375, true, null);
 
     public IReadOnlyList<StoredStrategy> StrategyList { get; set; } = [new StoredStrategy(Strategy, "intraday", false, DateTimeOffset.UnixEpoch, 1, 1)];
 
@@ -180,7 +231,26 @@ internal sealed class ReadinessFixture
 
     public ForwardEvidenceReader ForwardReader => new(ForwardEdge, Decay, Sequential, Kills, async cancellationToken => PaperPhaseVerdict.Met(await Phase.HandleAsync(new EvaluatePaperPhaseCheckQuery(null, null), cancellationToken)), Models, new StrategyCells(Log));
 
-    public ScorecardReader Reader => new(LabReader, ForwardReader, Gaps, Strategies, StrategyDetails, Options);
+    private ForwardEdgeReader TierEdge
+    {
+        get
+        {
+            if (TierShadowFailure is not { } failure)
+            {
+                return ForwardEdge;
+            }
+
+            var broken = Substitute.For<IShadowResultReader>();
+            broken.ResultsAsync(Arg.Any<CancellationToken>()).Returns(_ => ValueTask.FromException<IReadOnlyList<ShadowResultRow>>(failure));
+            return new ForwardEdgeReader(broken, Ledger, Confirmation);
+        }
+    }
+
+    public ForwardTierReader ForwardTiers => new(TierEdge, Instruments, BarQueries, new CostStressOptions(), NullLogger<ForwardTierReader>.Instance);
+
+    public ScorecardIntegrityReader IntegrityReader => new(Integrity, NullLogger<ScorecardIntegrityReader>.Instance);
+
+    public ScorecardReader Reader => new(LabReader, ForwardReader, ForwardTiers, IntegrityReader, Gaps, Strategies, StrategyDetails, Options);
 
     public ReadinessGate Gate => new(Reader, Store, Store, Options, Time, NullLogger<ReadinessGate>.Instance);
 

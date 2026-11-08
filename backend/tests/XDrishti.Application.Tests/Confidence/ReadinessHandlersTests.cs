@@ -82,9 +82,9 @@ public sealed class ReadinessHandlersTests
     }
 
     [Fact]
-    public async Task With_the_real_gaps_the_system_card_is_zero_because_the_integrity_cannot_be_read_and_the_weights_are_equal()
+    public async Task When_the_integrity_criterion_cannot_be_read_the_system_card_is_zero_and_the_weights_are_equal()
     {
-        var f = new ReadinessFixture { Gaps = new UnavailableReadinessGaps() };
+        var f = new ReadinessFixture { Gaps = new UnavailableReadinessGaps(), IntegrityFailure = new InvalidOperationException("down") };
 
         var result = await f.List.HandleAsync(new ListScorecardsQuery(), Ct);
 

@@ -1,11 +1,15 @@
+#pragma warning disable CA2012 // NSubstitute setup and verification calls on ValueTask members are not awaited
 using NSubstitute;
+using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Confidence;
 using XDrishti.Application.Lab;
+using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Paper;
 using XDrishti.Application.Shadow;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Readiness;
+using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Tests.Confidence;
 
@@ -60,10 +64,7 @@ public sealed class ScorecardReaderTests
         Status(card, 3).ShouldBe("pass");
         card.GateR.Passed.ShouldBeFalse();
         card.GateS.Passed.ShouldBeFalse();
-        card.Score.ShouldBe(0);
-        card.Label.ShouldBe("not_ready");
-        card.HardFails.ShouldContain(h => h.Contains("integrity fault", StringComparison.Ordinal) && h.Contains("unavailable", StringComparison.Ordinal));
-        card.HardFails.ShouldContain(h => h.Contains("tier C", StringComparison.Ordinal));
+        card.HardFails.ShouldBeEmpty("the integrity and tier C hard fails have their sources since SC-S3 (ADR 0224) and read clear here");
         card.Waiting.ShouldContain(w => w.Contains("row 13", StringComparison.Ordinal));
         card.Rows.Single(r => r.Number == 13).Value.ShouldContain("no same-universe benchmark producer");
         card.RawMinimum.ShouldBeGreaterThan(0, "the score without the faults is still shown");
@@ -76,6 +77,339 @@ public sealed class ScorecardReaderTests
     /// <summary>A block as the slice before S2b wrote it: no minute members, every capacity reading unavailable.</summary>
     private static CostStressTiersView BlockBeforeS2b(int breaches = 0, int capacityNone = 330) =>
         new(330, 300, 30, 0, 0, breaches, capacityNone, string.Empty, string.Empty, string.Empty, 0);
+
+    // ---- SC-S3 (ADR 0224): the integrity hard fail ----
+
+    private static string Note(ScorecardView card, string term) => card.Notes.Single(n => n.StartsWith($"Hard fail \"{term}\":", StringComparison.Ordinal));
+
+    [Fact]
+    public async Task Integrity_criterion_MET_is_clear_and_the_card_says_why()
+    {
+        var card = await CardAsync(new ReadinessFixture());
+
+        card.HardFails.ShouldNotContain(h => h.Contains("integrity", StringComparison.Ordinal));
+        card.NotApplicable.ShouldNotContain(h => h.Contains("integrity", StringComparison.Ordinal));
+        Note(card, ReadinessCalculator.IntegrityName).ShouldContain("clear");
+        Note(card, ReadinessCalculator.IntegrityName).ShouldContain("criterion I");
+    }
+
+    [Fact]
+    public async Task Integrity_criterion_NOT_MET_is_a_hard_fail_that_zeroes_the_score_and_shows_the_disagreement()
+    {
+        var f = new ReadinessFixture
+        {
+            IntegrityView = new CaptureIntegrityView("NOT MET", "NOT MET: 2 stored entries disagreed with a later replay (sessions 2026-11-02)", 40, new DateOnly(2026, 11, 6), []),
+        };
+
+        var card = await CardAsync(f);
+
+        card.HardFails.ShouldContain(ReadinessCalculator.IntegrityName);
+        card.Score.ShouldBe(0);
+        card.Label.ShouldBe("not_ready");
+        card.RawMinimum.ShouldBeGreaterThan(0);
+        Note(card, ReadinessCalculator.IntegrityName).ShouldContain("hard fail");
+        Note(card, ReadinessCalculator.IntegrityName).ShouldContain("2 stored entries disagreed");
+    }
+
+    [Fact]
+    public async Task Integrity_with_no_capture_run_yet_is_not_applicable_neither_a_fault_nor_a_pass()
+    {
+        var f = new ReadinessFixture { IntegrityView = new CaptureIntegrityView("NOT EVALUABLE", "NOT EVALUABLE: no capture run of this epoch", 0, new DateOnly(2026, 11, 6), []) };
+
+        var card = await CardAsync(f);
+
+        card.HardFails.ShouldNotContain(h => h.Contains("integrity", StringComparison.Ordinal));
+        card.NotApplicable.ShouldContain(ReadinessCalculator.IntegrityName);
+        Note(card, ReadinessCalculator.IntegrityName).ShouldContain("not applicable");
+        Note(card, ReadinessCalculator.IntegrityName).ShouldNotContain("clear");
+    }
+
+    [Fact]
+    public async Task Integrity_that_cannot_be_read_is_unavailable_a_hard_fail_and_not_a_detected_fault()
+    {
+        var f = new ReadinessFixture { IntegrityFailure = new InvalidOperationException("db down") };
+
+        var card = await CardAsync(f);
+
+        card.HardFails.ShouldContain(h => h.StartsWith(ReadinessCalculator.IntegrityName, StringComparison.Ordinal) && h.Contains("unavailable", StringComparison.Ordinal));
+        card.HardFails.ShouldNotContain(ReadinessCalculator.IntegrityName, "unavailable is not the detected fault");
+        card.Score.ShouldBe(0);
+        Note(card, ReadinessCalculator.IntegrityName).ShouldContain("could not be read");
+    }
+
+    [Fact]
+    public async Task An_unknown_verdict_word_is_unavailable_never_clear()
+    {
+        var f = new ReadinessFixture { IntegrityView = new CaptureIntegrityView("MAYBE", "?", 3, null, []) };
+
+        var card = await CardAsync(f);
+
+        card.HardFails.ShouldContain(h => h.Contains("integrity fault (the input is unavailable", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task The_integrity_criterion_is_read_once_for_all_strategies_of_a_scope()
+    {
+        var f = new ReadinessFixture();
+        var reader = f.Reader;
+
+        await reader.BuildAsync(ReadinessFixture.Strategy, 1, Ct);
+        await reader.BuildAsync(ReadinessFixture.Strategy, 1, Ct);
+
+        await f.Integrity.Received(1).HandleAsync(Arg.Any<GetCaptureIntegrityQuery>(), Arg.Any<CancellationToken>());
+    }
+
+    // ---- SC-S3 (ADR 0224): the tier C hard fail, judged on the Lab and the forward trades ----
+
+    private static ReadinessFixture AllLabTierC()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { Tiers = Tiers(a: 0, b: 0, c: 330) } };
+        return f;
+    }
+
+    private static ReadinessFixture AllForwardTierC() => new() { DefaultTradedValue = 5m * LiquidityTiers.Crore };
+
+    private static bool TierFault(ScorecardView card) => card.HardFails.Contains(ReadinessCalculator.TierName);
+
+    [Fact]
+    public async Task Mixed_A_and_C_in_both_sets_is_not_a_hard_fail()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { Tiers = Tiers(a: 100, b: 0, c: 230) } };
+        f.ValueBySymbol["S0"] = 5m * LiquidityTiers.Crore; // one forward trade tier C, the rest tier A
+
+        var card = await CardAsync(f);
+
+        TierFault(card).ShouldBeFalse();
+        card.HardFails.ShouldNotContain(h => h.Contains("tier C", StringComparison.Ordinal));
+        Note(card, ReadinessCalculator.TierName).ShouldStartWith($"Hard fail \"{ReadinessCalculator.TierName}\": clear");
+        Note(card, ReadinessCalculator.TierName).ShouldContain("A 100, B 0, C 230, unavailable 0");
+        Note(card, ReadinessCalculator.TierName).ShouldContain("A 329, B 0, C 1, unavailable 0");
+    }
+
+    [Fact]
+    public async Task A_Lab_set_of_only_tier_C_is_a_hard_fail_triggered_by_the_Lab_even_when_the_forward_trades_are_tier_A()
+    {
+        var card = await CardAsync(AllLabTierC());
+
+        TierFault(card).ShouldBeTrue();
+        card.Score.ShouldBe(0);
+        var note = Note(card, ReadinessCalculator.TierName);
+        note.ShouldContain("triggered by: Lab out-of-sample trades");
+        note.ShouldNotContain("triggered by: Lab out-of-sample trades, forward");
+        note.ShouldContain("Lab out-of-sample trades: A 0, B 0, C 330, unavailable 0 (only tier C)");
+        note.ShouldContain("forward shadow and paper trades: A 330, B 0, C 0, unavailable 0 (not only tier C)");
+    }
+
+    [Fact]
+    public async Task A_forward_set_of_only_tier_C_is_a_hard_fail_triggered_by_the_forward_trades_even_when_the_Lab_is_tier_A()
+    {
+        var card = await CardAsync(AllForwardTierC());
+
+        TierFault(card).ShouldBeTrue();
+        var note = Note(card, ReadinessCalculator.TierName);
+        note.ShouldContain("triggered by: forward shadow and paper trades");
+        note.ShouldContain("forward shadow and paper trades: A 0, B 0, C 330, unavailable 0 (only tier C)");
+        note.ShouldContain("Lab out-of-sample trades: A 300, B 30, C 0, unavailable 0 (not only tier C)");
+    }
+
+    [Fact]
+    public async Task Both_sets_only_tier_C_name_both_as_the_trigger()
+    {
+        var f = AllForwardTierC();
+        f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { Tiers = Tiers(a: 0, b: 0, c: 330) } };
+
+        var card = await CardAsync(f);
+
+        Note(card, ReadinessCalculator.TierName).ShouldContain("triggered by: Lab out-of-sample trades, forward shadow and paper trades");
+    }
+
+    [Fact]
+    public async Task Tier_B_is_not_tier_C_so_a_forward_set_of_only_tier_B_is_clear()
+    {
+        var f = new ReadinessFixture { DefaultTradedValue = 50m * LiquidityTiers.Crore };
+
+        var card = await CardAsync(f);
+
+        TierFault(card).ShouldBeFalse();
+        Note(card, ReadinessCalculator.TierName).ShouldContain("forward shadow and paper trades: A 0, B 330, C 0, unavailable 0");
+    }
+
+    [Fact]
+    public async Task No_forward_trades_is_not_tier_C_and_the_Lab_set_alone_decides()
+    {
+        var f = new ReadinessFixture { ShadowRows = [] };
+
+        var card = await CardAsync(f);
+
+        TierFault(card).ShouldBeFalse();
+        Note(card, ReadinessCalculator.TierName).ShouldContain("forward shadow and paper trades: no trades (not tier C)");
+        await f.BarQueries.DidNotReceiveWithAnyArgs().ReadDailyBarsAsync(default, default, default, Ct);
+    }
+
+    [Fact]
+    public async Task A_shadow_rows_read_that_throws_makes_the_forward_tier_set_unavailable_and_the_card_still_builds()
+    {
+        var f = new ReadinessFixture { TierShadowFailure = new InvalidOperationException("db down") };
+
+        var card = await CardAsync(f);
+
+        TierFault(card).ShouldBeFalse();
+        card.HardFails.ShouldContain(h => h.StartsWith(ReadinessCalculator.TierName, StringComparison.Ordinal) && h.Contains("unavailable", StringComparison.Ordinal));
+        Note(card, ReadinessCalculator.TierName).ShouldContain("forward shadow and paper trades: unavailable");
+        card.Label.ShouldNotBe("ready");
+    }
+
+    [Fact]
+    public async Task No_forward_trades_and_a_Lab_set_of_only_tier_C_is_a_hard_fail()
+    {
+        var f = AllLabTierC();
+        f.ShadowRows = [];
+
+        var card = await CardAsync(f);
+
+        TierFault(card).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_Lab_block_with_no_trades_is_absent_not_tier_C()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { Tiers = Tiers(a: 0, b: 0, c: 0) } };
+
+        var card = await CardAsync(f);
+
+        TierFault(card).ShouldBeFalse();
+        Note(card, ReadinessCalculator.TierName).ShouldContain("Lab out-of-sample trades: no trades (not tier C)");
+    }
+
+    [Fact]
+    public async Task No_trades_in_either_set_is_not_tier_C()
+    {
+        var f = new ReadinessFixture { ShadowRows = [] };
+        f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { Tiers = Tiers(a: 0, b: 0, c: 0) } };
+
+        var card = await CardAsync(f);
+
+        TierFault(card).ShouldBeFalse();
+        card.HardFails.ShouldNotContain(h => h.Contains("tier C", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_Lab_verdict_without_the_tier_block_is_unavailable_not_tier_C_and_a_forward_set_of_only_tier_C_still_fails_it()
+    {
+        var older = new ReadinessFixture();
+        older.Verdict = older.Verdict! with { CostStress = older.Verdict.CostStress! with { Tiers = null } };
+
+        var card = await CardAsync(older);
+
+        card.HardFails.ShouldContain(h => h.StartsWith(ReadinessCalculator.TierName, StringComparison.Ordinal) && h.Contains("unavailable", StringComparison.Ordinal));
+        card.HardFails.ShouldNotContain(ReadinessCalculator.TierName);
+        Note(card, ReadinessCalculator.TierName).ShouldContain("Lab out-of-sample trades: unavailable");
+
+        var both = AllForwardTierC();
+        both.Verdict = both.Verdict! with { CostStress = both.Verdict.CostStress! with { Tiers = null } };
+        TierFault(await CardAsync(both)).ShouldBeTrue("a detected fault in one set stands whatever the other set says");
+    }
+
+    [Fact]
+    public async Task Lab_trades_that_are_tier_C_or_without_a_tier_are_unavailable_not_tier_C()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { Tiers = Tiers(a: 0, b: 0, c: 300, none: 30) } };
+
+        var card = await CardAsync(f);
+
+        TierFault(card).ShouldBeFalse();
+        card.HardFails.ShouldContain(h => h.StartsWith(ReadinessCalculator.TierName, StringComparison.Ordinal) && h.Contains("unavailable", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Lab_trades_with_an_A_and_some_unavailable_are_not_only_tier_C()
+    {
+        var f = new ReadinessFixture();
+        f.Verdict = f.Verdict! with { CostStress = f.Verdict.CostStress! with { Tiers = Tiers(a: 1, b: 0, c: 300, none: 29) } };
+
+        var card = await CardAsync(f);
+
+        card.HardFails.ShouldNotContain(h => h.Contains("tier C", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Forward_trades_whose_symbol_does_not_resolve_are_unavailable_never_tier_C()
+    {
+        var f = new ReadinessFixture();
+        foreach (var i in Enumerable.Range(0, 330))
+        {
+            f.Unresolved.Add($"S{i}");
+        }
+
+        var card = await CardAsync(f);
+
+        TierFault(card).ShouldBeFalse();
+        card.HardFails.ShouldContain(h => h.StartsWith(ReadinessCalculator.TierName, StringComparison.Ordinal) && h.Contains("unavailable", StringComparison.Ordinal));
+        Note(card, ReadinessCalculator.TierName).ShouldContain("forward shadow and paper trades: unavailable");
+        Note(card, ReadinessCalculator.TierName).ShouldContain("A 0, B 0, C 0, unavailable 330");
+    }
+
+    [Fact]
+    public async Task An_ambiguous_symbol_gives_an_unavailable_tier()
+    {
+        var f = new ReadinessFixture { ShadowRows = ReadinessFixture.Series(1), Ambiguous = "S0" };
+
+        var card = await CardAsync(f);
+
+        Note(card, ReadinessCalculator.TierName).ShouldContain("forward shadow and paper trades: unavailable");
+    }
+
+    [Fact]
+    public async Task Fewer_than_20_sessions_of_bars_is_an_unavailable_tier_not_tier_C()
+    {
+        var f = new ReadinessFixture { ShadowRows = ReadinessFixture.Series(2) };
+        f.BarQueries.ReadDailyBarsAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<BarRow>>([]));
+
+        var card = await CardAsync(f);
+
+        TierFault(card).ShouldBeFalse();
+        Note(card, ReadinessCalculator.TierName).ShouldContain("forward shadow and paper trades: unavailable");
+    }
+
+    [Fact]
+    public async Task Forward_bars_that_cannot_be_read_make_that_instruments_trades_unavailable_and_the_card_still_builds()
+    {
+        var f = new ReadinessFixture { ShadowRows = ReadinessFixture.Series(3) };
+        f.UnreadableBars.Add(ReadinessFixture.IdOf("S1"));
+
+        var card = await CardAsync(f);
+
+        TierFault(card).ShouldBeFalse();
+        Note(card, ReadinessCalculator.TierName).ShouldContain("A 2, B 0, C 0, unavailable 1");
+    }
+
+    [Fact]
+    public async Task An_unreadable_forward_source_is_an_unavailable_set_never_a_pass()
+    {
+        var f = new ReadinessFixture();
+        f.Instruments.FindForResolveAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns<ValueTask<IReadOnlyList<ResolveCandidate>>>(_ => throw new InvalidOperationException("db down"));
+
+        var card = await CardAsync(f);
+
+        card.HardFails.ShouldContain(h => h.StartsWith(ReadinessCalculator.TierName, StringComparison.Ordinal) && h.Contains("unavailable", StringComparison.Ordinal));
+        card.Score.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task The_tier_is_taken_from_the_sessions_before_the_entry_day_and_each_instrument_is_read_once_and_bounded()
+    {
+        var f = new ReadinessFixture { ShadowRows = [.. ReadinessFixture.Series(3).Select((r, i) => r with { TradeKey = $"{ReadinessFixture.Strategy}|ABC|BUY|{i}" })] };
+
+        await CardAsync(f);
+
+        await f.BarQueries.Received(1).ReadDailyBarsAsync(Arg.Any<Guid>(), new DateOnly(2025, 1, 1).AddDays(-60), new DateOnly(2025, 1, 3).AddDays(1), Arg.Any<CancellationToken>());
+    }
+
 
     private static ReadinessFixture WithTiers(CostStressTiersView? tiers)
     {

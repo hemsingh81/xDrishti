@@ -15,7 +15,8 @@ namespace XDrishti.Application.Confidence;
 /// <param name="CostSheet">The cost-sheet hard-fail term.</param>
 /// <param name="HoldOutReused">The hold-out hard-fail term.</param>
 /// <param name="Notes">The honesty sentences about what was read.</param>
-internal sealed record LabEvidence(ChecklistInputs Checklist, int? Folds, int? PositiveFolds, FaultState CostSheet, FaultState HoldOutReused, IReadOnlyList<string> Notes);
+/// <param name="LabTiers">The Lab out-of-sample trades by liquidity tier, for the hard fail "evidence only from tier C" (ADR 0224); unavailable with the reason when the verdict has no tier block.</param>
+internal sealed record LabEvidence(ChecklistInputs Checklist, int? Folds, int? PositiveFolds, FaultState CostSheet, FaultState HoldOutReused, IReadOnlyList<string> Notes, TierSet LabTiers);
 
 /// <summary>
 /// Reads the stored Lab results of one strategy version (the newest finished full run's verdict, the registration and the hold-out) through the existing queries and maps them to the inputs of the checklist (spec CF-11 D1). A producer that judges its own thresholds
@@ -41,7 +42,7 @@ internal sealed class LabEvidenceReader(
         {
             rowNotes[1] = "the strategy has no version in the Lab.";
             notes.Add("The strategy has no version in the Lab, so no Lab result is read.");
-            return new LabEvidence(new ChecklistInputs { Notes = rowNotes }, null, null, FaultState.Unavailable, FaultState.Unavailable, notes);
+            return new LabEvidence(new ChecklistInputs { Notes = rowNotes }, null, null, FaultState.Unavailable, FaultState.Unavailable, notes, TierSet.Unreadable(LabSetName, "the strategy has no version in the Lab"));
         }
 
         var reg = await registration.HandleAsync(new GetRegistrationQuery(strategy, v), cancellationToken);
@@ -63,7 +64,7 @@ internal sealed class LabEvidenceReader(
             }
 
             rowNotes[1] = registered is null ? "the registration could not be read." : registered == false ? "no registration is stored for this version." : string.Empty;
-            return new LabEvidence(checklist with { Notes = rowNotes }, null, null, FaultState.Unavailable, reused, notes);
+            return new LabEvidence(checklist with { Notes = rowNotes }, null, null, FaultState.Unavailable, reused, notes, TierSet.Unreadable(LabSetName, why));
         }
 
         var evidence = verdict.Evidence;
@@ -167,8 +168,19 @@ internal sealed class LabEvidenceReader(
         }
 
         var costSheet = await CostSheetAsync(verdict, cancellationToken);
-        return new LabEvidence(checklist with { Notes = rowNotes }, evidence.Folds, evidence.PositiveFolds, costSheet, reused, notes);
+        return new LabEvidence(checklist with { Notes = rowNotes }, evidence.Folds, evidence.PositiveFolds, costSheet, reused, notes, LabTierSet(verdict.CostStress));
     }
+
+    /// <summary>The name of the Lab set beside the hard fail.</summary>
+    internal const string LabSetName = "Lab out-of-sample trades";
+
+    /// <summary>The Lab set from the tier counts of the cost stress block (ADR 0223): no block (cost stress Off, or a verdict produced before it) is unavailable, never tier C.</summary>
+    private static TierSet LabTierSet(CostStressView? stress) => stress switch
+    {
+        null => TierSet.Unreadable(LabSetName, "the cost stress is not computed (Confidence:CostStress:Mode is Off), so there is no tier count"),
+        { Tiers: null } => TierSet.Unreadable(LabSetName, "the verdict was produced before the tier and capacity check; re-run the robust test"),
+        { Tiers: { } t } => TierSet.Of(LabSetName, new TierCounts(t.TierA, t.TierB, t.TierC, t.TierUnavailable)),
+    };
 
     private async ValueTask<(LabVerdictView? Verdict, string Why)> VerdictAsync(string strategy, int version, CancellationToken cancellationToken)
     {
