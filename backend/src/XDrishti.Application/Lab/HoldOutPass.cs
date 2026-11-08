@@ -1,9 +1,9 @@
-using XDrishti.Domain.Confidence;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 
