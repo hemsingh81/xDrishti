@@ -32,6 +32,7 @@ public sealed class LearnedNoticesAndServiceTests
         var notice = notices.ShouldHaveSingleItem();
         notice.Text.ShouldContain("Tier A bps");
         notice.Text.ShouldContain("Nothing is loosened by itself");
+        notice.Text.ShouldContain("may be a cause");
         store.Rows.Single().NewValue.ShouldBe("4.2"); // the notice changed nothing
     }
 
@@ -44,6 +45,21 @@ public sealed class LearnedNoticesAndServiceTests
         store.Seed(FakeLearnedConfig.BpsKey, "4", "4.2", "tighten", "applied", "auto");
 
         (await new LearnedTighteningNotices(store, Probe(empty), new FakeLearnedConfig()).ListAsync(Now, Ct)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_current_tightening_is_found_even_when_more_than_a_hundred_newer_rows_exist()
+    {
+        var store = new FakeLearnedStore { Now = Now.AddDays(-90) };
+        store.Seed(FakeLearnedConfig.BpsKey, "4", "4.2", "tighten", "applied", "auto");
+        for (var i = 0; i < 120; i++)
+        {
+            store.Seed(FakeLearnedConfig.LoopLevel, "0.95", "0.96", "tighten", "dismissed", "owner:me@x.test");
+        }
+
+        var notices = await new LearnedTighteningNotices(store, Probe(6), new FakeLearnedConfig()).ListAsync(Now, Ct);
+
+        notices.Select(n => n.Id).ShouldBe(["learned-empty:1:6"]);
     }
 
     [Fact]

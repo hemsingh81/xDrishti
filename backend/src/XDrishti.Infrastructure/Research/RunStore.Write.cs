@@ -12,15 +12,15 @@ internal sealed partial class RunStore
     private const string InsertRun = """
         INSERT INTO research.sim_runs (run_key, engine_version, record_schema_version, trade_schema_version, strategy_id, definition_sha256, from_date, to_date, universe_kind, universe_label,
             instruments, instruments_run, trades_in_window, candidates_in_window, trade_count, open_at_end_count, acknowledge_csv_adjusted, fills, costs_sheet_id, costs_rates_sha256,
-            record_json, record_sha256, trades_sha256, created_at, created_by)
+            record_json, record_sha256, trades_sha256, created_at, created_by, purpose)
         VALUES (@run_key, @engine_version, @record_schema_version, @trade_schema_version, @strategy_id, @definition_sha256, @from_date, @to_date, @universe_kind, @universe_label,
             @instruments, @instruments_run, @trades_in_window, @candidates_in_window, @trade_count, @open_at_end_count, @acknowledge_csv_adjusted, @fills, @costs_sheet_id, @costs_rates_sha256,
-            @record_json, @record_sha256, @trades_sha256, @created_at, @created_by)
+            @record_json, @record_sha256, @trades_sha256, @created_at, @created_by, @purpose)
         ON CONFLICT (run_key) DO NOTHING
         RETURNING id
         """;
 
-    private const string SelectStored = "SELECT id, record_sha256, trades_sha256, trade_count, open_at_end_count, engine_version, record_schema_version, trade_schema_version FROM research.sim_runs WHERE run_key = @run_key";
+    private const string SelectStored = "SELECT id, record_sha256, trades_sha256, trade_count, open_at_end_count, engine_version, record_schema_version, trade_schema_version, purpose FROM research.sim_runs WHERE run_key = @run_key";
 
     private static readonly string CopySql = "COPY research.sim_trades (" + string.Join(", ", [TradeColumns.RunId, TradeColumns.OpenAtEnd, TradeColumns.Ordinal, TradeColumns.TradeKey, .. TradeColumns.Columns.Select(c => c.Name)]) + ") FROM STDIN (FORMAT BINARY)";
 
@@ -116,6 +116,7 @@ internal sealed partial class RunStore
         p.AddWithValue("trades_sha256", NpgsqlDbType.Char, store.Record.TradesSha256);
         p.AddWithValue("created_at", NpgsqlDbType.TimestampTz, store.CreatedAt.ToUniversalTime());
         p.AddWithValue("created_by", NpgsqlDbType.Varchar, store.Actor);
+        p.AddWithValue("purpose", NpgsqlDbType.Text, RunPurposes.Text(store.Purpose));
     }
 
     /// <summary>Streams the trades of both lists, in the record's order, from the lists the record already holds; nothing is copied into a second collection.</summary>
@@ -193,6 +194,12 @@ internal sealed partial class RunStore
         if (reader.GetInt16(6) != run.Run.SchemaVersion || reader.GetInt16(7) != SimTrade.CurrentSchemaVersion)
         {
             differing.Add("schema_version");
+        }
+
+        if (!string.Equals(reader.GetString(8), RunPurposes.Text(run.Purpose), StringComparison.Ordinal))
+        {
+            // the same run under the other purpose is never a no-op: a research request must not be told "stored" by a training row that no evidence reader sees (ADR 0243)
+            differing.Add("purpose");
         }
 
         return differing.Count == 0

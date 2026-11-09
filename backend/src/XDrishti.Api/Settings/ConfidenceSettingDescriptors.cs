@@ -62,7 +62,7 @@ internal static class ConfidenceSettingDescriptors
         K("Loop:TargetGain", NoDirection, 0.001, 0.1); K("Loop:SlopeLow", NoDirection, 0.8, 1); K("Loop:SlopeHigh", NoDirection, 1, 1.2); K("Loop:SlopeSe", NoDirection, 1, 2);
         K("Kill:StressMultiplier", Up, 1.5, 3); K("Kill:DrawdownFactor", Down, 1, 2);
         K("Registration:Enforce"); K("Registration:CountInFactor");
-        K("HoldOut:Enforce"); K("HoldOut:AutoUnlock"); K("HoldOut:MinMonths", NoDirection, 1, 60); K("HoldOut:SharePercent", NoDirection, 5, 50); K("HoldOut:MinTrades", NoDirection, 5, 1000); K("HoldOut:Retention", NoDirection, 0.1, 1);
+        K("HoldOut:Enforce"); K("HoldOut:AutoUnlock"); K("HoldOut:MinMonths", NoDirection, 1, 60); K("HoldOut:SharePercent", NoDirection, 5, 50); K("HoldOut:MinTrades", NoDirection, 5, 1000); K("HoldOut:Retention", NoDirection, 0.1, 1); K("HoldOut:TrainingEmbargoDays", NoDirection, 7, 90);
         K("Readiness:MinNEff", Up, 300, 100000); K("Readiness:MinTradesPerCell", Up, 30, 10000); K("Readiness:ExpectancyR", Up, 0.15, 2); K("Readiness:TStatistic", Up, 2, 10); K("Readiness:MinQuarterShare", Up, 0.70, 1);
         K("Readiness:MaxYearShare", Down, 0.20, 0.60); K("Readiness:MaxInstrumentShare", Down, 0.02, 0.15); K("Readiness:DrawdownBudgetR", Down, 1, 20);
         K("Readiness:BuildingFrom", Up, 40, 99); K("Readiness:UsableFrom", Up, 70, 99.5); K("Readiness:ReadyFrom", Up, 85, 100);

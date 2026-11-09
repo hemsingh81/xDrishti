@@ -62,11 +62,12 @@ public sealed record LearnedSkip(string Key, string Code);
 
 internal static class LearnedViews
 {
-    public static LearnedChangeView Of(LearnedChangeRow r, ILearnedConfig config)
+    /// <summary>A row of the log. <paramref name="isCurrent"/> is true for the newest applied row of its key: only that one can be undone (an older one is replaced).</summary>
+    public static LearnedChangeView Of(LearnedChangeRow r, ILearnedConfig config, bool isCurrent)
     {
         var descriptor = config.Descriptor(r.Key);
         return new LearnedChangeView(
             r.Id, r.Key, descriptor?.Label ?? r.Key, r.OldValue, r.NewValue, r.Direction, r.Source, r.State, r.DecidedBy, r.DecidedAt, r.UndoneBy, r.UndoneAt, r.EvidenceRef, r.SnapshotHash, r.UndoOf, r.CreatedAt,
-            LearnedRules.ApproveNeedsPassword(r, descriptor), r.State == "applied", LearnedRules.UndoNeedsPassword(r, descriptor));
+            LearnedRules.ApproveNeedsPassword(r, descriptor), r.State == "applied" && isCurrent, LearnedRules.UndoNeedsPassword(r, descriptor));
     }
 }

@@ -57,4 +57,7 @@ internal sealed class SimRunRow
     public DateTimeOffset CreatedAt { get; set; }
 
     public string CreatedBy { get; set; } = string.Empty;
+
+    /// <summary><c>research</c> (every run so far) or <c>training</c> (ADR 0243); readers of evidence take <c>research</c> only.</summary>
+    public string Purpose { get; set; } = "research";
 }

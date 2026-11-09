@@ -51,6 +51,9 @@ public interface ILearnedSettingStore
     /// <summary>One row, or null.</summary>
     ValueTask<LearnedChangeRow?> FindAsync(long id, CancellationToken cancellationToken);
 
+    /// <summary>The newest <c>applied</c> row of every key (not capped by a list limit): the rows whose change is in force.</summary>
+    ValueTask<IReadOnlyList<LearnedChangeRow>> CurrentAppliedAsync(CancellationToken cancellationToken);
+
     /// <summary>For every key the new value of its newest <c>applied</c> row.</summary>
     ValueTask<IReadOnlyDictionary<string, string>> AppliedValuesAsync(CancellationToken cancellationToken);
 

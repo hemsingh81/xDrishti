@@ -32,7 +32,7 @@ internal sealed partial class RunStore
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
             var keys = comparison.Members.Select(m => m.RunKey).ToArray();
-            await using (var count = new NpgsqlCommand("SELECT count(*) FROM research.sim_runs WHERE run_key = ANY(@keys)", connection, transaction))
+            await using (var count = new NpgsqlCommand("SELECT count(*) FROM research.sim_runs WHERE run_key = ANY(@keys) AND purpose = 'research'", connection, transaction))
             {
                 count.Parameters.AddWithValue("keys", NpgsqlDbType.Array | NpgsqlDbType.Char, keys);
                 if ((long)(await count.ExecuteScalarAsync(cancellationToken))! != keys.Length)

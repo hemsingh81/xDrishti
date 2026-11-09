@@ -33,6 +33,30 @@ public sealed class LearnedDecisionHandlerTests
     }
 
     [Fact]
+    public async Task A_stored_tightening_beyond_a_lowered_total_limit_is_refused_on_approve()
+    {
+        _store.Seed(FakeLearnedConfig.BpsKey, "4", "4.5", "tighten", "proposed", null); // 12.5% from the configured 4; the limit is now 10%
+
+        var result = await new ApproveLearnedChangeHandler(new LearnedDecisionSupport(_store, _config, new FakeAuto(false), new LearnedSettingsOptions { MaxTotalPercent = 10 }, _events, _events, new FakeTimeProvider(), NullLogger<LearnedDecisionSupport>.Instance))
+            .HandleAsync(new ApproveLearnedChangeCommand(1, Owner, FreshPassword: false), Ct);
+
+        result.Error.Code.ShouldBe("learned.total_limit");
+        _store.Rows.Single().State.ShouldBe("proposed");
+        _store.Decisions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Only_the_newest_applied_row_of_a_key_can_be_undone_in_the_view()
+    {
+        _store.Seed(FakeLearnedConfig.BpsKey, "4", "4.2", "tighten", "applied", "auto");
+        _store.Seed(FakeLearnedConfig.BpsKey, "4.2", "4.4", "tighten", "applied", "auto");
+        var view = await new GetLearnedChangesHandler(_store, _config, new FakeAuto(false), new LearnedSettingsOptions(), new FakeTimeProvider()).HandleAsync(new GetLearnedChangesQuery(), Ct);
+
+        view.Items.Single(c => c.Id == 1).CanUndo.ShouldBeFalse();
+        view.Items.Single(c => c.Id == 2).CanUndo.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task A_loosening_with_the_password_is_applied_as_the_owner_and_audited()
     {
         _store.Seed(FakeLearnedConfig.BpsKey, "4", "3.5", "loosen", "proposed", null);

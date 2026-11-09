@@ -34,7 +34,7 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger
 
     public async ValueTask<int> CountVariantsAsync(string strategyId, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("SELECT count(DISTINCT strategy_hash) FROM lab.test_ledger WHERE strategy_id = @id");
+        await using var command = dataSource.CreateCommand("SELECT count(DISTINCT strategy_hash) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind <> 'training_sweep'");
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
         return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
     }
@@ -47,7 +47,7 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger
                  sweeps AS (SELECT DISTINCT strategy_hash FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'run' AND method = 'sweep' AND strategy_hash NOT IN (SELECT strategy_hash FROM runs))
             SELECT (SELECT count(*) FROM runs),
                    (SELECT count(*) FROM sweeps),
-                   (SELECT coalesce(sum(extra_trials), 0) FROM lab.test_ledger WHERE strategy_id = @id),
+                   (SELECT coalesce(sum(extra_trials), 0) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind <> 'training_sweep'),
                    (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'replan'),
                    (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'null')
             """);
@@ -67,7 +67,7 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger
 
     public async ValueTask<bool> HasHashAsync(string strategyId, string strategyHash, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("SELECT 1 FROM lab.test_ledger WHERE strategy_id = @id AND strategy_hash = @hash LIMIT 1");
+        await using var command = dataSource.CreateCommand("SELECT 1 FROM lab.test_ledger WHERE strategy_id = @id AND strategy_hash = @hash AND trial_kind <> 'training_sweep' LIMIT 1");
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
         command.Parameters.AddWithValue("hash", NpgsqlDbType.Char, strategyHash);
         return await command.ExecuteScalarAsync(cancellationToken) is not null;
@@ -77,7 +77,7 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger
     {
         await using var command = dataSource.CreateCommand("""
             SELECT lab_run_id, run_key, strategy_id, version, strategy_hash, parent_hash, universe_label, window_from, window_to, method, created_at, trial_kind, extra_trials
-            FROM lab.test_ledger WHERE strategy_id = @id ORDER BY created_at DESC, id DESC
+            FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind <> 'training_sweep' ORDER BY created_at DESC, id DESC
             """);
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
