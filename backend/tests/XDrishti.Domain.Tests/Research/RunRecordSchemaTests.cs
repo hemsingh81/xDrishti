@@ -54,7 +54,7 @@ public sealed class RunRecordSchemaTests
 
         snapshot.ShouldBe(
         [
-            "SimulationRun: SchemaVersion, RunKey, EngineVersion, Strategy, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, CalendarExceptions, Instruments, Trades, OpenAtEnd, Totals, Costs, EventFilter, ResultsDays",
+            "SimulationRun: SchemaVersion, RunKey, EngineVersion, Strategy, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, CalendarExceptions, Instruments, Trades, OpenAtEnd, Totals, Costs, EventFilter, ResultsDays, IsTraining",
             "StrategyRecord: Id, Parameters, DefinitionJson, DefinitionSha256, EvaluationTimeframe, Sides",
             "UniverseRecord: Kind, BasketId, BasketName, Label, Members",
             "UniverseMember: Id, Symbol",
@@ -71,7 +71,7 @@ public sealed class RunRecordSchemaTests
             "RunTrade: Trade, BasketIds",
             "ReplayOptions: MinSessionCompleteness, DiscontinuityThreshold",
             "InstrumentReplay: Record, Trades, OpenAtEnd",
-            "RunHeader: Strategy, EngineVersion, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, Calendar, Costs, ContextSha256, Events, ResultsDays",
+            "RunHeader: Strategy, EngineVersion, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, Calendar, Costs, ContextSha256, Events, ResultsDays, Purpose",
             "InstrumentReplayInput: InstrumentId, Symbol, RawBars, Factors, CsvAdjustedThrough, Calendar, Options, From, To, Tick, PresetSkip, SkipDetail, Costs, ContextDays, ContextNote, Events, ResultsDays, TierOn, TurnoverOn",
             "CostRecord: SheetId, RatesSha256, SheetJson, Checked, Capital, Profile, MaxCostR",
             "EventFilterRecord: CalendarSha256, CalendarRows, LagMinutes, EvfVersion",

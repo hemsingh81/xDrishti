@@ -722,6 +722,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetLabReportQuery, Result<LabReportView>>, GetLabReportHandler>(); // the report of a full or robust run (P5-06, ADR 0063)
         services.AddScoped<IQueryHandler<GetLedgerQuery, Result<LedgerView>>, GetLedgerHandler>(); // the test ledger (P5-03, ADR 0059)
         services.AddScoped<LabHoldOutGuard>(); // the size, the block and the cut of the locked hold-out (CF-06)
+        services.AddScoped<TrainingWindowResolver>(); // the training window: ends before the hold-out and its embargo, fail closed (AU-11, ADR 0243)
         services.AddScoped<IQueryHandler<GetRegistrationQuery, Result<RegistrationView>>, GetRegistrationHandler>(); // reads only the registration store; here, not in AddLabRunner, because the readiness gate (CF-11) of the lifecycle recorder reads it in every host that records a cell move
         services.AddScoped<IQueryHandler<GetHoldOutQuery, Result<HoldOutView>>, GetHoldOutHandler>(); // reads the hold-out store and the guard; here for the same reason
         services.TryAddSingleton(LabSettings.Default); // the host replaces it with its configuration

@@ -42,7 +42,7 @@ Reader-by-reader exclusion tests; hold-out refusal; truncation; architecture pin
 None.
 
 ## Done when
-- [ ] All acceptance criteria have evidence
+- [x] All acceptance criteria have evidence (AC6 job-side append is AU-12; the kind and the fence are here; AC7 by the existing simulator truncation and look-ahead suites)
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`) and migration added, where this slice has them
 - [ ] Design docs/ADR updated if behaviour changed

@@ -20,7 +20,7 @@ public sealed class LearnedSettingProposerTests
     [InlineData("4", "3", 10, "3", LearnedOutcome.Loosen)]
     public void Tighten_and_loosen_table_for_a_higher_is_safer_key(string current, string proposed, int step, string expected, LearnedOutcome outcome)
     {
-        var d = LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.BpsKey), current, Evidence(FakeLearnedConfig.BpsKey, proposed), step);
+        var d = LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.BpsKey), current, Evidence(FakeLearnedConfig.BpsKey, proposed), step, current, 100);
 
         d.Outcome.ShouldBe(outcome);
         LearnedSettingProposer.Text(d.NewValue).ShouldBe(expected);
@@ -32,7 +32,7 @@ public sealed class LearnedSettingProposerTests
     [InlineData("1", "1.2", "1.2", LearnedOutcome.Loosen)]
     public void Tighten_and_loosen_table_for_a_lower_is_safer_key(string current, string proposed, string expected, LearnedOutcome outcome)
     {
-        var d = LearnedSettingProposer.Propose(Config.Descriptor("Confidence:Decay:Sigmas"), current, Evidence("Confidence:Decay:Sigmas", proposed), 10);
+        var d = LearnedSettingProposer.Propose(Config.Descriptor("Confidence:Decay:Sigmas"), current, Evidence("Confidence:Decay:Sigmas", proposed), 10, current, 100);
 
         d.Outcome.ShouldBe(outcome);
         LearnedSettingProposer.Text(d.NewValue).ShouldBe(expected);
@@ -41,7 +41,7 @@ public sealed class LearnedSettingProposerTests
     [Fact]
     public void A_key_with_no_declared_direction_is_never_learnable()
     {
-        var d = LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.NoDirectionKey), "50", Evidence(FakeLearnedConfig.NoDirectionKey, "60"), 10);
+        var d = LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.NoDirectionKey), "50", Evidence(FakeLearnedConfig.NoDirectionKey, "60"), 10, "50", 100);
 
         d.Outcome.ShouldBe(LearnedOutcome.Skip);
         d.Code.ShouldBe("learned.not_learnable");
@@ -50,7 +50,7 @@ public sealed class LearnedSettingProposerTests
     [Fact]
     public void Loop_level_is_not_learnable_even_with_a_direction()
     {
-        var d = LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.LoopLevel), "0.95", Evidence(FakeLearnedConfig.LoopLevel, "0.97"), 10);
+        var d = LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.LoopLevel), "0.95", Evidence(FakeLearnedConfig.LoopLevel, "0.97"), 10, "0.95", 100);
 
         d.Outcome.ShouldBe(LearnedOutcome.Skip);
         d.Code.ShouldBe("learned.not_learnable");
@@ -61,7 +61,7 @@ public sealed class LearnedSettingProposerTests
     {
         var rogue = Config.Descriptor(FakeLearnedConfig.NoDirectionKey)! with { Learnable = true, Safer = SettingSafer.Higher };
 
-        LearnedSettingProposer.Propose(rogue, "50", Evidence(rogue.Key, "55"), 10).Code.ShouldBe("learned.not_learnable");
+        LearnedSettingProposer.Propose(rogue, "50", Evidence(rogue.Key, "55"), 10, "50", 100).Code.ShouldBe("learned.not_learnable");
     }
 
     [Theory]
@@ -69,7 +69,7 @@ public sealed class LearnedSettingProposerTests
     [InlineData(true, true, "learned.sealed_evidence")] // hold-out data is never read here, even when it is out of sample
     public void Evidence_that_is_not_out_of_sample_or_is_sealed_changes_nothing(bool oos, bool sealedHoldOut, string code)
     {
-        var d = LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.BpsKey), "4", Evidence(FakeLearnedConfig.BpsKey, "4.2", oos, sealedHoldOut), 10);
+        var d = LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.BpsKey), "4", Evidence(FakeLearnedConfig.BpsKey, "4.2", oos, sealedHoldOut), 10, "4", 100);
 
         d.Outcome.ShouldBe(LearnedOutcome.Skip);
         d.Code.ShouldBe(code);
@@ -82,7 +82,7 @@ public sealed class LearnedSettingProposerTests
     [InlineData("4", "4.2", "h", " ")]
     public void Missing_or_unreadable_inputs_never_count_as_a_pass(string? current, string proposed, string hash, string reference)
     {
-        var d = LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.BpsKey), current, Evidence(FakeLearnedConfig.BpsKey, proposed, hash: hash, reference: reference), 10);
+        var d = LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.BpsKey), current, Evidence(FakeLearnedConfig.BpsKey, proposed, hash: hash, reference: reference), 10, current, 100);
 
         d.Outcome.ShouldBe(LearnedOutcome.Skip);
         d.Code.ShouldBe("learned.evidence_unavailable");
@@ -91,7 +91,7 @@ public sealed class LearnedSettingProposerTests
     [Fact]
     public void No_evidence_is_a_skip()
     {
-        LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.BpsKey), "4", null, 10).Code.ShouldBe("learned.evidence_unavailable");
+        LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.BpsKey), "4", null, 10, "4", 100).Code.ShouldBe("learned.evidence_unavailable");
     }
 
     [Theory]
@@ -99,7 +99,7 @@ public sealed class LearnedSettingProposerTests
     [InlineData("4", "4", "learned.no_change")]
     public void A_value_outside_the_bounds_or_no_change_is_left_alone(string current, string proposed, string code)
     {
-        LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.BpsKey), current, Evidence(FakeLearnedConfig.BpsKey, proposed), 10).Code.ShouldBe(code);
+        LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.BpsKey), current, Evidence(FakeLearnedConfig.BpsKey, proposed), 10, current, 100).Code.ShouldBe(code);
     }
 
     [Fact]
@@ -115,7 +115,7 @@ public sealed class LearnedSettingProposerTests
                 var proposed = (decimal)random.NextDouble() * ((d.Max ?? 5) - (d.Min ?? 0)) + (d.Min ?? 0);
                 var step = random.Next(1, 26);
 
-                var decision = LearnedSettingProposer.Propose(d, LearnedSettingProposer.Text(current), Evidence(key, LearnedSettingProposer.Text(proposed)), step);
+                var decision = LearnedSettingProposer.Propose(d, LearnedSettingProposer.Text(current), Evidence(key, LearnedSettingProposer.Text(proposed)), step, LearnedSettingProposer.Text(current), 100);
 
                 if (decision.Outcome == LearnedOutcome.Tighten)
                 {
@@ -125,6 +125,25 @@ public sealed class LearnedSettingProposerTests
             }
         }
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("not a number")]
+    public void Without_a_readable_configured_value_nothing_is_proposed(string? configured)
+    {
+        var d = LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.BpsKey), "4", Evidence(FakeLearnedConfig.BpsKey, "5"), 10, configured, 100);
+
+        d.Outcome.ShouldBe(LearnedOutcome.Skip);
+        d.Code.ShouldBe("learned.evidence_unavailable");
+    }
+
+    [Theory]
+    [InlineData("4.4", true)]
+    [InlineData("4.41", false)]
+    [InlineData("junk", false)]
+    public void The_drift_check_for_a_stored_proposal_fails_closed(string value, bool within) =>
+        LearnedSettingProposer.WithinDrift(Config.Descriptor(FakeLearnedConfig.BpsKey), "4", value, 10).ShouldBe(within);
 
     [Theory]
     [InlineData("4.4", "4", 10, 10, "4.4")] // at the limit already (10% of 4 = 0.4): nothing more

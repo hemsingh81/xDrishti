@@ -11,7 +11,8 @@ namespace XDrishti.Domain.Confidence;
 /// <param name="SharePercent">Share of the stored history kept (default 20; 5..50).</param>
 /// <param name="MinTrades">Fewest hold-out trades for a statement (default 30; 5..1000).</param>
 /// <param name="Retention">Share of the development expectancy the hold-out must keep (default 0.5; 0.1..1).</param>
-public sealed record HoldOutOptions(bool Enforce = false, bool AutoUnlock = false, int MinMonths = 6, double SharePercent = 20, int MinTrades = 30, double Retention = 0.5)
+/// <param name="TrainingEmbargoDays">Calendar days left empty between the end of a training window and the hold-out start (default 30; 28..180; ADR 0243, AU-11): a trade held across the cut, or a feature built on a trailing window, must not carry hold-out information into training. The longest holding period a strategy may declare is 20 sessions (about 28 calendar days), and the embargo of purged cross-validation is at least the label horizon, so 30 days is the shortest safe default. Not part of <see cref="KeyText"/>: it does not size the hold-out.</param>
+public sealed record HoldOutOptions(bool Enforce = false, bool AutoUnlock = false, int MinMonths = 6, double SharePercent = 20, int MinTrades = 30, double Retention = 0.5, int TrainingEmbargoDays = 30)
 {
     /// <summary>The text of the values, kept with every unlock so a stored result says which proposals it was judged by.</summary>
     public string KeyText() => string.Create(CultureInfo.InvariantCulture, $"holdout/enforce={(Enforce ? "on" : "off")}/auto_unlock={(AutoUnlock ? "on" : "off")}/min_months={MinMonths}/share={SharePercent:R}/min_trades={MinTrades}/retention={Retention:R}");
@@ -41,6 +42,11 @@ public sealed record HoldOutOptions(bool Enforce = false, bool AutoUnlock = fals
         if (!double.IsFinite(Retention) || Retention is < 0.1 or > 1)
         {
             problems.Add("HoldOut:Retention must be 0.1 to 1");
+        }
+
+        if (TrainingEmbargoDays is < 28 or > 180)
+        {
+            problems.Add("HoldOut:TrainingEmbargoDays must be 28 to 180");
         }
 
         return problems.AsReadOnly();

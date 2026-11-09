@@ -22,6 +22,12 @@ internal sealed class LearnedSettingChanges(NpgsqlDataSource dataSource) : ILear
         return await ReadAsync(command, cancellationToken);
     }
 
+    public async ValueTask<IReadOnlyList<LearnedChangeRow>> CurrentAppliedAsync(CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand($"SELECT DISTINCT ON (setting_key) {Columns} FROM config.learned_setting_changes WHERE state = 'applied' ORDER BY setting_key, id DESC");
+        return await ReadAsync(command, cancellationToken);
+    }
+
     public async ValueTask<LearnedChangeRow?> FindAsync(long id, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand($"SELECT {Columns} FROM config.learned_setting_changes WHERE id = @id");

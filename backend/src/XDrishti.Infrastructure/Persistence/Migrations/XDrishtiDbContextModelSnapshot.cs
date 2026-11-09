@@ -9673,6 +9673,13 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("open_at_end_count");
 
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("research")
+                        .HasColumnName("purpose");
+
                     b.Property<string>("RecordJson")
                         .IsRequired()
                         .HasColumnType("text")
@@ -9734,6 +9741,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_sim_runs");
 
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_sim_runs_training")
+                        .HasFilter("purpose = 'training'");
+
                     b.HasIndex("RunKey")
                         .IsUnique()
                         .HasDatabaseName("uq_sim_runs_run_key");
@@ -9747,6 +9758,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_sim_runs_costs", "(costs_sheet_id IS NULL) = (costs_rates_sha256 IS NULL)");
 
                             t.HasCheckConstraint("ck_sim_runs_counts", "trade_count >= 0 AND open_at_end_count >= 0");
+
+                            t.HasCheckConstraint("ck_sim_runs_purpose", "purpose IN ('research', 'training')");
 
                             t.HasCheckConstraint("ck_sim_runs_run_key", "run_key ~ '^[0-9a-f]{64}$'");
 
@@ -10364,7 +10377,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_test_ledger_hash", "strategy_hash ~ '^[0-9a-f]{64}$' AND window_from <= window_to");
 
-                            t.HasCheckConstraint("ck_test_ledger_trial", "trial_kind IN ('run','replan','null') AND extra_trials >= 0");
+                            t.HasCheckConstraint("ck_test_ledger_trial", "trial_kind IN ('run','replan','null','training_sweep') AND extra_trials >= 0");
                         });
                 });
 

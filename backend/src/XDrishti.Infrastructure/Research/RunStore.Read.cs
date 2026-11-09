@@ -14,16 +14,21 @@ internal sealed partial class RunStore
 {
     private static readonly string TradeSelect = "SELECT open_at_end, ordinal, " + string.Join(", ", TradeColumns.Columns.Select(c => c.Name)) + " FROM research.sim_trades";
 
+    /// <summary>
+    /// The only door to <c>sim_runs</c> for a reader (spec AU-11, ADR 0243): research runs, never a training run. A new reader takes its runs from here; <c>EvidenceReaderFenceTests</c> fails the build of any other path to the table.
+    /// </summary>
+    private IQueryable<SimRunRow> EvidenceRuns() => db.SimRuns.AsNoTracking().Where(x => x.Purpose == RunPurposes.ResearchText);
+
     public async ValueTask<StoredRunHeader?> FindAsync(string runKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(runKey);
-        return await Headers(db.SimRuns.AsNoTracking().Where(x => x.RunKey == runKey)).FirstOrDefaultAsync(cancellationToken);
+        return await Headers(EvidenceRuns().Where(x => x.RunKey == runKey)).FirstOrDefaultAsync(cancellationToken);
     }
 
     public async ValueTask<string?> ReadRecordTextAsync(string runKey, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(runKey);
-        return await db.SimRuns.AsNoTracking().Where(x => x.RunKey == runKey).Select(x => x.RecordJson).FirstOrDefaultAsync(cancellationToken);
+        return await EvidenceRuns().Where(x => x.RunKey == runKey).Select(x => x.RecordJson).FirstOrDefaultAsync(cancellationToken);
     }
 
     public async ValueTask<Result<Page<StoredRunHeader>>> ListAsync(RunListFilter filter, PageRequest page, CancellationToken cancellationToken)
@@ -35,7 +40,7 @@ internal sealed partial class RunStore
             return Result.Failure<Page<StoredRunHeader>>(StoreErrors.PageInvalid($"The page size is 1 to {PageRequest.MaxSize}."));
         }
 
-        var query = db.SimRuns.AsNoTracking().AsQueryable();
+        var query = EvidenceRuns().AsQueryable();
         if (filter.StrategyId is { } strategy)
         {
             query = query.Where(x => x.StrategyId == strategy);
@@ -263,7 +268,7 @@ internal sealed partial class RunStore
 
     private async Task<RunInfo?> FindRunAsync(string runKey, CancellationToken cancellationToken)
     {
-        var found = await db.SimRuns.AsNoTracking().Where(x => x.RunKey == runKey).Select(x => new { x.Id, x.CostsSheetId, x.TradeSchemaVersion }).FirstOrDefaultAsync(cancellationToken);
+        var found = await EvidenceRuns().Where(x => x.RunKey == runKey).Select(x => new { x.Id, x.CostsSheetId, x.TradeSchemaVersion }).FirstOrDefaultAsync(cancellationToken);
         return found is null ? null : new RunInfo(found.Id, found.CostsSheetId, found.TradeSchemaVersion);
     }
 

@@ -20,6 +20,7 @@ internal sealed class SimRunRowConfiguration : IEntityTypeConfiguration<SimRunRo
             t.HasCheckConstraint("ck_sim_runs_costs", "(costs_sheet_id IS NULL) = (costs_rates_sha256 IS NULL)");
             t.HasCheckConstraint("ck_sim_runs_universe_kind", $"universe_kind IN ({kinds})");
             t.HasCheckConstraint("ck_sim_runs_counts", "trade_count >= 0 AND open_at_end_count >= 0");
+            t.HasCheckConstraint("ck_sim_runs_purpose", "purpose IN ('research', 'training')");
         });
         builder.HasKey(x => x.Id).HasName("pk_sim_runs");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
@@ -48,8 +49,10 @@ internal sealed class SimRunRowConfiguration : IEntityTypeConfiguration<SimRunRo
         builder.Property(x => x.TradesSha256).HasColumnType("character(64)").IsRequired();
         builder.Property(x => x.CreatedAt).IsRequired();
         builder.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.Purpose).HasColumnType("text").HasDefaultValue("research").IsRequired();
 
         builder.HasIndex(x => x.RunKey).IsUnique().HasDatabaseName("uq_sim_runs_run_key");
         builder.HasIndex(x => new { x.StrategyId, x.CreatedAt }).IsDescending(false, true).HasDatabaseName("ix_sim_runs_strategy_created");
+        builder.HasIndex(x => x.CreatedAt).HasFilter("purpose = 'training'").HasDatabaseName("ix_sim_runs_training");
     }
 }

@@ -34,7 +34,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
         C("universe_label", "character varying", 200), C("instruments", "integer"), C("instruments_run", "integer"), C("trades_in_window", "bigint"), C("candidates_in_window", "bigint"),
         C("trade_count", "integer"), C("open_at_end_count", "integer"), C("acknowledge_csv_adjusted", "boolean"), C("fills", "character varying", 2000),
         C("costs_sheet_id", "character varying", 64, true), C("costs_rates_sha256", "character", 64, true), C("record_json", "text"), C("record_sha256", "character", 64),
-        C("trades_sha256", "character", 64), C("created_at", "timestamp with time zone"), C("created_by", "character varying", 100),
+        C("trades_sha256", "character", 64), C("created_at", "timestamp with time zone"), C("created_by", "character varying", 100), C("purpose", "text"),
     ];
 
     private static string[] TradeColumns()
@@ -109,7 +109,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
         [
             "ix_cell_stats_as_of_created", "ix_cell_stats_cell_key", "ix_exit_selections_comparison_id", "ix_experiment_jobs_job_key", "ix_experiment_jobs_queued", "ix_experiments_created_at",
             "ix_expression_runs_cash_run", "ix_expression_trades_fate", "ix_extension_evaluations_family_created", "ix_hypotheses_experiment_id", "ix_hypotheses_hypothesis_id_id", "ix_learning_changelog_created_at", "ix_learning_changelog_subject_id", "ix_learning_reports_kind_created",
-            "ix_lessons_lesson_id_id", "ix_ml_influence_checks_model_id_id", "ix_ml_switch_settings_name_id", "ix_model_designations_model_id_id", "ix_model_versions_sha256", "ix_model_versions_training_set_id", "ix_pair_formations_family_quarter", "ix_pair_trades_entry", "ix_rollback_proposals_model_id_id", "ix_rollback_proposals_state_id", "ix_sim_comparisons_entries_key", "ix_sim_runs_strategy_created",
+            "ix_lessons_lesson_id_id", "ix_ml_influence_checks_model_id_id", "ix_ml_switch_settings_name_id", "ix_model_designations_model_id_id", "ix_model_versions_sha256", "ix_model_versions_training_set_id", "ix_pair_formations_family_quarter", "ix_pair_trades_entry", "ix_rollback_proposals_model_id_id", "ix_rollback_proposals_state_id", "ix_sim_comparisons_entries_key", "ix_sim_runs_strategy_created", "ix_sim_runs_training",
             "ix_trade_features_ext_version_run", "ix_training_sets_created_at", "pk_cell_stats", "pk_digests", "pk_exit_selection_folds", "pk_exit_selections",
             "pk_experiment_jobs", "pk_experiments", "pk_expression_legs", "pk_expression_runs", "pk_expression_trades", "pk_extension_evaluations", "pk_extension_extractions", "pk_hypotheses", "pk_learning_changelog", "pk_learning_reports",
             "pk_lessons", "pk_ml_influence_checks", "pk_ml_monitor_checks", "pk_ml_switch_settings", "pk_model_designations", "pk_model_versions", "pk_option_spread_buckets", "pk_option_spread_models", "pk_pair_formations", "pk_pair_trades", "pk_rollback_proposals", "pk_sim_comparisons", "pk_sim_runs", "pk_sim_trade_leg_charges",
@@ -129,7 +129,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
             "ck_hypotheses_state", "ck_learning_changelog_evidence", "ck_learning_changelog_kind", "ck_learning_changelog_revert", "ck_learning_changelog_states", "ck_learning_reports_shape",
             "ck_lessons_closed", "ck_lessons_links", "ck_lessons_result", "ck_lessons_shape", "ck_lessons_state", "ck_ml_influence_checks_hashes", "ck_ml_monitor_checks_shape", "ck_ml_switch_settings_shape", "ck_model_designations_role",
             "ck_model_versions_shape", "ck_option_spread_buckets_n", "ck_option_spread_buckets_pct", "ck_option_spread_models_id", "ck_option_spread_models_sessions", "ck_option_spread_models_settings", "ck_pair_formations_counts", "ck_pair_formations_detail", "ck_pair_formations_id", "ck_pair_formations_window", "ck_pair_trades_numbers", "ck_pair_trades_ordinal", "ck_pair_trades_qty", "ck_pair_trades_reason", "ck_pair_trades_run", "ck_pair_trades_side", "ck_pair_trades_times", "ck_rollback_proposals_decision", "ck_rollback_proposals_shape", "ck_rollback_proposals_trigger", "ck_sim_comparisons_counts", "ck_sim_comparisons_keys", "ck_sim_comparisons_members", "ck_sim_comparisons_unit", "ck_sim_runs_costs",
-            "ck_sim_runs_counts", "ck_sim_runs_run_key", "ck_sim_runs_universe_kind", "ck_sim_trade_leg_charges_ordinals", "ck_sim_trade_leg_charges_quantity", "ck_sim_trade_legs_kind",
+            "ck_sim_runs_counts", "ck_sim_runs_purpose", "ck_sim_runs_run_key", "ck_sim_runs_universe_kind", "ck_sim_trade_leg_charges_ordinals", "ck_sim_trade_leg_charges_quantity", "ck_sim_trade_legs_kind",
             "ck_sim_trade_legs_ordinals", "ck_sim_trade_legs_share", "ck_sim_trades_cost_segment", "ck_sim_trades_costing_all_or_nothing", "ck_sim_trades_costs", "ck_sim_trades_costs_charged",
             "ck_sim_trades_entry_fill", "ck_sim_trades_exit_reason", "ck_sim_trades_fills", "ck_sim_trades_ordinal", "ck_sim_trades_side", "ck_sim_trades_trigger_timeframe",
             "ck_trade_features_ext_extension", "ck_trade_features_ext_run_key", "ck_trade_features_ext_values", "ck_trade_features_ext_version", "ck_trade_features_shape", "ck_training_sets_shape",

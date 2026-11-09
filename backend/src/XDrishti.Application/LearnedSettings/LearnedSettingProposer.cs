@@ -32,7 +32,7 @@ public static class LearnedSettingProposer
     /// <summary>The actor recorded for a change learning applied by itself. It is never an owner approval.</summary>
     public const string AutoActor = "auto";
 
-    public static LearnedDecision Propose(SettingDescriptor? descriptor, string? currentText, LearnedEvidenceItem? evidence, int maxStepPercent, string? configuredText = null, int maxTotalPercent = 100)
+    public static LearnedDecision Propose(SettingDescriptor? descriptor, string? currentText, LearnedEvidenceItem? evidence, int maxStepPercent, string? configuredText, int maxTotalPercent)
     {
         if (evidence is null)
         {
@@ -86,12 +86,15 @@ public static class LearnedSettingProposer
         }
 
         var stepped = descriptor.Safer == SettingSafer.Higher ? Math.Min(proposed, current + step) : Math.Max(proposed, current - step);
-        if (TryNumber(configuredText, out var configured))
+        if (!TryNumber(configuredText, out var configured))
         {
-            // total drift from the owner's configured value: stacked steps cannot walk a gate away without limit
-            var room = Math.Abs(configured) * Math.Clamp(maxTotalPercent, 1, 100) / 100m;
-            stepped = descriptor.Safer == SettingSafer.Higher ? Math.Min(stepped, configured + room) : Math.Max(stepped, configured - room);
+            // the owner's configured value is required for the drift limit; without it no tightening is proposed (fail closed)
+            return LearnedDecision.Skipped("learned.evidence_unavailable");
         }
+
+        // total drift from the owner's configured value: stacked steps cannot walk a gate away without limit
+        var room = Math.Abs(configured) * Math.Clamp(maxTotalPercent, 1, 100) / 100m;
+        stepped = descriptor.Safer == SettingSafer.Higher ? Math.Min(stepped, configured + room) : Math.Max(stepped, configured - room);
 
         stepped = Math.Round(stepped, 6);
         if (stepped == current)
@@ -105,6 +108,20 @@ public static class LearnedSettingProposer
         }
 
         return new LearnedDecision(LearnedOutcome.Tighten, "learned.tightening", stepped);
+    }
+
+    /// <summary>
+    /// Whether a tightened value stays within the total drift allowed from the owner's configured value; false when either number cannot be read (fail closed). Approving a stored proposal checks this again, because the limit may have been lowered since it was proposed.
+    /// </summary>
+    public static bool WithinDrift(SettingDescriptor? descriptor, string? configuredText, string newValue, int maxTotalPercent)
+    {
+        if (descriptor is null || !TryNumber(configuredText, out var configured) || !TryNumber(newValue, out var value))
+        {
+            return false;
+        }
+
+        var room = Math.Abs(configured) * Math.Clamp(maxTotalPercent, 1, 100) / 100m;
+        return descriptor.Safer == SettingSafer.Higher ? value <= configured + room : value >= configured - room;
     }
 
     /// <summary>Invariant text of a number, as stored.</summary>

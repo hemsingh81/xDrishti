@@ -50,6 +50,27 @@ public sealed class RunAssemblyTests
     private static Bar[] CriterionOneBars() => ReplayDays.Join(ReplayDays.Flat(ReplayDays.D1, 99.00), ReplayDays.F1(ReplayDays.D2), ReplayDays.Flat(ReplayDays.D3, 105.00));
 
     [Fact]
+    public void A_training_run_has_its_own_key_and_a_research_run_key_text_is_unchanged()
+    {
+        var strategy = Rep.Prepare(OrbV1.Create());
+        var universe = Universe((IdA, "AAA"));
+        var bars = ReplayDays.Join(ReplayDays.F2(ReplayDays.D1), ReplayDays.F1(ReplayDays.D2), ReplayDays.F6(ReplayDays.D3));
+        var replays = new[] { Rep.Replay(strategy, bars, ReplayDays.D1, ReplayDays.D3, id: IdA, symbol: "AAA") };
+        var research = new RunHeader(strategy.Record, SimulationEngine.Version, ReplayDays.D1, ReplayDays.D3, ReplayOptions.Default, false, strategy.Fills.ToCanonicalJson(), universe, Rep.DefaultCalendar);
+        var training = research with { Purpose = RunPurpose.Training };
+
+        var researchRun = RunAssembler.Assemble(research, replays);
+        var trainingRun = RunAssembler.Assemble(training, replays);
+
+        RunAssembler.KeyText(research, researchRun.Instruments, researchRun.CalendarExceptions).ShouldNotContain("purpose=");
+        RunAssembler.KeyText(training, trainingRun.Instruments, trainingRun.CalendarExceptions).ShouldContain("purpose=training\n");
+        trainingRun.RunKey.ShouldNotBe(researchRun.RunKey);
+        trainingRun.IsTraining.ShouldBeTrue(); // the store takes the purpose from the run the header made, so key and purpose cannot disagree
+        researchRun.IsTraining.ShouldBeFalse();
+        RunAssembler.Assemble(research with { Purpose = RunPurpose.Research }, replays).RunKey.ShouldBe(researchRun.RunKey);
+    }
+
+    [Fact]
     public void Two_assemblies_of_equal_inputs_are_equal_in_every_field_and_have_the_same_key()
     {
         var strategy = Rep.Prepare(OrbV1.Create());

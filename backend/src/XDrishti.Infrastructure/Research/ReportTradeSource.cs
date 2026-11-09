@@ -23,6 +23,7 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
                (SELECT t.basket_ids FROM research.sim_trades t WHERE t.run_id = r.id ORDER BY t.open_at_end, t.ordinal LIMIT 1) AS first_baskets, r.costs_rates_sha256, r.created_by LIKE 'experiment:%' AS experiment_candidate
         FROM research.sim_runs r
         LEFT JOIN lab.strategies s ON s.id = r.strategy_id
+        WHERE r.purpose = 'research'
         ORDER BY r.created_at DESC, r.id DESC
         """;
 
@@ -33,7 +34,7 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
         ORDER BY c.comparison_key, m.run_key
         """;
 
-    private const string RunIdsSql = "SELECT id, run_key FROM research.sim_runs WHERE run_key = ANY(@keys)";
+    private const string RunIdsSql = "SELECT id, run_key FROM research.sim_runs WHERE run_key = ANY(@keys) AND purpose = 'research'";
 
     private const string TradesSelect = """
         SELECT t.run_id, t.trade_key, t.strategy_id, t.trigger_timeframe, t.side, t.instrument_id, t.symbol, t.basket_ids, t.trade_date, t.exit_epoch_seconds, t.r_filled, t.r_net, t.sessions_held, t.ordinal

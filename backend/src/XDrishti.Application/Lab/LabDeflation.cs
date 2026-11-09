@@ -35,7 +35,7 @@ internal sealed class LabDeflation(ITestLedger ledger, IVariantStatsStore store,
         }
 
         var moments = TradeMoments.Of(oosResults);
-        var ledgerHashes = (await ledger.ListAsync(strategyId, cancellationToken)).Select(r => r.StrategyHash).ToHashSet(StringComparer.Ordinal);
+        var ledgerHashes = (await ledger.ListAsync(strategyId, cancellationToken)).Where(r => !r.IsTrainingSweep).Select(r => r.StrategyHash).ToHashSet(StringComparer.Ordinal);
         ledgerHashes.UnionWith(runRows.Select(r => r.VariantHash));
         var latest = new Dictionary<string, VariantStatsRow>(StringComparer.Ordinal);
         foreach (var stored in (await store.ListAsync(strategyId, cancellationToken)).OrderBy(r => r.CreatedAt))

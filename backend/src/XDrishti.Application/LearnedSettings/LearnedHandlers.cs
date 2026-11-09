@@ -19,13 +19,14 @@ internal sealed class GetLearnedChangesHandler(ILearnedSettingStore store, ILear
     {
         var rows = await store.ListAsync(Limit, cancellationToken);
         var used = await store.AutoAppliedSinceAsync(clock.GetUtcNow().AddDays(-LearnedSnapshot.WeekDays), cancellationToken);
+        var current = (await store.CurrentAppliedAsync(cancellationToken)).Select(r => r.Id).ToHashSet();
         var allow = LearnedAllowList.Keys.Order(StringComparer.Ordinal)
             .Select(k => config.Descriptor(k))
             .OfType<SettingDescriptor>()
             .Select(d => new LearnedAllowedSetting(d.Key, d.Label, d.Safer.ToString().ToLowerInvariant(), d.HasRange ? new SettingRange(d.Min, d.Max) : null))
             .ToList();
         return new LearnedChangesView(
-            await auto.IsOnAsync(cancellationToken), options.WeeklyCap, used, "An applied change is read by the host at its next start; the running values do not move meanwhile.", allow, [.. rows.Select(r => LearnedViews.Of(r, config))]);
+            await auto.IsOnAsync(cancellationToken), options.WeeklyCap, used, "An applied change is read by the host at its next start; the running values do not move meanwhile.", allow, [.. rows.Select(r => LearnedViews.Of(r, config, current.Contains(r.Id)))]);
     }
 }
 
@@ -36,7 +37,7 @@ internal sealed class GetLearnedChangeHandler(ILearnedSettingStore store, ILearn
     {
         ArgumentNullException.ThrowIfNull(query);
         var row = await store.FindAsync(query.Id, cancellationToken);
-        return row is null ? null : LearnedViews.Of(row, config);
+        return row is null ? null : LearnedViews.Of(row, config, (await store.CurrentAppliedAsync(cancellationToken)).Any(r => r.Id == row.Id));
     }
 }
 
@@ -178,6 +179,8 @@ internal sealed class LearnedDecisionSupport(ILearnedSettingStore store, ILearne
 
     public ILearnedConfig Config => config;
 
+    public LearnedSettingsOptions Options => options;
+
     public async ValueTask<Result<LearnedChangeRow>> FindAsync(long id, string actor, string state, CancellationToken cancellationToken)
     {
         if (!actor.StartsWith("owner:", StringComparison.Ordinal) || actor.Length <= "owner:".Length)
@@ -221,7 +224,7 @@ internal sealed class LearnedDecisionSupport(ILearnedSettingStore store, ILearne
         LearnedLog.Decided(logger, id, state, "owner");
         var row = (await store.FindAsync(id, cancellationToken))!;
         await AuditAsync(actor, row);
-        return Result.Success(LearnedViews.Of(row, config));
+        return Result.Success(LearnedViews.Of(row, config, true)); // an owner decision that applied is the newest applied row of its key; a dismissed row cannot be undone either way
     }
 
     /// <summary>The real snapshot of the settings an owner act is made under (Auto as stored now, the guardrails, the values in force).</summary>
@@ -254,7 +257,7 @@ internal sealed class LearnedDecisionSupport(ILearnedSettingStore store, ILearne
         return Result.Failure<LearnedChangeView>(error);
     }
 
-    public LearnedChangeView View(LearnedChangeRow row) => LearnedViews.Of(row, config);
+    public LearnedChangeView View(LearnedChangeRow row) => LearnedViews.Of(row, config, true); // used for the undo row just applied
 }
 
 internal sealed class ApproveLearnedChangeHandler(LearnedDecisionSupport support) : ICommandHandler<ApproveLearnedChangeCommand, LearnedChangeView>
@@ -281,9 +284,18 @@ internal sealed class ApproveLearnedChangeHandler(LearnedDecisionSupport support
             return support.Refuse(Error.Conflict("learned.stale", "The setting changed since this was proposed; read the list again."));
         }
 
-        return support.CheckCandidate(applied, row.Key, row.NewValue) is { } invalid
-            ? support.Refuse(invalid)
-            : await support.DecideAsync(row.Id, "applied", command.Actor, applied.GetValueOrDefault(row.Key), cancellationToken);
+        if (support.CheckCandidate(applied, row.Key, row.NewValue) is { } invalid)
+        {
+            return support.Refuse(invalid);
+        }
+
+        if (row.Direction == "tighten" && !LearnedSettingProposer.WithinDrift(support.Config.Descriptor(row.Key), support.Config.ConfiguredValue(row.Key), row.NewValue, support.Options.MaxTotalPercent))
+        {
+            // the drift limit is checked again at approval: it may have been lowered since the proposal was made
+            return support.Refuse(Error.Conflict("learned.total_limit", "This tightening is further from your configured value than the total limit allows now; dismiss it."));
+        }
+
+        return await support.DecideAsync(row.Id, "applied", command.Actor, applied.GetValueOrDefault(row.Key), cancellationToken);
     }
 }
 

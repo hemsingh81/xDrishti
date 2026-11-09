@@ -22,6 +22,9 @@ internal sealed class FakeLearnedStore : ILearnedSettingStore
 
     public ValueTask<LearnedChangeRow?> FindAsync(long id, CancellationToken cancellationToken) => ValueTask.FromResult(_rows.FirstOrDefault(r => r.Id == id));
 
+    public ValueTask<IReadOnlyList<LearnedChangeRow>> CurrentAppliedAsync(CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<LearnedChangeRow>>([.. _rows.Where(r => r.State == "applied").GroupBy(r => r.Key).Select(g => g.OrderBy(r => r.Id).Last())]);
+
     public ValueTask<IReadOnlyDictionary<string, string>> AppliedValuesAsync(CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyDictionary<string, string>>(_rows.Where(r => r.State == "applied").GroupBy(r => r.Key).ToDictionary(g => g.Key, g => g.OrderBy(r => r.Id).Last().NewValue));
 

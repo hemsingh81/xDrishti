@@ -31,6 +31,12 @@ public sealed record TrialsView(
         var c = CultureInfo.InvariantCulture;
         var text = $"{total.ToString(c)} looks = {parts.RunHashes.ToString(c)} strategy hashes + {parts.SweepPoints.ToString(c)} sweep points + {parts.ExtraExits.ToString(c)} extra exit candidates + {parts.Replans.ToString(c)} re-plans + {parts.NullRows.ToString(c)} nulls; "
             + $"honest factor {honest.ToString("0.0000", c)}; the gates were tightened by {used.ToString("0.0000", c)} ({(honestApplied ? "the honest count" : $"{parts.DistinctHashes.ToString(c)} distinct hashes, as before; the honest count is shown beside it")}).";
+        if (parts.TrainingSweeps > 0)
+        {
+            // shown beside the count, never inside it: no link from a tuned strategy to the sweep it came from exists yet, so the deflation cannot be applied honestly (ADR 0243)
+            text += $" {parts.TrainingSweeps.ToString(c)} training sweeps ({parts.TrainingSweepTrials.ToString(c)} variants) are recorded separately and are not in this count, because nothing links a strategy tuned from a sweep to it yet.";
+        }
+
         return new TrialsView(parts.RunHashes, parts.SweepPoints, parts.ExtraExits, parts.Replans, parts.NullRows, total, honest, judged, used, honestApplied, text);
     }
 }

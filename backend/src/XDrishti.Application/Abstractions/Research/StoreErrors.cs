@@ -12,6 +12,11 @@ public static class StoreErrors
     public const string RunConflictCode = "store.run_conflict";
 
     /// <summary>The write failed or its count check did not pass; nothing was stored.</summary>
+    /// <summary>A training run whose window reaches the hold-out block or its embargo, or that has no block to stay clear of (AU-11, ADR 0243).</summary>
+    public const string TrainingWindowRefusedCode = "store.training_window_refused";
+
+    public static Error TrainingWindowRefused(string message) => Error.Validation(TrainingWindowRefusedCode, message);
+
     public const string WriteFailedCode = "store.write_failed";
 
     /// <summary>A page size or a cursor is not valid.</summary>

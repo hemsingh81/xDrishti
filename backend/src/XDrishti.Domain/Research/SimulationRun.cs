@@ -23,6 +23,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="Costs">What the run charged with (ADR 0042, D14); null for a gross run.</param>
 /// <param name="ResultsDays">What a run that names <c>days_to_results</c> or <c>days_since_results</c> read: the calendar snapshot and filing-time hashes, rows, lag and series version (P15-05, ADR 0185); null otherwise.</param>
 /// <param name="EventFilter">What a run that names <c>not_event_day</c> read: the calendar snapshot hash, rows, lag and rule version (P15-06, ADR 0182); null otherwise.</param>
+/// <param name="IsTraining">True for a training run (AU-11, ADR 0243). Set from the header's purpose; a training run's key holds it, and the store takes the purpose from here. Not part of the record text (the exporter leaves it out: SimExportJson.WithoutTrainingFlag), so every research record and its digest are unchanged.</param>
 public sealed record SimulationRun(
     int SchemaVersion,
     string RunKey,
@@ -41,7 +42,8 @@ public sealed record SimulationRun(
     RunCounters Totals,
     CostRecord? Costs = null,
     EventFilterRecord? EventFilter = null,
-    ResultsDaysRecord? ResultsDays = null)
+    ResultsDaysRecord? ResultsDays = null,
+    bool IsTraining = false)
 {
     /// <summary>The schema of the record and of the run key this code writes.</summary>
     public const int CurrentSchemaVersion = 8;

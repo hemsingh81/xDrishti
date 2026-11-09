@@ -192,7 +192,7 @@ public sealed class LearnedSettingChangesGrantsTests(ResearchGrantsTests.Dedicat
         var results = await Task.WhenAll(Enumerable.Range(0, 6).Select(i => store.ApplyAsync(i % 2 == 0 ? a : b, "owner:me@x.test", null, Ct).AsTask()));
 
         results.Count(r => r).ShouldBe(1, "decisions for one key are checked and written one at a time");
-        var winner = results[0] ? a : b;
+        var winner = results.Where((_, i) => i % 2 == 0).Any(r => r) ? a : b; // calls 0, 2 and 4 decide row a, calls 1, 3 and 5 decide row b: the winner is the row whose call succeeded, not always the first call
         var loser = winner == a ? b : a;
         (await store.FindAsync(loser, Ct))!.State.ShouldBe("proposed");
 

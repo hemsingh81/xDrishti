@@ -212,6 +212,7 @@ internal static class ManifestViews
                 new("window_to", ColumnKind.Date, DataClass.C1, "India date", "Last date."),
                 new("method", ColumnKind.Code, DataClass.C1, "", "Test method."),
                 new("created_at", ColumnKind.Timestamp, DataClass.C1, "UTC", "Recorded."),
+                new("trial_kind", ColumnKind.Code, DataClass.C1, "", "Kind of look: run, replan, null, or training_sweep (a training simulation, shown but not counted as a look)."),
             ]),
         new(
             "cell_stats", "Learned statistics per cell, in-sample.", "per cell per snapshot", ViewClass.C1, "research.cell_stats",

@@ -62,7 +62,7 @@ internal sealed class ConfidenceSettings
     internal RegistrationOptions ToRegistrationOptions() => new(Registration.Enforce, Registration.CountInFactor);
 
     /// <summary>The <c>Confidence:HoldOut</c> subsection as the options of CF-06 (ADR 0207).</summary>
-    internal HoldOutOptions ToHoldOutOptions() => new(HoldOut.Enforce, HoldOut.AutoUnlock, HoldOut.MinMonths, HoldOut.SharePercent, HoldOut.MinTrades, HoldOut.Retention);
+    internal HoldOutOptions ToHoldOutOptions() => new(HoldOut.Enforce, HoldOut.AutoUnlock, HoldOut.MinMonths, HoldOut.SharePercent, HoldOut.MinTrades, HoldOut.Retention, HoldOut.TrainingEmbargoDays);
 
     /// <summary>The <c>Confidence:Nulls</c> subsection as the options of CF-07 (ADR 0208).</summary>
     internal NullOptions ToNullOptions() => new(Nulls.Mode, Nulls.Enforce, Nulls.Draws, Nulls.Percentile, Nulls.Redraws, Nulls.Placebos, Nulls.MinPlacebos, Nulls.MaxDraws);
@@ -433,5 +433,7 @@ internal sealed class ConfidenceSettings
         public int MinTrades { get; set; } = 30;
 
         public double Retention { get; set; } = 0.5;
+
+        public int TrainingEmbargoDays { get; set; } = 30;
     }
 }
