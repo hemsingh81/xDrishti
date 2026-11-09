@@ -86,3 +86,9 @@ export const optionCoverageQuery = (underlying: string) =>
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/options/coverage', { params: { query: { underlying } }, signal })),
   });
+
+/** The option archive per underlying: counts and dates only (spec P14-16). */
+export const optionSummaryQuery = queryOptions({
+  queryKey: ['quality', 'options-summary'] as const,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/options/summary', { signal })),
+});

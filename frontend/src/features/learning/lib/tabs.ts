@@ -105,6 +105,12 @@ const entries = [
     load: () => import('../components/ExtensionsTab').then((m) => ({ default: m.ExtensionsTab })),
   },
   {
+    id: 'options',
+    label: 'Options and stat-arb',
+    slice: 'P14-16',
+    load: () => import('../components/OptionsStatArbTab').then((m) => ({ default: m.OptionsStatArbTab })),
+  },
+  {
     id: 'decay',
     label: 'Decay',
     slice: 'CF-12',

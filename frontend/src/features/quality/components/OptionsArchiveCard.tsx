@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { formatIstDate } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { optionCoverageQuery, optionUnderlyings } from '../api/qualityQueries';
+import { OptionsSummary } from './OptionsSummary';
 
 /** Read-only: how complete and usable the recorded option archive is, per session and check. Never a price, IV or Greek. */
 // shortcut: no virtual list; a long archive is capped at this many rows with a count of the rest.
@@ -19,6 +20,7 @@ export function OptionsArchiveCard() {
       <Typography id="options-archive-heading" component="h2" variant="subtitle1" sx={{ fontWeight: 600 }}>
         Options archive
       </Typography>
+      <OptionsSummary />
       <TextField
         select
         size="small"

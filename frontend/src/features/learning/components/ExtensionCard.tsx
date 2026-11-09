@@ -1,6 +1,6 @@
 import { Alert, Box, Chip, Typography } from '@mui/material';
 import { EvidenceBlock, NonValue, formatR, formatRate } from '@/shared/analytics';
-import type { ExtensionEvaluation, ExtensionFamily } from '../api/extensionQueries';
+import type { ExtensionEvaluation } from '../api/extensionQueries';
 import { boundsOf, windowOf, type BoundLine } from '../lib/extensions';
 import { FilterSharesTable } from './FilterSharesTable';
 
@@ -21,7 +21,7 @@ function Bounds({ e }: { e: ExtensionEvaluation }) {
 }
 
 /** One stored record: the verdict word, N, what is missing (as text), the bounds, the evidence and, for the filter, the shares. */
-export function ExtensionCard({ family, e }: { family: ExtensionFamily; e: ExtensionEvaluation }) {
+export function ExtensionCard({ family, e }: { family: string; e: ExtensionEvaluation }) {
   const n = windowOf(e);
   const word = e.verdict.replaceAll('_', ' ');
   return (

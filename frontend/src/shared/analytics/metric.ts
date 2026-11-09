@@ -55,3 +55,9 @@ export function metricOf(value: number | null | undefined, missing = 'The API di
     ? { kind: 'value', value }
     : { kind: 'unavailable', reason: missing };
 }
+
+/** The API's reported figure (`state` `ok` with a value, else `unavailable` with a reason word) as a metric; never a zero. */
+export function reportedMetric(r: { state: string; value: number | null; reason: string | null }): MetricState {
+  if (r.state === 'ok') return metricOf(r.value);
+  return { kind: 'unavailable', reason: (r.reason ?? 'not reported').replaceAll('_', ' ') };
+}
