@@ -25,7 +25,7 @@ export function SettingsPage() {
       <Button
         variant="outlined"
         aria-expanded={advanced}
-        aria-controls="advanced-settings"
+        aria-controls={advanced ? 'advanced-settings' : undefined}
         onClick={() => {
           setParams(advanced ? {} : { tab: 'profiles' }, { replace: true });
         }}

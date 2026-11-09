@@ -22,7 +22,9 @@ describe('Settings page', () => {
     expect(screen.queryByText('Promote models automatically')).not.toBeInTheDocument();
     expect(screen.queryByText('Capital for grading')).not.toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
-    expect(within(list).queryByRole('switch')).not.toBeInTheDocument();
+    for (const role of ['checkbox', 'switch', 'button', 'textbox']) {
+      expect(within(list).queryByRole(role)).not.toBeInTheDocument();
+    }
     expect(within(list).getByRole('link', { name: 'Open risk profiles' })).toHaveAttribute(
       'href',
       '/settings?tab=profiles',
@@ -31,7 +33,28 @@ describe('Settings page', () => {
       'href',
       '/settings?tab=charge-sheet',
     );
-    expect(within(list).getAllByText(/Not changeable here yet/)).toHaveLength(3);
+    expect(within(list).getAllByText(/Not changeable here yet/)).toHaveLength(2);
+    expect(within(list).getByText(/Always on/)).toBeInTheDocument();
+  });
+
+  it('opens the matching tab from an essential link', async () => {
+    const { router } = renderSettings();
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Open the charge sheet' }));
+
+    expect(router.state.location.search).toBe('?tab=charge-sheet');
+    expect(await screen.findByRole('tab', { name: 'Charge sheet', selected: true })).toBeInTheDocument();
+  });
+
+  it('keeps Advanced settings usable when the catalog cannot be read', async () => {
+    server.use(
+      http.get('/api/settings/catalog', () => HttpResponse.json({ title: 'Service unavailable' }, { status: 503 })),
+    );
+    renderSettings();
+
+    expect(await screen.findByText('Service unavailable')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Advanced settings' }));
+    expect(await screen.findByRole('tab', { name: 'Risk profiles', selected: true })).toBeInTheDocument();
   });
 
   it('marks a value as default or changed', async () => {

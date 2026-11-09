@@ -14,7 +14,15 @@ interface Item {
 }
 
 /** The mark of a value: the default, changed from it, or not known here. Text and icon, never colour alone. */
-function Mark({ item }: { item: Item }) {
+function Mark({ item, alwaysOn }: { item: Item; alwaysOn: boolean }) {
+  if (alwaysOn) {
+    return (
+      <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+        <InfoIcon fontSize="small" color="action" aria-hidden />
+        <Typography variant="body2">Always on · not changeable here yet</Typography>
+      </Stack>
+    );
+  }
   if (item.value === null) {
     return (
       <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
@@ -65,7 +73,7 @@ export function EssentialSettings() {
                 {row.linkLabel}
               </Link>
             ) : (
-              <Mark item={item} />
+              <Mark item={item} alwaysOn={row.key === 'notices.failure' && item.value === null} />
             )}
           </Box>
           <Typography variant="body2" color="text.secondary">

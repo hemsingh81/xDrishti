@@ -1,5 +1,5 @@
 import { Box, Tab, Tabs } from '@mui/material';
-import { lazy, Suspense } from 'react';
+import { lazy } from 'react';
 import { useSearchParams } from 'react-router';
 import { RiskProfilesView, RoleMatrixView } from '@/features/accounts';
 import { LazyBoundary, LoadingState, ReloadAlert } from '@/shared/ui';
@@ -64,14 +64,20 @@ export function AdvancedSettings() {
         )}
         {tab === 'actions' && <ActionThresholdsCard />}
         {tab === 'charge-sheet' && (
-          <Suspense fallback={<LoadingState label="Loading the confirmation" />}>
+          <LazyBoundary
+            pending={<LoadingState label="Loading the confirmation" />}
+            failed={<ReloadAlert label="The confirmation" />}
+          >
             <ChargeSheetCard />
-          </Suspense>
+          </LazyBoundary>
         )}
         {tab === 'selection' && (
-          <Suspense fallback={<LoadingState label="Loading the event filter" />}>
+          <LazyBoundary
+            pending={<LoadingState label="Loading the event filter" />}
+            failed={<ReloadAlert label="The event filter" />}
+          >
             <EventFilterCard />
-          </Suspense>
+          </LazyBoundary>
         )}
       </Box>
     </>

@@ -25,6 +25,7 @@ The system adjusts a small allow-list of thresholds from what it has learned, on
 8. A change is applied only from evidence that is not sealed: hold-out data is never read here.
 10. The whole candidate configuration is validated before it is saved, because some keys limit each other and a change that is safe alone can break the pair: `Confidence:Ladder:MinProbability` against `Confidence:MlInfluence:HoldOutMinProbability` (the hold-out bar is never below the ladder bar), `CostStress:MidMultiplier` against `HighMultiplier` (high above mid), `CostStress:TierBCutCrore` against `TierACutCrore` (B below A), `Readiness:BuildingFrom` against `UsableFrom` against `ReadyFrom` (they must increase). A candidate that fails any existing validator is refused and nothing is saved.
 9. If a tightening would leave the coming plan empty for 5 sessions in a row, a notice names the setting; it does not self-loosen.
+11. On the Settings screen (AU-09), each Essential row shows a who/when line and a Reset to default; AU-10 owns the `notices.failure` store, and `risk.profile` and `chargesheet.gate` gain who-changed and reset. The default/changed mark then works in production.
 
 ## Contract
 - **API:** `GET /api/settings/learned`; `POST /api/settings/learned/{id}/approve` (fresh password when loosening) and `/dismiss`.
