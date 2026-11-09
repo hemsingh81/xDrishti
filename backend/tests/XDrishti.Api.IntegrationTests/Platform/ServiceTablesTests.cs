@@ -273,6 +273,29 @@ public sealed class ServiceTablesTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_partial_item_keeps_the_per_session_detail_as_jsonb_and_is_not_retried()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var ledger = scope.ServiceProvider.GetRequiredService<IRecoveryLedger>();
+        var now = DateTimeOffset.UtcNow;
+        var pass = await ledger.BeginPassAsync("startup", now, Ct);
+        var day = new DateOnly(2026, 10, 12);
+        var key = "probe-" + Guid.NewGuid().ToString("N")[..8];
+        const string Detail = "{\"qualityVerified\":true,\"sessions\":[{\"date\":\"2026-10-12\",\"state\":\"still_missing\"}]}";
+        await ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), pass, key, "2026-10-12", day, day, RecoveryStates.Partial, "0 of 1 sessions recovered", 1, null, Detail), Ct);
+
+        var item = (await ledger.FindAsync(key, "2026-10-12", Ct)).ShouldNotBeNull();
+
+        item.State.ShouldBe(RecoveryStates.Partial);
+        item.Detail.ShouldNotBeNull().ShouldContain("\"still_missing\""); // jsonb normalises the text
+        (await ledger.ListRetryableAsync(3, Ct)).ShouldNotContain(i => i.ServiceId == key);
+        await using var connection = await OpenAsync();
+        (await ScalarAsync(connection, $"SELECT detail->'sessions'->0->>'state' FROM platform.recovery_items WHERE service_id = '{key}'")).ShouldBe("still_missing");
+        await ledger.EndPassAsync(pass, "incomplete", now, Ct);
+        await ExecuteAsync(connection, $"DELETE FROM platform.recovery_items WHERE service_id = '{key}'");
+    }
+
+    [Fact]
     public async Task An_item_left_running_by_an_earlier_process_is_closed_as_failed_interrupted_and_so_is_its_pass()
     {
         await using var scope = factory.Services.CreateAsyncScope();

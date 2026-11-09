@@ -69,11 +69,11 @@ internal sealed class RecoveryLedger(NpgsqlDataSource dataSource) : IRecoveryLed
         return rows;
     }
 
-    private const string Columns = "id, pass_id, service_id, occurrence, session_from, session_to, state, reason, attempts, run_id";
+    private const string Columns = "id, pass_id, service_id, occurrence, session_from, session_to, state, reason, attempts, run_id, detail::text";
 
     private static RecoveryItemRow Read(NpgsqlDataReader r) => new(
         r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetFieldValue<DateOnly>(4), r.GetFieldValue<DateOnly>(5), r.GetString(6),
-        r.IsDBNull(7) ? null : r.GetString(7), r.GetInt16(8), r.IsDBNull(9) ? null : r.GetGuid(9));
+        r.IsDBNull(7) ? null : r.GetString(7), r.GetInt16(8), r.IsDBNull(9) ? null : r.GetGuid(9), r.IsDBNull(10) ? null : r.GetString(10));
 
     public async ValueTask<IReadOnlyList<RecoveryExhaustedRow>> ListWaitingAsync(DateOnly sessionOnOrBefore, CancellationToken cancellationToken)
     {
@@ -105,10 +105,10 @@ internal sealed class RecoveryLedger(NpgsqlDataSource dataSource) : IRecoveryLed
     {
         ArgumentNullException.ThrowIfNull(item);
         await using var command = dataSource.CreateCommand("""
-            INSERT INTO platform.recovery_items (id, pass_id, service_id, occurrence, session_from, session_to, state, reason, attempts, run_id)
-            VALUES (@id, @pass, @service, @occurrence, @from, @to, @state, @reason, @attempts, @run)
+            INSERT INTO platform.recovery_items (id, pass_id, service_id, occurrence, session_from, session_to, state, reason, attempts, run_id, detail)
+            VALUES (@id, @pass, @service, @occurrence, @from, @to, @state, @reason, @attempts, @run, @detail)
             ON CONFLICT (service_id, occurrence) DO UPDATE SET pass_id = EXCLUDED.pass_id, session_from = EXCLUDED.session_from, session_to = EXCLUDED.session_to,
-                state = EXCLUDED.state, reason = EXCLUDED.reason, attempts = EXCLUDED.attempts, run_id = EXCLUDED.run_id
+                state = EXCLUDED.state, reason = EXCLUDED.reason, attempts = EXCLUDED.attempts, run_id = EXCLUDED.run_id, detail = EXCLUDED.detail
             """);
         var p = command.Parameters;
         p.AddWithValue("id", NpgsqlDbType.Uuid, item.Id);
@@ -121,6 +121,7 @@ internal sealed class RecoveryLedger(NpgsqlDataSource dataSource) : IRecoveryLed
         p.Add(new NpgsqlParameter("reason", NpgsqlDbType.Varchar) { Value = (object?)item.Reason ?? DBNull.Value });
         p.AddWithValue("attempts", NpgsqlDbType.Smallint, (short)item.Attempts);
         p.Add(new NpgsqlParameter("run", NpgsqlDbType.Uuid) { Value = item.RunId is { } run ? run : DBNull.Value });
+        p.Add(new NpgsqlParameter("detail", NpgsqlDbType.Jsonb) { Value = (object?)item.Detail ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

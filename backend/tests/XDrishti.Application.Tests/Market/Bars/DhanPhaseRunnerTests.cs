@@ -5,6 +5,7 @@ using XDrishti.Application.Market.Bars.Gaps;
 using XDrishti.Application.Market.Bars.Pipeline;
 using XDrishti.Application.Tests.Market.Calendar;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.Calendar;
 
 namespace XDrishti.Application.Tests.Market.Bars;
 
@@ -56,6 +57,33 @@ public sealed class DhanPhaseRunnerTests
 
         var friday = new DateTimeOffset(2026, 10, 9, 15, 30, 0, TimeSpan.FromMinutes(330));
         _source.Plans.Single().Targets.SelectMany(t => t.Windows).ShouldAllBe(w => w.To <= friday);
+    }
+
+    [Theory]
+    [InlineData(2026, 10, 12, 10, 20, false, 12, 15, 30)] // Monday 15:50: capped at today's 15:30 close
+    [InlineData(2026, 10, 10, 14, 0, true, 10, 19, 0)] // Saturday special session 18:00-19:00, asked 19:30: capped at 19:00
+    [InlineData(2026, 10, 12, 10, 20, true, 9, 15, 30)] // Monday a holiday, asked 15:50: capped at Friday's close
+    public async Task The_end_of_day_cap_follows_the_real_session_of_the_day(int year, int month, int day, int hourUtc, int minuteUtc, bool exception, int capDay, int capHour, int capMinute)
+    {
+        var now = new DateTimeOffset(year, month, day, hourUtc, minuteUtc, 0, TimeSpan.Zero);
+        var clock = new FakeTimeProvider(now);
+        var date = new DateOnly(year, month, day);
+        if (exception)
+        {
+            _calendar.Calendar = new TradingCalendar([capDay == day
+                ? TradingDay.Special(date, 18 * 60, 19 * 60, CalendarSource.Manual, CalendarStatus.Confirmed, null, now)
+                : TradingDay.Holiday(date, CalendarSource.Manual, CalendarStatus.Confirmed, null, now)]);
+        }
+
+        Target("ABB", new DateTimeOffset(2026, 10, 9, 15, 29, 0, TimeSpan.FromMinutes(330)));
+        var job = DataJob.Start([DataSteps.Dhan], false, "system:data-eod", now, DataJobTrigger.Manual);
+        _jobs.Jobs[job.Id] = job;
+        var runner = new DhanPhaseRunner(_source, _account, _targets, _bars, _settings, _calendar, new GapBackfill(new FakeBarDayCounts(_bars), _gaps, _settings, clock), clock, NullLogger<DhanPhaseRunner>.Instance);
+
+        await runner.RunAsync(new JobReporter(job, _jobs, clock), Ct);
+
+        var cap = new DateTimeOffset(2026, 10, capDay, capHour, capMinute, 0, TimeSpan.FromMinutes(330));
+        _source.Plans.Single().Targets.SelectMany(t => t.Windows).Max(w => w.To).ShouldBe(cap);
     }
 
     [Fact]

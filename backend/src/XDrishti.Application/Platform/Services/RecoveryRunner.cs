@@ -252,7 +252,7 @@ public sealed class RecoveryRunner(
             var id = step.ServiceId;
             var occurrence = step.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             var existing = await ledger.FindAsync(id, occurrence, cancellationToken);
-            if (existing is { State: RecoveryStates.Succeeded or RecoveryStates.Superseded })
+            if (existing is { State: RecoveryStates.Succeeded or RecoveryStates.Superseded or RecoveryStates.Partial })
             {
                 continue;
             }
@@ -330,6 +330,10 @@ public sealed class RecoveryRunner(
                 waiting.Add(id);
                 allGood = false;
             }
+            else if (done.State == RecoveryStates.Partial)
+            {
+                allGood = false; // ran, but sessions are not recovered: the dependents still run (their own fail-closed gates decide) and the pass is incomplete
+            }
             else if (done.State != RecoveryStates.Succeeded)
             {
                 failed[id] = done.Reason ?? "failed";
@@ -369,15 +373,15 @@ public sealed class RecoveryRunner(
         {
             if (handled.Status == ServiceRunStatus.Succeeded)
             {
-                var made = item with { State = RecoveryStates.Succeeded, Reason = null, RunId = handled.Id };
+                var made = await ProveAsync(services, step, item with { State = RecoveryStates.Succeeded, Reason = null, RunId = handled.Id }, handled.StartedAt, cancellationToken);
                 await ledger.SaveAsync(made, cancellationToken);
                 ServicesLog.RecoveryStep(logger, id, item.Occurrence, RecoveryStates.Succeeded);
                 return made;
             }
 
-            if (handled.Trigger != ServiceRunTrigger.CatchUp && handled.Status == ServiceRunStatus.Failed)
+            if (handled.Trigger is not (ServiceRunTrigger.CatchUp or ServiceRunTrigger.Manual) && handled.Status == ServiceRunStatus.Failed)
             {
-                // the scheduler ran it at its time and it failed (with its own notice and retries): the pass does not run it again behind it, and what follows it is blocked. A skipped run proceeds: the service could not run then, and may now.
+                // the scheduler (not the owner, not a pass) ran it at its time and it failed (with its own notice and retries): the pass does not run it again behind it, and what follows it is blocked. A skipped run proceeds: the service could not run then, and may now.
                 var refused = item with { State = RecoveryStates.Failed, Reason = "its scheduled run failed; see its history", Attempts = Math.Max(item.Attempts, Math.Clamp(options.MaxAttempts, 1, 10)), RunId = handled.Id };
                 await ledger.SaveAsync(refused, cancellationToken);
                 return refused;
@@ -385,7 +389,7 @@ public sealed class RecoveryRunner(
         }
 
         var before = item;
-        item = item with { State = RecoveryStates.Running, Reason = null, Attempts = item.Attempts + 1, RunId = null };
+        item = item with { State = RecoveryStates.Running, Reason = null, Attempts = item.Attempts + 1, RunId = null, Detail = null };
         await ledger.SaveAsync(item, cancellationToken);
         RecoveryItemRow end;
         try
@@ -402,7 +406,7 @@ public sealed class RecoveryRunner(
                 var last = (await runs.ListAsync(id, 0, 10, cancellationToken)).FirstOrDefault(r => r.StartedAt >= run.StartedAt && r.Trigger == ServiceRunTrigger.CatchUp) ?? run;
                 end = last.Status switch
                 {
-                    ServiceRunStatus.Succeeded => item with { State = RecoveryStates.Succeeded, Reason = null, RunId = last.Id },
+                    ServiceRunStatus.Succeeded => await ProveAsync(services, step, item with { State = RecoveryStates.Succeeded, Reason = null, RunId = last.Id }, last.StartedAt, cancellationToken),
 
                     // the service could not do it now (no connected account, source down): not a failure and no attempt used; it is tried again at the next trigger and its dependents wait
                     ServiceRunStatus.Skipped => before with { State = RecoveryStates.Waiting, Reason = Clip("waiting: " + (last.Message ?? "the service had nothing to run on")), RunId = last.Id },
@@ -427,24 +431,71 @@ public sealed class RecoveryRunner(
         return end;
     }
 
+    /// <summary>
+    /// After a step that succeeded, a service that declares a proof (spec AU-03) is asked whether its sessions really have their data: the item then carries the per-session detail and is <c>succeeded</c> only when every session
+    /// is recovered, <c>partial</c> otherwise (the sessions not recovered are named by date). A partial item does not block what follows it: the dependents run and their own fail-closed gates decide. A proof that cannot be
+    /// worked out (a store read failed) is partial too, fail closed: the evidence is missing, never invented.
+    /// </summary>
+    private async Task<RecoveryItemRow> ProveAsync(IServiceProvider services, RecoveryStep step, RecoveryItemRow made, DateTimeOffset runStartedAt, CancellationToken cancellationToken)
+    {
+        var proof = services.GetServices<IRecoveryProof>().FirstOrDefault(p => string.Equals(p.ServiceId, step.ServiceId, StringComparison.Ordinal));
+        if (proof is null)
+        {
+            return made;
+        }
+
+        try
+        {
+            var result = await proof.ProveAsync(step.Sessions, runStartedAt, cancellationToken);
+            return result.AllRecovered
+                ? made with { Detail = result.Detail }
+                : made with { State = RecoveryStates.Partial, Reason = Clip(result.Reason ?? "sessions not recovered"), Detail = result.Detail };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031 // the run succeeded; a failed proof read must not turn it into a failure or end the pass
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            ServicesLog.RecoveryCrashed(logger, step.ServiceId, ex);
+            return made with { State = RecoveryStates.Partial, Reason = "the sessions could not be verified (a store read failed)" };
+        }
+    }
+
     private static string Clip(string text) => text.Length <= 400 ? text : text[..399] + "~";
 
-    /// <summary>When the service must not run in the market hours and it is inside them on a trading day, the instant they are over; otherwise null.</summary>
+    /// <summary>
+    /// When the service must not run in the market hours and it is inside the real session of today (a special session has its own window), the instant it can go on: the later of the minute after the close and the service's
+    /// own <c>StartNotBefore</c>; otherwise null.
+    /// </summary>
     private DateTimeOffset? InMarketHours(RecoveryInput input, TradingCalendar calendar)
     {
-        if (input.Definition.Constraints.MustNotOverlap is not { } quiet)
+        if (input.Definition.Constraints.MustNotOverlap is null)
         {
             return null;
         }
 
-        var now = clock.GetUtcNow();
-        var ist = IndiaTime.ToIst(now);
+        var ist = IndiaTime.ToIst(clock.GetUtcNow());
         var today = DateOnly.FromDateTime(ist.DateTime);
-        if (!calendar.IsTradingDay(today) || !quiet.Contains(TimeOnly.FromDateTime(ist.DateTime)))
+        if (calendar.SessionOf(today) is not { } session)
         {
             return null;
         }
 
-        return new DateTimeOffset(today.ToDateTime(quiet.To), IndiaTime.Offset).AddMinutes(1);
+        var minute = ist.Hour * 60 + ist.Minute;
+        if (minute < session.FromMinute || minute > session.ToMinute)
+        {
+            return null;
+        }
+
+        var resume = new TimeOnly(session.ToMinute / 60, session.ToMinute % 60).AddMinutes(1);
+        if (input.Definition.Constraints.StartNotBefore is { } earliest && earliest > resume)
+        {
+            resume = earliest;
+        }
+
+        return new DateTimeOffset(today.ToDateTime(resume), IndiaTime.Offset);
     }
 }

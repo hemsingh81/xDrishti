@@ -177,7 +177,6 @@ internal sealed class DhanPhaseRunner(
         }
     }
 
-    /// <summary>Finds the missing bars of every target before anything is fetched. One instrument whose gaps cannot be worked out is fetched as usual (and the owner is told once).</summary>
     /// <summary>
     /// Up to when the run asks Dhan for bars: now for a run the owner started; for the automatic end-of-day run (the scheduled run and the recovery pass) the end of the last closed session, so a run made up while a session is
     /// open stores no bar of that session, which is still in progress (ADR 0240, AC7).
@@ -195,6 +194,7 @@ internal sealed class DhanPhaseRunner(
         return end < now ? end : now;
     }
 
+    /// <summary>Finds the missing bars of every target before anything is fetched. One instrument whose gaps cannot be worked out is fetched as usual (and the owner is told once).</summary>
     private async ValueTask<Dictionary<Guid, GapPlan>> PlanGapsAsync(
         TradingCalendar calendar, IReadOnlyList<FetchTarget> targets, JobReporter reporter, CancellationToken cancellationToken)
     {
