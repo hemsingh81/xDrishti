@@ -23,7 +23,8 @@ public sealed record NewKillProposal(string Strategy, long? EpochId, string Rule
 /// <param name="Actor"><c>owner:...</c> or <c>auto</c> once decided, else null.</param>
 /// <param name="DecidedAt">When it was decided, or null.</param>
 /// <param name="AutoSettingId">For an automatic decision, the row of <c>confidence.kill_settings</c> in force (the setting snapshot), else null.</param>
-public sealed record KillProposalRow(long Id, NewKillProposal Proposal, DateOnly ProposedOn, DateTimeOffset ProposedAt, string State, string? Actor, DateTimeOffset? DecidedAt, long? AutoSettingId);
+/// <param name="DismissReason">The owner's reason when the state is <c>dismissed</c>, else null.</param>
+public sealed record KillProposalRow(long Id, NewKillProposal Proposal, DateOnly ProposedOn, DateTimeOffset ProposedAt, string State, string? Actor, DateTimeOffset? DecidedAt, long? AutoSettingId, string? DismissReason = null);
 
 /// <summary>Reads kill proposals. Read only.</summary>
 public interface IKillProposalReader
@@ -46,6 +47,9 @@ public interface IKillProposalStore
 
     /// <summary>Moves a <c>proposed</c> proposal to <paramref name="state"/> (<c>applied</c> or <c>dismissed</c>); <see cref="KillDecideResult.NotProposed"/> when it was not <c>proposed</c> any more, <see cref="KillDecideResult.Refused"/> when the record refuses the decision.</summary>
     ValueTask<KillDecideResult> DecideAsync(long id, string state, string actor, long? autoSettingId, CancellationToken cancellationToken);
+
+    /// <summary>Moves a <c>proposed</c> proposal to <c>dismissed</c> with the owner and the reason, in one conditional update (CF-12 leftover, ADR 0234); <see cref="KillDecideResult.NotProposed"/> when it was not <c>proposed</c> any more. It changes no lifecycle state.</summary>
+    ValueTask<KillDecideResult> DismissAsync(long id, string actor, string reason, CancellationToken cancellationToken);
 }
 
 /// <summary>What the record said to a decision.</summary>

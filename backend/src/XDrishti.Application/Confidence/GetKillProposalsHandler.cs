@@ -28,7 +28,7 @@ internal sealed class GetKillProposalsHandler(IKillProposalReader reader, IKillS
         var rows = await reader.ListAsync(query.State, strategy, query.Limit, cancellationToken);
         var current = await settings.CurrentAsync(cancellationToken);
         return Result.Success(new KillProposalsView(
-            [.. rows.Select(r => new KillProposalView(r.Id, r.Proposal.Strategy, r.Proposal.Rule, r.Proposal.ProposalOnly, r.Proposal.Value, r.Proposal.Limit, r.Proposal.Trades, r.Proposal.Text, r.Proposal.Cells, r.Proposal.SettingsHash, r.ProposedOn, r.ProposedAt, r.State, r.Actor, r.DecidedAt, r.AutoSettingId))],
+            [.. rows.Select(r => new KillProposalView(r.Id, r.Proposal.Strategy, r.Proposal.Rule, r.Proposal.ProposalOnly, r.Proposal.Value, r.Proposal.Limit, r.Proposal.Trades, r.Proposal.Text, r.Proposal.Cells, r.Proposal.SettingsHash, r.ProposedOn, r.ProposedAt, r.State, r.Actor, r.DecidedAt, r.AutoSettingId, r.DismissReason))],
             new KillSettingsView(current.Auto, current.Id, kill.StressMultiplier, kill.DrawdownFactor, kill.SnapshotHash()),
             [
                 "A proposal changes nothing by itself. Applying it pauses the cells it names (Paper or Active to Paused); the owner applies it, or the automatic setting does when it is ON (default OFF), except for the CF-09 failure boundary, which only the owner applies.",

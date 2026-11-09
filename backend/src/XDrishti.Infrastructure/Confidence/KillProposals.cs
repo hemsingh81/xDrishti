@@ -12,7 +12,7 @@ namespace XDrishti.Infrastructure.Confidence;
 /// </summary>
 internal sealed class KillProposals(NpgsqlDataSource dataSource) : IKillProposalReader, IKillProposalStore
 {
-    private const string Columns = "id, strategy, epoch_id, rule, proposal_only, value, limit_value, trades, text, cells::text, settings_hash, series_trades, proposed_on, proposed_at, state, actor, decided_at, auto_setting_id";
+    private const string Columns = "id, strategy, epoch_id, rule, proposal_only, value, limit_value, trades, text, cells::text, settings_hash, series_trades, proposed_on, proposed_at, state, actor, decided_at, auto_setting_id, dismiss_reason";
 
     public async ValueTask<long?> InsertAsync(NewKillProposal proposal, DateOnly day, CancellationToken cancellationToken)
     {
@@ -52,6 +52,22 @@ internal sealed class KillProposals(NpgsqlDataSource dataSource) : IKillProposal
         catch (PostgresException refusal) when (refusal.SqlState == PostgresErrorCodes.CheckViolation)
         {
             // the guard trigger or a check of the table: the record refuses this decision (nothing was changed)
+            return KillDecideResult.Refused;
+        }
+    }
+
+    public async ValueTask<KillDecideResult> DismissAsync(long id, string actor, string reason, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("UPDATE confidence.kill_proposals SET state = 'dismissed', actor = @actor, dismiss_reason = @reason, decided_at = now() WHERE id = @id AND state = 'proposed'");
+        command.Parameters.AddWithValue("actor", NpgsqlDbType.Varchar, actor);
+        command.Parameters.AddWithValue("reason", NpgsqlDbType.Varchar, reason);
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, id);
+        try
+        {
+            return await command.ExecuteNonQueryAsync(cancellationToken) == 1 ? KillDecideResult.Decided : KillDecideResult.NotProposed;
+        }
+        catch (PostgresException refusal) when (refusal.SqlState == PostgresErrorCodes.CheckViolation)
+        {
             return KillDecideResult.Refused;
         }
     }
@@ -113,5 +129,6 @@ internal sealed class KillProposals(NpgsqlDataSource dataSource) : IKillProposal
         r.GetString(14),
         r.IsDBNull(15) ? null : r.GetString(15),
         r.IsDBNull(16) ? null : r.GetFieldValue<DateTimeOffset>(16),
-        r.IsDBNull(17) ? null : r.GetInt64(17));
+        r.IsDBNull(17) ? null : r.GetInt64(17),
+        r.IsDBNull(18) ? null : r.GetString(18));
 }

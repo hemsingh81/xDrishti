@@ -11,6 +11,9 @@ internal static partial class KillLog
     [LoggerMessage(EventId = 7101, Level = LogLevel.Information, Message = "confidence.kill.applied {ProposalId} by {Kind}: {Paused} cell(s) paused, {Skipped} skipped")]
     public static partial void Applied(ILogger logger, long proposalId, string kind, int paused, int skipped);
 
+    [LoggerMessage(EventId = 7108, Level = LogLevel.Information, Message = "confidence.kill.dismissed {ProposalId} by the owner")]
+    public static partial void Dismissed(ILogger logger, long proposalId);
+
     [LoggerMessage(EventId = 7102, Level = LogLevel.Warning, Message = "confidence.kill.refused {Code}")]
     public static partial void Refused(ILogger logger, string code);
 

@@ -60,6 +60,18 @@ internal sealed class FakeKillStore : IKillProposalReader, IKillProposalStore
         return ValueTask.FromResult(KillDecideResult.Decided);
     }
 
+    public ValueTask<KillDecideResult> DismissAsync(long id, string actor, string reason, CancellationToken cancellationToken)
+    {
+        var index = Rows.FindIndex(r => r.Id == id && r.State == "proposed");
+        if (index < 0)
+        {
+            return ValueTask.FromResult(KillDecideResult.NotProposed);
+        }
+
+        Rows[index] = Rows[index] with { State = "dismissed", Actor = actor, DismissReason = reason, DecidedAt = Clock() };
+        return ValueTask.FromResult(KillDecideResult.Decided);
+    }
+
     public ValueTask<KillProposalRow?> FindAsync(long id, CancellationToken cancellationToken) => ValueTask.FromResult(Rows.FirstOrDefault(r => r.Id == id));
 
     public ValueTask<IReadOnlyList<KillProposalRow>> ListAsync(string? state, string? strategy, int limit, CancellationToken cancellationToken) =>
@@ -113,6 +125,8 @@ internal sealed class KillFixture
     public ApplyKillHandler Apply => new(Store, Store, Settings, Cells, Pause, NullLogger<ApplyKillHandler>.Instance);
 
     public ProposeKillHandler Propose => new(Report, Store, Store, Checks, Settings, Cells, Apply, new DecayOptions(), new KillOptions(), Time, NullLogger<ProposeKillHandler>.Instance);
+
+    public DismissKillHandler Dismiss => new(Store, Store, NullLogger<DismissKillHandler>.Instance);
 
     public ReEnableCellHandler ReEnable => new(Log, Store, Report, Record, NullLogger<ReEnableCellHandler>.Instance);
 

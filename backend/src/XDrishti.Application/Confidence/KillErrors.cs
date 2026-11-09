@@ -40,6 +40,16 @@ public static class KillErrors
     /// <summary>A reason of 1 to 300 characters is required.</summary>
     public const string ReasonInvalidCode = "confidence.reason_invalid";
 
+    /// <summary>The proposal was applied and cannot be dismissed.</summary>
+    public const string ProposalAppliedCode = "confidence.proposal_applied";
+
+    public static Error ProposalApplied(long id) => Error.Conflict(ProposalAppliedCode, $"Kill proposal {id} was applied and cannot be dismissed.");
+
+    /// <summary>The proposal was dismissed while it was being applied; the cells this call paused stay paused.</summary>
+    public const string DismissedDuringApplyCode = "confidence.proposal_dismissed_during_apply";
+
+    public static Error DismissedDuringApply(long id, IReadOnlyList<string> paused) => Error.Conflict(DismissedDuringApplyCode, $"Kill proposal {id} was dismissed while it was being applied: it stays dismissed, and the cells this call had already paused stay paused ({(paused.Count == 0 ? "none" : string.Join("; ", paused))}). Re-enable them if that is not wanted.");
+
     public static Error ProposalNotFound(long id) => Error.NotFound(ProposalNotFoundCode, $"No kill proposal {id}.");
 
     /// <summary>The record of the proposal refused the decision.</summary>
@@ -59,5 +69,7 @@ public static class KillErrors
 
     public static Error NotPaused(string cell, CellState state) => Error.Conflict(NotPausedCode, $"The cell {cell} is {state.Code()}, not paused: there is nothing to re-enable.");
 
-    public static Error ReasonInvalid() => Error.Validation(ReasonInvalidCode, "A reason of 1 to 300 characters is required.");
+    public static Error ReasonInvalid() => ReasonInvalid(300);
+
+    public static Error ReasonInvalid(int max) => Error.Validation(ReasonInvalidCode, $"A reason of 1 to {max} characters is required.");
 }

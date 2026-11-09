@@ -9,6 +9,10 @@ interface Props {
   intro?: ReactNode;
   /** False when the act takes no reason (the reason is then sent empty and not asked). */
   askReason?: boolean;
+  /** Starts the reason field with this text (a caller that remounts the dialog after a refusal keeps what was typed). */
+  initialReason?: string;
+  /** Longest reason the server takes; shown beside the field and enforced in it. */
+  maxReasonLength?: number;
   pending: boolean;
   error: unknown;
   /** Called with the typed password and reason; the dialog stays open until the caller closes it. */
@@ -23,6 +27,8 @@ export function PasswordReasonDialog({
   confirmLabel,
   intro,
   askReason = true,
+  initialReason = '',
+  maxReasonLength,
   pending,
   error,
   onSubmit,
@@ -30,7 +36,7 @@ export function PasswordReasonDialog({
 }: Props) {
   const id = useId();
   const [password, setPassword] = useState('');
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState(initialReason);
   // The typed secrets do not outlive the dialog (adjusting state while rendering, not in an effect).
   if (!open && (password !== '' || reason !== '')) {
     setPassword('');
@@ -59,6 +65,12 @@ export function PasswordReasonDialog({
               required
               multiline
               minRows={2}
+              {...(maxReasonLength === undefined
+                ? {}
+                : {
+                    slotProps: { htmlInput: { maxLength: maxReasonLength } },
+                    helperText: `${String(reason.length)} of ${String(maxReasonLength)} characters`,
+                  })}
             />
           )}
           <TextField

@@ -13,6 +13,7 @@ const WRITER_FEATURES = new Set([
   'exports',
   'instruments',
   'lab',
+  'learning',
   'live',
   'owner-acts',
   'plans',

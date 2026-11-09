@@ -95,7 +95,7 @@ describe('Decay tab', () => {
     expect(rows[2]).toHaveTextContent('Applied');
     expect(rows[2]).toHaveTextContent('auto, 3 Nov 2026');
     expect(screen.getByText(/OFF \(manual approval\)/)).toBeInTheDocument();
-    expect(screen.getByText(/done through the API for now/)).toBeInTheDocument();
+    expect(screen.getByText(/Every act here is the owner's, explicit and confirmed/)).toBeInTheDocument();
   });
 
   it('says what the automatic setting means when ON', async () => {
@@ -242,15 +242,14 @@ describe('Decay tab', () => {
     expect(await screen.findByText(/No strategy to pick yet/)).toBeInTheDocument();
   });
 
-  it('has no control that changes anything', async () => {
+  it('sends only reads on load: every owner act waits for a confirmation', async () => {
     twoStrategies();
     const seen = mountConfidence({ proposals: buildProposals({ items: [buildProposal()] }) });
     renderLearning('?tab=decay');
 
     await screen.findByRole('table', { name: 'Kill proposals, newest first' });
     const panel = screen.getByRole('tabpanel');
-    expect(within(panel).queryAllByRole('button')).toHaveLength(0);
-    expect(within(panel).queryAllByRole('switch')).toHaveLength(0);
+    expect(within(panel).getByRole('button', { name: 'Apply proposal 7' })).toBeInTheDocument();
     expect(seen.methods.every((method) => method === 'GET')).toBe(true);
   });
 });

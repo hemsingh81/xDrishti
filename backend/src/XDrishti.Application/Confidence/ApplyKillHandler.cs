@@ -109,6 +109,13 @@ internal sealed class ApplyKillHandler(
         if (result == KillDecideResult.NotProposed)
         {
             var decided = await reader.FindAsync(row.Id, cancellationToken) ?? row;
+            if (decided.State == "dismissed")
+            {
+                // the owner dismissed it between the pauses and this update: the cells above stay paused (the safe direction), the proposal stays dismissed, and this is never reported as applied
+                KillLog.Refused(logger, KillErrors.DismissedDuringApplyCode);
+                return Result.Failure<ApplyKillOutcome>(KillErrors.DismissedDuringApply(row.Id, paused));
+            }
+
             return Result.Success(Outcome(decided, true, paused, skipped, decided.Actor));
         }
 
