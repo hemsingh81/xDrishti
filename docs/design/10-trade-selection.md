@@ -133,3 +133,7 @@ Section 8 exists: `xd plan grade` walks every ticket of a past plan (primary, re
 
 ## 13. As built (P7-11, [ADR 0096](../adr/0096-the-pre-open-check-arms-only-approved-tickets-as-a-service-move-a-missing-input-invalidates-and-armed-tickets-join-the-feed-set-last.md))
 The pre-open check of section 7 is the paused `preopen` service (09:10, never after 09:15): each Approved ticket is armed or invalidated from `|last - previous close| > 0.5 x ATR(14)`; a missing price, previous close or range invalidates, so nothing is armed on a missing input. **There is no promotion from the reserve**: the owner decided it is off, the code has no path and a test fails if one appears. Ban list, surveillance and the price band are not re-checked (no source). Arming says "Armed: watched with alerts. No order is placed and none exists. A stop is only an alert." The `plan-expiry` service (15:40) expires what is left.
+
+## Auto (planned, AU-16 to AU-18, [ADR 0244](../adr/0244-one-auto-switch-runs-the-chain-and-only-suggests.md))
+
+One password-protected switch, default OFF, runs the chain and shows next-day suggestions for chosen baskets or stocks with reason and evidence. It places no order, approves nothing and does not change the autonomy level.

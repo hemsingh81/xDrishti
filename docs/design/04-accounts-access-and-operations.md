@@ -300,3 +300,7 @@ Rejected suggestions are not repeated for a configurable number of days.
 | `workflow.approvals` | Item type, item id, decision, modifications, actor, decided_at, cutoff |
 | `workflow.suggestions` | Source (AI / engine), type, payload, reason, expiry, status |
 | `ops.service_runs` | Service/job runs with schedule, start/end, outcome, catch-up flag |
+
+## Recovery across missed days (planned, AU-01 to AU-04, [ADR 0240](../adr/0240-missed-days-are-recovered-by-one-dependency-ordered-pass-and-each-service-declares-how-it-can-be-recovered.md))
+
+Start-up, wake from sleep and a Data-account reconnect start one recovery pass, in service dependency order, reaching back `Recovery:MaxSessions` sessions. It replaces the same-day catch-up of §3. A plan is only recovered for the latest closed session and before its cutoff; a decision-time capture is never made up.
