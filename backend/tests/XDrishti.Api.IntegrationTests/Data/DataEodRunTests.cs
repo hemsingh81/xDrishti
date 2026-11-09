@@ -277,17 +277,20 @@ public sealed class DataEodRunTests(ApiFactory factory) : DataTestBase(factory)
     }
 
     [Fact]
-    public async Task A_holiday_or_a_weekend_starts_nothing()
+    public async Task A_holiday_starts_nothing_and_a_machine_that_slept_over_a_weekend_makes_up_only_by_the_recovery_pass()
     {
         (await Client.PostJsonAsync("/api/data/calendar", new { date = "2026-10-12", kind = "holiday" }, Ct)).EnsureSuccessStatusCode();
 
         await TickAtAsync(At(12, 16, 0));
-        await TickAtAsync(At(17, 16, 0)); // Saturday the 17th
 
         (await JobsAsync()).ShouldBeEmpty();
         var eod = (await OverviewAsync()).Eod;
         (eod.TimeIst, eod.LastRun).ShouldBe(("15:50", null));
         (await EodRunsAsync()).ShouldBeEmpty();
+
+        await TickAtAsync(At(17, 16, 0)); // Saturday the 17th: the sessions of the 13th to the 16th were missed; the weekend itself is no session
+
+        (await EodRunsAsync()).ShouldAllBe(r => r.Trigger == "catch_up"); // never a scheduled start on a weekend
     }
 
     [Fact]

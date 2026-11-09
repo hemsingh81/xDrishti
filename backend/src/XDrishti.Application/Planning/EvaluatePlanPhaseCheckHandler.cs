@@ -157,7 +157,7 @@ internal sealed class EvaluatePlanPhaseCheckHandler(
         foreach (var date in dates)
         {
             var rows = await plans.ListRunsAsync(date, RunRowsRead, cancellationToken);
-            var runs = rows.OrderBy(r => r.Id).Select(r => new PhaseRun(r.Id, r.Attempt, r.Run.Outcome, r.Run.FailedGate, r.Run.Reason, r.Run.Manual, r.Run.StartedAt, r.Run.FinishedAt, r.Run.PlanId)).ToList();
+            var runs = rows.OrderBy(r => r.Id).Select(r => new PhaseRun(r.Id, r.Attempt, r.Run.Outcome, r.Run.FailedGate, r.Run.Reason, r.Run.Manual, r.Run.StartedAt, r.Run.FinishedAt, r.Run.PlanId, r.Run.Recovered)).ToList();
             PhasePlan? plan = null;
             if (runs.Find(r => r.Outcome == "published")?.PlanId is { } planId && await plans.FindAsync(planId, cancellationToken) is { } row)
             {

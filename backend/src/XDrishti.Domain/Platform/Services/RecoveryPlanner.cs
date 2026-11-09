@@ -256,6 +256,20 @@ public static class RecoveryPlanner
         return due;
     }
 
+    /// <summary>The registered services this one must follow, by <c>MustFollow</c> or an 'after' schedule (direct ones only); the runner uses it to block the dependents of a failed step.</summary>
+    public static IReadOnlyList<string> DependenciesOf(RecoveryInput input, IReadOnlyCollection<string> registeredIds)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(registeredIds);
+        var ids = new List<string>(input.Definition.Constraints.MustFollow);
+        if (input.Settings.Schedule is { Type: ScheduleType.After, After: { } after })
+        {
+            ids.Add(after);
+        }
+
+        return ids.Where(registeredIds.Contains).Distinct(StringComparer.Ordinal).ToList();
+    }
+
     private static List<string> DependenciesOf(RecoveryInput input, Dictionary<string, RecoveryInput> byId)
     {
         var ids = new List<string>(input.Definition.Constraints.MustFollow);

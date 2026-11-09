@@ -207,6 +207,8 @@ internal sealed class PlanRunRecord
 
     public bool Manual { get; set; }
 
+    public bool Recovered { get; set; }
+
     public DateTimeOffset StartedAt { get; set; }
 
     public DateTimeOffset FinishedAt { get; set; }

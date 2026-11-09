@@ -167,6 +167,39 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
         }
     }
 
+    /// <summary>Completes when the service has no run or retry in progress in this process (a retry that waits is waited for, so the sequence is over); ends early only when <paramref name="cancellationToken"/> does (by throwing).</summary>
+    public async Task WhenServiceIdleAsync(string serviceId, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            Task? running;
+            lock (_gate)
+            {
+                if (!_active.TryGetValue(serviceId, out var sequence))
+                {
+                    return;
+                }
+
+                running = sequence.Task;
+            }
+
+            if (running is { IsCompleted: false })
+            {
+                await running.WaitAsync(cancellationToken);
+            }
+            else if (running is null)
+            {
+                await Task.Delay(IdlePoll, clock, cancellationToken); // waiting for the back-off of a retry, which the scheduler starts
+            }
+            else
+            {
+                await Task.Yield(); // the run ended; its reservation is given back a moment later
+            }
+        }
+    }
+
+    private static readonly TimeSpan IdlePoll = TimeSpan.FromSeconds(1);
+
     /// <summary>Completes when every run that is executing now has ended (retries that wait are not waited for). For tests and for shutdown.</summary>
     public Task WhenIdleAsync()
     {
@@ -294,7 +327,7 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
                 Release(id);
                 if (outcome.Status == ServiceRunStatus.Succeeded)
                 {
-                    await StartDependentsAsync(id);
+                    await StartDependentsAsync(id, sequence.Trigger);
                 }
             }
         }
@@ -384,7 +417,7 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
         return true;
     }
 
-    private async Task StartDependentsAsync(string serviceId)
+    private async Task StartDependentsAsync(string serviceId, ServiceRunTrigger cause)
     {
         try
         {
@@ -396,7 +429,8 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
 
             foreach (var dependent in all.Where(s => s.Settings is { Enabled: true, Schedule: { Type: ScheduleType.After } schedule } && schedule.After == serviceId))
             {
-                await StartAsync(dependent.Id, ServiceRunTrigger.After, $"system:after:{serviceId}", _stopping.Token);
+                // what a recovery pass sets going stays a recovered run (trigger catch_up), so a run-after chain cannot hand a made-up run to the unattended count (ADR 0240)
+                await StartAsync(dependent.Id, cause == ServiceRunTrigger.CatchUp ? ServiceRunTrigger.CatchUp : ServiceRunTrigger.After, $"system:after:{serviceId}", _stopping.Token);
             }
         }
         catch (OperationCanceledException) when (_stopping.IsCancellationRequested)

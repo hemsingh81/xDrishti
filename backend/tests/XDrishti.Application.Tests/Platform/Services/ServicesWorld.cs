@@ -45,7 +45,10 @@ internal sealed class ServicesWorld : IDisposable
             .Singleton<IFeedHeartbeats>(Heartbeats)
             .Singleton<IFeedManualRun>(Manual)
             .Singleton(FeedManualRunSettings.Default)
+            .Singleton<IRecoveryLedger>(Ledger)
+            .Singleton(new RecoverySettings())
             .Singleton<ServiceRunner, ServiceRunner>()
+            .Singleton<RecoveryRunner, RecoveryRunner>()
             .Singleton<ServiceScheduler, ServiceScheduler>()
             .Scoped<ServiceSettingsReader>()
             .Scoped<ServiceViewReader>()
@@ -76,6 +79,8 @@ internal sealed class ServicesWorld : IDisposable
 
     public InMemoryServiceData Data { get; } = new();
 
+    public InMemoryRecoveryLedger Ledger { get; } = new();
+
     public TradingCalendar Calendar { get; set; } = new();
 
     public FakeApplicationInfo Application { get; } = new();
@@ -88,11 +93,20 @@ internal sealed class ServicesWorld : IDisposable
 
     public ServiceScheduler Scheduler => _provider.GetRequiredService<ServiceScheduler>();
 
+    public RecoveryRunner Recovery => _provider.GetRequiredService<RecoveryRunner>();
+
     public ServiceRunner Runner => _provider.GetRequiredService<ServiceRunner>();
 
     public static DateTimeOffset At(int day, int hour, int minute, int second = 0, int month = 10) => new(2026, month, day, hour, minute, second, Ist);
 
     /// <summary>Sets the clock, also back in time (an adjusted machine clock).</summary>
+    /// <summary>Waits until the recovery pass and the runs it started have ended.</summary>
+    public async Task SettleAsync()
+    {
+        await Recovery.WhenIdleAsync();
+        await Runner.WhenIdleAsync();
+    }
+
     public void SetClock(DateTimeOffset instant) => Clock.Jump(instant);
 
     /// <summary>Runs a handler the way a request does: in its own scope.</summary>

@@ -28,7 +28,7 @@ public sealed class ServiceSchedulerTests : IDisposable
     {
         _world.SetClock(instant);
         await _world.Scheduler.TickAsync(Ct);
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
     }
 
     private async Task StartUpAtAsync(DateTimeOffset instant)
@@ -36,7 +36,7 @@ public sealed class ServiceSchedulerTests : IDisposable
         _world.SetClock(instant);
         _world.Application.StartedAt = instant;
         await _world.Scheduler.StartUpAsync(Ct);
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
     }
 
     private IEnumerable<string> Triggers(string id = "eod") => _world.Data.RunsOf(id).Select(r => r.Trigger.ToCode());
@@ -87,11 +87,12 @@ public sealed class ServiceSchedulerTests : IDisposable
     }
 
     [Fact]
-    public async Task A_time_that_passed_unseen_on_an_earlier_day_or_with_catch_up_off_is_not_made_up_for()
+    public async Task A_time_that_passed_unseen_on_earlier_days_is_made_up_by_one_pass_and_never_with_catch_up_off()
     {
         await StartUpAtAsync(At(12, 10, 0));
-        await TickAtAsync(At(15, 9, 0)); // slept from Monday morning to Thursday: Tuesday's and Wednesday's runs are gone
-        _eod.Calls.ShouldBeEmpty();
+        await TickAtAsync(At(15, 9, 0)); // slept from Monday morning to Thursday: the recovery pass makes up Monday to Wednesday with one run of the convergent service
+        _eod.Calls.Count.ShouldBe(1);
+        Triggers().ShouldBe(["catch_up"]);
 
         using var world = new ServicesWorld(Eod(catchUp: false));
         world.SetClock(At(12, 10, 0));
@@ -99,21 +100,22 @@ public sealed class ServiceSchedulerTests : IDisposable
         await world.Scheduler.StartUpAsync(Ct);
         world.SetClock(At(12, 17, 45));
         await world.Scheduler.TickAsync(Ct);
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
         world.Data.Runs.ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task At_most_one_catch_up_per_service_per_start_counts_the_ones_found_by_a_look_too()
+    public async Task A_second_wake_after_the_debounce_makes_up_again_and_one_inside_it_starts_nothing()
     {
         await StartUpAtAsync(At(12, 10, 0));
 
-        await TickAtAsync(At(12, 17, 45)); // slept through Monday's time: made up for once
-        await TickAtAsync(At(13, 17, 45)); // slept through Tuesday's time as well: not again in the same start
+        await TickAtAsync(At(12, 17, 45)); // slept through Monday's time: made up for
+        await TickAtAsync(At(13, 17, 45)); // slept through Tuesday's time as well, long after the debounce: a second pass
 
-        _world.Data.RunsOf("eod").Select(r => r.Trigger).ShouldBe([ServiceRunTrigger.CatchUp]);
-        await StartUpAtAsync(At(13, 17, 50)); // a new start makes up for it
         _world.Data.RunsOf("eod").Select(r => r.Trigger).ShouldBe([ServiceRunTrigger.CatchUp, ServiceRunTrigger.CatchUp]);
+        await StartUpAtAsync(At(13, 17, 50)); // five minutes after the last accepted trigger: inside the debounce, nothing starts
+        _world.Data.RunsOf("eod").Count().ShouldBe(2);
+        _world.Ledger.Passes.Count.ShouldBe(2);
     }
 
     [Fact]
@@ -193,6 +195,7 @@ public sealed class ServiceSchedulerTests : IDisposable
     [Fact]
     public async Task A_clock_set_back_does_not_start_anything_by_itself()
     {
+        _world.Data.Store("eod", Settings(Schedule.Daily(T(15, 50))));
         await StartUpAtAsync(At(12, 16, 0));
         _eod.Calls.Count.ShouldBe(1); // catch-up
 
@@ -239,18 +242,19 @@ public sealed class ServiceSchedulerTests : IDisposable
         world.SetClock(At(12, 10, 0));
         world.Application.StartedAt = At(12, 10, 0);
         await world.Scheduler.StartUpAsync(Ct);
+        await world.SettleAsync(); // the start-up pass runs in the background
         world.SetClock(At(12, 11, 0));
         await world.Scheduler.TickAsync(Ct);
 
         world.Data.Store("job", Settings(Schedule.Daily(T(10, 30)))); // moved to a time that is over
         world.SetClock(At(12, 11, 1));
         await world.Scheduler.TickAsync(Ct);
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
 
         job.Calls.ShouldBeEmpty();
         world.SetClock(At(13, 10, 30));
         await world.Scheduler.TickAsync(Ct);
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
         job.Calls.Count.ShouldBe(1);
     }
 
@@ -319,14 +323,14 @@ public sealed class ServiceSchedulerTests : IDisposable
     }
 
     [Fact]
-    public async Task The_first_start_settings_are_no_decision_of_the_owner_so_a_catch_up_still_follows_them()
+    public async Task The_first_start_settings_are_the_registration_so_a_first_start_after_the_time_makes_up_nothing()
     {
         _eod.Seed = Settings(Schedule.Daily(T(15, 50)));
 
         await StartUpAtAsync(At(12, 17, 0));
 
         _world.Data.Rows["eod"].UpdatedBy.ShouldBe(ServiceScheduler.SeedRequester);
-        _eod.Calls.Count.ShouldBe(1);
+        _eod.Calls.ShouldBeEmpty(); // no surprise recovered run on first enablement (ADR 0240 amendment 2)
     }
 
     [Fact]
@@ -341,7 +345,7 @@ public sealed class ServiceSchedulerTests : IDisposable
         world.Services[0].Calls.ShouldBeEmpty(); // catch-up is off
 
         await world.Scheduler.TickAsync(Ct);
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
 
         world.Data.Runs.ShouldHaveSingleItem().Trigger.ShouldBe(ServiceRunTrigger.Scheduled);
     }
@@ -351,6 +355,7 @@ public sealed class ServiceSchedulerTests : IDisposable
     [Fact]
     public async Task Started_after_the_time_without_a_run_since_it_makes_up_once_with_the_catch_up_trigger()
     {
+        _world.Data.Store("eod", Settings(Schedule.Daily(T(15, 50))));
         await StartUpAtAsync(At(12, 17, 0));
 
         var run = _world.Data.Runs.ShouldHaveSingleItem();
@@ -369,7 +374,7 @@ public sealed class ServiceSchedulerTests : IDisposable
         world.Application.StartedAt = At(12, 17, 0);
 
         await world.Scheduler.StartUpAsync(Ct);
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
 
         world.Data.Runs.ShouldBeEmpty();
     }
@@ -385,7 +390,7 @@ public sealed class ServiceSchedulerTests : IDisposable
         await world.ResumeAsync("eod");
         world.SetClock(At(12, 17, 1));
         await world.Scheduler.TickAsync(Ct);
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
 
         world.Data.Runs.ShouldBeEmpty();
     }
@@ -422,31 +427,33 @@ public sealed class ServiceSchedulerTests : IDisposable
     }
 
     [Fact]
-    public async Task Yesterdays_time_is_not_made_up_for_by_a_daily_job_but_is_by_a_service_that_asks_for_the_latest_reach()
+    public async Task Yesterdays_time_is_made_up_for_by_every_service_that_has_a_baseline_before_it()
     {
         using var world = new ServicesWorld(Eod(reach: CatchUpReach.SameDay), Make("refresh", Schedule.Daily(T(8, 45), false, Weekdays.EveryDay), constraints: new ServiceConstraints { CatchUpReach = CatchUpReach.Latest }));
+        world.Data.Store("eod", Settings(Schedule.Daily(T(15, 50))));
+        world.Data.Store("refresh", Settings(Schedule.Daily(T(8, 45), false, Weekdays.EveryDay)));
         world.SetClock(At(13, 7, 30));
         world.Application.StartedAt = At(13, 7, 30);
 
         await world.Scheduler.StartUpAsync(Ct);
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
 
-        world.Services[0].Calls.ShouldBeEmpty();
+        world.Services[0].Calls.Count.ShouldBe(1);
         world.Services[1].Calls.Count.ShouldBe(1);
         world.Data.RunsOf("refresh").Single().Trigger.ShouldBe(ServiceRunTrigger.CatchUp);
     }
 
     [Fact]
-    public async Task A_service_that_was_never_run_is_made_up_for_at_start_when_it_asks_for_the_latest_reach()
+    public async Task A_service_that_never_ran_has_the_baseline_of_its_start_so_nothing_is_reported_missed()
     {
         using var world = new ServicesWorld(Make("refresh", Schedule.Daily(T(8, 45), false, Weekdays.EveryDay), constraints: new ServiceConstraints { CatchUpReach = CatchUpReach.Latest }));
         world.SetClock(At(12, 7, 30));
         world.Application.StartedAt = At(12, 7, 30);
 
         await world.Scheduler.StartUpAsync(Ct);
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
 
-        world.Services[0].Calls.Count.ShouldBe(1);
+        world.Services[0].Calls.ShouldBeEmpty();
     }
 
     // ---- recovery ----
@@ -533,7 +540,7 @@ public sealed class ServiceSchedulerTests : IDisposable
         world.SetClock(At(12, 15, 50));
         await world.Scheduler.TickAsync(Ct);
         await report.WhenStartedAsync().WaitAsync(TimeSpan.FromSeconds(10), Ct);
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
 
         var run = world.Data.RunsOf("report").ShouldHaveSingleItem();
         (run.Trigger, run.Status).ShouldBe((ServiceRunTrigger.After, ServiceRunStatus.Succeeded));
@@ -554,7 +561,7 @@ public sealed class ServiceSchedulerTests : IDisposable
 
         world.SetClock(At(12, 15, 50));
         await world.Scheduler.TickAsync(Ct);
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
 
         report.Calls.ShouldBeEmpty();
     }
@@ -570,7 +577,7 @@ public sealed class ServiceSchedulerTests : IDisposable
 
         world.SetClock(At(12, 15, 50));
         await world.Scheduler.TickAsync(Ct);
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
 
         report.Calls.ShouldBeEmpty();
     }

@@ -59,14 +59,14 @@ public sealed class EodServiceTests : IDisposable
         _world.SetClock(At(day, hour, minute));
         _world.Application.StartedAt = At(day, hour, minute);
         await _world.Scheduler.StartUpAsync(Ct);
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
     }
 
     private async Task TickAtAsync(int day, int hour, int minute)
     {
         _world.SetClock(At(day, hour, minute));
         await _world.Scheduler.TickAsync(Ct);
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
     }
 
     private IEnumerable<ServiceRun> Runs => _world.Data.RunsOf("eod");
@@ -135,7 +135,7 @@ public sealed class EodServiceTests : IDisposable
         await StartUpAtAsync(12, 10, 0);
 
         await _world.Runner.StartAsync("eod", ServiceRunTrigger.Scheduled, "system:scheduler", Ct);
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
 
         var run = Runs.ShouldHaveSingleItem();
         (run.Status, run.Message).ShouldBe((ServiceRunStatus.Skipped, EodService.AlreadyRanToday));
@@ -303,8 +303,18 @@ public sealed class EodServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task A_first_start_after_the_run_time_makes_nothing_up_its_baseline_is_the_start_ADR_0240()
+    {
+        await StartUpAtAsync(12, 17, 0);
+
+        _jobs.Started.ShouldBeEmpty();
+        Runs.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Started_after_the_run_time_without_a_run_today_it_updates_at_once()
     {
+        _world.Data.Store("eod", EodService.Definition.Defaults); // a service registered before this start
         await StartUpAtAsync(12, 17, 0);
 
         var job = _jobs.Started.ShouldHaveSingleItem();
@@ -342,6 +352,7 @@ public sealed class EodServiceTests : IDisposable
                 .Singleton<IIntradayBarSource>(_source)
                 .Singleton<IDataAccountStatus>(_account)
                 .Singleton<ICommandHandler<StartDataJobCommand, DataJobView>>(new StartDataJobHandler(_jobs, _queue, Substitute.For<IInstrumentCatalog>(), new FakeCsvFolder(), _clock, NullLogger<StartDataJobHandler>.Instance)));
+        world.Data.Store("eod", EodService.Definition.Defaults);
         var stuck = DataJob.Start(["csv"], false, "owner", At(12, 15, 0)); // still "running" in the database: the previous process died
         _jobs.Jobs[stuck.Id] = stuck;
         world.SetClock(At(12, 17, 0));
@@ -354,7 +365,7 @@ public sealed class EodServiceTests : IDisposable
         _jobs.Started.ShouldBeEmpty();
         (await _jobs.FailInterruptedAsync(At(12, 16, 0), world.Clock.GetUtcNow(), Ct)).ShouldBe(1); // what the data worker's recovery does
         recovery.MarkCompleted();
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
 
         _jobs.Started.ShouldHaveSingleItem().Trigger.ShouldBe(DataJobTrigger.Daily);
         _jobs.Skipped.ShouldBeEmpty();
@@ -374,6 +385,7 @@ public sealed class EodServiceTests : IDisposable
                 .Singleton<IIntradayBarSource>(_source)
                 .Singleton<IDataAccountStatus>(_account)
                 .Singleton<ICommandHandler<StartDataJobCommand, DataJobView>>(new StartDataJobHandler(_jobs, _queue, Substitute.For<IInstrumentCatalog>(), new FakeCsvFolder(), _clock, NullLogger<StartDataJobHandler>.Instance)));
+        world.Data.Store("eod", EodService.Definition.Defaults);
         var stuck = DataJob.Start(["csv"], false, "owner", At(12, 15, 0));
         _jobs.Jobs[stuck.Id] = stuck;
         world.SetClock(At(12, 17, 0));
@@ -382,7 +394,7 @@ public sealed class EodServiceTests : IDisposable
         await world.Scheduler.StartUpAsync(Ct);
         await world.Clock.WhenWaitingForAsync(EodService.RecoveryWait);
         world.Clock.Advance(EodService.RecoveryWait);
-        await world.Runner.WhenIdleAsync();
+        await world.SettleAsync();
 
         _jobs.Skipped.ShouldHaveSingleItem().Error.ShouldBe("Another data update was running.");
     }
@@ -415,7 +427,7 @@ public sealed class EodServiceTests : IDisposable
         (await _world.ViewAsync("eod")).Status.ShouldBe("running");
         job.Finish(_world.Clock.GetUtcNow());
         _world.Clock.Advance(JobPolling.FirstWait);
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
 
         Runs.Single().Status.ShouldBe(ServiceRunStatus.Succeeded);
     }
@@ -429,7 +441,7 @@ public sealed class EodServiceTests : IDisposable
         _world.SetClock(At(12, 16, 30));
 
         var run = await _world.RunNowAsync("eod");
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
 
         run.IsSuccess.ShouldBeTrue();
         var job = _jobs.Started.ShouldHaveSingleItem();
@@ -444,7 +456,7 @@ public sealed class EodServiceTests : IDisposable
         _world.SetClock(At(12, 16, 30));
 
         await _world.RunNowAsync("eod");
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
 
         Runs.Single().Status.ShouldBe(ServiceRunStatus.Skipped);
         _jobs.Skipped.ShouldBeEmpty();
@@ -453,7 +465,7 @@ public sealed class EodServiceTests : IDisposable
     [Fact]
     public async Task A_retry_after_a_failed_job_is_not_stopped_by_the_failed_job_of_the_day()
     {
-        _world.Data.Store("eod", Svc.Settings(Schedule.Daily(new TimeOnly(15, 50)), retries: 1, timeout: 240));
+        _world.Data.Store("eod", Svc.Settings(Schedule.Daily(new TimeOnly(15, 50)), retries: 1, timeout: 240), at: At(12, 9, 0));
         var attempts = 0;
         _jobWork = job =>
         {
@@ -479,7 +491,7 @@ public sealed class EodServiceTests : IDisposable
 
     private async Task TimeOutTheRunAsync(int retries)
     {
-        _world.Data.Store("eod", Svc.Settings(Schedule.Daily(new TimeOnly(15, 50)), retries: retries, timeout: 60));
+        _world.Data.Store("eod", Svc.Settings(Schedule.Daily(new TimeOnly(15, 50)), retries: retries, timeout: 60), at: At(12, 9, 0));
         _jobWork = null; // the data job stays running
         await StartUpAtAsync(12, 10, 0);
         _world.SetClock(At(12, 15, 50));
@@ -487,7 +499,7 @@ public sealed class EodServiceTests : IDisposable
         await _world.Clock.WhenWaitingForAsync(JobPolling.FirstWait);
 
         _world.Clock.Advance(TimeSpan.FromMinutes(60));
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
     }
 
     [Theory]
@@ -512,7 +524,7 @@ public sealed class EodServiceTests : IDisposable
 
         _world.Runner.ResumeRetry("eod", ServiceRunTrigger.Scheduled, "system:retry", 2, At(12, 17, 0)); // an attempt 2 (it skips the once-a-day rule)
         await _world.Scheduler.TickAsync(Ct);
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
 
         var run = Runs.Last();
         (run.Attempt, run.Status, run.Message).ShouldBe((2, ServiceRunStatus.Skipped, EodService.OwnJobRunning));
@@ -527,7 +539,7 @@ public sealed class EodServiceTests : IDisposable
         _world.SetClock(At(12, 17, 0));
 
         await _world.RunNowAsync("eod");
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
 
         Runs.Last().Status.ShouldBe(ServiceRunStatus.Skipped);
         _jobs.Skipped.ShouldBeEmpty();

@@ -12,7 +12,8 @@ namespace XDrishti.Application.Planning;
 /// <param name="DryRun">Read the gates and build, write nothing.</param>
 /// <param name="Manual">Whether a person started it (the phase check counts these).</param>
 /// <param name="RequestedBy">Who or what started it, for the log of the caller; not stored.</param>
-public sealed record RunNightlyPlanCommand(DateOnly? Date, bool DryRun, bool Manual, string RequestedBy) : ICommand;
+/// <param name="Recovered">Whether the recovery pass made it up after the fact (ADR 0240): stored, and never counted as unattended.</param>
+public sealed record RunNightlyPlanCommand(DateOnly? Date, bool DryRun, bool Manual, string RequestedBy, bool Recovered = false) : ICommand;
 
 /// <summary>The reading of one gate in a result.</summary>
 /// <param name="Gate">The gate id.</param>

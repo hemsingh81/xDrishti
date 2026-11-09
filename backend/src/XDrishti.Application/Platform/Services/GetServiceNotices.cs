@@ -13,11 +13,15 @@ namespace XDrishti.Application.Platform.Services;
 /// </summary>
 public sealed record GetServiceNoticesQuery : IQuery<ServiceNotices>;
 
-internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, ServiceSettingsReader settings, IServiceRunStore runs, TimeProvider clock) : IQueryHandler<GetServiceNoticesQuery, ServiceNotices>
+internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, ServiceSettingsReader settings, IServiceRunStore runs, IRecoveryLedger recovery, RecoverySettings recoveryOptions, TimeProvider clock) : IQueryHandler<GetServiceNoticesQuery, ServiceNotices>
 {
     public const string Failed = "service_failed";
 
+    public const string RecoveryFailed = "recovery_failed";
+
     private const int MaxReasonLength = 160;
+
+    private const int RecoveryNoticeDays = 7;
 
     public async ValueTask<ServiceNotices> HandleAsync(GetServiceNoticesQuery query, CancellationToken cancellationToken)
     {
@@ -32,6 +36,22 @@ internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, Service
                 var day = IndiaTime.Today(run.StartedAt).ToString("d MMM", CultureInfo.InvariantCulture);
                 var reason = string.IsNullOrWhiteSpace(run.Message) ? "see the History of the service" : Short(run.Message);
                 notices.Add(new ServiceNotice($"service:failed:{service.Id}:{IndiaTime.Today(run.StartedAt).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}", Failed, "error", $"{service.Definition.Name} failed on {day}: {reason}", service.Id, run.FinishedAt ?? run.StartedAt));
+            }
+        }
+
+        // a step of the recovery pass that used up its attempts: one notice per service per day (the day of the pass that last tried it)
+        foreach (var exhausted in await recovery.ListExhaustedAsync(recoveryOptions.MaxAttempts, now.AddDays(-RecoveryNoticeDays), cancellationToken))
+        {
+            if (registry.Find(exhausted.ServiceId) is not { } service)
+            {
+                continue;
+            }
+
+            var day = IndiaTime.Today(exhausted.At).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            var id = $"recovery:failed:{exhausted.ServiceId}:{day}";
+            if (!notices.Any(n => n.Id == id))
+            {
+                notices.Add(new ServiceNotice(id, RecoveryFailed, "error", $"{service.Definition.Name} could not be made up for {exhausted.Occurrence}: {(string.IsNullOrWhiteSpace(exhausted.Reason) ? "see the History of the service" : Short(exhausted.Reason))}", exhausted.ServiceId, exhausted.At));
             }
         }
 

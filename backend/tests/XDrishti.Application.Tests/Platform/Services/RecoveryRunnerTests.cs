@@ -1,0 +1,290 @@
+using Microsoft.Extensions.DependencyInjection;
+using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Platform.Services;
+using XDrishti.Domain.Market.Calendar;
+using XDrishti.Domain.Platform.Services;
+using static XDrishti.Application.Tests.Platform.Services.ServicesWorld;
+using static XDrishti.Application.Tests.Platform.Services.Svc;
+
+namespace XDrishti.Application.Tests.Platform.Services;
+
+/// <summary>
+/// The recovery runner over fakes (ADR 0240, AU-02): one pass in plan order, one step at a time through the normal runner with trigger catch_up, a failure blocks the dependents, attempts are bounded, the three triggers are
+/// debounced and cannot stack, a crash is resumed without a second run of what succeeded, market hours wait, cancellation ends the pass. The clock starts on Monday 2026-10-12, 10:00 India time; the three services have stored
+/// rows (baseline: the epoch), so every day since is missed.
+/// </summary>
+public sealed class RecoveryRunnerTests : IDisposable
+{
+    private readonly TestService _eod = Eod();
+    private readonly TestService _learn = Make("learn", Schedule.Daily(T(16, 30)), constraints: new ServiceConstraints { MustFollow = ["eod"] });
+    private readonly TestService _other = Make("other", Schedule.Daily(T(16, 0)));
+    private readonly ServicesWorld _world;
+    private readonly List<string> _order = [];
+
+    public RecoveryRunnerTests()
+    {
+        _world = new ServicesWorld(_eod, _learn, _other);
+        foreach (var service in _world.Services)
+        {
+            var id = service.Definition.Id;
+            _world.Data.Store(id, service.Definition.Defaults);
+            service.Behavior = (_, _) =>
+            {
+                lock (_order)
+                {
+                    _order.Add(id);
+                }
+
+                return ValueTask.FromResult(ServiceOutcome.Succeeded());
+            };
+        }
+    }
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    public void Dispose() => _world.Dispose();
+
+    private async Task StartUpAtAsync(DateTimeOffset instant)
+    {
+        _world.SetClock(instant);
+        _world.Application.StartedAt = instant;
+        await _world.Scheduler.StartUpAsync(Ct);
+        await _world.SettleAsync();
+    }
+
+    private async Task RequestAtAsync(DateTimeOffset instant, RecoveryTrigger trigger = RecoveryTrigger.Wake)
+    {
+        _world.SetClock(instant);
+        _world.Recovery.Request(trigger);
+        await _world.SettleAsync();
+    }
+
+    [Fact]
+    public async Task A_start_up_pass_runs_the_missed_steps_in_plan_order_each_through_the_runner_with_the_catch_up_trigger_linked_by_run_id()
+    {
+        await StartUpAtAsync(At(12, 17, 0));
+
+        _order.IndexOf("eod").ShouldBeLessThan(_order.IndexOf("learn")); // learn follows eod
+        _order.Order().ShouldBe(["eod", "learn", "other"]);
+        _world.Data.Runs.ShouldAllBe(r => r.Trigger == ServiceRunTrigger.CatchUp && r.Status == ServiceRunStatus.Succeeded);
+        var pass = _world.Ledger.Passes.ShouldHaveSingleItem();
+        (pass.Trigger, pass.Status).ShouldBe(("startup", "succeeded"));
+        foreach (var item in _world.Ledger.Items.Values)
+        {
+            item.State.ShouldBe(RecoveryStates.Succeeded);
+            item.PassId.ShouldBe(pass.Id);
+            item.RunId.ShouldBe(_world.Data.RunsOf(item.ServiceId).Single().Id);
+        }
+    }
+
+    [Fact]
+    public async Task A_failed_step_blocks_what_follows_it_and_only_that_while_independent_branches_continue()
+    {
+        _eod.AlwaysFail("the data source is down");
+
+        await StartUpAtAsync(At(12, 17, 0));
+
+        _learn.Calls.ShouldBeEmpty();
+        _other.Calls.Count.ShouldBe(1);
+        var eod = _world.Ledger.Items[("eod", "2026-10-12")];
+        (eod.State, eod.Attempts, eod.Reason).ShouldBe((RecoveryStates.Failed, 1, "the data source is down"));
+        var learn = _world.Ledger.Items[("learn", "2026-10-12")];
+        learn.State.ShouldBe(RecoveryStates.Blocked);
+        learn.Reason.ShouldNotBeNull().ShouldContain("eod");
+        learn.Attempts.ShouldBe(0); // it never ran: no attempt used
+        _world.Ledger.Passes.Single().Status.ShouldBe("incomplete");
+    }
+
+    [Fact]
+    public async Task A_blocked_step_runs_at_the_next_trigger_once_what_it_follows_has_succeeded()
+    {
+        _eod.AlwaysFail("down");
+        await StartUpAtAsync(At(12, 17, 0));
+        _eod.Behavior = (_, _) => ValueTask.FromResult(ServiceOutcome.Succeeded());
+
+        await RequestAtAsync(At(12, 17, 11));
+
+        _world.Ledger.Items[("eod", "2026-10-12")].State.ShouldBe(RecoveryStates.Succeeded);
+        _world.Ledger.Items[("learn", "2026-10-12")].State.ShouldBe(RecoveryStates.Succeeded);
+        _learn.Calls.Count.ShouldBe(1);
+        _other.Calls.Count.ShouldBe(1); // not run twice
+    }
+
+    [Fact]
+    public async Task A_failed_step_is_tried_at_each_trigger_at_most_max_attempts_times_then_stays_failed_with_one_notice_per_service_and_day()
+    {
+        _eod.AlwaysFail("down");
+        await StartUpAtAsync(At(12, 17, 0));
+        await RequestAtAsync(At(12, 17, 11));
+        await RequestAtAsync(At(12, 17, 22));
+        await RequestAtAsync(At(12, 17, 33)); // the fourth trigger: no attempt is left
+
+        _eod.Calls.Count.ShouldBe(3);
+        var item = _world.Ledger.Items[("eod", "2026-10-12")];
+        (item.State, item.Attempts).ShouldBe((RecoveryStates.Failed, 3));
+        _learn.Calls.ShouldBeEmpty(); // still blocked by the step that stays failed
+        var notices = await _world.WithScopeAsync(sp => sp.GetRequiredService<IQueryHandler<GetServiceNoticesQuery, ServiceNotices>>().HandleAsync(new GetServiceNoticesQuery(), Ct));
+        notices.Items.Count(n => n.Kind == GetServiceNoticesHandler.RecoveryFailed && n.ServiceId == "eod").ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Triggers_inside_the_debounce_or_while_a_pass_runs_start_nothing_and_record_no_second_pass()
+    {
+        var gate = _eod.Gate();
+        _world.SetClock(At(12, 17, 0));
+        _world.Application.StartedAt = At(12, 17, 0);
+        await _world.Scheduler.StartUpAsync(Ct);
+        await _eod.WhenStartedAsync();
+
+        _world.SetClock(At(12, 17, 30)); // past the debounce, but the pass still runs
+        _world.Recovery.Request(RecoveryTrigger.BrokerReconnect).ShouldBeFalse();
+        _world.Recovery.Request(RecoveryTrigger.Wake).ShouldBeFalse();
+        gate.SetResult(ServiceOutcome.Succeeded());
+        await _world.SettleAsync();
+
+        _world.Ledger.Passes.Count.ShouldBe(1);
+        _eod.Calls.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_debounce_is_ten_minutes_by_default_from_the_last_accepted_trigger_and_a_trigger_after_it_is_accepted()
+    {
+        await StartUpAtAsync(At(12, 17, 0));
+        _world.Recovery.Request(RecoveryTrigger.Wake).ShouldBeFalse(); // same instant: refused
+
+        _world.SetClock(At(12, 17, 9));
+        _world.Recovery.Request(RecoveryTrigger.BrokerReconnect).ShouldBeFalse();
+        _world.SetClock(At(12, 17, 10));
+        _world.Recovery.Request(RecoveryTrigger.BrokerReconnect).ShouldBeTrue();
+        await _world.SettleAsync();
+    }
+
+    [Fact]
+    public async Task A_burst_of_triggers_at_once_starts_exactly_one_pass()
+    {
+        _world.SetClock(At(12, 17, 0));
+        var accepted = Enumerable.Range(0, 20).AsParallel().Select(_ => _world.Recovery.Request(RecoveryTrigger.Wake)).ToList();
+        await _world.SettleAsync();
+
+        accepted.Count(a => a).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task After_a_crash_an_item_left_running_becomes_failed_interrupted_and_runs_again_but_a_step_that_succeeded_does_not()
+    {
+        var old = await _world.Ledger.BeginPassAsync("startup", At(12, 16, 0), Ct);
+        await _world.Ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), old, "eod", "2026-10-12", new DateOnly(2026, 10, 12), new DateOnly(2026, 10, 12), RecoveryStates.Running, null, 1, null), Ct);
+        await _world.Ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), old, "other", "2026-10-12", new DateOnly(2026, 10, 12), new DateOnly(2026, 10, 12), RecoveryStates.Succeeded, null, 1, Guid.NewGuid()), Ct);
+
+        await StartUpAtAsync(At(12, 17, 0));
+
+        _world.Ledger.Passes.First().Status.ShouldBe("interrupted");
+        var eod = _world.Ledger.Items[("eod", "2026-10-12")];
+        (eod.State, eod.Attempts).ShouldBe((RecoveryStates.Succeeded, 2)); // the interrupted attempt counted
+        _other.Calls.ShouldBeEmpty(); // already made up: never started again
+        _learn.Calls.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_service_that_must_not_run_in_market_hours_waits_and_a_later_look_resumes_it_after_the_close()
+    {
+        using var world = new ServicesWorld(Backup());
+        world.Data.Store("backup", Backup().Definition.Defaults);
+        world.SetClock(At(12, 11, 0));
+        world.Application.StartedAt = At(12, 11, 0);
+        await world.Scheduler.StartUpAsync(Ct);
+        await world.SettleAsync();
+
+        world.Services[0].Calls.ShouldBeEmpty();
+        var waiting = world.Ledger.Items.Values.ShouldHaveSingleItem();
+        (waiting.State, waiting.Reason).ShouldBe((RecoveryStates.Waiting, RecoveryRunner.WaitingMarketHours));
+        world.Recovery.ResumeAt.ShouldBe(At(12, 15, 31));
+
+        world.SetClock(At(12, 15, 30));
+        await world.Scheduler.TickAsync(Ct);
+        await world.SettleAsync();
+        world.Services[0].Calls.ShouldBeEmpty(); // the market hours include 15:30
+
+        world.SetClock(At(12, 15, 32));
+        await world.Scheduler.TickAsync(Ct);
+        await world.SettleAsync();
+
+        world.Services[0].Calls.Count.ShouldBe(1);
+        world.Ledger.Items.Values.Single().State.ShouldBe(RecoveryStates.Succeeded);
+        world.Ledger.Passes.Select(p => p.Trigger).ShouldBe(["startup", "resume"]);
+    }
+
+    [Fact]
+    public async Task Stopping_the_application_ends_the_pass_as_interrupted_and_it_starts_nothing_more()
+    {
+        var gate = _eod.Gate();
+        _world.SetClock(At(12, 17, 0));
+        _world.Application.StartedAt = At(12, 17, 0);
+        await _world.Scheduler.StartUpAsync(Ct);
+        await _eod.WhenStartedAsync();
+
+        await _world.Recovery.StopAsync(TimeSpan.FromSeconds(10));
+        gate.TrySetResult(ServiceOutcome.Succeeded());
+        await _world.Runner.WhenIdleAsync();
+
+        _world.Ledger.Passes.Single().Status.ShouldBe("interrupted");
+        _world.Ledger.Items[("eod", "2026-10-12")].State.ShouldBe(RecoveryStates.Running); // closed as failed (interrupted) by the next pass
+        _learn.Calls.ShouldBeEmpty();
+        _world.Recovery.Request(RecoveryTrigger.Wake).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task The_scheduler_and_the_runner_together_run_each_occurrence_exactly_once()
+    {
+        await StartUpAtAsync(At(12, 17, 0));
+        _world.SetClock(At(12, 17, 1));
+        await _world.Scheduler.TickAsync(Ct);
+        await _world.SettleAsync();
+        _world.SetClock(At(12, 18, 0));
+        await _world.Scheduler.TickAsync(Ct);
+        await _world.SettleAsync();
+
+        _eod.Calls.Count.ShouldBe(1);
+        _learn.Calls.Count.ShouldBe(1);
+        _other.Calls.Count.ShouldBe(1);
+
+        _world.SetClock(At(13, 15, 50)); // the next day's time comes: one scheduled run
+        await _world.Scheduler.TickAsync(Ct);
+        await _world.SettleAsync();
+        _eod.Calls.Count.ShouldBe(2);
+        _world.Data.RunsOf("eod").Select(r => r.Trigger.ToCode()).ShouldBe(["catch_up", "scheduled"]);
+    }
+
+    [Fact]
+    public void A_service_without_a_row_or_a_run_counts_from_the_start_of_the_process_and_a_resumed_or_seeded_one_from_its_row()
+    {
+        var processStart = At(12, 16, 0);
+        var service = Make("x", Schedule.Daily(T(9, 0)));
+        RecoveryRunner.Baseline(new EffectiveService(service.Definition, service.Definition.Defaults, null), null, processStart).ShouldBe(processStart);
+        var row = ServiceSchedule.Create("x", service.Definition.Defaults, "owner", At(10, 9, 0));
+        RecoveryRunner.Baseline(new EffectiveService(service.Definition, service.Definition.Defaults, row), null, processStart).ShouldBe(At(10, 9, 0));
+        var run = ServiceRun.Skipped("x", ServiceRunTrigger.Scheduled, "x", At(11, 9, 0));
+        RecoveryRunner.Baseline(new EffectiveService(service.Definition, service.Definition.Defaults, row), run, processStart).ShouldBe(At(11, 9, 0));
+        RecoveryRunner.Baseline(new EffectiveService(service.Definition, service.Definition.Defaults, null), run, processStart).ShouldBe(At(11, 9, 0));
+        var seed = ServiceSchedule.Create("x", service.Definition.Defaults, ServiceScheduler.SeedRequester, At(12, 16, 0));
+        RecoveryRunner.Baseline(new EffectiveService(service.Definition, service.Definition.Defaults, seed), null, processStart).ShouldBe(At(12, 16, 0)); // a first start: no surprise run
+        RecoveryRunner.Baseline(new EffectiveService(service.Definition, service.Definition.Defaults, seed), run, processStart).ShouldBe(At(11, 9, 0)); // a run exists: the first-start row hides nothing
+    }
+
+    [Fact]
+    public async Task Services_started_by_a_recovery_step_through_a_run_after_chain_are_recovered_runs_too()
+    {
+        using var world = new ServicesWorld(Eod(), Make("chain", Schedule.AfterService("eod")));
+        world.Data.Store("eod", world.Services[0].Definition.Defaults);
+        world.Data.Store("chain", world.Services[1].Definition.Defaults);
+        world.SetClock(At(12, 17, 0));
+        world.Application.StartedAt = At(12, 17, 0);
+
+        await world.Scheduler.StartUpAsync(Ct);
+        await world.SettleAsync();
+
+        world.Data.RunsOf("chain").ShouldAllBe(r => r.Trigger == ServiceRunTrigger.CatchUp);
+        world.Services[1].Calls.Count.ShouldBe(1);
+    }
+}

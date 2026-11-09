@@ -14,6 +14,26 @@ public sealed class CompleteConnectHandlerTests
     private readonly ConnectionsFixture _fx = new();
 
     [Fact]
+    public async Task A_completed_sign_in_asks_for_a_recovery_pass_only_for_a_data_account_and_never_after_a_failure()
+    {
+        var account = await _fx.DhanAccountAsync();
+        await _fx.StartAsync(account.Id);
+        (await _fx.CompleteAsync(null)).ErrorCode.ShouldNotBeNull(); // cancelled at the broker
+        _fx.RecoveryRequests.ShouldBeEmpty(); // a failed sign-in
+
+        await _fx.StartAsync(account.Id);
+        await _fx.CompleteAsync(Code);
+        _fx.RecoveryRequests.ShouldBeEmpty(); // not a Data account
+
+        await _fx.Accounts.UpdateRoles().HandleAsync(
+            new UpdateRolesCommand(account.Id, new RolesInput(new DataRoleInput(true, "primary"), null, null), AccountsFixture.Actor), CancellationToken.None);
+        await _fx.StartAsync(account.Id);
+        await _fx.CompleteAsync(Code);
+
+        _fx.RecoveryRequests.ShouldBe([XDrishti.Application.Abstractions.Platform.RecoveryTrigger.BrokerReconnect]);
+    }
+
+    [Fact]
     public async Task The_sessions_open_sign_in_is_exchanged_stored_encrypted_and_audited()
     {
         var account = await _fx.DhanAccountAsync();

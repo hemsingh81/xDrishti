@@ -25,6 +25,9 @@ public static class PlanPhaseCheck
 
     public const string StateManual = "manual_run";
 
+    /// <summary>A run made up by the recovery pass (ADR 0240): never unattended, it breaks the streak.</summary>
+    public const string StateRecovered = "recovered_run";
+
     public const string StateFailed = "failed_closed";
 
     public const string StateNoRun = "no_run";
@@ -112,8 +115,9 @@ public static class PlanPhaseCheck
     private static PlanPhaseSession Classify(PhaseSessionInput s, DateOnly? firstRecorded)
     {
         var runs = s.Runs.OrderBy(r => r.Id).ToList();
-        var scheduled = runs.Count(r => !r.Manual);
+        var scheduled = runs.Count(r => r is { Manual: false, Recovered: false });
         var manual = runs.Count(r => r.Manual);
+        var recovered = runs.Count(r => r.Recovered);
         var failed = runs.Count(r => r.Outcome == "failed_closed");
         var published = runs.FirstOrDefault(r => r.Outcome == "published");
         var deciding = published ?? runs.LastOrDefault();
@@ -125,6 +129,7 @@ public static class PlanPhaseCheck
         {
             (0, _, _, _, _) when firstRecorded is null || s.Date < firstRecorded => (StateBeforeHistory, "no run recorded yet: the pipeline has no history this far back"),
             (0, _, _, _, _) => (StateNoRun, "no run recorded: the nightly did not run for this session (a gap breaks the run)"),
+            (_, _, _, _, _) when recovered > 0 && manual == 0 => (StateRecovered, $"{recovered} run(s) made up by the recovery pass: the session was not unattended (ADR 0240)"),
             (_, > 0, _, _, _) => (StateManual, $"{manual} manual run(s): a person started the pipeline, so the session is not unattended"),
             (_, _, > 0, _, _) => (StateFailed, "failed closed: " + FailureText(runs.Last(r => r.Outcome == "failed_closed"))),
             (_, _, _, null, _) => (StateNoRun, "runs are recorded but none published a plan"),
@@ -240,7 +245,7 @@ public static class PlanPhaseCheck
         var caveat = empty == sessions.Count
             ? string.Create(c, $"COUNT ONLY: all {sessions.Count} plans are empty, no ticket was ever proposed")
             : zero > 0 ? string.Create(c, $"{zero} of {sessions.Count} plans have zero primary tickets, {sessions.Count(s => s.Skeleton)} of them skeleton") : null;
-        return new PlanPhaseCriterion(1, name, PlanPhaseVerdicts.Met, facts1 + "; unattended means: scheduled or catch-up runs only (the stored manual flag), no failed-closed attempt, in the trading calendar's order (a holiday between two sessions does not break the run).", caveat);
+        return new PlanPhaseCriterion(1, name, PlanPhaseVerdicts.Met, facts1 + "; unattended means: scheduled runs only (the stored manual and recovered flags), no failed-closed attempt, in the trading calendar's order (a holiday between two sessions does not break the run).", caveat);
     }
 
     /// <summary>Why the window cannot be trusted as ten consecutive trading sessions ending at the requested date; null when it can.</summary>
@@ -451,7 +456,7 @@ public static class PlanPhaseCheck
         "unattended is read from the stored manual flag and the absence of failed attempts; a code change or an owner action on the pipeline is not recorded and cannot be seen here",
         "the Dhan Data-account token lapses about daily; a lapse fails the EOD gate and breaks the run, so ten in a row may take more than ten calendar sessions",
         "stored records only: the criteria that tests prove are NOT EVALUABLE here (no test is run), and a MET with a caveat rests on a test or a configuration this check does not run or see",
-        "a run the services framework starts as a catch-up after a restart counts as scheduled (only a manual start sets the manual flag); hand-run eod or portfolio-sync runs are not read, only the nightly's own rows",
+        "a run the recovery pass makes up after a restart, a wake or a reconnect is stored as recovered, is not unattended and breaks the streak (ADR 0240, tightening ADR 0097); only a manual start sets the manual flag; hand-run eod or portfolio-sync runs are not read, only the nightly's own rows",
         "the newest 200 run rows, the newest 60 plans (with their tickets, approvals, grades and journal) and up to 200 autonomy settings rows are read; older records are not",
         "switches marked as read by this process are read from the configuration of the process that ran the check (the host CLI when run with xd); the running containers may be configured differently",
         "nothing is written, trained or changed by this check, and no setting is turned on by it",

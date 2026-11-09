@@ -94,7 +94,8 @@ public sealed record PlanPublished(long Id, bool Created, bool RunRecorded = fal
 /// <param name="StartedAt">Start.</param>
 /// <param name="FinishedAt">End.</param>
 /// <param name="Reason">Why, in words (at most 500 characters).</param>
-public sealed record PublishRun(bool Manual, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, string Reason);
+/// <param name="Recovered">Made up by the recovery pass (ADR 0240).</param>
+public sealed record PublishRun(bool Manual, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, string Reason, bool Recovered = false);
 
 /// <summary>One attempt of the nightly pipeline (spec P7-03; written by P7-08). Insert-only.</summary>
 /// <param name="ForDate">The session planned for.</param>
@@ -106,7 +107,8 @@ public sealed record PublishRun(bool Manual, DateTimeOffset StartedAt, DateTimeO
 /// <param name="Manual">Whether a person started it (the phase check counts these).</param>
 /// <param name="StartedAt">Start.</param>
 /// <param name="FinishedAt">End.</param>
-public sealed record NewPlanRun(DateOnly ForDate, string? PlanKey, string Outcome, string? FailedGate, string Reason, long? PlanId, bool Manual, DateTimeOffset StartedAt, DateTimeOffset FinishedAt);
+/// <param name="Recovered">Made up after the fact by the recovery pass (ADR 0240); never counted as unattended.</param>
+public sealed record NewPlanRun(DateOnly ForDate, string? PlanKey, string Outcome, string? FailedGate, string Reason, long? PlanId, bool Manual, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, bool Recovered = false);
 
 /// <summary>One stored attempt of the nightly pipeline (spec P7-08).</summary>
 /// <param name="Id">The row id.</param>

@@ -8,8 +8,7 @@ namespace XDrishti.Application.Platform.Services;
 
 /// <summary>
 /// The one scheduler of the automatic jobs (ADR 0018 §3, §4). At start-up it closes the runs the previous process left running (<c>failed: interrupted</c>), stores the first-start settings of the
-/// services that have no row, and makes up once for each service whose scheduled time passed while the application was down (trigger <c>catch_up</c>; never for a paused service, never more than one
-/// per service per start). Then it looks at the schedules at least once a minute and at the next start: it re-reads the stored rows each time, so an edit counts at the next look without a restart,
+/// services that have no row, and asks <see cref="RecoveryRunner"/> for one pass that makes up what was missed while the application was down (trigger <c>catch_up</c>, ADR 0240; never for a paused service). A scheduled time found late when it looks (the machine slept) asks for a pass too. Then it looks at the schedules at least once a minute and at the next start: it re-reads the stored rows each time, so an edit counts at the next look without a restart,
 /// starts the services whose time came since the last look, starts the retries that are due and leaves the rest to <see cref="ServiceRunner"/>. A paused service is not started, and its past times
 /// are not made up for when it is resumed. The ticks of an interval or window schedule are never made up for, and one that falls while the service still runs is dropped with a log line and no run record
 /// (ADR 0019 §5). The API's hosted service only calls <see cref="RunAsync"/>. A service that another process runs (<see cref="IExternallyRunService"/>, the live feed) is looked at by nobody here: it is never started,
@@ -19,6 +18,7 @@ public sealed class ServiceScheduler(
     IServiceScopeFactory scopes,
     ServiceRegistry registry,
     ServiceRunner runner,
+    RecoveryRunner recovery,
     IApplicationInfo application,
     TimeProvider clock,
     ILogger<ServiceScheduler> logger)
@@ -37,7 +37,6 @@ public sealed class ServiceScheduler(
     public const string InterruptedMessage = "Interrupted: the application stopped or crashed while the service ran.";
 
     private readonly Dictionary<string, DateTimeOffset> _lookedAt = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _caughtUp = new(StringComparer.Ordinal);
 
     /// <summary>Runs until cancelled.</summary>
     public async Task RunAsync(CancellationToken cancellationToken)
@@ -57,6 +56,7 @@ public sealed class ServiceScheduler(
         }
         finally
         {
+            await recovery.StopAsync(StopWait);
             await runner.StopAsync(StopWait);
         }
     }
@@ -69,18 +69,17 @@ public sealed class ServiceScheduler(
     {
         // read before the work below, which can be slow: a time that comes during it is seen by the first look, not lost
         var now = clock.GetUtcNow();
-        _caughtUp.Clear();
         _lookedAt.Clear();
         await RecoverAsync(cancellationToken);
         await SeedAsync(cancellationToken);
         await ResumeRetriesAsync(cancellationToken);
-        await CatchUpAsync(cancellationToken);
         foreach (var service in registry.All)
         {
             _lookedAt[service.Definition.Id] = now;
         }
 
         ServicesLog.SchedulerStarted(logger, registry.All.Count, now);
+        recovery.Request(RecoveryTrigger.StartUp); // one pass makes up what was missed while the application was down (ADR 0240); it never blocks the loop
     }
 
     /// <summary>
@@ -97,6 +96,7 @@ public sealed class ServiceScheduler(
             var all = await scope.ServiceProvider.GetRequiredService<ServiceSettingsReader>().ReadAllAsync(cancellationToken);
             var latest = await scope.ServiceProvider.GetRequiredService<IServiceRunStore>().GetLatestAsync(registry.Ids, cancellationToken);
             var calendar = await scope.ServiceProvider.GetRequiredService<ITradingCalendar>().GetAsync(cancellationToken);
+            var wake = false;
             foreach (var service in all)
             {
                 var since = _lookedAt.TryGetValue(service.Id, out var seen) && seen <= now ? seen : now;
@@ -117,14 +117,9 @@ public sealed class ServiceScheduler(
                         // a tick of an interval or window schedule that finds the service busy is dropped (log, no run record); a daily, weekly or run-after start is recorded as skipped
                         await StartAsync(service.Id, ServiceRunTrigger.Scheduled, cancellationToken, dropWhenBusy: schedule.Type is ScheduleType.Interval or ScheduleType.Window);
                     }
-                    else if (service.Settings.CatchUp
-                        && !_caughtUp.Contains(service.Id)
-                        && ScheduleCalculator.MissedOccurrence(schedule, now, handledAt, calendar, service.NotBeforeSessionEnd, service.Definition.Constraints.CatchUpReach) is { } missed)
+                    else if (service.Settings.CatchUp)
                     {
-                        // the time passed unseen (the machine slept, the clock jumped): the same rules as after a restart, including at most one catch-up per service per start
-                        _caughtUp.Add(service.Id);
-                        ServicesLog.CatchUp(logger, service.Id, missed);
-                        await StartAsync(service.Id, ServiceRunTrigger.CatchUp, cancellationToken);
+                        wake = true; // the time passed unseen (the machine slept, the clock jumped): the recovery pass decides what to make up
                     }
                 }
 
@@ -132,6 +127,11 @@ public sealed class ServiceScheduler(
                 {
                     next = upcoming;
                 }
+            }
+
+            if (wake)
+            {
+                recovery.Request(RecoveryTrigger.Wake);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -146,6 +146,7 @@ public sealed class ServiceScheduler(
         }
 
         await runner.StartDueRetriesAsync(cancellationToken);
+        recovery.ResumeIfDue();
         return runner.NextRetryAt is { } retry && retry < next ? retry : next;
     }
 
@@ -255,39 +256,6 @@ public sealed class ServiceScheduler(
 #pragma warning restore CA1031
         {
             ServicesLog.RecoveryFailed(logger, ex);
-        }
-    }
-
-    /// <summary>For every enabled service with catch-up on whose latest scheduled time passed without a run since (within the reach of the service), one run now.</summary>
-    private async Task CatchUpAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await using var scope = scopes.CreateAsyncScope();
-            var all = await scope.ServiceProvider.GetRequiredService<ServiceSettingsReader>().ReadAllAsync(cancellationToken);
-            var latest = await scope.ServiceProvider.GetRequiredService<IServiceRunStore>().GetLatestAsync(registry.Ids, cancellationToken);
-            var calendar = await scope.ServiceProvider.GetRequiredService<ITradingCalendar>().GetAsync(cancellationToken);
-            var now = clock.GetUtcNow();
-            foreach (var service in all.Where(s => s.Settings is { Enabled: true, CatchUp: true } && !registry.IsExternal(s.Id) && !_caughtUp.Contains(s.Id) && !runner.IsActive(s.Id)))
-            {
-                var lastStart = HandledAt(service, latest.GetValueOrDefault(service.Id));
-                if (ScheduleCalculator.MissedOccurrence(service.Settings.Schedule, now, lastStart, calendar, service.NotBeforeSessionEnd, service.Definition.Constraints.CatchUpReach) is { } missed)
-                {
-                    _caughtUp.Add(service.Id);
-                    ServicesLog.CatchUp(logger, service.Id, missed);
-                    await StartAsync(service.Id, ServiceRunTrigger.CatchUp, cancellationToken);
-                }
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-#pragma warning disable CA1031 // if the catch-up cannot be decided, the schedule still runs; the next scheduled time makes up
-        catch (Exception ex)
-#pragma warning restore CA1031
-        {
-            ServicesLog.TickCrashed(logger, ex);
         }
     }
 
