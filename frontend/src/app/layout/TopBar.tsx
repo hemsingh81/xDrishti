@@ -1,15 +1,31 @@
 import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
 import LightModeIcon from '@mui/icons-material/LightModeOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
-import { AppBar, Box, IconButton, Skeleton, Toolbar, Tooltip, Typography } from '@mui/material';
-import { Suspense } from 'react';
+import { AppBar, Box, Button, IconButton, Skeleton, Toolbar, Tooltip, Typography } from '@mui/material';
 import { NotificationBell } from '@/features/notifications';
 import { HeaderAccounts } from '@/features/accounts';
-import { UserMenu } from '@/features/auth';
+import { UserMenu, useLogout } from '@/features/auth';
 import { StopChip } from '@/features/execution';
+import { LazyBoundary } from '@/shared/ui';
 import { IstClock } from '@/shared/ui/IstClock';
 import { layout, rem, useColorMode } from '@/theme';
 import { SearchButton } from './palette/SearchButton';
+
+/** Stands in for the account menu when its code cannot load: sign-out must stay reachable. */
+function PlainSignOut() {
+  const logout = useLogout();
+  return (
+    <Button
+      size="small"
+      onClick={() => {
+        logout.mutate();
+      }}
+      disabled={logout.isPending}
+    >
+      Sign out
+    </Button>
+  );
+}
 
 export function TopBar({ title, onMenu }: { title: string; onMenu: () => void }) {
   const { mode, toggle } = useColorMode();
@@ -53,8 +69,9 @@ export function TopBar({ title, onMenu }: { title: string; onMenu: () => void })
         {/* India time, whatever the browser's zone: next to the other status controls. */}
         <IstClock />
         {/* Same size as the control's button, so it loading in does not move the other controls. */}
-        <Suspense
-          fallback={
+        <LazyBoundary
+          failed={null}
+          pending={
             <Skeleton
               variant="rounded"
               sx={{ width: { xs: 58, sm: 64 }, height: { xs: 44, sm: 30 }, minWidth: { sm: 250 } }}
@@ -62,28 +79,32 @@ export function TopBar({ title, onMenu }: { title: string; onMenu: () => void })
           }
         >
           <HeaderAccounts />
-        </Suspense>
+        </LazyBoundary>
         {/* The stop control: shown only while something is automated or a halt is active, so no placeholder. */}
-        <Suspense fallback={null}>
+        <LazyBoundary pending={null} failed={null}>
           <StopChip />
-        </Suspense>
+        </LazyBoundary>
         {/* Same size as the bell, so it loading in does not move the other controls. */}
-        <Suspense
-          fallback={<Skeleton variant="rounded" sx={{ width: { xs: 44, sm: 36 }, height: { xs: 44, sm: 36 } }} />}
+        <LazyBoundary
+          failed={null}
+          pending={<Skeleton variant="rounded" sx={{ width: { xs: 44, sm: 36 }, height: { xs: 44, sm: 36 } }} />}
         >
           <NotificationBell />
-        </Suspense>
+        </LazyBoundary>
         <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>
           <IconButton aria-label="Toggle colour mode" onClick={toggle}>
             {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
           </IconButton>
         </Tooltip>
         {/* About the size of the menu button, so it loading in does not move the other controls. */}
-        <Suspense
-          fallback={<Skeleton variant="rounded" sx={{ width: { xs: 44, lg: 150 }, height: { xs: 44, sm: 36 } }} />}
+        <LazyBoundary
+          failed={<PlainSignOut />}
+          pending={
+            <Skeleton variant="rounded" sx={{ width: { xs: 44, sm: 64, lg: 150 }, height: { xs: 44, sm: 36 } }} />
+          }
         >
           <UserMenu />
-        </Suspense>
+        </LazyBoundary>
       </Toolbar>
     </AppBar>
   );

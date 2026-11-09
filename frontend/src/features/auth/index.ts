@@ -7,6 +7,7 @@ export { useStepUp, type WithStepUp } from './hooks/useStepUp';
 export { isStepUpCancelled } from './lib/stepUpErrors';
 export { RequireAuth } from './components/RequireAuth';
 export { connectAuth } from './lib/connectAuth';
+export { useLogout } from './api/authMutations';
 
 /** Loaded on demand (route-level code splitting); render inside <Suspense>. */
 export const LoginPage = lazy(async () => ({ default: (await import('./components/LoginPage')).LoginPage }));
