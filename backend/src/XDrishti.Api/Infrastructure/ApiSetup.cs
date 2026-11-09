@@ -24,6 +24,7 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Learning.Jobs;
 using XDrishti.Application.Live.Push;
+using XDrishti.Application.SettingsCatalog;
 using XDrishti.Strategies.Compilation;
 
 namespace XDrishti.Api.Infrastructure;
@@ -74,6 +75,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, SystemEndpoints>();
         services.AddSingleton<IEndpointModule, SettingsEndpoints>(); // the settings catalog (AU-08, ADR 0242)
         services.AddSingleton<Application.Abstractions.SettingsCatalog.ISettingsCatalogSource, Settings.SettingsCatalogSource>();
+        services.AddSettingsCatalogHandler(); // registered with its source, in the Api only
         services.AddSingleton<IEndpointModule, AuthEndpoints>();
         services.AddSingleton<IEndpointModule, AccountsEndpoints>();
         services.AddSingleton<IEndpointModule, BrokersEndpoints>();

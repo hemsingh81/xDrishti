@@ -1,6 +1,8 @@
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using XDrishti.Api.Confidence;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Api.Settings;
@@ -42,6 +44,7 @@ public sealed partial class SettingsCatalogTests(ApiFactory factory)
         var missing = Leaves(typeof(ConfidenceSettings), ConfidenceSettings.SectionName).Where(k => !described.Contains(k)).ToList();
 
         missing.ShouldBeEmpty("Confidence keys with no descriptor: " + string.Join(", ", missing));
+        described.ShouldBe(Leaves(typeof(ConfidenceSettings), ConfidenceSettings.SectionName).ToHashSet(StringComparer.Ordinal), ignoreOrder: true); // no stray descriptor either
         described.Count.ShouldBe(ConfidenceSettingDescriptors.All.Count);
     }
 
@@ -76,13 +79,109 @@ public sealed partial class SettingsCatalogTests(ApiFactory factory)
     }
 
     [Fact]
-    public void A_value_outside_a_range_stops_the_host_at_start()
+    public void A_value_outside_a_range_stops_the_start_up_with_the_key_named()
+    {
+        var services = new ServiceCollection();
+        services.AddOptions<ConfidenceSettings>().Configure(o => o.Kill.StressMultiplier = 9).ValidateOnStart();
+        services.AddSingleton<IValidateOptions<ConfidenceSettings>, ConfidenceRangeValidator>(); // alone: only the descriptor bounds reject here
+        using var provider = services.BuildServiceProvider();
+
+        var thrown = Should.Throw<OptionsValidationException>(() => provider.GetRequiredService<IOptions<ConfidenceSettings>>().Value);
+
+        thrown.Message.ShouldContain("Confidence:Kill:StressMultiplier");
+    }
+
+    [Fact]
+    public void A_value_outside_a_range_also_stops_the_host()
     {
         Should.Throw<Exception>(() =>
         {
             using var host = factory.WithWebHostBuilder(b => b.UseSetting("Confidence:Kill:StressMultiplier", "9"));
             host.CreateClient();
         });
+    }
+
+    /// <summary>Every declared direction, pinned: a change here is a safety review. Every other key is None and loosens both ways.</summary>
+    private static readonly Dictionary<string, SettingSafer> Declared = new(StringComparer.Ordinal)
+    {
+        ["Confidence:CostStress:CapacityFillShare"] = SettingSafer.Lower,
+        ["Confidence:CostStress:CapacityDailyShare"] = SettingSafer.Lower,
+        ["Confidence:CostStress:TierACutCrore"] = SettingSafer.Higher,
+        ["Confidence:CostStress:TierBCutCrore"] = SettingSafer.Higher,
+        ["Confidence:CostStress:TierABps"] = SettingSafer.Higher,
+        ["Confidence:CostStress:TierBBps"] = SettingSafer.Higher,
+        ["Confidence:CostStress:RangeFraction"] = SettingSafer.Higher,
+        ["Confidence:CostStress:MinTurnoverCrore"] = SettingSafer.Higher,
+        ["Confidence:Pbo:MaxPbo"] = SettingSafer.Lower,
+        ["Confidence:MlInfluence:HoldOutMinRows"] = SettingSafer.Higher,
+        ["Confidence:MlInfluence:HoldOutMinProbability"] = SettingSafer.Higher,
+        ["Confidence:MlInfluence:ForwardMinCandidates"] = SettingSafer.Higher,
+        ["Confidence:MlInfluence:ForwardMinWeeks"] = SettingSafer.Higher,
+        ["Confidence:MlInfluence:ForwardMaxEcePp"] = SettingSafer.Lower,
+        ["Confidence:Decay:Sigmas"] = SettingSafer.Lower,
+        ["Confidence:Decay:QuarterFloorR"] = SettingSafer.Higher,
+        ["Confidence:Loop:Level"] = SettingSafer.Higher,
+        ["Confidence:Loop:HelpsAt"] = SettingSafer.Higher,
+        ["Confidence:Kill:StressMultiplier"] = SettingSafer.Higher,
+        ["Confidence:Kill:DrawdownFactor"] = SettingSafer.Lower,
+        ["Confidence:Readiness:MinNEff"] = SettingSafer.Higher,
+        ["Confidence:Readiness:MinTradesPerCell"] = SettingSafer.Higher,
+        ["Confidence:Readiness:ExpectancyR"] = SettingSafer.Higher,
+        ["Confidence:Readiness:TStatistic"] = SettingSafer.Higher,
+        ["Confidence:Readiness:MinQuarterShare"] = SettingSafer.Higher,
+        ["Confidence:Readiness:MaxYearShare"] = SettingSafer.Lower,
+        ["Confidence:Readiness:MaxInstrumentShare"] = SettingSafer.Lower,
+        ["Confidence:Readiness:DrawdownBudgetR"] = SettingSafer.Lower,
+        ["Confidence:Readiness:BuildingFrom"] = SettingSafer.Higher,
+        ["Confidence:Readiness:UsableFrom"] = SettingSafer.Higher,
+        ["Confidence:Readiness:ReadyFrom"] = SettingSafer.Higher,
+        ["StrategyLab:Gates:MinOosTrades"] = SettingSafer.Higher,
+        ["StrategyLab:Gates:MinExpectancyR"] = SettingSafer.Higher,
+        ["StrategyLab:Gates:MinProfitFactor"] = SettingSafer.Higher,
+        ["StrategyLab:Gates:MinPositiveFoldsPct"] = SettingSafer.Higher,
+        ["StrategyLab:Gates:MaxDrawdownR"] = SettingSafer.Lower,
+        ["StrategyLab:Gates:MaxCalibrationErrorPp"] = SettingSafer.Lower,
+    };
+
+    [Fact]
+    public void The_declared_directions_are_exactly_the_pinned_table()
+    {
+        var actual = ConfidenceSettingDescriptors.All.Concat(SettingsRegistry.All).Where(d => d.Safer != SettingSafer.None).ToDictionary(d => d.Key, d => d.Safer, StringComparer.Ordinal);
+
+        actual.OrderBy(x => x.Key).ShouldBe(Declared.OrderBy(x => x.Key));
+    }
+
+    [Theory]
+    [InlineData("Confidence:Sequential:Alpha")]
+    [InlineData("Confidence:Sequential:BetaCaution")]
+    [InlineData("Confidence:Sequential:BetaFail")]
+    [InlineData("Confidence:Ladder:MinRows")]
+    [InlineData("Confidence:Loop:MinSlopePer50Rows")]
+    public void The_keys_that_weaken_a_detector_in_either_direction_loosen_both_ways(string key)
+    {
+        var d = ConfidenceSettingDescriptors.All.Single(x => x.Key == key);
+
+        d.Safer.ShouldBe(SettingSafer.None);
+        d.IsLoosening(0.05m, 0.04m).ShouldBeTrue();
+        d.IsLoosening(0.05m, 0.06m).ShouldBeTrue();
+        d.IsLoosening(0.05m, 0.05m).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task The_catalog_needs_a_session_and_answers_get_only()
+    {
+        using var anonymous = factory.CreateAnonymousClient();
+        using var denied = await anonymous.GetAsync(new Uri("/api/settings/catalog", UriKind.Relative), TestContext.Current.CancellationToken);
+        denied.StatusCode.ShouldBe(System.Net.HttpStatusCode.Unauthorized);
+
+        var signedIn = await factory.SignInAsync(TestContext.Current.CancellationToken);
+        using var post = await signedIn.Client.PostAsJsonAsync(new Uri("/api/settings/catalog", UriKind.Relative), new { }, TestContext.Current.CancellationToken);
+        using var put = await signedIn.Client.PutAsJsonAsync(new Uri("/api/settings/catalog", UriKind.Relative), new { }, TestContext.Current.CancellationToken);
+        using var delete = await signedIn.Client.DeleteAsync(new Uri("/api/settings/catalog", UriKind.Relative), TestContext.Current.CancellationToken);
+
+        post.StatusCode.ShouldBe(System.Net.HttpStatusCode.MethodNotAllowed);
+        put.StatusCode.ShouldBe(System.Net.HttpStatusCode.MethodNotAllowed);
+        delete.StatusCode.ShouldBe(System.Net.HttpStatusCode.MethodNotAllowed);
     }
 
     [Theory]

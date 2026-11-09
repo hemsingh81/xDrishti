@@ -24,7 +24,15 @@ internal sealed class SettingsCatalogSource(IOptions<ConfidenceSettings> confide
 
         foreach (var d in SettingsRegistry.All)
         {
-            entries.Add(new SettingsCatalogEntry(d, null, d.Kind == SettingKind.Stored ? "stored" : "section"));
+            if (d.Kind == SettingKind.Configuration)
+            {
+                var raw = configuration[d.Key];
+                entries.Add(new SettingsCatalogEntry(d, raw ?? d.Default, raw is null ? "default" : "configuration"));
+            }
+            else
+            {
+                entries.Add(new SettingsCatalogEntry(d, null, d.Kind == SettingKind.Stored ? "stored" : "section"));
+            }
         }
 
         return entries;
