@@ -7,8 +7,8 @@ const tiles = [
   { key: 'stillFailing', label: 'Still failing' },
 ] as const;
 
-/** The three headline counts. */
-export function RecoveryCounts({ counts }: { counts: Counts }) {
+/** The three headline counts. Missed reads Unknown when the plan could not be read (the count would be a guess). */
+export function RecoveryCounts({ counts, missedKnown = true }: { counts: Counts; missedKnown?: boolean }) {
   return (
     <Grid container spacing={2} component="dl" sx={{ m: 0, mb: 2 }}>
       {tiles.map(({ key, label }) => (
@@ -19,7 +19,7 @@ export function RecoveryCounts({ counts }: { counts: Counts }) {
                 {label}
               </Typography>
               <Typography component="dd" variant="h2" sx={{ m: 0 }}>
-                {counts[key]}
+                {key === 'missed' && !missedKnown ? 'Unknown' : counts[key]}
               </Typography>
             </CardContent>
           </Card>

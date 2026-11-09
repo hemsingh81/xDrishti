@@ -91,6 +91,14 @@ describe('deriveServiceNotifications', () => {
     });
   });
 
+  it('sends a recovery notice to the Recovery screen', () => {
+    const [notice] = deriveServiceNotifications([
+      buildServiceNotice({ kind: 'recovery_failed', id: 'recovery:failed:x' }),
+    ]);
+
+    expect(notice?.href).toBe('/services/recovery');
+  });
+
   it('drops a kind this version does not know, and keeps an unknown time as null', () => {
     const list = deriveServiceNotifications([
       buildServiceNotice({ kind: 'service_something_new' }),

@@ -1,3 +1,4 @@
+using System.Data.Common;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
@@ -16,11 +17,15 @@ public static class RecoveryErrors
 {
     public const string AlreadyRunningCode = "recovery.already_running";
 
+    public const string PlanUnavailableCode = "recovery.plan_unavailable";
+
     public const string NotRecordedCode = "recovery.not_recorded";
 
     public static readonly Error AlreadyRunning = Error.Conflict(AlreadyRunningCode, "A recovery pass is running already.");
 
-    public static readonly Error NotRecorded = Error.Conflict(NotRecordedCode, "The request could not be recorded. Try again.");
+    public static readonly Error NotRecorded = Error.Conflict(NotRecordedCode, "The recovery pass started, but the request could not be recorded in the audit log. Do not press again.");
+
+    public static Error PlanUnavailable(string reason) => Error.Conflict(PlanUnavailableCode, $"No pass was started: the plan of what to recover was refused ({reason}).");
 }
 
 internal sealed class RetryRecoveryHandler(RecoveryRunner runner, IAccountEventLog events, IPlatformUnitOfWork unitOfWork, TimeProvider clock)
@@ -33,7 +38,13 @@ internal sealed class RetryRecoveryHandler(RecoveryRunner runner, IAccountEventL
             return Result.Failure<RecoveryRetryAccepted>(RecoveryErrors.AlreadyRunning);
         }
 
-        var steps = (await runner.PreviewAsync(true, cancellationToken)) is { IsSuccess: true } plan ? plan.Value.Steps.Count : 0;
+        var plan = await runner.PreviewAsync(true, cancellationToken);
+        if (plan.IsFailure)
+        {
+            return Result.Failure<RecoveryRetryAccepted>(RecoveryErrors.PlanUnavailable(plan.Error.Message));
+        }
+
+        var steps = plan.Value.Steps.Count; // the planner leaves out disabled and catch-up-off services: these are the steps that run
         if (!runner.Request(RecoveryTrigger.Manual))
         {
             return Result.Failure<RecoveryRetryAccepted>(RecoveryErrors.AlreadyRunning);
@@ -41,8 +52,15 @@ internal sealed class RetryRecoveryHandler(RecoveryRunner runner, IAccountEventL
 
         var now = clock.GetUtcNow();
         events.Record(AccountEvent.Record(AccountEventType.ServiceRunRequested, null, "recovery: run now", command.Actor, now));
-        return await unitOfWork.TrySaveAsync(cancellationToken)
-            ? Result.Success(new RecoveryRetryAccepted(now, steps > 0, steps))
-            : Result.Failure<RecoveryRetryAccepted>(RecoveryErrors.NotRecorded); // the pass runs all the same; only the audit row is missing
+        try
+        {
+            return await unitOfWork.TrySaveAsync(CancellationToken.None) // the pass has started: a cancelled request must not leave it unrecorded
+                ? Result.Success(new RecoveryRetryAccepted(now, steps > 0, steps))
+                : Result.Failure<RecoveryRetryAccepted>(RecoveryErrors.NotRecorded); // the pass runs all the same; only the audit row is missing
+        }
+        catch (Exception ex) when (ex is DbException || ex.InnerException is DbException)
+        {
+            return Result.Failure<RecoveryRetryAccepted>(RecoveryErrors.NotRecorded); // a database error (EF wraps it in DbUpdateException) after the pass started: same outcome
+        }
     }
 }

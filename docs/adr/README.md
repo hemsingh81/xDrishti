@@ -239,3 +239,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0242](0242-few-visible-settings-and-learned-changes-tighten-automatically-while-loosening-needs-the-owners-password.md) | Few visible settings, and learned changes tighten automatically while loosening needs the owner's password | Accepted |
 | [0243](0243-simulate-everything-is-training-data-fenced-from-the-hold-out-and-from-scorecard-evidence.md) | Simulate-everything is training data, fenced from the hold-out and from scorecard evidence | Accepted |
 | [0244](0244-one-auto-switch-runs-the-chain-and-only-suggests.md) | One Auto switch runs the chain and only suggests | Accepted |
+| [0245](0245-the-unused-code-removal-list-from-the-au-05-audit.md) | The unused-code removal list from the AU-05 audit | Proposed |

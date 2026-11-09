@@ -109,6 +109,7 @@ internal sealed class InMemoryServiceData : IServiceScheduleStore, IServiceRunSt
 
     public ValueTask<bool> TrySaveAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         lock (_gate)
         {
             if (Collisions.TryDequeue(out var concurrent))

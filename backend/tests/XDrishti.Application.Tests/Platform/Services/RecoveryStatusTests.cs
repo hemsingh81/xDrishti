@@ -169,12 +169,26 @@ public sealed class RecoveryStatusTests : IDisposable
     [Fact]
     public async Task A_failed_step_with_attempts_left_can_be_retried_by_running_it_again()
     {
+        var missed = (await StatusAsync()).Value.Sessions.SelectMany(s => s.Items).First(r => r.ServiceId == "eod" && r.Status == RecoveryRowStatus.Missed);
         var pass = await _world.Ledger.BeginPassAsync("startup", At(12, 9, 0), Ct);
-        await _world.Ledger.SaveAsync(Item(pass, "eod", new DateOnly(2026, 10, 12), RecoveryStates.Failed, "down", 1), Ct);
+        await _world.Ledger.SaveAsync(Item(pass, "eod", missed.To, RecoveryStates.Failed, "down", 1), Ct);
 
         var row = (await StatusAsync()).Value.Sessions.SelectMany(s => s.Items).Single(r => r.ServiceId == "eod" && r.Status == RecoveryRowStatus.StillFailing);
 
         (row.CanRetry, row.RetryKind).ShouldBe((true, RecoveryRetryKinds.Run));
+    }
+
+    [Fact]
+    public async Task A_failed_row_the_plan_has_no_step_for_is_not_offered_a_run()
+    {
+        var pass = await _world.Ledger.BeginPassAsync("startup", At(12, 9, 0), Ct);
+        await _world.Ledger.SaveAsync(Item(pass, "eod", new DateOnly(2026, 10, 12), RecoveryStates.Failed, "down", 1), Ct);
+        await _world.Ledger.SaveAsync(Item(pass, "ghost", new DateOnly(2026, 10, 9), RecoveryStates.Blocked, "waits"), Ct);
+
+        var rows = (await StatusAsync()).Value.Sessions.SelectMany(s => s.Items).Where(r => r.Status is RecoveryRowStatus.StillFailing or RecoveryRowStatus.Blocked).ToList();
+
+        rows.ShouldNotBeEmpty();
+        rows.ShouldAllBe(r => r.RetryKind == null && !r.CanRetry); // 2026-10-12 is no missed session of eod, and "ghost" is no service
     }
 
     [Fact]
@@ -188,6 +202,63 @@ public sealed class RecoveryStatusTests : IDisposable
         var rows = (await StatusAsync()).Value.Sessions.SelectMany(s => s.Items).Where(r => r.ServiceId == "eod").ToList();
 
         rows.ShouldNotContain(r => r.Status == RecoveryRowStatus.Missed);
+    }
+
+    [Fact]
+    public async Task Retry_with_a_refused_plan_is_plan_unavailable_and_starts_nothing()
+    {
+        using var world = new ServicesWorld(
+            Make("a", Schedule.Daily(T(16, 0)), constraints: new ServiceConstraints { MustFollow = ["b"] }),
+            Make("b", Schedule.Daily(T(16, 0)), constraints: new ServiceConstraints { MustFollow = ["a"] }));
+
+        var result = await world.WithScopeAsync(sp => sp.GetRequiredService<ICommandHandler<RetryRecoveryCommand, RecoveryRetryAccepted>>().HandleAsync(new RetryRecoveryCommand("owner@example.invalid"), Ct));
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(RecoveryErrors.PlanUnavailableCode);
+        world.Data.Events.ShouldBeEmpty();
+        world.Ledger.Passes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Retry_whose_audit_row_cannot_be_saved_says_the_pass_started_and_the_audit_was_not_written()
+    {
+        _world.Data.Collisions.Enqueue(() => { });
+
+        var result = await RetryAsync();
+        await _world.SettleAsync();
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(RecoveryErrors.NotRecordedCode);
+        result.Error.Message.ShouldContain("started");
+        _world.Ledger.Passes.Select(p => p.Trigger).ShouldContain("manual");
+    }
+
+    private sealed class FailingDatabaseException : System.Data.Common.DbException
+    {
+    }
+
+    [Fact]
+    public async Task Retry_whose_audit_save_throws_a_database_error_is_not_recorded_and_the_pass_still_runs()
+    {
+        _world.Data.Collisions.Enqueue(() => throw new InvalidOperationException("wrapped", new FailingDatabaseException()));
+
+        var result = await RetryAsync();
+        await _world.SettleAsync();
+
+        result.Error.Code.ShouldBe(RecoveryErrors.NotRecordedCode);
+        _world.Ledger.Passes.Select(p => p.Trigger).ShouldContain("manual");
+    }
+
+    [Fact]
+    public async Task Retry_audit_save_is_not_cancelled_with_the_request()
+    {
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync(); // the caller has gone before the audit row is written
+        var result = await _world.WithScopeAsync(sp => sp.GetRequiredService<ICommandHandler<RetryRecoveryCommand, RecoveryRetryAccepted>>().HandleAsync(new RetryRecoveryCommand("owner@example.invalid"), cancelled.Token));
+        await _world.SettleAsync();
+
+        result.IsSuccess.ShouldBeTrue();
+        _world.Data.Events.ShouldContain(e => e.Actor == "owner@example.invalid");
     }
 
     [Fact]
