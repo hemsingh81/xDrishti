@@ -70,9 +70,13 @@ internal sealed class GetRecoveryStatusHandler(IRecoveryLedger ledger, RecoveryR
         var truncated = fetched.Count > MaxRows;
         var items = fetched.Take(MaxRows).ToList();
         var rows = new List<(DateOnly Session, RecoveryRowView Row)>();
+
+        // a retry runs a row only when the plan with retries has a step for its occurrence (a used-up or ineligible row is not run)
+        var retryPlan = await runner.PreviewAsync(true, cancellationToken);
+        var steps = retryPlan.IsSuccess ? retryPlan.Value.Steps : [];
         foreach (var item in items)
         {
-            rows.Add((item.SessionTo, Row(item)));
+            rows.Add((item.SessionTo, Row(item, steps)));
         }
 
         // what a pass would do now and the ledger does not yet cover: missed, never made up, superseded, out of reach
@@ -84,6 +88,7 @@ internal sealed class GetRecoveryStatusHandler(IRecoveryLedger ledger, RecoveryR
                 continue;
             }
 
+            var runs = missed.Status == RecoveryItemStatus.Planned && Covered(steps, missed.ServiceId, missed.Session, missed.Session);
             var status = missed.Status switch
             {
                 RecoveryItemStatus.Planned => RecoveryRowStatus.Missed,
@@ -91,7 +96,7 @@ internal sealed class GetRecoveryStatusHandler(IRecoveryLedger ledger, RecoveryR
                 RecoveryItemStatus.NotRecoverable => RecoveryRowStatus.NotRecoverable,
                 _ => RecoveryRowStatus.OutOfReach,
             };
-            rows.Add((missed.Session, new RecoveryRowView(missed.ServiceId, registry.NameOf(missed.ServiceId), status, Clip(missed.Reason), 0, missed.Session, missed.Session, null, status == RecoveryRowStatus.Missed, status == RecoveryRowStatus.Missed ? RecoveryRetryKinds.Run : null, [])));
+            rows.Add((missed.Session, new RecoveryRowView(missed.ServiceId, registry.NameOf(missed.ServiceId), status, Clip(missed.Reason), 0, missed.Session, missed.Session, null, runs, runs ? RecoveryRetryKinds.Run : null, [])));
         }
 
         var sessions = rows.GroupBy(r => r.Session).OrderBy(g => g.Key)
@@ -106,7 +111,7 @@ internal sealed class GetRecoveryStatusHandler(IRecoveryLedger ledger, RecoveryR
         return Result.Success(new RecoveryStatusView(now, runner.IsRunning, latest, query.Days, counts, truncated, preview.IsFailure ? new RecoveryPlanUnavailable(preview.Error.Message) : null, sessions));
     }
 
-    private RecoveryRowView Row(RecoveryItemRow item)
+    private RecoveryRowView Row(RecoveryItemRow item, IReadOnlyList<RecoveryStep> steps)
     {
         var status = item.State switch
         {
@@ -123,13 +128,16 @@ internal sealed class GetRecoveryStatusHandler(IRecoveryLedger ledger, RecoveryR
             : [];
         var kind = status switch
         {
-            RecoveryRowStatus.StillFailing when item.Attempts < options.MaxAttempts => RecoveryRetryKinds.Run,
-            RecoveryRowStatus.Blocked or RecoveryRowStatus.Waiting => RecoveryRetryKinds.Run,
+            RecoveryRowStatus.StillFailing when item.Attempts < options.MaxAttempts && Covered(steps, item.ServiceId, item.SessionFrom, item.SessionTo) => RecoveryRetryKinds.Run,
+            RecoveryRowStatus.Blocked or RecoveryRowStatus.Waiting when Covered(steps, item.ServiceId, item.SessionFrom, item.SessionTo) => RecoveryRetryKinds.Run,
             RecoveryRowStatus.Partial => RecoveryRetryKinds.Recheck,
             _ => null,
         };
         return new RecoveryRowView(item.ServiceId, registry.NameOf(item.ServiceId), status, Clip(item.Reason), item.Attempts, item.SessionFrom, item.SessionTo, item.RunId, kind is not null, kind, missing);
     }
+
+    private static bool Covered(IReadOnlyList<RecoveryStep> steps, string serviceId, DateOnly from, DateOnly to) =>
+        steps.Any(st => st.ServiceId == serviceId && st.Sessions.Any(d => d >= from && d <= to));
 
     private static string? Clip(string? reason) =>
         string.IsNullOrWhiteSpace(reason) ? null : reason.Length <= 300 ? reason : string.Concat(reason.AsSpan(0, 299), "…");

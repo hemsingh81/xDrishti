@@ -234,6 +234,38 @@ describe('Recovery screen', () => {
     expect(await screen.findByText('Nothing to run; re-checked what was partial.')).toBeInTheDocument();
   });
 
+  it('shows recovery.plan_unavailable in the server’s words and does not invite a re-press', async () => {
+    mountRead(() => withSession([row({ canRetry: true, retryKind: 'run' })]));
+    server.use(
+      http.post('/api/services/recovery/retry', () =>
+        problemResponse(
+          { title: 'The calendar could not be read.', status: 409, code: 'recovery.plan_unavailable' },
+          409,
+        ),
+      ),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Retry recovery' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Start recovery' }));
+    expect(await screen.findByText('The calendar could not be read.')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Retry recovery' })).toBeDisabled();
+    });
+  });
+
+  it('keeps the rows under the plan alert and does not show a Missed count', async () => {
+    mountRead(() =>
+      withSession([row({ serviceName: 'Kept row' })], {
+        planUnavailable: { reason: 'The calendar could not be read.' },
+      }),
+    );
+    renderPage();
+    expect(await screen.findByText('The calendar could not be read.')).toBeInTheDocument();
+    expect(screen.getAllByText('Kept row').length).toBeGreaterThan(0);
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
+  });
+
   it('shows recovery.not_recorded in the server’s words', async () => {
     mountRead(() => withSession([row({ canRetry: true, retryKind: 'run' })]));
     server.use(
