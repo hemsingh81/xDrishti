@@ -25,6 +25,7 @@ public sealed class PaperCaptureService(IServiceScopeFactory scopes) : ISchedule
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.TimeBound,
             MustFollow = [EodService.Id],
             StartNotBefore = new TimeOnly(16, 30),
             StartAdvice = "It must start after the end-of-day data run (the bars of the session must be stored) and before the nightly plan (18:30).",

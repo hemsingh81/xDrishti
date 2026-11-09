@@ -42,7 +42,7 @@ public sealed class LiveFeedService : IScheduledService, IExternallyRunService
         [ScheduleType.Window],
         new ServiceSettings(true, Schedule.Window(new TimeOnly(9, 0), new TimeOnly(15, 35)), 0, ServiceSettings.MaxTimeoutMinutes, false, true, new Dictionary<string, JsonElement>()),
         [],
-        new ServiceConstraints { MustCover = TimeRange.MarketHours });
+        new ServiceConstraints { RecoveryClass = RecoveryClass.TimeBound, MustCover = TimeRange.MarketHours });
 
     ServiceDefinition IScheduledService.Definition => Definition;
 

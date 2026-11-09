@@ -44,6 +44,7 @@ public sealed class EodService(IServiceScopeFactory scopes, IDataSettings settin
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.Convergent,
             StartNotBefore = new TimeOnly(15, 35),
             StartAdvice = "The session ends at 15:30; the last minutes may not be available from Dhan yet.",
             NotBeforeSessionEnd = true,

@@ -35,7 +35,7 @@ public sealed class DepthRecorderService : IScheduledService, IExternallyRunServ
         [ScheduleType.Window],
         new ServiceSettings(false, Schedule.Window(WindowStart, WindowEnd), 0, ServiceSettings.MaxTimeoutMinutes, false, true, new Dictionary<string, JsonElement>()),
         [],
-        new ServiceConstraints());
+        new ServiceConstraints { RecoveryClass = RecoveryClass.TimeBound });
 
     ServiceDefinition IScheduledService.Definition => Definition;
 

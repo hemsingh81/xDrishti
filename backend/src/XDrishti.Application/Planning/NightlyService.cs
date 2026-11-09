@@ -27,6 +27,7 @@ public sealed class NightlyService(IServiceScopeFactory scopes) : IScheduledServ
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.LatestOnly,
             MustFollow = [EodService.Id, PortfolioBrokerHistoryService.Id],
             StartNotBefore = new TimeOnly(16, 30),
             StartAdvice = "The end-of-day data run (15:50) and the portfolio sync (16:30) must have finished; the gates fail the plan closed if they have not.",

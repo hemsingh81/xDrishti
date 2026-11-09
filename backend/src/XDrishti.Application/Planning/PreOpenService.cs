@@ -25,6 +25,7 @@ public sealed class PreOpenService(IServiceScopeFactory scopes) : IScheduledServ
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.TimeBound,
             MustFollow = [ReviewCutoffService.Id],
             StartNotBefore = new TimeOnly(9, 8),
             StartNotAfter = new TimeOnly(9, 14),

@@ -26,6 +26,7 @@ public sealed class LiveSettleService(IServiceScopeFactory scopes, ILiveCaptureS
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.TimeBound,
             MustFollow = [PortfolioBrokerHistoryService.Id],
             StartAdvice = "It follows the evening read of Dhan's trades and ledger; the plan grade of a session is stored by the grading run, and a ticket whose grade is not there yet is settled by a later run.",
             CatchUpReach = CatchUpReach.SameDay,

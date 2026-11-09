@@ -29,6 +29,7 @@ public sealed class TicketPromptsService(IServiceScopeFactory scopes, TimeProvid
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.LatestOnly,
             StartNotBefore = new TimeOnly(16, 30),
             StartAdvice = "Start it after plan-expiry (15:40) and the 16:30 portfolio sync, so the day's trades are on record when the question is asked.",
             NotBeforeSessionEnd = true,

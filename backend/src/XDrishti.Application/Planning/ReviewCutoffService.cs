@@ -25,6 +25,7 @@ public sealed class ReviewCutoffService(IServiceScopeFactory scopes) : ISchedule
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.TimeBound,
             StartNotAfter = new TimeOnly(9, 5),
             StartAdvice = "It must run through the cutoff time (09:05) of the plan: unreviewed tickets lapse only when it runs at or after it, and the pre-open check follows at 09:10.",
         });

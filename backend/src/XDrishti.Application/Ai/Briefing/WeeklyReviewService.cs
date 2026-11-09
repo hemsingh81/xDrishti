@@ -29,6 +29,7 @@ public sealed class WeeklyReviewService(IServiceScopeFactory scopes) : ISchedule
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.LatestOnly,
             MustFollow = [WeeklyService.Id],
             StartAdvice = "It reads the digest the weekly service stored; run it after the digest.",
         });

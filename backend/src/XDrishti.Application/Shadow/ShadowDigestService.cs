@@ -22,7 +22,7 @@ public sealed class ShadowDigestService(IServiceScopeFactory scopes) : ISchedule
         [ScheduleType.Weekly],
         new ServiceSettings(false, Schedule.Weekly(DayOfWeek.Saturday, new TimeOnly(11, 0)), 0, 30, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
-        new ServiceConstraints { CatchUpReach = CatchUpReach.SameDay });
+        new ServiceConstraints { RecoveryClass = RecoveryClass.LatestOnly, CatchUpReach = CatchUpReach.SameDay });
 
     ServiceDefinition IScheduledService.Definition => Definition;
 

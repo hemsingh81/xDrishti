@@ -21,7 +21,7 @@ public sealed class OptionArchiveQualityService(IServiceScopeFactory scopes) : I
         [ScheduleType.Daily, ScheduleType.Weekly, ScheduleType.After],
         new ServiceSettings(true, Schedule.Daily(new TimeOnly(16, 15)), 1, 60, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
-        new ServiceConstraints { CatchUpReach = CatchUpReach.SameDay });
+        new ServiceConstraints { RecoveryClass = RecoveryClass.Convergent, CatchUpReach = CatchUpReach.SameDay });
 
     ServiceDefinition IScheduledService.Definition => Definition;
 

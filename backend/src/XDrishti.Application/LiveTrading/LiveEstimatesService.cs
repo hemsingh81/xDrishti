@@ -25,6 +25,7 @@ public sealed class LiveEstimatesService(IServiceScopeFactory scopes, ILiveEstim
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.TimeBound,
             StartAdvice = "It reads the executions that the evening live settle stores; with few live trades most buckets stay 'insufficient' for weeks.",
             CatchUpReach = CatchUpReach.SameDay,
         });

@@ -27,6 +27,7 @@ public sealed class WeeklyService(IServiceScopeFactory scopes) : IScheduledServi
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.LatestOnly,
             CatchUpReach = CatchUpReach.SameDay, // a weekly job missed on Saturday is caught up within 24 hours (Sunday); a later start would store a digest of a past week
         });
 

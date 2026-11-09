@@ -24,6 +24,7 @@ public sealed class SuggestionsService(IServiceScopeFactory scopes) : IScheduled
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.LatestOnly,
             MustFollow = [NightlyService.Id],
             StartAdvice = "It reads the plan the nightly run stored; run it after the nightly plan.",
         });

@@ -40,6 +40,7 @@ public sealed class PortfolioBrokerHistoryService(IServiceScopeFactory scopes, I
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.LatestOnly,
             StartNotBefore = new TimeOnly(15, 35),
             StartAdvice = "The session ends at 15:30; Dhan's trade history and ledger are complete for the day a little later.",
             NotBeforeSessionEnd = true,

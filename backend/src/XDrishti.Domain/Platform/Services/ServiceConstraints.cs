@@ -26,5 +26,8 @@ public sealed record ServiceConstraints
     /// <summary>A run on a trading day never starts before that day's session has ended (a special session that ends later moves it, ADR 0017 §2).</summary>
     public bool NotBeforeSessionEnd { get; init; }
 
+    /// <summary>How a missed day of this service is made up (ADR 0240). Null means not declared: the registry test fails and the planner refuses the service.</summary>
+    public RecoveryClass? RecoveryClass { get; init; }
+
     public CatchUpReach CatchUpReach { get; init; } = CatchUpReach.SameDay;
 }
