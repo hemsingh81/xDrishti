@@ -29,9 +29,9 @@ Names reached only by reflection or DI (EF `*Configuration`, registration extens
 | 6 | `AiSqlRunner.Short` (private) | IDE0051 | 0 | AU-06 A, done |
 | 7 | `ScheduleCalculator.WeeklyReach` (private field) | IDE0052 | 0 | AU-06 A, done |
 | 8 | `LegState._t1Epoch` (private field, written never read) | IDE0052 | 0 | AU-06 A, done |
-| 9 | `daysBetween` (`frontend/src/features/live/lib/dates.ts`) | import/name scan, no test | 0 | AU-07 A |
-| 10 | `isReplayTimeframe` (`features/reports/lib/replayModel.ts`) | same | 0 | AU-07 A |
-| 11 | `MAX_PIVOT_CELLS` (`features/reports/lib/pivotLimits.ts`; delete the file if it holds nothing else) | same | 0 | AU-07 A |
+| 9 | `daysBetween` (`frontend/src/features/live/lib/dates.ts`) | import/name scan, no test | 0 | AU-07 A, done |
+| 10 | `isReplayTimeframe` (`features/reports/lib/replayModel.ts`) | same | 0 | AU-07 A, done |
+| 11 | `MAX_PIVOT_CELLS` (`features/reports/lib/pivotLimits.ts`; delete the file if it holds nothing else) | same | 0 | AU-07 A, done |
 
 Risk: low. Items 1 to 8 are checked by the compiler on removal (a wrong removal does not build); 9 to 11 by `tsc`. Items 1 to 8 are about half a day, 9 to 11 under an hour. Because the method has the limits above, the AU-06/AU-07 builds and tests are the final proof, and a reviewer samples the list before removal.
 

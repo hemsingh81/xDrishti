@@ -235,7 +235,11 @@ describe('Recovery screen', () => {
   });
 
   it('shows recovery.plan_unavailable in the server’s words and does not invite a re-press', async () => {
-    mountRead(() => withSession([row({ canRetry: true, retryKind: 'run' })]));
+    mountRead(() =>
+      withSession([row({ canRetry: true, retryKind: 'run' })], {
+        planUnavailable: { reason: 'The calendar could not be read.' },
+      }),
+    );
     server.use(
       http.post('/api/services/recovery/retry', () =>
         problemResponse(
@@ -251,6 +255,32 @@ describe('Recovery screen', () => {
     expect(await screen.findByText('The calendar could not be read.')).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Retry recovery' })).toBeDisabled();
+    });
+  });
+
+  it('enables Retry again once the plan reads again after recovery.plan_unavailable', async () => {
+    let planDown = true;
+    mountRead(() =>
+      withSession([row({ canRetry: true, retryKind: 'run' })], {
+        planUnavailable: planDown ? { reason: 'Plan is down.' } : null,
+      }),
+    );
+    server.use(
+      http.post('/api/services/recovery/retry', () => {
+        planDown = false; // the plan reads again by the time the page re-reads after the refusal
+        return problemResponse(
+          { title: 'The calendar could not be read.', status: 409, code: 'recovery.plan_unavailable' },
+          409,
+        );
+      }),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Retry recovery' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Start recovery' }));
+    expect(await screen.findByText('The calendar could not be read.')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Retry recovery' })).toBeEnabled();
     });
   });
 
