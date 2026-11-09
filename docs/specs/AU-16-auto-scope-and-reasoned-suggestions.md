@@ -21,6 +21,7 @@ For the chosen baskets or stocks, each next-day suggestion says what, why, and o
 4. A figure that is missing reads `unavailable` and is never shown as a pass; a candidate without the required evidence is not suggested and appears under `Not suggested` with why.
 5. Every suggestion carries the plan's basis text (replayed-history estimate, conditional on tomorrow's bars) and the words `Suggestion only, no order is placed`.
 6. Rejected and reserve items remain visible with reasons.
+7. The `suggest.scope` control appears on the Essential Settings row (AU-09 AC3), with the scope store behind it.
 
 ## Contract
 - **API:** `GET|PUT /api/auto/scope` (PUT audited); `GET /api/auto/suggestions?forDate=`. `scripts/gen-api.sh`.

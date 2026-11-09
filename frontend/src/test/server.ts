@@ -23,6 +23,7 @@ import {
   buildSystemStatus,
   summaryOf,
 } from './fixtures';
+import { buildSettingsCatalog } from './settingsCatalogFixtures';
 import { brokerHistoryHandlers } from './brokerHistoryFixtures';
 import { dividendHandlers } from './dividendFixtures';
 import { actionCenterHandlers } from './actionCenterFixtures';
@@ -42,6 +43,7 @@ export const dhanRedirectUrl = 'http://localhost:8080/api/brokers/dhan/callback'
 
 /** Default API mocks (network level): a signed-in owner. Override per test with server.use(...). */
 export const handlers = [
+  http.get('/api/settings/catalog', () => HttpResponse.json(buildSettingsCatalog())),
   http.get('/api/auth/session', () => HttpResponse.json(buildSession())),
   // Owner-act switches: none listed (every switch off); the owner-acts tests bring `createCapabilitiesFake`.
   http.get('/api/capabilities', () => HttpResponse.json({ items: [], history: [] })),

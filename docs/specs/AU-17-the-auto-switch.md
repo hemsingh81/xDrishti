@@ -23,6 +23,7 @@ One switch runs the whole chain, from data to next-day suggestions.
 6. Auto cannot affect `live-*` or Execution: an architecture test fails on any reference from AU code to `XDrishti.Execution` or to order-capable ports.
 7. Auto ON and a service later paused by the owner: the screen shows the chain as incomplete rather than hiding it.
 8. With Auto ON and a fail-closed night, no suggestions are shown, and the reason is.
+9. The `auto.enabled` control appears on the Essential Settings row (AU-09 AC3), with the password rule of AC1.
 
 ## Contract
 - **API:** `GET /api/auto`; `POST /api/auto/on` (fresh password via `OwnerAct`); `POST /api/auto/off`.

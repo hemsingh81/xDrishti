@@ -33,7 +33,9 @@ describe('Settings: the charge sheet confirmation', () => {
   it('is a tab of Settings that loads on demand, kept in the URL', async () => {
     const fake = createChargeSheetFake();
     server.use(...fake.handlers);
-    const { router } = renderRoutes([{ path: '/settings', element: <SettingsPage /> }], { initialPath: '/settings' });
+    const { router } = renderRoutes([{ path: '/settings', element: <SettingsPage /> }], {
+      initialPath: '/settings?tab=profiles',
+    });
 
     await userEvent.click(await screen.findByRole('tab', { name: 'Charge sheet' }));
 

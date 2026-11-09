@@ -27,7 +27,7 @@ const restore = () => screen.getByRole('button', { name: 'Restore defaults' });
 describe('Settings: Action center thresholds', () => {
   it('is a tab of Settings, kept in the URL', async () => {
     server.use(...createActionCenterFake().handlers);
-    const { router } = renderTab('/settings');
+    const { router } = renderTab('/settings?tab=profiles');
 
     await userEvent.click(await screen.findByRole('tab', { name: 'Action center' }));
 
