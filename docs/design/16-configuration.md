@@ -635,3 +635,7 @@ The ingest is the service `filings-ingest` of the scheduler in `xd-api` ([ADR 01
 | `Confidence:Loop:MinSlopePer50Rows` / `TargetGain` | The learning curve: the gain per 50 rows below which a curve is "flat" (above 0, up to 0.1) and the gain the projection aims at (0.001..0.1) | 0.002 / 0.01 |
 | `Confidence:Loop:SlopeLow` / `SlopeHigh` / `SlopeSe` | The reliability slope (trailing window fixed at 200 outcomes; with fewer the slope is shown and never alarms): the alarm bars (0.8 up to but not including 1; above 1 up to 1.2) and the standard errors from 1 the slope must also be (1..2). Tighten only | 0.8 / 1.2 / 2 |
 | `goals.max_drawdown_pct` | Halt-and-review threshold | 8% |
+
+## Visible settings (planned, AU-08 and AU-09, [ADR 0242](../adr/0242-few-visible-settings-and-learned-changes-tighten-automatically-while-loosening-needs-the-owners-password.md))
+
+At most eight Essential settings are shown first; the rest stay under `Advanced settings` or are internal. Each has a validated range and a safer direction. New AU keys (`Recovery:*`, `Simulate:*`, `Training:*`, `Learned:WeeklyCap`) are not Essential.

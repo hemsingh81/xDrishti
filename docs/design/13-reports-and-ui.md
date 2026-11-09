@@ -328,3 +328,7 @@ summary. Notifications appear in-app (SignalR); optional external channel only i
   nightly; responses are chart-ready series.
 - Lightweight Charts (TradingView, Apache-2.0, pinned `5.2.1`) for anything price-based, behind the one lazy wrapper `shared/ui/chart/PriceChart` (the trade replay, later the ticket charts); ECharts for analytics. Bars are built, adjusted and aggregated on the server; the page carries the library's attribution notice ([ADR 0125](../adr/0125-the-trade-replay-reads-one-stored-trade-on-server-built-adjusted-bars-with-an-entry-check-and-draws-it-with-lightweight-charts-behind-one-wrapper.md)).
 - The SPA is an installable app (P8-21, [ADR 0132](../adr/0132-the-pwa-is-an-installable-shell-and-an-offline-page-behind-a-capability-its-worker-caches-six-static-files-and-answers-only-failed-page-loads.md)): a manifest and icons, and, only while the owner has switched `pwa` on, a service worker that shows an offline page and caches nothing else. It holds no data offline and is removed on sign-out. Installing needs a secure address: `localhost` on this Mac qualifies; a phone needs the private tunnel of doc 17 "Phone access".
+
+## AU screens (planned)
+
+`/services/recovery` (missed, recovered, still failing), `/reports/simulation` (stock or basket, from-to, report type, usable while the job runs, training data only) and `/auto` (switch, scope, suggestions).
