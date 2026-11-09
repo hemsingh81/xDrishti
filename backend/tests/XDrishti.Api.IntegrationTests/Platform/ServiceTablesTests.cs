@@ -354,6 +354,34 @@ public sealed class ServiceTablesTests(ApiFactory factory) : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task The_manual_trigger_migration_admits_a_manual_pass_and_goes_down_and_up_again()
+    {
+        var admin = new NpgsqlConnectionStringBuilder(factory.AdminConnectionString);
+        var scratch = new NpgsqlConnectionStringBuilder(factory.AdminConnectionString) { Database = ScratchDatabase, Pooling = false };
+        await CreateScratchDatabaseAsync(admin, scratch);
+        try
+        {
+            await using var migrated = factory.WithWebHostBuilder(b => b.UseSetting("Database:ConnectionString", scratch.ConnectionString));
+            await DatabaseMigrator.MigrateAsync(migrated.Services, Ct);
+            await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+            await connection.OpenAsync(Ct);
+            await ExecuteAsync(connection, "INSERT INTO platform.recovery_passes (id, trigger, started_at, status) VALUES ('00000000-0000-7000-8000-000000000002', 'manual', now(), 'running')");
+
+            await using var scope = migrated.Services.CreateAsyncScope();
+            var migrator = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>().GetService<IMigrator>();
+            await migrator.MigrateAsync("20261109110000_AddRecoveryItemDetail", Ct); // down
+            (await ScalarAsync(connection, "SELECT trigger FROM platform.recovery_passes")).ShouldBe("resume");
+            await ShouldBeRejectedAsync(connection, "INSERT INTO platform.recovery_passes (id, trigger, started_at, status) VALUES (gen_random_uuid(), 'manual', now(), 'running')", PostgresErrorCodes.CheckViolation);
+            await migrator.MigrateAsync(null, Ct); // and up again
+            await ExecuteAsync(connection, "INSERT INTO platform.recovery_passes (id, trigger, started_at, status) VALUES (gen_random_uuid(), 'manual', now(), 'running')");
+        }
+        finally
+        {
+            await DropScratchDatabaseAsync(admin);
+        }
+    }
+
     private static async Task CreateScratchDatabaseAsync(NpgsqlConnectionStringBuilder admin, NpgsqlConnectionStringBuilder scratch)
     {
         await using (var connection = new NpgsqlConnection(admin.ConnectionString))

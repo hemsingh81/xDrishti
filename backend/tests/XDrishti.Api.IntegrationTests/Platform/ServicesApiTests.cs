@@ -356,7 +356,33 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
 
         view!.Truncated.ShouldBeTrue();
         view.Counts.Recovered.ShouldBe(500);
-        watch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(5));
+        watch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(1)); // a single request on a shared CI-style host; the 150 ms p95 of the spec is not measured here (no load test), only this generous ceiling
+    }
+
+    [Fact]
+    public async Task Retry_is_202_starts_a_manual_pass_that_is_recorded_and_audited_and_a_second_retry_while_it_runs_is_409()
+    {
+        (await _client.PutJsonAsync($"/api/services/{FakeJobService.Id}/schedule", Body(), Ct)).EnsureSuccessStatusCode(); // the stored row is the baseline
+        await factory.WithDbAsync(async db => await db.Database.ExecuteSqlRawAsync("UPDATE platform.service_schedules SET updated_at = updated_at - interval '6 days'", Ct)); // the row is six days old: sessions were missed
+        _fake.Hold();
+
+        using var first = await _client.PostAsync("/api/services/recovery/retry", Ct);
+        first.StatusCode.ShouldBe(HttpStatusCode.Accepted, await first.Content.ReadAsStringAsync(Ct));
+        var accepted = await first.Content.ReadFromJsonAsync<RecoveryRetryAccepted>(Ct);
+        accepted!.Started.ShouldBeTrue();
+        accepted.Steps.ShouldBeGreaterThan(0);
+        using var second = await _client.PostAsync("/api/services/recovery/retry", Ct);
+        second.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await second.ReadProblemAsync(Ct)).Code.ShouldBe("recovery.already_running");
+        (await _client.GetFromJsonAsync<RecoveryStatusView>("/api/services/recovery", Ct))!.Running.ShouldBeTrue();
+
+        _fake.Release();
+        await _host.Services.GetRequiredService<RecoveryRunner>().WhenIdleAsync();
+        await Runner.WhenIdleAsync();
+
+        var triggers = await factory.WithDbAsync(async db => await db.Database.SqlQueryRaw<string>("SELECT trigger AS \"Value\" FROM platform.recovery_passes").ToListAsync(Ct));
+        triggers.ShouldBe(["manual"]);
+        (await AuditEventsAsync()).Count(e => e == "ServiceRunRequested").ShouldBe(1);
     }
 
     [Theory]

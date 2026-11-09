@@ -8,7 +8,7 @@ import { severityOf, type AppNotification } from './deriveNotifications';
  */
 export function deriveServiceNotifications(notices: readonly ServiceNotice[]): AppNotification[] {
   return notices.flatMap((notice) =>
-    notice.kind === 'service_failed'
+    notice.kind === 'service_failed' || notice.kind.startsWith('recovery_')
       ? [
           {
             id: notice.id,
@@ -17,7 +17,7 @@ export function deriveServiceNotifications(notices: readonly ServiceNotice[]): A
             accountId: null,
             accountName: null,
             text: notice.text,
-            href: '/services',
+            href: notice.kind.startsWith('recovery_') ? '/services/recovery' : '/services',
             at: notice.at === null ? null : Date.parse(notice.at),
             title: null,
             actions: [],

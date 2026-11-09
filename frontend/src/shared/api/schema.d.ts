@@ -18983,7 +18983,7 @@ export interface components {
       /** @description The owner's password, re-entered for THIS save. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
       password: null | string;
     };
-    /** @description Headline counts: missed (missed, waiting, running, not recoverable, out of reach), recovered, still failing (still failing, blocked, partial). */
+    /** @description Headline counts, in rows (one row is one step of the ledger, which may cover several sessions, or one missed session of the plan; not sessions): missed (missed, waiting, running, not recoverable, out of reach), recovered, still failing (still failing, blocked, partial). */
     RecoveryCounts: {
       /** Format: int32 */
       missed: number;
@@ -19000,11 +19000,19 @@ export interface components {
       finishedAt: null | string;
       status: string;
     };
+    /** @description The plan of what a pass would do was refused (`Reason`): the rows of the ledger are shown, but "nothing missed" cannot be concluded. */
+    RecoveryPlanUnavailable: {
+      reason: string;
+    };
+    /** @description `Started` is true when the pass has steps to run (`Steps`); false when there is nothing to run, so the pass only proves partial items again. */
     RecoveryRetryAccepted: {
       /** Format: date-time */
       requestedAt: string;
+      started: boolean;
+      /** Format: int32 */
+      steps: number;
     };
-    /** @description One service at one session. `Session` is the last session of the step; `From` to `To` are the sessions the step covers; `MissingSessions` are those a partial recovery did not fill. */
+    /** @description One service at one session. `From` to `To` are the sessions the step covers (the group is its last session); `MissingSessions` are those a partial recovery did not fill; `RetryKind` says what a retry does (null: nothing, `CanRetry` false), a failed step that used up its attempts is not run again. */
     RecoveryRowView: {
       serviceId: string;
       serviceName: string;
@@ -19019,6 +19027,7 @@ export interface components {
       /** Format: uuid */
       runId: null | string;
       canRetry: boolean;
+      retryKind: null | string;
       missingSessions: string[];
     };
     RecoverySessionView: {
@@ -19036,6 +19045,7 @@ export interface components {
       days: number;
       counts: components['schemas']['RecoveryCounts'];
       truncated: boolean;
+      planUnavailable: null | components['schemas']['RecoveryPlanUnavailable'];
       sessions: components['schemas']['RecoverySessionView'][];
     };
     /** @description One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving. */

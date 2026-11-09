@@ -1,7 +1,8 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { pinClock } from '@/test/pinClock';
+import { fakeTimers, pinClock } from '@/test/pinClock';
+import { stubPhoneWidth } from '@/test/matchMedia';
 import { renderRoutes } from '@/test/render';
 import { problemResponse, server } from '@/test/server';
 import type { RecoveryRow, RecoveryStatus } from '@/shared/api/types';
@@ -21,6 +22,7 @@ const row = (over: Partial<RecoveryRow> = {}): RecoveryRow => ({
   to: '2026-11-05',
   runId: null,
   canRetry: false,
+  retryKind: null,
   missingSessions: [],
   ...over,
 });
@@ -32,6 +34,7 @@ const status = (over: Partial<RecoveryStatus> = {}): RecoveryStatus => ({
   days: 14,
   counts: { missed: 0, recovered: 0, stillFailing: 0 },
   truncated: false,
+  planUnavailable: null,
   sessions: [],
   ...over,
 });
@@ -118,35 +121,72 @@ describe('Recovery screen', () => {
   it('polls only while a pass runs and stops when it ends', async () => {
     let running = true;
     const reads = mountRead(() => withSession([row()], { running }));
+    fakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'], shouldAdvanceTime: true });
     renderPage();
     await screen.findByText(/A recovery pass is running now/);
+    await vi.advanceTimersByTimeAsync(100);
     await waitFor(() => {
       expect(reads()).toBeGreaterThan(2);
     });
     running = false;
+    await vi.advanceTimersByTimeAsync(100);
     await waitFor(() => {
       expect(screen.queryByText(/A recovery pass is running now/)).not.toBeInTheDocument();
     });
     const settled = reads();
-    await new Promise((r) => setTimeout(r, 120));
+    await vi.advanceTimersByTimeAsync(2000);
     expect(reads()).toBe(settled);
   });
 
   it('does not poll when nothing runs', async () => {
     const reads = mountRead(() => status());
+    fakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'], shouldAdvanceTime: true });
     renderPage();
     await screen.findByText(/Nothing was missed/);
-    await new Promise((r) => setTimeout(r, 120));
+    await vi.advanceTimersByTimeAsync(2000);
     expect(reads()).toBe(1);
+  });
+
+  it('shows why the plan is unavailable instead of "nothing was missed"', async () => {
+    mountRead(() => status({ planUnavailable: { reason: 'The calendar could not be read.' } }));
+    renderPage();
+    expect(await screen.findByText('The calendar could not be read.')).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing was missed/)).not.toBeInTheDocument();
+  });
+
+  it('labels a partial row’s retry as a re-check and says a spent failing row will not run again', async () => {
+    mountRead(() =>
+      withSession([
+        row({ status: 'partial', canRetry: true, retryKind: 'recheck', missingSessions: ['2026-11-04'] }),
+        row({ serviceId: 'f', serviceName: 'Fails', status: 'still_failing', attempts: 3 }),
+      ]),
+    );
+    renderPage();
+    expect(await screen.findByText(/re-checks the data already stored/)).toBeInTheDocument();
+    expect(screen.getByText(/Tried 3 times/)).toBeInTheDocument();
+  });
+
+  it('is usable on a phone: sessions are tables, counts and Retry are present', async () => {
+    stubPhoneWidth();
+    mountRead(() => withSession([row({ canRetry: true, retryKind: 'run' })]));
+    renderPage();
+    expect(await screen.findByRole('table', { name: /Session/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry recovery' })).toBeInTheDocument();
+    expect(screen.getAllByRole('term')).toHaveLength(3);
   });
 
   it('offers one confirmed Retry that starts a pass, and starts nothing on load', async () => {
     const posts: string[] = [];
-    mountRead(() => withSession([row({ canRetry: true }), row({ serviceId: 'b', serviceName: 'B', canRetry: true })]));
+    mountRead(() =>
+      withSession([
+        row({ canRetry: true, retryKind: 'run' }),
+        row({ serviceId: 'b', serviceName: 'B', canRetry: true, retryKind: 'run' }),
+      ]),
+    );
     server.use(
       http.post('/api/services/recovery/retry', () => {
         posts.push('x');
-        return HttpResponse.json({ requestedAt: '2026-11-09T10:00:00Z' }, { status: 202 });
+        return HttpResponse.json({ requestedAt: '2026-11-09T10:00:00Z', started: true, steps: 2 }, { status: 202 });
       }),
     );
     renderPage();
@@ -164,7 +204,7 @@ describe('Recovery screen', () => {
   });
 
   it('shows the server’s words on 409', async () => {
-    mountRead(() => withSession([row({ canRetry: true })]));
+    mountRead(() => withSession([row({ canRetry: true, retryKind: 'run' })]));
     server.use(
       http.post('/api/services/recovery/retry', () =>
         problemResponse(
@@ -178,5 +218,33 @@ describe('Recovery screen', () => {
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Start recovery' }));
     expect(await screen.findByText('A recovery pass is already running.')).toBeInTheDocument();
+  });
+
+  it('says when nothing ran, only partial items were re-checked', async () => {
+    mountRead(() => withSession([row({ status: 'partial', canRetry: true, retryKind: 'recheck' })]));
+    server.use(
+      http.post('/api/services/recovery/retry', () =>
+        HttpResponse.json({ requestedAt: '2026-11-09T10:00:00Z', started: false, steps: 0 }, { status: 202 }),
+      ),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Retry recovery' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Start recovery' }));
+    expect(await screen.findByText('Nothing to run; re-checked what was partial.')).toBeInTheDocument();
+  });
+
+  it('shows recovery.not_recorded in the server’s words', async () => {
+    mountRead(() => withSession([row({ canRetry: true, retryKind: 'run' })]));
+    server.use(
+      http.post('/api/services/recovery/retry', () =>
+        problemResponse({ title: 'Recovery is not being recorded.', status: 409, code: 'recovery.not_recorded' }, 409),
+      ),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Retry recovery' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Start recovery' }));
+    expect(await screen.findByText('Recovery is not being recorded.')).toBeInTheDocument();
   });
 });

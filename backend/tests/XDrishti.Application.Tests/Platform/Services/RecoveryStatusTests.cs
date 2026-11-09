@@ -29,8 +29,10 @@ public sealed class RecoveryStatusTests : IDisposable
 
     public void Dispose() => _world.Dispose();
 
-    private Task<Result<RecoveryStatusView>> StatusAsync(int days = 14) =>
-        _world.WithScopeAsync(sp => sp.GetRequiredService<IQueryHandler<GetRecoveryStatusQuery, Result<RecoveryStatusView>>>().HandleAsync(new GetRecoveryStatusQuery(days), Ct));
+    private Task<Result<RecoveryStatusView>> StatusAsync(int days = 14) => StatusAsync(_world, days);
+
+    private static Task<Result<RecoveryStatusView>> StatusAsync(ServicesWorld world, int days = 14) =>
+        world.WithScopeAsync(sp => sp.GetRequiredService<IQueryHandler<GetRecoveryStatusQuery, Result<RecoveryStatusView>>>().HandleAsync(new GetRecoveryStatusQuery(days), Ct));
 
     private Task<Result<RecoveryRetryAccepted>> RetryAsync() =>
         _world.WithScopeAsync(sp => sp.GetRequiredService<ICommandHandler<RetryRecoveryCommand, RecoveryRetryAccepted>>().HandleAsync(new RetryRecoveryCommand("owner@example.invalid"), Ct));
@@ -93,9 +95,10 @@ public sealed class RecoveryStatusTests : IDisposable
         var rows = view.Sessions.SelectMany(s => s.Items).ToList();
         rows.Single(r => r.ServiceId == "eod" && r.To == day).Status.ShouldBe(RecoveryRowStatus.Recovered);
         var failed = rows.Single(r => r.ServiceId == "other" && r.To == day);
-        (failed.Status, failed.Reason, failed.Attempts, failed.CanRetry).ShouldBe((RecoveryRowStatus.StillFailing, "source down", 3, true));
+        (failed.Status, failed.Reason, failed.Attempts, failed.CanRetry, failed.RetryKind).ShouldBe((RecoveryRowStatus.StillFailing, "source down", 3, false, null)); // used up its attempts: a pass does not run it again
         var partial = rows.Single(r => r.Status == RecoveryRowStatus.Partial);
         partial.MissingSessions.ShouldBe([new DateOnly(2026, 10, 9)]);
+        (partial.CanRetry, partial.RetryKind).ShouldBe((true, RecoveryRetryKinds.Recheck));
         rows.ShouldContain(r => r.Status == RecoveryRowStatus.Superseded && !r.CanRetry);
         view.Counts.Recovered.ShouldBe(1);
         view.Counts.StillFailing.ShouldBe(2);
@@ -161,5 +164,99 @@ public sealed class RecoveryStatusTests : IDisposable
         result.Error.Code.ShouldBe(RecoveryErrors.AlreadyRunningCode);
         _world.Data.Events.Count.ShouldBe(events);
         view.Running.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_failed_step_with_attempts_left_can_be_retried_by_running_it_again()
+    {
+        var pass = await _world.Ledger.BeginPassAsync("startup", At(12, 9, 0), Ct);
+        await _world.Ledger.SaveAsync(Item(pass, "eod", new DateOnly(2026, 10, 12), RecoveryStates.Failed, "down", 1), Ct);
+
+        var row = (await StatusAsync()).Value.Sessions.SelectMany(s => s.Items).Single(r => r.ServiceId == "eod" && r.Status == RecoveryRowStatus.StillFailing);
+
+        (row.CanRetry, row.RetryKind).ShouldBe((true, RecoveryRetryKinds.Run));
+    }
+
+    [Fact]
+    public async Task The_sessions_of_a_failed_step_are_not_listed_again_as_missed_by_the_preview()
+    {
+        var pass = await _world.Ledger.BeginPassAsync("startup", At(12, 9, 0), Ct);
+        await _world.Ledger.SaveAsync(Item(pass, "eod", new DateOnly(2026, 10, 12), RecoveryStates.Failed, "down", 1), Ct);
+        await _world.Runner.StartAsync("eod", ServiceRunTrigger.Manual, "owner", Ct); // the service has a successful run today
+        await _world.SettleAsync();
+
+        var rows = (await StatusAsync()).Value.Sessions.SelectMany(s => s.Items).Where(r => r.ServiceId == "eod").ToList();
+
+        rows.ShouldNotContain(r => r.Status == RecoveryRowStatus.Missed);
+    }
+
+    [Fact]
+    public async Task A_plan_the_planner_refuses_is_reported_as_unavailable_and_not_as_nothing_missed()
+    {
+        using var world = new ServicesWorld(
+            Make("a", Schedule.Daily(T(16, 0)), constraints: new ServiceConstraints { MustFollow = ["b"] }),
+            Make("b", Schedule.Daily(T(16, 0)), constraints: new ServiceConstraints { MustFollow = ["a"] }));
+
+        var view = (await StatusAsync(world)).Value;
+
+        view.PlanUnavailable.ShouldNotBeNull().Reason.ShouldContain("cycle");
+        view.Sessions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_time_bound_service_is_listed_as_not_recoverable_with_its_reason_and_no_retry_and_old_sessions_as_out_of_reach()
+    {
+        using var world = new ServicesWorld(Make("live", Schedule.Daily(T(10, 0)), constraints: new ServiceConstraints { RecoveryClass = RecoveryClass.TimeBound }));
+        world.Data.Store("live", world.Services[0].Definition.Defaults);
+
+        var rows = (await StatusAsync(world, 90)).Value.Sessions.SelectMany(s => s.Items).ToList();
+
+        var notRecoverable = rows.First(r => r.Status == RecoveryRowStatus.NotRecoverable);
+        (notRecoverable.CanRetry, notRecoverable.RetryKind).ShouldBe((false, null));
+        notRecoverable.Reason.ShouldNotBeNull().ShouldContain("live observation");
+        rows.ShouldContain(r => r.Status == RecoveryRowStatus.OutOfReach && !r.CanRetry);
+    }
+
+    [Fact]
+    public async Task Retry_reports_whether_steps_are_planned_and_a_manual_pass_still_respects_paused_and_catch_up_off()
+    {
+        (await _world.PauseAsync("other")).IsSuccess.ShouldBeTrue();
+        var retry = await RetryAsync();
+        await _world.SettleAsync();
+
+        retry.Value.Started.ShouldBeTrue();
+        retry.Value.Steps.ShouldBeGreaterThan(0);
+        _world.Services.Single(x => x.Definition.Id == "other").Calls.ShouldBeEmpty();
+        _world.Ledger.Passes.Select(p => p.Trigger).ShouldContain("manual");
+    }
+
+    [Fact]
+    public async Task A_manual_pass_waits_for_the_close_of_the_market_hours_like_any_other()
+    {
+        using var world = new ServicesWorld(Backup());
+        world.Data.Store("backup", Backup().Definition.Defaults);
+        world.SetClock(At(12, 11, 0));
+        world.Application.StartedAt = At(12, 11, 0);
+
+        world.Recovery.Request(RecoveryTrigger.Manual);
+        await world.SettleAsync();
+
+        world.Services[0].Calls.ShouldBeEmpty();
+        world.Ledger.Items.Values.ShouldHaveSingleItem().State.ShouldBe(RecoveryStates.Waiting);
+        world.Ledger.Passes.Single().Trigger.ShouldBe("manual");
+    }
+
+    [Fact]
+    public async Task A_manual_pass_does_not_run_a_nightly_past_its_review_cutoff()
+    {
+        using var world = new ServicesWorld(Nightly());
+        world.Data.Store("nightly", Nightly().Definition.Defaults);
+        world.SetClock(At(13, 12, 0)); // Tuesday noon: the review cutoff of the next session after Monday has passed
+        world.Application.StartedAt = At(13, 12, 0);
+
+        world.Recovery.Request(RecoveryTrigger.Manual);
+        await world.SettleAsync();
+
+        world.Services[0].Calls.ShouldBeEmpty();
     }
 }

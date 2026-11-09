@@ -72,7 +72,9 @@ export function RecoveryPage() {
               There is more than can be shown here; these are the newest 500.
             </Alert>
           )}
-          {data.sessions.length === 0 ? (
+          {data.planUnavailable ? (
+            <Alert severity="warning">{data.planUnavailable.reason}</Alert>
+          ) : data.sessions.length === 0 ? (
             <Typography>
               Nothing was missed in the last {data.days} days. Last checked {formatDateTime(data.checkedAt)}.
             </Typography>

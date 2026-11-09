@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Platform.Services;
@@ -64,11 +65,15 @@ public sealed class RecoveryRunner(
         }
     }
 
-    /// <summary>What a pass would do now (read-only: nothing is run or written), or null when the plan is refused. For the Recovery screen.</summary>
-    public async Task<RecoveryPlan?> PreviewAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// What a pass would do now (read-only: nothing is run or written), or the refusal of the plan. For the Recovery screen. With <paramref name="withRetries"/> false the plan counts from the true baseline (the latest run), not from the start of a failed
+    /// item, so the sessions a failed item covers (which the ledger already shows) are not listed again as missed.
+    /// </summary>
+    public async Task<Result<RecoveryPlan>> PreviewAsync(bool withRetries, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
-        return (await PlanAsync(scope.ServiceProvider, clock.GetUtcNow(), cancellationToken))?.Plan;
+        var planned = await PlanAsync(scope.ServiceProvider, clock.GetUtcNow(), cancellationToken, withRetries);
+        return planned.IsFailure ? Result.Failure<RecoveryPlan>(planned.Error) : Result.Success(planned.Value.Plan);
     }
 
     /// <inheritdoc />
@@ -162,10 +167,12 @@ public sealed class RecoveryRunner(
             var ledger = scope.ServiceProvider.GetRequiredService<IRecoveryLedger>();
             await ledger.InterruptRunningAsync(now, token);
             await ReproveOpenAsync(scope.ServiceProvider, ledger, token);
-            if (await PlanAsync(scope.ServiceProvider, now, token) is not { } planned)
+            if (await PlanAsync(scope.ServiceProvider, now, token) is not { IsSuccess: true } result)
             {
                 return;
             }
+
+            var planned = result.Value;
 
             if (planned.Plan.Steps.Count == 0)
             {
@@ -214,12 +221,12 @@ public sealed class RecoveryRunner(
 
     private sealed record Planned(RecoveryPlan Plan, IReadOnlyDictionary<string, RecoveryInput> Inputs, TradingCalendar Calendar);
 
-    private async Task<Planned?> PlanAsync(IServiceProvider services, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task<Result<Planned>> PlanAsync(IServiceProvider services, DateTimeOffset now, CancellationToken cancellationToken, bool withRetries = true)
     {
         var all = await services.GetRequiredService<ServiceSettingsReader>().ReadAllAsync(cancellationToken);
         var latest = await services.GetRequiredService<IServiceRunStore>().GetLatestAsync(registry.Ids, cancellationToken);
         var calendar = await services.GetRequiredService<ITradingCalendar>().GetAsync(cancellationToken);
-        var retryable = (await services.GetRequiredService<IRecoveryLedger>().ListRetryableAsync(options.MaxAttempts, cancellationToken))
+        var retryable = (withRetries ? await services.GetRequiredService<IRecoveryLedger>().ListRetryableAsync(options.MaxAttempts, cancellationToken) : [])
             .GroupBy(i => i.ServiceId, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Min(i => i.SessionFrom), StringComparer.Ordinal);
         var inputs = all.Where(s => !registry.IsExternal(s.Id)).Select(s =>
         {
@@ -237,10 +244,10 @@ public sealed class RecoveryRunner(
         if (result.IsFailure)
         {
             ServicesLog.RecoveryPlanRefused(logger, result.Error.Code);
-            return null;
+            return Result.Failure<Planned>(result.Error);
         }
 
-        return new Planned(result.Value, inputs.ToDictionary(i => i.Definition.Id, StringComparer.Ordinal), calendar);
+        return Result.Success(new Planned(result.Value, inputs.ToDictionary(i => i.Definition.Id, StringComparer.Ordinal), calendar));
     }
 
     /// <summary>
@@ -378,7 +385,7 @@ public sealed class RecoveryRunner(
         }
 
         // the nightly runs only before its review cutoff: plan again at this instant and keep the step only if it is still there
-        return await PlanAsync(services, clock.GetUtcNow(), cancellationToken) is { } again && again.Plan.Steps.Any(s => s.ServiceId == step.ServiceId && s.To == step.To);
+        return await PlanAsync(services, clock.GetUtcNow(), cancellationToken) is { IsSuccess: true } again && again.Value.Plan.Steps.Any(s => s.ServiceId == step.ServiceId && s.To == step.To);
     }
 
     private async Task<RecoveryItemRow> RunStepAsync(IServiceProvider services, IRecoveryLedger ledger, Planned planned, RecoveryStep step, RecoveryItemRow item, CancellationToken cancellationToken)

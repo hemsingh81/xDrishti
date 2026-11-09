@@ -55859,7 +55859,7 @@
             "format": "int32"
           }
         },
-        "description": "Headline counts: missed (missed, waiting, running, not recoverable, out of reach), recovered, still failing (still failing, blocked, partial)."
+        "description": "Headline counts, in rows (one row is one step of the ledger, which may cover several sessions, or one missed session of the plan; not sessions): missed (missed, waiting, running, not recoverable, out of reach), recovered, still failing (still failing, blocked, partial)."
       },
       "RecoveryPassView": {
         "required": [
@@ -55889,17 +55889,39 @@
           }
         }
       },
+      "RecoveryPlanUnavailable": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "The plan of what a pass would do was refused (`Reason`): the rows of the ledger are shown, but \"nothing missed\" cannot be concluded."
+      },
       "RecoveryRetryAccepted": {
         "required": [
-          "requestedAt"
+          "requestedAt",
+          "started",
+          "steps"
         ],
         "type": "object",
         "properties": {
           "requestedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "started": {
+            "type": "boolean"
+          },
+          "steps": {
+            "type": "integer",
+            "format": "int32"
           }
-        }
+        },
+        "description": "`Started` is true when the pass has steps to run (`Steps`); false when there is nothing to run, so the pass only proves partial items again."
       },
       "RecoveryRowView": {
         "required": [
@@ -55912,6 +55934,7 @@
           "to",
           "runId",
           "canRetry",
+          "retryKind",
           "missingSessions"
         ],
         "type": "object",
@@ -55953,6 +55976,12 @@
           "canRetry": {
             "type": "boolean"
           },
+          "retryKind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "missingSessions": {
             "type": "array",
             "items": {
@@ -55961,7 +55990,7 @@
             }
           }
         },
-        "description": "One service at one session. `Session` is the last session of the step; `From` to `To` are the sessions the step covers; `MissingSessions` are those a partial recovery did not fill."
+        "description": "One service at one session. `From` to `To` are the sessions the step covers (the group is its last session); `MissingSessions` are those a partial recovery did not fill; `RetryKind` says what a retry does (null: nothing, `CanRetry` false), a failed step that used up its attempts is not run again."
       },
       "RecoverySessionView": {
         "required": [
@@ -55990,6 +56019,7 @@
           "days",
           "counts",
           "truncated",
+          "planUnavailable",
           "sessions"
         ],
         "type": "object",
@@ -56020,6 +56050,16 @@
           },
           "truncated": {
             "type": "boolean"
+          },
+          "planUnavailable": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RecoveryPlanUnavailable"
+              }
+            ]
           },
           "sessions": {
             "type": "array",

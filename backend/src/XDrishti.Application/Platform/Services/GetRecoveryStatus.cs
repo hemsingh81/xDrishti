@@ -30,18 +30,28 @@ public sealed record GetRecoveryStatusQuery(int Days = GetRecoveryStatusQuery.De
 
 public sealed record RecoveryPassView(string Trigger, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt, string Status);
 
-/// <summary>Headline counts: missed (missed, waiting, running, not recoverable, out of reach), recovered, still failing (still failing, blocked, partial).</summary>
+/// <summary>Headline counts, in rows (one row is one step of the ledger, which may cover several sessions, or one missed session of the plan; not sessions): missed (missed, waiting, running, not recoverable, out of reach), recovered, still failing (still failing, blocked, partial).</summary>
 public sealed record RecoveryCounts(int Missed, int Recovered, int StillFailing);
 
-/// <summary>One service at one session. <c>Session</c> is the last session of the step; <c>From</c> to <c>To</c> are the sessions the step covers; <c>MissingSessions</c> are those a partial recovery did not fill.</summary>
-public sealed record RecoveryRowView(string ServiceId, string ServiceName, string Status, string? Reason, int Attempts, DateOnly From, DateOnly To, Guid? RunId, bool CanRetry, IReadOnlyList<DateOnly> MissingSessions);
+/// <summary>What a retry does for a row: <c>run</c> runs the step again; <c>recheck</c> only proves the stored data again (a partial item); null when a retry does nothing for it.</summary>
+public static class RecoveryRetryKinds
+{
+    public const string Run = "run";
+    public const string Recheck = "recheck";
+}
+
+/// <summary>One service at one session. <c>From</c> to <c>To</c> are the sessions the step covers (the group is its last session); <c>MissingSessions</c> are those a partial recovery did not fill; <c>RetryKind</c> says what a retry does (null: nothing, <c>CanRetry</c> false), a failed step that used up its attempts is not run again.</summary>
+public sealed record RecoveryRowView(string ServiceId, string ServiceName, string Status, string? Reason, int Attempts, DateOnly From, DateOnly To, Guid? RunId, bool CanRetry, string? RetryKind, IReadOnlyList<DateOnly> MissingSessions);
 
 public sealed record RecoverySessionView(DateOnly Session, IReadOnlyList<RecoveryRowView> Items);
 
-/// <summary><c>CheckedAt</c> is when this was read; <c>Running</c> is true while a pass runs; <c>Truncated</c> when the ledger held more rows than are shown (the newest sessions are kept). Sessions are oldest first.</summary>
-public sealed record RecoveryStatusView(DateTimeOffset CheckedAt, bool Running, RecoveryPassView? LatestPass, int Days, RecoveryCounts Counts, bool Truncated, IReadOnlyList<RecoverySessionView> Sessions);
+/// <summary>The plan of what a pass would do was refused (<c>Reason</c>): the rows of the ledger are shown, but "nothing missed" cannot be concluded.</summary>
+public sealed record RecoveryPlanUnavailable(string Reason);
 
-internal sealed class GetRecoveryStatusHandler(IRecoveryLedger ledger, RecoveryRunner runner, ServiceRegistry registry, TimeProvider clock)
+/// <summary><c>CheckedAt</c> is when this was read; <c>Running</c> is true while a pass runs; <c>Truncated</c> when the ledger held more rows than are shown (the newest sessions are kept). Sessions are oldest first.</summary>
+public sealed record RecoveryStatusView(DateTimeOffset CheckedAt, bool Running, RecoveryPassView? LatestPass, int Days, RecoveryCounts Counts, bool Truncated, RecoveryPlanUnavailable? PlanUnavailable, IReadOnlyList<RecoverySessionView> Sessions);
+
+internal sealed class GetRecoveryStatusHandler(IRecoveryLedger ledger, RecoveryRunner runner, ServiceRegistry registry, RecoverySettings options, TimeProvider clock)
     : IQueryHandler<GetRecoveryStatusQuery, Result<RecoveryStatusView>>
 {
     private const int MaxRows = 500;
@@ -66,10 +76,10 @@ internal sealed class GetRecoveryStatusHandler(IRecoveryLedger ledger, RecoveryR
         }
 
         // what a pass would do now and the ledger does not yet cover: missed, never made up, superseded, out of reach
-        var plan = await runner.PreviewAsync(cancellationToken);
-        foreach (var missed in plan?.Items ?? [])
+        var preview = await runner.PreviewAsync(false, cancellationToken);
+        foreach (var missed in preview.IsSuccess ? preview.Value.Items : [])
         {
-            if (missed.Session < since || items.Any(i => i.ServiceId == missed.ServiceId && i.SessionFrom <= missed.Session && missed.Session <= i.SessionTo))
+            if (missed.Session < since || fetched.Any(i => i.ServiceId == missed.ServiceId && i.SessionFrom <= missed.Session && missed.Session <= i.SessionTo))
             {
                 continue;
             }
@@ -81,7 +91,7 @@ internal sealed class GetRecoveryStatusHandler(IRecoveryLedger ledger, RecoveryR
                 RecoveryItemStatus.NotRecoverable => RecoveryRowStatus.NotRecoverable,
                 _ => RecoveryRowStatus.OutOfReach,
             };
-            rows.Add((missed.Session, new RecoveryRowView(missed.ServiceId, registry.NameOf(missed.ServiceId), status, Clip(missed.Reason), 0, missed.Session, missed.Session, null, status == RecoveryRowStatus.Missed, [])));
+            rows.Add((missed.Session, new RecoveryRowView(missed.ServiceId, registry.NameOf(missed.ServiceId), status, Clip(missed.Reason), 0, missed.Session, missed.Session, null, status == RecoveryRowStatus.Missed, status == RecoveryRowStatus.Missed ? RecoveryRetryKinds.Run : null, [])));
         }
 
         var sessions = rows.GroupBy(r => r.Session).OrderBy(g => g.Key)
@@ -93,7 +103,7 @@ internal sealed class GetRecoveryStatusHandler(IRecoveryLedger ledger, RecoveryR
             all.Count(s => s == RecoveryRowStatus.Recovered),
             all.Count(s => s is RecoveryRowStatus.StillFailing or RecoveryRowStatus.Blocked or RecoveryRowStatus.Partial));
         var latest = pass is null ? null : new RecoveryPassView(pass.Trigger, pass.StartedAt, pass.FinishedAt, pass.Status);
-        return Result.Success(new RecoveryStatusView(now, runner.IsRunning, latest, query.Days, counts, truncated, sessions));
+        return Result.Success(new RecoveryStatusView(now, runner.IsRunning, latest, query.Days, counts, truncated, preview.IsFailure ? new RecoveryPlanUnavailable(preview.Error.Message) : null, sessions));
     }
 
     private RecoveryRowView Row(RecoveryItemRow item)
@@ -111,8 +121,14 @@ internal sealed class GetRecoveryStatusHandler(IRecoveryLedger ledger, RecoveryR
         IReadOnlyList<DateOnly> missing = status == RecoveryRowStatus.Partial && RecoveryProofDetail.Read(item.Detail) is { } proof
             ? [.. proof.Sessions.Where(s => s.State is SessionProofStates.StillMissing or SessionProofStates.Unfillable).Select(s => s.Date).OrderBy(d => d)]
             : [];
-        var canRetry = status is RecoveryRowStatus.StillFailing or RecoveryRowStatus.Blocked or RecoveryRowStatus.Partial or RecoveryRowStatus.Waiting;
-        return new RecoveryRowView(item.ServiceId, registry.NameOf(item.ServiceId), status, Clip(item.Reason), item.Attempts, item.SessionFrom, item.SessionTo, item.RunId, canRetry, missing);
+        var kind = status switch
+        {
+            RecoveryRowStatus.StillFailing when item.Attempts < options.MaxAttempts => RecoveryRetryKinds.Run,
+            RecoveryRowStatus.Blocked or RecoveryRowStatus.Waiting => RecoveryRetryKinds.Run,
+            RecoveryRowStatus.Partial => RecoveryRetryKinds.Recheck,
+            _ => null,
+        };
+        return new RecoveryRowView(item.ServiceId, registry.NameOf(item.ServiceId), status, Clip(item.Reason), item.Attempts, item.SessionFrom, item.SessionTo, item.RunId, kind is not null, kind, missing);
     }
 
     private static string? Clip(string? reason) =>

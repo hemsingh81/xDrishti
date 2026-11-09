@@ -14,9 +14,12 @@ export function RecoveryRetry({ disabled }: { disabled: boolean }) {
 
   const confirm = () => {
     retry.mutate(undefined, {
-      onSuccess: () => {
+      onSuccess: (accepted) => {
         setRefused(null);
-        toast.notify('Recovery started.', 'success');
+        toast.notify(
+          accepted.started ? 'Recovery started.' : 'Nothing to run; re-checked what was partial.',
+          accepted.started ? 'success' : 'info',
+        );
       },
       onError: (error) => {
         setRefused(problemText(error, 'Recovery could not be started.'));
@@ -53,7 +56,8 @@ export function RecoveryRetry({ disabled }: { disabled: boolean }) {
           setAsking(false);
         }}
       >
-        This runs the whole recovery pass again, for every service that can be retried. It places no orders.
+        This runs the whole recovery pass again. Where a row only needs its stored data checked again (partly
+        recovered), that is all it does. It places no orders.
       </ConfirmDialog>
     </>
   );
