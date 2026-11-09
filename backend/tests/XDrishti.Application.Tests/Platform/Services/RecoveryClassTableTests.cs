@@ -30,9 +30,9 @@ public sealed class RecoveryClassTableTests
         ["weekly-review"] = RecoveryClass.LatestOnly,
         ["proposals"] = RecoveryClass.LatestOnly,
         ["paper-review"] = RecoveryClass.LatestOnly,
-        ["decay-monitor"] = RecoveryClass.LatestOnly,
-        ["readiness-snapshot"] = RecoveryClass.LatestOnly,
-        ["ml-monitor"] = RecoveryClass.LatestOnly,
+        ["decay-monitor"] = RecoveryClass.TimeBound,
+        ["readiness-snapshot"] = RecoveryClass.TimeBound,
+        ["ml-monitor"] = RecoveryClass.TimeBound,
         ["shadow-digest"] = RecoveryClass.LatestOnly,
         ["preopen"] = RecoveryClass.TimeBound,
         ["review-cutoff"] = RecoveryClass.TimeBound,
@@ -70,6 +70,33 @@ public sealed class RecoveryClassTableTests
         var actual = Registered().ToDictionary(d => d.Id, d => d.Constraints.RecoveryClass!.Value, StringComparer.Ordinal);
 
         actual.OrderBy(a => a.Key, StringComparer.Ordinal).ShouldBe(Expected.OrderBy(a => a.Key, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void No_registered_service_is_dated_until_the_first_start_baseline_is_settled()
+    {
+        // A Dated service would run once per missed session; with no baseline for "registered since" a never-run service would replay the whole reach (AU-02 settles it first).
+        Registered().Where(d => d.Constraints.RecoveryClass == RecoveryClass.Dated).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Planning_over_the_real_definitions_orders_data_then_nightly_then_suggestions()
+    {
+        var inputs = Registered().Select(d => new RecoveryInput(d, d.Defaults with { Enabled = true, CatchUp = true }, null)).ToList();
+        var calendar = new XDrishti.Domain.Market.Calendar.TradingCalendar();
+        var now = new DateTimeOffset(2026, 10, 9, 23, 0, 0, TimeSpan.FromMinutes(330)); // Fri 23:00: the Monday cutoff is ahead
+
+        var plan = RecoveryPlanner.Plan(inputs, calendar, now, 30).Value;
+        var order = plan.Steps.Select(s => s.ServiceId).ToList();
+
+        order.ShouldContain("eod");
+        order.ShouldContain("portfolio-broker-history");
+        order.ShouldContain("nightly");
+        order.ShouldContain("suggestions");
+        order.IndexOf("eod").ShouldBeLessThan(order.IndexOf("nightly"));
+        order.IndexOf("portfolio-broker-history").ShouldBeLessThan(order.IndexOf("nightly"));
+        order.IndexOf("nightly").ShouldBeLessThan(order.IndexOf("suggestions"));
+        plan.Steps.Select(s => s.ServiceId).ShouldAllBe(id => Expected[id] != RecoveryClass.TimeBound);
     }
 
     [Fact]

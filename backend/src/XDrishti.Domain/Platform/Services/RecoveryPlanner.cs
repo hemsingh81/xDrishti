@@ -30,6 +30,10 @@ public static class RecoveryPlanner
 
     public const string LiveObservationReason = "needs a live observation at the time; made up later it would be a record that was not seen then";
 
+    public const string WeeklyPastReason = "a weekly run is made up only within 24 hours of its time; later it would describe a past week";
+
+    private static readonly TimeSpan WeeklyReach = TimeSpan.FromHours(24);
+
     public const string CutoffPassedReason = "cutoff passed";
 
     public const string OutOfReachReason = "older than the recovery reach (Recovery:MaxSessions); the Data backfill is the way";
@@ -68,25 +72,35 @@ public static class RecoveryPlanner
         var reachStart = ReachStart(calendar, lastClosed, maxSessions);
         var steps = new List<RecoveryStep>();
         var items = new List<RecoveryItem>();
+        var blocked = new HashSet<string>(StringComparer.Ordinal); // services that made no step although they were due, or that are not eligible: what follows them cannot run
         foreach (var id in order)
         {
             var input = byId[id];
             if (!input.Settings.Enabled || !input.Settings.CatchUp)
             {
+                blocked.Add(id);
                 continue;
             }
 
             var due = DueOccurrences(input, byId, calendar, now, reachStart);
-            if (due.Count > 0)
+            if (due.Count == 0)
             {
-                Classify(input, due, calendar, now, lastClosed, reachStart, steps, items);
+                continue;
+            }
+
+            var blocker = dependencies[id].FirstOrDefault(blocked.Contains);
+            var before = steps.Count;
+            Classify(input, due, calendar, now, lastClosed, reachStart, blocker, byId, steps, items);
+            if (steps.Count == before)
+            {
+                blocked.Add(id);
             }
         }
 
         return Result.Success(new RecoveryPlan(steps, items));
     }
 
-    private static void Classify(RecoveryInput input, List<(DateOnly Session, DateTimeOffset Due)> due, TradingCalendar calendar, DateTimeOffset now, DateOnly lastClosed, DateOnly reachStart, List<RecoveryStep> steps, List<RecoveryItem> items)
+    private static void Classify(RecoveryInput input, List<(DateOnly Session, DateTimeOffset Due)> due, TradingCalendar calendar, DateTimeOffset now, DateOnly lastClosed, DateOnly reachStart, string? blocker, Dictionary<string, RecoveryInput> byId, List<RecoveryStep> steps, List<RecoveryItem> items)
     {
         var id = input.Definition.Id;
         var cls = input.Definition.Constraints.RecoveryClass!.Value;
@@ -108,6 +122,23 @@ public static class RecoveryPlanner
             return;
         }
 
+        if (cls != RecoveryClass.TimeBound && blocker is not null)
+        {
+            AddAll(items, id, inReach, RecoveryItemStatus.NotRecoverable, $"{blocker} did not run");
+            return;
+        }
+
+        if (cls != RecoveryClass.TimeBound && IsWeeklyBound(input, byId))
+        {
+            // a weekly run is made up only within 24 hours of its time (ADR 0018 §4 and the services' own check): a later run would store a record of a past week
+            AddAll(items, id, inReach.Where(d => now - d.Due > WeeklyReach), RecoveryItemStatus.NotRecoverable, WeeklyPastReason);
+            inReach = inReach.Where(d => now - d.Due <= WeeklyReach).ToList();
+            if (inReach.Count == 0)
+            {
+                return;
+            }
+        }
+
         switch (cls)
         {
             case RecoveryClass.TimeBound:
@@ -122,7 +153,7 @@ public static class RecoveryPlanner
                 steps.AddRange(inReach.Select(d => new RecoveryStep(id, cls, [d.Session])));
                 break;
             case RecoveryClass.LatestOnly:
-                if (string.Equals(id, NightlyId, StringComparison.Ordinal) && !CutoffAhead(calendar, now, lastClosed))
+                if (string.Equals(id, NightlyId, StringComparison.Ordinal) && !(inReach[^1].Session == lastClosed && CutoffAhead(calendar, now, lastClosed)))
                 {
                     AddAll(items, id, inReach, RecoveryItemStatus.NotRecoverable, CutoffPassedReason);
                     break;
@@ -137,6 +168,40 @@ public static class RecoveryPlanner
                 throw new ArgumentOutOfRangeException(nameof(input), cls, "Unknown recovery class.");
         }
     }
+
+    /// <summary>Every service it follows by an 'after' schedule, up to the timed one, is enabled with catch-up on: only then is its own occurrence derived from the leader's.</summary>
+    private static bool ChainEnabled(RecoveryInput input, Dictionary<string, RecoveryInput> byId)
+    {
+        var current = input;
+        while (current.Settings.Schedule.Type == ScheduleType.After)
+        {
+            if (current.Settings.Schedule.After is not { } next || !byId.TryGetValue(next, out current!) || !current.Settings.Enabled || !current.Settings.CatchUp)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static RecoveryInput? Leader(RecoveryInput input, Dictionary<string, RecoveryInput> byId)
+    {
+        var leader = input;
+        while (leader.Settings.Schedule.Type == ScheduleType.After)
+        {
+            if (leader.Settings.Schedule.After is not { } next || !byId.TryGetValue(next, out var found))
+            {
+                return null;
+            }
+
+            leader = found;
+        }
+
+        return leader;
+    }
+
+    private static bool IsWeeklyBound(RecoveryInput input, Dictionary<string, RecoveryInput> byId) =>
+        input.Definition.Constraints.CatchUpReach == CatchUpReach.SameDay && Leader(input, byId)?.Settings.Schedule.Type == ScheduleType.Weekly;
 
     private static void AddAll(List<RecoveryItem> items, string id, IEnumerable<(DateOnly Session, DateTimeOffset Due)> due, RecoveryItemStatus status, string? reason) =>
         items.AddRange(due.Select(d => new RecoveryItem(id, d.Session, d.Due, status, reason)));
@@ -167,20 +232,15 @@ public static class RecoveryPlanner
     private static List<(DateOnly Session, DateTimeOffset Due)> DueOccurrences(RecoveryInput input, Dictionary<string, RecoveryInput> byId, TradingCalendar calendar, DateTimeOffset now, DateOnly reachStart)
     {
         var due = new List<(DateOnly, DateTimeOffset)>();
-        var leader = input;
-        while (leader.Settings.Schedule.Type == ScheduleType.After)
+        var leader = Leader(input, byId);
+        if (leader is null || !ChainEnabled(input, byId))
         {
-            if (leader.Settings.Schedule.After is not { } next || !byId.TryGetValue(next, out var found))
-            {
-                return due;
-            }
-
-            leader = found;
+            return due; // follows a service that is not registered, or one that is paused: it is never due
         }
 
         var schedule = leader.Settings.Schedule;
         var today = IndiaTime.Today(now);
-        var last = input.LastRunStartedAt;
+        var last = input.LastRunStartedAt; // shortcut: a service that never ran is missed for the whole reach (no baseline of 'registered since'); AU-02 decides whether a first start needs a baseline (ADR 0240 Amendment 1)
         var limit = today.AddDays(-SearchDays);
         var floor = last is null ? reachStart : DateOnly.FromDayNumber(Math.Max(IndiaTime.Today(last.Value).DayNumber, limit.DayNumber));
 
