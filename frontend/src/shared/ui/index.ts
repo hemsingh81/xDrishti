@@ -8,3 +8,4 @@ export { StatusChip } from './StatusChip';
 // @/shared/ui/ToastProvider, @/shared/ui/toastContext) so that this barrel does not pull Dialog and Snackbar into the
 // initial bundle.
 export { Facts, type Fact } from './Facts';
+export { LazyBoundary, ReloadAlert } from './LazyBoundary';

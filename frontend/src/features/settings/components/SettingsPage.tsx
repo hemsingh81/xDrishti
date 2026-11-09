@@ -3,7 +3,7 @@ import { Box, Tab, Tabs } from '@mui/material';
 import { lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router';
 import { RiskProfilesView, RoleMatrixView } from '@/features/accounts';
-import { LoadingState, PageHeader } from '@/shared/ui';
+import { LazyBoundary, LoadingState, PageHeader, ReloadAlert } from '@/shared/ui';
 import { ActionThresholdsCard } from './ActionThresholdsCard';
 
 // The owner's confirmation of the charge sheet loads on demand: the first load of Settings does not carry it.
@@ -53,8 +53,22 @@ export function SettingsPage() {
         ))}
       </Tabs>
       <Box role="tabpanel" id={`settings-panel-${tab}`} aria-labelledby={`settings-tab-${tab}`}>
-        {tab === 'profiles' && <RiskProfilesView />}
-        {tab === 'roles' && <RoleMatrixView />}
+        {tab === 'profiles' && (
+          <LazyBoundary
+            pending={<LoadingState label="Loading risk profiles" />}
+            failed={<ReloadAlert label="Risk profiles" />}
+          >
+            <RiskProfilesView />
+          </LazyBoundary>
+        )}
+        {tab === 'roles' && (
+          <LazyBoundary
+            pending={<LoadingState label="Loading the role matrix" />}
+            failed={<ReloadAlert label="The role matrix" />}
+          >
+            <RoleMatrixView />
+          </LazyBoundary>
+        )}
         {tab === 'actions' && <ActionThresholdsCard />}
         {tab === 'charge-sheet' && (
           <Suspense fallback={<LoadingState label="Loading the confirmation" />}>

@@ -8,10 +8,16 @@ export { useAccountsNeedingAction } from './hooks/useAccountsNeedingAction';
 export type { AccountNeedingAction, AccountsNeedingAction } from './lib/needingAction';
 export { connectionState } from './lib/connection';
 export { keyExpiry } from './lib/secrets';
-export { AccountsPage } from './components/AccountsPage';
+/** The route component, loaded on demand (the router awaits it). */
+export const loadAccountsPage = async () => (await import('./components/AccountsPage')).AccountsPage;
 // Shared views shown on the Settings page: risk profiles (shared by Trading accounts) and the accounts × roles matrix.
-export { RiskProfilesView } from './components/RiskProfilesView';
-export { RoleMatrixView } from './components/RoleMatrixView';
+// Loaded on demand so they stay out of the app shell; render inside <Suspense>.
+export const RiskProfilesView = lazy(async () => ({
+  default: (await import('./components/RiskProfilesView')).RiskProfilesView,
+}));
+export const RoleMatrixView = lazy(async () => ({
+  default: (await import('./components/RoleMatrixView')).RoleMatrixView,
+}));
 
 /** The top-bar accounts control. Loaded on demand so the accounts code stays out of the shell; render inside <Suspense>. */
 export const HeaderAccounts = lazy(async () => ({
