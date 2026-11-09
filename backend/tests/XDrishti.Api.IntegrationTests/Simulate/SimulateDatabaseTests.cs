@@ -55,6 +55,8 @@ public sealed partial class SimulateDatabaseTests(ApiFactory factory) : DataTest
 
         public ValueTask<IBarMergeSession> BeginMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken) => Record<IBarMergeSession>(nameof(BeginMergeAsync));
 
+        public ValueTask<IBarMergeSession> BeginInsertOnlyMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken) => Record<IBarMergeSession>(nameof(BeginInsertOnlyMergeAsync));
+
         public ValueTask<IReadOnlyList<Bar>> ReadAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) => Record<IReadOnlyList<Bar>>(nameof(ReadAsync));
 
         public ValueTask<BarTotals> GetBarTotalsAsync(DateTimeOffset expectedStart, CancellationToken cancellationToken) => Record<BarTotals>(nameof(GetBarTotalsAsync));

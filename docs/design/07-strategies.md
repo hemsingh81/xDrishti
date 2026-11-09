@@ -144,7 +144,7 @@ Confluence (same symbol & side on several timeframes/strategies) is a feature an
 | Trend | EMA slopes (9/21/50/200), price vs EMAs, ADX, swing structure, supertrend |
 | Momentum | RSI(2/14), ROC, MACD histogram, distance from N-day high/low |
 | Volatility | ATR %, ATR percentile, Bollinger bandwidth, NR4/NR7, inside bars, gap in ATR |
-| Volume | Relative volume (same time-of-day), delivery %, OI change |
+| Volume | Relative volume (same time-of-day: `rel_volume_tod(n)` on intraday timeframes; `rel_volume(n)` divides by the previous n bars of the timeframe, so on 1D it is the day against the n days before it), delivery %, OI change |
 | Levels | Distance to previous-day H/L/C, CPR width, VWAP distance, 52-week high/low, round numbers |
 | Relative strength | Stock vs index, stock vs sector, sector vs index (5/20/60 days) |
 | Market context | Index trend/ADX, VIX level/percentile/change, breadth — **built in P3-01c** as the features `index_trend`, `index_adx`, `index_vol_pct`, `vix`, `vix_pct`, `vix_chg`, `breadth`, `regime_trend`, `regime_vol`, `regime`: daily, as of the previous session ([doc 11](11-strategy-lab.md) §2, [ADR 0033](../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md)); the index and VIX series are written by P3-01d and the breadth of the owner's tracked shares by P3-01e (both after the P3 exit check, see the [roadmap](18-roadmap.md)); `sector_rs` is not planned until a strategy needs it |

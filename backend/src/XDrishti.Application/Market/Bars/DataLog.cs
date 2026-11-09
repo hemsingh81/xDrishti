@@ -73,4 +73,16 @@ internal static partial class DataLog
 
     [LoggerMessage(EventId = 3325, Level = LogLevel.Error, Message = "The undo of a CSV load could not be written to the activity log")]
     public static partial void CsvUndoAuditFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 3326, Level = LogLevel.Information, Message = "Repair of old bar holes for {Symbol}, sessions {From} to {To}: {Missing} minutes missing, {Inserted} inserted, {Rejected} rejected by the checks")]
+    public static partial void BarHolesRepaired(ILogger logger, string symbol, DateOnly from, DateOnly to, int missing, long inserted, int rejected);
+
+    [LoggerMessage(EventId = 3327, Level = LogLevel.Error, Message = "Repair of old bar holes for {Symbol} could not store the bars")]
+    public static partial void BarHolesRepairFailed(ILogger logger, string symbol, Exception exception);
+
+    [LoggerMessage(EventId = 3328, Level = LogLevel.Error, Message = "The audit record of the repair of old bar holes for {Symbol} could not be written")]
+    public static partial void BarHolesAuditFailed(ILogger logger, string symbol, Exception exception);
+
+    [LoggerMessage(EventId = 3329, Level = LogLevel.Error, Message = "The record of the repair job {JobId} could not be published; the stale rule will release the slot")]
+    public static partial void BarHolesJobPublishFailed(ILogger logger, Guid jobId, Exception exception);
 }

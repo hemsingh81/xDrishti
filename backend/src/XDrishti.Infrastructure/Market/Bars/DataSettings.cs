@@ -22,6 +22,8 @@ internal sealed class DataSettings(IOptions<DataOptions> options) : IDataSetting
 
     public int GapLookbackSessions => options.Value.Gaps.LookbackSessions;
 
+    public int RepairMaxSessions => options.Value.Repair.MaxSessions;
+
     public bool EodEnabled => options.Value.Eod.Enabled;
 
     public TimeOnly EodTimeIst => TimeOnly.ParseExact(options.Value.Eod.TimeIst, EodDataOptions.TimeFormat, CultureInfo.InvariantCulture);

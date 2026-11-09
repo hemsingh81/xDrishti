@@ -19,8 +19,8 @@ public sealed class AllFeatureNamesBindingTests
     [Fact]
     public void The_table_of_forms_has_one_form_for_each_of_the_60_names_of_the_catalog()
     {
-        IndicatorCatalog.All.Count.ShouldBe(60);
-        AllFeatureForms.Forms.Count.ShouldBe(60);
+        IndicatorCatalog.All.Count.ShouldBe(61);
+        AllFeatureForms.Forms.Count.ShouldBe(61);
         AllFeatureForms.Forms.Keys.OrderBy(n => n, StringComparer.Ordinal).ShouldBe(IndicatorCatalog.All.Select(i => i.Name).OrderBy(n => n, StringComparer.Ordinal));
     }
 

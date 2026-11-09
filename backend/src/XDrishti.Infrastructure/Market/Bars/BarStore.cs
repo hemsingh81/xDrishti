@@ -49,6 +49,19 @@ internal sealed class BarStore(NpgsqlDataSource dataSource, TimeProvider clock) 
         FROM j
         """;
 
+    // The repair of old holes (ISS-29): a minute that has a stored bar is 'kept' whatever the staged bar says, so nothing is ever updated.
+    private const string ClassifyInsertOnly =
+        """
+        WITH j AS (
+            SELECT s.ts, CASE WHEN b.ts IS NULL THEN 'new' ELSE 'kept' END AS kind
+            FROM stage_bars s
+            LEFT JOIN market.bars_1m b ON b.instrument_id = @id AND b.ts = s.ts)
+        SELECT count(*) FILTER (WHERE kind = 'new'), 0::bigint, 0::bigint,
+               count(*) FILTER (WHERE kind = 'kept'), 0::bigint,
+               min(ts) FILTER (WHERE kind = 'new'), max(ts) FILTER (WHERE kind = 'new')
+        FROM j
+        """;
+
     // New minutes are inserted without ON CONFLICT: on a hypertable the arbiter makes an insert five times slower, and the classification above has just found
     // which minutes are new (one job writes at a time).
     private const string InsertNew =
@@ -78,7 +91,11 @@ internal sealed class BarStore(NpgsqlDataSource dataSource, TimeProvider clock) 
             first_bar = EXCLUDED.first_bar, last_bar = EXCLUDED.last_bar, undone_at = NULL
         """;
 
-    public async ValueTask<IBarMergeSession> BeginMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken)
+    public ValueTask<IBarMergeSession> BeginMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken) => BeginAsync(instrumentId, source, false, cancellationToken);
+
+    public ValueTask<IBarMergeSession> BeginInsertOnlyMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken) => BeginAsync(instrumentId, source, true, cancellationToken);
+
+    private async ValueTask<IBarMergeSession> BeginAsync(Guid instrumentId, BarSource source, bool insertOnly, CancellationToken cancellationToken)
     {
         var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         try
@@ -90,7 +107,7 @@ internal sealed class BarStore(NpgsqlDataSource dataSource, TimeProvider clock) 
             }
 
             var importer = await connection.BeginBinaryImportAsync(CopyStage, cancellationToken);
-            return new MergeSession(connection, transaction, importer, instrumentId, source, clock);
+            return new MergeSession(connection, transaction, importer, instrumentId, source, insertOnly, clock);
         }
         catch
         {
@@ -127,6 +144,7 @@ internal sealed class BarStore(NpgsqlDataSource dataSource, TimeProvider clock) 
         NpgsqlBinaryImporter importer,
         Guid instrumentId,
         BarSource source,
+        bool insertOnly,
         TimeProvider clock) : IBarMergeSession
     {
         private bool _completed;
@@ -159,7 +177,7 @@ internal sealed class BarStore(NpgsqlDataSource dataSource, TimeProvider clock) 
 
             long inserted, updated, same, kept, taken;
             DateTimeOffset? dirtyFrom = null, dirtyTo = null;
-            await using (var classify = Command(Classify))
+            await using (var classify = Command(insertOnly ? ClassifyInsertOnly : Classify))
             await using (var reader = await classify.ExecuteReaderAsync(cancellationToken))
             {
                 await reader.ReadAsync(cancellationToken);

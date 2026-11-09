@@ -1018,6 +1018,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/data/instruments/{id}/repair-holes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Owner repair of old holes in one instrument's stored 1-minute bars (ISS-29, ADR 0233): body from and to (closed trading sessions, at most Data:Repair:MaxSessions of them); asks the Dhan Data API again for the days with missing minutes and stores only the missing minutes, never changing a stored bar; then starts an aggregate and quality job when bars were added. Needs a step-up (no undo). Holds the data-job slot (409 data.job_running). Audited. Repaired bars change the bars hash of the window: stored runs stay intact but can no longer be reproduced and their trade cards fail the BarsSha256 check; a re-run gets a new key. Gap records are not updated. Off while Data:Repair:MaxSessions is 0 (409 data.repair_disabled). 400 data.invalid; 404 data.instrument_not_found; 409 data.dhan_not_available, data.dhan_not_connected, data.repair_fetch_failed */
+    post: operations['RepairBarHoles'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/data/jobs': {
     parameters: {
       query?: never;
@@ -19061,6 +19078,44 @@ export interface components {
       /** Format: int32 */
       memberCount: number;
     };
+    /** @description The body of the repair: the first and the last closed session of the window. */
+    RepairBarHolesRequest: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+    };
+    /**
+     * @description What the repair did. int RepairBarHolesResult.MissingAfter is what the broker could not give. int RepairBarHolesResult.Rejected counts bars the broker returned that failed the bar checks.
+     *     Guid? RepairBarHolesResult.AggregateJobId is the follow-up job, or null with string? RepairBarHolesResult.AggregateNote saying why not.
+     */
+    RepairBarHolesResult: {
+      symbol: string;
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      /** Format: int32 */
+      sessionsChecked: number;
+      /** Format: int32 */
+      sessionsWithHoles: number;
+      /** Format: int32 */
+      missingBefore: number;
+      /** Format: int32 */
+      fetched: number;
+      /** Format: int64 */
+      inserted: number;
+      /** Format: int32 */
+      missingAfter: number;
+      /** Format: uuid */
+      aggregateJobId: null | string;
+      /**
+       * Format: int32
+       * @default 0
+       */
+      rejected: number;
+      aggregateNote?: null | string;
+    };
     /** @description One bar: `t` is the epoch seconds of its start. */
     ReplayBarView: {
       /** Format: int64 */
@@ -25207,6 +25262,68 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RepairBarHoles: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RepairBarHolesRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RepairBarHolesResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
       /** @description Conflict */

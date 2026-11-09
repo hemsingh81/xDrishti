@@ -5,6 +5,7 @@ using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Bars.Eod;
 using XDrishti.Application.Market.Bars.Gaps;
+using XDrishti.Application.Market.Bars.Repair;
 using XDrishti.Domain.Market.Bars;
 
 namespace XDrishti.Api.IntegrationTests.Data;
@@ -100,6 +101,52 @@ public sealed class DataGapBackfillTests(ApiFactory factory) : DataTestBase(fact
         overview.Gaps.LastDetectedAt.ShouldNotBeNull();
         (await NoticesAsync()).Items.ShouldBeEmpty();
         (await InstrumentsAsync()).Items.Single().OpenGaps.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task The_owner_repair_fills_only_the_missing_minutes_of_the_window_leaves_stored_bars_alone_and_rebuilds_the_aggregates()
+    {
+        var abb = await LoadAsync("ABB", 1);
+        var stored = await ScalarAsync<double>("SELECT close FROM market.bars_1m WHERE instrument_id = @id AND ts = to_timestamp(@ts)", ("id", abb), ("ts", (double)BarFixtures.Epoch(Partial, SessionClock.OpenMinute)));
+        // The broker answers with the missing minutes and also with a different bar for the first stored minute: that one must not replace the stored bar.
+        var source = Factory.Dhan.UseSource(t => new IntradayResult(t.InstrumentId, [.. Missing(1), new Bar(BarFixtures.Epoch(Partial, SessionClock.OpenMinute), 5, 6, 4, 5, 1)], t.Windows.Count));
+        Factory.Dhan.UseConnectedAccount();
+
+        var elevated = await Factory.SignInElevatedAsync(Ct);
+        using var response = await elevated.Client.PostJsonAsync($"/api/data/instruments/{abb}/repair-holes", new { from = Partial, to = Partial }, Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(Ct));
+        var result = (await response.Content.ReadFromJsonAsync<RepairBarHolesResult>(Ct))!;
+        (result.SessionsChecked, result.SessionsWithHoles, result.MissingBefore, result.Inserted, result.MissingAfter).ShouldBe((1, 1, SessionClock.RegularBars - PartialBars, (long)(SessionClock.RegularBars - PartialBars), 0));
+        result.AggregateJobId.ShouldNotBeNull();
+        IsPartialDayWindow(source.Plans.ShouldHaveSingleItem().Targets.ShouldHaveSingleItem().Windows.ShouldHaveSingleItem()).ShouldBeTrue();
+        (await ScalarAsync<double>("SELECT close FROM market.bars_1m WHERE instrument_id = @id AND ts = to_timestamp(@ts)", ("id", abb), ("ts", (double)BarFixtures.Epoch(Partial, SessionClock.OpenMinute)))).ShouldBe(stored);
+
+        await Factory.DataJobs.RunPendingAsync(Factory.Services, Ct);
+
+        (await ScalarAsync<int>("SELECT bars FROM market.bars_agg WHERE instrument_id = @id AND timeframe = '1D' AND ts = to_timestamp(@ts)", ("id", abb), ("ts", (double)BarFixtures.Epoch(Partial, 0)))).ShouldBe(SessionClock.RegularBars);
+    }
+
+    [Fact]
+    public async Task The_repair_needs_a_session_the_csrf_token_and_a_step_up()
+    {
+        var abb = await SeedAsync("ABB");
+        var path = $"/api/data/instruments/{abb}/repair-holes";
+        var body = new { from = Partial, to = Partial };
+
+        using var anonymous = await Factory.CreateAnonymousClient().PostJsonAsync(path, body, Ct);
+        anonymous.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        var signedIn = await Factory.SignInAsync(Ct);
+        var noToken = Factory.CreateAnonymousClient();
+        noToken.DefaultRequestHeaders.Add("Cookie", signedIn.CookieHeader);
+        using var withoutCsrf = await noToken.PostAsJsonAsync(new Uri(path, UriKind.Relative), body, Ct);
+        withoutCsrf.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await withoutCsrf.ReadProblemAsync(Ct)).Code.ShouldBe("auth.csrf_invalid");
+
+        using var withoutStepUp = await signedIn.Client.PostJsonAsync(path, body, Ct);
+        withoutStepUp.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await withoutStepUp.ReadProblemAsync(Ct)).Code.ShouldBe("auth.step_up_required");
     }
 
     [Fact]

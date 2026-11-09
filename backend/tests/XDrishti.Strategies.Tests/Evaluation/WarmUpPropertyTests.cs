@@ -24,6 +24,7 @@ public sealed class WarmUpPropertyTests
         ["highest"] = "highest(2)",
         ["lowest"] = "lowest(2)",
         ["rel_volume"] = "rel_volume(2)",
+        ["rel_volume_tod"] = "rel_volume_tod(2)",
         ["or_high"] = "or_high(60)",
         ["or_low"] = "or_low(60)",
         ["adx"] = "adx(2)",

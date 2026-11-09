@@ -136,7 +136,7 @@ public sealed class AllocationTests
         {
             IIndicator[] indicators =
             [
-                new Sma(20), new Ema(20), new Rsi(14), new Atr(14), new Highest(20), new Lowest(20), new Vwap(), new RelVolume(20), new OrHigh(15), new OrLow(15), new SessionContext(SessionField.GapPct),
+                new Sma(20), new Ema(20), new Rsi(14), new Atr(14), new Highest(20), new Lowest(20), new Vwap(), new RelVolume(20), new RelVolumeTimeOfDay(20), new OrHigh(15), new OrLow(15), new SessionContext(SessionField.GapPct),
                 new Adx(14), new PlusDi(14), new MinusDi(14), new MacdLine(12, 26, 9), new MacdSignal(12, 26, 9), new MacdHist(12, 26, 9), new BbUpper(20, 2), new BbMiddle(20, 2), new BbLower(20, 2), new BbWidth(20, 2),
                 new Supertrend(10, 3), new SupertrendDirection(10, 3), new Roc(10), new InsideBar(), new NarrowRange(7), new Engulfing(), new PivotHigh(5), new PivotLow(5), new PivotHighAge(5), new PivotLowAge(5), new RawBar(PriceSource.Close),
             ];

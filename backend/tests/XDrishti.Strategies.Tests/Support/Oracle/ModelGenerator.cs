@@ -42,7 +42,7 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
 
     private static readonly string[] IndicatorNames =
     [
-        "sma", "ema", "rsi", "atr", "highest", "lowest", "rel_volume", "or_high", "or_low", "adx", "plus_di", "minus_di", "macd_line", "macd_signal", "macd_hist",
+        "sma", "ema", "rsi", "atr", "highest", "lowest", "rel_volume", "rel_volume_tod", "or_high", "or_low", "adx", "plus_di", "minus_di", "macd_line", "macd_signal", "macd_hist",
         "bb_upper", "bb_middle", "bb_lower", "bb_width", "supertrend", "supertrend_dir", "roc", "nr", "pivot_high", "pivot_low", "pivot_high_age", "pivot_low_age",
     ];
 

@@ -74,7 +74,7 @@ public static class CompilerWarmup
         new("sma(20) > ema(50) and supertrend_dir(10, 3) > 0 and close > supertrend(10, 3) and plus_di(14) > minus_di(14)"),
         new("macd_line() > macd_signal() and macd_hist() > 0 and roc(5) > 0"),
         new("bb_lower(20, 2) < bb_middle(20, 2) and bb_middle(20, 2) < bb_upper(20, 2) and bb_width(20, 2) < 0.05"),
-        new("highest(10) > lowest(10) and close > or_high(15) and close < or_low(15) and rel_volume(20) > 1.5"),
+        new("highest(10) > lowest(10) and close > or_high(15) and close < or_low(15) and rel_volume(20) > 1.5 and rel_volume_tod(20) > 1"),
         new("inside_bar > 0 and nr() > 0 and engulfing > 0"),
         new("pivot_high() > 0 and pivot_low() > 0 and pivot_high_age() < 5 and pivot_low_age() < 5"),
         new("open > 0 and high > 0 and low > 0 and close > 0 and volume > 0"),
