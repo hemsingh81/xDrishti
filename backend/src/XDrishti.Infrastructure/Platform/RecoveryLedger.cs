@@ -155,4 +155,28 @@ internal sealed class RecoveryLedger(NpgsqlDataSource dataSource) : IRecoveryLed
 
         return rows;
     }
+
+    public async ValueTask<RecoveryPassRow?> LatestPassAsync(CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT id, trigger, started_at, finished_at, status FROM platform.recovery_passes ORDER BY started_at DESC LIMIT 1");
+        await using var r = await command.ExecuteReaderAsync(cancellationToken);
+        return await r.ReadAsync(cancellationToken)
+            ? new RecoveryPassRow(r.GetGuid(0), r.GetString(1), r.GetFieldValue<DateTimeOffset>(2), r.IsDBNull(3) ? null : r.GetFieldValue<DateTimeOffset>(3), r.GetString(4))
+            : null;
+    }
+
+    public async ValueTask<IReadOnlyList<RecoveryItemRow>> ListSinceAsync(DateOnly since, int limit, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand($"SELECT {Columns} FROM platform.recovery_items WHERE session_to >= @since ORDER BY session_to DESC, service_id LIMIT @limit");
+        command.Parameters.AddWithValue("since", NpgsqlDbType.Date, since);
+        command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, Math.Clamp(limit, 1, 1000));
+        var rows = new List<RecoveryItemRow>();
+        await using var r = await command.ExecuteReaderAsync(cancellationToken);
+        while (await r.ReadAsync(cancellationToken))
+        {
+            rows.Add(Read(r));
+        }
+
+        return rows;
+    }
 }

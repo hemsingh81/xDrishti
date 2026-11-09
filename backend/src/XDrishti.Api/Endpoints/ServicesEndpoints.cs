@@ -32,6 +32,16 @@ internal sealed class ServicesEndpoints : IEndpointModule
             .WithName("GetServiceNotices")
             .WithSummary("What the owner should know about the services for the notification bell: service_failed for the latest run of each service with notify on failure when it failed and no retry follows (id service:failed:{serviceId}:{yyyy-MM-dd}: one notice per service per India day, text and time of the latest failure); the next run of the service clears it");
 
+        group.MapGet("/recovery", GetRecoveryAsync)
+            .WithName("GetRecoveryStatus")
+            .WithSummary("What the machine missed and what became of it (spec AU-04, ADR 0240): the latest pass, the counts (missed, recovered, stillFailing) and, per session oldest first, each service with status missed|recovered|partial|still_failing|blocked|waiting|running|not_recoverable|superseded|out_of_reach and a reason. days 1 to 90, default 14; at most 500 ledger rows (truncated says so). 400 services.invalid")
+            .ProducesValidationProblem();
+
+        group.MapPost("/recovery/retry", RetryRecoveryAsync)
+            .WithName("RetryRecovery")
+            .WithSummary("Start a recovery pass now (the normal pass, not debounced). 202. Audited. 409 recovery.already_running while a pass runs")
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapGet("/{id}", GetAsync)
             .WithName("GetService")
             .WithSummary("One service as the list shows it. 404 services.not_found")
@@ -97,6 +107,25 @@ internal sealed class ServicesEndpoints : IEndpointModule
 
     private static async Task<Ok<ServiceNotices>> GetNoticesAsync(IQueryHandler<GetServiceNoticesQuery, ServiceNotices> handler, CancellationToken cancellationToken) =>
         TypedResults.Ok(await handler.HandleAsync(new GetServiceNoticesQuery(), cancellationToken));
+
+    private static async Task<Results<Ok<RecoveryStatusView>, ProblemHttpResult>> GetRecoveryAsync(
+        HttpContext http,
+        IQueryHandler<GetRecoveryStatusQuery, Result<RecoveryStatusView>> handler,
+        CancellationToken cancellationToken,
+        int days = GetRecoveryStatusQuery.DefaultDays)
+    {
+        var result = await handler.HandleAsync(new GetRecoveryStatusQuery(days), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Accepted<RecoveryRetryAccepted>, ProblemHttpResult>> RetryRecoveryAsync(
+        HttpContext http,
+        ICommandHandler<RetryRecoveryCommand, RecoveryRetryAccepted> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new RetryRecoveryCommand(http.GetActor()), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Accepted("/api/services/recovery", result.Value);
+    }
 
     private static async Task<Results<Ok<ServiceView>, ProblemHttpResult>> GetAsync(
         string id,

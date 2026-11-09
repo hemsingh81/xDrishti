@@ -1,4 +1,5 @@
 import { Box, Button } from '@mui/material';
+import { Link as RouterLink } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useState } from 'react';
 import { PortfolioRefreshDialog } from '@/features/accounts';
@@ -87,6 +88,9 @@ function ServicesContent() {
               }}
             >
               Recorders
+            </Button>
+            <Button size="small" component={RouterLink} to="/services/recovery">
+              Recovery
             </Button>
             {recorders && (
               <Box sx={{ maxHeight: { md: '45vh' }, overflowY: { md: 'auto' } }}>

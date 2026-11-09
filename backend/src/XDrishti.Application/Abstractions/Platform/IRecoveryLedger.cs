@@ -19,6 +19,9 @@ public static class RecoveryStates
 /// <summary>One item of the ledger: one run to make for one service and occurrence (unique per service and occurrence); <c>Detail</c> is the JSON of the proof of its sessions (spec AU-03), null until proved.</summary>
 public sealed record RecoveryItemRow(Guid Id, Guid PassId, string ServiceId, string Occurrence, DateOnly SessionFrom, DateOnly SessionTo, string State, string? Reason, int Attempts, Guid? RunId, string? Detail = null);
 
+/// <summary>One pass of the ledger (<c>platform.recovery_passes</c>) as the Recovery screen shows it.</summary>
+public sealed record RecoveryPassRow(Guid Id, string Trigger, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt, string Status);
+
 /// <summary>A failed item that used up its attempts, with the instant of the pass that last touched it (for the one-notice-per-service-per-day rule).</summary>
 public sealed record RecoveryExhaustedRow(string ServiceId, string Occurrence, string? Reason, DateTimeOffset At);
 
@@ -54,4 +57,10 @@ public interface IRecoveryLedger
 
     /// <summary>Failed items with at least <paramref name="maxAttempts"/> attempts whose pass started at or after <paramref name="since"/>.</summary>
     ValueTask<IReadOnlyList<RecoveryExhaustedRow>> ListExhaustedAsync(int maxAttempts, DateTimeOffset since, CancellationToken cancellationToken);
+
+    /// <summary>The newest pass (by start), or null when none was ever recorded.</summary>
+    ValueTask<RecoveryPassRow?> LatestPassAsync(CancellationToken cancellationToken);
+
+    /// <summary>Items whose last session is on or after <paramref name="since"/>, newest session first, at most <paramref name="limit"/> (read-only; for the Recovery screen).</summary>
+    ValueTask<IReadOnlyList<RecoveryItemRow>> ListSinceAsync(DateOnly since, int limit, CancellationToken cancellationToken);
 }

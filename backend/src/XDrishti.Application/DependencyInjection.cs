@@ -413,6 +413,8 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<PauseServiceCommand, ServiceView>, PauseServiceHandler>();
         services.AddScoped<ICommandHandler<ResumeServiceCommand, ServiceView>, ResumeServiceHandler>();
         services.AddScoped<ICommandHandler<RunServiceNowCommand, ServiceRunView>, RunServiceNowHandler>();
+        services.AddScoped<IQueryHandler<GetRecoveryStatusQuery, Result<RecoveryStatusView>>, GetRecoveryStatusHandler>();
+        services.AddScoped<ICommandHandler<RetryRecoveryCommand, RecoveryRetryAccepted>, RetryRecoveryHandler>();
     }
 
     private static void AddAccounts(this IServiceCollection services)

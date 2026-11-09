@@ -5315,6 +5315,79 @@
         }
       }
     },
+    "/api/services/recovery": {
+      "get": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "What the machine missed and what became of it (spec AU-04, ADR 0240): the latest pass, the counts (missed, recovered, stillFailing) and, per session oldest first, each service with status missed|recovered|partial|still_failing|blocked|waiting|running|not_recoverable|superseded|out_of_reach and a reason. days 1 to 90, default 14; at most 500 ledger rows (truncated says so). 400 services.invalid",
+        "operationId": "GetRecoveryStatus",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 14
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryStatusView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/services/recovery/retry": {
+      "post": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "Start a recovery pass now (the normal pass, not debounced). 202. Audited. 409 recovery.already_running while a pass runs",
+        "operationId": "RetryRecovery",
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryRetryAccepted"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/services/{id}": {
       "get": {
         "tags": [
@@ -55764,6 +55837,198 @@
           }
         },
         "description": "The body of a compliance record (spec P11-05). The owner is never part of it: the actor comes from the signed-in session. The lock end is not part of it either: the server derives it."
+      },
+      "RecoveryCounts": {
+        "required": [
+          "missed",
+          "recovered",
+          "stillFailing"
+        ],
+        "type": "object",
+        "properties": {
+          "missed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recovered": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stillFailing": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Headline counts: missed (missed, waiting, running, not recoverable, out of reach), recovered, still failing (still failing, blocked, partial)."
+      },
+      "RecoveryPassView": {
+        "required": [
+          "trigger",
+          "startedAt",
+          "finishedAt",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "trigger": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "RecoveryRetryAccepted": {
+        "required": [
+          "requestedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RecoveryRowView": {
+        "required": [
+          "serviceId",
+          "serviceName",
+          "status",
+          "reason",
+          "attempts",
+          "from",
+          "to",
+          "runId",
+          "canRetry",
+          "missingSessions"
+        ],
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string"
+          },
+          "serviceName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "runId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "canRetry": {
+            "type": "boolean"
+          },
+          "missingSessions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        },
+        "description": "One service at one session. `Session` is the last session of the step; `From` to `To` are the sessions the step covers; `MissingSessions` are those a partial recovery did not fill."
+      },
+      "RecoverySessionView": {
+        "required": [
+          "session",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "string",
+            "format": "date"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecoveryRowView"
+            }
+          }
+        }
+      },
+      "RecoveryStatusView": {
+        "required": [
+          "checkedAt",
+          "running",
+          "latestPass",
+          "days",
+          "counts",
+          "truncated",
+          "sessions"
+        ],
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "latestPass": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RecoveryPassView"
+              }
+            ]
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/RecoveryCounts"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecoverySessionView"
+            }
+          }
+        },
+        "description": "`CheckedAt` is when this was read; `Running` is true while a pass runs; `Truncated` when the ledger held more rows than are shown (the newest sessions are kept). Sessions are oldest first."
       },
       "RefreshRunView": {
         "required": [

@@ -192,6 +192,11 @@ export type OfficialDailyCheck = Schemas['OfficialDailyCheck'];
 /** Services (P1-13): the registered automatic jobs with their schedule, execution settings, parameters, last and next run. */
 export type ServiceView = Schemas['ServiceView'];
 export type ServiceList = Schemas['ServiceList'];
+/** Recovery (AU-04): what was missed, recovered or still failing, per session and service. */
+export type RecoveryStatus = Schemas['RecoveryStatusView'];
+export type RecoveryCounts = Schemas['RecoveryCounts'];
+export type RecoverySession = Schemas['RecoverySessionView'];
+export type RecoveryRow = Schemas['RecoveryRowView'];
 /** The stored form of a schedule: type daily · weekly · after · window · interval · continuous, times HH:mm India time. */
 export type ScheduleSpec = Schemas['ScheduleSpec'];
 export type ServiceExecution = Schemas['ExecutionView'];

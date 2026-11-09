@@ -136,4 +136,21 @@ internal sealed class InMemoryRecoveryLedger : IRecoveryLedger
             return ValueTask.FromResult(rows);
         }
     }
+
+    public ValueTask<RecoveryPassRow?> LatestPassAsync(CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            var p = Passes.OrderByDescending(x => x.StartedAt).Select(x => (x.Id, x.Trigger, x.StartedAt, x.Status)).FirstOrDefault();
+            return ValueTask.FromResult<RecoveryPassRow?>(p.Id == Guid.Empty ? null : new RecoveryPassRow(p.Id, p.Trigger, p.StartedAt, null, p.Status));
+        }
+    }
+
+    public ValueTask<IReadOnlyList<RecoveryItemRow>> ListSinceAsync(DateOnly since, int limit, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            return ValueTask.FromResult<IReadOnlyList<RecoveryItemRow>>([.. Items.Values.Where(i => i.SessionTo >= since).OrderByDescending(i => i.SessionTo).ThenBy(i => i.ServiceId, StringComparer.Ordinal).Take(limit)]);
+        }
+    }
 }

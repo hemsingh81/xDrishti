@@ -52,6 +52,25 @@ public sealed class RecoveryRunner(
         }
     }
 
+    /// <summary>True while a pass runs.</summary>
+    public bool IsRunning
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _pass is { IsCompleted: false };
+            }
+        }
+    }
+
+    /// <summary>What a pass would do now (read-only: nothing is run or written), or null when the plan is refused. For the Recovery screen.</summary>
+    public async Task<RecoveryPlan?> PreviewAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        return (await PlanAsync(scope.ServiceProvider, clock.GetUtcNow(), cancellationToken))?.Plan;
+    }
+
     /// <inheritdoc />
     public bool Request(RecoveryTrigger trigger)
     {
@@ -66,13 +85,13 @@ public sealed class RecoveryRunner(
 
             if (_pass is { IsCompleted: false })
             {
-                _pending = trigger == RecoveryTrigger.Resume ? _pending : trigger; // a trigger refused for now is not lost: one trailing pass follows (no ledger row for it)
+                _pending = trigger is RecoveryTrigger.Resume or RecoveryTrigger.Manual ? _pending : trigger; // a trigger refused for now is not lost: one trailing pass follows (no ledger row for it)
                 ServicesLog.RecoveryIgnored(logger, code, "a pass is running");
                 return false;
             }
 
             var debounce = TimeSpan.FromMinutes(Math.Clamp(options.DebounceMinutes, 1, 120));
-            if (trigger != RecoveryTrigger.Resume && _lastAccepted is { } last && now >= last && now - last < debounce)
+            if (trigger is not (RecoveryTrigger.Resume or RecoveryTrigger.Manual) && _lastAccepted is { } last && now >= last && now - last < debounce)
             {
                 _pending = trigger;
                 ServicesLog.RecoveryIgnored(logger, code, "inside the debounce");

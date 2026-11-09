@@ -65,7 +65,9 @@ internal sealed class ServicesWorld : IDisposable
             .Scoped<ICommandHandler<ResetServiceScheduleCommand, ServiceView>, ResetServiceScheduleHandler>()
             .Scoped<ICommandHandler<PauseServiceCommand, ServiceView>, PauseServiceHandler>()
             .Scoped<ICommandHandler<ResumeServiceCommand, ServiceView>, ResumeServiceHandler>()
-            .Scoped<ICommandHandler<RunServiceNowCommand, ServiceRunView>, RunServiceNowHandler>();
+            .Scoped<ICommandHandler<RunServiceNowCommand, ServiceRunView>, RunServiceNowHandler>()
+            .Scoped<IQueryHandler<GetRecoveryStatusQuery, Result<RecoveryStatusView>>, GetRecoveryStatusHandler>()
+            .Scoped<ICommandHandler<RetryRecoveryCommand, RecoveryRetryAccepted>, RetryRecoveryHandler>();
         var all = create(this, provider);
         provider.Singleton(new ServiceRegistry(all));
         configure(provider);
