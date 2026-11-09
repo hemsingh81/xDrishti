@@ -8,7 +8,7 @@ export const extensionFamilies = ['filter:results', 'ext:ev-1', 'ext:fu-1', 'ext
 export type ExtensionFamily = (typeof extensionFamilies)[number];
 
 /** The stored evaluations of one family, newest first (at most 100). */
-export const extensionsQuery = (family: ExtensionFamily) =>
+export const extensionsQuery = (family: string) =>
   queryOptions({
     queryKey: ['learning', 'extensions', family] as const,
     queryFn: async ({ signal }) =>

@@ -193,6 +193,7 @@ describe('Learning overview', () => {
       'Smart rules',
       'Loss tags',
       'Fundamentals and events',
+      'Options and stat-arb',
       'Decay',
       'Loop',
     ]);

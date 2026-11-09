@@ -34,4 +34,28 @@ export const p15Screens: Screen[] = [
       },
     },
   },
+  {
+    id: 'P14-16-options-stat-arb',
+    route: '/learning?tab=options',
+    mounts: {
+      full: () => {
+        server.use(
+          http.get('/api/research/extensions', () => HttpResponse.json({ family: 'ext:iv-1', items: [] })),
+          http.get('/api/research/expression-runs', () =>
+            HttpResponse.json({ state: 'unavailable', reason: 'no_runs', items: [] }),
+          ),
+          http.get('/api/research/pair-formations', () =>
+            HttpResponse.json({
+              state: 'unavailable',
+              reason: 'no_runs',
+              from: '2026-01-01',
+              to: '2026-10-30',
+              items: [],
+              truncated: false,
+            }),
+          ),
+        );
+      },
+    },
+  },
 ];

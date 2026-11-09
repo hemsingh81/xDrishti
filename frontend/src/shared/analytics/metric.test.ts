@@ -1,4 +1,4 @@
-import { carriesNumber, metricOf, nonValueKinds, resolveMetric, type MetricState } from './metric';
+import { carriesNumber, metricOf, nonValueKinds, reportedMetric, resolveMetric, type MetricState } from './metric';
 
 describe('metricOf', () => {
   it('makes a finite number a value, zero included', () => {
@@ -40,5 +40,44 @@ describe('carriesNumber', () => {
     expect(carriesNumber({ kind: 'value', value: 1 })).toBe(true);
     expect(carriesNumber({ kind: 'provisional', value: 1, reason: 'r' })).toBe(true);
     expect(nonValueKinds).toHaveLength(6);
+  });
+});
+
+describe('reportedMetric', () => {
+  it.each([
+    [
+      { state: 'ok', value: 3, reason: null },
+      { kind: 'value', value: 3 },
+    ],
+    [
+      { state: 'ok', value: 0, reason: null },
+      { kind: 'value', value: 0 },
+    ],
+    [
+      { state: 'ok', value: null, reason: null },
+      { kind: 'unavailable', reason: 'The API did not report a value.' },
+    ],
+    [
+      { state: 'ok', value: Number.NaN, reason: null },
+      { kind: 'unavailable', reason: 'The API did not report a value.' },
+    ],
+    [
+      { state: 'ok', value: Infinity, reason: null },
+      { kind: 'unavailable', reason: 'The API did not report a value.' },
+    ],
+    [
+      { state: 'unavailable', value: 5, reason: 'no_model' },
+      { kind: 'unavailable', reason: 'no model' },
+    ],
+    [
+      { state: 'unavailable', value: null, reason: null },
+      { kind: 'unavailable', reason: 'not reported' },
+    ],
+    [
+      { state: 'cut', value: 1, reason: 'cut' },
+      { kind: 'unavailable', reason: 'cut' },
+    ],
+  ])('maps %j to %j, never a number for a non-ok state', (input, expected) => {
+    expect(reportedMetric(input)).toEqual(expected);
   });
 });

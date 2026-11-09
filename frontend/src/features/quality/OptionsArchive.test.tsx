@@ -1,8 +1,8 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { buildCoverageView } from '@/test/optionsFixtures';
-import { problemResponse } from '@/test/server';
+import { buildCoverageView, buildUnderlyingSummary } from '@/test/optionsFixtures';
+import { problemResponse, server } from '@/test/server';
 import { renderQuality } from './testing';
 
 const open = async () => {
@@ -11,6 +11,35 @@ const open = async () => {
 };
 
 describe('Data quality: options archive', () => {
+  beforeEach(() => {
+    server.use(http.get('/api/options/summary', () => HttpResponse.json({ underlyings: [buildUnderlyingSummary()] })));
+  });
+
+  it('shows the archive summary with a missing model as a word, not a zero', async () => {
+    renderQuality({ handlers: [http.get('/api/options/coverage', () => HttpResponse.json(buildCoverageView()))] });
+    const card = await open();
+    const table = await within(card).findByRole('table', { name: 'Options archive summary' });
+    expect(within(table).getByText('NSE:NIFTY')).toBeInTheDocument();
+    expect(within(table).getByText('31')).toBeInTheDocument();
+    expect(within(table).getByText('not usable (coverage) 9')).toBeInTheDocument();
+    expect(within(table).getByText(/given up 1/)).toBeInTheDocument();
+    expect(within(table).getByText(/no model/)).toBeInTheDocument();
+  });
+
+  it('says nothing is recorded when the summary is empty, and shows an error when it fails', async () => {
+    server.use(http.get('/api/options/summary', () => HttpResponse.json({ underlyings: [] })));
+    renderQuality({ handlers: [http.get('/api/options/coverage', () => HttpResponse.json(buildCoverageView()))] });
+    const card = await open();
+    expect(await within(card).findByText('nothing recorded yet')).toBeInTheDocument();
+  });
+
+  it('shows an error state for a failing summary', async () => {
+    server.use(http.get('/api/options/summary', () => problemResponse({ title: 'Summary down', code: 'x' }, 500)));
+    renderQuality({ handlers: [http.get('/api/options/coverage', () => HttpResponse.json(buildCoverageView()))] });
+    const card = await open();
+    expect(await within(card).findByText('Summary down')).toBeInTheDocument();
+  });
+
   it('reads nothing until opened, then shows checks, usable and truncated without any price', async () => {
     const asked: (string | null)[] = [];
     renderQuality({

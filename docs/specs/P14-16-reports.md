@@ -65,3 +65,12 @@ Each route ≤ 300 ms p95 on the owner's database (bounded reads of summary rows
 - [ ] `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any series field, any non-value printed as a digit, any unbounded query)
 - [ ] Contract regenerated (`scripts/gen-api.sh`); no migration
 - [ ] Doc 13 note
+
+## Part B build note (2026-11-09, approved by delegation)
+Built on the owner's delegation, with the existing routes only (no backend change). Decisions taken as best practice:
+- Learning gets one lazy tab "Options and stat-arb": verdict cards (the P15-11 `ExtensionCard` with the evidence block) for `expr:option_buy`, `expr:debit_spread`, `expr:credit_spread`, `expr:iron_condor`, `pairs:intraday-1`, `ext:iv-1`; "none stored" when a family has no record; then expression runs (newest 20) and pair formations as tables. The BASIS family is not shown (default cut, no stored record); add it to `p14Families` when it is built.
+- Data quality: the existing lazy "Options archive" card gains the `GET /api/options/summary` table above the coverage list. No new eager code beyond one tab registry entry.
+- The verdict words KEEP, DROP, INCONCLUSIVE and NOT EVALUABLE are shown as stored (a KEEP is not a pass of anything unavailable: a missing bound reads as words, never a digit); an unavailable share, count, date, gap or half-life is a word with its reason (not a digit); non-finite numbers are never printed (`reportedMetric`). No price, IV or Greek field is read.
+- Gap: the `P14VerdictList` read model has no route, so cut families cannot show `cut`; the section uses `GET /api/research/extensions?family=` per family (an empty list reads "none stored"). Not a blocker.
+- Cuts: this screen cannot know which families are cut (no route carries it); `xd options phase-check --cut` is the authority. Each family notes that a development KEEP changes nothing and whether the hold-out has been read. Lot feasibility is shown per run.
+- Prototype: no screen shows options, expressions or pairs; the layout follows the Learning panels.
