@@ -26,6 +26,7 @@ public sealed class ShadowGradeService(IServiceScopeFactory scopes) : IScheduled
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.Convergent,
             MustFollow = [EodService.Id],
             StartNotBefore = new TimeOnly(16, 30),
             StartAdvice = "It must start after the end-of-day data run: the bars of the session must be stored, or the candidates stay pending until the next run.",

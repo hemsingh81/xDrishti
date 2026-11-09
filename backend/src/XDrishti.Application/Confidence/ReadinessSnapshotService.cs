@@ -24,6 +24,7 @@ public sealed class ReadinessSnapshotService(IServiceScopeFactory scopes) : ISch
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.TimeBound,
             MustFollow = [DecayMonitorService.Id],
             StartNotBefore = new TimeOnly(18, 0),
             StartAdvice = "It must start after the decay monitor, so that the day's kill-rule state is stored before the score is read.",

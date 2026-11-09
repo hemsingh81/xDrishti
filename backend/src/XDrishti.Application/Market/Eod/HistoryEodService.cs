@@ -25,7 +25,7 @@ public sealed class HistoryEodService(IServiceScopeFactory scopes, IEodSettings 
         [ScheduleType.Daily, ScheduleType.Weekly, ScheduleType.After],
         new ServiceSettings(false, Schedule.Daily(new TimeOnly(18, 30)), 0, 240, false, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
-        new ServiceConstraints { CatchUpReach = CatchUpReach.SameDay });
+        new ServiceConstraints { RecoveryClass = RecoveryClass.Convergent, CatchUpReach = CatchUpReach.SameDay });
 
     ServiceDefinition IScheduledService.Definition => Definition;
 

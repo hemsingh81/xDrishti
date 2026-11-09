@@ -31,7 +31,7 @@ public sealed class OptionBackfillService : IScheduledService, IExternallyRunSer
         [ScheduleType.Continuous],
         new ServiceSettings(false, Schedule.Continuous(), 0, ServiceSettings.MaxTimeoutMinutes, false, true, new Dictionary<string, JsonElement>()),
         [],
-        new ServiceConstraints());
+        new ServiceConstraints { RecoveryClass = RecoveryClass.Convergent });
 
     ServiceDefinition IScheduledService.Definition => Definition;
 

@@ -29,6 +29,7 @@ public sealed class ProposalService(IServiceScopeFactory scopes) : IScheduledSer
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.LatestOnly,
             MustFollow = [WeeklyService.Id],
             StartAdvice = "It reads the cell statistics and the report engine; run it after the weekly digest. It needs Assistant:Proposals:Enabled, the assistant's master switch and a ready model; otherwise it does nothing.",
         });

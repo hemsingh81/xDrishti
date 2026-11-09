@@ -26,6 +26,7 @@ public sealed class DecayMonitorService(IServiceScopeFactory scopes) : ISchedule
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.TimeBound,
             MustFollow = [ShadowGradeService.Id],
             StartNotBefore = new TimeOnly(17, 30),
             StartAdvice = "It must start after the shadow grading: the day's grades must be stored, or the series stops before the ungraded session.",

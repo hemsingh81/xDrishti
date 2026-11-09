@@ -27,6 +27,7 @@ public sealed class MlMonitorService(IServiceScopeFactory scopes) : IScheduledSe
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.TimeBound,
             MustFollow = [DecayMonitorService.Id],
             StartNotBefore = new TimeOnly(18, 0),
             StartAdvice = "It must start after the decay monitor, so that the day's evaluations and the bell are in order.",

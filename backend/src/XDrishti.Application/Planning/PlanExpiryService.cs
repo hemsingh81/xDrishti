@@ -24,6 +24,7 @@ public sealed class PlanExpiryService(IServiceScopeFactory scopes) : IScheduledS
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.LatestOnly,
             StartNotBefore = new TimeOnly(15, 30),
             StartAdvice = "It must start after the close (15:30): before it, armed tickets would leave the feed during the session.",
             NotBeforeSessionEnd = true,

@@ -23,7 +23,7 @@ public sealed class FilingIngestService(IServiceScopeFactory scopes, ILogger<Fil
         [ScheduleType.Daily, ScheduleType.Weekly, ScheduleType.After],
         new ServiceSettings(false, Schedule.Daily(new TimeOnly(17, 5)), 1, 30, false, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
-        new ServiceConstraints { CatchUpReach = CatchUpReach.SameDay });
+        new ServiceConstraints { RecoveryClass = RecoveryClass.LatestOnly, CatchUpReach = CatchUpReach.SameDay });
 
     ServiceDefinition IScheduledService.Definition => Definition;
 

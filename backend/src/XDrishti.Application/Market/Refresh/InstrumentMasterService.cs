@@ -31,7 +31,7 @@ public sealed class InstrumentMasterService(IServiceScopeFactory scopes, IInstru
         [ScheduleType.Daily, ScheduleType.Weekly, ScheduleType.After],
         new ServiceSettings(true, Schedule.Daily(new TimeOnly(8, 45), false, Weekdays.EveryDay), 0, 30, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
-        new ServiceConstraints { CatchUpReach = CatchUpReach.Latest });
+        new ServiceConstraints { RecoveryClass = RecoveryClass.LatestOnly, CatchUpReach = CatchUpReach.Latest });
 
     ServiceDefinition IScheduledService.Definition => Definition;
 

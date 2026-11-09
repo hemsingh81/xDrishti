@@ -25,6 +25,7 @@ public sealed class ShadowWriteService(IServiceScopeFactory scopes) : IScheduled
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.TimeBound,
             MustFollow = [NightlyService.Id],
             StartNotBefore = new TimeOnly(18, 30),
             StartAdvice = "It must start after the nightly plan (18:30) has stored the plan; a night it misses is recorded as a gap and never filled in after the open.",

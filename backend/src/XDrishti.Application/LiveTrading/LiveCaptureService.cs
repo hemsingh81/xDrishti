@@ -27,6 +27,7 @@ public sealed class LiveCaptureService(IServiceScopeFactory scopes, ILiveCapture
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.TimeBound,
             StartAdvice = "Polls from 09:10 to 15:40 on trading days; the trade book is the day's trades, so a poll outside the day reads nothing new.",
         });
 

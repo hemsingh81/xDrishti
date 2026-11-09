@@ -28,6 +28,7 @@ public sealed class PaperReviewService(IServiceScopeFactory scopes) : IScheduled
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.LatestOnly,
             MustFollow = [WeeklyService.Id],
             CatchUpReach = CatchUpReach.SameDay, // missed on Saturday: caught up within 24 hours; a later start would store a review of a past week
         });

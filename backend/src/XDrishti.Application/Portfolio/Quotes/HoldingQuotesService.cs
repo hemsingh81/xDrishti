@@ -40,7 +40,7 @@ public sealed class HoldingQuotesService(IServiceScopeFactory scopes, TimeProvid
         [ScheduleType.Interval],
         new ServiceSettings(true, Schedule.Interval(5, new TimeOnly(9, 15), new TimeOnly(15, 30)), 0, 2, false, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
-        new ServiceConstraints { MustCover = TimeRange.MarketHours });
+        new ServiceConstraints { RecoveryClass = RecoveryClass.TimeBound, MustCover = TimeRange.MarketHours });
 
     ServiceDefinition IScheduledService.Definition => Definition;
 

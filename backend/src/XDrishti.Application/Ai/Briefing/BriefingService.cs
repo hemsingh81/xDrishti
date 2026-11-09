@@ -29,6 +29,7 @@ public sealed class BriefingService(IServiceScopeFactory scopes) : IScheduledSer
         [],
         new ServiceConstraints
         {
+            RecoveryClass = RecoveryClass.LatestOnly,
             MustFollow = [SuggestionsService.Id],
             StartAdvice = "It reads the plan and the suggestions of the nightly run; run it after them. With the briefing switch off it stores the fixed-format text.",
         });
