@@ -43,7 +43,7 @@ public sealed class KillGrantsTests(ResearchGrantsTests.DedicatedServer server) 
     private Task<long> SwitchAsync(bool auto) => ScalarAsync(server.App, $"INSERT INTO confidence.kill_settings (auto, actor, reason) VALUES ({auto.ToString().ToLowerInvariant()}, 'owner:me@x.test', 'why') RETURNING id");
 
     [Fact]
-    public async Task The_schema_holds_the_three_tables_with_no_table_level_update_or_delete_for_the_runtime_role_and_four_updatable_columns()
+    public async Task The_schema_holds_the_three_tables_with_no_table_level_update_or_delete_for_the_runtime_role_and_five_updatable_columns()
     {
         await using var connection = new NpgsqlConnection(server.Owner);
         await connection.OpenAsync(Ct);
@@ -92,7 +92,7 @@ public sealed class KillGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             }
         }
 
-        updatable.ShouldBe(["actor", "auto_setting_id", "decided_at", "state"]);
+        updatable.ShouldBe(["actor", "auto_setting_id", "decided_at", "dismiss_reason", "state"]);
     }
 
     [Fact]
