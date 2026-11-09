@@ -37,11 +37,14 @@ public interface IRecoveryLedger
     /// <summary>Items that failed with fewer than <paramref name="maxAttempts"/> attempts, and items that wait (market hours, a skipped run): the next pass tries them again.</summary>
     ValueTask<IReadOnlyList<RecoveryItemRow>> ListRetryableAsync(int maxAttempts, CancellationToken cancellationToken);
 
-    /// <summary>Closes the service's open items (failed, blocked, waiting) of an older occurrence than <paramref name="occurrence"/> as superseded: a later step covers them.</summary>
-    ValueTask SupersedeOlderAsync(string serviceId, string occurrence, CancellationToken cancellationToken);
+    /// <summary>Closes the service's open items (failed, blocked, waiting) of an older occurrence than <paramref name="occurrence"/> as superseded: a later step covers them. A failed item that used up its attempts stays (its failure is the evidence and its notice). Shortcut: a later step is taken to cover every older occurrence, true for the classes in use (convergent, latest-only); a dated service would need its own date.</summary>
+    ValueTask SupersedeOlderAsync(string serviceId, string occurrence, int maxAttempts, CancellationToken cancellationToken);
 
     /// <summary>Inserts the item or, for the same service and occurrence, updates it (the unique key makes a repeat idempotent).</summary>
     ValueTask SaveAsync(RecoveryItemRow item, CancellationToken cancellationToken);
+
+    /// <summary>Items that wait (market hours, a skipped run) for a session on or before <paramref name="sessionOnOrBefore"/>, with the instant of the pass that last touched them.</summary>
+    ValueTask<IReadOnlyList<RecoveryExhaustedRow>> ListWaitingAsync(DateOnly sessionOnOrBefore, CancellationToken cancellationToken);
 
     /// <summary>Failed items with at least <paramref name="maxAttempts"/> attempts whose pass started at or after <paramref name="since"/>.</summary>
     ValueTask<IReadOnlyList<RecoveryExhaustedRow>> ListExhaustedAsync(int maxAttempts, DateTimeOffset since, CancellationToken cancellationToken);

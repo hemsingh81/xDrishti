@@ -286,6 +286,9 @@ internal sealed class FakeDataJobStore : IDataJobStore
     /// <summary>When set, reading the latest job of a trigger throws it (the database is down).</summary>
     public Exception? LastByTriggerFailure { get; set; }
 
+    public ValueTask<DataJob?> GetLastAutomaticAsync(string requester, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Jobs.Values.Where(j => j.Trigger == DataJobTrigger.Daily || j.RequestedBy == requester).OrderByDescending(j => j.StartedAt).FirstOrDefault());
+
     public ValueTask<DataJob?> GetLastByTriggerAsync(DataJobTrigger trigger, CancellationToken cancellationToken) =>
         LastByTriggerFailure is { } failure
             ? throw failure

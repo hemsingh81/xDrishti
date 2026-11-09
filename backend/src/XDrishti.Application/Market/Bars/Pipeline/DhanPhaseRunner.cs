@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Market.Bars.Csv;
 using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Application.Market.Bars.Gaps;
+using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
 
@@ -59,7 +60,7 @@ internal sealed class DhanPhaseRunner(
 
         var calendar = await tradingCalendar.GetAsync(cancellationToken);
         var gapPlans = await PlanGapsAsync(calendar, list, reporter, cancellationToken);
-        var plan = DhanFetchPlanner.Plan(list, clock.GetUtcNow(), settings.DhanInitialDays, gapPlans.ToDictionary(p => p.Key, p => p.Value.Windows), settings.DhanInitialDaysIndex);
+        var plan = DhanFetchPlanner.Plan(list, FetchLimit(calendar, reporter.Job.RequestedBy), settings.DhanInitialDays, gapPlans.ToDictionary(p => p.Key, p => p.Value.Windows), settings.DhanInitialDaysIndex);
         phase = phase with { Total = list.Count, AccountName = state.Name };
         await reporter.ReportAsync(phase, cancellationToken, publishNow: true);
 
@@ -177,6 +178,23 @@ internal sealed class DhanPhaseRunner(
     }
 
     /// <summary>Finds the missing bars of every target before anything is fetched. One instrument whose gaps cannot be worked out is fetched as usual (and the owner is told once).</summary>
+    /// <summary>
+    /// Up to when the run asks Dhan for bars: now for a run the owner started; for the automatic end-of-day run (the scheduled run and the recovery pass) the end of the last closed session, so a run made up while a session is
+    /// open stores no bar of that session, which is still in progress (ADR 0240, AC7).
+    /// </summary>
+    private DateTimeOffset FetchLimit(TradingCalendar calendar, string requestedBy)
+    {
+        var now = clock.GetUtcNow();
+        if (!string.Equals(requestedBy, Eod.EodService.Requester, StringComparison.Ordinal))
+        {
+            return now;
+        }
+
+        var last = calendar.LastClosedSession(now);
+        var end = calendar.SessionOf(last) is { } session ? new DateTimeOffset(last.ToDateTime(new TimeOnly(session.ToMinute / 60, session.ToMinute % 60)), IndiaTime.Offset) : now;
+        return end < now ? end : now;
+    }
+
     private async ValueTask<Dictionary<Guid, GapPlan>> PlanGapsAsync(
         TradingCalendar calendar, IReadOnlyList<FetchTarget> targets, JobReporter reporter, CancellationToken cancellationToken)
     {

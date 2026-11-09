@@ -83,16 +83,27 @@ internal sealed class InMemoryRecoveryLedger : IRecoveryLedger
         }
     }
 
-    public ValueTask SupersedeOlderAsync(string serviceId, string occurrence, CancellationToken cancellationToken)
+    public ValueTask SupersedeOlderAsync(string serviceId, string occurrence, int maxAttempts, CancellationToken cancellationToken)
     {
         lock (_gate)
         {
-            foreach (var key in Items.Where(i => i.Key.Service == serviceId && string.CompareOrdinal(i.Key.Occurrence, occurrence) < 0 && i.Value.State is RecoveryStates.Failed or RecoveryStates.Blocked or RecoveryStates.Waiting).Select(i => i.Key).ToList())
+            foreach (var key in Items.Where(i => i.Key.Service == serviceId && string.CompareOrdinal(i.Key.Occurrence, occurrence) < 0 && i.Value.State is RecoveryStates.Failed or RecoveryStates.Blocked or RecoveryStates.Waiting && !(i.Value.State == RecoveryStates.Failed && i.Value.Attempts >= maxAttempts)).Select(i => i.Key).ToList())
             {
                 Items[key] = Items[key] with { State = RecoveryStates.Superseded, Reason = "superseded by " + occurrence };
             }
 
             return ValueTask.CompletedTask;
+        }
+    }
+
+    public ValueTask<IReadOnlyList<RecoveryExhaustedRow>> ListWaitingAsync(DateOnly sessionOnOrBefore, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            IReadOnlyList<RecoveryExhaustedRow> rows = [.. Items.Values
+                .Where(i => i.State == RecoveryStates.Waiting && i.SessionTo <= sessionOnOrBefore)
+                .Select(i => new RecoveryExhaustedRow(i.ServiceId, i.Occurrence, i.Reason, Passes.FirstOrDefault(p => p.Id == i.PassId).StartedAt))];
+            return ValueTask.FromResult(rows);
         }
     }
 

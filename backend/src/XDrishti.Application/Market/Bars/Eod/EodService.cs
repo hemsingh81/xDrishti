@@ -48,6 +48,7 @@ public sealed class EodService(IServiceScopeFactory scopes, IDataSettings settin
             StartNotBefore = new TimeOnly(15, 35),
             StartAdvice = "The session ends at 15:30; the last minutes may not be available from Dhan yet.",
             NotBeforeSessionEnd = true,
+            MustNotOverlap = TimeRange.MarketHours, // a run made up in the market hours waits for the close (ADR 0240)
             CatchUpReach = CatchUpReach.SameDay,
         });
 
@@ -97,7 +98,7 @@ public sealed class EodService(IServiceScopeFactory scopes, IDataSettings settin
             }
 
             // A job of the end-of-day run itself that is still going (an earlier run timed out while it went on) is not "another" update, and is no reason to write a skipped job that would hide it.
-            var own = await jobs.GetRunningAsync(cancellationToken) is { Trigger: DataJobTrigger.Daily };
+            var own = await jobs.GetRunningAsync(cancellationToken) is { } running && (running.Trigger == DataJobTrigger.Daily || string.Equals(running.RequestedBy, Requester, StringComparison.Ordinal));
             return await SkipAsync(jobs, steps, own ? OwnJobRunning : AnotherJobRunning, automatic && !own && !recovered, now, cancellationToken);
         }
 

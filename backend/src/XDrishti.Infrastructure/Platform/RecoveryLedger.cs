@@ -75,9 +75,27 @@ internal sealed class RecoveryLedger(NpgsqlDataSource dataSource) : IRecoveryLed
         r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetFieldValue<DateOnly>(4), r.GetFieldValue<DateOnly>(5), r.GetString(6),
         r.IsDBNull(7) ? null : r.GetString(7), r.GetInt16(8), r.IsDBNull(9) ? null : r.GetGuid(9));
 
-    public async ValueTask SupersedeOlderAsync(string serviceId, string occurrence, CancellationToken cancellationToken)
+    public async ValueTask<IReadOnlyList<RecoveryExhaustedRow>> ListWaitingAsync(DateOnly sessionOnOrBefore, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("UPDATE platform.recovery_items SET state = 'superseded', reason = 'superseded by ' || @occurrence WHERE service_id = @service AND occurrence < @occurrence AND state IN ('failed', 'blocked', 'waiting')");
+        await using var command = dataSource.CreateCommand("""
+            SELECT i.service_id, i.occurrence, i.reason, p.started_at FROM platform.recovery_items i JOIN platform.recovery_passes p ON p.id = i.pass_id
+            WHERE i.state = 'waiting' AND i.session_to <= @cutoff ORDER BY p.started_at DESC LIMIT 200
+            """);
+        command.Parameters.AddWithValue("cutoff", NpgsqlDbType.Date, sessionOnOrBefore);
+        var rows = new List<RecoveryExhaustedRow>();
+        await using var r = await command.ExecuteReaderAsync(cancellationToken);
+        while (await r.ReadAsync(cancellationToken))
+        {
+            rows.Add(new RecoveryExhaustedRow(r.GetString(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), r.GetFieldValue<DateTimeOffset>(3)));
+        }
+
+        return rows;
+    }
+
+    public async ValueTask SupersedeOlderAsync(string serviceId, string occurrence, int maxAttempts, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("UPDATE platform.recovery_items SET state = 'superseded', reason = 'superseded by ' || @occurrence WHERE service_id = @service AND occurrence < @occurrence AND state IN ('failed', 'blocked', 'waiting') AND NOT (state = 'failed' AND attempts >= @max)");
+        command.Parameters.AddWithValue("max", NpgsqlDbType.Integer, maxAttempts);
         command.Parameters.AddWithValue("service", NpgsqlDbType.Varchar, serviceId);
         command.Parameters.AddWithValue("occurrence", NpgsqlDbType.Varchar, occurrence);
         await command.ExecuteNonQueryAsync(cancellationToken);

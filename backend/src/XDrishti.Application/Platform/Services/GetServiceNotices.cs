@@ -19,6 +19,8 @@ internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, Service
 
     public const string RecoveryFailed = "recovery_failed";
 
+    public const string RecoveryWaiting = "recovery_waiting";
+
     private const int MaxReasonLength = 160;
 
     private const int RecoveryNoticeDays = 7;
@@ -52,6 +54,22 @@ internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, Service
             if (!notices.Any(n => n.Id == id))
             {
                 notices.Add(new ServiceNotice(id, RecoveryFailed, "error", $"{service.Definition.Name} could not be made up for {exhausted.Occurrence}: {(string.IsNullOrWhiteSpace(exhausted.Reason) ? "see the History of the service" : Short(exhausted.Reason))}", exhausted.ServiceId, exhausted.At));
+            }
+        }
+
+        // a step that has waited for days (no connected account, a source that is down): one warning per service per day, though the wait costs no attempt
+        var waitingBefore = IndiaTime.Today(now).AddDays(-recoveryOptions.WaitingNoticeDays);
+        foreach (var waiting in await recovery.ListWaitingAsync(waitingBefore, cancellationToken))
+        {
+            if (registry.Find(waiting.ServiceId) is not { } service)
+            {
+                continue;
+            }
+
+            var id = $"recovery:waiting:{waiting.ServiceId}:{IndiaTime.Today(now).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
+            if (!notices.Any(n => n.Id == id))
+            {
+                notices.Add(new ServiceNotice(id, RecoveryWaiting, "warning", $"{service.Definition.Name} is still waiting to be made up for {waiting.Occurrence}: {(string.IsNullOrWhiteSpace(waiting.Reason) ? "see the History of the service" : Short(waiting.Reason))}", waiting.ServiceId, waiting.At));
             }
         }
 

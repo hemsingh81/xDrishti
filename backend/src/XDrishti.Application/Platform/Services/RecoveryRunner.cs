@@ -323,7 +323,7 @@ public sealed class RecoveryRunner(
                 continue;
             }
 
-            await ledger.SupersedeOlderAsync(id, occurrence, cancellationToken); // an older open item of the service is covered by this step, so it no longer holds the baseline back
+            await ledger.SupersedeOlderAsync(id, occurrence, maxAttempts, cancellationToken); // an older open item of the service is covered by this step, so it no longer holds the baseline back
             var done = await RunStepAsync(services, ledger, planned, step, item, cancellationToken);
             if (done.State == RecoveryStates.Waiting)
             {
@@ -375,10 +375,12 @@ public sealed class RecoveryRunner(
                 return made;
             }
 
-            if (handled.Trigger != ServiceRunTrigger.CatchUp)
+            if (handled.Trigger != ServiceRunTrigger.CatchUp && handled.Status == ServiceRunStatus.Failed)
             {
-                // the scheduler ran it at its time (it failed or was skipped, with its own notice and retries): the pass does not run it again behind it; what follows it is blocked
-                return item with { State = RecoveryStates.Failed, Reason = "its scheduled run did not succeed; see its history" };
+                // the scheduler ran it at its time and it failed (with its own notice and retries): the pass does not run it again behind it, and what follows it is blocked. A skipped run proceeds: the service could not run then, and may now.
+                var refused = item with { State = RecoveryStates.Failed, Reason = "its scheduled run failed; see its history", Attempts = Math.Max(item.Attempts, Math.Clamp(options.MaxAttempts, 1, 10)), RunId = handled.Id };
+                await ledger.SaveAsync(refused, cancellationToken);
+                return refused;
             }
         }
 

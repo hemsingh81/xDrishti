@@ -231,36 +231,50 @@ public sealed class EodServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task A_morning_recovery_is_no_run_of_the_day_so_the_scheduled_run_at_15_50_still_goes_ahead()
+    public async Task A_recovery_in_the_market_hours_waits_for_the_close_and_does_not_stop_the_scheduled_run_at_15_50()
     {
         _world.Data.Store("eod", EodService.Definition.Defaults); // registered before: Monday's run was missed
         await StartUpAtAsync(13, 10, 0);
 
-        _jobs.Started.ShouldHaveSingleItem().Trigger.ShouldBe(DataJobTrigger.Manual); // the made-up run is not a Daily job
+        _jobs.Started.ShouldBeEmpty(); // the session is open: nothing is fetched now
+        _world.Ledger.Items.Values.ShouldHaveSingleItem().Reason.ShouldBe("waiting: market hours");
         await TickAtAsync(13, 15, 50);
 
-        _jobs.Started.Select(j => j.Trigger).ShouldBe([DataJobTrigger.Manual, DataJobTrigger.Daily]);
-        Runs.Select(r => (r.Trigger, r.Status)).ShouldBe([(ServiceRunTrigger.CatchUp, ServiceRunStatus.Succeeded), (ServiceRunTrigger.Scheduled, ServiceRunStatus.Succeeded)]);
+        _jobs.Started.ShouldHaveSingleItem().Trigger.ShouldBe(DataJobTrigger.Daily);
+        Runs.Select(r => (r.Trigger, r.Status)).ShouldBe([(ServiceRunTrigger.Scheduled, ServiceRunStatus.Succeeded)]); // the pass found it made up and ran nothing twice
     }
 
     [Fact]
-    public async Task A_recovery_run_that_finds_the_token_lapsed_records_no_daily_skipped_job_and_runs_after_the_reconnect()
+    public async Task A_recovery_after_the_close_is_no_run_of_the_day_it_writes_a_manual_job_and_the_scheduled_run_still_goes_ahead()
+    {
+        _world.Data.Store("eod", EodService.Definition.Defaults);
+        await StartUpAtAsync(13, 15, 40);
+
+        _jobs.Started.ShouldHaveSingleItem().Trigger.ShouldBe(DataJobTrigger.Manual);
+        await TickAtAsync(13, 15, 50);
+
+        _jobs.Started.Select(j => j.Trigger).ShouldBe([DataJobTrigger.Manual, DataJobTrigger.Daily]);
+    }
+
+    [Fact]
+    public async Task A_lapsed_token_skips_the_recovery_and_the_scheduled_run_and_a_reconnect_later_runs_it_without_a_daily_skipped_job_from_the_recovery()
     {
         _world.Data.Store("eod", EodService.Definition.Defaults);
         _account.State = new DataAccountState(Guid.NewGuid(), "Primary", DataAccountStatuses.Expired, "The sign-in of the Data account has expired. Reconnect it under Accounts.");
         await StartUpAtAsync(13, 10, 0);
+        await TickAtAsync(13, 15, 50);
 
-        _jobs.Skipped.ShouldBeEmpty(); // a skipped Daily job would hide the day's real run
+        _jobs.Skipped.ShouldHaveSingleItem(); // the scheduled run's own skipped job
         _jobs.Started.ShouldBeEmpty();
-        Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Skipped);
 
         _account.State = FakeAccountStatus.Connected().State;
-        _world.SetClock(At(13, 10, 11));
+        _world.SetClock(At(13, 18, 0));
         _world.Recovery.Request(XDrishti.Application.Abstractions.Platform.RecoveryTrigger.BrokerReconnect);
         await _world.SettleAsync();
 
         _jobs.Started.ShouldHaveSingleItem().Trigger.ShouldBe(DataJobTrigger.Manual);
         Runs.Last().Status.ShouldBe(ServiceRunStatus.Succeeded);
+        _jobs.Skipped.ShouldHaveSingleItem(); // no second skipped job from a recovery
     }
 
     [Fact]

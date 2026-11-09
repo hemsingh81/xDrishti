@@ -76,7 +76,7 @@ internal sealed class GetDataOverviewHandler(
     {
         // the schedule is the one of the Services screen (ADR 0018): the stored choices of the end-of-day run
         var eod = await schedules.GetAsync(EodService.Id, cancellationToken);
-        var last = await jobs.GetLastByTriggerAsync(DataJobTrigger.Daily, cancellationToken);
+        var last = await jobs.GetLastAutomaticAsync(EodService.Requester, cancellationToken); // the scheduled run and what the recovery pass made up
         return new EodOverview(
             eod?.Enabled ?? false,
             eod?.TimeIst?.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,

@@ -261,12 +261,13 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
         var dry = await preview.ReadAsync<SchedulePreview>(Ct);
 
         dry.NextRuns.Select(r => r.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)).ShouldBe(["2026-10-12 15:30", "2026-10-13 15:30", "2026-10-14 15:30"]);
-        dry.Issues.ShouldHaveSingleItem().Code.ShouldBe("start_too_early");
+        dry.Issues.Select(i => i.Code).Order().ShouldBe(["overlaps_market_hours", "start_too_early"]); // 15:20 is also inside the market hours the end-of-day run must not overlap (ADR 0240)
         (await GetServiceAsync("eod")).Revision.ShouldBe(0);
 
         using var saved = await _client.PutJsonAsync("/api/services/eod/schedule", Body("15:20", timeoutMinutes: 60), Ct);
         var view = await saved.ReadAsync<ServiceView>(Ct);
-        view.Issues.ShouldHaveSingleItem().Severity.ShouldBe("warning");
+        view.Issues.ShouldAllBe(i => i.Severity == "warning");
+        view.Issues.Count.ShouldBe(2);
     }
 
     [Fact]

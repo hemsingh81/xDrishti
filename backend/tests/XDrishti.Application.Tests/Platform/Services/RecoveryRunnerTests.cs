@@ -379,4 +379,28 @@ public sealed class RecoveryRunnerTests : IDisposable
         _world.Ledger.Items[("learn", "2026-10-12")].State.ShouldBe(RecoveryStates.Failed); // not overwritten as blocked: its notice stays
         _learn.Calls.ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task An_older_failed_item_that_used_up_its_attempts_is_kept_as_evidence_when_a_later_step_runs()
+    {
+        var old = await _world.Ledger.BeginPassAsync("startup", At(9, 16, 0), Ct);
+        await _world.Ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), old, "eod", "2026-10-09", new DateOnly(2026, 10, 9), new DateOnly(2026, 10, 9), RecoveryStates.Failed, "down", 3, null), Ct);
+
+        await StartUpAtAsync(At(12, 17, 0));
+
+        _world.Ledger.Items[("eod", "2026-10-09")].State.ShouldBe(RecoveryStates.Failed);
+    }
+
+    [Fact]
+    public async Task A_step_that_has_waited_for_a_session_a_day_old_raises_one_notice_per_service_and_day()
+    {
+        var pass = await _world.Ledger.BeginPassAsync("startup", At(12, 9, 0), Ct);
+        var day = new DateOnly(2026, 10, 9);
+        await _world.Ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), pass, "eod", "2026-10-09", day, day, RecoveryStates.Waiting, "waiting: The Data account is not connected.", 0, null), Ct);
+        await _world.Ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), pass, "eod", "2026-10-08", day, day, RecoveryStates.Waiting, "waiting: again", 0, null), Ct);
+
+        var notices = await _world.WithScopeAsync(sp => sp.GetRequiredService<IQueryHandler<GetServiceNoticesQuery, ServiceNotices>>().HandleAsync(new GetServiceNoticesQuery(), Ct));
+
+        notices.Items.Count(n => n.Kind == GetServiceNoticesHandler.RecoveryWaiting && n.ServiceId == "eod").ShouldBe(1);
+    }
 }

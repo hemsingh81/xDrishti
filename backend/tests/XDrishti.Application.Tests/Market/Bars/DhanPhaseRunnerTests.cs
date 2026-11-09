@@ -44,6 +44,21 @@ public sealed class DhanPhaseRunnerTests
     }
 
     [Fact]
+    public async Task The_automatic_end_of_day_run_asks_for_nothing_after_the_last_closed_session_so_a_morning_recovery_stores_no_bar_of_the_open_session()
+    {
+        var morning = Now; // Monday 12:00 India time, the session is open
+        Target("ABB", new DateTimeOffset(2026, 10, 9, 15, 29, 0, TimeSpan.FromMinutes(330)));
+        var job = DataJob.Start([DataSteps.Dhan], false, "system:data-eod", morning, DataJobTrigger.Manual);
+        _jobs.Jobs[job.Id] = job;
+        var runner = new DhanPhaseRunner(_source, _account, _targets, _bars, _settings, _calendar, new GapBackfill(new FakeBarDayCounts(_bars), _gaps, _settings, _clock), _clock, NullLogger<DhanPhaseRunner>.Instance);
+
+        await runner.RunAsync(new JobReporter(job, _jobs, _clock), Ct);
+
+        var friday = new DateTimeOffset(2026, 10, 9, 15, 30, 0, TimeSpan.FromMinutes(330));
+        _source.Plans.Single().Targets.SelectMany(t => t.Windows).ShouldAllBe(w => w.To <= friday);
+    }
+
+    [Fact]
     public async Task A_source_that_is_not_available_skips_the_phase_with_its_reason_before_anything_else_is_asked()
     {
         _source.Availability = new SourceAvailability(false, "Dhan Data API fetch is not available yet");
