@@ -1,7 +1,5 @@
 /** The most baskets one comparison takes: the chart has six colour roles (P8-09 decision 2). */
 export const MAX_BASKETS = 6;
-/** The pivot cap of the server (cells); a bigger pivot is refused with the server's own message. */
-export const MAX_PIVOT_CELLS = 2000;
 /** Rows past which the pivot grid scrolls inside its card (it never truncates). */
 export const TALL_GRID_ROWS = 40;
 

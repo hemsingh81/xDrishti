@@ -15,8 +15,6 @@ public static class EodErrors
 
     public const string DuplicateRowCode = "history.duplicate_row";
 
-    public const string FetchFailedCode = "history.fetch_failed";
-
     /// <summary>The header of a file is not one the parser knows: the whole file is refused and nothing is written.</summary>
     public static Error UnknownFormat(string file, string detail) => Error.Validation(UnknownFormatCode, $"The {file} file has a header this version does not know ({detail}). Nothing was written.");
 
@@ -29,6 +27,4 @@ public static class EodErrors
 
     /// <summary>The same (symbol, series) twice in one file: the whole file is refused (a day with two prices for a name has no honest row).</summary>
     public static Error DuplicateRow(string file, string symbol, string series) => Error.Validation(DuplicateRowCode, $"The {file} file has more than one row for {symbol} ({series}). Nothing was written.");
-
-    public static Error FetchFailed(string detail) => Error.Upstream(FetchFailedCode, detail);
 }

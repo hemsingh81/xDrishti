@@ -11,7 +11,6 @@ internal sealed partial class LegState
 {
     private LegPolicy? _policy;
     private bool _t1Filled;
-    private long _t1Epoch;
     private decimal _t1Extreme;
     private int _barsRead;
     private bool _timeStopSpent;
@@ -39,7 +38,6 @@ internal sealed partial class LegState
         OpenShare -= book;
         T1Pending = false;
         _t1Filled = true;
-        _t1Epoch = minuteEpoch;
         _t1Extreme = position.IsBuy ? minute.High : minute.Low;
         _position = _policy.Partial == PartialKind.Be
             ? position with { Stop = position.Entry, Target = position.Entry + ((position.IsBuy ? 1m : -1m) * _policy.T2Rr * position.Risk) }

@@ -41,7 +41,7 @@ export function RecoveryPage() {
             <Link component={RouterLink} to="/services">
               Back to Services
             </Link>
-            {canRetry && <RecoveryRetry disabled={data?.running ?? false} />}
+            {canRetry && <RecoveryRetry disabled={data?.running ?? false} planUnavailable={!!data?.planUnavailable} />}
           </>
         }
       />

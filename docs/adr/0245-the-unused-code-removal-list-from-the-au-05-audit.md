@@ -1,11 +1,11 @@
 # 0245 — The unused-code removal list from the AU-05 audit
 
-- **Status:** Proposed (owner to accept the list before AU-06/AU-07 delete anything).
+- **Status:** Accepted by delegation (owner instruction in chat 2026-11-09: audit first, record the list in an ADR, then remove in small reviewed slices). All 11 certain items removed in AU-06/AU-07 after an independent review; the owner may still review this list.
 - **Date:** 2026-11-09.
 - **Relation to other ADRs:** Applies [0241](0241-code-is-removed-only-from-a-recorded-list-of-unreachable-code-no-spec-plans-to-use.md); spec AU-05; feeds AU-06 and AU-07.
 
 ## Context
-AU-05 audited `backend/src`, `backend/tests` and `frontend/src` for code nothing reaches. Nothing is deleted by this ADR.
+AU-05 audited `backend/src`, `backend/tests` and `frontend/src` for code nothing reaches. The ADR itself deleted nothing; AU-06 and AU-07 did, item by item.
 
 ## Method and its limits
 1. **Compiler/analyser pass (backend).** `dotnet build XDrishti.slnx` with `EnforceCodeStyleInBuild=true` and IDE0051 (unused private member), IDE0052 (private member never read), IDE0060 (unused parameter) and CA1822 raised to warning through a temporary `.editorconfig` change that was reverted (no committed setting changed, no tool added). Result: 7 IDE0051 (3 are EF private constructors, a false positive), 4 IDE0052, 15 IDE0060 (mostly interface or delegate shaped parameters, not candidates), 0 CA1822. These analysers only see private members; they say nothing about public or internal ones.
@@ -21,17 +21,17 @@ Names reached only by reflection or DI (EF `*Configuration`, registration extens
 ### Certain (nothing reaches them, no spec or design mentions them)
 | # | Item | Evidence | Spec/design hits | Slice |
 |---|------|----------|------------------|-------|
-| 1 | `BarGrid.LastOnDate` (`Domain/Options/Remark/BarGrid.cs`) | name scan: 1 hit, no test | 0 | AU-06 A |
-| 2 | `EodErrors.FetchFailed` and `FetchFailedCode` (`Application/Market/Eod/EodErrors.cs`) | name scan, no test; the live code is `DataErrors.RepairFetchFailedCode` | 0 | AU-06 A |
-| 3 | `DataLog.EodCrashed` (`Application/Market/Bars/DataLog.cs`) | name scan: log message with no caller; leftover | 0 | AU-06 A |
-| 4 | `ProposalAnswerReader.Clip` (private) | IDE0051 | 0 | AU-06 A |
-| 5 | `ProtocolF.Share(double?)` overload (private, line 290) | IDE0051 | 0 | AU-06 A |
-| 6 | `AiSqlRunner.Short` (private) | IDE0051 | 0 | AU-06 A |
-| 7 | `ScheduleCalculator.WeeklyReach` (private field) | IDE0052 | 0 | AU-06 A |
-| 8 | `LegState._t1Epoch` (private field, written never read) | IDE0052 | 0 | AU-06 A |
-| 9 | `daysBetween` (`frontend/src/features/live/lib/dates.ts`) | import/name scan, no test | 0 | AU-07 A |
-| 10 | `isReplayTimeframe` (`features/reports/lib/replayModel.ts`) | same | 0 | AU-07 A |
-| 11 | `MAX_PIVOT_CELLS` (`features/reports/lib/pivotLimits.ts`; delete the file if it holds nothing else) | same | 0 | AU-07 A |
+| 1 | `BarGrid.LastOnDate` (`Domain/Options/Remark/BarGrid.cs`) | name scan: 1 hit, no test | 0 | AU-06 A, done |
+| 2 | `EodErrors.FetchFailed` and `FetchFailedCode` (`Application/Market/Eod/EodErrors.cs`) | name scan, no test; the live code is `DataErrors.RepairFetchFailedCode` | 0 | AU-06 A, done |
+| 3 | `DataLog.EodCrashed` (`Application/Market/Bars/DataLog.cs`) | name scan: log message with no caller; leftover | 0 | AU-06 A, done |
+| 4 | `ProposalAnswerReader.Clip` (private) | IDE0051 | 0 | AU-06 A, done |
+| 5 | `ProtocolF.Share(double?)` overload (private, line 290) | IDE0051 | 0 | AU-06 A, done |
+| 6 | `AiSqlRunner.Short` (private) | IDE0051 | 0 | AU-06 A, done |
+| 7 | `ScheduleCalculator.WeeklyReach` (private field) | IDE0052 | 0 | AU-06 A, done |
+| 8 | `LegState._t1Epoch` (private field, written never read) | IDE0052 | 0 | AU-06 A, done |
+| 9 | `daysBetween` (`frontend/src/features/live/lib/dates.ts`) | import/name scan, no test | 0 | AU-07 A, done |
+| 10 | `isReplayTimeframe` (`features/reports/lib/replayModel.ts`) | same | 0 | AU-07 A, done |
+| 11 | `MAX_PIVOT_CELLS` (`features/reports/lib/pivotLimits.ts`; delete the file if it holds nothing else) | same | 0 | AU-07 A, done |
 
 Risk: low. Items 1 to 8 are checked by the compiler on removal (a wrong removal does not build); 9 to 11 by `tsc`. Items 1 to 8 are about half a day, 9 to 11 under an hour. Because the method has the limits above, the AU-06/AU-07 builds and tests are the final proof, and a reviewer samples the list before removal.
 
@@ -59,4 +59,4 @@ Doubtful items are not scheduled.
 - `LlmLog.KeyMissing` was never called, so an enabled model server with an empty key was silent. Fixed in this slice: `LlmStartupCheck` logs it once at start when `Enabled` and the key is empty (it never calls the server; test `LlmStartupCheckTests`).
 
 ## Consequences
-The certain list is short (11 items) because most parked code is protected and the name scan cannot prove more. Nothing is deleted by this ADR.
+The certain list is short (11 items) because most parked code is protected and the name scan cannot prove more. The ADR itself deleted nothing; AU-06 and AU-07 did, item by item.

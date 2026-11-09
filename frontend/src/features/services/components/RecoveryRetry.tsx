@@ -6,10 +6,11 @@ import { useRetryRecovery } from '../api/recoveryApi';
 import { codeOf, problemText } from '../lib/errors';
 
 /** One Retry for the whole pass (it never retries a single row), asked to confirm. The 409 is shown in the server's words. */
-export function RecoveryRetry({ disabled }: { disabled: boolean }) {
+export function RecoveryRetry({ disabled, planUnavailable }: { disabled: boolean; planUnavailable: boolean }) {
   const [asking, setAsking] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
-  const [blocked, setBlocked] = useState(false);
+  // not_recorded stays blocked until fixed; plan_unavailable blocks only while the plan still reads as unavailable.
+  const [blocked, setBlocked] = useState<'not_recorded' | 'plan' | null>(null);
   const retry = useRetryRecovery();
   const toast = useToast();
 
@@ -17,7 +18,7 @@ export function RecoveryRetry({ disabled }: { disabled: boolean }) {
     retry.mutate(undefined, {
       onSuccess: (accepted) => {
         setRefused(null);
-        setBlocked(false);
+        setBlocked(null);
         toast.notify(
           accepted.started ? 'Recovery started.' : 'Nothing to run; re-checked what was partial.',
           accepted.started ? 'success' : 'info',
@@ -25,8 +26,11 @@ export function RecoveryRetry({ disabled }: { disabled: boolean }) {
       },
       onError: (error) => {
         setRefused(problemText(error, 'Recovery could not be started.'));
-        // These refusals do not change by pressing again; the cause has to be fixed first.
-        setBlocked(['recovery.not_recorded', 'recovery.plan_unavailable'].includes(codeOf(error) ?? ''));
+        // A failed audit stays blocked; a refused plan blocks only while the plan still reads as unavailable.
+        const code = codeOf(error);
+        setBlocked(
+          code === 'recovery.not_recorded' ? 'not_recorded' : code === 'recovery.plan_unavailable' ? 'plan' : null,
+        );
       },
       onSettled: () => {
         setAsking(false);
@@ -38,14 +42,14 @@ export function RecoveryRetry({ disabled }: { disabled: boolean }) {
     <>
       <Button
         variant="contained"
-        disabled={disabled || blocked}
+        disabled={disabled || blocked === 'not_recorded' || (blocked === 'plan' && planUnavailable)}
         onClick={() => {
           setAsking(true);
         }}
       >
         Retry recovery
       </Button>
-      {refused && (
+      {refused && !(blocked === 'plan' && !planUnavailable) && (
         <Alert severity="warning" sx={{ mt: 1 }}>
           {refused}
         </Alert>

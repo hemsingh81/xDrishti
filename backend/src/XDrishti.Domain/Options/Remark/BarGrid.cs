@@ -1,6 +1,3 @@
-using XDrishti.Domain.Market;
-using XDrishti.Domain.Market.Bars;
-
 namespace XDrishti.Domain.Options.Remark;
 
 /// <summary>
@@ -44,19 +41,6 @@ public sealed class BarGrid
         var index = Array.BinarySearch(_times, at.ToUniversalTime());
         index = index < 0 ? ~index : index;
         return index < _times.Length ? index : -1;
-    }
-
-    /// <summary>The index of the last bar time on the India date; -1 when the date has none.</summary>
-    public int LastOnDate(DateOnly date)
-    {
-        var last = -1;
-        var first = FirstAtOrAfter(new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset));
-        for (var i = first; i >= 0 && i < _times.Length && SessionClock.DateOf(_times[i].ToUnixTimeSeconds()) == date; i++)
-        {
-            last = i;
-        }
-
-        return last;
     }
 
     /// <summary>The bars at the time (any offset); empty when the time is not on the grid.</summary>

@@ -62,9 +62,6 @@ internal static partial class DataLog
     [LoggerMessage(EventId = 3322, Level = LogLevel.Warning, Message = "The scheduled end-of-day update was skipped: {Reason}")]
     public static partial void EodSkipped(ILogger logger, string reason);
 
-    [LoggerMessage(EventId = 3323, Level = LogLevel.Error, Message = "The scheduled end-of-day update could not be started")]
-    public static partial void EodCrashed(ILogger logger, Exception exception);
-
     [LoggerMessage(EventId = 3390, Level = LogLevel.Warning, Message = "The cleanup of interrupted data jobs did not finish in time; the end-of-day catch-up goes on without it")]
     public static partial void EodRecoveryTimedOut(ILogger logger);
 

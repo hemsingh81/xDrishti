@@ -94,7 +94,5 @@ export function replayEvents(view: TradeReplay): ReplayEvent[] {
 /** The ladder of timeframes, for the "use a larger timeframe" offer after a refused window. */
 export const replayTimeframes = ['1m', '5m', '15m', '1h', '1D'] as const;
 export type ReplayTimeframe = (typeof replayTimeframes)[number];
-export const isReplayTimeframe = (value: string | null): value is ReplayTimeframe =>
-  replayTimeframes.some((t) => t === value);
 export const largerTimeframe = (t: ReplayTimeframe): ReplayTimeframe | null =>
   replayTimeframes[replayTimeframes.indexOf(t) + 1] ?? null;

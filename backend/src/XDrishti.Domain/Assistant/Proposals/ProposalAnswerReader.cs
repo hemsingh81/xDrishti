@@ -160,8 +160,6 @@ public static partial class ProposalAnswerReader
         return text is { Length: > 0 and <= 40 } && !text.Any(char.IsControl) ? text.Trim() : null;
     }
 
-    private static string Clip(string text, int max) => text.Length <= max ? text : text[..max].TrimEnd();
-
     /// <summary>Control characters removed and markup characters turned to plain ones: the text is shown and stored as text, never as markup.</summary>
     private static string Clean(string text) => UntrustedText.Clean(text).Text.Trim();
 
