@@ -1,6 +1,7 @@
 using System.Globalization;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Abstractions.SettingsCatalog;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Platform.Services;
 
@@ -13,7 +14,7 @@ namespace XDrishti.Application.Platform.Services;
 /// </summary>
 public sealed record GetServiceNoticesQuery : IQuery<ServiceNotices>;
 
-internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, ServiceSettingsReader settings, IServiceRunStore runs, IRecoveryLedger recovery, RecoverySettings recoveryOptions, TimeProvider clock) : IQueryHandler<GetServiceNoticesQuery, ServiceNotices>
+internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, ServiceSettingsReader settings, IServiceRunStore runs, IRecoveryLedger recovery, RecoverySettings recoveryOptions, IEssentialSettingStore essentials, TimeProvider clock) : IQueryHandler<GetServiceNoticesQuery, ServiceNotices>
 {
     public const string Failed = "service_failed";
 
@@ -33,7 +34,8 @@ internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, Service
         var latest = await runs.GetLatestAsync(registry.Ids, cancellationToken);
         var now = clock.GetUtcNow();
         var notices = new List<ServiceNotice>();
-        foreach (var service in all.Where(s => s.Settings.NotifyOnFailure))
+        var failuresOn = (await essentials.GetAsync("notices.failure", cancellationToken))?.Value != "false"; // the Essential setting "Failure notices" (AU-10): default on, the owner may turn it off
+        foreach (var service in all.Where(s => failuresOn && s.Settings.NotifyOnFailure))
         {
             if (latest.TryGetValue(service.Id, out var run) && run is { Status: ServiceRunStatus.Failed } && ServiceRetryRules.IsOver(run, service.Settings.Retries, service.Settings.Enabled, now))
             {
@@ -44,7 +46,7 @@ internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, Service
         }
 
         // a step of the recovery pass that used up its attempts: one notice per service per day (the day of the pass that last tried it)
-        foreach (var exhausted in await recovery.ListExhaustedAsync(recoveryOptions.MaxAttempts, now.AddDays(-RecoveryNoticeDays), cancellationToken))
+        foreach (var exhausted in failuresOn ? await recovery.ListExhaustedAsync(recoveryOptions.MaxAttempts, now.AddDays(-RecoveryNoticeDays), cancellationToken) : [])
         {
             if (registry.Find(exhausted.ServiceId) is not { } service)
             {

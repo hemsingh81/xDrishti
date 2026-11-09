@@ -29,6 +29,7 @@ public sealed class RecoveryClassTableTests
         ["weekly"] = RecoveryClass.LatestOnly,
         ["weekly-review"] = RecoveryClass.LatestOnly,
         ["proposals"] = RecoveryClass.LatestOnly,
+        ["learned-settings"] = RecoveryClass.LatestOnly,
         ["paper-review"] = RecoveryClass.LatestOnly,
         ["decay-monitor"] = RecoveryClass.TimeBound,
         ["readiness-snapshot"] = RecoveryClass.TimeBound,

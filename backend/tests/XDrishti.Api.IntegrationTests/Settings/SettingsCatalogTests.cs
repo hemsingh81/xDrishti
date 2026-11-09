@@ -210,12 +210,12 @@ public sealed partial class SettingsCatalogTests(ApiFactory factory)
     }
 
     [Fact]
-    public void No_descriptor_key_looks_like_a_secret_and_learning_is_off_everywhere()
+    public void No_descriptor_key_looks_like_a_secret_and_only_the_allow_list_is_learnable()
     {
         var all = ConfidenceSettingDescriptors.All.Concat(SettingsRegistry.All).ToList();
 
         all.Where(d => SecretLooking().IsMatch(d.Key)).ShouldBeEmpty();
-        all.ShouldAllBe(d => !d.Learnable);
+        all.Where(d => d.Learnable).Select(d => d.Key).ShouldBe(XDrishti.Application.LearnedSettings.LearnedAllowList.Keys, ignoreOrder: true);
     }
 
     [Fact]

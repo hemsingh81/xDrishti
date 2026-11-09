@@ -42,4 +42,7 @@ public static class Schemas
 
     /// <summary>The readiness scorecard (spec CF-11 part 1, ADR 0221): <c>settings</c> (the owner's enforce switch) and <c>scorecard_snapshots</c>, both insert-only for the runtime role. Raw SQL, no EF entity. A schema of its own, so that the grants of the <c>confidence</c> schema are not touched.</summary>
     public const string Readiness = "readiness";
+
+    /// <summary>The learned setting changes (spec AU-10, ADR 0247): <c>learned_setting_changes</c>, insert-only for the runtime role except a column grant on the decision columns. Raw SQL, no EF entity. A schema of its own, so that no other grant is touched.</summary>
+    public const string Config = "config";
 }

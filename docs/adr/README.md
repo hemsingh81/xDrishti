@@ -241,3 +241,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0244](0244-one-auto-switch-runs-the-chain-and-only-suggests.md) | One Auto switch runs the chain and only suggests | Accepted |
 | [0245](0245-the-unused-code-removal-list-from-the-au-05-audit.md) | The unused-code removal list from the AU-05 audit | Accepted by delegation |
 | [0246](0246-the-settings-catalog-has-one-descriptor-per-key-five-essential-settings-and-an-undeclared-direction-loosens-both-ways.md) | The settings catalog: one descriptor per key, five Essential settings, and an undeclared direction loosens both ways | Accepted by delegation |
+| [0247](0247-learned-setting-changes-are-bounded-steps-on-a-short-allow-list-stored-in-an-insert-only-log-and-applied-at-the-next-start.md) | Learned setting changes are bounded steps on a short allow-list, kept in an insert-only log and applied at the next start | Accepted by delegation |

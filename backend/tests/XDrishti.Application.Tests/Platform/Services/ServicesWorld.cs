@@ -46,6 +46,7 @@ internal sealed class ServicesWorld : IDisposable
             .Singleton<IFeedManualRun>(Manual)
             .Singleton(FeedManualRunSettings.Default)
             .Singleton<IRecoveryLedger>(Ledger)
+            .Singleton<XDrishti.Application.Abstractions.SettingsCatalog.IEssentialSettingStore>(Essentials)
             .Singleton(new RecoverySettings())
             .Singleton<ServiceRunner, ServiceRunner>()
             .Singleton<RecoveryRunner, RecoveryRunner>()
@@ -82,6 +83,9 @@ internal sealed class ServicesWorld : IDisposable
     public InMemoryServiceData Data { get; } = new();
 
     public InMemoryRecoveryLedger Ledger { get; } = new();
+
+    /// <summary>The Essential settings store (AU-10): empty, so Failure notices keep their default, on.</summary>
+    public LearnedSettings.InMemoryEssentialStore Essentials { get; } = new();
 
     public TradingCalendar Calendar { get; set; } = new();
 

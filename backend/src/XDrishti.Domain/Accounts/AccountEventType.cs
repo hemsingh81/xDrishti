@@ -98,4 +98,6 @@ public enum AccountEventType
     LabHoldOutUnlocked,
     ShadowRecordSwitched,
     BarHolesRepaired,
+    LearnedSettingDecided,
+    EssentialSettingReset,
 }

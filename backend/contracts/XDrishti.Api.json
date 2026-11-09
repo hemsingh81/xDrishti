@@ -47,6 +47,169 @@
         }
       }
     },
+    "/api/settings/essentials": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "The five Essential settings with value, default, whether it is the default, who changed it and when, and whether Reset to default works here (risk.profile has no single default)",
+        "operationId": "GetEssentialSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EssentialSettingsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/essentials/{key}": {
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Turn Failure notices (notices.failure) on or off as the owner. Turning it OFF needs the password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 409 settings.not_here for any other key",
+        "operationId": "ChangeEssentialSetting",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeEssentialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EssentialSettingView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/essentials/{key}/reset": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Put an Essential setting back to its default as the owner, with a fresh password for this act. 404 settings.not_found, 409 settings.reset_not_single for risk.profile",
+        "operationId": "ResetEssentialSetting",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetEssentialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EssentialSettingView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/login": {
       "post": {
         "tags": [
@@ -21098,6 +21261,245 @@
           }
         }
       }
+    },
+    "/api/settings/learned": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "The learned changes of settings (newest first) with the Auto switch, the weekly cap and what it has used, the allow-list, and for each change whether approving or undoing it needs the owner's password",
+        "operationId": "GetLearnedSettingChanges",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearnedChangesView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/learned/{id}/approve": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Apply a proposed change as the owner. A loosening needs the password in the body (403 auth.step_up_required without it, 401 auth.invalid_credentials, 423 auth.locked); a tightening needs only the session. 404 learned.not_found, 409 learned.wrong_state or learned.stale, 422-class learned.config_invalid when the whole configuration with it would be invalid",
+        "operationId": "ApproveLearnedSettingChange",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LearnedPasswordRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearnedChangeView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/learned/{id}/dismiss": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Set a proposed change aside as the owner (the safe direction: no password). 404 learned.not_found, 409 learned.wrong_state",
+        "operationId": "DismissLearnedSettingChange",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearnedChangeView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/learned/{id}/undo": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Undo an applied change in one step. Undoing a tightening is a loosening: it needs the password in the body, at any Auto state. 404 learned.not_found, 409 learned.wrong_state or learned.stale, 403 auth.step_up_required",
+        "operationId": "UndoLearnedSettingChange",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LearnedPasswordRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearnedChangeView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -26311,6 +26713,25 @@
           }
         },
         "description": "The body of the switch that allows confirming (off until the owner switches it on)."
+      },
+      "ChangeEssentialRequest": {
+        "required": [
+          "on",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The body of a change to the Failure notices setting: on or off, and the password (needed to turn it OFF)."
       },
       "ChangeLiveSettingsRequest": {
         "required": [
@@ -34620,6 +35041,80 @@
           }
         },
         "description": "The equity curves of a report for a lens, one per group, with the evidence of the report. At most int EquityView.MaxSeries groups are drawn; a lens with more is refused rather than cut silently."
+      },
+      "EssentialSettingView": {
+        "required": [
+          "key",
+          "label",
+          "value",
+          "default",
+          "isDefault",
+          "changedBy",
+          "changedAt",
+          "canReset",
+          "resetNote"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "default": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "changedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "changedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "canReset": {
+            "type": "boolean"
+          },
+          "resetNote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "`Value` and `Default` are plain text (null when not known here); `IsDefault` is true when no row exists or it equals the default; `ChangedBy` and `ChangedAt` are null while never changed (or not recorded); `CanReset` and `ResetNote` say whether Reset to default works here."
+      },
+      "EssentialSettingsView": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EssentialSettingView"
+            }
+          }
+        }
       },
       "EvalCaseView": {
         "required": [
@@ -43006,6 +43501,196 @@
           }
         },
         "description": "The last snapshot taken."
+      },
+      "LearnedAllowedSetting": {
+        "required": [
+          "key",
+          "label",
+          "safer",
+          "range"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "safer": {
+            "type": "string"
+          },
+          "range": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SettingRange"
+              }
+            ]
+          }
+        },
+        "description": "An allow-listed key with its label, its safer direction and the bounds."
+      },
+      "LearnedChangeView": {
+        "required": [
+          "id",
+          "key",
+          "label",
+          "oldValue",
+          "newValue",
+          "direction",
+          "source",
+          "state",
+          "decidedBy",
+          "decidedAt",
+          "undoneBy",
+          "undoneAt",
+          "evidenceRef",
+          "snapshotHash",
+          "undoOf",
+          "createdAt",
+          "approveNeedsPassword",
+          "canUndo",
+          "undoNeedsPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "oldValue": {
+            "type": "string"
+          },
+          "newValue": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "decidedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "decidedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "undoneBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "undoneAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "evidenceRef": {
+            "type": "string"
+          },
+          "snapshotHash": {
+            "type": "string"
+          },
+          "undoOf": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approveNeedsPassword": {
+            "type": "boolean"
+          },
+          "canUndo": {
+            "type": "boolean"
+          },
+          "undoNeedsPassword": {
+            "type": "boolean"
+          }
+        },
+        "description": "One change. `Direction` is tighten or loosen. `State` is proposed, applied, dismissed or undone. `DecidedBy` is `auto` (never shown as an owner approval) or `owner:&lt;e-mail&gt;`. `ApproveNeedsPassword` is true for a loosening;\n`CanUndo` is true for an applied change and `UndoNeedsPassword` says whether the undo loosens (undoing a tightening always does)."
+      },
+      "LearnedChangesView": {
+        "required": [
+          "autoOn",
+          "weeklyCap",
+          "autoAppliedThisWeek",
+          "takesEffect",
+          "allowlist",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "autoOn": {
+            "type": "boolean"
+          },
+          "weeklyCap": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "autoAppliedThisWeek": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "takesEffect": {
+            "type": "string"
+          },
+          "allowlist": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearnedAllowedSetting"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearnedChangeView"
+            }
+          }
+        },
+        "description": "`AutoOn`: the Auto switch (OFF by default). `WeeklyCap` and `AutoAppliedThisWeek`: the guardrail and what it has used in the trailing 7 days. `TakesEffect`: when an applied change is read by the host. `Allowlist`: the keys learning may touch."
+      },
+      "LearnedPasswordRequest": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The body of an approve or an undo: the owner's password, re-entered for THIS act. Needed when the act loosens a gate (a loosening proposal, and any undo of a tightening); ignored otherwise. The owner is never part of the body."
       },
       "LearningOverviewView": {
         "required": [
@@ -57997,6 +58682,21 @@
           }
         },
         "description": "One timed read of the phase check (spec P8-17)."
+      },
+      "ResetEssentialRequest": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The body of a reset: the owner's password, re-entered for THIS act."
       },
       "ResolveBreakRequest": {
         "required": [

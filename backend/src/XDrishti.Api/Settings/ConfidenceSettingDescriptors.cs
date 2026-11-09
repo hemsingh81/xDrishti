@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Reflection;
 using XDrishti.Api.Confidence;
+using XDrishti.Application.LearnedSettings;
 using XDrishti.Application.SettingsCatalog;
 
 namespace XDrishti.Api.Settings;
@@ -8,7 +9,7 @@ namespace XDrishti.Api.Settings;
 /// <summary>
 /// One descriptor for every key of the <c>Confidence</c> section (AU-08, ADR 0242). The default is read from a fresh <see cref="ConfidenceSettings"/>, so it cannot drift from the real default. The bounds are the outer
 /// bounds of the existing validation messages (inclusive; the existing validators keep the stricter rules). A key with no declared direction has <c>None</c> and so loosens both ways; the direction is declared only
-/// only where the existing validation or an ADR says the key may only be tightened (Readiness, Kill, MlInfluence, Decay, Loop Level and HelpsAt, the CostStress tier, capacity and turnover values, Pbo MaxPbo); when a direction is not provably safe it is None. No key is learnable until AU-10 allow-lists it.
+/// where the existing validation or an ADR says the key may only be tightened (Readiness, Kill, MlInfluence, Decay, Loop Level and HelpsAt, the CostStress tier, capacity and turnover values; and by plain meaning of the gate Pbo MaxPbo, the largest probability of backtest overfitting a pass tolerates); when a direction is not provably safe it is None. A key is learnable only when it is on <see cref="LearnedAllowList"/> (AU-10).
 /// </summary>
 internal static class ConfidenceSettingDescriptors
 {
@@ -33,7 +34,7 @@ internal static class ConfidenceSettingDescriptors
             var tier = AdvancedSections.Contains(section) ? SettingTier.Advanced : SettingTier.Internal;
             var key = ConfidenceSettings.SectionName + ":" + path;
             list.Add(new SettingDescriptor(key, Humanise(path), tier, SettingKind.Configuration, DefaultOf(defaults, path),
-                min is null ? null : (decimal)min, max is null ? null : (decimal)max, safer, Learnable: false));
+                min is null ? null : (decimal)min, max is null ? null : (decimal)max, safer, Learnable: LearnedAllowList.Keys.Contains(key)));
         }
 
         K("EffectiveN:Mode"); K("EffectiveN:MinSessionsForAutocorr", NoDirection, 5, 250); K("EffectiveN:MinTradesForEstimate", NoDirection, 3, 50); K("EffectiveN:MinClusters", NoDirection, 3, 50);
