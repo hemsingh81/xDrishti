@@ -26,7 +26,7 @@ export function RecoveryRetry({ disabled, planUnavailable }: { disabled: boolean
       },
       onError: (error) => {
         setRefused(problemText(error, 'Recovery could not be started.'));
-        // These refusals do not change by pressing again; the cause has to be fixed first.
+        // A failed audit stays blocked; a refused plan blocks only while the plan still reads as unavailable.
         const code = codeOf(error);
         setBlocked(
           code === 'recovery.not_recorded' ? 'not_recorded' : code === 'recovery.plan_unavailable' ? 'plan' : null,
@@ -49,7 +49,7 @@ export function RecoveryRetry({ disabled, planUnavailable }: { disabled: boolean
       >
         Retry recovery
       </Button>
-      {refused && (
+      {refused && !(blocked === 'plan' && !planUnavailable) && (
         <Alert severity="warning" sx={{ mt: 1 }}>
           {refused}
         </Alert>
