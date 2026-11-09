@@ -36,17 +36,20 @@ public sealed class PaperCaptureServiceTests
         ScheduleRules.Evaluate(subjects).ShouldBeEmpty();
     }
 
-    private static async Task<ServiceOutcome> RunAsync(PaperCaptureOutcome outcome)
+    private static async Task<ServiceOutcome> RunAsync(PaperCaptureOutcome outcome, string? unproven = null, ServiceRunTrigger trigger = ServiceRunTrigger.Scheduled)
     {
+        var guard = Substitute.For<IRecoveryDataGuard>();
+        guard.WhyUnprovenAsync(null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(unproven));
         var handler = Substitute.For<ICommandHandler<CapturePaperFillsCommand, PaperCaptureOutcome>>();
         handler.HandleAsync(Arg.Any<CapturePaperFillsCommand>(), Ct).Returns(Result.Success(outcome));
         var provider = Substitute.For<IServiceProvider>();
         provider.GetService(typeof(ICommandHandler<CapturePaperFillsCommand, PaperCaptureOutcome>)).Returns(handler);
+        provider.GetService(typeof(IRecoveryDataGuard)).Returns(guard);
         var scope = Substitute.For<IServiceScope>();
         scope.ServiceProvider.Returns(provider);
         var factory = Substitute.For<IServiceScopeFactory>();
         factory.CreateScope().Returns(scope);
-        var context = new ServiceRunContext(Guid.NewGuid(), ServiceRunTrigger.Scheduled, 1, "system", new Dictionary<string, JsonElement>(), (_, _) => ValueTask.CompletedTask);
+        var context = new ServiceRunContext(Guid.NewGuid(), trigger, 1, "system", new Dictionary<string, JsonElement>(), (_, _) => ValueTask.CompletedTask);
 
         return await new PaperCaptureService(factory).RunAsync(context, Ct);
     }
@@ -56,5 +59,17 @@ public sealed class PaperCaptureServiceTests
     {
         (await RunAsync(new PaperCaptureOutcome(1, 0, 0, 0, 0, 0, 0, 1))).Status.ShouldBe(ServiceRunStatus.Failed);
         (await RunAsync(new PaperCaptureOutcome(1, 1, 1, 1, 0, 0, 0, 0))).Status.ShouldBe(ServiceRunStatus.Succeeded);
+    }
+
+    [Fact]
+    public async Task A_capture_waits_by_skipping_while_the_end_of_day_data_is_not_proved_but_the_owners_own_run_goes_ahead()
+    {
+        var clean = new PaperCaptureOutcome(1, 1, 1, 1, 0, 0, 0, 0);
+
+        var scheduled = await RunAsync(clean, "the end-of-day data is not complete for 2026-10-09");
+        var manual = await RunAsync(clean, "the end-of-day data is not complete for 2026-10-09", ServiceRunTrigger.Manual);
+
+        (scheduled.Status, scheduled.Message).ShouldBe((ServiceRunStatus.Skipped, "the end-of-day data is not complete for 2026-10-09"));
+        manual.Status.ShouldBe(ServiceRunStatus.Succeeded);
     }
 }

@@ -116,6 +116,14 @@ internal sealed class InMemoryRecoveryLedger : IRecoveryLedger
         }
     }
 
+    public ValueTask<IReadOnlyList<RecoveryItemRow>> ListPartialAsync(CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            return ValueTask.FromResult<IReadOnlyList<RecoveryItemRow>>([.. Items.Values.Where(i => i.State == RecoveryStates.Partial).OrderByDescending(i => i.Occurrence).Take(50)]);
+        }
+    }
+
     public ValueTask<IReadOnlyList<RecoveryExhaustedRow>> ListExhaustedAsync(int maxAttempts, DateTimeOffset since, CancellationToken cancellationToken)
     {
         lock (_gate)

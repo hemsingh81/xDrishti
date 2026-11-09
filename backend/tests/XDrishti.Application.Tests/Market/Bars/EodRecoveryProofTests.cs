@@ -20,6 +20,7 @@ public sealed class EodRecoveryProofTests
     private readonly IBarAggregates _aggregates = Substitute.For<IBarAggregates>();
     private readonly IQualityQueries _quality = Substitute.For<IQualityQueries>();
     private readonly FakeBarDayCounts _counts;
+    private readonly FakeDataSettings _settings = new();
 
     public EodRecoveryProofTests()
     {
@@ -43,7 +44,7 @@ public sealed class EodRecoveryProofTests
     private void Bars(Guid id, params (DateOnly Day, int Count)[] days) => _counts.Preset[id] = days.ToDictionary(d => d.Day, d => d.Count);
 
     private ValueTask<XDrishti.Application.Abstractions.Platform.RecoveryProofResult> ProveAsync() =>
-        new EodRecoveryProof(_targets, _counts, _gaps, _aggregates, _quality, new FixedCalendar()).ProveAsync(Week, RunStart, Ct);
+        new EodRecoveryProof(_targets, _counts, _gaps, _aggregates, _quality, new FixedCalendar(), _settings).ProveAsync(Week, RunStart, Ct);
 
     [Fact]
     public async Task Five_missed_sessions_that_all_have_their_bars_are_five_recovered_sessions()
@@ -138,5 +139,48 @@ public sealed class EodRecoveryProofTests
         await ProveAsync();
 
         _counts.Asked.ShouldBe([(a, Week[0], Week[4]), (b, Week[0], Week[4])]);
+    }
+
+    [Fact]
+    public async Task One_thin_instrument_and_one_unfillable_one_among_full_ones_are_served_but_a_real_hole_is_still_missing()
+    {
+        var thin = Instrument("THIN");
+        var dead = Instrument("DEAD");
+        var hole = Instrument("HOLE");
+        var full = Instrument("FULL");
+        Bars(full, [.. Week.Select(d => (d, 375))]);
+        Bars(thin, [.. Week.Select(d => (d, 373))]); // short by 2 of 375: within the 1 % of the quality check
+        Bars(dead, [.. Week.Select(d => (d, 100))]);
+        foreach (var day in Week)
+        {
+            var gap = BarGap.Detect(dead, day, 375, 100, RunStart);
+            gap.RecordRefetch(100, 100, RunStart);
+            _gaps.Rows[(dead, day)] = gap;
+        }
+
+        Bars(hole, [.. Week.Where(d => d != Week[4]).Select(d => (d, 375)), (Week[4], 200)]); // a real hole on the last day
+
+        var result = await ProveAsync();
+
+        result.Reason.ShouldBe("4 of 5 sessions recovered; not recovered: 2026-10-09 still_missing");
+        result.Detail.ShouldContain("\"complete\":3,\"unfillable\":1,\"missing\":0");
+    }
+
+    [Fact]
+    public async Task A_session_in_which_every_instrument_is_unfillable_does_not_read_as_recovered()
+    {
+        var dead = Instrument("DEAD");
+        Bars(dead, [.. Week.Select(d => (d, 100))]);
+        foreach (var day in Week)
+        {
+            var gap = BarGap.Detect(dead, day, 375, 100, RunStart);
+            gap.RecordRefetch(100, 100, RunStart);
+            _gaps.Rows[(dead, day)] = gap;
+        }
+
+        var result = await ProveAsync();
+
+        result.AllRecovered.ShouldBeFalse();
+        result.Reason.ShouldNotBeNull().ShouldContain("2026-10-05 unfillable");
     }
 }

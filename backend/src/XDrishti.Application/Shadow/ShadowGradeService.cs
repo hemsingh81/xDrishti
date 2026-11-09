@@ -42,6 +42,13 @@ public sealed class ShadowGradeService(IServiceScopeFactory scopes) : IScheduled
     {
         ArgumentNullException.ThrowIfNull(context);
         await using var scope = scopes.CreateAsyncScope();
+
+        // the replay must not run on a hole the end-of-day proof found (a grade over a missing minute is never graded again): the run is skipped, so a recovery pass waits and tries again; the owner's own run is not held back
+        if (context.Trigger != ServiceRunTrigger.Manual && await scope.ServiceProvider.GetRequiredService<IRecoveryDataGuard>().WhyUnprovenAsync(null, cancellationToken) is { } why)
+        {
+            return ServiceOutcome.Skipped(why);
+        }
+
         var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<GradeShadowCommand, ShadowGradeOutcome>>();
         var result = await handler.HandleAsync(new GradeShadowCommand(), cancellationToken);
         if (result.IsFailure)

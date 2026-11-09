@@ -24,7 +24,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("""
-                UPDATE platform.recovery_items SET state = 'succeeded' WHERE state = 'partial';
+                UPDATE platform.recovery_items SET state = 'failed', reason = 'partial (downgraded)' WHERE state = 'partial';
                 ALTER TABLE platform.recovery_items DROP CONSTRAINT ck_recovery_items_state;
                 ALTER TABLE platform.recovery_items ADD CONSTRAINT ck_recovery_items_state CHECK (state IN ('running', 'succeeded', 'failed', 'blocked', 'waiting', 'superseded') AND attempts >= 0 AND session_from <= session_to);
                 ALTER TABLE platform.recovery_items DROP COLUMN detail;

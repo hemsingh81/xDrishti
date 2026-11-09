@@ -11,7 +11,7 @@ public sealed class RecoveryProofRulesTests
     [Theory]
     [InlineData(375, 375, null, false, InstrumentSessionState.Complete)]
     [InlineData(375, 375, GapStatus.Filled, false, InstrumentSessionState.Complete)]
-    [InlineData(375, 374, null, false, InstrumentSessionState.Missing)]
+    [InlineData(375, 370, null, false, InstrumentSessionState.Missing)]
     [InlineData(375, 0, null, false, InstrumentSessionState.Missing)]
     [InlineData(375, 200, GapStatus.Open, false, InstrumentSessionState.Missing)]
     [InlineData(375, 375, null, true, InstrumentSessionState.Missing)] // bars there, aggregates not built
@@ -19,7 +19,16 @@ public sealed class RecoveryProofRulesTests
     [InlineData(375, 375, GapStatus.Unfillable, false, InstrumentSessionState.Unfillable)] // a stale unfillable record is never read as recovered
     public void An_instrument_is_complete_only_with_every_bar_and_its_aggregates_and_unfillable_wins_over_a_count(int expected, int found, GapStatus? gap, bool stale, InstrumentSessionState state)
     {
-        RecoveryProofRules.Instrument(expected, found, gap, stale).ShouldBe(state);
+        RecoveryProofRules.Instrument(expected, found, gap, stale, 1).ShouldBe(state);
+    }
+
+    [Theory]
+    [InlineData(375, 372, 1, InstrumentSessionState.Complete)] // 3 minutes of 375 are 1 %
+    [InlineData(375, 371, 1, InstrumentSessionState.Missing)]
+    [InlineData(375, 374, 0, InstrumentSessionState.Missing)]
+    public void An_instrument_short_by_no_more_than_the_tolerance_is_complete(int expected, int found, double tolerance, InstrumentSessionState state)
+    {
+        RecoveryProofRules.Instrument(expected, found, null, false, tolerance).ShouldBe(state);
     }
 
     [Fact]
@@ -39,9 +48,11 @@ public sealed class RecoveryProofRulesTests
     }
 
     [Fact]
-    public void An_unfillable_instrument_makes_the_session_unfillable_never_recovered()
+    public void Unfillable_instruments_are_served_beside_more_complete_ones_but_a_session_they_do_not_trail_is_unfillable_never_recovered()
     {
+        RecoveryProofRules.Session(Day, [InstrumentSessionState.Complete, InstrumentSessionState.Complete, InstrumentSessionState.Unfillable], true).State.ShouldBe(SessionProofStates.Recovered);
         RecoveryProofRules.Session(Day, [InstrumentSessionState.Complete, InstrumentSessionState.Unfillable], true).State.ShouldBe(SessionProofStates.Unfillable);
+        RecoveryProofRules.Session(Day, [InstrumentSessionState.Unfillable], true).State.ShouldBe(SessionProofStates.Unfillable);
     }
 
     [Fact]

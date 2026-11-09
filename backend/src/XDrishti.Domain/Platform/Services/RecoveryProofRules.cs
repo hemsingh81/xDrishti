@@ -28,20 +28,24 @@ public sealed record SessionProof(DateOnly Date, string State, int Instruments, 
 public static class RecoveryProofRules
 {
     /// <summary>
-    /// One instrument in one session. An <c>unfillable</c> gap record wins even when the count now reaches the expectation (a stale record is corrected by the next gap check; until then the session is not reported as recovered,
-    /// AC3); otherwise the day is complete only with every expected bar stored and its aggregates built.
+    /// One instrument in one session. An <c>unfillable</c> gap record wins even when the count now reaches the expectation (a stale record is corrected by the next gap check); otherwise the day is complete with every expected
+    /// bar stored, or short by no more than <paramref name="tolerancePercent"/> of them (the quality check's tolerance: a thin instrument is not a hole), and its aggregates built.
     /// </summary>
-    public static InstrumentSessionState Instrument(int expected, int found, GapStatus? gap, bool aggregatesStale)
+    public static InstrumentSessionState Instrument(int expected, int found, GapStatus? gap, bool aggregatesStale, double tolerancePercent = 0)
     {
         if (gap == GapStatus.Unfillable)
         {
             return InstrumentSessionState.Unfillable;
         }
 
-        return BarGap.IsComplete(expected, found) && !aggregatesStale ? InstrumentSessionState.Complete : InstrumentSessionState.Missing;
+        var allowed = (int)Math.Floor(expected * Math.Clamp(tolerancePercent, 0, 100) / 100);
+        return BarGap.IsComplete(expected - allowed, found) && !aggregatesStale ? InstrumentSessionState.Complete : InstrumentSessionState.Missing;
     }
 
-    /// <summary>A session is <c>recovered</c> only when there is evidence (at least one instrument), none is missing, the quality run of the step succeeded and none is unfillable; unfillable beats recovered, missing beats both.</summary>
+    /// <summary>
+    /// A session is <c>recovered</c> when there is evidence, no instrument is missing, the quality run of the step is verified and more instruments are complete than unfillable (an unfillable instrument was fetched and has nothing
+    /// more to give: it is served, and counted in the detail). One real hole makes it <c>still_missing</c>; a session in which unfillable instruments are not outnumbered by complete ones is <c>unfillable</c>, never recovered.
+    /// </summary>
     public static SessionProof Session(DateOnly date, IReadOnlyCollection<InstrumentSessionState> states, bool qualityVerified)
     {
         ArgumentNullException.ThrowIfNull(states);
@@ -50,7 +54,7 @@ public static class RecoveryProofRules
         var missing = states.Count(s => s == InstrumentSessionState.Missing);
         var state = states.Count == 0 || missing > 0 || !qualityVerified
             ? SessionProofStates.StillMissing
-            : unfillable > 0 ? SessionProofStates.Unfillable : SessionProofStates.Recovered;
+            : complete > unfillable ? SessionProofStates.Recovered : SessionProofStates.Unfillable;
         return new SessionProof(date, state, states.Count, complete, unfillable, missing);
     }
 

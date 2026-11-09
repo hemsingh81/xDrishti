@@ -8,7 +8,7 @@ public sealed record RecoveryProofResult(bool AllRecovered, string Detail, strin
 
 /// <summary>
 /// Checks after a successful recovery step that the sessions it covered really have their data (spec AU-03, ADR 0240): a service that can say what it should have produced declares it here and the runner asks.
-/// Reads the existing gap, aggregate and quality stores only, one small read per instrument; never writes.
+/// Reads the existing gap, aggregate and quality stores only, a bounded read per instrument over the step's sessions (never the bar history); never writes.
 /// </summary>
 public interface IRecoveryProof
 {

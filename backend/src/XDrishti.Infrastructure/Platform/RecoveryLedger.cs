@@ -101,6 +101,19 @@ internal sealed class RecoveryLedger(NpgsqlDataSource dataSource) : IRecoveryLed
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async ValueTask<IReadOnlyList<RecoveryItemRow>> ListPartialAsync(CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand($"SELECT {Columns} FROM platform.recovery_items WHERE state = 'partial' ORDER BY occurrence DESC LIMIT 50");
+        var rows = new List<RecoveryItemRow>();
+        await using var r = await command.ExecuteReaderAsync(cancellationToken);
+        while (await r.ReadAsync(cancellationToken))
+        {
+            rows.Add(Read(r));
+        }
+
+        return rows;
+    }
+
     public async ValueTask SaveAsync(RecoveryItemRow item, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(item);

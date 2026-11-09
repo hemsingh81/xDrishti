@@ -49,6 +49,9 @@ public interface IRecoveryLedger
     /// <summary>Items that wait (market hours, a skipped run) for a session on or before <paramref name="sessionOnOrBefore"/>, with the instant of the pass that last touched them.</summary>
     ValueTask<IReadOnlyList<RecoveryExhaustedRow>> ListWaitingAsync(DateOnly sessionOnOrBefore, CancellationToken cancellationToken);
 
+    /// <summary>The items left <c>partial</c> (newest first, at most 50): proved again at every pass and by the data guard.</summary>
+    ValueTask<IReadOnlyList<RecoveryItemRow>> ListPartialAsync(CancellationToken cancellationToken);
+
     /// <summary>Failed items with at least <paramref name="maxAttempts"/> attempts whose pass started at or after <paramref name="since"/>.</summary>
     ValueTask<IReadOnlyList<RecoveryExhaustedRow>> ListExhaustedAsync(int maxAttempts, DateTimeOffset since, CancellationToken cancellationToken);
 }

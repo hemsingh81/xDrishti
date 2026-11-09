@@ -142,6 +142,7 @@ public sealed class RecoveryRunner(
             await using var scope = scopes.CreateAsyncScope();
             var ledger = scope.ServiceProvider.GetRequiredService<IRecoveryLedger>();
             await ledger.InterruptRunningAsync(now, token);
+            await ReproveOpenAsync(scope.ServiceProvider, ledger, token);
             if (await PlanAsync(scope.ServiceProvider, now, token) is not { } planned)
             {
                 return;
@@ -375,7 +376,7 @@ public sealed class RecoveryRunner(
             {
                 var made = await ProveAsync(services, step, item with { State = RecoveryStates.Succeeded, Reason = null, RunId = handled.Id }, handled.StartedAt, cancellationToken);
                 await ledger.SaveAsync(made, cancellationToken);
-                ServicesLog.RecoveryStep(logger, id, item.Occurrence, RecoveryStates.Succeeded);
+                ServicesLog.RecoveryStep(logger, id, item.Occurrence, made.State);
                 return made;
             }
 
@@ -446,10 +447,7 @@ public sealed class RecoveryRunner(
 
         try
         {
-            var result = await proof.ProveAsync(step.Sessions, runStartedAt, cancellationToken);
-            return result.AllRecovered
-                ? made with { Detail = result.Detail }
-                : made with { State = RecoveryStates.Partial, Reason = Clip(result.Reason ?? "sessions not recovered"), Detail = result.Detail };
+            return RecoveryProofDetail.Apply(made, await proof.ProveAsync(step.Sessions, runStartedAt, cancellationToken));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -460,7 +458,46 @@ public sealed class RecoveryRunner(
 #pragma warning restore CA1031
         {
             ServicesLog.RecoveryCrashed(logger, step.ServiceId, ex);
-            return made with { State = RecoveryStates.Partial, Reason = "the sessions could not be verified (a store read failed)" };
+            return RecoveryProofDetail.Unverified(made, step.Sessions, runStartedAt); // retryable: the next pass proves the sessions again
+        }
+    }
+
+    /// <summary>
+    /// Proves again every item left <c>partial</c> (spec AU-03): a later run, a fetch of the owner or a refetch of the gaps may have filled what was missing, and a read that failed is tried again. Runs at the start of every pass, also
+    /// when the plan has no step. An item whose proof cannot be read again stays as it is; one that is now fully recovered becomes <c>succeeded</c>.
+    /// </summary>
+    private async Task ReproveOpenAsync(IServiceProvider services, IRecoveryLedger ledger, CancellationToken cancellationToken)
+    {
+        var proofs = services.GetServices<IRecoveryProof>().ToList();
+        if (proofs.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var item in await ledger.ListPartialAsync(cancellationToken))
+        {
+            if (proofs.FirstOrDefault(p => string.Equals(p.ServiceId, item.ServiceId, StringComparison.Ordinal)) is not { } proof)
+            {
+                continue;
+            }
+
+            try
+            {
+                if (await RecoveryProofDetail.ReproveAsync(proof, item, cancellationToken) is { } result)
+                {
+                    await ledger.SaveAsync(RecoveryProofDetail.Apply(item, result), cancellationToken);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+#pragma warning disable CA1031 // a failed look leaves the item partial; the next pass looks again
+            catch (Exception ex)
+#pragma warning restore CA1031
+            {
+                ServicesLog.RecoveryCrashed(logger, item.ServiceId, ex);
+            }
         }
     }
 

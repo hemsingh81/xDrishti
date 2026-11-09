@@ -289,6 +289,7 @@ public sealed class ServiceTablesTests(ApiFactory factory) : IAsyncLifetime
         item.State.ShouldBe(RecoveryStates.Partial);
         item.Detail.ShouldNotBeNull().ShouldContain("\"still_missing\""); // jsonb normalises the text
         (await ledger.ListRetryableAsync(3, Ct)).ShouldNotContain(i => i.ServiceId == key);
+        (await ledger.ListPartialAsync(Ct)).ShouldContain(i => i.ServiceId == key);
         await using var connection = await OpenAsync();
         (await ScalarAsync(connection, $"SELECT detail->'sessions'->0->>'state' FROM platform.recovery_items WHERE service_id = '{key}'")).ShouldBe("still_missing");
         await ledger.EndPassAsync(pass, "incomplete", now, Ct);
