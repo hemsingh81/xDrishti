@@ -67,6 +67,7 @@ public static class SettingsRegistry
         Config("StrategyLab:Gates:MaxCalibrationErrorPp", "Maximum calibration error (pp)", SettingTier.Advanced, QualificationDefaults.MaxCalibrationErrorPp, 0, null, SettingSafer.Lower),
         Config("Live:Writes:Enabled", "Live writes deployment gate", SettingTier.Advanced, "false"),
         Config("Learned:WeeklyCap", "Most automatic learned changes per week", SettingTier.Internal, "3", 0, 10),
+        Config("Learned:MaxTotalPercent", "Largest total learned drift from the configured value (%)", SettingTier.Internal, "30", 1, 100),
         Config("Learned:MaxStepPercent", "Largest automatic learned step (% of the value)", SettingTier.Internal, "10", 1, 25),
         Config("Migrate:SkipOwner", "Skip owner provisioning at migrate", SettingTier.Internal, "false"),
         Config("Planning:Builder:UseSelection", "Plan builder uses the selection", SettingTier.Internal, "false"),

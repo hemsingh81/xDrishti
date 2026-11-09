@@ -60,10 +60,16 @@ public interface ILearnedSettingStore
     /// <summary>Inserts a proposal; null when a row for this key and evidence exists already (idempotent).</summary>
     ValueTask<long?> InsertProposedAsync(NewLearnedChange change, CancellationToken cancellationToken);
 
-    /// <summary>Moves a <c>proposed</c> row to <c>applied</c> or <c>dismissed</c>; false when it is not proposed any more or the database refuses (for <c>auto</c> it refuses unless the Auto switch is ON).</summary>
-    ValueTask<bool> DecideAsync(long id, string state, string decidedBy, CancellationToken cancellationToken);
+    /// <summary>
+    /// Applies a <c>proposed</c> row, atomically per key: under a lock on the key it re-reads the newest applied value of the key and applies only if that is still <paramref name="expectedApplied"/> (null: no applied row). False when the row is not proposed any more, another decision
+    /// for the key won, or the database refuses (for <c>auto</c> it refuses unless the Auto switch is ON).
+    /// </summary>
+    ValueTask<bool> ApplyAsync(long id, string decidedBy, string? expectedApplied, CancellationToken cancellationToken);
 
-    /// <summary>One transaction: the <paramref name="undo"/> row is inserted and applied by <paramref name="owner"/>, and row <paramref name="id"/> becomes <c>undone</c>. Null when row <paramref name="id"/> is not <c>applied</c> any more.</summary>
+    /// <summary>Dismisses a <c>proposed</c> row; false when it is not proposed any more.</summary>
+    ValueTask<bool> DismissAsync(long id, string decidedBy, CancellationToken cancellationToken);
+
+    /// <summary>One transaction: the <paramref name="undo"/> row is inserted and applied by <paramref name="owner"/>, and row <paramref name="id"/> becomes <c>undone</c>. Null when row <paramref name="id"/> is not the NEWEST applied row of its key any more (checked under the same lock as <see cref="ApplyAsync"/>).</summary>
     ValueTask<long?> UndoAsync(long id, NewLearnedChange undo, string owner, CancellationToken cancellationToken);
 }
 

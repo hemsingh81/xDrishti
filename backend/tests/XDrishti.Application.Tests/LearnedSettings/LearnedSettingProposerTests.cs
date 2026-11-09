@@ -125,4 +125,21 @@ public sealed class LearnedSettingProposerTests
             }
         }
     }
+
+    [Theory]
+    [InlineData("4.4", "4", 10, 10, "4.4")] // at the limit already (10% of 4 = 0.4): nothing more
+    [InlineData("4.2", "4", 10, 10, "4.4")] // the step would reach 4.62 but the room is 0.4
+    public void The_total_limit_stops_the_drift_from_the_configured_value(string current, string configured, int step, int total, string expectedOrLimit)
+    {
+        var d = LearnedSettingProposer.Propose(Config.Descriptor(FakeLearnedConfig.BpsKey), current, Evidence(FakeLearnedConfig.BpsKey, "5"), step, configured, total);
+
+        if (current == expectedOrLimit)
+        {
+            d.Code.ShouldBe("learned.total_limit");
+        }
+        else
+        {
+            LearnedSettingProposer.Text(d.NewValue).ShouldBe(expectedOrLimit);
+        }
+    }
 }

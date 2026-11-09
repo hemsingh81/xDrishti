@@ -38,7 +38,7 @@ public sealed class LearnedSettingsApiTests(ApiFactory factory) : DataTestBase(f
         {
             await using var connection = await OpenAsync();
             await ExecuteAsync(connection, "INSERT INTO platform.app_settings (key, value, updated_by, updated_at) VALUES ('auto.enabled', 'true', 'owner:t@x.test', now()) ON CONFLICT (key) DO UPDATE SET value = 'true'");
-            (await store.DecideAsync(id, "applied", autoApply, Ct)).ShouldBeTrue();
+            (await store.ApplyAsync(id, autoApply, null, Ct)).ShouldBeTrue();
             await ExecuteAsync(connection, "DELETE FROM platform.app_settings WHERE key = 'auto.enabled'");
         }
 
@@ -68,7 +68,7 @@ public sealed class LearnedSettingsApiTests(ApiFactory factory) : DataTestBase(f
         view.Status.ShouldBe(HttpStatusCode.OK);
         view.Body.GetProperty("autoOn").GetBoolean().ShouldBeFalse();
         view.Body.GetProperty("weeklyCap").GetInt32().ShouldBe(3);
-        view.Body.GetProperty("allowlist").GetArrayLength().ShouldBe(9);
+        view.Body.GetProperty("allowlist").GetArrayLength().ShouldBe(6);
         view.Body.GetProperty("allowlist").EnumerateArray().Select(a => a.GetProperty("key").GetString()).ShouldNotContain("Confidence:Loop:Level");
         var item = view.Body.GetProperty("items").EnumerateArray().Single();
         item.GetProperty("direction").GetString().ShouldBe("tighten");

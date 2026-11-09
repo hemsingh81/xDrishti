@@ -6,7 +6,7 @@ namespace XDrishti.Application.LearnedSettings;
 
 /// <summary>
 /// The one place that says when the owner's fresh password is needed (AU-10, ADR 0242). A move needs it unless the descriptor declares a safer direction and the move goes that way; an unknown key, an unreadable value or an undeclared direction all need it.
-/// The handlers refuse without it and the database refuses an automatic loosening, so there is no path around this.
+/// The handlers refuse without it. The database adds a second line of defence that does not know numbers: it refuses an automatic decision on any row that is not labelled a tightening made by learning, and the label is set by the application from the descriptor, so the numeric comparison itself lives here and is covered by tests.
 /// </summary>
 internal static class LearnedRules
 {

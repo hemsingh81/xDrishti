@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.ChargeSheet;
 using XDrishti.Application.Abstractions.Messaging;
@@ -77,7 +78,7 @@ internal sealed class GetEssentialSettingsHandler(IEssentialSettingStore store, 
     }
 }
 
-internal sealed class ChangeEssentialSettingHandler(IEssentialSettingStore store, IAccountEventLog events, IAccountUnitOfWork unitOfWork, TimeProvider clock) : ICommandHandler<ChangeEssentialSettingCommand, EssentialSettingView>
+internal sealed class ChangeEssentialSettingHandler(IEssentialSettingStore store, IAccountEventLog events, IAccountUnitOfWork unitOfWork, TimeProvider clock, ILogger<ChangeEssentialSettingHandler> logger) : ICommandHandler<ChangeEssentialSettingCommand, EssentialSettingView>
 {
     public async ValueTask<Result<EssentialSettingView>> HandleAsync(ChangeEssentialSettingCommand command, CancellationToken cancellationToken)
     {
@@ -100,12 +101,12 @@ internal sealed class ChangeEssentialSettingHandler(IEssentialSettingStore store
         var now = clock.GetUtcNow();
         var value = command.On ? "true" : "false";
         await store.SetAsync(command.Key, value, command.Actor, now, cancellationToken);
-        await EssentialAudit.RecordAsync(events, unitOfWork, AccountEventType.EssentialSettingReset, string.Create(CultureInfo.InvariantCulture, $"{command.Key}={value}"), command.Actor, now);
+        await EssentialAudit.RecordAsync(events, unitOfWork, AccountEventType.EssentialSettingChanged, string.Create(CultureInfo.InvariantCulture, $"{command.Key}={value}"), command.Actor, now, logger);
         return Result.Success(new EssentialSettingView(command.Key, "Failure notices", value, "true", value == "true", command.Actor, now, true, null));
     }
 }
 
-internal sealed class ResetEssentialSettingHandler(IEssentialSettingStore store, IAccountEventLog events, IAccountUnitOfWork unitOfWork, TimeProvider clock) : ICommandHandler<ResetEssentialSettingCommand, EssentialSettingView>
+internal sealed class ResetEssentialSettingHandler(IEssentialSettingStore store, IAccountEventLog events, IAccountUnitOfWork unitOfWork, TimeProvider clock, ILogger<ResetEssentialSettingHandler> logger) : ICommandHandler<ResetEssentialSettingCommand, EssentialSettingView>
 {
     public async ValueTask<Result<EssentialSettingView>> HandleAsync(ResetEssentialSettingCommand command, CancellationToken cancellationToken)
     {
@@ -125,7 +126,7 @@ internal sealed class ResetEssentialSettingHandler(IEssentialSettingStore store,
         if (EssentialKeys.StoredDefaults.TryGetValue(command.Key, out var def))
         {
             await store.SetAsync(command.Key, def, command.Actor, now, cancellationToken);
-            await EssentialAudit.RecordAsync(events, unitOfWork, AccountEventType.EssentialSettingReset, $"{command.Key} reset to default", command.Actor, now);
+            await EssentialAudit.RecordAsync(events, unitOfWork, AccountEventType.EssentialSettingReset, $"{command.Key} reset to default", command.Actor, now, logger);
             return Result.Success(new EssentialSettingView(command.Key, descriptor.Label, def, def, true, command.Actor, now, true, null));
         }
 
@@ -139,21 +140,29 @@ internal sealed class ResetEssentialSettingHandler(IEssentialSettingStore store,
     }
 }
 
-internal static class EssentialAudit
+internal static partial class EssentialAudit
 {
     public static bool IsOwner(string actor) => actor.StartsWith("owner:", StringComparison.Ordinal) && actor.Length > "owner:".Length;
 
-    /// <summary>One audit row; the change stands and a failed audit write does not undo it.</summary>
-    public static async ValueTask RecordAsync(IAccountEventLog events, IAccountUnitOfWork unitOfWork, AccountEventType type, string detail, string actor, DateTimeOffset now)
+    /// <summary>One audit row; the change stands and a failed audit write is logged, not hidden.</summary>
+    public static async ValueTask RecordAsync(IAccountEventLog events, IAccountUnitOfWork unitOfWork, AccountEventType type, string detail, string actor, DateTimeOffset now, ILogger logger)
     {
         try
         {
             events.Record(AccountEvent.Record(type, null, detail, actor, now));
-            await unitOfWork.TrySaveChangesAsync(CancellationToken.None);
+            if (await unitOfWork.TrySaveChangesAsync(CancellationToken.None))
+            {
+                return;
+            }
         }
         catch (Exception failure) when (failure is not OperationCanceledException and not OutOfMemoryException)
         {
-            // the change stands
+            // falls through to the log
         }
+
+        AuditFailed(logger, type.ToString());
     }
+
+    [LoggerMessage(EventId = 5566, Level = LogLevel.Warning, Message = "settings.audit_failed {Type}: the change stands, its audit row was not written")]
+    private static partial void AuditFailed(ILogger logger, string type);
 }

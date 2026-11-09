@@ -58,10 +58,45 @@ internal sealed class LearnedSettingChanges(NpgsqlDataSource dataSource) : ILear
         return await command.ExecuteScalarAsync(cancellationToken) as long?;
     }
 
-    public async ValueTask<bool> DecideAsync(long id, string state, string decidedBy, CancellationToken cancellationToken)
+    public async ValueTask<bool> ApplyAsync(long id, string decidedBy, string? expectedApplied, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("UPDATE config.learned_setting_changes SET state = @state, decided_by = @by, decided_at = now() WHERE id = @id AND state = 'proposed'");
-        command.Parameters.AddWithValue("state", NpgsqlDbType.Varchar, state);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var key = await LockKeyAsync(connection, transaction, id, cancellationToken);
+            if (key is null)
+            {
+                return false;
+            }
+
+            await using var newest = new NpgsqlCommand("SELECT new_value FROM config.learned_setting_changes WHERE setting_key = @key AND state = 'applied' ORDER BY id DESC LIMIT 1", connection, transaction);
+            newest.Parameters.AddWithValue("key", NpgsqlDbType.Varchar, key);
+            if (await newest.ExecuteScalarAsync(cancellationToken) as string != expectedApplied)
+            {
+                return false; // another decision for this key won while the caller was checking
+            }
+
+            await using var update = new NpgsqlCommand("UPDATE config.learned_setting_changes SET state = 'applied', decided_by = @by, decided_at = now() WHERE id = @id AND state = 'proposed'", connection, transaction);
+            update.Parameters.AddWithValue("by", NpgsqlDbType.Varchar, decidedBy);
+            update.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, id);
+            if (await update.ExecuteNonQueryAsync(cancellationToken) != 1)
+            {
+                return false;
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+        }
+        catch (PostgresException refusal) when (refusal.SqlState == PostgresErrorCodes.CheckViolation)
+        {
+            return false; // the guard trigger or a check of the table refuses this decision; nothing was changed
+        }
+    }
+
+    public async ValueTask<bool> DismissAsync(long id, string decidedBy, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("UPDATE config.learned_setting_changes SET state = 'dismissed', decided_by = @by, decided_at = now() WHERE id = @id AND state = 'proposed'");
         command.Parameters.AddWithValue("by", NpgsqlDbType.Varchar, decidedBy);
         command.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, id);
         try
@@ -70,7 +105,7 @@ internal sealed class LearnedSettingChanges(NpgsqlDataSource dataSource) : ILear
         }
         catch (PostgresException refusal) when (refusal.SqlState == PostgresErrorCodes.CheckViolation)
         {
-            return false; // the guard trigger or a check of the table refuses this decision; nothing was changed
+            return false;
         }
     }
 
@@ -81,6 +116,19 @@ internal sealed class LearnedSettingChanges(NpgsqlDataSource dataSource) : ILear
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         try
         {
+            var key = await LockKeyAsync(connection, transaction, id, cancellationToken);
+            if (key is null)
+            {
+                return null;
+            }
+
+            await using var newest = new NpgsqlCommand("SELECT id FROM config.learned_setting_changes WHERE setting_key = @key AND state = 'applied' ORDER BY id DESC LIMIT 1", connection, transaction);
+            newest.Parameters.AddWithValue("key", NpgsqlDbType.Varchar, key);
+            if (await newest.ExecuteScalarAsync(cancellationToken) as long? != id)
+            {
+                return null; // only the newest applied row of a key is undone
+            }
+
             await using var mark = new NpgsqlCommand("UPDATE config.learned_setting_changes SET state = 'undone', undone_by = @by WHERE id = @id AND state = 'applied'", connection, transaction);
             mark.Parameters.AddWithValue("by", NpgsqlDbType.Varchar, owner);
             mark.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, id);
@@ -111,6 +159,22 @@ internal sealed class LearnedSettingChanges(NpgsqlDataSource dataSource) : ILear
         {
             return null; // refused by the database (or undone already); the transaction rolls back
         }
+    }
+
+    /// <summary>Takes a transaction lock on the key of row <paramref name="id"/> and returns the key (null when there is no such row), so that decisions for one key are checked and written one at a time.</summary>
+    private static async ValueTask<string?> LockKeyAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, long id, CancellationToken cancellationToken)
+    {
+        await using var read = new NpgsqlCommand("SELECT setting_key FROM config.learned_setting_changes WHERE id = @id", connection, transaction);
+        read.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, id);
+        if (await read.ExecuteScalarAsync(cancellationToken) as string is not { } key)
+        {
+            return null;
+        }
+
+        await using var @lock = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtextextended('config.learned:' || @key, 0))", connection, transaction);
+        @lock.Parameters.AddWithValue("key", NpgsqlDbType.Varchar, key);
+        await @lock.ExecuteNonQueryAsync(cancellationToken);
+        return key;
     }
 
     public IReadOnlyList<LearnedOverride>? ReadApplied()

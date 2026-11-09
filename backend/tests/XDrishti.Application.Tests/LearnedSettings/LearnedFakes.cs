@@ -42,23 +42,42 @@ internal sealed class FakeLearnedStore : ILearnedSettingStore
         return ValueTask.FromResult<long?>(id);
     }
 
-    public ValueTask<bool> DecideAsync(long id, string state, string decidedBy, CancellationToken cancellationToken)
+    public ValueTask<bool> ApplyAsync(long id, string decidedBy, string? expectedApplied, CancellationToken cancellationToken)
     {
-        Decisions.Add((id, state, decidedBy));
+        Decisions.Add((id, "applied", decidedBy));
         var i = _rows.FindIndex(r => r.Id == id && r.State == "proposed");
         if (i < 0 || (decidedBy == "auto" && (!AutoSwitchOn || _rows[i].Direction != "tighten")))
         {
             return ValueTask.FromResult(false);
         }
 
-        _rows[i] = _rows[i] with { State = state, DecidedBy = decidedBy, DecidedAt = Now };
+        var newest = _rows.Where(r => r.Key == _rows[i].Key && r.State == "applied").OrderBy(r => r.Id).LastOrDefault();
+        if (newest?.NewValue != expectedApplied)
+        {
+            return ValueTask.FromResult(false);
+        }
+
+        _rows[i] = _rows[i] with { State = "applied", DecidedBy = decidedBy, DecidedAt = Now };
+        return ValueTask.FromResult(true);
+    }
+
+    public ValueTask<bool> DismissAsync(long id, string decidedBy, CancellationToken cancellationToken)
+    {
+        Decisions.Add((id, "dismissed", decidedBy));
+        var i = _rows.FindIndex(r => r.Id == id && r.State == "proposed");
+        if (i < 0)
+        {
+            return ValueTask.FromResult(false);
+        }
+
+        _rows[i] = _rows[i] with { State = "dismissed", DecidedBy = decidedBy, DecidedAt = Now };
         return ValueTask.FromResult(true);
     }
 
     public ValueTask<long?> UndoAsync(long id, NewLearnedChange undo, string owner, CancellationToken cancellationToken)
     {
         var i = _rows.FindIndex(r => r.Id == id && r.State == "applied");
-        if (i < 0)
+        if (i < 0 || _rows.Where(r => r.Key == _rows[i].Key && r.State == "applied").Max(r => r.Id) != id)
         {
             return ValueTask.FromResult<long?>(null);
         }

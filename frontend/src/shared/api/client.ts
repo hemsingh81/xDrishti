@@ -56,6 +56,10 @@ const passwordCheckPaths = new Set<string>([
   '/api/confidence/kill-proposals/{id}/dismiss',
   '/api/confidence/kill-settings',
   '/api/learning/cells/{key}/re-enable',
+  '/api/settings/essentials/{key}',
+  '/api/settings/essentials/{key}/reset',
+  '/api/settings/learned/{id}/approve',
+  '/api/settings/learned/{id}/undo',
 ]);
 
 api.use({

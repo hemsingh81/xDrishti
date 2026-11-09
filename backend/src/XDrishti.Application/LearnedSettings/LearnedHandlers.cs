@@ -54,6 +54,7 @@ internal static class LearnedSnapshot
             w.WriteBoolean("auto", autoOn);
             w.WriteNumber("weeklyCap", options.WeeklyCap);
             w.WriteNumber("maxStepPercent", options.MaxStepPercent);
+            w.WriteNumber("maxTotalPercent", options.MaxTotalPercent);
             w.WriteStartObject("values");
             foreach (var (k, v) in values.OrderBy(x => x.Key, StringComparer.Ordinal))
             {
@@ -125,7 +126,7 @@ internal sealed class RunLearnedSettingsHandler(
 
             var descriptor = config.Descriptor(item.Key);
             var current = applied.TryGetValue(item.Key, out var a) ? a : config.ConfiguredValue(item.Key);
-            var decision = LearnedSettingProposer.Propose(descriptor, current, item, settings.MaxStepPercent);
+            var decision = LearnedSettingProposer.Propose(descriptor, current, item, settings.MaxStepPercent, config.ConfiguredValue(item.Key), settings.MaxTotalPercent);
             if (decision.Outcome == LearnedOutcome.Skip)
             {
                 skipped.Add(Skip(item.Key, decision.Code));
@@ -151,7 +152,7 @@ internal sealed class RunLearnedSettingsHandler(
 
             proposed++;
             LearnedLog.Proposed(logger, id.Value, item.Key, direction);
-            if (decision.Outcome == LearnedOutcome.Tighten && autoOn && used < settings.WeeklyCap && await store.DecideAsync(id.Value, "applied", LearnedSettingProposer.AutoActor, cancellationToken))
+            if (decision.Outcome == LearnedOutcome.Tighten && autoOn && used < settings.WeeklyCap && await store.ApplyAsync(id.Value, LearnedSettingProposer.AutoActor, applied.GetValueOrDefault(item.Key), cancellationToken))
             {
                 used++;
                 appliedNow++;
@@ -171,7 +172,7 @@ internal sealed class RunLearnedSettingsHandler(
 }
 
 /// <summary>What the three owner decisions share: the owner check, the lookup, the stored move and the refusals (AU-10).</summary>
-internal sealed class LearnedDecisionSupport(ILearnedSettingStore store, ILearnedConfig config, IAccountEventLog events, IAccountUnitOfWork unitOfWork, TimeProvider clock, ILogger<LearnedDecisionSupport> logger)
+internal sealed class LearnedDecisionSupport(ILearnedSettingStore store, ILearnedConfig config, IAutoSwitch auto, LearnedSettingsOptions options, IAccountEventLog events, IAccountUnitOfWork unitOfWork, TimeProvider clock, ILogger<LearnedDecisionSupport> logger)
 {
     public ILearnedSettingStore Store => store;
 
@@ -208,11 +209,13 @@ internal sealed class LearnedDecisionSupport(ILearnedSettingStore store, ILearne
         return failures.Count > 0 ? Error.Validation("learned.config_invalid", "The configuration with this change is not valid: " + string.Join(" ", failures.Take(3))) : null;
     }
 
-    public async ValueTask<Result<LearnedChangeView>> DecideAsync(long id, string state, string actor, CancellationToken cancellationToken)
+    /// <summary>Applies (with the value the caller checked against) or dismisses a proposed row as the owner.</summary>
+    public async ValueTask<Result<LearnedChangeView>> DecideAsync(long id, string state, string actor, string? expectedApplied, CancellationToken cancellationToken)
     {
-        if (!await store.DecideAsync(id, state, actor, cancellationToken))
+        var done = state == "applied" ? await store.ApplyAsync(id, actor, expectedApplied, cancellationToken) : await store.DismissAsync(id, actor, cancellationToken);
+        if (!done)
         {
-            return Refuse(Error.Conflict("learned.wrong_state", "The change was decided meanwhile."));
+            return Refuse(Error.Conflict("learned.stale", "The change was decided meanwhile, or another change to the same setting came first; read the list again."));
         }
 
         LearnedLog.Decided(logger, id, state, "owner");
@@ -220,6 +223,10 @@ internal sealed class LearnedDecisionSupport(ILearnedSettingStore store, ILearne
         await AuditAsync(actor, row);
         return Result.Success(LearnedViews.Of(row, config));
     }
+
+    /// <summary>The real snapshot of the settings an owner act is made under (Auto as stored now, the guardrails, the values in force).</summary>
+    public async ValueTask<(string Json, string Hash)> SnapshotAsync(IReadOnlyDictionary<string, string> applied, CancellationToken cancellationToken) =>
+        LearnedSnapshot.Make(await auto.IsOnAsync(cancellationToken), options, LearnedSnapshot.Effective(config, applied));
 
     /// <summary>One audit row for the owner's decision. The decision stands and ignores the request token; a failed audit write is logged and does not undo it.</summary>
     public async ValueTask AuditAsync(string actor, LearnedChangeRow row)
@@ -276,7 +283,7 @@ internal sealed class ApproveLearnedChangeHandler(LearnedDecisionSupport support
 
         return support.CheckCandidate(applied, row.Key, row.NewValue) is { } invalid
             ? support.Refuse(invalid)
-            : await support.DecideAsync(row.Id, "applied", command.Actor, cancellationToken);
+            : await support.DecideAsync(row.Id, "applied", command.Actor, applied.GetValueOrDefault(row.Key), cancellationToken);
     }
 }
 
@@ -286,7 +293,7 @@ internal sealed class DismissLearnedChangeHandler(LearnedDecisionSupport support
     {
         ArgumentNullException.ThrowIfNull(command);
         var found = await support.FindAsync(command.Id, command.Actor, "proposed", cancellationToken);
-        return found.IsFailure ? Result.Failure<LearnedChangeView>(found.Error) : await support.DecideAsync(found.Value.Id, "dismissed", command.Actor, cancellationToken);
+        return found.IsFailure ? Result.Failure<LearnedChangeView>(found.Error) : await support.DecideAsync(found.Value.Id, "dismissed", command.Actor, null, cancellationToken);
     }
 }
 
@@ -320,7 +327,7 @@ internal sealed class UndoLearnedChangeHandler(LearnedDecisionSupport support) :
         }
 
         var direction = LearnedRules.Loosens(descriptor, row.NewValue, row.OldValue) ? "loosen" : "tighten";
-        var (json, hash) = LearnedSnapshot.Make(false, new LearnedSettingsOptions(), LearnedSnapshot.Effective(support.Config, applied));
+        var (json, hash) = await support.SnapshotAsync(applied, cancellationToken);
         var idText = row.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
         var undo = new NewLearnedChange(row.Key, row.NewValue, row.OldValue, direction, "owner", json, hash, "undo of change " + idText, "undo:" + idText, row.Id);
         var id = await support.Store.UndoAsync(row.Id, undo, command.Actor, cancellationToken);

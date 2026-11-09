@@ -21,9 +21,9 @@ public sealed class EssentialSettingsHandlerTests
         _log.ReadAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new ChargeSheetLedger(false, null, []));
     }
 
-    private ChangeEssentialSettingHandler Change() => new(_store, _events, _events, new Microsoft.Extensions.Time.Testing.FakeTimeProvider());
+    private ChangeEssentialSettingHandler Change() => new(_store, _events, _events, new Microsoft.Extensions.Time.Testing.FakeTimeProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ChangeEssentialSettingHandler>.Instance);
 
-    private ResetEssentialSettingHandler Reset() => new(_store, _events, _events, new Microsoft.Extensions.Time.Testing.FakeTimeProvider());
+    private ResetEssentialSettingHandler Reset() => new(_store, _events, _events, new Microsoft.Extensions.Time.Testing.FakeTimeProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ResetEssentialSettingHandler>.Instance);
 
     [Fact]
     public async Task The_five_rows_start_at_their_defaults_with_no_who_and_when()
@@ -50,7 +50,7 @@ public sealed class EssentialSettingsHandlerTests
         var row = view.Items.Single(i => i.Key == "notices.failure");
         (row.Value, row.IsDefault, row.ChangedBy).ShouldBe(("false", false, Owner));
         row.ChangedAt.ShouldNotBeNull();
-        _events.Recorded.Count.ShouldBe(1);
+        _events.Recorded.Single().Event.ShouldBe(XDrishti.Domain.Accounts.AccountEventType.EssentialSettingChanged);
     }
 
     [Fact]

@@ -32,7 +32,7 @@ public static class LearnedSettingProposer
     /// <summary>The actor recorded for a change learning applied by itself. It is never an owner approval.</summary>
     public const string AutoActor = "auto";
 
-    public static LearnedDecision Propose(SettingDescriptor? descriptor, string? currentText, LearnedEvidenceItem? evidence, int maxStepPercent)
+    public static LearnedDecision Propose(SettingDescriptor? descriptor, string? currentText, LearnedEvidenceItem? evidence, int maxStepPercent, string? configuredText = null, int maxTotalPercent = 100)
     {
         if (evidence is null)
         {
@@ -86,8 +86,20 @@ public static class LearnedSettingProposer
         }
 
         var stepped = descriptor.Safer == SettingSafer.Higher ? Math.Min(proposed, current + step) : Math.Max(proposed, current - step);
+        if (TryNumber(configuredText, out var configured))
+        {
+            // total drift from the owner's configured value: stacked steps cannot walk a gate away without limit
+            var room = Math.Abs(configured) * Math.Clamp(maxTotalPercent, 1, 100) / 100m;
+            stepped = descriptor.Safer == SettingSafer.Higher ? Math.Min(stepped, configured + room) : Math.Max(stepped, configured - room);
+        }
+
         stepped = Math.Round(stepped, 6);
-        if (!descriptor.InRange(stepped) || descriptor.IsLoosening(current, stepped) || stepped == current)
+        if (stepped == current)
+        {
+            return LearnedDecision.Skipped("learned.total_limit");
+        }
+
+        if (!descriptor.InRange(stepped) || descriptor.IsLoosening(current, stepped))
         {
             return LearnedDecision.Skipped("learned.no_change");
         }

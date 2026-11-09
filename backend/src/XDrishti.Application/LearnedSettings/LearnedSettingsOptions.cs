@@ -15,4 +15,8 @@ public sealed class LearnedSettingsOptions
 
     [Range(1, 25)]
     public int MaxStepPercent { get; set; } = 10;
+
+    /// <summary>The most all automatic and proposed tightenings together may move a value away from the configured one, as a share of the configured value (stacked steps cannot drift without limit).</summary>
+    [Range(1, 100)]
+    public int MaxTotalPercent { get; set; } = 30;
 }

@@ -159,9 +159,9 @@ public sealed class LearnedSettingChangesGrantsTests(ResearchGrantsTests.Dedicat
         var id = (await store.InsertProposedAsync(change, Ct))!.Value;
         (await store.InsertProposedAsync(change, Ct)).ShouldBeNull("once per evidence");
 
-        (await store.DecideAsync(id, "applied", "auto", Ct)).ShouldBeFalse("the switch is off: the database refuses");
+        (await store.ApplyAsync(id, "auto", null, Ct)).ShouldBeFalse("the switch is off: the database refuses");
         await SwitchAsync(true);
-        (await store.DecideAsync(id, "applied", "auto", Ct)).ShouldBeTrue();
+        (await store.ApplyAsync(id, "auto", null, Ct)).ShouldBeTrue();
         await SwitchAsync(false);
 
         (await store.AppliedValuesAsync(Ct))["Confidence:CostStress:TierABps"].ShouldBe("3.3");
@@ -177,6 +177,30 @@ public sealed class LearnedSettingChangesGrantsTests(ResearchGrantsTests.Dedicat
         (await store.AppliedValuesAsync(Ct))["Confidence:CostStress:TierABps"].ShouldBe("3");
         (await store.UndoAsync(id, undo, "owner:me@x.test", Ct)).ShouldBeNull("already undone");
         (await store.UndoAsync(undoId, undo with { EvidenceHash = "undo:again", UndoOf = undoId, OldValue = "3", NewValue = "3.3", Direction = "tighten" }, "auto", Ct)).ShouldBeNull("an undo is never by auto");
+    }
+
+    [Fact]
+    public async Task Of_two_proposals_for_one_key_decided_at_once_exactly_one_wins_and_only_the_newest_applied_row_is_undone()
+    {
+        await using var source = NpgsqlDataSource.Create(server.App);
+        var store = new LearnedSettingChanges(source);
+        const string key = "Confidence:Decay:Sigmas";
+        NewLearnedChange Change(string to, string evidence) => new(key, "1.5", to, "tighten", "learning", "{}", Hash, "ref", evidence, null);
+        var a = (await store.InsertProposedAsync(Change("1.4", "race-a"), Ct))!.Value;
+        var b = (await store.InsertProposedAsync(Change("1.3", "race-b"), Ct))!.Value;
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 6).Select(i => store.ApplyAsync(i % 2 == 0 ? a : b, "owner:me@x.test", null, Ct).AsTask()));
+
+        results.Count(r => r).ShouldBe(1, "decisions for one key are checked and written one at a time");
+        var winner = results[0] ? a : b;
+        var loser = winner == a ? b : a;
+        (await store.FindAsync(loser, Ct))!.State.ShouldBe("proposed");
+
+        // the winner is the newest applied row; a later applied row makes it un-undoable until that one is undone
+        var next = (await store.InsertProposedAsync(Change("1.2", "race-c") with { OldValue = (await store.FindAsync(winner, Ct))!.NewValue }, Ct))!.Value;
+        (await store.ApplyAsync(next, "owner:me@x.test", (await store.FindAsync(winner, Ct))!.NewValue, Ct)).ShouldBeTrue();
+        var undo = new NewLearnedChange(key, "1.3", "1.4", "loosen", "owner", "{}", Hash, "undo", "undo:x", winner);
+        (await store.UndoAsync(winner, undo, "owner:me@x.test", Ct)).ShouldBeNull("it is not the newest applied row of its key");
     }
 
     [Fact]

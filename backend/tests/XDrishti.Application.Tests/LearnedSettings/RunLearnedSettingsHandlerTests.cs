@@ -163,4 +163,28 @@ public sealed class RunLearnedSettingsHandlerTests
 
         _store.Rows.Select(r => (r.OldValue, r.NewValue)).ShouldBe([("4", "4.4"), ("4.4", "4.84")]);
     }
+
+    [Fact]
+    public async Task Repeated_runs_cannot_drift_past_the_total_limit_from_the_configured_value()
+    {
+        // Sigmas: lower is safer, configured 1, step 10%, total 30%: 0.9, 0.81, 0.729, then the floor 0.7, then nothing more
+        var values = new List<string>();
+        for (var week = 1; week <= 7; week++)
+        {
+            var result = await RunAsync(Handler(true, Batch(Item("Confidence:Decay:Sigmas", "0.1", "w" + week)), cap: 10));
+            values.Add(result.Value.Applied == 1 ? _store.Rows[^1].NewValue : "-" + result.Value.Skipped.Single().Code);
+        }
+
+        values.ShouldBe(["0.9", "0.81", "0.729", "0.7", "-learned.total_limit", "-learned.total_limit", "-learned.total_limit"]);
+        _store.Rows.Count.ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task Proposals_that_were_not_applied_do_not_count_toward_the_drift()
+    {
+        await RunAsync(Handler(false, Batch(Item("Confidence:Decay:Sigmas", "0.1", "w1")))); // a proposal only: 0.9
+        await RunAsync(Handler(false, Batch(Item("Confidence:Decay:Sigmas", "0.1", "w2"))));
+
+        _store.Rows.Select(r => r.NewValue).ShouldBe(["0.9", "0.9"]);
+    }
 }

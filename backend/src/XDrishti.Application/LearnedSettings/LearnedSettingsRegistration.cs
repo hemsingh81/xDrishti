@@ -19,7 +19,7 @@ public static class LearnedSettingsRegistration
         services.AddScoped<ICommandHandler<UndoLearnedChangeCommand, LearnedChangeView>, UndoLearnedChangeHandler>();
         services.AddScoped<ICommandHandler<RunLearnedSettingsCommand, LearnedRunView>, RunLearnedSettingsHandler>();
         services.TryAddSingleton<ILearnedEvidenceSource, NoLearnedEvidence>(); // no measured source exists yet: unavailable, nothing changes
-        services.TryAddSingleton<IEmptyPlanProbe, NoEmptyPlanProbe>(); // cannot tell yet: no notice
+        services.AddScoped<IEmptyPlanProbe, StoredEmptyPlanProbe>(); // the stored plans: how many sessions in a row the coming plan was empty (criterion 9)
         services.AddScoped<IBellNoticeSource, LearnedTighteningNotices>();
         return services;
     }

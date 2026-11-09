@@ -130,7 +130,7 @@ public sealed class LearnedConfigTests(ApiFactory factory)
     {
         var options = factory.Services.GetRequiredService<LearnedSettingsOptions>();
 
-        (options.WeeklyCap, options.MaxStepPercent).ShouldBe((3, 10));
+        (options.WeeklyCap, options.MaxStepPercent, options.MaxTotalPercent).ShouldBe((3, 10, 30));
         _ = factory.Services.GetRequiredService<IConfiguration>();
     }
 }

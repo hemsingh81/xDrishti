@@ -16,7 +16,7 @@ public sealed class LearnedDecisionHandlerTests
     private readonly FakeLearnedConfig _config = new();
     private readonly FakeAccountEvents _events = new();
 
-    private LearnedDecisionSupport Support() => new(_store, _config, _events, _events, new FakeTimeProvider(), NullLogger<LearnedDecisionSupport>.Instance);
+    private LearnedDecisionSupport Support() => new(_store, _config, new FakeAuto(false), new LearnedSettingsOptions(), _events, _events, new FakeTimeProvider(), NullLogger<LearnedDecisionSupport>.Instance);
 
     [Fact]
     public async Task A_loosening_is_refused_without_a_fresh_password_and_nothing_is_written()
@@ -157,5 +157,50 @@ public sealed class LearnedDecisionHandlerTests
         var result = await new ApproveLearnedChangeHandler(Support()).HandleAsync(new ApproveLearnedChangeCommand(1, Owner, FreshPassword: true), Ct);
 
         result.Error.Code.ShouldBe("learned.wrong_state");
+    }
+
+    [Fact]
+    public async Task Of_two_proposals_for_one_key_only_the_first_decision_wins()
+    {
+        _store.Seed(FakeLearnedConfig.BpsKey, "4", "4.2", "tighten", "proposed", null);
+        _store.Seed(FakeLearnedConfig.BpsKey, "4", "4.4", "tighten", "proposed", null);
+
+        var first = await new ApproveLearnedChangeHandler(Support()).HandleAsync(new ApproveLearnedChangeCommand(1, Owner, FreshPassword: false), Ct);
+        var second = await new ApproveLearnedChangeHandler(Support()).HandleAsync(new ApproveLearnedChangeCommand(2, Owner, FreshPassword: false), Ct);
+
+        first.IsSuccess.ShouldBeTrue();
+        second.Error.Code.ShouldBe("learned.stale");
+        _store.Rows[1].State.ShouldBe("proposed");
+    }
+
+    [Fact]
+    public async Task The_store_refuses_a_decision_that_lost_the_race_even_when_the_handler_read_an_old_value()
+    {
+        _store.Seed(FakeLearnedConfig.BpsKey, "4", "4.2", "tighten", "proposed", null);
+        _store.Seed(FakeLearnedConfig.BpsKey, "4", "4.4", "tighten", "proposed", null);
+
+        (await _store.ApplyAsync(1, Owner, null, Ct)).ShouldBeTrue();
+        (await _store.ApplyAsync(2, Owner, null, Ct)).ShouldBeFalse("the newest applied value is 4.2 now, not none");
+    }
+
+    [Fact]
+    public async Task Only_the_newest_applied_row_of_a_key_is_undone_and_an_undo_can_itself_be_undone()
+    {
+        _store.Seed(FakeLearnedConfig.BpsKey, "4", "4.2", "tighten", "applied", "auto");
+        _store.Seed(FakeLearnedConfig.BpsKey, "4.2", "4.4", "tighten", "applied", "auto");
+
+        var older = await new UndoLearnedChangeHandler(Support()).HandleAsync(new UndoLearnedChangeCommand(1, Owner, FreshPassword: true), Ct);
+        var newest = await new UndoLearnedChangeHandler(Support()).HandleAsync(new UndoLearnedChangeCommand(2, Owner, FreshPassword: true), Ct);
+
+        older.Error.Code.ShouldBe("learned.stale");
+        newest.IsSuccess.ShouldBeTrue();
+        var undo = _store.Rows[2];
+        (undo.OldValue, undo.NewValue, undo.Direction).ShouldBe(("4.4", "4.2", "loosen"));
+        undo.Snapshot.ShouldContain("maxTotalPercent"); // the real guardrails, not defaults made up for the undo
+
+        // the undo is the newest applied row now; undoing it puts the tighter value back, a tightening, so the session is enough
+        var again = await new UndoLearnedChangeHandler(Support()).HandleAsync(new UndoLearnedChangeCommand(3, Owner, FreshPassword: false), Ct);
+        again.IsSuccess.ShouldBeTrue();
+        again.Value.NewValue.ShouldBe("4.4");
     }
 }

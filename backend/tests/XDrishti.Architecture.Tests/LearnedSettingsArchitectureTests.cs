@@ -20,7 +20,7 @@ public sealed class LearnedSettingsArchitectureTests
         users.ShouldBe(["LearnedHandlers.cs", "LearnedOverridesPostConfigure.cs", "LearnedTighteningNotices.cs"]);
 
         var handlers = File.ReadAllText(Path.Combine(Src, "XDrishti.Application", "LearnedSettings", "LearnedHandlers.cs"));
-        var autoDecisions = handlers.Split('\n').Where(l => l.Contains("DecideAsync(", StringComparison.Ordinal) && l.Contains("AutoActor", StringComparison.Ordinal)).ToList();
+        var autoDecisions = handlers.Split('\n').Where(l => l.Contains("ApplyAsync(", StringComparison.Ordinal) && l.Contains("AutoActor", StringComparison.Ordinal)).ToList();
         autoDecisions.Count.ShouldBe(1);
         autoDecisions[0].ShouldContain("LearnedOutcome.Tighten");
         autoDecisions[0].ShouldContain("autoOn");
@@ -32,7 +32,7 @@ public sealed class LearnedSettingsArchitectureTests
     {
         var writers = Sources()
             .Where(f => File.ReadAllText(f) is var t && t.Contains("ILearnedSettingStore", StringComparison.Ordinal)
-                && (t.Contains(".InsertProposedAsync(", StringComparison.Ordinal) || t.Contains(".DecideAsync(", StringComparison.Ordinal) || t.Contains(".UndoAsync(", StringComparison.Ordinal)))
+                && (t.Contains(".InsertProposedAsync(", StringComparison.Ordinal) || t.Contains(".ApplyAsync(", StringComparison.Ordinal) || t.Contains(".DismissAsync(", StringComparison.Ordinal) || t.Contains(".UndoAsync(", StringComparison.Ordinal)))
             .Select(Path.GetFileName)
             .ToList();
 
@@ -62,5 +62,18 @@ public sealed class LearnedSettingsArchitectureTests
         migration.ShouldContain("NOT (decided_by = 'auto' AND (direction <> 'tighten' OR source <> 'learning'))");
         migration.ShouldContain("An automatic decision needs the Auto switch to be ON");
         migration.ShouldContain("MakeAppendOnlyForAppRole");
+    }
+
+    [Fact]
+    public void A_real_empty_plan_probe_is_the_registered_one_before_any_real_evidence_source_can_exist()
+    {
+        // AU-10 criterion 9: the notice for a too-strict setting needs a probe that can really tell. Any evidence source other than the empty one may only appear
+        // while the registered probe is a real one; adding a source means updating this list on purpose.
+        var evidenceSources = Sources().SelectMany(f => System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(f), @"class (\w+)[^\n]*: ILearnedEvidenceSource").Select(m => m.Groups[1].Value)).ToList();
+        evidenceSources.ShouldBe(["NoLearnedEvidence"], "a real evidence source is a new slice: review it and this pin together");
+
+        var registration = File.ReadAllText(Path.Combine(Src, "XDrishti.Application", "LearnedSettings", "LearnedSettingsRegistration.cs"));
+        registration.ShouldContain("IEmptyPlanProbe, StoredEmptyPlanProbe>");
+        registration.ShouldNotContain("NoEmptyPlanProbe");
     }
 }

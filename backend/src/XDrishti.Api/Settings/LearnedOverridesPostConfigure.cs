@@ -15,7 +15,14 @@ internal sealed partial class LearnedOverridesPostConfigure(ILearnedOverrideSour
     public void PostConfigure(string? name, ConfidenceSettings options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        if (source.ReadApplied() is not { Count: > 0 } applied)
+        var read = source.ReadApplied();
+        if (read is null)
+        {
+            Unreadable(logger); // the configured values stand; a tightening learned earlier is NOT in force until the log can be read
+            return;
+        }
+
+        if (read is not { Count: > 0 } applied)
         {
             return;
         }
@@ -52,6 +59,9 @@ internal sealed partial class LearnedOverridesPostConfigure(ILearnedOverrideSour
             }
         }
     }
+
+    [LoggerMessage(EventId = 5565, Level = LogLevel.Warning, Message = "learned.log_unreadable: the learned-change log could not be read; the configured values stand, so earlier learned tightenings are not in force")]
+    private static partial void Unreadable(ILogger logger);
 
     [LoggerMessage(EventId = 5564, Level = LogLevel.Warning, Message = "learned.left_out {Key}: {Reason}")]
     private static partial void Left(ILogger logger, string key, string reason);

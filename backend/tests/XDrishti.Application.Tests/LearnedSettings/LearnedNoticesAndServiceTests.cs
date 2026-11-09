@@ -47,19 +47,38 @@ public sealed class LearnedNoticesAndServiceTests
     }
 
     [Fact]
-    public async Task An_owner_decision_or_an_old_change_is_not_named()
+    public async Task An_old_automatic_tightening_that_still_stands_is_named_but_an_owner_decision_an_undone_or_replaced_one_is_not()
     {
-        var store = new FakeLearnedStore { Now = Now.AddDays(-30) };
-        store.Seed(FakeLearnedConfig.BpsKey, "4", "4.2", "tighten", "applied", "auto");
-        store.Seed("Confidence:Decay:Sigmas", "1", "0.9", "tighten", "applied", "owner:me@x.test");
+        var store = new FakeLearnedStore { Now = Now.AddDays(-90) };
+        store.Seed(FakeLearnedConfig.BpsKey, "4", "4.2", "tighten", "applied", "auto"); // 1: old, still the newest of its key
+        store.Seed("Confidence:Decay:Sigmas", "1", "0.9", "tighten", "applied", "owner:me@x.test"); // 2: an owner decision
+        store.Seed(FakeLearnedConfig.NoDirectionKey, "50", "55", "tighten", "undone", "auto"); // 3: undone
+        store.Seed(FakeLearnedConfig.LoopLevel, "0.95", "0.96", "tighten", "applied", "auto"); // 4: auto, then replaced by an owner row
+        store.Seed(FakeLearnedConfig.LoopLevel, "0.96", "0.95", "loosen", "applied", "owner:me@x.test"); // 5
 
-        (await new LearnedTighteningNotices(store, Probe(9), new FakeLearnedConfig()).ListAsync(Now, Ct)).ShouldBeEmpty();
+        var notices = await new LearnedTighteningNotices(store, Probe(6), new FakeLearnedConfig()).ListAsync(Now, Ct);
+
+        notices.Select(n => n.Id).ShouldBe(["learned-empty:1:6"]);
     }
 
     [Fact]
-    public async Task The_default_probe_and_the_default_evidence_know_nothing()
+    public async Task The_stored_probe_counts_the_newest_version_of_each_session_while_the_primary_list_is_empty()
     {
-        (await new NoEmptyPlanProbe().ConsecutiveEmptySessionsAsync(Ct)).ShouldBeNull();
+        var plans = Substitute.For<XDrishti.Application.Abstractions.Planning.IPlanStore>();
+        XDrishti.Application.Abstractions.Planning.PlanRow Row(long id, int day, int version, int primary) =>
+            new(id, new XDrishti.Application.Abstractions.Planning.NewPlan("k", new DateOnly(2026, 11, day), Now, version, "h", "b", false, "t", Now, []), XDrishti.Domain.Planning.PlanState.Published, primary, 0, 0);
+        plans.ListAsync(null, null, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new[] { Row(5, 9, 1, 0), Row(4, 8, 2, 0), Row(3, 8, 1, 3), Row(2, 7, 1, 0), Row(1, 6, 1, 2) });
+
+        (await new StoredEmptyPlanProbe(plans).ConsecutiveEmptySessionsAsync(Ct)).ShouldBe(3); // 9, 8 (version 2 is empty), 7; then 6 has a primary
+    }
+
+    [Fact]
+    public async Task With_no_stored_plan_the_stored_probe_cannot_tell()
+    {
+        var plans = Substitute.For<XDrishti.Application.Abstractions.Planning.IPlanStore>();
+        plans.ListAsync(null, null, Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(Array.Empty<XDrishti.Application.Abstractions.Planning.PlanRow>());
+
+        (await new StoredEmptyPlanProbe(plans).ConsecutiveEmptySessionsAsync(Ct)).ShouldBeNull();
         (await new NoLearnedEvidence().ReadAsync(Ct)).Available.ShouldBeFalse();
     }
 

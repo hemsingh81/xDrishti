@@ -40,7 +40,7 @@ public static class AuditKinds
         (Configuration,
         [
             AccountEventType.AccountCreated, AccountEventType.AccountArchived, AccountEventType.TradingUpdated, AccountEventType.PortfolioUpdated, AccountEventType.DataUpdated, AccountEventType.RiskProfileCreated, AccountEventType.RiskProfileUpdated, AccountEventType.RiskProfileDeleted,
-            AccountEventType.CapabilityChanged, AccountEventType.BucketAdded, AccountEventType.BucketCreated, AccountEventType.BucketRenamed, AccountEventType.PortfolioRefreshSettingsChanged, AccountEventType.PortfolioBenchmarkChanged, AccountEventType.FirstImportDateChanged, AccountEventType.ComplianceRecorded, AccountEventType.EssentialSettingReset,
+            AccountEventType.CapabilityChanged, AccountEventType.BucketAdded, AccountEventType.BucketCreated, AccountEventType.BucketRenamed, AccountEventType.PortfolioRefreshSettingsChanged, AccountEventType.PortfolioBenchmarkChanged, AccountEventType.FirstImportDateChanged, AccountEventType.ComplianceRecorded, AccountEventType.EssentialSettingReset, AccountEventType.EssentialSettingChanged,
         ]),
         (Selection, [AccountEventType.EventFilterSwitched]),
         (Learning, [AccountEventType.ExperimentJobStarted, AccountEventType.ExperimentJobCancelled, AccountEventType.LessonMoved, AccountEventType.HypothesisMoved, AccountEventType.ChangelogReverted, AccountEventType.ReportExported, AccountEventType.LabHoldOutUnlocked, AccountEventType.LearnedSettingDecided]),

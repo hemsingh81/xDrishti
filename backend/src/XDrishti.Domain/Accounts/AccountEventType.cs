@@ -100,4 +100,5 @@ public enum AccountEventType
     BarHolesRepaired,
     LearnedSettingDecided,
     EssentialSettingReset,
+    EssentialSettingChanged,
 }

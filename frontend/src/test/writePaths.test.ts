@@ -114,3 +114,22 @@ describe('the learning move routes are written from owner-acts only', () => {
     expect(writes('/api/autonomy/settings', "api.GET('/api/autonomy/settings', {})")).toBe(false);
   });
 });
+
+// AU-10: the learned-change and Essential-setting writes are named in the settings feature only.
+describe('the learned and essential settings writes are made from settings only', () => {
+  const routes = [
+    ['PUT', '/api/settings/essentials/{key}'],
+    ['POST', '/api/settings/essentials/{key}/reset'],
+    ['POST', '/api/settings/learned/{id}/approve'],
+    ['POST', '/api/settings/learned/{id}/undo'],
+    ['POST', '/api/settings/learned/{id}/dismiss'],
+  ] as const;
+
+  it.each(routes)('%s %s', (verb, route) => {
+    const pattern = new RegExp(`\\.${verb}\\(\\s*'${route.replace(/[{}/]/g, (c) => `\\${c}`)}'`);
+    const holders = [...byFeature.entries()]
+      .filter(([, files]) => files.some(([, text]) => pattern.test(text)))
+      .map(([feature]) => feature);
+    expect(holders).toEqual(['settings']);
+  });
+});
