@@ -11,6 +11,9 @@ type Run = Schemas['ExpressionRunSummary'];
 
 const words = (s: string) => s.replaceAll('_', ' ');
 
+const shareText = (s: Run['fallbackShare']) =>
+  s.state === 'ok' ? formatRate(s.value) : `unavailable, ${words(s.reason ?? 'not reported')}`;
+
 const columns: Column<Run>[] = [
   {
     kind: 'text',
@@ -54,6 +57,17 @@ const columns: Column<Run>[] = [
     header: 'Derived expiry',
     metric: (r) => reportedMetric(r.expiryDerivedShare),
     format: formatRate,
+  },
+  {
+    kind: 'text',
+    id: 'lots',
+    header: 'Lot feasibility',
+    render: (r) =>
+      r.lotFeasibility.length === 0
+        ? 'none'
+        : r.lotFeasibility
+            .map((l) => `${words(l.feasibility)} ${formatCount(l.paired)} (${shareText(l.share)})`)
+            .join('; '),
   },
   {
     kind: 'metric',

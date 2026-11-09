@@ -10,9 +10,11 @@ import { ExtensionCard } from './ExtensionCard';
 import { PairFormationsPanel } from './PairFormationsPanel';
 import { Panel } from './Panel';
 
+// shortcut: no cut list is read here (no route carries it); the CLI phase check is the authority on cut families.
 function Family({ family }: { family: string }) {
   const query = useQuery(extensionsQuery(family));
   const records = query.data ? latestPerKey(query.data.items) : [];
+  const holdOutRead = records.some((r) => r.holdOutRead);
   return (
     <Panel title={family}>
       {query.isPending && <LoadingState label={`Loading ${family}`} />}
@@ -25,6 +27,11 @@ function Family({ family }: { family: string }) {
           {records.map((e) => (
             <ExtensionCard key={e.id} family={family} e={e} />
           ))}
+          {!holdOutRead && (
+            <Typography variant="body2" color="text.secondary">
+              The hold-out has not been read for this family yet.
+            </Typography>
+          )}
         </Box>
       )}
     </Panel>
@@ -37,7 +44,8 @@ export function OptionsStatArbTab() {
     <Box sx={{ display: 'grid', gap: 2, minWidth: 0 }}>
       <Typography variant="body2" color="text.secondary">
         Advisory research records; nothing here places an order or changes a setting. A figure that is not available is
-        shown as a word, never as a zero.
+        shown as a word, never as a zero. A development KEEP changes nothing. Families the owner has cut are not known
+        to this screen; `xd options phase-check --cut` is the authority.
       </Typography>
       {p14Families.map((family) => (
         <Family key={family} family={family} />

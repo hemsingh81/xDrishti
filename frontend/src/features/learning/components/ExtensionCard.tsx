@@ -1,5 +1,5 @@
 import { Alert, Box, Chip, Typography } from '@mui/material';
-import { EvidenceBlock, NonValue, formatR, formatRate } from '@/shared/analytics';
+import { EvidenceBlock, NonValue, formatCount, formatR, formatRate } from '@/shared/analytics';
 import type { ExtensionEvaluation } from '../api/extensionQueries';
 import { boundsOf, windowOf, type BoundLine } from '../lib/extensions';
 import { FilterSharesTable } from './FilterSharesTable';
@@ -10,7 +10,13 @@ const syntheticNote =
 function Bounds({ e }: { e: ExtensionEvaluation }) {
   const lines = boundsOf(e);
   const fmt = (b: BoundLine) =>
-    b.value === null ? 'unavailable' : b.unit === 'share' ? formatRate(b.value) : formatR(b.value);
+    b.value === null
+      ? 'unavailable'
+      : b.unit === 'share'
+        ? formatRate(b.value)
+        : b.unit === 'count'
+          ? formatCount(b.value)
+          : formatR(b.value);
   return (
     <Typography variant="body2">
       {lines.map((b) => `${b.label} ${fmt(b)}`).join('; ')}

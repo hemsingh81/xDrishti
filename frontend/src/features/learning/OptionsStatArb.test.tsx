@@ -135,4 +135,100 @@ describe('Learning: options and stat-arb', () => {
     expect(within(table).getByText(/cut/)).toBeInTheDocument();
     expect(screen.getByText(/More formations exist than are listed/)).toBeInTheDocument();
   });
+
+  it.each([
+    [
+      'expr:option_buy',
+      'O',
+      {
+        paired: 150,
+        mean_d: 0.2,
+        day_lower: 0.05,
+        day_upper: 0.35,
+        session_lower: 0.01,
+        session_upper: 0.4,
+        required: 0.1,
+      },
+      'N (paired trades) 150',
+    ],
+    [
+      'expr:iron_condor',
+      'R',
+      {
+        paired: 120,
+        mean_d: -0.2,
+        day_lower: -0.4,
+        day_upper: -0.05,
+        session_lower: -0.5,
+        session_upper: -0.01,
+        required: 0.1,
+      },
+      'N (paired trades) 120',
+    ],
+    [
+      'pairs:intraday-1',
+      'S',
+      {
+        trades: 300,
+        mean_r: 0.3,
+        day_lower: 0.1,
+        day_upper: 0.5,
+        session_lower: 0.05,
+        session_upper: 0.55,
+        required: 0.15,
+      },
+      'N (trades) 300',
+    ],
+  ])(
+    'shows N, bounds and margin for a KEEP and a DROP of %s (protocol %s)',
+    async (family, protocol, estimates, nText) => {
+      for (const verdict of ['KEEP', 'DROP']) {
+        serve({
+          byFamily: {
+            [family]: [buildEvaluation({ family, protocol, versionKey: 'v1', verdict, missing: [], estimates })],
+          },
+        });
+        const view = open();
+        const card = await screen.findByRole('article', { name: new RegExp(`${family} development`) });
+        expect(within(card).getByText(new RegExp(`Verdict: ${verdict}`))).toBeInTheDocument();
+        expect(card).toHaveTextContent(nText);
+        expect(card).toHaveTextContent(/Day-block lower bound [+-]\d/);
+        expect(card).toHaveTextContent(/Required \+0\.\d\d R/);
+        expect(card).toHaveTextContent(/margin widened by the ledger count/);
+        view.unmount();
+      }
+    },
+  );
+
+  it('reads an unavailable bound of a KEEP as words, never a digit', async () => {
+    serve({
+      byFamily: {
+        'expr:option_buy': [
+          buildEvaluation({
+            family: 'expr:option_buy',
+            protocol: 'O',
+            versionKey: 'v1',
+            verdict: 'KEEP',
+            missing: [],
+            estimates: { paired: 150, mean_d: 0.2, day_lower: 'unavailable', required: 'unavailable' },
+          }),
+        ],
+      },
+    });
+    open();
+    const card = await screen.findByRole('article', { name: /expr:option_buy development/ });
+    expect(card).toHaveTextContent('Day-block lower bound unavailable');
+    expect(card).toHaveTextContent('Required unavailable');
+    expect(card).not.toHaveTextContent(/NaN/);
+  });
+
+  it('notes that a development KEEP changes nothing, that cuts are not known here and the hold-out state', async () => {
+    serve({ byFamily: { 'ext:iv-1': [buildEvaluation({ family: 'ext:iv-1', protocol: 'X', versionKey: 'v1' })] } });
+    open();
+    expect(await screen.findByText(/A development KEEP changes nothing/)).toBeInTheDocument();
+    expect(screen.getByText(/xd options phase-check --cut/)).toBeInTheDocument();
+    expect((await screen.findAllByText('The hold-out has not been read for this family yet.')).length).toBeGreaterThan(
+      0,
+    );
+  });
 });

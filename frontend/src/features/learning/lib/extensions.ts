@@ -77,7 +77,7 @@ export interface BoundLine {
   label: string;
   /** Null when the key is absent or not a number (the stored `unavailable`): shown as a word, never as zero. */
   value: number | null;
-  unit: 'R' | 'share';
+  unit: 'R' | 'share' | 'count';
 }
 
 /**
@@ -115,6 +115,39 @@ export function boundsOf(e: ExtensionEvaluation): BoundLine[] {
             line('Test gain', 'test_gain_r'),
             line('Lower bound', 'lower'),
             line('Upper bound', 'upper'),
+            line('Required', 'required'),
+          ];
+    case 'O':
+    case 'R':
+      return e.holdOutRead
+        ? [
+            line('N (hold-out paired trades)', 'hold_out_paired', 'count'),
+            line('Hold-out mean difference', 'hold_out_mean_d'),
+            line('Day-block lower bound', 'day_lower'),
+          ]
+        : [
+            line('N (paired trades)', 'paired', 'count'),
+            line('Mean difference', 'mean_d'),
+            line('Day-block lower bound', 'day_lower'),
+            line('Day-block upper bound', 'day_upper'),
+            line('Session-block lower bound', 'session_lower'),
+            line('Session-block upper bound', 'session_upper'),
+            line('Required', 'required'),
+          ];
+    case 'S':
+      return e.holdOutRead
+        ? [
+            line('N (hold-out trades)', 'hold_out_trades', 'count'),
+            line('Hold-out mean R', 'hold_out_mean_r'),
+            line('Day-block lower bound', 'day_lower'),
+          ]
+        : [
+            line('N (trades)', 'trades', 'count'),
+            line('Mean R', 'mean_r'),
+            line('Day-block lower bound', 'day_lower'),
+            line('Day-block upper bound', 'day_upper'),
+            line('Session-block lower bound', 'session_lower'),
+            line('Session-block upper bound', 'session_upper'),
             line('Required', 'required'),
           ];
     default:
