@@ -3,6 +3,7 @@ using System.ClientModel.Primitives;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenAI;
 using XDrishti.Application.Abstractions.Ai;
@@ -24,6 +25,9 @@ public static class LlmClientRegistration
             .ValidateDataAnnotations()
             .Validate(o => o.HasValidBaseUrl(), "Assistant:Llm:BaseUrl must be an absolute http or https address.")
             .ValidateOnStart();
+
+        // not a hosted service (the architecture test forbids one): logged once when the options are first built, which ValidateOnStart does at start
+        services.AddOptions<LlmOptions>().PostConfigure<ILoggerFactory>((o, factory) => ReportMissingKey(o, factory.CreateLogger(nameof(LlmClientRegistration))));
 
         // No redirects, no cookies: a model server that answers with a redirect is treated as not understood, never followed.
         services.AddHttpClient(HttpLlmHealth.ClientName)
@@ -51,6 +55,15 @@ public static class LlmClientRegistration
             return client.GetChatClient(settings.Model).AsIChatClient();
         });
         return services;
+    }
+
+    /// <summary>Logs <c>llm.key_missing</c> when the model server is enabled and the API key is empty (spec P9-01); settings only, never the key.</summary>
+    internal static void ReportMissingKey(LlmOptions settings, ILogger logger)
+    {
+        if (settings.Enabled && string.IsNullOrEmpty(settings.ApiKey))
+        {
+            logger.KeyMissing();
+        }
     }
 
     private static HttpMessageHandler CreateHandler() => new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false, UseProxy = false };

@@ -1,3 +1,4 @@
+using System.Data.Common;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
@@ -51,8 +52,15 @@ internal sealed class RetryRecoveryHandler(RecoveryRunner runner, IAccountEventL
 
         var now = clock.GetUtcNow();
         events.Record(AccountEvent.Record(AccountEventType.ServiceRunRequested, null, "recovery: run now", command.Actor, now));
-        return await unitOfWork.TrySaveAsync(CancellationToken.None) // the pass has started: a cancelled request must not leave it unrecorded
-            ? Result.Success(new RecoveryRetryAccepted(now, steps > 0, steps))
-            : Result.Failure<RecoveryRetryAccepted>(RecoveryErrors.NotRecorded); // the pass runs all the same; only the audit row is missing
+        try
+        {
+            return await unitOfWork.TrySaveAsync(CancellationToken.None) // the pass has started: a cancelled request must not leave it unrecorded
+                ? Result.Success(new RecoveryRetryAccepted(now, steps > 0, steps))
+                : Result.Failure<RecoveryRetryAccepted>(RecoveryErrors.NotRecorded); // the pass runs all the same; only the audit row is missing
+        }
+        catch (Exception ex) when (ex is DbException || ex.InnerException is DbException)
+        {
+            return Result.Failure<RecoveryRetryAccepted>(RecoveryErrors.NotRecorded); // a database error (EF wraps it in DbUpdateException) after the pass started: same outcome
+        }
     }
 }

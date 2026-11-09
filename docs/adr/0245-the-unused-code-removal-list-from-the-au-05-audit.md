@@ -5,53 +5,58 @@
 - **Relation to other ADRs:** Applies [0241](0241-code-is-removed-only-from-a-recorded-list-of-unreachable-code-no-spec-plans-to-use.md); spec AU-05; feeds AU-06 and AU-07.
 
 ## Context
-AU-05 audited `backend/src`, `backend/tests` and `frontend/src` for code nothing reaches. Method (read-only, no tool added): every
-`public`/`internal` type and method name in `backend/src` was counted across all `.cs` files (migrations and spikes excluded from
-the count of callers, included when checking helpers they call); frontend files by import graph and exports by name count; the
-`appsettings.json` keys by name. Each hit was then grepped in `docs/specs`, `docs/design` and the tests. Names that are only
-reached by reflection or DI (EF `*Configuration` classes, registration extension classes, log holders, CLI/MCP entry points,
-`ToCode`-style extension methods) were reviewed and are **not** candidates. Everything in `XDrishti.Execution` (P12), the P13
-recorders, P14 archive, migrations and the ADR 0241 null seams is excluded.
+AU-05 audited `backend/src`, `backend/tests` and `frontend/src` for code nothing reaches. Nothing is deleted by this ADR.
+
+## Method and its limits
+1. **Compiler/analyser pass (backend).** `dotnet build XDrishti.slnx` with `EnforceCodeStyleInBuild=true` and IDE0051 (unused private member), IDE0052 (private member never read), IDE0060 (unused parameter) and CA1822 raised to warning through a temporary `.editorconfig` change that was reverted (no committed setting changed, no tool added). Result: 7 IDE0051 (3 are EF private constructors, a false positive), 4 IDE0052, 15 IDE0060 (mostly interface or delegate shaped parameters, not candidates), 0 CA1822. These analysers only see private members; they say nothing about public or internal ones.
+2. **Name-count scan (backend).** Every public/internal type and method name in `backend/src` (spikes and migrations excluded) was counted across all `.cs` files. A name that appears once in `src` is a candidate; one that appears in tests only is "test-only". This is a text match, not a compiler proof: it misses unused members that share a name with a used one (overloads, common names such as `ToCode`), and it does not sweep properties, fields, constants or enum members.
+3. **Frontend.** `tsc -p tsconfig.app.json --noEmit --noUnusedLocals --noUnusedParameters` reports 0 errors (it only sees non-exported symbols). Exports and files were checked by an import-graph and name-count script. `knip` is not installed and was not added.
+4. **Routes.** All 355 paths of the generated OpenAPI schema were compared with the frontend sources, CLI, MCP, deploy and scripts. 342 have a consumer. 13 have none outside tests and docs (listed under Doubtful). CLI verbs (`Api/Cli`) and MCP tools were not individually swept for reachability: they are owner-only entry points (ADR 0241 rule 3) and the `[McpServerTool]` attribute is not used, so tools are registered by code, not found by a text match.
+5. **Settings.** All leaf keys of the five host files (`Api` 12, `Execution` 5, `Feed` 12, `Mcp` 10, `Worker` 6) were matched with a name in `backend/src`; every key is read. Logging/Serilog keys excluded.
+6. **Plan check.** Each candidate was searched in `docs/specs` and `docs/design`.
+Names reached only by reflection or DI (EF `*Configuration`, registration extensions, log holders, entry points, migration helpers) were reviewed and are not candidates. `XDrishti.Execution` (P12), P13 recorders, P14 archive, migrations and the ADR 0241 null seams are excluded.
 
 ## Candidates
 
-### Certain (no reference anywhere, no spec or design plans it)
-| # | Item | Evidence | Slice |
-|---|------|----------|-------|
-| 1 | `BarGrid.LastOnDate` (`Domain/Options/Remark/BarGrid.cs`) | 0 callers, 0 tests, 0 spec/design hits | AU-06 group A |
-| 2 | `EodErrors.FetchFailed` and `FetchFailedCode` (`Application/Market/Eod/EodErrors.cs`) | 0 callers, 0 tests; the live code is `DataErrors.RepairFetchFailedCode` | AU-06 group A |
-| 3 | `daysBetween` (`frontend/src/features/live/lib/dates.ts`) | 0 callers, 0 tests, no spec | AU-07 group A |
-| 4 | `needsPassword` (`frontend/src/features/learning/lib/mlText.ts`) | 0 callers, 0 tests | AU-07 group A |
-| 5 | `isReplayTimeframe` (`frontend/src/features/reports/lib/replayModel.ts`) | 0 callers, 0 tests | AU-07 group A |
-| 6 | `MAX_PIVOT_CELLS` (`frontend/src/features/reports/lib/pivotLimits.ts`) | 0 readers, 0 tests (delete the file if it holds nothing else) | AU-07 group A |
+### Certain (nothing reaches them, no spec or design mentions them)
+| # | Item | Evidence | Spec/design hits | Slice |
+|---|------|----------|------------------|-------|
+| 1 | `BarGrid.LastOnDate` (`Domain/Options/Remark/BarGrid.cs`) | name scan: 1 hit, no test | 0 | AU-06 A |
+| 2 | `EodErrors.FetchFailed` and `FetchFailedCode` (`Application/Market/Eod/EodErrors.cs`) | name scan, no test; the live code is `DataErrors.RepairFetchFailedCode` | 0 | AU-06 A |
+| 3 | `DataLog.EodCrashed` (`Application/Market/Bars/DataLog.cs`) | name scan: log message with no caller; leftover | 0 | AU-06 A |
+| 4 | `ProposalAnswerReader.Clip` (private) | IDE0051 | 0 | AU-06 A |
+| 5 | `ProtocolF.Share(double?)` overload (private, line 290) | IDE0051 | 0 | AU-06 A |
+| 6 | `AiSqlRunner.Short` (private) | IDE0051 | 0 | AU-06 A |
+| 7 | `ScheduleCalculator.WeeklyReach` (private field) | IDE0052 | 0 | AU-06 A |
+| 8 | `LegState._t1Epoch` (private field, written never read) | IDE0052 | 0 | AU-06 A |
+| 9 | `daysBetween` (`frontend/src/features/live/lib/dates.ts`) | import/name scan, no test | 0 | AU-07 A |
+| 10 | `isReplayTimeframe` (`features/reports/lib/replayModel.ts`) | same | 0 | AU-07 A |
+| 11 | `MAX_PIVOT_CELLS` (`features/reports/lib/pivotLimits.ts`; delete the file if it holds nothing else) | same | 0 | AU-07 A |
 
-Risk of each group: low (compile-time proof; the compiler and `tsc` fail on a wrong removal). Together under half a day.
+Risk: low. Items 1 to 8 are checked by the compiler on removal (a wrong removal does not build); 9 to 11 by `tsc`. Items 1 to 8 are about half a day, 9 to 11 under an hour. Because the method has the limits above, the AU-06/AU-07 builds and tests are the final proof, and a reviewer samples the list before removal.
 
 ### Doubtful (left in place; the owner decides)
-| Item | Why doubtful |
-|------|--------------|
-| `PeadV1.VariantOf` | 0 callers and 0 tests, but it is the label protocol of a built-in strategy; may be meant for the lab ledger. |
-| `LlmLog.KeyMissing`, `DataLog.EodCrashed` | Log messages never called. They look like a missing diagnostic (see Findings), so the fix may be to call them, not delete them. |
-| Test-only methods (reachable only from tests): `RollingRequest.IsFailedAttempt`, `ReplayPlan.BaselineRequest`, `DataManifest.IsForbiddenColumnName`, `LabRunStates.HoldsKey/IsCancellable/IsTerminal`, `SurpriseMath.Ttm`, `RegimeCellRule.ShrinksToParent`, `CheckStatus.IsKnownResult`, `PairVariant.FromLabel`, `EngleGranger.TestPrices`, `ServiceRun.LinkDataJob`, `Transaction.Supersede`, `ChargeSheetAct.IsAboutConfirmation`, `ChargeSchedule.RatesOf`, `FeatureFrame.HasTimeframe/SpecOf`, `RandomEntryWalker.RandomTrades`, `HashingFileSink.GetMemory`, `ModelHoldOutLooks.ClaimAsync` (22 items) | A test is the only caller; removing them removes the pinned behaviour with them. Several are guards for a rule (hold-out, supersede). |
-| `plannedNavItems`, `isJobRunning` (frontend) | Used by tests only. |
-| Frontend exported types and test kits with no other reader (about 60 `type` exports, `testing.ts*` helpers) | No runtime effect; helpers are used by tests. Not worth a slice. |
-| `features/lab/monaco-api.d.ts` | An ambient module declaration; looks unimported but TypeScript loads it implicitly. |
-| `MigrationBuilderExtensions` helpers, `DesignTimeDbContextFactory`, EF configurations, `*Registration`, `*Log` holders | Reached by migrations, tooling or reflection. Protected. |
+- **Kept by decision (owner/coordinator, 2026-11-09):** `needsPassword` (encodes the step-up rule, ADR 0241 rule 4), `ModelHoldOutLooks.ClaimAsync`, `PeadV1.VariantOf`, `plannedNavItems`, `isJobRunning`, `PairVariant.FromLabel`, `DataManifest.IsForbiddenColumnName`, `LlmLog.KeyMissing` (planned in P9-01; now logged at start, see Findings).
+- **Test-only (20 names), left in:** `RollingRequest.IsFailedAttempt`, `ReplayPlan.BaselineRequest`, `LabRunStates.HoldsKey`, `LabRunStates.IsCancellable`, `LabRunStates.IsTerminal`, `SurpriseMath.Ttm`, `RegimeCellRule.ShrinksToParent`, `CheckStatus.IsKnownResult`, `EngleGranger.TestPrices`, `ServiceRun.LinkDataJob`, `Transaction.Supersede`, `ChargeSheetAct.IsAboutConfirmation`, `ChargeSchedule.RatesOf`, `FeatureFrame.HasTimeframe`, `FeatureFrame.SpecOf`, `RandomEntryWalker.RandomTrades`, `EvalFraction.ToDouble`, `MigrationBuilderExtensions.GrantColumnUpdateToAppRole`, `GrantTableToAppRole`, `MakeAppendOnlyForAppRole`. A test is the only caller; removal would delete the pinned behaviour with it.
+- **Unread private fields of indicators:** `BbMiddle._k`, `MacdLine._signalPeriod` (stored constructor arguments; harmless).
+- **`BarAggregates.MinuteOfDay`** (private SQL snippet): the spec/design search finds the word "MinuteOfDay" three times; not checked further.
+- **Routes without a UI, CLI or MCP consumer (13):** `/api/assistant/briefings/preview`, `/api/confidence/pack-gate-results`, `/api/learning/counterfactuals`, `/api/paper/capture-runs`, `/api/paper/config/changes`, `/api/paper/entries`, `/api/paper/shadow/settings`, and the P12/P13 ones `/api/execution/alarms`, `/api/execution/reconciliation`, `/api/execution/breaks/{id}/resolve`, `/api/live-trading/halts`, `/api/live-trading/notices`, `/api/live-trading/outcomes`. They are owner or tool endpoints with tests; none is proposed.
+- **Unused parameters (15 IDE0060):** shaped by interfaces and delegates; not candidates.
+- **Frontend:** `monaco-api.d.ts` (ambient module declaration, loaded implicitly), about 60 exported types and the `testing.ts*` helpers (no runtime effect).
 
-### Protected (excluded by ADR 0241)
-`XDrishti.Execution` including `FakeBroker.LagTradeBook` (P12-06), `ClosedProtectionSource`, `IStoredTrades`, in-memory stores; settings keys (all 12 leaf keys in `appsettings.json` are read).
+### Protected (ADR 0241)
+`XDrishti.Execution` including `FakeBroker.LagTradeBook`, `ClosedProtectionSource`, `IStoredTrades`, in-memory stores; `MigrationBuilderExtensions` helpers used by migrations; EF configurations, registration extensions, log holders.
 
 ### Trading-safety code
 None is proposed. Any halt, freeze, gate or reconciliation item needs the owner's explicit yes (ADR 0241 rule 4).
 
 ## Removal slices
-- AU-06 group A: items 1 and 2 (backend, a few lines, risk low).
-- AU-07 group A: items 3 to 6 (frontend, risk low).
+- AU-06 group A: items 1 to 8 (backend, risk low).
+- AU-07 group A: items 9 to 11 (frontend, risk low).
 Doubtful items are not scheduled.
 
-## Findings that look like defects, not dead code
-- `LlmLog.KeyMissing` ("model server is enabled but the API key is empty") is never called, so that misconfiguration is silent.
-- `DataLog.EodCrashed` ("the scheduled end-of-day update could not be started") is never called, so that failure may not be logged.
+## Findings that looked like defects
+- `LlmLog.KeyMissing` was never called, so an enabled model server with an empty key was silent. Fixed in this slice: `LlmStartupCheck` logs it once at start when `Enabled` and the key is empty (it never calls the server; test `LlmStartupCheckTests`).
 
 ## Consequences
-The certain list is small (6 items) because the codebase was audited slice by slice and most parked code is protected. Nothing is deleted by this ADR.
+The certain list is short (11 items) because most parked code is protected and the name scan cannot prove more. Nothing is deleted by this ADR.

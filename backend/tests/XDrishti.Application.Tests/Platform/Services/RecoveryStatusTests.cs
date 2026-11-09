@@ -188,7 +188,7 @@ public sealed class RecoveryStatusTests : IDisposable
         var rows = (await StatusAsync()).Value.Sessions.SelectMany(s => s.Items).Where(r => r.Status is RecoveryRowStatus.StillFailing or RecoveryRowStatus.Blocked).ToList();
 
         rows.ShouldNotBeEmpty();
-        rows.ShouldAllBe(r => r.RetryKind == null && !r.CanRetry || r.ServiceId == "eod");
+        rows.ShouldAllBe(r => r.RetryKind == null && !r.CanRetry); // 2026-10-12 is no missed session of eod, and "ghost" is no service
     }
 
     [Fact]
@@ -231,6 +231,34 @@ public sealed class RecoveryStatusTests : IDisposable
         result.Error.Code.ShouldBe(RecoveryErrors.NotRecordedCode);
         result.Error.Message.ShouldContain("started");
         _world.Ledger.Passes.Select(p => p.Trigger).ShouldContain("manual");
+    }
+
+    private sealed class FailingDatabaseException : System.Data.Common.DbException
+    {
+    }
+
+    [Fact]
+    public async Task Retry_whose_audit_save_throws_a_database_error_is_not_recorded_and_the_pass_still_runs()
+    {
+        _world.Data.Collisions.Enqueue(() => throw new InvalidOperationException("wrapped", new FailingDatabaseException()));
+
+        var result = await RetryAsync();
+        await _world.SettleAsync();
+
+        result.Error.Code.ShouldBe(RecoveryErrors.NotRecordedCode);
+        _world.Ledger.Passes.Select(p => p.Trigger).ShouldContain("manual");
+    }
+
+    [Fact]
+    public async Task Retry_audit_save_is_not_cancelled_with_the_request()
+    {
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync(); // the caller has gone before the audit row is written
+        var result = await _world.WithScopeAsync(sp => sp.GetRequiredService<ICommandHandler<RetryRecoveryCommand, RecoveryRetryAccepted>>().HandleAsync(new RetryRecoveryCommand("owner@example.invalid"), cancelled.Token));
+        await _world.SettleAsync();
+
+        result.IsSuccess.ShouldBeTrue();
+        _world.Data.Events.ShouldContain(e => e.Actor == "owner@example.invalid");
     }
 
     [Fact]
