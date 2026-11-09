@@ -322,4 +322,70 @@ public sealed class RepairBarHolesTests
         _jobs.Jobs.Values.Single().Status.ShouldBe(DataJobStatus.Failed);
         await _start.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
     }
+
+    [Fact]
+    public async Task A_caller_that_disconnects_after_the_merge_still_gets_the_audit_the_follow_up_and_a_success()
+    {
+        Store(ThreeHoles);
+        using var cts = new CancellationTokenSource();
+        _source.Respond = t =>
+        {
+            cts.Cancel(); // the caller goes away while the bars are on their way in
+            return new IntradayResult(t.InstrumentId, [.. ThreeHoles.Select(m => BarAt(Minute(Wed, m), 250))], 1);
+        };
+
+        var result = await Handler().HandleAsync(new RepairBarHolesCommand(_id, Wed, Thu, "owner@example.invalid"), cts.Token);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Inserted.ShouldBe(3L);
+        _jobs.Jobs.Values.Single().Status.ShouldBe(DataJobStatus.Succeeded);
+        await _uow.Received(1).SaveAsync(Arg.Is<CancellationToken>(t => !t.CanBeCanceled));
+        await _start.Received(1).HandleAsync(Arg.Any<StartDataJobCommand>(), Arg.Is<CancellationToken>(t => !t.CanBeCanceled));
+    }
+
+    [Fact]
+    public async Task A_failed_repair_is_audited_too()
+    {
+        Store(ThreeHoles);
+        _source.Respond = t => new IntradayResult(t.InstrumentId, [], 1, new IntradayFailure(IntradayFailureKind.Failed, "no"));
+
+        await RunAsync(Wed, Thu);
+
+        _events.Received(1).Record(Arg.Is<AccountEvent>(e => e.Detail == "instrument=NSE:ABB window=2026-10-07..2026-10-08 failed=data.repair_fetch_failed"));
+    }
+
+    [Fact]
+    public async Task A_failure_to_write_the_audit_does_not_undo_the_repair()
+    {
+        Store(ThreeHoles);
+        ServeHoles();
+        var result = await new RepairBarHolesHandler(_queries, _source, _account, _targets, _store, _settings, _calendar, _jobs, _start, _events, new DownUnitOfWork(), _clock, NullLogger<RepairBarHolesHandler>.Instance)
+            .HandleAsync(new RepairBarHolesCommand(_id, Wed, Thu, "owner@example.invalid"), Ct);
+
+        result.Value.Inserted.ShouldBe(3L);
+        _start.ReceivedCalls().ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public async Task An_unexpected_exception_and_a_cancellation_before_the_merge_both_release_the_slot()
+    {
+        Store(ThreeHoles);
+        _source.Respond = _ => throw new InvalidOperationException("boom");
+        await Should.ThrowAsync<InvalidOperationException>(async () => await RunAsync(Wed, Thu));
+        _jobs.Jobs.Values.ShouldAllBe(j => !j.IsRunning);
+
+        _source.Respond = _ => throw new OperationCanceledException();
+        await Should.ThrowAsync<OperationCanceledException>(async () => await RunAsync(Wed, Thu));
+        _jobs.Jobs.Values.ShouldAllBe(j => !j.IsRunning);
+        _jobs.Jobs.Values.ShouldAllBe(j => j.Status == DataJobStatus.Failed);
+        ServeHoles();
+        (await RunAsync(Wed, Thu)).IsSuccess.ShouldBeTrue("the slot is free for the next repair");
+    }
+
+    private sealed class DownUnitOfWork : IMarketUnitOfWork
+    {
+        public ValueTask SaveAsync(CancellationToken cancellationToken) => throw new InvalidOperationException("db down");
+
+        public ValueTask<bool> TrySaveAsync(CancellationToken cancellationToken) => throw new InvalidOperationException("db down");
+    }
 }

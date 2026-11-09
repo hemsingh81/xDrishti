@@ -106,7 +106,7 @@ internal sealed class RepairBarHolesHandler(
         catch
         {
             job.Fail(clock.GetUtcNow(), "The repair of old bar holes stopped unexpectedly.");
-            await jobs.PublishAsync(job, CancellationToken.None);
+            await PublishQuietlyAsync(job);
             throw;
         }
 
@@ -120,7 +120,10 @@ internal sealed class RepairBarHolesHandler(
             job.Finish(clock.GetUtcNow());
         }
 
-        await jobs.PublishAsync(job, CancellationToken.None);
+        await PublishQuietlyAsync(job);
+
+        // The bars are committed (or nothing was stored): neither the audit nor the follow-up may depend on the caller still being connected.
+        await AuditAsync(command, target, outcome, now);
         if (outcome.IsFailure || outcome.Value.Inserted == 0)
         {
             return outcome;
@@ -128,7 +131,7 @@ internal sealed class RepairBarHolesHandler(
 
         // The slot is free again: the aggregates are rebuilt by a job of their own.
         var started = await start.HandleAsync(
-            new StartDataJobCommand(new StartDataJobRequest([DataSteps.Aggregate, DataSteps.Quality]), command.RequestedBy, DataJobTrigger.Manual, command.InstrumentId), cancellationToken);
+            new StartDataJobCommand(new StartDataJobRequest([DataSteps.Aggregate, DataSteps.Quality]), command.RequestedBy, DataJobTrigger.Manual, command.InstrumentId), CancellationToken.None);
         var note = started.IsSuccess
             ? null
             : started.Error.Code == DataErrors.JobRunning.Code
@@ -164,7 +167,6 @@ internal sealed class RepairBarHolesHandler(
 
         if (missing.Count == 0)
         {
-            await AuditAsync(command, target, 0, 0, now, cancellationToken);
             return Result.Success(new RepairBarHolesResult(target.Symbol, command.From, command.To, sessions.Count, 0, 0, 0, 0, 0, null));
         }
 
@@ -204,7 +206,6 @@ internal sealed class RepairBarHolesHandler(
             }
 
             DataLog.BarHolesRepaired(logger, target.Symbol, command.From, command.To, missing.Count, merge.Inserted, (int)checkedBars.Rejected);
-            await AuditAsync(command, target, missing.Count, merge.Inserted, now, cancellationToken);
             return Result.Success(new RepairBarHolesResult(
                 target.Symbol, command.From, command.To, sessions.Count, holeDays.Count, missing.Count, fill.Length, merge.Inserted, missing.Count - (int)merge.Inserted, null, (int)checkedBars.Rejected));
         }
@@ -212,11 +213,41 @@ internal sealed class RepairBarHolesHandler(
         return Result.Failure<RepairBarHolesResult>(Error.Conflict(DataErrors.RepairFetchFailedCode, "Dhan returned nothing for this instrument."));
     }
 
-    private async ValueTask AuditAsync(RepairBarHolesCommand command, FetchTarget target, int missing, long inserted, DateTimeOffset now, CancellationToken cancellationToken)
+    /// <summary>
+    /// Records the repair (or its failure) once it has ended, with no cancellation: the bars are already committed. A failure to write the record is logged, not thrown, so it cannot turn a stored repair
+    /// into an error or skip the follow-up job.
+    /// </summary>
+    private async ValueTask AuditAsync(RepairBarHolesCommand command, FetchTarget target, Result<RepairBarHolesResult> outcome, DateTimeOffset now)
     {
-        events.Record(AccountEvent.Record(
-            AccountEventType.BarHolesRepaired, null, $"instrument={target.Symbol} window={command.From:yyyy-MM-dd}..{command.To:yyyy-MM-dd} missing={missing} inserted={inserted}", command.RequestedBy, now));
-        await unitOfWork.SaveAsync(cancellationToken);
+        var detail = outcome.IsFailure
+            ? $"instrument={target.Symbol} window={command.From:yyyy-MM-dd}..{command.To:yyyy-MM-dd} failed={outcome.Error.Code}"
+            : $"instrument={target.Symbol} window={command.From:yyyy-MM-dd}..{command.To:yyyy-MM-dd} missing={outcome.Value.MissingBefore} inserted={outcome.Value.Inserted}";
+        try
+        {
+            events.Record(AccountEvent.Record(AccountEventType.BarHolesRepaired, null, detail, command.RequestedBy, now));
+            await unitOfWork.SaveAsync(CancellationToken.None);
+        }
+#pragma warning disable CA1031 // the audit of a finished repair must not undo or hide it; the failure is logged
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            DataLog.BarHolesAuditFailed(logger, target.Symbol, ex);
+        }
+    }
+
+    /// <summary>Publishes the ended job record. A failure here is logged and ignored: the slot is released by the job's stale rule, and the repair itself is already done.</summary>
+    private async ValueTask PublishQuietlyAsync(DataJob job)
+    {
+        try
+        {
+            await jobs.PublishAsync(job, CancellationToken.None);
+        }
+#pragma warning disable CA1031 // see the summary
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            DataLog.BarHolesJobPublishFailed(logger, job.Id, ex);
+        }
     }
 
     private static List<DateOnly> Sessions(RepairBarHolesCommand command, TradingCalendar calendar, DateTimeOffset now, int max, out (string Field, string Message)? invalid)
