@@ -186,6 +186,218 @@ public sealed class RecoveryRunnerTests : IDisposable
         _learn.Calls.Count.ShouldBe(1);
     }
 
+    private sealed class StubProof(bool all) : IRecoveryProof
+    {
+        public bool All { get; set; } = all;
+
+        public bool Throws { get; set; }
+
+        public string ServiceId => "eod";
+
+        public List<IReadOnlyList<DateOnly>> Asked { get; } = [];
+
+        public ValueTask<RecoveryProofResult> ProveAsync(IReadOnlyList<DateOnly> sessions, DateTimeOffset runStartedAt, CancellationToken cancellationToken)
+        {
+            Asked.Add(sessions);
+            if (Throws)
+            {
+                throw new InvalidOperationException("the store is down");
+            }
+
+            var detail = RecoveryProofDetail.Write([.. sessions.Select(d => new SessionProof(d, All ? SessionProofStates.Recovered : SessionProofStates.StillMissing, 1, All ? 1 : 0, 0, All ? 0 : 1))], All, runStartedAt);
+            return ValueTask.FromResult(All ? new RecoveryProofResult(true, detail, null) : new RecoveryProofResult(false, detail, "1 of 2 sessions recovered; not recovered: 2026-10-09 still_missing"));
+        }
+    }
+
+    private static ServicesWorld ProvedWorld(StubProof proof, TestService eod, TestService learn)
+    {
+        var world = new ServicesWorld((_, _) => [eod, learn], p => p.Singleton<IRecoveryProof>(proof));
+        foreach (var service in world.Services)
+        {
+            world.Data.Store(service.Definition.Id, service.Definition.Defaults);
+        }
+
+        return world;
+    }
+
+    [Fact]
+    public async Task A_run_whose_proof_finds_a_session_not_recovered_leaves_a_partial_item_with_its_detail_and_the_dependents_still_run()
+    {
+        var eod = Eod();
+        var learn = Make("learn", Schedule.Daily(T(16, 30)), constraints: new ServiceConstraints { MustFollow = ["eod"] });
+        var proof = new StubProof(false);
+        using var world = ProvedWorld(proof, eod, learn);
+        world.SetClock(At(12, 17, 0));
+        world.Application.StartedAt = At(12, 17, 0);
+
+        await world.Scheduler.StartUpAsync(Ct);
+        await world.SettleAsync();
+
+        var item = world.Ledger.Items[("eod", "2026-10-12")];
+        item.State.ShouldBe(RecoveryStates.Partial);
+        item.Detail.ShouldNotBeNull().ShouldContain("still_missing");
+        item.Reason.ShouldNotBeNull().ShouldContain("2026-10-09 still_missing");
+        learn.Calls.Count.ShouldBe(1); // its own fail-closed gates decide, the runner does not block it
+        world.Ledger.Items[("learn", "2026-10-12")].State.ShouldBe(RecoveryStates.Succeeded);
+        world.Ledger.Passes.Single().Status.ShouldBe("incomplete");
+        proof.Asked.ShouldHaveSingleItem().ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_proof_that_finds_everything_recovered_keeps_the_item_succeeded_and_stores_the_detail()
+    {
+        var eod = Eod();
+        var learn = Make("learn", Schedule.Daily(T(16, 30)), constraints: new ServiceConstraints { MustFollow = ["eod"] });
+        using var world = ProvedWorld(new StubProof(true), eod, learn);
+        world.SetClock(At(12, 17, 0));
+        world.Application.StartedAt = At(12, 17, 0);
+
+        await world.Scheduler.StartUpAsync(Ct);
+        await world.SettleAsync();
+
+        var item = world.Ledger.Items[("eod", "2026-10-12")];
+        (item.State, item.Reason).ShouldBe((RecoveryStates.Succeeded, null));
+        item.Detail.ShouldNotBeNull().ShouldContain("\"recovered\"");
+        world.Ledger.Passes.Single().Status.ShouldBe("succeeded");
+    }
+
+    private static ServicesWorld EodOnlyWorld(StubProof proof)
+    {
+        var eod = Eod();
+        var world = new ServicesWorld((_, _) => [eod], p => p.Singleton<IRecoveryProof>(proof));
+        world.Data.Store("eod", eod.Definition.Defaults);
+        return world;
+    }
+
+    [Fact]
+    public async Task A_proof_that_throws_leaves_a_partial_item_with_every_session_still_missing_and_the_next_pass_proves_it_again()
+    {
+        var proof = new StubProof(true) { Throws = true };
+        using var world = EodOnlyWorld(proof);
+        world.SetClock(At(12, 17, 0));
+        world.Application.StartedAt = At(12, 17, 0);
+
+        await world.Scheduler.StartUpAsync(Ct);
+        await world.SettleAsync();
+
+        var item = world.Ledger.Items[("eod", "2026-10-12")];
+        item.State.ShouldBe(RecoveryStates.Partial);
+        item.Reason.ShouldNotBeNull().ShouldContain("could not be verified");
+        item.Detail.ShouldNotBeNull().ShouldContain("still_missing");
+        world.Ledger.Passes.Single().Status.ShouldBe("incomplete");
+
+        proof.Throws = false;
+        world.SetClock(At(12, 17, 30));
+        world.Recovery.Request(RecoveryTrigger.Wake);
+        await world.SettleAsync();
+
+        world.Ledger.Items[("eod", "2026-10-12")].State.ShouldBe(RecoveryStates.Succeeded);
+        world.Services[0].Calls.Count.ShouldBe(1); // proved again, not run again
+    }
+
+    [Fact]
+    public async Task A_partial_item_is_proved_again_at_the_next_pass_even_when_the_plan_has_nothing_to_run_and_a_still_missing_one_stays_partial()
+    {
+        var proof = new StubProof(false);
+        using var world = EodOnlyWorld(proof);
+        world.SetClock(At(12, 17, 0));
+        world.Application.StartedAt = At(12, 17, 0);
+        await world.Scheduler.StartUpAsync(Ct);
+        await world.SettleAsync();
+        world.Ledger.Items[("eod", "2026-10-12")].State.ShouldBe(RecoveryStates.Partial);
+
+        world.SetClock(At(12, 17, 20));
+        world.Recovery.Request(RecoveryTrigger.Wake);
+        await world.SettleAsync();
+        world.Ledger.Items[("eod", "2026-10-12")].State.ShouldBe(RecoveryStates.Partial);
+
+        proof.All = true; // a later fetch filled the hole
+        world.SetClock(At(12, 17, 40));
+        world.Recovery.Request(RecoveryTrigger.Wake);
+        await world.SettleAsync();
+
+        world.Ledger.Items[("eod", "2026-10-12")].State.ShouldBe(RecoveryStates.Succeeded);
+        world.Services[0].Calls.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_proof_also_judges_a_step_the_scheduler_already_made_up()
+    {
+        var proof = new StubProof(false);
+        using var world = EodOnlyWorld(proof);
+        var scheduled = ServiceRun.Start("eod", ServiceRunTrigger.Scheduled, 1, At(9, 16, 0));
+        scheduled.Succeed(At(9, 16, 1));
+        world.Data.Runs.Add(scheduled);
+        var pass = await world.Ledger.BeginPassAsync("startup", At(9, 15, 0), Ct);
+        var friday = new DateOnly(2026, 10, 9);
+        await world.Ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), pass, "eod", "2026-10-09", friday, friday, RecoveryStates.Failed, "boom", 1, null), Ct);
+        world.SetClock(At(9, 17, 0));
+        world.Application.StartedAt = At(9, 17, 0);
+
+        await world.Scheduler.StartUpAsync(Ct);
+        await world.SettleAsync();
+
+        world.Services[0].Calls.ShouldBeEmpty(); // the scheduler's run is the step's run
+        var item = world.Ledger.Items[("eod", "2026-10-09")];
+        (item.State, item.RunId).ShouldBe((RecoveryStates.Partial, scheduled.Id));
+        proof.Asked.ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_partial_item_raises_one_notice_per_service_per_day()
+    {
+        using var world = EodOnlyWorld(new StubProof(false));
+        world.SetClock(At(12, 17, 0));
+        world.Application.StartedAt = At(12, 17, 0);
+        await world.Scheduler.StartUpAsync(Ct);
+        await world.SettleAsync();
+
+        var notices = await world.WithScopeAsync(sp => sp.GetRequiredService<IQueryHandler<GetServiceNoticesQuery, ServiceNotices>>().HandleAsync(new GetServiceNoticesQuery(), Ct));
+
+        var partial = notices.Items.Where(n => n.Kind == GetServiceNoticesHandler.RecoveryPartial).ShouldHaveSingleItem();
+        (partial.Severity, partial.ServiceId).ShouldBe(("warning", "eod"));
+        partial.Text.ShouldContain("not complete");
+    }
+
+    [Fact]
+    public async Task A_service_in_the_market_hours_of_a_special_session_resumes_after_its_real_close_and_not_before_its_own_earliest_start()
+    {
+        var backup = Make("backup", Schedule.Daily(T(23, 30), false, Weekdays.EveryDay), constraints: new ServiceConstraints { MustNotOverlap = TimeRange.MarketHours, StartNotBefore = T(16, 0) });
+        using var world = new ServicesWorld(backup);
+        world.Data.Store("backup", backup.Definition.Defaults);
+        world.Calendar = new TradingCalendar([TradingDay.Special(new DateOnly(2026, 10, 12), 9 * 60 + 15, 13 * 60, CalendarSource.Manual, CalendarStatus.Confirmed, null, At(1, 0, 0))]);
+        world.SetClock(At(12, 12, 0));
+        world.Application.StartedAt = At(12, 12, 0);
+
+        await world.Scheduler.StartUpAsync(Ct);
+        await world.SettleAsync();
+
+        world.Ledger.Items.Values.ShouldHaveSingleItem().State.ShouldBe(RecoveryStates.Waiting);
+        world.Recovery.ResumeAt.ShouldBe(At(12, 16, 0)); // the later of the close (13:01) and its own earliest start
+
+        world.SetClock(At(12, 13, 30)); // after the special session's close: not inside any market hours, runs now
+        world.Recovery.Request(RecoveryTrigger.Wake);
+        await world.SettleAsync();
+
+        backup.Calls.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_failed_run_the_owner_started_is_not_taken_for_a_scheduled_failure_and_the_step_runs_again()
+    {
+        var manual = ServiceRun.Start("eod", ServiceRunTrigger.Manual, 1, At(9, 16, 30));
+        manual.Fail(At(9, 16, 31), "boom");
+        _world.Data.Runs.Add(manual);
+        var pass = await _world.Ledger.BeginPassAsync("startup", At(9, 16, 0), Ct);
+        var friday = new DateOnly(2026, 10, 9);
+        await _world.Ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), pass, "eod", "2026-10-09", friday, friday, RecoveryStates.Failed, "boom", 1, null), Ct);
+
+        await StartUpAtAsync(At(9, 17, 0));
+
+        _eod.Calls.Count.ShouldBe(1);
+        _world.Ledger.Items[("eod", "2026-10-09")].State.ShouldBe(RecoveryStates.Succeeded);
+    }
+
     [Fact]
     public async Task A_service_that_must_not_run_in_market_hours_waits_and_a_later_look_resumes_it_after_the_close()
     {

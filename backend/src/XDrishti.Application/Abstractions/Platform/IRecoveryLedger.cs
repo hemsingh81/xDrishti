@@ -10,11 +10,14 @@ public static class RecoveryStates
     public const string Waiting = "waiting";
     public const string Superseded = "superseded";
 
+    /// <summary>The step ran and succeeded but the proof found sessions not recovered (spec AU-03); final for the occurrence, the sessions are named in <c>detail</c> and the reason.</summary>
+    public const string Partial = "partial";
+
     public const string Interrupted = "interrupted";
 }
 
-/// <summary>One item of the ledger: one run to make for one service and occurrence (unique per service and occurrence).</summary>
-public sealed record RecoveryItemRow(Guid Id, Guid PassId, string ServiceId, string Occurrence, DateOnly SessionFrom, DateOnly SessionTo, string State, string? Reason, int Attempts, Guid? RunId);
+/// <summary>One item of the ledger: one run to make for one service and occurrence (unique per service and occurrence); <c>Detail</c> is the JSON of the proof of its sessions (spec AU-03), null until proved.</summary>
+public sealed record RecoveryItemRow(Guid Id, Guid PassId, string ServiceId, string Occurrence, DateOnly SessionFrom, DateOnly SessionTo, string State, string? Reason, int Attempts, Guid? RunId, string? Detail = null);
 
 /// <summary>A failed item that used up its attempts, with the instant of the pass that last touched it (for the one-notice-per-service-per-day rule).</summary>
 public sealed record RecoveryExhaustedRow(string ServiceId, string Occurrence, string? Reason, DateTimeOffset At);
@@ -45,6 +48,9 @@ public interface IRecoveryLedger
 
     /// <summary>Items that wait (market hours, a skipped run) for a session on or before <paramref name="sessionOnOrBefore"/>, with the instant of the pass that last touched them.</summary>
     ValueTask<IReadOnlyList<RecoveryExhaustedRow>> ListWaitingAsync(DateOnly sessionOnOrBefore, CancellationToken cancellationToken);
+
+    /// <summary>The items left <c>partial</c> (newest first, at most 50): proved again at every pass and by the data guard.</summary>
+    ValueTask<IReadOnlyList<RecoveryItemRow>> ListPartialAsync(CancellationToken cancellationToken);
 
     /// <summary>Failed items with at least <paramref name="maxAttempts"/> attempts whose pass started at or after <paramref name="since"/>.</summary>
     ValueTask<IReadOnlyList<RecoveryExhaustedRow>> ListExhaustedAsync(int maxAttempts, DateTimeOffset since, CancellationToken cancellationToken);

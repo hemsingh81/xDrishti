@@ -60,10 +60,30 @@ public sealed class NightlyGateWiringTests
         var bars = Substitute.For<IBarQueries>();
         bars.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Ct).Returns(new BarTotals(100, 1000, null, new DateTimeOffset(2026, 10, 23, 15, 29, 0, Ist), 0, 0));
 
-        var result = await new FreshDataGate(bars).CheckAsync(Context, Ct);
+        var result = await new FreshDataGate(bars, Proved(null)).CheckAsync(Context, Ct);
 
         result.Status.ShouldBe(GateStatus.Pass);
         await bars.Received(1).GetBarTotalsAsync(new DateTimeOffset(2026, 10, 23, 0, 0, 0, Ist), Ct);
+    }
+
+    private static IRecoveryDataGuard Proved(string? why)
+    {
+        var guard = Substitute.For<IRecoveryDataGuard>();
+        guard.WhyUnprovenAsync(Arg.Any<DateOnly?>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(why));
+        return guard;
+    }
+
+    [Fact]
+    public async Task The_fresh_data_gate_fails_when_a_recovered_end_of_day_step_left_a_session_it_reads_missing()
+    {
+        var bars = Substitute.For<IBarQueries>();
+        bars.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Ct).Returns(new BarTotals(100, 1000, null, new DateTimeOffset(2026, 10, 23, 15, 29, 0, Ist), 0, 0));
+        var guard = Proved("the end-of-day data is not complete for 2026-10-23");
+
+        var result = await new FreshDataGate(bars, guard).CheckAsync(Context, Ct);
+
+        (result.Status, result.Reason).ShouldBe((GateStatus.Fail, "the end-of-day data is not complete for 2026-10-23."));
+        await guard.Received(1).WhyUnprovenAsync(new DateOnly(2026, 10, 23), Ct);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+#pragma warning disable CA2012 // NSubstitute setup calls on ValueTask members are not awaited
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -80,10 +81,34 @@ public sealed class ShadowWriteServiceTests
     }
 
     [Fact]
+    public async Task A_grading_run_is_skipped_while_the_end_of_day_data_is_not_proved_and_grades_nothing()
+    {
+        var handler = Substitute.For<ICommandHandler<GradeShadowCommand, ShadowGradeOutcome>>();
+        var guard = Substitute.For<IRecoveryDataGuard>();
+        guard.WhyUnprovenAsync(null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<string?>("the end-of-day data is not complete for 2026-10-09"));
+        var provider = Substitute.For<IServiceProvider>();
+        provider.GetService(typeof(ICommandHandler<GradeShadowCommand, ShadowGradeOutcome>)).Returns(handler);
+        provider.GetService(typeof(IRecoveryDataGuard)).Returns(guard);
+        var scope = Substitute.For<IServiceScope>();
+        scope.ServiceProvider.Returns(provider);
+        var factory = Substitute.For<IServiceScopeFactory>();
+        factory.CreateScope().Returns(scope);
+        var context = new ServiceRunContext(Guid.NewGuid(), ServiceRunTrigger.Scheduled, 1, "system", new Dictionary<string, JsonElement>(), (_, _) => ValueTask.CompletedTask);
+
+        var outcome = await new ShadowGradeService(factory).RunAsync(context, Ct);
+
+        outcome.Status.ShouldBe(ServiceRunStatus.Skipped);
+        await handler.DidNotReceive().HandleAsync(Arg.Any<GradeShadowCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task A_grading_run_reports_its_counts_and_fails_when_a_candidate_failed()
     {
         var handler = Substitute.For<ICommandHandler<GradeShadowCommand, ShadowGradeOutcome>>();
+        var guard = Substitute.For<IRecoveryDataGuard>();
+        guard.WhyUnprovenAsync(null, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<string?>(null));
         var provider = Substitute.For<IServiceProvider>();
+        provider.GetService(typeof(IRecoveryDataGuard)).Returns(guard);
         provider.GetService(typeof(ICommandHandler<GradeShadowCommand, ShadowGradeOutcome>)).Returns(handler);
         var scope = Substitute.For<IServiceScope>();
         scope.ServiceProvider.Returns(provider);

@@ -391,6 +391,8 @@ public static class DependencyInjection
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
         services.TryAddSingleton(new RecoverySettings()); // the infrastructure replaces it with the validated section; the defaults serve a host that has none
+        services.AddScoped<IRecoveryProof, XDrishti.Application.Market.Bars.Eod.EodRecoveryProof>(); // the proof that a recovered eod step really filled its sessions (AU-03)
+        services.AddScoped<IRecoveryDataGuard, RecoveryDataGuard>(); // the nightly, shadow grading and paper capture wait for sessions the proof found missing (AU-03)
         services.AddSingleton<RecoveryRunner>(); // the recovery pass (ADR 0240, AU-02): one path decides what is made up
         services.AddSingleton<IRecoveryTrigger>(sp => sp.GetRequiredService<RecoveryRunner>());
         services.AddSingleton<ServiceScheduler>();

@@ -164,14 +164,23 @@ internal sealed class PortfolioSyncGate(IServiceRunStore runs) : INightlyGate
 
 /// <summary>
 /// The stored bars reach the session for all but a small share of the instruments (spec P7-08). Limits: the newest bar of ANY instrument on or after the session is enough for the "reach" test (one early bar passes it); the share test
-/// is what catches a thin day. Instruments in the coverage table that are inactive or delisted count as behind or empty, so a large dead universe can fail this gate chronically (fail closed, visible in the row).
+/// is what catches a thin day. A newest recovered end-of-day item that is partial with a missing session from the planned session on (<see cref="IRecoveryDataGuard"/>) fails it too. Instruments in the coverage table that are inactive or delisted count as behind or empty, so a large dead universe can fail this gate chronically (fail closed, visible in the row).
 /// </summary>
-internal sealed class FreshDataGate(IBarQueries bars) : INightlyGate
+internal sealed class FreshDataGate(IBarQueries bars, IRecoveryDataGuard guard) : INightlyGate
 {
     public string Id => NightlyGateIds.FreshData;
 
-    public async ValueTask<GateResult> CheckAsync(GateContext context, CancellationToken cancellationToken) =>
-        NightlyChecks.Fresh(await bars.GetBarTotalsAsync(new DateTimeOffset(context.Session.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset), cancellationToken), context);
+    public async ValueTask<GateResult> CheckAsync(GateContext context, CancellationToken cancellationToken)
+    {
+        var fresh = NightlyChecks.Fresh(await bars.GetBarTotalsAsync(new DateTimeOffset(context.Session.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset), cancellationToken), context);
+
+        // a recovered end-of-day step whose proof found a session of the plan's reading still missing is no fresh data (spec AU-03): the plan waits and the next pass proves it again
+        return fresh.Blocks || await guard.WhyUnprovenAsync(context.Session, cancellationToken) is not { } why
+            ? fresh
+            : GateResult.Failed(Id, Say($"{why}."));
+    }
+
+    private static string Say(FormattableString text) => text.ToString(CultureInfo.InvariantCulture);
 }
 
 /// <summary>

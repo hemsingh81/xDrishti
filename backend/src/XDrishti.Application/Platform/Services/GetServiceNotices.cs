@@ -21,6 +21,8 @@ internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, Service
 
     public const string RecoveryWaiting = "recovery_waiting";
 
+    public const string RecoveryPartial = "recovery_partial";
+
     private const int MaxReasonLength = 160;
 
     private const int RecoveryNoticeDays = 7;
@@ -70,6 +72,21 @@ internal sealed class GetServiceNoticesHandler(ServiceRegistry registry, Service
             if (!notices.Any(n => n.Id == id))
             {
                 notices.Add(new ServiceNotice(id, RecoveryWaiting, "warning", $"{service.Definition.Name} is still waiting to be made up for {waiting.Occurrence}: {(string.IsNullOrWhiteSpace(waiting.Reason) ? "see the History of the service" : Short(waiting.Reason))}", waiting.ServiceId, waiting.At));
+            }
+        }
+
+        // a recovered run whose proof found sessions not recovered (spec AU-03): one warning per service per day while it stays partial
+        foreach (var partial in await recovery.ListPartialAsync(cancellationToken))
+        {
+            if (registry.Find(partial.ServiceId) is not { } service)
+            {
+                continue;
+            }
+
+            var id = $"recovery:partial:{partial.ServiceId}:{IndiaTime.Today(now).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
+            if (!notices.Any(n => n.Id == id))
+            {
+                notices.Add(new ServiceNotice(id, RecoveryPartial, "warning", $"{service.Definition.Name} ran for {partial.Occurrence} but its data is not complete: {(string.IsNullOrWhiteSpace(partial.Reason) ? "see the History of the service" : Short(partial.Reason))}", partial.ServiceId, now));
             }
         }
 
