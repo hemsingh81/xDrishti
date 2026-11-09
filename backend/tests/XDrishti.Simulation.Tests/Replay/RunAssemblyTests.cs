@@ -65,6 +65,8 @@ public sealed class RunAssemblyTests
         RunAssembler.KeyText(research, researchRun.Instruments, researchRun.CalendarExceptions).ShouldNotContain("purpose=");
         RunAssembler.KeyText(training, trainingRun.Instruments, trainingRun.CalendarExceptions).ShouldContain("purpose=training\n");
         trainingRun.RunKey.ShouldNotBe(researchRun.RunKey);
+        trainingRun.IsTraining.ShouldBeTrue(); // the store takes the purpose from the run the header made, so key and purpose cannot disagree
+        researchRun.IsTraining.ShouldBeFalse();
         RunAssembler.Assemble(research with { Purpose = RunPurpose.Research }, replays).RunKey.ShouldBe(researchRun.RunKey);
     }
 

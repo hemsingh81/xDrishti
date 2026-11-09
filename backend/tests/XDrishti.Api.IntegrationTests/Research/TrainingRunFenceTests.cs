@@ -45,8 +45,8 @@ public sealed class TrainingRunFenceTests(ApiFactory factory) : IAsyncLifetime
 
     private async Task<SimulationRun> StoredAsync(RunPurpose purpose)
     {
-        var run = StoredRunFixtures.Run(to: RunStoreRoundTripTests.NextTo());
-        (await WithStore(s => s.StoreAsync(StoreKit.ToStore(run) with { Purpose = purpose }, Ct).AsTask())).IsSuccess.ShouldBeTrue();
+        var run = StoredRunFixtures.Run(to: RunStoreRoundTripTests.NextTo()) with { IsTraining = purpose == RunPurpose.Training };
+        (await WithStore(s => s.StoreAsync(StoreKit.ToStore(run), Ct).AsTask())).IsSuccess.ShouldBeTrue();
         return run;
     }
 
@@ -110,15 +110,15 @@ public sealed class TrainingRunFenceTests(ApiFactory factory) : IAsyncLifetime
     {
         var research = StoredRunFixtures.Run(to: RunStoreRoundTripTests.NextTo());
         // a training header adds the line purpose=training to the key text (RunAssembler), so the same inputs give another key
-        var training = research with { RunKey = StoreKit.Sha256(research.RunKey + "|purpose=training") };
+        var training = research with { RunKey = StoreKit.Sha256(research.RunKey + "|purpose=training"), IsTraining = true };
 
-        (await WithStore(s => s.StoreAsync(StoreKit.ToStore(training) with { Purpose = RunPurpose.Training }, Ct).AsTask())).IsSuccess.ShouldBeTrue();
+        (await WithStore(s => s.StoreAsync(StoreKit.ToStore(training), Ct).AsTask())).IsSuccess.ShouldBeTrue();
         (await WithStore(s => s.StoreAsync(StoreKit.ToStore(research), Ct).AsTask())).Value.WasAlreadyStored.ShouldBeFalse();
 
         (await WithStore(s => s.FindAsync(research.RunKey, Ct).AsTask())).ShouldNotBeNull();
         (await WithStore(s => s.FindAsync(training.RunKey, Ct).AsTask())).ShouldBeNull();
         // the same key under the other purpose is still a true mismatch: refused, never a silent no-op
-        var clash = await WithStore(s => s.StoreAsync(StoreKit.ToStore(training), Ct).AsTask());
+        var clash = await WithStore(s => s.StoreAsync(StoreKit.ToStore(training with { IsTraining = false }), Ct).AsTask());
         clash.IsFailure.ShouldBeTrue();
         clash.Error.Code.ShouldBe(StoreErrors.RunConflictCode);
     }
@@ -146,6 +146,11 @@ public sealed class TrainingRunFenceTests(ApiFactory factory) : IAsyncLifetime
         await connection.OpenAsync(Ct);
         await using var command = new NpgsqlCommand("""
             SELECT schemaname || '.' || viewname FROM pg_views
+            WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+              AND (definition ~* 'sim_runs|sim_trades|sim_trade_legs|sim_trade_leg_charges')
+              AND definition !~* 'purpose\s*=\s*''research''::text'
+            UNION ALL
+            SELECT schemaname || '.' || matviewname FROM pg_matviews
             WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
               AND (definition ~* 'sim_runs|sim_trades|sim_trade_legs|sim_trade_leg_charges')
               AND definition !~* 'purpose\s*=\s*''research''::text'

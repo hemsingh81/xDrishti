@@ -17,8 +17,11 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
     private static string Rel(string file) => Path.GetRelativePath(Src, file).Replace('\\', '/');
 
     /// <summary>The source of a file without whole-line comments, split into statements at ';' (a const SQL text, an EF query and a method call are each one statement).</summary>
-    private static string[] Statements(string file) =>
-        string.Join('\n', File.ReadAllLines(file).Where(l => !l.TrimStart().StartsWith("//", StringComparison.Ordinal))).Split(';');
+    private static string StripComments(string text) =>
+        Regex.Replace(Regex.Replace(text, @"/\*.*?\*/", " ", RegexOptions.Singleline, TimeSpan.FromSeconds(2)), @"(?<=^|\s)//[^\n]*", " ", RegexOptions.Multiline, TimeSpan.FromSeconds(2));
+
+    /// <summary>The code of a file without any comment (whole-line, trailing or block), split into statements at ';' (a const SQL text, an EF query and a method call are each one statement).</summary>
+    private static string[] Statements(string file) => StripComments(File.ReadAllText(file)).Split(';');
 
     private const string Tables = "sim_(runs|trades|trade_legs|trade_leg_charges)";
 
@@ -32,7 +35,10 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
 
     private static readonly Regex WriteVerb = new(@"(INSERT\s+INTO|COPY|DELETE\s+FROM|UPDATE|TRUNCATE)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
 
-    private static readonly string[] RunFences = ["purpose = 'research'", "Purpose == RunPurposes.ResearchText"];
+    /// <summary>The fence as a conjunct: <c>WHERE/AND purpose = 'research'</c> in SQL, or <c>Purpose == RunPurposes.ResearchText</c> in a Where; an <c>OR</c> beside it is not a fence.</summary>
+    private static bool HasFence(string statement) =>
+        Regex.IsMatch(statement, @"\b(WHERE|AND)\s+(\w+\.)?purpose\s*=\s*'research'|\.Where\(\s*\w+\s*=>\s*\w+\.Purpose\s*==\s*RunPurposes\.ResearchText\s*\)", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2))
+        && !Regex.IsMatch(statement, @"\bOR\s+(\w+\.)?purpose\b|\|\|\s*\w+\.Purpose", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
 
     /// <summary>
     /// Files allowed to name the run child tables (trades, legs, charges) or to write: they take their run ids from a fenced lookup (<c>FindRunAsync</c>, the fenced run-id statement of the report source) or write research runs. A new file is not on this list.
@@ -71,7 +77,7 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
                     continue; // SelectStored is the write path's idempotency check, which must see a run of either purpose
                 }
 
-                RunFences.Any(f => statement.Contains(f, StringComparison.Ordinal)).ShouldBeTrue($"{file}: a statement reads research.sim_runs without a purpose = 'research' fence (ADR 0243): {statement.Trim()[..Math.Min(120, statement.Trim().Length)]}");
+                HasFence(statement).ShouldBeTrue($"{file}: a statement reads research.sim_runs without a purpose = 'research' fence (ADR 0243): {statement.Trim()[..Math.Min(120, statement.Trim().Length)]}");
             }
             else
             {
@@ -83,7 +89,7 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
     [Fact]
     public void The_ef_sets_of_the_run_tables_are_used_on_exactly_the_known_lines()
     {
-        var uses = Sources().SelectMany(f => File.ReadAllLines(f).Select((l, i) => (File: Rel(f), Line: l, No: i + 1)).Where(x => !x.Line.TrimStart().StartsWith("//", StringComparison.Ordinal) && EfSet().IsMatch(x.Line))).ToList();
+        var uses = Sources().SelectMany(f => StripComments(File.ReadAllText(f)).Split('\n').Select((l, i) => (File: Rel(f), Line: l, No: i + 1)).Where(x => EfSet().IsMatch(x.Line))).ToList();
 
         // the one door (EvidenceRuns) and the model registration; any other use of a set of these tables is a new reader without the fence
         uses.Where(u => u.File.EndsWith("RunStore.Read.cs", StringComparison.Ordinal)).Select(u => u.Line.Trim()).ShouldBe(["private IQueryable<SimRunRow> EvidenceRuns() => db.SimRuns.AsNoTracking().Where(x => x.Purpose == RunPurposes.ResearchText);"]);
@@ -123,6 +129,19 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
     }
 
     [Fact]
+    public void No_source_names_a_run_table_without_its_schema_or_with_an_interpolated_schema()
+    {
+        var bare = new Regex(@"(?<![\w.])sim_(runs|trades|trade_legs|trade_leg_charges)\b", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
+        var interpolated = new Regex(@"\{[^}]+\}\s*\.\s*""?sim_(runs|trades|trade_legs|trade_leg_charges)|Schemas\.Research\s*\+", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
+        foreach (var file in Sources().Where(f => !NotEvidenceReads.Contains(Rel(f)) && !Rel(f).EndsWith("RunStore.Legs.cs", StringComparison.Ordinal) /* the leg tables are named by a variable there and found by the concatenation rule */ && !Rel(f).Contains("/Persistence/Configurations/", StringComparison.Ordinal)))
+        {
+            var code = StripComments(File.ReadAllText(file));
+            bare.IsMatch(code).ShouldBeFalse($"{Rel(file)} names a run table without a schema; the pin cannot see it (ADR 0243)");
+            interpolated.IsMatch(code).ShouldBeFalse($"{Rel(file)} builds a run table name from an interpolated schema; the pin cannot see it (ADR 0243)");
+        }
+    }
+
+    [Fact]
     public void A_migration_that_redefines_an_evidence_view_keeps_the_fence()
     {
         var migrations = Directory.EnumerateFiles(Path.Combine(Src, "XDrishti.Infrastructure", "Persistence", "Migrations"), "2*.cs")
@@ -132,19 +151,51 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
         var fenceAt = migrations.FindIndex(f => Path.GetFileName(f).Contains("AddSimRunPurpose", StringComparison.Ordinal));
         fenceAt.ShouldBeGreaterThan(0);
 
-        var views = new (string View, string Fence)[] { ("aiv.sim_runs", "purpose = 'research'"), ("aiv.sim_trades", "purpose = 'research'"), ("aiv.sim_trade_legs", "purpose = 'research'"), ("aiv.test_ledger", "trial_kind AS trial_kind") };
+        var viewStatement = new Regex(@"CREATE\s+(OR\s+REPLACE\s+)?(MATERIALIZED\s+)?VIEW\s+(?<name>[\w.]+)", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
+        var runTables = new Regex(@"sim_(runs|trades|trade_legs|trade_leg_charges)\b", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
+        var checkedViews = 0;
         foreach (var file in migrations.Skip(fenceAt))
         {
             var text = File.ReadAllText(file);
-            foreach (var (view, fence) in views)
+            if (file.Contains("AddSimRunPurpose", StringComparison.Ordinal))
             {
-                if (Regex.IsMatch(text, @"CREATE\s+(OR\s+REPLACE\s+)?VIEW\s+" + Regex.Escape(view) + @"\b", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2)) && !file.Contains("AddSimRunPurpose", StringComparison.Ordinal))
+                text = text[..text.IndexOf("protected override void Down", StringComparison.Ordinal)]; // Up only: Down restores the old views on purpose
+            }
+
+            // each CREATE VIEW statement is checked on its own: a fence elsewhere in the file does not count
+            foreach (var chunk in text.Split("migrationBuilder.Sql(").Skip(1))
+            {
+                var statement = StripComments(chunk.Split("\"\"\");")[0]);
+                if (viewStatement.Match(statement) is not { Success: true } view)
                 {
-                    text.ShouldContain(fence, Case.Sensitive, $"{Path.GetFileName(file)} defines {view} without the training fence (ADR 0243)");
+                    continue;
+                }
+
+                if (runTables.IsMatch(statement))
+                {
+                    HasFence(statement).ShouldBeTrue($"{Path.GetFileName(file)} defines {view.Groups["name"].Value} over the run tables without the training fence (ADR 0243)");
+                    checkedViews++;
+                }
+                else if (view.Groups["name"].Value.Equals("aiv.test_ledger", StringComparison.OrdinalIgnoreCase))
+                {
+                    statement.ShouldContain("trial_kind AS trial_kind", Case.Sensitive, $"{Path.GetFileName(file)} defines aiv.test_ledger without the kind column");
+                    checkedViews++;
                 }
             }
         }
+
+        checkedViews.ShouldBe(4);
     }
+
+    [Theory]
+    [InlineData("SELECT 1 FROM research.sim_runs r WHERE r.purpose = 'research'", true)]
+    [InlineData("SELECT 1 FROM research.sim_runs r WHERE x = 1 AND purpose = 'research' ORDER BY id", true)]
+    [InlineData("SELECT 1 FROM research.sim_runs r WHERE x = 1 OR purpose = 'research'", false)]
+    [InlineData("SELECT 1 FROM research.sim_runs r -- purpose = 'research'", false)]
+    [InlineData("db.SimRuns.Where(x => x.Purpose == RunPurposes.ResearchText)", true)]
+    [InlineData("db.SimRuns.Where(x => x.Purpose == RunPurposes.ResearchText || x.Id > 0)", false)]
+    public void The_fence_check_accepts_only_a_conjunct_predicate_outside_comments(string statement, bool fenced) =>
+        HasFence(StripComments(statement)).ShouldBe(fenced);
 
     [Fact]
     public void The_training_window_has_no_order_path_and_no_reference_to_the_execution_service()
@@ -162,6 +213,6 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
         // the purpose is chosen only where a RunToStore or RunHeader is made for training; today nothing does (AU-12 will), so no source outside the model names Training
         var users = Sources().Where(f => File.ReadAllText(f).Contains("RunPurpose.Training", StringComparison.Ordinal)).Select(Path.GetFileName).Order(StringComparer.Ordinal).ToList();
 
-        users.ShouldBe(["RunAssembler.cs", "RunPurposes.cs", "RunStore.Write.cs"]);
+        users.ShouldBe(["RunAssembler.cs", "RunPurposes.cs", "RunStore.Write.cs", "RunToStore.cs"]);
     }
 }

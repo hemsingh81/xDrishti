@@ -61,7 +61,8 @@ public static class RunAssembler
             TotalsOf(records),
             header.Costs,
             header.Events,
-            header.ResultsDays);
+            header.ResultsDays,
+            header.Purpose == RunPurpose.Training);
     }
 
     /// <summary>

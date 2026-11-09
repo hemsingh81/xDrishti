@@ -54,7 +54,7 @@ public sealed class RunRecordSchemaTests
 
         snapshot.ShouldBe(
         [
-            "SimulationRun: SchemaVersion, RunKey, EngineVersion, Strategy, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, CalendarExceptions, Instruments, Trades, OpenAtEnd, Totals, Costs, EventFilter, ResultsDays",
+            "SimulationRun: SchemaVersion, RunKey, EngineVersion, Strategy, From, To, Options, AcknowledgeCsvAdjusted, Fills, Universe, CalendarExceptions, Instruments, Trades, OpenAtEnd, Totals, Costs, EventFilter, ResultsDays, IsTraining",
             "StrategyRecord: Id, Parameters, DefinitionJson, DefinitionSha256, EvaluationTimeframe, Sides",
             "UniverseRecord: Kind, BasketId, BasketName, Label, Members",
             "UniverseMember: Id, Symbol",

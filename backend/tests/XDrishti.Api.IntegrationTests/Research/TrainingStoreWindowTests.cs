@@ -2,7 +2,6 @@ using Microsoft.Extensions.DependencyInjection;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
-using XDrishti.Domain.Research;
 
 namespace XDrishti.Api.IntegrationTests.Research;
 
@@ -17,8 +16,8 @@ public sealed class TrainingStoreWindowTests(ApiFactory factory)
     private static async Task<Result<StoreOutcome>> StoreAsync(ScratchDatabase scratch, DateOnly to)
     {
         using var scope = scratch.Host.Services.CreateScope();
-        var run = StoredRunFixtures.Run(to: to);
-        return await scope.ServiceProvider.GetRequiredService<IRunStore>().StoreAsync(StoreKit.ToStore(run) with { Purpose = RunPurpose.Training }, Ct);
+        var run = StoredRunFixtures.Run(to: to) with { IsTraining = true };
+        return await scope.ServiceProvider.GetRequiredService<IRunStore>().StoreAsync(StoreKit.ToStore(run), Ct);
     }
 
     [Fact]
