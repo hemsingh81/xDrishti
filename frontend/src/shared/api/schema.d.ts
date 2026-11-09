@@ -38,6 +38,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/settings/essentials': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The five Essential settings with value, default, whether it is the default, who changed it and when, and whether Reset to default works here (risk.profile has no single default) */
+    get: operations['GetEssentialSettings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/settings/essentials/{key}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Turn Failure notices (notices.failure) on or off as the owner. Turning it OFF needs the password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 409 settings.not_here for any other key */
+    put: operations['ChangeEssentialSetting'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/settings/essentials/{key}/reset': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Put an Essential setting back to its default as the owner, with a fresh password for this act. 404 settings.not_found, 409 settings.reset_not_single for risk.profile */
+    post: operations['ResetEssentialSetting'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/auth/login': {
     parameters: {
       query?: never;
@@ -6090,6 +6141,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/settings/learned': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The learned changes of settings (newest first) with the Auto switch, the weekly cap and what it has used, the allow-list, and for each change whether approving or undoing it needs the owner's password */
+    get: operations['GetLearnedSettingChanges'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/settings/learned/{id}/approve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Apply a proposed change as the owner. A loosening needs the password in the body (403 auth.step_up_required without it, 401 auth.invalid_credentials, 423 auth.locked); a tightening needs only the session. 404 learned.not_found, 409 learned.wrong_state or learned.stale, 422-class learned.config_invalid when the whole configuration with it would be invalid */
+    post: operations['ApproveLearnedSettingChange'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/settings/learned/{id}/dismiss': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Set a proposed change aside as the owner (the safe direction: no password). 404 learned.not_found, 409 learned.wrong_state */
+    post: operations['DismissLearnedSettingChange'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/settings/learned/{id}/undo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Undo an applied change in one step. Undoing a tightening is a loosening: it needs the password in the body, at any Auto state. 404 learned.not_found, 409 learned.wrong_state or learned.stale, 403 auth.step_up_required */
+    post: operations['UndoLearnedSettingChange'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7938,6 +8057,11 @@ export interface components {
       /** @description Why, 1 to 500 characters. */
       reason: null | string;
       /** @description The owner's password, re-entered for THIS act. */
+      password: null | string;
+    };
+    /** @description The body of a change to the Failure notices setting: on or off, and the password (needed to turn it OFF). */
+    ChangeEssentialRequest: {
+      on: boolean;
       password: null | string;
     };
     /** @description The body of a change of the live switches (spec P11-04). Both default OFF. */
@@ -11111,6 +11235,22 @@ export interface components {
       /** @description The evidence of the report. */
       evidence: components['schemas']['ReportEvidenceView'];
     };
+    /** @description `Value` and `Default` are plain text (null when not known here); `IsDefault` is true when no row exists or it equals the default; `ChangedBy` and `ChangedAt` are null while never changed (or not recorded); `CanReset` and `ResetNote` say whether Reset to default works here. */
+    EssentialSettingView: {
+      key: string;
+      label: string;
+      value: null | string;
+      default: null | string;
+      isDefault: boolean;
+      changedBy: null | string;
+      /** Format: date-time */
+      changedAt: null | string;
+      canReset: boolean;
+      resetNote: null | string;
+    };
+    EssentialSettingsView: {
+      items: components['schemas']['EssentialSettingView'][];
+    };
     /** @description One stored case repeat. The answer is fixture data only. */
     EvalCaseView: {
       set: string;
@@ -13933,6 +14073,58 @@ export interface components {
        * @description The newest session of the run.
        */
       sessionDate: string;
+    };
+    /** @description An allow-listed key with its label, its safer direction and the bounds. */
+    LearnedAllowedSetting: {
+      key: string;
+      label: string;
+      safer: string;
+      range: null | components['schemas']['SettingRange'];
+    };
+    /**
+     * @description One change. `Direction` is tighten or loosen. `State` is proposed, applied, dismissed or undone. `DecidedBy` is `auto` (never shown as an owner approval) or `owner:&lt;e-mail&gt;`. `ApproveNeedsPassword` is true for a loosening;
+     *     `CanUndo` is true for an applied change and `UndoNeedsPassword` says whether the undo loosens (undoing a tightening always does).
+     */
+    LearnedChangeView: {
+      /** Format: int64 */
+      id: number;
+      key: string;
+      label: string;
+      oldValue: string;
+      newValue: string;
+      direction: string;
+      source: string;
+      state: string;
+      decidedBy: null | string;
+      /** Format: date-time */
+      decidedAt: null | string;
+      undoneBy: null | string;
+      /** Format: date-time */
+      undoneAt: null | string;
+      evidenceRef: string;
+      snapshotHash: string;
+      /** Format: int64 */
+      undoOf: null | number;
+      /** Format: date-time */
+      createdAt: string;
+      approveNeedsPassword: boolean;
+      canUndo: boolean;
+      undoNeedsPassword: boolean;
+    };
+    /** @description `AutoOn`: the Auto switch (OFF by default). `WeeklyCap` and `AutoAppliedThisWeek`: the guardrail and what it has used in the trailing 7 days. `TakesEffect`: when an applied change is read by the host. `Allowlist`: the keys learning may touch. */
+    LearnedChangesView: {
+      autoOn: boolean;
+      /** Format: int32 */
+      weeklyCap: number;
+      /** Format: int32 */
+      autoAppliedThisWeek: number;
+      takesEffect: string;
+      allowlist: components['schemas']['LearnedAllowedSetting'][];
+      items: components['schemas']['LearnedChangeView'][];
+    };
+    /** @description The body of an approve or an undo: the owner's password, re-entered for THIS act. Needed when the act loosens a gate (a loosening proposal, and any undo of a tightening); ignored otherwise. The owner is never part of the body. */
+    LearnedPasswordRequest: {
+      password: null | string;
     };
     /** @description What the Learning screen needs first (P6-18, ADR 0080): counts and the newest verdicts of the stored learning records. Read from the stores; no statistic is computed and no model is scored. */
     LearningOverviewView: {
@@ -19721,6 +19913,10 @@ export interface components {
        */
       warmMs: null | number;
     };
+    /** @description The body of a reset: the owner's password, re-entered for THIS act. */
+    ResetEssentialRequest: {
+      password: null | string;
+    };
     /** @description The owner's resolution of a break: `accept_broker` or `dismiss_foreign` (a foreign conflict only), an optional note of at most 300 characters and the password, checked afresh for this act. */
     ResolveBreakRequest: {
       resolution: null | string;
@@ -22709,6 +22905,132 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SettingsCatalogResponse'];
+        };
+      };
+    };
+  };
+  GetEssentialSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EssentialSettingsView'];
+        };
+      };
+    };
+  };
+  ChangeEssentialSetting: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangeEssentialRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EssentialSettingView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ResetEssentialSetting: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResetEssentialRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EssentialSettingView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };
@@ -37750,6 +38072,181 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLearnedSettingChanges: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LearnedChangesView'];
+        };
+      };
+    };
+  };
+  ApproveLearnedSettingChange: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['LearnedPasswordRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LearnedChangeView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DismissLearnedSettingChange: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LearnedChangeView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UndoLearnedSettingChange: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['LearnedPasswordRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LearnedChangeView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

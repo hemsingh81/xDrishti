@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
-import { buildCatalogItem } from '@/test/settingsCatalogFixtures';
+import { buildEssential, buildEssentials } from '@/test/settingsFixtures';
 import { SettingsPage } from './components/SettingsPage';
 
 function renderSettings(path = '/settings') {
@@ -22,7 +22,7 @@ describe('Settings page', () => {
     expect(screen.queryByText('Promote models automatically')).not.toBeInTheDocument();
     expect(screen.queryByText('Capital for grading')).not.toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
-    for (const role of ['checkbox', 'switch', 'button', 'textbox']) {
+    for (const role of ['checkbox', 'switch', 'textbox']) {
       expect(within(list).queryByRole(role)).not.toBeInTheDocument();
     }
     expect(within(list).getByRole('link', { name: 'Open risk profiles' })).toHaveAttribute(
@@ -34,7 +34,12 @@ describe('Settings page', () => {
       '/settings?tab=charge-sheet',
     );
     expect(within(list).getAllByText(/Not changeable here yet/)).toHaveLength(2);
-    expect(within(list).getByText(/Always on/)).toBeInTheDocument();
+    expect(
+      within(list)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['Turn off failure notices']);
+    expect(within(list).getByText(/no single default/)).toBeInTheDocument();
   });
 
   it('opens the matching tab from an essential link', async () => {
@@ -48,7 +53,7 @@ describe('Settings page', () => {
 
   it('keeps Advanced settings usable when the catalog cannot be read', async () => {
     server.use(
-      http.get('/api/settings/catalog', () => HttpResponse.json({ title: 'Service unavailable' }, { status: 503 })),
+      http.get('/api/settings/essentials', () => HttpResponse.json({ title: 'Service unavailable' }, { status: 503 })),
     );
     renderSettings();
 
@@ -59,11 +64,17 @@ describe('Settings page', () => {
 
   it('marks a value as default or changed', async () => {
     server.use(
-      http.get('/api/settings/catalog', () =>
+      http.get('/api/settings/essentials', () =>
         HttpResponse.json({
           items: [
-            buildCatalogItem({ key: 'notices.failure', label: 'Failure notices', value: 'false', default: 'true' }),
-            buildCatalogItem({ key: 'auto.enabled', label: 'Auto', value: 'false', default: 'false' }),
+            buildEssential({
+              key: 'notices.failure',
+              label: 'Failure notices',
+              value: 'false',
+              default: 'true',
+              isDefault: false,
+            }),
+            buildEssential({ key: 'auto.enabled', label: 'Auto', value: 'false', default: 'false' }),
           ],
         }),
       ),
@@ -74,14 +85,40 @@ describe('Settings page', () => {
     expect(screen.getByText('Off · default')).toBeInTheDocument();
   });
 
+  it('shows who changed a value and when, from the server', async () => {
+    server.use(
+      http.get('/api/settings/essentials', () =>
+        HttpResponse.json({
+          items: [
+            ...buildEssentials().items.filter((i) => i.key !== 'notices.failure'),
+            buildEssential({
+              key: 'notices.failure',
+              label: 'Failure notices',
+              value: 'false',
+              default: 'true',
+              isDefault: false,
+              changedBy: 'owner@example.com',
+              changedAt: '2026-11-09T05:00:00Z',
+              canReset: true,
+            }),
+          ],
+        }),
+      ),
+    );
+    renderSettings();
+
+    expect(await screen.findByText(/Changed by owner@example.com · 9 Nov 2026, 10:30 IST/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reset Failure notices to default' })).toBeInTheDocument();
+  });
+
   it('says so while loading, when empty and when the catalog fails', async () => {
-    server.use(http.get('/api/settings/catalog', () => HttpResponse.json({ items: [] })));
+    server.use(http.get('/api/settings/essentials', () => HttpResponse.json({ items: [] })));
     const first = renderSettings();
     expect(await screen.findByText('No settings to show yet.')).toBeInTheDocument();
     first.unmount();
 
     server.use(
-      http.get('/api/settings/catalog', () => HttpResponse.json({ title: 'Service unavailable' }, { status: 503 })),
+      http.get('/api/settings/essentials', () => HttpResponse.json({ title: 'Service unavailable' }, { status: 503 })),
     );
     renderSettings();
     expect(screen.getByRole('status')).toHaveTextContent('Loading your settings');

@@ -379,6 +379,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, BriefingService>(); // the daily briefing text after the suggestions (P9-06); starts paused, the model is used only under both switches
         services.AddSingleton<IScheduledService, WeeklyReviewService>(); // the weekly review text after the digest (P9-06); starts paused, applies nothing
         services.AddSingleton<IScheduledService, ProposalService>(); // hypothesis and basket proposals after the digest (P9-08); starts paused, off unless Assistant:Proposals:Enabled and the master switch are on
+        services.AddSingleton<IScheduledService, LearnedSettings.LearnedSettingsService>(); // learned setting changes after the digest (AU-10); starts paused, applies a tightening only with Auto ON, a loosening never
         services.AddSingleton<IScheduledService, PaperReviewService>(); // the weekly paper review (P10-03); starts paused, builds and stores one text per week and epoch, applies nothing
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<IScheduledService, DepthRecorderService>(); // the depth recorder (P7-16): shown and edited here, run by xd-feed; starts paused, Run now is refused

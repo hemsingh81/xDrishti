@@ -74,6 +74,7 @@ internal static class ApiSetup
         // Endpoint modules are registered explicitly — one line per feature module.
         services.AddSingleton<IEndpointModule, SystemEndpoints>();
         services.AddSingleton<IEndpointModule, SettingsEndpoints>(); // the settings catalog (AU-08, ADR 0242)
+        services.AddSingleton<IEndpointModule, EssentialSettingsEndpoints>(); // the Essential settings with who/when and Reset to default (AU-10)
         services.AddSingleton<Application.Abstractions.SettingsCatalog.ISettingsCatalogSource, Settings.SettingsCatalogSource>();
         services.AddSettingsCatalogHandler(); // registered with its source, in the Api only
         services.AddSingleton<IEndpointModule, AuthEndpoints>();
@@ -234,6 +235,17 @@ internal static class ApiSetup
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToReadinessOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToRegistrationOptions()));
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<ConfidenceSettings>>().Value.ToHoldOutOptions()));
+
+        // Learned changes (AU-10, ADR 0242, ADR 0247): the guardrails, the applied values laid over the Confidence options at start (each one only if the options stay valid), and the handlers that need the Confidence settings of this host.
+        services.AddOptions<Application.LearnedSettings.LearnedSettingsOptions>()
+            .BindConfiguration(Application.LearnedSettings.LearnedSettingsOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<Application.LearnedSettings.LearnedSettingsOptions>>().Value);
+        services.AddSingleton<IPostConfigureOptions<ConfidenceSettings>, Settings.LearnedOverridesPostConfigure>();
+        services.AddSingleton<Application.Abstractions.LearnedSettings.ILearnedConfig, Settings.LearnedConfig>();
+        Application.LearnedSettings.LearnedSettingsRegistration.AddLearnedSettingsHandlers(services);
+        services.AddSingleton<IEndpointModule, LearnedSettingsEndpoints>();
     }
 
     /// <summary>

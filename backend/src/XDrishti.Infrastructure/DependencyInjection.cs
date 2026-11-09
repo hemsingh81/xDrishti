@@ -226,6 +226,10 @@ public static class DependencyInjection
         services.AddScoped<KillProposals>(); // confidence.kill_proposals: insert, and one conditional update of the decision columns (CF-12 part 12b, ADR 0219)
         services.AddScoped<IKillProposalReader>(sp => sp.GetRequiredService<KillProposals>());
         services.AddScoped<IKillProposalStore>(sp => sp.GetRequiredService<KillProposals>());
+        services.AddScoped<XDrishti.Application.Abstractions.LearnedSettings.ILearnedSettingStore, LearnedSettings.LearnedSettingChanges>(); // config.learned_setting_changes: insert and the state column only (AU-10, ADR 0247)
+        services.AddSingleton<XDrishti.Application.Abstractions.LearnedSettings.ILearnedOverrideSource, LearnedSettings.LearnedSettingChanges>(); // the same table read once while the host builds its options; never throws
+        services.AddScoped<XDrishti.Application.Abstractions.LearnedSettings.IAutoSwitch, LearnedSettings.AutoSwitch>(); // auto.enabled in platform.app_settings: no row is OFF
+        services.AddScoped<XDrishti.Application.Abstractions.SettingsCatalog.IEssentialSettingStore, LearnedSettings.EssentialSettingStore>(); // the Essential settings that are one text in platform.app_settings (AU-10)
         services.AddScoped<KillSettings>(); // confidence.kill.auto: the newest row of confidence.kill_settings, OFF when none (CF-12 part 12b)
         services.AddScoped<IKillSettings>(sp => sp.GetRequiredService<KillSettings>());
         services.AddScoped<IKillSwitchStore>(sp => sp.GetRequiredService<KillSettings>());

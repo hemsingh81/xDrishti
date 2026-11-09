@@ -9,6 +9,8 @@ import { ActionThresholdsCard } from './ActionThresholdsCard';
 const ChargeSheetCard = lazy(() => import('./ChargeSheetCard'));
 // The event-risk filter's switch card (P15-11) loads on demand too.
 const EventFilterCard = lazy(() => import('./EventFilterCard'));
+// The learned changes panel (AU-10) loads on demand too.
+const LearnedChangesPanel = lazy(() => import('./LearnedChangesPanel'));
 
 const settingsTabs = [
   { key: 'profiles', label: 'Risk profiles' },
@@ -16,6 +18,7 @@ const settingsTabs = [
   { key: 'actions', label: 'Action center' },
   { key: 'charge-sheet', label: 'Charge sheet' },
   { key: 'selection', label: 'Selection' },
+  { key: 'learned', label: 'Learned changes' },
 ] as const;
 
 type SettingsTab = (typeof settingsTabs)[number]['key'];
@@ -77,6 +80,14 @@ export function AdvancedSettings() {
             failed={<ReloadAlert label="The event filter" />}
           >
             <EventFilterCard />
+          </LazyBoundary>
+        )}
+        {tab === 'learned' && (
+          <LazyBoundary
+            pending={<LoadingState label="Loading learned changes" />}
+            failed={<ReloadAlert label="Learned changes" />}
+          >
+            <LearnedChangesPanel />
           </LazyBoundary>
         )}
       </Box>
