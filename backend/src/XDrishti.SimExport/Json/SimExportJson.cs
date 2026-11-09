@@ -26,13 +26,13 @@ public static class SimExportJson
 
     private static readonly JsonSerializerOptions RecordOptions = new(SimExportJsonContext.Default.Options)
     {
-        TypeInfoResolver = SimExportJsonContext.Default.WithAddedModifier(WithoutTrades).WithAddedModifier(WithoutZeroTierExcluded),
+        TypeInfoResolver = SimExportJsonContext.Default.WithAddedModifier(WithoutTrades).WithAddedModifier(WithoutZeroTierExcluded).WithAddedModifier(WithoutTrainingFlag),
     };
 
     /// <summary>The export options: the context's, with the counter of CF-05 left out while it is 0.</summary>
     private static readonly JsonSerializerOptions ExportOptions = new(SimExportJsonContext.Default.Options)
     {
-        TypeInfoResolver = SimExportJsonContext.Default.WithAddedModifier(WithoutZeroTierExcluded),
+        TypeInfoResolver = SimExportJsonContext.Default.WithAddedModifier(WithoutZeroTierExcluded).WithAddedModifier(WithoutTrainingFlag),
     };
 
     /// <summary>Writes <c>run.json</c> to the sink.</summary>
@@ -86,6 +86,25 @@ public static class SimExportJson
         foreach (var property in typeInfo.Properties.Where(p => (string.Equals(p.Name, "tier_excluded", StringComparison.Ordinal) || string.Equals(p.Name, "turnover_blocked", StringComparison.Ordinal))))
         {
             property.ShouldSerialize = static (_, value) => value is not 0L;
+        }
+    }
+
+    /// <summary>
+    /// AU-11 (ADR 0243): <c>IsTraining</c> says why a run exists and is carried to the store beside the record, never in it, so the record text and hash of every run are as before. Kept out here so the Domain type stays free of serializer attributes.
+    /// </summary>
+    private static void WithoutTrainingFlag(JsonTypeInfo typeInfo)
+    {
+        if (typeInfo.Type != typeof(SimulationRun))
+        {
+            return;
+        }
+
+        for (var i = typeInfo.Properties.Count - 1; i >= 0; i--)
+        {
+            if (string.Equals(typeInfo.Properties[i].Name.Replace("_", string.Empty, StringComparison.Ordinal), "istraining", StringComparison.OrdinalIgnoreCase))
+            {
+                typeInfo.Properties.RemoveAt(i);
+            }
         }
     }
 
