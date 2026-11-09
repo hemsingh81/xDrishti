@@ -229,6 +229,4 @@ internal sealed class AiSqlRunner(AiDataSources sources) : IAiSqlRunner
 
         await connection.DisposeAsync();
     }
-
-    private static string Short(string text) => text.Length <= 200 ? text : text[..200] + "…";
 }

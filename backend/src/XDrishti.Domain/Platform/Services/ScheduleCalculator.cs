@@ -14,9 +14,6 @@ public static class ScheduleCalculator
     /// <summary>How far ahead (or back) the search for a date that fires goes: a calendar full of holidays must not loop for ever.</summary>
     private const int SearchDays = 400;
 
-    /// <summary>A weekly run missed within this long is still made up for.</summary>
-    private static readonly TimeSpan WeeklyReach = TimeSpan.FromHours(24);
-
     /// <summary>The instants the schedule fires on the India date, in order. A window has one (its start), an interval every step from its start up to and including its end.</summary>
     public static IReadOnlyList<DateTimeOffset> OccurrencesOn(Schedule schedule, DateOnly date, TradingCalendar calendar, bool notBeforeSessionEnd = false)
     {

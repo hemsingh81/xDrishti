@@ -286,6 +286,4 @@ public static class ProtocolF
     private static string Fmt(double? v) => v is { } x ? x.ToString("F4", CultureInfo.InvariantCulture) : "unavailable";
 
     private static string Share(double v) => double.IsFinite(v) ? (100 * v).ToString("F1", CultureInfo.InvariantCulture) + " %" : "unavailable";
-
-    private static string Share(double? v) => v is { } x ? (100 * x).ToString("F1", CultureInfo.InvariantCulture) + " %" : "unavailable";
 }

@@ -21,14 +21,14 @@ Names reached only by reflection or DI (EF `*Configuration`, registration extens
 ### Certain (nothing reaches them, no spec or design mentions them)
 | # | Item | Evidence | Spec/design hits | Slice |
 |---|------|----------|------------------|-------|
-| 1 | `BarGrid.LastOnDate` (`Domain/Options/Remark/BarGrid.cs`) | name scan: 1 hit, no test | 0 | AU-06 A |
-| 2 | `EodErrors.FetchFailed` and `FetchFailedCode` (`Application/Market/Eod/EodErrors.cs`) | name scan, no test; the live code is `DataErrors.RepairFetchFailedCode` | 0 | AU-06 A |
-| 3 | `DataLog.EodCrashed` (`Application/Market/Bars/DataLog.cs`) | name scan: log message with no caller; leftover | 0 | AU-06 A |
-| 4 | `ProposalAnswerReader.Clip` (private) | IDE0051 | 0 | AU-06 A |
-| 5 | `ProtocolF.Share(double?)` overload (private, line 290) | IDE0051 | 0 | AU-06 A |
-| 6 | `AiSqlRunner.Short` (private) | IDE0051 | 0 | AU-06 A |
-| 7 | `ScheduleCalculator.WeeklyReach` (private field) | IDE0052 | 0 | AU-06 A |
-| 8 | `LegState._t1Epoch` (private field, written never read) | IDE0052 | 0 | AU-06 A |
+| 1 | `BarGrid.LastOnDate` (`Domain/Options/Remark/BarGrid.cs`) | name scan: 1 hit, no test | 0 | AU-06 A, done |
+| 2 | `EodErrors.FetchFailed` and `FetchFailedCode` (`Application/Market/Eod/EodErrors.cs`) | name scan, no test; the live code is `DataErrors.RepairFetchFailedCode` | 0 | AU-06 A, done |
+| 3 | `DataLog.EodCrashed` (`Application/Market/Bars/DataLog.cs`) | name scan: log message with no caller; leftover | 0 | AU-06 A, done |
+| 4 | `ProposalAnswerReader.Clip` (private) | IDE0051 | 0 | AU-06 A, done |
+| 5 | `ProtocolF.Share(double?)` overload (private, line 290) | IDE0051 | 0 | AU-06 A, done |
+| 6 | `AiSqlRunner.Short` (private) | IDE0051 | 0 | AU-06 A, done |
+| 7 | `ScheduleCalculator.WeeklyReach` (private field) | IDE0052 | 0 | AU-06 A, done |
+| 8 | `LegState._t1Epoch` (private field, written never read) | IDE0052 | 0 | AU-06 A, done |
 | 9 | `daysBetween` (`frontend/src/features/live/lib/dates.ts`) | import/name scan, no test | 0 | AU-07 A |
 | 10 | `isReplayTimeframe` (`features/reports/lib/replayModel.ts`) | same | 0 | AU-07 A |
 | 11 | `MAX_PIVOT_CELLS` (`features/reports/lib/pivotLimits.ts`; delete the file if it holds nothing else) | same | 0 | AU-07 A |
