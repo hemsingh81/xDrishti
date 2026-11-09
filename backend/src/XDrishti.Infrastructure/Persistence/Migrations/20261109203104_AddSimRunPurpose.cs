@@ -6,7 +6,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 {
     /// <summary>
     /// Spec AU-11, ADR 0243: <c>research.sim_runs.purpose</c> (<c>research</c> default, so every existing run reads as research and no report changes; <c>training</c> for bulk simulation), a partial index for training runs, the ledger kind
-    /// <c>training_sweep</c>, and the three AI read views now show research runs only. Down refuses while a training run exists (dropping the column would turn it into evidence) and removes the training_sweep ledger rows the old check refuses.
+    /// <c>training_sweep</c>, and the three AI read views now show research runs only. Down refuses while a training run exists (dropping the column would turn it into evidence) and likewise while a training_sweep ledger row exists (the ledger is the honest count).
     /// </summary>
     public partial class AddSimRunPurpose : Migration
     {
@@ -145,9 +145,9 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         t.window_from AS window_from,
                         t.window_to AS window_to,
                         t.method AS method,
-                        t.created_at AS created_at
+                        t.created_at AS created_at,
+                        t.trial_kind AS trial_kind
                     FROM lab.test_ledger t LEFT JOIN lab.lab_runs r ON r.id = t.lab_run_id
-                    WHERE t.trial_kind <> 'training_sweep'
                 """);
         }
 
@@ -168,14 +168,17 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     IF EXISTS (SELECT 1 FROM research.sim_runs WHERE purpose = 'training') THEN
                         RAISE EXCEPTION 'Training runs exist; removing the purpose column would turn them into evidence. Delete them first.';
                     END IF;
+                    IF EXISTS (SELECT 1 FROM lab.test_ledger WHERE trial_kind = 'training_sweep') THEN
+                        RAISE EXCEPTION 'Training sweep ledger rows exist; the ledger is the honest count and is not deleted by a down migration. Remove them deliberately first.';
+                    END IF;
                 END $$;
                 """);
 
-            migrationBuilder.Sql("DELETE FROM lab.test_ledger WHERE trial_kind = 'training_sweep';");
 
+            migrationBuilder.Sql("DROP VIEW aiv.test_ledger");
 
             migrationBuilder.Sql("""
-                CREATE OR REPLACE VIEW aiv.test_ledger AS
+                CREATE VIEW aiv.test_ledger AS
                     SELECT
                         t.strategy_id AS strategy_id,
                         t.version AS version,

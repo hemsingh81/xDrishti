@@ -32,6 +32,12 @@ internal sealed partial class RunStore
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
+            if (run.Purpose == RunPurpose.Training && await TrainingWindowProblemAsync(connection, transaction, run, cancellationToken) is { } refusal)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return Result.Failure<StoreOutcome>(StoreErrors.TrainingWindowRefused(refusal));
+            }
+
             long? id;
             await using (var insert = new NpgsqlCommand(InsertRun, connection, transaction))
             {
@@ -86,6 +92,26 @@ internal sealed partial class RunStore
         failure.SqlState == PostgresErrorCodes.UndefinedTable || failure.SqlState == PostgresErrorCodes.InvalidSchemaName
             ? "The result store tables do not exist: the migration AddResearchResultStore has not been applied (deploy/xd-up.sh applies it). Nothing was stored."
             : $"The database refused the write (SQLSTATE {failure.SqlState}{(failure.ConstraintName is { } name ? ", constraint " + name : string.Empty)}); nothing was stored.";
+
+    /// <summary>
+    /// The last gate of a training run, inside the write transaction and independent of any caller: the stored block must exist and the window must end at least the embargo before its start. Returns the reason, or null when the window is clear.
+    /// </summary>
+    private async Task<string?> TrainingWindowProblemAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, RunToStore run, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("SELECT start_date FROM lab.holdout_blocks ORDER BY created_at ASC, id ASC LIMIT 1", connection, transaction);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return "No hold-out block is stored, so a training run cannot be kept clear of it; nothing was stored.";
+        }
+
+        var start = reader.GetFieldValue<DateOnly>(0);
+
+        var latest = start.AddDays(-1 - holdOut.TrainingEmbargoDays);
+        return run.Run.To > latest || run.Run.From > latest
+            ? $"The training window reaches the hold-out block (starts {start:yyyy-MM-dd}) or its {holdOut.TrainingEmbargoDays}-day embargo; it must end on or before {latest:yyyy-MM-dd}. Nothing was stored."
+            : null;
+    }
 
     private static void BindHeader(NpgsqlCommand command, RunToStore store)
     {

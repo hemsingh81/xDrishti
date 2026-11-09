@@ -19,4 +19,5 @@ public sealed record RunHeader(
     CostRecord? Costs = null,
     string? ContextSha256 = null,
     EventFilterRecord? Events = null,
-    ResultsDaysRecord? ResultsDays = null);
+    ResultsDaysRecord? ResultsDays = null,
+    RunPurpose Purpose = RunPurpose.Research);

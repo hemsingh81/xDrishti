@@ -36,7 +36,7 @@ public sealed class TrainingWindowResolverTests
         window.IsSuccess.ShouldBeTrue();
         var block = _store.Blocks.Single();
         window.Value.HoldOutStart.ShouldBe(block.Start);
-        window.Value.To.ShouldBe(block.Start.AddDays(-1 - 14));
+        window.Value.To.ShouldBe(block.Start.AddDays(-1 - 30));
         window.Value.From.ShouldBe(new DateOnly(2024, 10, 1));
     }
 
@@ -49,7 +49,7 @@ public sealed class TrainingWindowResolverTests
         await resolver.ResolveAsync(null, null, Ct); // fixes the block
         var start = _store.Blocks.Single().Start;
 
-        foreach (var end in new[] { start.AddDays(-14), start, start.AddDays(30) })
+        foreach (var end in new[] { start.AddDays(-30), start, start.AddDays(30) })
         {
             var result = await resolver.ResolveAsync(null, end, Ct);
 
@@ -57,7 +57,7 @@ public sealed class TrainingWindowResolverTests
             result.Error.Code.ShouldBe(LabErrors.HoldOutTouchedCode);
         }
 
-        (await resolver.ResolveAsync(null, start.AddDays(-15), Ct)).IsSuccess.ShouldBeTrue();
+        (await resolver.ResolveAsync(null, start.AddDays(-31), Ct)).IsSuccess.ShouldBeTrue();
     }
 
     [Fact]
@@ -91,10 +91,10 @@ public sealed class TrainingWindowResolverTests
     }
 
     [Theory]
-    [InlineData(6, true)]
-    [InlineData(7, false)]
-    [InlineData(90, false)]
-    [InlineData(91, true)]
+    [InlineData(27, true)]
+    [InlineData(28, false)]
+    [InlineData(180, false)]
+    [InlineData(181, true)]
     public void The_embargo_setting_is_validated_seven_to_ninety_days(int days, bool problem) =>
         new HoldOutOptions(TrainingEmbargoDays: days).Problems().Any(p => p.Contains("TrainingEmbargoDays", StringComparison.Ordinal)).ShouldBe(problem);
 }

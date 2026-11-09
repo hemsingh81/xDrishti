@@ -434,6 +434,6 @@ internal sealed class ConfidenceSettings
 
         public double Retention { get; set; } = 0.5;
 
-        public int TrainingEmbargoDays { get; set; } = 14;
+        public int TrainingEmbargoDays { get; set; } = 30;
     }
 }

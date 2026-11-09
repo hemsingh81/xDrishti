@@ -493,7 +493,7 @@ public sealed class AskYourDataDatabaseTests(ReadOnlyDatabase db) : IAsyncLifeti
         granted.Keys.Order().ShouldBe(["lab.strategies", "research.sim_comparisons", "research.sim_runs", "research.sim_trades"]);
         granted["lab.strategies"].ShouldBe(["id", "style"]);
         granted["research.sim_comparisons"].ShouldBe(["comparison_key", "member_candidate_ids", "member_run_keys"]);
-        granted["research.sim_runs"].ShouldBe(["costs_rates_sha256", "costs_sheet_id", "created_at", "created_by", "from_date", "id", "instruments", "instruments_run", "open_at_end_count", "run_key", "strategy_id", "to_date", "trade_count", "universe_kind", "universe_label"]);
+        granted["research.sim_runs"].ShouldBe(["costs_rates_sha256", "costs_sheet_id", "created_at", "created_by", "from_date", "id", "instruments", "instruments_run", "open_at_end_count", "purpose", "run_key", "strategy_id", "to_date", "trade_count", "universe_kind", "universe_label"]);
         granted["research.sim_trades"].ShouldNotContain("cost_total");
         granted["research.sim_trades"].ShouldNotContain("entry_snapshot_json");
         (await ColumnsAsync("xd_mcp_sql")).ShouldBeEmpty();

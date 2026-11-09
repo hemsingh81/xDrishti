@@ -19,7 +19,14 @@ public sealed record LedgerRow(
     string Method,
     DateTimeOffset CreatedAt,
     string TrialKind = "run",
-    int ExtraTrials = 0);
+    int ExtraTrials = 0)
+{
+    /// <summary>The trial kind of a training sweep (AU-11, ADR 0243): listed beside the looks, never counted as one and never a variant of the family.</summary>
+    public const string TrainingSweepKind = "training_sweep";
+
+    /// <summary>True for a training sweep row; evidence readers of the list skip these.</summary>
+    public bool IsTrainingSweep => string.Equals(TrialKind, TrainingSweepKind, StringComparison.Ordinal);
+}
 
 /// <summary>
 /// The per-family count of looks (spec P5-03, ADR 0059): <c>lab.test_ledger</c> behind a port. Insert-only for the runtime role; a row stays whatever happens to its run.

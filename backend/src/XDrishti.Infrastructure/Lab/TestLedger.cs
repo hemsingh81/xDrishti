@@ -49,12 +49,14 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger
                    (SELECT count(*) FROM sweeps),
                    (SELECT coalesce(sum(extra_trials), 0) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind <> 'training_sweep'),
                    (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'replan'),
-                   (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'null')
+                   (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'null'),
+                   (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep'),
+                   (SELECT coalesce(sum(extra_trials), 0) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep')
             """);
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         await reader.ReadAsync(cancellationToken);
-        return new TrialCounts((int)reader.GetInt64(0), (int)reader.GetInt64(1), (int)reader.GetInt64(2), (int)reader.GetInt64(3), (int)reader.GetInt64(4));
+        return new TrialCounts((int)reader.GetInt64(0), (int)reader.GetInt64(1), (int)reader.GetInt64(2), (int)reader.GetInt64(3), (int)reader.GetInt64(4), (int)reader.GetInt64(5), (int)reader.GetInt64(6));
     }
 
     public async ValueTask<bool> HasFullRunAsync(string strategyId, string strategyHash, CancellationToken cancellationToken)
@@ -77,7 +79,7 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger
     {
         await using var command = dataSource.CreateCommand("""
             SELECT lab_run_id, run_key, strategy_id, version, strategy_hash, parent_hash, universe_label, window_from, window_to, method, created_at, trial_kind, extra_trials
-            FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind <> 'training_sweep' ORDER BY created_at DESC, id DESC
+            FROM lab.test_ledger WHERE strategy_id = @id ORDER BY created_at DESC, id DESC
             """);
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);

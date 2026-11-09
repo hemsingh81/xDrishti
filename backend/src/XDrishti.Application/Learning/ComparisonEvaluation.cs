@@ -112,7 +112,7 @@ internal sealed class ComparisonEvaluation(
         // Ledger first: the trial is counted before the core is called; the core refuses a trial it does not find there.
         var trial = ExtensionTrial.Of(group, trainer.Candidate.Name, options, from, to);
         await writer.AppendTrialAsync(trial, data.TrainingDataId, from, to, Method, cancellationToken);
-        var hashes = (await ledger.ListAsync(family, cancellationToken)).Select(r => r.StrategyHash).ToArray();
+        var hashes = (await ledger.ListAsync(family, cancellationToken)).Where(r => !r.IsTrainingSweep).Select(r => r.StrategyHash).ToArray();
         var compared = ProtocolX.Compare(development, data.BaseWidth, group, trainer.Candidate, hashes, sessions, options);
         if (compared.IsFailure)
         {
