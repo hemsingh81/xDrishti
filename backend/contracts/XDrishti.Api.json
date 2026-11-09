@@ -26,6 +26,27 @@
         }
       }
     },
+    "/api/settings/catalog": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Every setting with its tier, value, default, range, safer direction and source",
+        "operationId": "GetSettingsCatalog",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsCatalogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/login": {
       "post": {
         "tags": [
@@ -61030,6 +61051,100 @@
         },
         "description": "The summary of one set: its outcome, its rates with intervals, and the repeat figures (`pass@1` and `stability` where they apply)."
       },
+      "SettingRange": {
+        "required": [
+          "min",
+          "max"
+        ],
+        "type": "object",
+        "properties": {
+          "min": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "max": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "SettingsCatalogItem": {
+        "required": [
+          "key",
+          "label",
+          "tier",
+          "value",
+          "default",
+          "range",
+          "safer",
+          "learnable",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "tier": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "default": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "range": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SettingRange"
+              }
+            ]
+          },
+          "safer": {
+            "type": "string"
+          },
+          "learnable": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "description": "`Tier` is Essential, Advanced or Internal; `Safer` is higher, lower or none (none loosens both ways); `Source` is default, configuration, stored or section."
+      },
+      "SettingsCatalogResponse": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SettingsCatalogItem"
+            }
+          }
+        }
+      },
       "ShadowChainView": {
         "required": [
           "sessions",
@@ -65776,6 +65891,9 @@
   "tags": [
     {
       "name": "System"
+    },
+    {
+      "name": "Settings"
     },
     {
       "name": "Auth"
