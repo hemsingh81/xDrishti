@@ -17,7 +17,7 @@ public sealed class FakeJobService : IScheduledService
         [ScheduleType.Daily, ScheduleType.Weekly, ScheduleType.After, ScheduleType.Window, ScheduleType.Interval, ScheduleType.Continuous],
         new ServiceSettings(true, Schedule.Daily(new TimeOnly(10, 0)), 0, 5, true, true, new Dictionary<string, JsonElement>()),
         [ParameterDefinition.Whole("lookback", "Look-back", 1, 30, 5)],
-        new ServiceConstraints());
+        new ServiceConstraints { RecoveryClass = RecoveryClass.LatestOnly });
 
     private TaskCompletionSource<ServiceOutcome>? _gate;
 

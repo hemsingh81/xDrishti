@@ -3,3 +3,6 @@ export const servicesRunningPollMs = 2000;
 
 /** While none runs, the list is read this often (and only while the page is visible): a scheduled start is noticed. */
 export const servicesIdlePollMs = 60_000;
+
+/** The recovery screen is read this often, only while a pass runs. */
+export const recoveryPollMs = 5000;

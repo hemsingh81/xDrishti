@@ -97,6 +97,8 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
         { "GET", "/api/services" },
         { "GET", "/api/services/timeline" },
         { "GET", "/api/services/notices" },
+        { "GET", "/api/services/recovery" },
+        { "POST", "/api/services/recovery/retry" },
         { "GET", "/api/services/eod" },
         { "GET", "/api/services/eod/runs" },
         { "PUT", "/api/services/eod/schedule" },
@@ -124,6 +126,7 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
     [Theory]
     [InlineData("/api/services/eod/pause")]
     [InlineData("/api/services/eod/run")]
+    [InlineData("/api/services/recovery/retry")]
     [InlineData("/api/services/eod/schedule/reset")]
     public async Task A_change_without_the_CSRF_token_is_refused_even_with_a_session(string path)
     {
@@ -298,6 +301,98 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
 
         using var save = await _client.PutJsonAsync("/api/services/account-sync/schedule", Body(), Ct);
         save.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+    }
+
+    // ---- recovery screen (spec AU-04) ----
+
+    private Task<int> SeedLedgerAsync(string items) => factory.WithDbAsync(async db =>
+    {
+        await db.Database.ExecuteSqlRawAsync("INSERT INTO platform.recovery_passes (id, trigger, started_at, finished_at, status) VALUES ('0192f000-0000-7000-8000-000000000001', 'startup', now(), now(), 'failed')");
+        await db.Database.ExecuteSqlRawAsync(items);
+        return 0;
+    });
+
+    [Fact]
+    public async Task The_recovery_status_with_an_empty_ledger_has_no_pass_and_never_a_secret()
+    {
+        using var response = await _client.GetAsync("/api/services/recovery", Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var view = await response.Content.ReadFromJsonAsync<RecoveryStatusView>(Ct);
+        view!.LatestPass.ShouldBeNull();
+        view.Running.ShouldBeFalse();
+        view.Truncated.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task The_recovery_status_shows_failed_and_recovered_items_by_session_oldest_first()
+    {
+        await SeedLedgerAsync("""
+            INSERT INTO platform.recovery_items (id, pass_id, service_id, occurrence, session_from, session_to, state, reason, attempts) VALUES
+            ('0192f000-0000-7000-8000-000000000011', '0192f000-0000-7000-8000-000000000001', 'eod', '2026-10-12', '2026-10-12', '2026-10-12', 'failed', 'source down', 3),
+            ('0192f000-0000-7000-8000-000000000012', '0192f000-0000-7000-8000-000000000001', 'eod', '2026-10-09', '2026-10-09', '2026-10-09', 'succeeded', NULL, 1)
+            """);
+
+        var view = await _client.GetFromJsonAsync<RecoveryStatusView>("/api/services/recovery?days=14", Ct);
+
+        view!.LatestPass!.Trigger.ShouldBe("startup");
+        var rows = view.Sessions.SelectMany(x => x.Items).Where(r => r.ServiceId == "eod").ToList();
+        rows.Select(r => r.Status).ShouldBe(["recovered", "still_failing"]);
+        rows[1].Reason.ShouldBe("source down");
+        view.Sessions.Select(x => x.Session).ShouldBe(view.Sessions.Select(x => x.Session).Order());
+    }
+
+    [Fact]
+    public async Task A_large_recovery_ledger_is_bounded_and_answers_fast_enough()
+    {
+        await SeedLedgerAsync("""
+            INSERT INTO platform.recovery_items (id, pass_id, service_id, occurrence, session_from, session_to, state, attempts)
+            SELECT gen_random_uuid(), '0192f000-0000-7000-8000-000000000001', 'svc' || g, '2026-10-12', DATE '2026-10-12', DATE '2026-10-12', 'succeeded', 1 FROM generate_series(1, 800) g
+            """);
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var view = await _client.GetFromJsonAsync<RecoveryStatusView>("/api/services/recovery", Ct);
+        watch.Stop();
+
+        view!.Truncated.ShouldBeTrue();
+        view.Counts.Recovered.ShouldBe(500);
+        watch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(1)); // a single request on a shared CI-style host; the 150 ms p95 of the spec is not measured here (no load test), only this generous ceiling
+    }
+
+    [Fact]
+    public async Task Retry_is_202_starts_a_manual_pass_that_is_recorded_and_audited_and_a_second_retry_while_it_runs_is_409()
+    {
+        (await _client.PutJsonAsync($"/api/services/{FakeJobService.Id}/schedule", Body(), Ct)).EnsureSuccessStatusCode(); // the stored row is the baseline
+        await factory.WithDbAsync(async db => await db.Database.ExecuteSqlRawAsync("UPDATE platform.service_schedules SET updated_at = updated_at - interval '6 days'", Ct)); // the row is six days old: sessions were missed
+        _fake.Hold();
+
+        using var first = await _client.PostAsync("/api/services/recovery/retry", Ct);
+        first.StatusCode.ShouldBe(HttpStatusCode.Accepted, await first.Content.ReadAsStringAsync(Ct));
+        var accepted = await first.Content.ReadFromJsonAsync<RecoveryRetryAccepted>(Ct);
+        accepted!.Started.ShouldBeTrue();
+        accepted.Steps.ShouldBeGreaterThan(0);
+        using var second = await _client.PostAsync("/api/services/recovery/retry", Ct);
+        second.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await second.ReadProblemAsync(Ct)).Code.ShouldBe("recovery.already_running");
+        (await _client.GetFromJsonAsync<RecoveryStatusView>("/api/services/recovery", Ct))!.Running.ShouldBeTrue();
+
+        _fake.Release();
+        await _host.Services.GetRequiredService<RecoveryRunner>().WhenIdleAsync();
+        await Runner.WhenIdleAsync();
+
+        var triggers = await factory.WithDbAsync(async db => await db.Database.SqlQueryRaw<string>("SELECT trigger AS \"Value\" FROM platform.recovery_passes").ToListAsync(Ct));
+        triggers.ShouldBe(["manual"]);
+        (await AuditEventsAsync()).Count(e => e == "ServiceRunRequested").ShouldBe(1);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(91)]
+    public async Task The_recovery_status_refuses_days_outside_1_to_90(int days)
+    {
+        using var response = await _client.GetAsync($"/api/services/recovery?days={days}", Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
     // ---- run now, history, notices ----

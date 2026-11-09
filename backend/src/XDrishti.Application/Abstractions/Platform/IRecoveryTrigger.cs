@@ -14,6 +14,9 @@ public enum RecoveryTrigger
 
     /// <summary>A step that waited for the market hours to end can go on.</summary>
     Resume,
+
+    /// <summary>The owner asked for a pass on the Recovery screen (not debounced).</summary>
+    Manual,
 }
 
 public static class RecoveryTriggerCodes
@@ -24,6 +27,7 @@ public static class RecoveryTriggerCodes
         RecoveryTrigger.Wake => "wake",
         RecoveryTrigger.BrokerReconnect => "broker_reconnect",
         RecoveryTrigger.Resume => "resume",
+        RecoveryTrigger.Manual => "manual",
         _ => throw new ArgumentOutOfRangeException(nameof(trigger)),
     };
 }

@@ -1530,6 +1530,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/services/recovery': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What the machine missed and what became of it (spec AU-04, ADR 0240): the latest pass, the counts (missed, recovered, stillFailing) and, per session oldest first, each service with status missed|recovered|partial|still_failing|blocked|waiting|running|not_recoverable|superseded|out_of_reach and a reason. days 1 to 90, default 14; at most 500 ledger rows (truncated says so). 400 services.invalid */
+    get: operations['GetRecoveryStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/services/recovery/retry': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start a recovery pass now (the normal pass, not debounced). 202. Audited. 409 recovery.already_running while a pass runs */
+    post: operations['RetryRecovery'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/services/{id}': {
     parameters: {
       query?: never;
@@ -18949,6 +18983,71 @@ export interface components {
       /** @description The owner's password, re-entered for THIS save. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
       password: null | string;
     };
+    /** @description Headline counts, in rows (one row is one step of the ledger, which may cover several sessions, or one missed session of the plan; not sessions): missed (missed, waiting, running, not recoverable, out of reach), recovered, still failing (still failing, blocked, partial). */
+    RecoveryCounts: {
+      /** Format: int32 */
+      missed: number;
+      /** Format: int32 */
+      recovered: number;
+      /** Format: int32 */
+      stillFailing: number;
+    };
+    RecoveryPassView: {
+      trigger: string;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      status: string;
+    };
+    /** @description The plan of what a pass would do was refused (`Reason`): the rows of the ledger are shown, but "nothing missed" cannot be concluded. */
+    RecoveryPlanUnavailable: {
+      reason: string;
+    };
+    /** @description `Started` is true when the pass has steps to run (`Steps`); false when there is nothing to run, so the pass only proves partial items again. */
+    RecoveryRetryAccepted: {
+      /** Format: date-time */
+      requestedAt: string;
+      started: boolean;
+      /** Format: int32 */
+      steps: number;
+    };
+    /** @description One service at one session. `From` to `To` are the sessions the step covers (the group is its last session); `MissingSessions` are those a partial recovery did not fill; `RetryKind` says what a retry does (null: nothing, `CanRetry` false), a failed step that used up its attempts is not run again. */
+    RecoveryRowView: {
+      serviceId: string;
+      serviceName: string;
+      status: string;
+      reason: null | string;
+      /** Format: int32 */
+      attempts: number;
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      /** Format: uuid */
+      runId: null | string;
+      canRetry: boolean;
+      retryKind: null | string;
+      missingSessions: string[];
+    };
+    RecoverySessionView: {
+      /** Format: date */
+      session: string;
+      items: components['schemas']['RecoveryRowView'][];
+    };
+    /** @description `CheckedAt` is when this was read; `Running` is true while a pass runs; `Truncated` when the ledger held more rows than are shown (the newest sessions are kept). Sessions are oldest first. */
+    RecoveryStatusView: {
+      /** Format: date-time */
+      checkedAt: string;
+      running: boolean;
+      latestPass: null | components['schemas']['RecoveryPassView'];
+      /** Format: int32 */
+      days: number;
+      counts: components['schemas']['RecoveryCounts'];
+      truncated: boolean;
+      planUnavailable: null | components['schemas']['RecoveryPlanUnavailable'];
+      sessions: components['schemas']['RecoverySessionView'][];
+    };
     /** @description One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving. */
     RefreshRunView: {
       /** Format: uuid */
@@ -26390,6 +26489,66 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ServiceNotices'];
+        };
+      };
+    };
+  };
+  GetRecoveryStatus: {
+    parameters: {
+      query?: {
+        days?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RecoveryStatusView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  RetryRecovery: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RecoveryRetryAccepted'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };
