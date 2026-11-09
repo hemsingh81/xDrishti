@@ -281,7 +281,7 @@ describe('Recovery screen', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Retry recovery' })).toBeEnabled();
     });
-      expect(screen.queryByText('The calendar could not be read.')).not.toBeInTheDocument();
+    expect(screen.queryByText('The calendar could not be read.')).not.toBeInTheDocument();
   });
 
   it('keeps the rows under the plan alert and does not show a Missed count', async () => {
