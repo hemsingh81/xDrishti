@@ -34,6 +34,8 @@ public sealed partial class SimulateDatabaseTests
 
         public ValueTask<IBarMergeSession> BeginMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken) => inner.BeginMergeAsync(instrumentId, source, cancellationToken);
 
+        public ValueTask<IBarMergeSession> BeginInsertOnlyMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken) => inner.BeginInsertOnlyMergeAsync(instrumentId, source, cancellationToken);
+
         public async ValueTask<IReadOnlyList<Bar>> ReadAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
         {
             var bars = await inner.ReadAsync(instrumentId, from, to, cancellationToken);

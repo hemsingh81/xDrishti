@@ -22,6 +22,10 @@ internal sealed class DataOptions
     [Required]
     public GapDataOptions Gaps { get; set; } = new();
 
+    /// <summary>The owner-invoked repair of old bar holes (ADR 0233).</summary>
+    [Required]
+    public RepairDataOptions Repair { get; set; } = new();
+
     /// <summary>The scheduled end-of-day run (ADR 0017 §2).</summary>
     [Required]
     public EodDataOptions Eod { get; set; } = new();
@@ -34,13 +38,14 @@ internal sealed class DataOptions
     [Required]
     public ContextDataOptions Context { get; set; } = new();
 
-    public const string InvalidMessage = "Data:Dhan:InitialDays must be 1 to 3650, Data:Dhan:InitialDaysIndex 365 to 1825 and Data:Dhan:RequestsPerSecond 1 to 5; Data:Csv:MaxRowsPerFile must be 1000 to 100000000, Data:Csv:MaxBytesPerFile 1048576 to 17179869184 and Data:Csv:MaxSpanDays 31 to 36500; Data:Gaps:LookbackSessions must be 1 to 250; Data:Eod:TimeIst must be a time of day as HH:mm (24-hour), India time, e.g. 15:50; Data:Quality:Sessions must be 1 to 60, Data:Quality:SpikeMultiple 2 to 1000, Data:Quality:MaxMissingPercent 0 to 100 and Data:Quality:MaxFailedPercent 0 to 100; Data:Context:VixGraceSessions must be 1 to 30 and Data:Context:MinDayFraction 0.5 to 1; Data:Context:BreadthGraceSessions must be 1 to 30, Data:Context:Breadth:SmaSessions 2 to 250, MinVoters 1 to 1000, MinShare 0.1 to 1 and MinBarShare 0 to 1.";
+    public const string InvalidMessage = "Data:Dhan:InitialDays must be 1 to 3650, Data:Dhan:InitialDaysIndex 365 to 1825 and Data:Dhan:RequestsPerSecond 1 to 5; Data:Csv:MaxRowsPerFile must be 1000 to 100000000, Data:Csv:MaxBytesPerFile 1048576 to 17179869184 and Data:Csv:MaxSpanDays 31 to 36500; Data:Gaps:LookbackSessions must be 1 to 250; Data:Repair:MaxSessions must be 0 to 60; Data:Eod:TimeIst must be a time of day as HH:mm (24-hour), India time, e.g. 15:50; Data:Quality:Sessions must be 1 to 60, Data:Quality:SpikeMultiple 2 to 1000, Data:Quality:MaxMissingPercent 0 to 100 and Data:Quality:MaxFailedPercent 0 to 100; Data:Context:VixGraceSessions must be 1 to 30 and Data:Context:MinDayFraction 0.5 to 1; Data:Context:BreadthGraceSessions must be 1 to 30, Data:Context:Breadth:SmaSessions 2 to 250, MinVoters 1 to 1000, MinShare 0.1 to 1 and MinBarShare 0 to 1.";
 
     /// <summary>The settings of the nested section are checked here: the data-annotation validation does not look into nested objects.</summary>
     public static bool IsValid(DataOptions options) =>
         options.Dhan is { InitialDays: >= 1 and <= 3650, InitialDaysIndex: >= 365 and <= 1825, RequestsPerSecond: >= 1 and <= 5 }
         && options.Csv is { MaxRowsPerFile: >= 1000 and <= 100_000_000, MaxBytesPerFile: >= 1L << 20 and <= 1L << 34, MaxSpanDays: >= 31 and <= 36_500 }
         && options.Gaps is { LookbackSessions: >= 1 and <= 250 }
+        && options.Repair is { MaxSessions: >= 0 and <= 60 }
         && options.Eod is { } eod && EodDataOptions.IsValidTime(eod.TimeIst)
         && options.Quality is { Sessions: >= 1 and <= 60, SpikeMultiple: >= 2 and <= 1000, MaxMissingPercent: >= 0 and <= 100, MaxFailedPercent: >= 0 and <= 100 }
         && options.Context is { VixGraceSessions: >= 1 and <= 30, MinDayFraction: >= 0.5 and <= 1, BreadthGraceSessions: >= 1 and <= 30, Breadth: { SmaSessions: >= 2 and <= 250, MinVoters: >= 1 and <= 1000, MinShare: >= 0.1 and <= 1, MinBarShare: >= 0 and <= 1 } };
@@ -84,6 +89,14 @@ internal sealed class GapDataOptions
     /// <summary>How many of the latest trading sessions are checked (a gap older than that is not looked for, but one on record is retried until it is filled or unfillable).</summary>
     [Range(1, 250)]
     public int LookbackSessions { get; set; } = 30;
+}
+
+/// <summary>The owner-invoked repair of old holes in the stored bars (<c>Data:Repair</c>, ADR 0233).</summary>
+internal sealed class RepairDataOptions
+{
+    /// <summary>The most closed sessions one repair may cover; 0 (the default) switches the repair off. A repair reads the broker once per window of at most 90 days, so 60 sessions are a few requests.</summary>
+    [Range(0, 60)]
+    public int MaxSessions { get; set; }
 }
 
 /// <summary>The first-start settings of the end-of-day service (<c>Data:Eod</c>, ADR 0018): read once, when the service has no stored row; the Services screen decides after that.</summary>

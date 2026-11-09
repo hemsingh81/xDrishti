@@ -503,6 +503,8 @@ public sealed class BuildTradeCardsHandlerTests
 
         public ValueTask<IBarMergeSession> BeginMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken) => throw new InvalidOperationException("no merge");
 
+        public ValueTask<IBarMergeSession> BeginInsertOnlyMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken) => throw new InvalidOperationException("no merge");
+
         public async ValueTask<IReadOnlyList<Bar>> ReadAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
         {
             if (_lists.Count > 0)

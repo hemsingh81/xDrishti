@@ -9,6 +9,9 @@ public static class DataErrors
     public const string JobNotFoundCode = "data.job_not_found";
     public const string InstrumentNotFoundCode = "data.instrument_not_found";
     public const string InvalidCode = "data.invalid";
+    public const string RepairDisabledCode = "data.repair_disabled";
+    public const string RepairFetchFailedCode = "data.repair_fetch_failed";
+    public const string RepairStoreFailedCode = "data.repair_store_failed";
     public const string MasterMissingCode = "data.master_missing";
     public const string CsvFolderMissingCode = "data.csv_folder_missing";
     public const string DhanNotConnectedCode = "data.dhan_not_connected";

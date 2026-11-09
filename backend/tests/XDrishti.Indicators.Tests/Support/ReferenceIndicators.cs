@@ -23,6 +23,7 @@ internal static class ReferenceIndicators
             "lowest" => Extreme(Pick(bars, spec.Source), n, highest: false),
             "vwap" => Vwap(bars),
             "rel_volume" => RelVolume(bars, n),
+            "rel_volume_tod" => RelVolumeTimeOfDay(bars, n),
             "or_high" => OpeningRange(bars, n, spec.Timeframe, high: true),
             "or_low" => OpeningRange(bars, n, spec.Timeframe, high: false),
             "prev_day_open" => Session(bars, (prev, _) => prev?.Open ?? double.NaN),
@@ -196,6 +197,31 @@ internal static class ReferenceIndicators
         for (var i = n; i < bars.Count; i++)
         {
             var mean = Enumerable.Range(i - n, n).Sum(j => (double)bars[j].Volume) / n;
+            result[i] = mean > 0 ? bars[i].Volume / mean : double.NaN;
+        }
+
+        return result;
+    }
+
+    /// <summary>Volume over the mean volume of the last n earlier bars that start at the same minute of the day; NaN outside the regular session, before n of them exist and while the mean is 0.</summary>
+    public static double[] RelVolumeTimeOfDay(IReadOnlyList<Bar> bars, int n)
+    {
+        var result = Nan(bars.Count);
+        for (var i = 0; i < bars.Count; i++)
+        {
+            var minute = MinuteOf(bars[i]);
+            if (minute < Minutes.Open || minute >= Minutes.Open + 375)
+            {
+                continue;
+            }
+
+            var earlier = Enumerable.Range(0, i).Where(j => MinuteOf(bars[j]) == minute).TakeLast(n).ToList();
+            if (earlier.Count < n)
+            {
+                continue;
+            }
+
+            var mean = earlier.Sum(j => (double)bars[j].Volume) / n;
             result[i] = mean > 0 ? bars[i].Volume / mean : double.NaN;
         }
 

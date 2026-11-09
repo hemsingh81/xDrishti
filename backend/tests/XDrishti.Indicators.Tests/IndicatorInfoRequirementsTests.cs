@@ -25,7 +25,7 @@ public sealed class IndicatorInfoRequirementsTests
     [Fact]
     public void There_are_sixty_names_and_the_ten_context_names_are_among_them_as_date_driven_ones()
     {
-        IndicatorCatalog.All.Count.ShouldBe(60);
+        IndicatorCatalog.All.Count.ShouldBe(61);
         ReadContext.Distinct().Count().ShouldBe(10);
         foreach (var name in ReadContext.Append(ExpiryName))
         {

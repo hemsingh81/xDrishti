@@ -51,6 +51,7 @@ using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Bars.Eod;
 using XDrishti.Application.Market.Bars.Gaps;
 using XDrishti.Application.Market.Bars.Pipeline;
+using XDrishti.Application.Market.Bars.Repair;
 using XDrishti.Application.Market.Bars.Review;
 using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Market.Calendar;
@@ -514,6 +515,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListQualityRunsQuery, IReadOnlyList<QualityRunView>>, ListQualityRunsHandler>();
         services.AddScoped<ICommandHandler<StartQualityRunCommand, DataJobView>, StartQualityRunHandler>();
         services.AddScoped<ICommandHandler<RefetchQualityInstrumentCommand, DataJobView>, RefetchQualityInstrumentHandler>();
+        services.AddScoped<ICommandHandler<RepairBarHolesCommand, RepairBarHolesResult>, RepairBarHolesHandler>();
         services.AddScoped<ICommandHandler<RefreshQualityAggregatesCommand, DataJobView>, RefreshQualityAggregatesHandler>();
 
         // The scheduled end-of-day run (ADR 0017 §2) is a service of the framework (ADR 0018, registered with the others in AddServices): it waits for the cleanup of interrupted jobs first.

@@ -27,6 +27,9 @@ public interface IDataSettings
     /// <summary>How many of the latest trading sessions are checked for missing bars (<c>Data:Gaps:LookbackSessions</c>, default 30).</summary>
     int GapLookbackSessions { get; }
 
+    /// <summary>The most sessions one owner-invoked repair of old bar holes may cover (<c>Data:Repair:MaxSessions</c>, 0 to 60, default 0 = the repair is off; ADR 0233).</summary>
+    int RepairMaxSessions { get; }
+
     /// <summary>First-start setting of the end-of-day service (ADR 0018): whether it starts switched on (<c>Data:Eod:Enabled</c>, default true). Read once, when the service has no stored row; the Services screen decides after that.</summary>
     bool EodEnabled { get; }
 

@@ -31,7 +31,7 @@ internal readonly record struct ValueRange(double Minimum, double Maximum, bool 
         }
 
         table["day_of_week"] = new ValueRange(1, 7);
-        foreach (var name in new[] { "atr", "volume", "rel_volume", "prev_day_volume", "bb_width", "days_to_results", "days_since_results" })
+        foreach (var name in new[] { "atr", "volume", "rel_volume", "rel_volume_tod", "prev_day_volume", "bb_width", "days_to_results", "days_since_results" })
         {
             table[name] = new ValueRange(0, double.PositiveInfinity);
         }

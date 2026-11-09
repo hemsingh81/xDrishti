@@ -5,6 +5,7 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Bars.Eod;
 using XDrishti.Application.Market.Bars.Gaps;
+using XDrishti.Application.Market.Bars.Repair;
 using XDrishti.Application.Market.Calendar;
 using XDrishti.Application.Market.Context;
 using XDrishti.Domain.Common;
@@ -42,6 +43,14 @@ internal sealed class DataEndpoints : IEndpointModule
             .WithName("StartDataRefresh")
             .WithSummary("Start a data update in the background: steps (any of csv, dhan, aggregate, quality; default csv, dhan and aggregate, always in that order; quality checks the data after the others, see /data/quality), forceCsv loads unchanged CSV files again, refetchGaps also retries the sessions the Dhan phase gave up on (unfillable), csvFiles (1 to 214 file names of the CSV folder, only with the csv step; see /data/csv/files) loads only those files - an empty list or a name the folder does not have is 400 data.invalid naming it. 202 with the job; 409 data.job_running while one runs, 409 data.master_missing without an instrument list")
             .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/instruments/{id:guid}/repair-holes", RepairHolesAsync)
+            .WithName("RepairBarHoles")
+            .WithSummary("Owner repair of old holes in one instrument's stored 1-minute bars (ISS-29, ADR 0233): body from and to (closed trading sessions, at most Data:Repair:MaxSessions of them); asks the Dhan Data API again for the days with missing minutes and stores only the missing minutes, never changing a stored bar; then starts an aggregate and quality job when bars were added. Needs a step-up (no undo). Holds the data-job slot (409 data.job_running). Audited. Repaired bars change the bars hash of the window: stored runs stay intact but can no longer be reproduced and their trade cards fail the BarsSha256 check; a re-run gets a new key. Gap records are not updated. Off while Data:Repair:MaxSessions is 0 (409 data.repair_disabled). 400 data.invalid; 404 data.instrument_not_found; 409 data.dhan_not_available, data.dhan_not_connected, data.repair_fetch_failed")
+            .RequireStepUp()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapGet("/jobs", ListJobsAsync)
@@ -175,6 +184,17 @@ internal sealed class DataEndpoints : IEndpointModule
         return result.IsFailure
             ? ProblemResults.From(result.Error, http)
             : TypedResults.Accepted($"/api/data/jobs/{result.Value.Id}", result.Value);
+    }
+
+    private static async Task<Results<Ok<RepairBarHolesResult>, ProblemHttpResult>> RepairHolesAsync(
+        Guid id,
+        HttpContext http,
+        ICommandHandler<RepairBarHolesCommand, RepairBarHolesResult> handler,
+        [FromBody] RepairBarHolesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new RepairBarHolesCommand(id, request.From, request.To, http.GetActor()), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Ok<IReadOnlyList<DataJobView>>> ListJobsAsync(

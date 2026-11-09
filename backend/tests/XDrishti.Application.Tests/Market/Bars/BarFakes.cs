@@ -133,6 +133,21 @@ internal sealed class FakeBarStore : IBarStore
         return ValueTask.FromResult<IBarMergeSession>(session);
     }
 
+    /// <summary>Bars that appear in the store while a repair is between its read and its merge (a race the job slot should make impossible).</summary>
+    public List<Bar>? AppearBeforeMerge { get; set; }
+
+    public ValueTask<IBarMergeSession> BeginInsertOnlyMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken)
+    {
+        if (AppearBeforeMerge is { } late)
+        {
+            Stored.GetValueOrDefault(instrumentId, [])?.AddRange(late);
+        }
+
+        var session = new FakeSession(this, instrumentId, source) { InsertOnly = true };
+        Sessions.Add(session);
+        return ValueTask.FromResult<IBarMergeSession>(session);
+    }
+
     public async ValueTask<IReadOnlyList<Bar>> ReadAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
     {
         Reads.Add((instrumentId, from, to));
@@ -165,6 +180,8 @@ internal sealed class FakeBarStore : IBarStore
 
         public bool Completed { get; private set; }
 
+        public bool InsertOnly { get; init; }
+
         public ValueTask AddAsync(ReadOnlyMemory<Bar> bars, CancellationToken cancellationToken)
         {
             Bars.AddRange(bars.ToArray());
@@ -183,6 +200,14 @@ internal sealed class FakeBarStore : IBarStore
             if (!store.Stored.TryGetValue(instrumentId, out var list))
             {
                 store.Stored[instrumentId] = list = [];
+            }
+
+            if (InsertOnly)
+            {
+                var have = list.Select(b => b.EpochSeconds).ToHashSet();
+                var fresh = Bars.Where(b => !have.Contains(b.EpochSeconds)).ToList();
+                list.AddRange(fresh);
+                return ValueTask.FromResult(new BarMergeResult(fresh.Count, 0, 0, Bars.Count - fresh.Count));
             }
 
             list.AddRange(Bars);
@@ -291,6 +316,8 @@ internal sealed class FakeDataSettings : IDataSettings
     public int CsvMaxSpanDays { get; set; } = 3_700;
 
     public int GapLookbackSessions { get; set; } = 30;
+
+    public int RepairMaxSessions { get; set; }
 
     public bool EodEnabled { get; set; } = true;
 

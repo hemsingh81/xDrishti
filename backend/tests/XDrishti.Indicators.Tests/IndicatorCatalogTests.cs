@@ -13,7 +13,7 @@ public sealed class IndicatorCatalogTests
     /// <summary>1,100 gap-free sessions (about 220 weeks, 52 months): enough weekly and monthly bars for the longest warm-up of the test variants (42).</summary>
     private static readonly Lazy<List<Bar>> LongSessions = new(() => SeriesGenerator.Sessions(7, 1_100));
 
-    private static readonly string[] IntradayOnlyNames = ["vwap", "or_high", "or_low"];
+    private static readonly string[] IntradayOnlyNames = ["vwap", "rel_volume_tod", "or_high", "or_low"];
 
     /// <summary>The names that are tied to the trading session of one India date and so are refused on weekly and monthly bars (independent of the catalog's own flags).</summary>
     private static readonly string[] SessionBound =
@@ -162,10 +162,10 @@ public sealed class IndicatorCatalogTests
             "inside_bar", "nr", "engulfing", "pivot_high", "pivot_low", "pivot_high_age", "pivot_low_age", "open", "high", "low", "close", "volume",
         ];
 
-        IndicatorCatalog.All.Count(i => !i.DateDriven).ShouldBe(19 + added.Length);
-        IndicatorCatalog.All.Count(i => !i.DateDriven).ShouldBe(44);
-        IndicatorCatalog.All.Count.ShouldBe(44 + TestSpecs.ContextNames.Count + TestSpecs.ResultsNames.Count);
-        IndicatorCatalog.All.Count.ShouldBe(60);
+        IndicatorCatalog.All.Count(i => !i.DateDriven).ShouldBe(20 + added.Length);
+        IndicatorCatalog.All.Count(i => !i.DateDriven).ShouldBe(45);
+        IndicatorCatalog.All.Count.ShouldBe(45 + TestSpecs.ContextNames.Count + TestSpecs.ResultsNames.Count);
+        IndicatorCatalog.All.Count.ShouldBe(61);
         foreach (var name in added)
         {
             IndicatorCatalog.TryGet(name, out var info).ShouldBeTrue(name);
@@ -288,8 +288,8 @@ public sealed class IndicatorCatalogTests
             var refused = IndicatorCatalog.All.Where(i => !i.Supports(timeframe)).Select(i => i.Name).ToList();
             var accepted = IndicatorCatalog.All.Where(i => i.Supports(timeframe)).ToList();
 
-            refused.Order().ShouldBe(SessionBound.Concat(TestSpecs.ContextNames).Concat(TestSpecs.ResultsNames).Order(), timeframe.ToCode() + ": the session-bound ones and the date-driven ones (1m only)");
-            accepted.Count.ShouldBe(44 - SessionBound.Length, timeframe.ToCode());
+            refused.Order().ShouldBe(SessionBound.Append("rel_volume_tod").Concat(TestSpecs.ContextNames).Concat(TestSpecs.ResultsNames).Order(), timeframe.ToCode() + ": the session-bound ones and the date-driven ones (1m only)");
+            accepted.Count.ShouldBe(45 - SessionBound.Length - 1, timeframe.ToCode());
             accepted.ShouldAllBe(i => i.SessionBehaviour == SessionBehaviour.Continuous && !i.IntradayOnly && !i.DateDriven);
         }
     }

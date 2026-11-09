@@ -54,6 +54,7 @@ public static class IndicatorCatalog
     private static IndicatorInfo[] Build()
     {
         var period = new IndicatorParameter("n", ParameterKind.Whole, 1, MaxPeriod, 20);
+        var sessions = period with { Max = 250 };
         var rsiPeriod = period with { Default = 14 };
         var minutes = new IndicatorParameter("minutes", ParameterKind.Whole, 1, SessionClock.RegularBars, 15);
         var dmiPeriod = rsiPeriod;
@@ -84,6 +85,8 @@ public static class IndicatorCatalog
                 _ => 1, _ => new Vwap()),
             new("rel_volume", "Volume divided by the mean volume of the previous n bars (current bar excluded).", [period], SessionBehaviour.Continuous, false, PriceSource.Close, false,
                 spec => (int)spec.P1 + 1, spec => new RelVolume((int)spec.P1)),
+            new("rel_volume_tod", "Volume divided by the mean volume at the same time of day over the previous n sessions (current bar excluded; n up to 250, default 20); intraday only.", [sessions], SessionBehaviour.Continuous, false, PriceSource.Close, true,
+                spec => ((int)spec.P1 * BarsPerSession(spec.Timeframe)) + 1, spec => new RelVolumeTimeOfDay((int)spec.P1, BarMinutes(spec))),
             new("or_high", "Highest high of the first m minutes of the session; ready once they have closed.", [minutes], SessionBehaviour.PerSession, false, PriceSource.Close, true,
                 spec => (int)spec.P1 / BarMinutes(spec), spec => new OrHigh((int)spec.P1, BarMinutes(spec)), WholeBars),
             new("or_low", "Lowest low of the first m minutes of the session; ready once they have closed.", [minutes], SessionBehaviour.PerSession, false, PriceSource.Close, true,

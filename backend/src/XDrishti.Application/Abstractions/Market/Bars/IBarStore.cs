@@ -24,6 +24,11 @@ public interface IBarStore
     /// </summary>
     ValueTask<IBarMergeSession> BeginMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Like <see cref="BeginMergeAsync"/> but only inserts minutes that have no stored bar: a staged bar for a minute that has one is dropped and counted as kept, a stored bar is never updated (ISS-29 repair).
+    /// </summary>
+    ValueTask<IBarMergeSession> BeginInsertOnlyMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken);
+
     /// <summary>The stored bars of the instrument from <paramref name="from"/> up to and including <paramref name="to"/>, oldest first.</summary>
     ValueTask<IReadOnlyList<Bar>> ReadAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken);
 }

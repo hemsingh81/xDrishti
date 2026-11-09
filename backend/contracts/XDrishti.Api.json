@@ -3807,6 +3807,88 @@
         }
       }
     },
+    "/api/data/instruments/{id}/repair-holes": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Owner repair of old holes in one instrument's stored 1-minute bars (ISS-29, ADR 0233): body from and to (closed trading sessions, at most Data:Repair:MaxSessions of them); asks the Dhan Data API again for the days with missing minutes and stores only the missing minutes, never changing a stored bar; then starts an aggregate and quality job when bars were added. Needs a step-up (no undo). Holds the data-job slot (409 data.job_running). Audited. Repaired bars change the bars hash of the window: stored runs stay intact but can no longer be reproduced and their trade cards fail the BarsSha256 check; a re-run gets a new key. Gap records are not updated. Off while Data:Repair:MaxSessions is 0 (409 data.repair_disabled). 400 data.invalid; 404 data.instrument_not_found; 409 data.dhan_not_available, data.dhan_not_connected, data.repair_fetch_failed",
+        "operationId": "RepairBarHoles",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepairBarHolesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepairBarHolesResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data/jobs": {
       "get": {
         "tags": [
@@ -56109,6 +56191,95 @@
           }
         },
         "description": "What a removal did: `removed` were members, `notMembers` were not. Untracking never happens. `memberCount` = members now."
+      },
+      "RepairBarHolesRequest": {
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "description": "The body of the repair: the first and the last closed session of the window."
+      },
+      "RepairBarHolesResult": {
+        "required": [
+          "symbol",
+          "from",
+          "to",
+          "sessionsChecked",
+          "sessionsWithHoles",
+          "missingBefore",
+          "fetched",
+          "inserted",
+          "missingAfter",
+          "aggregateJobId"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "sessionsChecked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sessionsWithHoles": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "missingBefore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fetched": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inserted": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "missingAfter": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "aggregateJobId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "aggregateNote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "What the repair did. int RepairBarHolesResult.MissingAfter is what the broker could not give. int RepairBarHolesResult.Rejected counts bars the broker returned that failed the bar checks.\nGuid? RepairBarHolesResult.AggregateJobId is the follow-up job, or null with string? RepairBarHolesResult.AggregateNote saying why not."
       },
       "ReplayBarView": {
         "required": [

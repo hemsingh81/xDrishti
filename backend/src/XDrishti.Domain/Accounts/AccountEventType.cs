@@ -97,4 +97,5 @@ public enum AccountEventType
     EventFilterSwitched,
     LabHoldOutUnlocked,
     ShadowRecordSwitched,
+    BarHolesRepaired,
 }

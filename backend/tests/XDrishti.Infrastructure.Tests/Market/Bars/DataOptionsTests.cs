@@ -86,6 +86,23 @@ public sealed class DataOptionsTests
         DataOptions.IsValid(new DataOptions { Gaps = new GapDataOptions { LookbackSessions = sessions } }).ShouldBeTrue();
     }
 
+    [Fact]
+    public void The_repair_of_old_bar_holes_is_off_by_default_and_the_setting_reaches_the_pipeline()
+    {
+        new DataOptions().Repair.MaxSessions.ShouldBe(0);
+        DataOptions.IsValid(new DataOptions()).ShouldBeTrue();
+        new DataSettings(Options.Create(new DataOptions { Repair = new RepairDataOptions { MaxSessions = 7 } })).RepairMaxSessions.ShouldBe(7);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(61)]
+    public void A_repair_window_outside_0_to_60_sessions_is_refused(int sessions)
+    {
+        DataOptions.IsValid(new DataOptions { Repair = new RepairDataOptions { MaxSessions = sessions } }).ShouldBeFalse();
+        DataOptions.IsValid(new DataOptions { Repair = new RepairDataOptions { MaxSessions = 60 } }).ShouldBeTrue();
+    }
+
     [Theory]
     [InlineData("00:00")]
     [InlineData("15:50")]

@@ -11,7 +11,7 @@ public sealed class MirrorTableTests
 {
     // P15-05 added two rows (days_to_results, days_since_results: side-independent counts, mirrored to themselves) for names that did not exist before; no mirrored definition stored earlier can change, so the version was kept (a point for the owner in ADR 0185)
     // P15-09 added two refused names (results_sue_q, results_car3_q: a bucket has no opposite side) that did not exist before; no stored definition can contain them, so the version was kept (a point for the owner in ADR 0187)
-    private const string PinnedFingerprint = "59f02f144d78a39a0f48536f1a199e0730dab0e3c482dcd837eef56418eaa7fa";
+    private const string PinnedFingerprint = "eb0b46dd28f583c09bcf46aee3b677a0b0f80a4e7819060c1817b9ffa08ab458";
 
     [Fact]
     public void The_two_quintile_features_are_refused_like_the_regime_not_mirrored_because_a_bucket_has_no_opposite_side()
@@ -31,7 +31,7 @@ public sealed class MirrorTableTests
         var missing = IndicatorCatalog.All.Select(i => i.Name).Where(n => !Classified(n)).ToList();
 
         missing.ShouldBeEmpty();
-        IndicatorCatalog.All.Count.ShouldBe(60);
+        IndicatorCatalog.All.Count.ShouldBe(61);
     }
 
     [Fact]

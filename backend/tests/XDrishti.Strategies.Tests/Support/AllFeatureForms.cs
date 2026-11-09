@@ -16,6 +16,7 @@ internal static class AllFeatureForms
         ["lowest"] = "lowest()",
         ["vwap"] = "vwap",
         ["rel_volume"] = "rel_volume()",
+        ["rel_volume_tod"] = "rel_volume_tod()",
         ["or_high"] = "or_high()",
         ["or_low"] = "or_low()",
         ["adx"] = "adx()",

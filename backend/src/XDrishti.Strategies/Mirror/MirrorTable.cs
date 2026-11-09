@@ -70,7 +70,7 @@ public static class MirrorTable
         rows["supertrend_dir"] = new MirrorRow(MirrorKind.Signed, "supertrend_dir", false);
         rows["rsi"] = new MirrorRow(MirrorKind.Osc, "rsi");
         // the two results-day counts (P15-05) are side-independent numbers of the date, so they mirror to themselves; adding rows for names that did not exist cannot change any mirrored definition stored before, so the version stays
-        foreach (var name in new[] { "atr", "adx", "rel_volume", "volume", "prev_day_volume", "inside_bar", "nr", "days_to_results", "days_since_results" })
+        foreach (var name in new[] { "atr", "adx", "rel_volume", "rel_volume_tod", "volume", "prev_day_volume", "inside_bar", "nr", "days_to_results", "days_since_results" })
         {
             rows[name] = new MirrorRow(MirrorKind.Plain, name);
         }
