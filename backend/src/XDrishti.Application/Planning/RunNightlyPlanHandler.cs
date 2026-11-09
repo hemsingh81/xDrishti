@@ -97,7 +97,7 @@ internal sealed class RunNightlyPlanHandler(
         PlanPublished published;
         try
         {
-            published = await store.PublishWithRunAsync(plan, new PublishRun(command.Manual, started, Later(started), Clip(publishReason)), cancellationToken);
+            published = await store.PublishWithRunAsync(plan, new PublishRun(command.Manual, started, Later(started), Clip(publishReason), command.Recovered), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -127,7 +127,7 @@ internal sealed class RunNightlyPlanHandler(
     {
         if (!command.DryRun)
         {
-            await store.RecordRunAsync(new NewPlanRun(c.ForDate, planKey, NightlyOutcomes.FailedClosed, blocked.Gate, Clip(blocked.Reason), null, command.Manual, started, Later(started)), cancellationToken);
+            await store.RecordRunAsync(new NewPlanRun(c.ForDate, planKey, NightlyOutcomes.FailedClosed, blocked.Gate, Clip(blocked.Reason), null, command.Manual, started, Later(started), command.Recovered), cancellationToken);
             NightlyLog.FailedClosed(logger, c.ForDate, blocked.Gate, blocked.Code, attempt);
         }
         else

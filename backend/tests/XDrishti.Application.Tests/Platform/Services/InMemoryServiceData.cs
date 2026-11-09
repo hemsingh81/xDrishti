@@ -34,17 +34,17 @@ internal sealed class InMemoryServiceData : IServiceScheduleStore, IServiceRunSt
     public IEnumerable<ServiceRun> RunsOf(string serviceId) => Runs.Where(r => r.ServiceId == serviceId).OrderBy(r => r.StartedAt).ThenBy(r => r.Attempt);
 
     /// <summary>A row as a save would have stored it (a new revision), without going through a handler.</summary>
-    public ServiceSchedule Store(string serviceId, ServiceSettings settings, string by = "test")
+    public ServiceSchedule Store(string serviceId, ServiceSettings settings, string by = "test", DateTimeOffset? at = null)
     {
         lock (_gate)
         {
             if (Rows.TryGetValue(serviceId, out var row))
             {
-                row.Apply(settings, by, DateTimeOffset.UnixEpoch);
+                row.Apply(settings, by, at ?? DateTimeOffset.UnixEpoch);
             }
             else
             {
-                row = ServiceSchedule.Create(serviceId, settings, by, DateTimeOffset.UnixEpoch);
+                row = ServiceSchedule.Create(serviceId, settings, by, at ?? DateTimeOffset.UnixEpoch);
                 Rows[serviceId] = row;
             }
 

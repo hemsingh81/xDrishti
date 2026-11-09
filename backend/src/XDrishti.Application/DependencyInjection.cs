@@ -390,6 +390,9 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, XDrishti.Application.Market.Eod.HistoryEodService>(); // CF-04 Part A: the NSE daily-file history; starts paused and with Data:History:Nse:Enabled off a run makes no request
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
+        services.TryAddSingleton(new RecoverySettings()); // the infrastructure replaces it with the validated section; the defaults serve a host that has none
+        services.AddSingleton<RecoveryRunner>(); // the recovery pass (ADR 0240, AU-02): one path decides what is made up
+        services.AddSingleton<IRecoveryTrigger>(sp => sp.GetRequiredService<RecoveryRunner>());
         services.AddSingleton<ServiceScheduler>();
         services.AddScoped<ServiceSettingsReader>();
         services.AddScoped<ServiceViewReader>();

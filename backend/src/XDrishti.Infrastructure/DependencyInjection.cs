@@ -110,6 +110,7 @@ public static class DependencyInjection
         services.AddScoped<IServiceHeartbeatStore, ServiceHeartbeatStore>();
         services.AddScoped<IServiceScheduleStore, ServiceScheduleStore>();
         services.AddScoped<IServiceRunStore, ServiceRunStore>();
+        services.AddScoped<IRecoveryLedger, RecoveryLedger>(); // the ledger of the recovery passes (ADR 0240, AU-02)
         services.AddScoped<IPlatformUnitOfWork, PlatformUnitOfWork>();
         services.AddScoped<IDatabaseInfoProvider, DatabaseInfoProvider>();
         services.AddScoped<ILiveNotifier, LiveNotifier>();
@@ -189,7 +190,8 @@ public static class DependencyInjection
         services.AddScoped<ITrainingSetStore, TrainingSetStore>(); // the training-set records (spec P6-04)
         services.AddOptions<ReportBenchmarkOptions>().Bind(configuration.GetSection(ReportBenchmarkOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // basket benchmarks (spec P8-07)
         services.AddScoped(sp => sp.GetRequiredService<IOptions<ReportBenchmarkOptions>>().Value);
-        services.AddOptions<RecoverySettings>().Bind(configuration.GetSection(RecoverySettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the reach of the recovery planner; no reader until AU-02 (ADR 0240)
+        services.AddOptions<RecoverySettings>().Bind(configuration.GetSection(RecoverySettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the reach, debounce and attempts of the recovery pass (ADR 0240)
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<RecoverySettings>>().Value);
         services.AddOptions<PlanVsActualSettings>().Bind(configuration.GetSection(PlanVsActualSettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // plan versus actual (spec P8-04)
         services.AddScoped(sp => sp.GetRequiredService<IOptions<PlanVsActualSettings>>().Value);
         services.AddOptions<ModelStoreOptions>().Bind(configuration.GetSection(ModelStoreOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();

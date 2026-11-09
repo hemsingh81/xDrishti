@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using XDrishti.Api.IntegrationTests.Infrastructure;
@@ -234,6 +236,93 @@ public sealed class ServiceTablesTests(ApiFactory factory) : IAsyncLifetime
             await ShouldBeRejectedAsync(connection, "DELETE FROM platform.service_schedules", PostgresErrorCodes.InsufficientPrivilege);
             await ShouldBeRejectedAsync(connection, "DELETE FROM platform.service_runs", PostgresErrorCodes.InsufficientPrivilege);
             (await ScalarAsync(connection, "SELECT has_table_privilege('xd_app', 'platform.service_heartbeats', 'DELETE')")).ShouldBe(true); // the other platform table is unchanged
+        }
+        finally
+        {
+            await DropScratchDatabaseAsync(admin);
+        }
+    }
+
+    // ---- the recovery ledger (migration AddRecoveryLedger, ADR 0240) ----
+
+    [Fact]
+    public async Task The_recovery_ledger_keeps_one_item_per_service_and_occurrence_and_a_repeated_save_updates_it()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var ledger = scope.ServiceProvider.GetRequiredService<IRecoveryLedger>();
+        var now = DateTimeOffset.UtcNow;
+        var pass = await ledger.BeginPassAsync("startup", now, Ct);
+        var day = new DateOnly(2026, 10, 12);
+        var key = "probe-" + Guid.NewGuid().ToString("N")[..8];
+        await ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), pass, key, "2026-10-12", day, day, RecoveryStates.Running, null, 1, null), Ct);
+        await ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), pass, key, "2026-10-12", day, day, RecoveryStates.Failed, "down", 2, null), Ct);
+
+        var item = (await ledger.FindAsync(key, "2026-10-12", Ct)).ShouldNotBeNull();
+        (item.State, item.Attempts, item.Reason).ShouldBe((RecoveryStates.Failed, 2, "down"));
+        (await ledger.ListRetryableAsync(3, Ct)).ShouldContain(i => i.ServiceId == key);
+        (await ledger.ListRetryableAsync(2, Ct)).ShouldNotContain(i => i.ServiceId == key);
+        (await ledger.ListExhaustedAsync(2, now.AddMinutes(-1), Ct)).ShouldContain(e => e.ServiceId == key);
+        (await ledger.FindNewestAsync(key, Ct)).ShouldNotBeNull().Occurrence.ShouldBe("2026-10-12");
+
+        await using var connection = await OpenAsync();
+        await ShouldBeRejectedAsync(connection, $"INSERT INTO platform.recovery_items (id, pass_id, service_id, occurrence, session_from, session_to, state, attempts) VALUES (gen_random_uuid(), '{pass}', '{key}', '2026-10-12', '2026-10-12', '2026-10-12', 'running', 0)", PostgresErrorCodes.UniqueViolation);
+        await ShouldBeRejectedAsync(connection, $"UPDATE platform.recovery_items SET state = 'bogus' WHERE service_id = '{key}'", PostgresErrorCodes.CheckViolation);
+
+        await ledger.EndPassAsync(pass, "incomplete", now, Ct);
+        await ExecuteAsync(connection, $"DELETE FROM platform.recovery_items WHERE service_id = '{key}'");
+    }
+
+    [Fact]
+    public async Task An_item_left_running_by_an_earlier_process_is_closed_as_failed_interrupted_and_so_is_its_pass()
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var ledger = scope.ServiceProvider.GetRequiredService<IRecoveryLedger>();
+        var now = DateTimeOffset.UtcNow;
+        var pass = await ledger.BeginPassAsync("wake", now, Ct);
+        var key = "probe-" + Guid.NewGuid().ToString("N")[..8];
+        var day = new DateOnly(2026, 10, 12);
+        await ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), pass, key, "2026-10-12", day, day, RecoveryStates.Running, null, 1, null), Ct);
+
+        (await ledger.InterruptRunningAsync(now, Ct)).ShouldBeGreaterThanOrEqualTo(1);
+
+        var item = (await ledger.FindAsync(key, "2026-10-12", Ct)).ShouldNotBeNull();
+        (item.State, item.Reason).ShouldBe((RecoveryStates.Failed, "interrupted"));
+        await using var connection = await OpenAsync();
+        (await ScalarAsync(connection, $"SELECT status FROM platform.recovery_passes WHERE id = '{pass}'")).ShouldBe("interrupted");
+        await ExecuteAsync(connection, $"DELETE FROM platform.recovery_items WHERE service_id = '{key}'");
+    }
+
+    [Fact]
+    public async Task The_recovery_migration_runs_up_down_and_up_with_the_app_role_unable_to_delete_the_ledger()
+    {
+        var admin = new NpgsqlConnectionStringBuilder(factory.AdminConnectionString);
+        var scratch = new NpgsqlConnectionStringBuilder(factory.AdminConnectionString) { Database = ScratchDatabase, Pooling = false };
+        await CreateScratchDatabaseAsync(admin, scratch);
+        try
+        {
+            await using var migrated = factory.WithWebHostBuilder(b => b.UseSetting("Database:ConnectionString", scratch.ConnectionString));
+            await DatabaseMigrator.MigrateAsync(migrated.Services, Ct);
+            await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+            await connection.OpenAsync(Ct);
+            (await ScalarAsync(connection, "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'trading' AND table_name = 'plan_runs' AND column_name = 'recovered' AND column_default = 'false' AND is_nullable = 'NO'")).ShouldBe(1L);
+            await ExecuteAsync(connection, "SET ROLE xd_app");
+            await ExecuteAsync(connection, "INSERT INTO platform.recovery_passes (id, trigger, started_at, status) VALUES ('00000000-0000-7000-8000-000000000001', 'startup', now(), 'running')");
+            await ExecuteAsync(connection, "INSERT INTO platform.recovery_items (id, pass_id, service_id, occurrence, session_from, session_to, state, attempts) VALUES (gen_random_uuid(), '00000000-0000-7000-8000-000000000001', 'eod', '2026-10-12', '2026-10-12', '2026-10-12', 'running', 1)");
+            await ExecuteAsync(connection, "UPDATE platform.recovery_items SET state = 'succeeded'");
+            await ExecuteAsync(connection, "UPDATE platform.recovery_passes SET status = 'succeeded', finished_at = now()");
+            await ShouldBeRejectedAsync(connection, "DELETE FROM platform.recovery_items", PostgresErrorCodes.InsufficientPrivilege);
+            await ShouldBeRejectedAsync(connection, "DELETE FROM platform.recovery_passes", PostgresErrorCodes.InsufficientPrivilege);
+            await ExecuteAsync(connection, "RESET ROLE");
+
+            await using (var scope = migrated.Services.CreateAsyncScope())
+            {
+                var migrator = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>().GetService<IMigrator>();
+                await migrator.MigrateAsync("20261109090000_AddKillDismissReason", Ct); // down
+                (await ScalarAsync(connection, "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'platform' AND table_name LIKE 'recovery_%'")).ShouldBe(0L);
+                (await ScalarAsync(connection, "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'trading' AND table_name = 'plan_runs' AND column_name = 'recovered'")).ShouldBe(0L);
+                await migrator.MigrateAsync(null, Ct); // and up again
+                (await ScalarAsync(connection, "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'platform' AND table_name LIKE 'recovery_%'")).ShouldBe(2L);
+            }
         }
         finally
         {

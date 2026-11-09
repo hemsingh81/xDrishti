@@ -45,7 +45,7 @@ public sealed class NightlyService(IServiceScopeFactory scopes) : IScheduledServ
         await using var scope = scopes.CreateAsyncScope();
         var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<RunNightlyPlanCommand, NightlyRunView>>();
         var manual = context.Trigger == ServiceRunTrigger.Manual;
-        var result = await handler.HandleAsync(new RunNightlyPlanCommand(null, false, manual, manual ? context.RequestedBy : "system:nightly"), cancellationToken);
+        var result = await handler.HandleAsync(new RunNightlyPlanCommand(null, false, manual, manual ? context.RequestedBy : "system:nightly", context.Trigger == ServiceRunTrigger.CatchUp), cancellationToken);
         if (result.IsFailure)
         {
             return ServiceOutcome.Failed(result.Error.Message);

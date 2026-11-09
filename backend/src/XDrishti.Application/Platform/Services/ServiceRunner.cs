@@ -62,7 +62,7 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
     /// (<see cref="ServiceStart.AlreadyRunning"/>). With <paramref name="dropWhenBusy"/> (the ticks of an interval or window schedule, ADR 0019 §5) a start that finds the service busy is only logged
     /// (<c>service.tick_dropped</c>) and leaves no run record. <paramref name="cancellationToken"/> only matters before the start: once the run record is written the work goes on whatever happens to the caller.
     /// </summary>
-    public async ValueTask<ServiceStart> StartAsync(string serviceId, ServiceRunTrigger trigger, string requestedBy, CancellationToken cancellationToken, bool dropWhenBusy = false)
+    public async ValueTask<ServiceStart> StartAsync(string serviceId, ServiceRunTrigger trigger, string requestedBy, CancellationToken cancellationToken, bool dropWhenBusy = false, bool startDependents = true)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (registry.Find(serviceId) is not { } service)
@@ -75,7 +75,7 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
             return ServiceStart.NotRunHere; // another process runs it and owns its run records
         }
 
-        var sequence = new Sequence(trigger, requestedBy);
+        var sequence = new Sequence(trigger, requestedBy) { StartDependents = startDependents };
         if (!TryReserve(serviceId, sequence))
         {
             return await BusyAsync(serviceId, trigger, dropWhenBusy);
@@ -166,6 +166,39 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
             }
         }
     }
+
+    /// <summary>Completes when the service has no run or retry in progress in this process (a retry that waits is waited for, so the sequence is over); ends early only when <paramref name="cancellationToken"/> does (by throwing).</summary>
+    public async Task WhenServiceIdleAsync(string serviceId, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            Task? running;
+            lock (_gate)
+            {
+                if (!_active.TryGetValue(serviceId, out var sequence))
+                {
+                    return;
+                }
+
+                running = sequence.Task;
+            }
+
+            if (running is { IsCompleted: false })
+            {
+                await running.WaitAsync(cancellationToken);
+            }
+            else if (running is null)
+            {
+                await Task.Delay(IdlePoll, clock, cancellationToken); // waiting for the back-off of a retry, which the scheduler starts
+            }
+            else
+            {
+                await Task.Yield(); // the run ended; its reservation is given back a moment later
+            }
+        }
+    }
+
+    private static readonly TimeSpan IdlePoll = TimeSpan.FromSeconds(1);
 
     /// <summary>Completes when every run that is executing now has ended (retries that wait are not waited for). For tests and for shutdown.</summary>
     public Task WhenIdleAsync()
@@ -292,7 +325,7 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
             if (!retry)
             {
                 Release(id);
-                if (outcome.Status == ServiceRunStatus.Succeeded)
+                if (outcome.Status == ServiceRunStatus.Succeeded && sequence.StartDependents)
                 {
                     await StartDependentsAsync(id);
                 }
@@ -448,5 +481,8 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
         public Task? Task { get; set; }
 
         public DateTimeOffset? RetryAt { get; set; }
+
+        /// <summary>False for a run the recovery pass starts: the plan has a step for each dependent (TimeBound, paused, market hours and order are decided there), so no run-after chain starts them behind its back.</summary>
+        public bool StartDependents { get; init; } = true;
     }
 }

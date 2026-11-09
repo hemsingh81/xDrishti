@@ -10,7 +10,8 @@ namespace XDrishti.Domain.Planning;
 /// <param name="StartedAt">Start.</param>
 /// <param name="FinishedAt">End.</param>
 /// <param name="PlanId">The plan a published row names, or null.</param>
-public sealed record PhaseRun(long Id, int Attempt, string Outcome, string? FailedGate, string Reason, bool Manual, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, long? PlanId);
+/// <param name="Recovered">Made up by the recovery pass (ADR 0240).</param>
+public sealed record PhaseRun(long Id, int Attempt, string Outcome, string? FailedGate, string Reason, bool Manual, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, long? PlanId, bool Recovered = false);
 
 /// <summary>The stored plan a published row names.</summary>
 /// <param name="Id">The plan id.</param>

@@ -494,6 +494,31 @@ public sealed class PlanPhaseCheckTests
     }
 
     [Fact]
+    public void A_run_made_up_by_the_recovery_pass_is_reported_as_recovered_is_not_unattended_and_breaks_the_streak()
+    {
+        var window = Ten();
+        var recovered = Published(window[9].Date.DayNumber, manual: false) with { Recovered = true };
+        window[9] = window[9] with { Runs = [recovered] };
+
+        var report = PlanPhaseCheck.Evaluate(Facts(window));
+
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.Sessions[9].State.ShouldBe("recovered_run");
+        (report.Sessions[9].ScheduledRuns, report.Sessions[9].ManualRuns).ShouldBe((0, 0));
+        report.Streak.ShouldBe(0);
+        report.ToText().ShouldContain("recovered_run");
+    }
+
+    [Fact]
+    public void A_manual_run_wins_over_the_recovered_flag()
+    {
+        var window = Ten();
+        window[3] = window[3] with { Runs = [Published(window[3].Date.DayNumber, manual: true) with { Recovered = true }] };
+
+        PlanPhaseCheck.Evaluate(Facts(window)).Sessions[3].State.ShouldBe("manual_run");
+    }
+
+    [Fact]
     public void A_gate_name_is_cleaned_cut_without_splitting_a_surrogate_pair_and_never_prints_control_characters()
     {
         var gate = new string('g', 38) + "\U0001F600\U0001F600\n";
@@ -514,7 +539,7 @@ public sealed class PlanPhaseCheckTests
     {
         var text = PlanPhaseCheck.Evaluate(Facts()).ToText();
 
-        text.ShouldContain("catch-up after a restart counts as scheduled");
+        text.ShouldContain("recovery pass makes up after a restart, a wake or a reconnect is stored as recovered, is not unattended and breaks the streak");
         text.ShouldContain("hand-run eod or portfolio-sync runs are not read");
         text.ShouldContain("the newest 200 run rows, the newest 60 plans");
         text.ShouldContain("read by this process");

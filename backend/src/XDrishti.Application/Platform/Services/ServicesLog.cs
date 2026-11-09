@@ -58,4 +58,25 @@ internal static partial class ServicesLog
 
     [LoggerMessage(EventId = 3418, Level = LogLevel.Information, Message = "service.tick_dropped service={ServiceId} trigger={Trigger}: the previous run was still going")]
     public static partial void TickDropped(ILogger logger, string serviceId, string trigger);
+
+    [LoggerMessage(EventId = 3419, Level = LogLevel.Information, Message = "recovery.started trigger={Trigger} steps={Steps}")]
+    public static partial void RecoveryStarted(ILogger logger, string trigger, int steps);
+
+    [LoggerMessage(EventId = 3420, Level = LogLevel.Information, Message = "recovery.step service={ServiceId} occurrence={Occurrence} state={State}")]
+    public static partial void RecoveryStep(ILogger logger, string serviceId, string occurrence, string state);
+
+    [LoggerMessage(EventId = 3421, Level = LogLevel.Warning, Message = "recovery.blocked service={ServiceId} occurrence={Occurrence} by={Blocker}")]
+    public static partial void RecoveryBlocked(ILogger logger, string serviceId, string occurrence, string blocker);
+
+    [LoggerMessage(EventId = 3422, Level = LogLevel.Information, Message = "recovery.finished trigger={Trigger} status={Status}")]
+    public static partial void RecoveryFinished(ILogger logger, string trigger, string status);
+
+    [LoggerMessage(EventId = 3423, Level = LogLevel.Information, Message = "recovery.ignored trigger={Trigger}: {Reason}")]
+    public static partial void RecoveryIgnored(ILogger logger, string trigger, string reason);
+
+    [LoggerMessage(EventId = 3424, Level = LogLevel.Error, Message = "recovery.crashed trigger={Trigger}")]
+    public static partial void RecoveryCrashed(ILogger logger, string trigger, Exception exception);
+
+    [LoggerMessage(EventId = 3425, Level = LogLevel.Error, Message = "recovery.plan_refused: {Code}")]
+    public static partial void RecoveryPlanRefused(ILogger logger, string code);
 }

@@ -56,6 +56,28 @@ public sealed class NightlyServiceTests
         return outcome;
     }
 
+    [Theory]
+    [InlineData(ServiceRunTrigger.Scheduled, false, false)]
+    [InlineData(ServiceRunTrigger.CatchUp, false, true)]
+    [InlineData(ServiceRunTrigger.Manual, true, false)]
+    public async Task Only_a_run_made_up_by_the_recovery_pass_is_flagged_recovered_and_only_a_hand_start_is_manual(ServiceRunTrigger trigger, bool manual, bool recovered)
+    {
+        RunNightlyPlanCommand? seen = null;
+        var handler = Substitute.For<ICommandHandler<RunNightlyPlanCommand, NightlyRunView>>();
+        handler.HandleAsync(Arg.Do<RunNightlyPlanCommand>(c => seen = c), Ct).Returns(Result.Success(new NightlyRunView(Friday, Friday.AddDays(3), "published", false, false, 1, null, "ok", 5, [])));
+        var provider = Substitute.For<IServiceProvider>();
+        provider.GetService(typeof(ICommandHandler<RunNightlyPlanCommand, NightlyRunView>)).Returns(handler);
+        var scope = Substitute.For<IServiceScope>();
+        scope.ServiceProvider.Returns(provider);
+        var factory = Substitute.For<IServiceScopeFactory>();
+        factory.CreateScope().Returns(scope);
+
+        await new NightlyService(factory).RunAsync(new ServiceRunContext(Guid.NewGuid(), trigger, 1, "owner@x", new Dictionary<string, JsonElement>(), (_, _) => ValueTask.CompletedTask), Ct);
+
+        seen.ShouldNotBeNull();
+        (seen.Manual, seen.Recovered).ShouldBe((manual, recovered));
+    }
+
     [Fact]
     public async Task A_published_plan_is_a_success()
     {

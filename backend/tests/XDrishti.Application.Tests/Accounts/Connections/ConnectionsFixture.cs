@@ -17,6 +17,9 @@ internal sealed class ConnectionsFixture
 
     public FakeConnector Dhan { get; } = new();
 
+    /// <summary>The recovery requests the completed sign-ins made.</summary>
+    public List<XDrishti.Application.Abstractions.Platform.RecoveryTrigger> RecoveryRequests { get; } = [];
+
     public InMemoryAccountData Data => Accounts.Data;
 
     public InMemoryConnectionData Connections => Accounts.Connections;
@@ -29,7 +32,7 @@ internal sealed class ConnectionsFixture
         new(Data, Connections, Data, Writer, Dhan, Clock, NullLogger<StartConnectHandler>.Instance);
 
     public CompleteConnectHandler CompleteHandler() =>
-        new(Data, Connections, Data, Data, Writer, Dhan, Accounts.Attention, Clock, NullLogger<CompleteConnectHandler>.Instance);
+        new(Data, Connections, Data, Data, Writer, Dhan, Accounts.Attention, new RecordingRecovery(RecoveryRequests), Clock, NullLogger<CompleteConnectHandler>.Instance);
 
     public DisconnectHandler DisconnectHandler() => new(Data, Data, Connections, Data, Data, Writer, Accounts.Views, Clock, NullLogger<DisconnectHandler>.Instance);
 
@@ -65,4 +68,13 @@ internal sealed class ConnectionsFixture
     public BrokerConnection? Connection(Guid accountId) => Connections.Connections.SingleOrDefault(c => c.AccountId == accountId);
 
     public List<AccountEvent> Events(AccountEventType type) => [.. Data.Events.Where(e => e.Event == type)];
+
+    private sealed class RecordingRecovery(List<XDrishti.Application.Abstractions.Platform.RecoveryTrigger> requests) : XDrishti.Application.Abstractions.Platform.IRecoveryTrigger
+    {
+        public bool Request(XDrishti.Application.Abstractions.Platform.RecoveryTrigger trigger)
+        {
+            requests.Add(trigger);
+            return true;
+        }
+    }
 }

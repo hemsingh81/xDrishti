@@ -50,14 +50,14 @@ public sealed class InstrumentMasterServiceTests : IDisposable
     {
         _world.Application.StartedAt = _world.Clock.GetUtcNow();
         await _world.Scheduler.StartUpAsync(Ct);
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
     }
 
     private async Task TickAtAsync(DateTimeOffset instant)
     {
         _world.SetClock(instant);
         await _world.Scheduler.TickAsync(Ct);
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
     }
 
     private void RanAt(DateTimeOffset startedAt, ServiceRunStatus status = ServiceRunStatus.Succeeded)
@@ -113,7 +113,7 @@ public sealed class InstrumentMasterServiceTests : IDisposable
     public async Task Run_now_starts_a_manual_refresh_for_the_owner()
     {
         await _world.RunNowAsync("instrument-master");
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
 
         var command = _started.ShouldHaveSingleItem();
         (command.Trigger, command.Force, command.RequestedBy).ShouldBe((RefreshTrigger.Manual, false, "owner@example.invalid"));
@@ -231,11 +231,11 @@ public sealed class InstrumentMasterServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task A_list_that_was_never_refreshed_is_refreshed_at_start()
+    public async Task A_list_that_was_never_refreshed_is_not_made_up_at_a_first_start_its_baseline_is_the_start_ADR_0240()
     {
         await StartUpAsync();
 
-        _started.ShouldHaveSingleItem();
+        _started.ShouldBeEmpty(); // a first start is no missed day: the 08:45 schedule refreshes it
     }
 
     [Theory]
@@ -254,11 +254,12 @@ public sealed class InstrumentMasterServiceTests : IDisposable
     public async Task A_refresh_that_is_running_is_not_started_again_by_the_catch_up()
     {
         _answer = _ => Result.Failure<RefreshStarted>(MarketErrors.RefreshRunning);
+        RanAt(At(9, 8, 45, 2)); // two days ago: yesterday's refresh was missed
 
         await StartUpAsync();
 
         _started.ShouldHaveSingleItem(); // asked once; the answer was "already running"
-        Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Skipped);
+        Runs.Last().Status.ShouldBe(ServiceRunStatus.Skipped);
     }
 
     [Fact]
@@ -303,7 +304,7 @@ public sealed class InstrumentMasterServiceTests : IDisposable
         await _world.Clock.WhenWaitingForAsync(JobPolling.FirstWait);
 
         _world.Clock.Advance(TimeSpan.FromMinutes(30));
-        await _world.Runner.WhenIdleAsync();
+        await _world.SettleAsync();
 
         var run = Runs.Last();
         (run.Status, run.Message).ShouldBe((ServiceRunStatus.Failed, "Timed out after 30 min (the job is still running)."));

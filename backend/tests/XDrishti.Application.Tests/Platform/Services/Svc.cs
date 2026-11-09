@@ -33,7 +33,7 @@ internal static class Svc
             allowed ?? Enum.GetValues<ScheduleType>(),
             Settings(schedule, enabled, retries, timeout, catchUp, notify),
             parameters ?? [],
-            constraints ?? new ServiceConstraints()));
+            (constraints ?? new ServiceConstraints()) with { RecoveryClass = constraints?.RecoveryClass ?? RecoveryClass.LatestOnly }));
 
     /// <summary>Like the end-of-day run: every trading day at 15:50, never before the session has ended, warned about before 15:35.</summary>
     public static TestService Eod(Schedule? schedule = null, bool enabled = true, int retries = 0, bool catchUp = true, bool notify = true, CatchUpReach reach = CatchUpReach.SameDay) =>
@@ -43,6 +43,7 @@ internal static class Svc
             StartAdvice = "The session ends at 15:30.",
             NotBeforeSessionEnd = true,
             CatchUpReach = reach,
+            RecoveryClass = RecoveryClass.Convergent,
         });
 
     /// <summary>A nightly pipeline that must follow the end-of-day run and the account sync (which is not a registered service).</summary>

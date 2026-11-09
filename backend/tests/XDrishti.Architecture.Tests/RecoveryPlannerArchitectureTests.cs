@@ -40,4 +40,41 @@ public sealed class RecoveryPlannerArchitectureTests
 
         result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
     }
+
+    [Fact]
+    public void The_recovery_runner_and_ledger_name_no_execution_type_no_broker_and_only_use_ports()
+    {
+        var application = Types.InAssembly(Application).That().HaveNameStartingWith("Recovery").Or().HaveName("IRecoveryLedger").Or().HaveName("IRecoveryTrigger")
+            .ShouldNot().HaveDependencyOnAny("XDrishti.Execution", "XDrishti.Infrastructure", "Npgsql", "Microsoft.EntityFrameworkCore")
+            .GetResult();
+        var infrastructure = Types.InAssembly(typeof(XDrishti.Infrastructure.DependencyInjection).Assembly).That().HaveName("RecoveryLedger")
+            .ShouldNot().HaveDependencyOnAny("XDrishti.Execution")
+            .GetResult();
+
+        application.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", application.FailingTypeNames ?? []));
+        infrastructure.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", infrastructure.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void The_recovery_sources_place_no_order_and_the_ledger_never_deletes()
+    {
+        foreach (var file in new[] { new[] { "XDrishti.Application", "Platform", "Services", "RecoveryRunner.cs" }, ["XDrishti.Infrastructure", "Platform", "RecoveryLedger.cs"] })
+        {
+            var source = File.ReadAllText(RepositoryFiles.RepositoryFile(["backend", "src", .. file]));
+            source.ShouldNotContain("XDrishti.Execution");
+            source.ShouldNotContain("PlaceOrder", Case.Insensitive);
+            source.ShouldNotContain("DELETE FROM", Case.Insensitive);
+        }
+    }
+
+    [Fact]
+    public void The_scheduler_has_no_catch_up_branch_of_its_own_and_only_asks_the_recovery_runner()
+    {
+        var source = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Application", "Platform", "Services", "ServiceScheduler.cs"));
+
+        source.ShouldNotContain("CatchUpAsync");
+        source.ShouldNotContain("MissedOccurrence");
+        source.ShouldNotContain("ServiceRunTrigger.CatchUp");
+        source.ShouldContain("recovery.Request(");
+    }
 }

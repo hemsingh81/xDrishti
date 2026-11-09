@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Portfolio.Attention;
 using XDrishti.Domain.Accounts;
@@ -30,6 +31,7 @@ internal sealed class CompleteConnectHandler(
     ConnectionWriter writer,
     IBrokerConnector connector,
     IAttentionReconciler attention,
+    IRecoveryTrigger recovery,
     TimeProvider clock,
     ILogger<CompleteConnectHandler> logger) : ICommandHandler<CompleteConnectCommand, ConnectReturn>
 {
@@ -99,6 +101,11 @@ internal sealed class CompleteConnectHandler(
 
         AccountsLog.Connected(logger, account.Slug);
         await attention.ReconcileAsync(cancellationToken); // the "reconnect" item resolves now, not at the next tick (ADR 0030)
+        if (account.DataEnabled)
+        {
+            recovery.Request(RecoveryTrigger.BrokerReconnect); // a Data account is back: one pass makes up what the outage missed (ADR 0240); debounced, never waits
+        }
+
         return Result.Success(new ConnectReturn(account.Id, null));
     }
 

@@ -122,8 +122,8 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
     private static async Task InsertPublishedRunAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, NewPlan plan, long planId, PublishRun run, string reason, CancellationToken cancellationToken)
     {
         await using var insert = new NpgsqlCommand("""
-            INSERT INTO trading.plan_runs (for_date, plan_key, outcome, failed_gate, reason, plan_id, manual, started_at, finished_at)
-            VALUES (@date, @key, 'published', NULL, @reason, @plan, @manual, @start, @end)
+            INSERT INTO trading.plan_runs (for_date, plan_key, outcome, failed_gate, reason, plan_id, manual, recovered, started_at, finished_at)
+            VALUES (@date, @key, 'published', NULL, @reason, @plan, @manual, @recovered, @start, @end)
             """, connection, transaction);
         var p = insert.Parameters;
         p.AddWithValue("date", NpgsqlDbType.Date, plan.ForDate);
@@ -131,6 +131,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
         p.AddWithValue("reason", NpgsqlDbType.Varchar, reason.Length <= 500 ? reason : reason[..499] + "~");
         p.AddWithValue("plan", NpgsqlDbType.Bigint, planId);
         p.AddWithValue("manual", NpgsqlDbType.Boolean, run.Manual);
+        p.AddWithValue("recovered", NpgsqlDbType.Boolean, run.Recovered);
         p.AddWithValue("start", NpgsqlDbType.TimestampTz, run.StartedAt);
         p.AddWithValue("end", NpgsqlDbType.TimestampTz, run.FinishedAt);
         await insert.ExecuteNonQueryAsync(cancellationToken);
@@ -464,8 +465,8 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
     {
         ArgumentNullException.ThrowIfNull(run);
         await using var insert = dataSource.CreateCommand("""
-            INSERT INTO trading.plan_runs (for_date, plan_key, outcome, failed_gate, reason, plan_id, manual, started_at, finished_at)
-            VALUES (@date, @key, @outcome, @gate, @reason, @plan, @manual, @start, @end)
+            INSERT INTO trading.plan_runs (for_date, plan_key, outcome, failed_gate, reason, plan_id, manual, recovered, started_at, finished_at)
+            VALUES (@date, @key, @outcome, @gate, @reason, @plan, @manual, @recovered, @start, @end)
             """);
         var p = insert.Parameters;
         p.AddWithValue("date", NpgsqlDbType.Date, run.ForDate);
@@ -475,6 +476,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
         p.AddWithValue("reason", NpgsqlDbType.Varchar, run.Reason);
         p.Add(new NpgsqlParameter("plan", NpgsqlDbType.Bigint) { Value = run.PlanId is { } id ? id : DBNull.Value });
         p.AddWithValue("manual", NpgsqlDbType.Boolean, run.Manual);
+        p.AddWithValue("recovered", NpgsqlDbType.Boolean, run.Recovered);
         p.AddWithValue("start", NpgsqlDbType.TimestampTz, run.StartedAt);
         p.AddWithValue("end", NpgsqlDbType.TimestampTz, run.FinishedAt);
         await insert.ExecuteNonQueryAsync(cancellationToken);
@@ -484,7 +486,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
     public async ValueTask<IReadOnlyList<PlanRunRow>> ListRunsAsync(DateOnly? forDate, int limit, CancellationToken cancellationToken)
     {
         await using var select = dataSource.CreateCommand("""
-            SELECT id, attempt, for_date, plan_key, outcome, failed_gate, reason, plan_id, manual, started_at, finished_at FROM (
+            SELECT id, attempt, for_date, plan_key, outcome, failed_gate, reason, plan_id, manual, started_at, finished_at, recovered FROM (
                 SELECT r.*, row_number() OVER (PARTITION BY for_date ORDER BY id) AS attempt FROM trading.plan_runs r
             ) x WHERE (@date::date IS NULL OR for_date = @date) ORDER BY for_date DESC, id DESC LIMIT @limit
             """);
@@ -497,7 +499,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
             rows.Add(new PlanRunRow(
                 r.GetInt64(0),
                 (int)r.GetInt64(1),
-                new NewPlanRun(r.GetFieldValue<DateOnly>(2), Text(r, 3), r.GetString(4), Text(r, 5), r.GetString(6), Whole(r, 7), r.GetBoolean(8), r.GetFieldValue<DateTimeOffset>(9), r.GetFieldValue<DateTimeOffset>(10))));
+                new NewPlanRun(r.GetFieldValue<DateOnly>(2), Text(r, 3), r.GetString(4), Text(r, 5), r.GetString(6), Whole(r, 7), r.GetBoolean(8), r.GetFieldValue<DateTimeOffset>(9), r.GetFieldValue<DateTimeOffset>(10), r.GetBoolean(11))));
         }
 
         return rows;

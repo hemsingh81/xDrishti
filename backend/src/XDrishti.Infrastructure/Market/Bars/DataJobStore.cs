@@ -75,6 +75,9 @@ internal sealed class DataJobStore(XDrishtiDbContext db, NpgsqlDataSource dataSo
     public async ValueTask<DataJob?> GetLastByTriggerAsync(DataJobTrigger trigger, CancellationToken cancellationToken) =>
         await db.DataJobs.AsNoTracking().Where(x => x.Trigger == trigger).OrderByDescending(x => x.StartedAt).FirstOrDefaultAsync(cancellationToken);
 
+    public async ValueTask<DataJob?> GetLastAutomaticAsync(string requester, CancellationToken cancellationToken) =>
+        await db.DataJobs.AsNoTracking().Where(x => x.Trigger == DataJobTrigger.Daily || x.RequestedBy == requester).OrderByDescending(x => x.StartedAt).FirstOrDefaultAsync(cancellationToken);
+
     /// <summary>Inserts the job as it is: running for a started job (the one-running-job index applies), ended for a skipped one.</summary>
     private static async Task InsertAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, DataJob job, CancellationToken cancellationToken)
     {
