@@ -21,6 +21,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/settings/catalog': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Every setting with its tier, value, default, range, safer direction and source */
+    get: operations['GetSettingsCatalog'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/auth/login': {
     parameters: {
       query?: never;
@@ -20829,6 +20846,27 @@ export interface components {
       /** Format: double */
       intentLowest: null | number;
     };
+    SettingRange: {
+      /** Format: double */
+      min: null | number;
+      /** Format: double */
+      max: null | number;
+    };
+    /** @description `Tier` is Essential, Advanced or Internal; `Safer` is higher, lower or none (none loosens both ways); `Source` is default, configuration, stored or section. */
+    SettingsCatalogItem: {
+      key: string;
+      label: string;
+      tier: string;
+      value: null | string;
+      default: null | string;
+      range: null | components['schemas']['SettingRange'];
+      safer: string;
+      learnable: boolean;
+      source: string;
+    };
+    SettingsCatalogResponse: {
+      items: components['schemas']['SettingsCatalogItem'][];
+    };
     /** @description The chain of digests: the owner copies the last one outside the database, and `xd paper shadow verify` recomputes it. */
     ShadowChainView: {
       /**
@@ -22651,6 +22689,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SystemStatusResponse'];
+        };
+      };
+    };
+  };
+  GetSettingsCatalog: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SettingsCatalogResponse'];
         };
       };
     };

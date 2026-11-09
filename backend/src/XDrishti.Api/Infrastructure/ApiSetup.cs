@@ -72,6 +72,8 @@ internal static class ApiSetup
 
         // Endpoint modules are registered explicitly — one line per feature module.
         services.AddSingleton<IEndpointModule, SystemEndpoints>();
+        services.AddSingleton<IEndpointModule, SettingsEndpoints>(); // the settings catalog (AU-08, ADR 0242)
+        services.AddSingleton<Application.Abstractions.SettingsCatalog.ISettingsCatalogSource, Settings.SettingsCatalogSource>();
         services.AddSingleton<IEndpointModule, AuthEndpoints>();
         services.AddSingleton<IEndpointModule, AccountsEndpoints>();
         services.AddSingleton<IEndpointModule, BrokersEndpoints>();
@@ -186,6 +188,7 @@ internal static class ApiSetup
     /// </summary>
     private static void AddConfidence(this IServiceCollection services)
     {
+        services.AddSingleton<Microsoft.Extensions.Options.IValidateOptions<ConfidenceSettings>, Settings.ConfidenceRangeValidator>(); // the descriptor bounds, checked at start (AU-08)
         services.AddOptions<ConfidenceSettings>()
             .BindConfiguration(ConfidenceSettings.SectionName)
             .Validate(s => s.ToOptions().Problems().Count == 0, "Confidence: a value is out of range (EffectiveN:MinSessionsForAutocorr 5..250, MinTradesForEstimate 3..50, MinClusters 3..50, Power:Alpha 0.001..0.2, Power 0.5..0.99, SigmaFloorR 0.1..5, TargetEdgeR 0.01..5, MinTrl:Confidence 0.5..0.999, BenchmarkSr -1..1).")

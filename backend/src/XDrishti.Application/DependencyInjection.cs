@@ -92,6 +92,7 @@ using XDrishti.Application.Reporting;
 using XDrishti.Application.Research;
 using XDrishti.Application.Research.CostSheets;
 using XDrishti.Application.Selection;
+using XDrishti.Application.SettingsCatalog;
 using XDrishti.Application.Shadow;
 using XDrishti.Application.Ticks;
 using XDrishti.Domain.Common;
@@ -111,6 +112,7 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
 
         services.AddScoped<IQueryHandler<GetSystemStatusQuery, SystemStatusResponse>, GetSystemStatusHandler>();
+        services.AddScoped<IQueryHandler<GetSettingsCatalogQuery, SettingsCatalogResponse>, GetSettingsCatalogHandler>(); // the settings catalog (AU-08, ADR 0242)
         services.AddScoped<ICommandHandler<RecordHeartbeatCommand>, RecordHeartbeatHandler>();
         services.AddScoped<IFeedHeartbeats, FeedHeartbeats>();
         services.AddScoped<IDepthHeartbeats, DepthHeartbeats>(); // the depth recorder's own row xd-depth (P7-16)

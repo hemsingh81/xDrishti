@@ -78,6 +78,7 @@ namespace XDrishti.Api.Infrastructure;
 /// </summary>
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, NumberHandling = JsonNumberHandling.Strict)]
 [JsonSerializable(typeof(SystemStatusResponse))]
+[JsonSerializable(typeof(XDrishti.Application.SettingsCatalog.SettingsCatalogResponse))]
 [JsonSerializable(typeof(ValidateStrategyRequest))]
 [JsonSerializable(typeof(CreateStrategyRequest))]
 [JsonSerializable(typeof(CloneStrategyRequest))]
