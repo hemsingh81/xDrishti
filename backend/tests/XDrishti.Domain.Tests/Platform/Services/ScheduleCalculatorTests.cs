@@ -25,37 +25,8 @@ public sealed class ScheduleCalculatorTests
         ScheduleCalculator.NextAfter(EndOfDay, At(10, 12, hour, minute), Plain, notBeforeSessionEnd: true).ShouldBe(At(10, nextDay, 15, 50));
     }
 
-    [Theory]
-    [InlineData(15, 49, false)]
-    [InlineData(15, 50, true)]
-    [InlineData(16, 0, true)]
-    [InlineData(23, 59, true)]
-    public void A_daily_run_is_missed_from_its_time_until_the_day_ends_when_no_run_started_since(int hour, int minute, bool missed)
-    {
-        var due = ScheduleCalculator.MissedOccurrence(EndOfDay, At(10, 12, hour, minute), null, Plain, notBeforeSessionEnd: true);
 
-        due.HasValue.ShouldBe(missed);
-        if (missed)
-        {
-            due.ShouldBe(At(10, 12, 15, 50));
-        }
-    }
 
-    [Fact]
-    public void A_run_that_started_at_or_after_the_time_means_nothing_was_missed()
-    {
-        ScheduleCalculator.MissedOccurrence(EndOfDay, At(10, 12, 17, 0), At(10, 12, 15, 50), Plain, true).ShouldBeNull();
-        ScheduleCalculator.MissedOccurrence(EndOfDay, At(10, 12, 17, 0), At(10, 12, 15, 49, 59), Plain, true).ShouldBe(At(10, 12, 15, 50));
-    }
-
-    [Fact]
-    public void After_midnight_India_time_yesterdays_time_is_no_longer_made_up_for_but_the_latest_reach_still_is()
-    {
-        var now = At(10, 13, 0, 5);
-
-        ScheduleCalculator.MissedOccurrence(EndOfDay, now, null, Plain, true).ShouldBeNull();
-        ScheduleCalculator.MissedOccurrence(EndOfDay, now, null, Plain, true, CatchUpReach.Latest).ShouldBe(At(10, 12, 15, 50));
-    }
 
     [Theory]
     [InlineData(10)]
@@ -64,7 +35,6 @@ public sealed class ScheduleCalculatorTests
     {
         ScheduleCalculator.OccurrencesOn(EndOfDay, Date(10, day), Plain, true).ShouldBeEmpty();
         ScheduleCalculator.NextAfter(EndOfDay, At(10, day, 10, 0), Plain, true).ShouldBe(At(10, 12, 15, 50));
-        ScheduleCalculator.MissedOccurrence(EndOfDay, At(10, day, 18, 0), null, Plain, true).ShouldBeNull();
     }
 
     [Fact]
@@ -79,7 +49,6 @@ public sealed class ScheduleCalculatorTests
         var calendar = new TradingCalendar([Holiday(10, 13)]);
 
         ScheduleCalculator.NextAfter(EndOfDay, At(10, 12, 16, 0), calendar, true).ShouldBe(At(10, 14, 15, 50));
-        ScheduleCalculator.MissedOccurrence(EndOfDay, At(10, 13, 18, 0), null, calendar, true).ShouldBeNull();
     }
 
     [Fact]
@@ -96,7 +65,6 @@ public sealed class ScheduleCalculatorTests
         var calendar = new TradingCalendar([Special(10, 10, 10 * 60, 11 * 60)]); // Saturday 10:00-11:00
 
         ScheduleCalculator.NextAfter(EndOfDay, At(10, 9, 16, 0), calendar, true).ShouldBe(At(10, 10, 15, 50));
-        ScheduleCalculator.MissedOccurrence(EndOfDay, At(10, 10, 16, 0), null, calendar, true).ShouldBe(At(10, 10, 15, 50));
     }
 
     [Fact]
@@ -105,8 +73,6 @@ public sealed class ScheduleCalculatorTests
         var calendar = new TradingCalendar([Special(11, 8, 18 * 60 + 15, 19 * 60 + 15)]); // Muhurat, a Sunday
 
         ScheduleCalculator.OccurrencesOn(EndOfDay, Date(11, 8), calendar, true).ShouldBe([At(11, 8, 19, 15)]);
-        ScheduleCalculator.MissedOccurrence(EndOfDay, At(11, 8, 15, 55), null, calendar, true).ShouldBeNull();
-        ScheduleCalculator.MissedOccurrence(EndOfDay, At(11, 8, 19, 15), null, calendar, true).ShouldBe(At(11, 8, 19, 15));
         ScheduleCalculator.NextAfter(EndOfDay, At(11, 6, 16, 0), calendar, true).ShouldBe(At(11, 8, 19, 15));
     }
 
@@ -209,17 +175,6 @@ public sealed class ScheduleCalculatorTests
         ScheduleCalculator.LatestAtOrBefore(daily, At(10, 11, 8, 45), Plain).ShouldBe(At(10, 11, 8, 45));
     }
 
-    [Fact]
-    public void The_latest_reach_makes_up_for_a_run_missed_days_ago_but_only_when_nothing_started_since()
-    {
-        var daily = Schedule.Daily(T(8, 45), false, Weekdays.EveryDay);
-        var now = At(10, 12, 7, 30);
-
-        ScheduleCalculator.MissedOccurrence(daily, now, At(10, 9, 8, 45), Plain, false, CatchUpReach.Latest).ShouldBe(At(10, 11, 8, 45));
-        ScheduleCalculator.MissedOccurrence(daily, now, At(10, 11, 8, 45), Plain, false, CatchUpReach.Latest).ShouldBeNull();
-        ScheduleCalculator.MissedOccurrence(daily, now, null, Plain, false, CatchUpReach.Latest).ShouldBe(At(10, 11, 8, 45));
-        ScheduleCalculator.MissedOccurrence(daily, now, At(10, 9, 8, 45), Plain, false, CatchUpReach.SameDay).ShouldBeNull();
-    }
 
     // ---- weekly ----
 
@@ -230,8 +185,6 @@ public sealed class ScheduleCalculatorTests
 
         ScheduleCalculator.NextAfter(saturday, At(10, 12, 9, 0), Plain).ShouldBe(At(10, 17, 10, 0));
         ScheduleCalculator.NextAfter(saturday, At(10, 10, 9, 59), Plain).ShouldBe(At(10, 10, 10, 0));
-        ScheduleCalculator.MissedOccurrence(saturday, At(10, 11, 9, 0), null, Plain).ShouldBe(At(10, 10, 10, 0)); // 23 h later, across midnight
-        ScheduleCalculator.MissedOccurrence(saturday, At(10, 11, 10, 1), null, Plain).ShouldBeNull();
     }
 
     [Fact]
@@ -254,7 +207,6 @@ public sealed class ScheduleCalculatorTests
             ScheduleCalculator.OccurrencesOn(schedule, Date(10, 12), Plain).ShouldBeEmpty();
             ScheduleCalculator.NextAfter(schedule, At(10, 12, 9, 0), Plain).ShouldBeNull();
             ScheduleCalculator.LatestAtOrBefore(schedule, At(10, 12, 9, 0), Plain).ShouldBeNull();
-            ScheduleCalculator.MissedOccurrence(schedule, At(10, 12, 9, 0), null, Plain).ShouldBeNull();
         }
     }
 
@@ -314,11 +266,6 @@ public sealed class ScheduleCalculatorTests
         ScheduleCalculator.LatestAtOrBefore(alerts, At(10, 12, 9, 0), Plain).ShouldBe(At(10, 9, 15, 30));
     }
 
-    [Fact]
-    public void An_interval_is_not_made_up_for()
-    {
-        ScheduleCalculator.MissedOccurrence(Schedule.Interval(5, T(9, 15), T(15, 30)), At(10, 12, 12, 0), null, Plain).ShouldBeNull();
-    }
 
     // ---- preview ----
 

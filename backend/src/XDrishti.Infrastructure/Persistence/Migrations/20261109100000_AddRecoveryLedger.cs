@@ -46,7 +46,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     CONSTRAINT pk_recovery_items PRIMARY KEY (id),
                     CONSTRAINT fk_recovery_items_passes FOREIGN KEY (pass_id) REFERENCES platform.recovery_passes (id),
                     CONSTRAINT uq_recovery_items_service_occurrence UNIQUE (service_id, occurrence),
-                    CONSTRAINT ck_recovery_items_state CHECK (state IN ('running', 'succeeded', 'failed', 'blocked', 'waiting') AND attempts >= 0 AND session_from <= session_to)
+                    CONSTRAINT ck_recovery_items_state CHECK (state IN ('running', 'succeeded', 'failed', 'blocked', 'waiting', 'superseded') AND attempts >= 0 AND session_from <= session_to)
                 );
                 CREATE INDEX ix_recovery_items_pass_id ON platform.recovery_items (pass_id);
                 """);

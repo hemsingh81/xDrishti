@@ -65,7 +65,9 @@ public sealed class EodService(IServiceScopeFactory scopes, IDataSettings settin
         var jobs = services.GetRequiredService<IDataJobStore>();
         var now = clock.GetUtcNow();
         var automatic = context.Trigger != ServiceRunTrigger.Manual;
-        var dayRules = automatic && context.Attempt == 1;
+        // a run the recovery pass makes up (catch_up) is no "run of the day": it neither obeys nor sets the once-a-day rule of the scheduled run, writes no Daily job and leaves no skipped Daily job behind (ADR 0240)
+        var recovered = context.Trigger == ServiceRunTrigger.CatchUp;
+        var dayRules = automatic && !recovered && context.Attempt == 1;
         if (dayRules && await RanTodayAsync(jobs, now, cancellationToken))
         {
             return ServiceOutcome.Skipped(AlreadyRanToday);
@@ -74,12 +76,12 @@ public sealed class EodService(IServiceScopeFactory scopes, IDataSettings settin
         var steps = DataEodSteps.Planned();
         if (await WhyNotAsync(services, cancellationToken) is { } unavailable)
         {
-            return await SkipAsync(jobs, steps, unavailable, automatic, now, cancellationToken);
+            return await SkipAsync(jobs, steps, unavailable, automatic && !recovered, now, cancellationToken);
         }
 
         var start = services.GetRequiredService<ICommandHandler<StartDataJobCommand, DataJobView>>();
         var started = await start.HandleAsync(
-            new StartDataJobCommand(new StartDataJobRequest(steps), automatic ? Requester : context.RequestedBy, automatic ? DataJobTrigger.Daily : DataJobTrigger.Manual),
+            new StartDataJobCommand(new StartDataJobRequest(steps), automatic ? Requester : context.RequestedBy, automatic && !recovered ? DataJobTrigger.Daily : DataJobTrigger.Manual),
             cancellationToken);
         if (started.IsFailure)
         {
@@ -91,12 +93,12 @@ public sealed class EodService(IServiceScopeFactory scopes, IDataSettings settin
 
             if (started.Error.Code != DataErrors.JobRunningCode)
             {
-                return await SkipAsync(jobs, steps, started.Error.Message, automatic, now, cancellationToken);
+                return await SkipAsync(jobs, steps, started.Error.Message, automatic && !recovered, now, cancellationToken);
             }
 
             // A job of the end-of-day run itself that is still going (an earlier run timed out while it went on) is not "another" update, and is no reason to write a skipped job that would hide it.
             var own = await jobs.GetRunningAsync(cancellationToken) is { Trigger: DataJobTrigger.Daily };
-            return await SkipAsync(jobs, steps, own ? OwnJobRunning : AnotherJobRunning, automatic && !own, now, cancellationToken);
+            return await SkipAsync(jobs, steps, own ? OwnJobRunning : AnotherJobRunning, automatic && !own && !recovered, now, cancellationToken);
         }
 
         DataLog.EodStarted(logger, started.Value.Id);

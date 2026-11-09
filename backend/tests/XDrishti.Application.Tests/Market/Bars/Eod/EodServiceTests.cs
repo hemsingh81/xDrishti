@@ -231,6 +231,39 @@ public sealed class EodServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task A_morning_recovery_is_no_run_of_the_day_so_the_scheduled_run_at_15_50_still_goes_ahead()
+    {
+        _world.Data.Store("eod", EodService.Definition.Defaults); // registered before: Monday's run was missed
+        await StartUpAtAsync(13, 10, 0);
+
+        _jobs.Started.ShouldHaveSingleItem().Trigger.ShouldBe(DataJobTrigger.Manual); // the made-up run is not a Daily job
+        await TickAtAsync(13, 15, 50);
+
+        _jobs.Started.Select(j => j.Trigger).ShouldBe([DataJobTrigger.Manual, DataJobTrigger.Daily]);
+        Runs.Select(r => (r.Trigger, r.Status)).ShouldBe([(ServiceRunTrigger.CatchUp, ServiceRunStatus.Succeeded), (ServiceRunTrigger.Scheduled, ServiceRunStatus.Succeeded)]);
+    }
+
+    [Fact]
+    public async Task A_recovery_run_that_finds_the_token_lapsed_records_no_daily_skipped_job_and_runs_after_the_reconnect()
+    {
+        _world.Data.Store("eod", EodService.Definition.Defaults);
+        _account.State = new DataAccountState(Guid.NewGuid(), "Primary", DataAccountStatuses.Expired, "The sign-in of the Data account has expired. Reconnect it under Accounts.");
+        await StartUpAtAsync(13, 10, 0);
+
+        _jobs.Skipped.ShouldBeEmpty(); // a skipped Daily job would hide the day's real run
+        _jobs.Started.ShouldBeEmpty();
+        Runs.ShouldHaveSingleItem().Status.ShouldBe(ServiceRunStatus.Skipped);
+
+        _account.State = FakeAccountStatus.Connected().State;
+        _world.SetClock(At(13, 10, 11));
+        _world.Recovery.Request(XDrishti.Application.Abstractions.Platform.RecoveryTrigger.BrokerReconnect);
+        await _world.SettleAsync();
+
+        _jobs.Started.ShouldHaveSingleItem().Trigger.ShouldBe(DataJobTrigger.Manual);
+        Runs.Last().Status.ShouldBe(ServiceRunStatus.Succeeded);
+    }
+
+    [Fact]
     public async Task When_the_dhan_fetch_is_not_available_the_run_is_skipped_with_its_reason()
     {
         _source.Availability = new SourceAvailability(false, "The Dhan Data API fetch is not available yet.");
@@ -318,7 +351,7 @@ public sealed class EodServiceTests : IDisposable
         await StartUpAtAsync(12, 17, 0);
 
         var job = _jobs.Started.ShouldHaveSingleItem();
-        job.Trigger.ShouldBe(DataJobTrigger.Daily);
+        job.Trigger.ShouldBe(DataJobTrigger.Manual);
         Runs.ShouldHaveSingleItem().Trigger.ShouldBe(ServiceRunTrigger.CatchUp);
         (await _world.ViewAsync("eod")).NextRun.ShouldBe(At(13, 15, 50)); // and the schedule goes on
     }
@@ -367,7 +400,7 @@ public sealed class EodServiceTests : IDisposable
         recovery.MarkCompleted();
         await world.SettleAsync();
 
-        _jobs.Started.ShouldHaveSingleItem().Trigger.ShouldBe(DataJobTrigger.Daily);
+        _jobs.Started.ShouldHaveSingleItem().Trigger.ShouldBe(DataJobTrigger.Manual); // a made-up run is no Daily job (ADR 0240)
         _jobs.Skipped.ShouldBeEmpty();
     }
 
@@ -396,7 +429,8 @@ public sealed class EodServiceTests : IDisposable
         world.Clock.Advance(EodService.RecoveryWait);
         await world.SettleAsync();
 
-        _jobs.Skipped.ShouldHaveSingleItem().Error.ShouldBe("Another data update was running.");
+        _jobs.Skipped.ShouldBeEmpty(); // a recovery run leaves no skipped Daily job that would hide the day's real run
+        world.Data.RunsOf("eod").Single().Message.ShouldBe("Another data update was running.");
     }
 
     // ---- the job's outcome ----

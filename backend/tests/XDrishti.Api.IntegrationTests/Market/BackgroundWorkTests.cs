@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using XDrishti.Api.IntegrationTests.Infrastructure;
-using XDrishti.Api.Platform;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Refresh;
@@ -51,21 +50,12 @@ public sealed class BackgroundWorkTests(ApiFactory factory) : MarketTestBase(fac
         await using var scheduled = Factory.WithWebHostBuilder(b =>
         {
             b.UseSetting("Instruments:AutoRefresh:Enabled", "true").UseSetting("Instruments:AutoRefresh:TimeIst", "03:30");
-            b.ConfigureTestServices(services => services.AddHostedService<ServiceSchedulerHost>()); // the suite switches the loop off; this test is about it
         });
-        using var client = scheduled.CreateClient(); // starts the host and its hosted services
+        using var client = scheduled.CreateClient();
+        await scheduled.Services.GetRequiredService<ServiceScheduler>().StartUpAsync(Ct); // what the hosted scheduler does at start, called here so the seeding is finished before the checks
+        await scheduled.Services.GetRequiredService<XDrishti.Application.Platform.Services.RecoveryRunner>().WhenIdleAsync();
 
-        XDrishti.Domain.Platform.Services.ServiceSchedule? row = null;
-        for (var attempt = 0; attempt < 100 && row is null; attempt++)
-        {
-            row = await Factory.WithDbAsync(async db => await db.ServiceSchedules.AsNoTracking().SingleOrDefaultAsync(x => x.Id == "instrument-master", Ct));
-            if (row is null)
-            {
-                await Task.Delay(100, Ct);
-            }
-        }
-
-        row.ShouldNotBeNull();
+        var row = await Factory.WithDbAsync(async db => await db.ServiceSchedules.AsNoTracking().SingleAsync(x => x.Id == "instrument-master", Ct));
         (row.Enabled, row.Schedule.StartTime, row.UpdatedBy).ShouldBe((true, new TimeOnly(3, 30), "system:first-start"));
         (await Factory.WithDbAsync(async db => await db.RefreshRuns.CountAsync(Ct))).ShouldBe(0); // the first start is the baseline (ADR 0240): no surprise run
     }

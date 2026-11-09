@@ -8,6 +8,7 @@ public static class RecoveryStates
     public const string Failed = "failed";
     public const string Blocked = "blocked";
     public const string Waiting = "waiting";
+    public const string Superseded = "superseded";
 
     public const string Interrupted = "interrupted";
 }
@@ -33,8 +34,11 @@ public interface IRecoveryLedger
     /// <summary>The newest item (by occurrence) of the service, or null.</summary>
     ValueTask<RecoveryItemRow?> FindNewestAsync(string serviceId, CancellationToken cancellationToken);
 
-    /// <summary>Items that failed and have fewer than <paramref name="maxAttempts"/> attempts: the next pass tries them again.</summary>
+    /// <summary>Items that failed with fewer than <paramref name="maxAttempts"/> attempts, and items that wait (market hours, a skipped run): the next pass tries them again.</summary>
     ValueTask<IReadOnlyList<RecoveryItemRow>> ListRetryableAsync(int maxAttempts, CancellationToken cancellationToken);
+
+    /// <summary>Closes the service's open items (failed, blocked, waiting) of an older occurrence than <paramref name="occurrence"/> as superseded: a later step covers them.</summary>
+    ValueTask SupersedeOlderAsync(string serviceId, string occurrence, CancellationToken cancellationToken);
 
     /// <summary>Inserts the item or, for the same service and occurrence, updates it (the unique key makes a repeat idempotent).</summary>
     ValueTask SaveAsync(RecoveryItemRow item, CancellationToken cancellationToken);

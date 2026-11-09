@@ -127,23 +127,6 @@ public static class ScheduleCalculator
         return null;
     }
 
-    /// <summary>
-    /// The occurrence that was missed, or null: a daily or weekly schedule whose latest occurrence is within reach (<see cref="CatchUpReach"/>) of <paramref name="now"/> and with no run started
-    /// at or after it (<paramref name="lastRunStartedAt"/>, a run of any kind and outcome). Windows, intervals and the other types are not made up for.
-    /// </summary>
-    public static DateTimeOffset? MissedOccurrence(Schedule schedule, DateTimeOffset now, DateTimeOffset? lastRunStartedAt, TradingCalendar calendar, bool notBeforeSessionEnd = false, CatchUpReach reach = CatchUpReach.SameDay)
-    {
-        ArgumentNullException.ThrowIfNull(schedule);
-        if (schedule.Type is not (ScheduleType.Daily or ScheduleType.Weekly) || LatestAtOrBefore(schedule, now, calendar, notBeforeSessionEnd) is not { } occurrence)
-        {
-            return null;
-        }
-
-        var within = reach == CatchUpReach.Latest
-            || (schedule.Type == ScheduleType.Weekly ? now - occurrence <= WeeklyReach : IndiaTime.Today(occurrence) == IndiaTime.Today(now));
-        return within && (lastRunStartedAt is null || lastRunStartedAt < occurrence) ? occurrence : null;
-    }
-
     /// <summary>The time a daily or weekly run starts on a date: the configured time, but not before the session has closed when asked to.</summary>
     private static TimeOnly RunTime(TradingCalendar calendar, DateOnly date, TimeOnly time, bool notBeforeSessionEnd)
     {

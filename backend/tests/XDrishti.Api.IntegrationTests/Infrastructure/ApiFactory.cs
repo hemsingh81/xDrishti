@@ -365,6 +365,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await this.WithDbAsync(async db =>
         {
             await db.Database.ExecuteSqlRawAsync("""
+                DELETE FROM platform.recovery_items;
+                DELETE FROM platform.recovery_passes;
                 DELETE FROM platform.service_runs;
                 DELETE FROM platform.service_schedules;
                 DELETE FROM accounts.account_events WHERE event LIKE 'Service%';

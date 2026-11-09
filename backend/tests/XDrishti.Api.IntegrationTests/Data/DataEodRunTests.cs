@@ -290,7 +290,9 @@ public sealed class DataEodRunTests(ApiFactory factory) : DataTestBase(factory)
 
         await TickAtAsync(At(17, 16, 0)); // Saturday the 17th: the sessions of the 13th to the 16th were missed; the weekend itself is no session
 
-        (await EodRunsAsync()).ShouldAllBe(r => r.Trigger == "catch_up"); // never a scheduled start on a weekend
+        var made = await EodRunsAsync();
+        made.ShouldNotBeEmpty();
+        made.ShouldAllBe(r => r.Trigger == "catch_up"); // never a scheduled start on a weekend
     }
 
     [Fact]

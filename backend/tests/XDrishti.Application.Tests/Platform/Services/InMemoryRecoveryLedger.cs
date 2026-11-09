@@ -78,8 +78,21 @@ internal sealed class InMemoryRecoveryLedger : IRecoveryLedger
     {
         lock (_gate)
         {
-            IReadOnlyList<RecoveryItemRow> rows = [.. Items.Values.Where(i => i.State == RecoveryStates.Failed && i.Attempts < maxAttempts)];
+            IReadOnlyList<RecoveryItemRow> rows = [.. Items.Values.Where(i => (i.State == RecoveryStates.Failed && i.Attempts < maxAttempts) || i.State == RecoveryStates.Waiting)];
             return ValueTask.FromResult(rows);
+        }
+    }
+
+    public ValueTask SupersedeOlderAsync(string serviceId, string occurrence, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            foreach (var key in Items.Where(i => i.Key.Service == serviceId && string.CompareOrdinal(i.Key.Occurrence, occurrence) < 0 && i.Value.State is RecoveryStates.Failed or RecoveryStates.Blocked or RecoveryStates.Waiting).Select(i => i.Key).ToList())
+            {
+                Items[key] = Items[key] with { State = RecoveryStates.Superseded, Reason = "superseded by " + occurrence };
+            }
+
+            return ValueTask.CompletedTask;
         }
     }
 

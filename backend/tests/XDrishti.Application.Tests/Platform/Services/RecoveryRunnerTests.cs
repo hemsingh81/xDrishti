@@ -273,7 +273,7 @@ public sealed class RecoveryRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task Services_started_by_a_recovery_step_through_a_run_after_chain_are_recovered_runs_too()
+    public async Task A_service_that_runs_after_another_is_made_up_by_its_own_plan_step_never_started_by_the_run_after_chain_of_a_recovery_run()
     {
         using var world = new ServicesWorld(Eod(), Make("chain", Schedule.AfterService("eod")));
         world.Data.Store("eod", world.Services[0].Definition.Defaults);
@@ -284,7 +284,99 @@ public sealed class RecoveryRunnerTests : IDisposable
         await world.Scheduler.StartUpAsync(Ct);
         await world.SettleAsync();
 
-        world.Data.RunsOf("chain").ShouldAllBe(r => r.Trigger == ServiceRunTrigger.CatchUp);
+        world.Data.RunsOf("chain").Select(r => r.Trigger).ShouldBe([ServiceRunTrigger.CatchUp]); // one run, from its own step, never an After run
         world.Services[1].Calls.Count.ShouldBe(1);
+        world.Services[1].Calls[0].RequestedBy.ShouldBe(RecoveryRunner.Requester);
+    }
+
+    [Fact]
+    public async Task A_trigger_refused_while_a_pass_runs_is_not_lost_one_trailing_pass_follows_at_the_next_look()
+    {
+        var gate = _eod.Gate();
+        _world.SetClock(At(12, 17, 0));
+        _world.Application.StartedAt = At(12, 17, 0);
+        await _world.Scheduler.StartUpAsync(Ct);
+        await _eod.WhenStartedAsync();
+        _world.SetClock(At(12, 17, 5));
+        _world.Recovery.Request(RecoveryTrigger.BrokerReconnect).ShouldBeFalse(); // refused: kept as pending
+        gate.SetResult(ServiceOutcome.Failed("down"));
+        await _world.SettleAsync();
+        _eod.Behavior = (_, _) => ValueTask.FromResult(ServiceOutcome.Succeeded());
+
+        _world.SetClock(At(12, 17, 6));
+        await _world.Scheduler.TickAsync(Ct);
+        await _world.SettleAsync();
+        _eod.Calls.Count.ShouldBe(1); // inside the debounce: still waiting
+
+        _world.SetClock(At(12, 17, 11));
+        await _world.Scheduler.TickAsync(Ct);
+        await _world.SettleAsync();
+
+        _eod.Calls.Count.ShouldBe(2);
+        _world.Ledger.Items[("eod", "2026-10-12")].State.ShouldBe(RecoveryStates.Succeeded);
+        _learn.Calls.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_skipped_run_costs_no_attempt_makes_its_dependents_wait_and_is_tried_again_at_the_next_trigger()
+    {
+        _eod.Behavior = (_, _) => ValueTask.FromResult(ServiceOutcome.Skipped("The Data account is not connected."));
+        await StartUpAtAsync(At(12, 17, 0));
+
+        var eod = _world.Ledger.Items[("eod", "2026-10-12")];
+        (eod.State, eod.Attempts).ShouldBe((RecoveryStates.Waiting, 0));
+        eod.Reason.ShouldNotBeNull().ShouldContain("not connected");
+        _world.Ledger.Items[("learn", "2026-10-12")].State.ShouldBe(RecoveryStates.Waiting);
+        _learn.Calls.ShouldBeEmpty();
+        _other.Calls.Count.ShouldBe(1);
+
+        _eod.Behavior = (_, _) => ValueTask.FromResult(ServiceOutcome.Succeeded());
+        await RequestAtAsync(At(12, 17, 11), RecoveryTrigger.BrokerReconnect);
+
+        _world.Ledger.Items[("eod", "2026-10-12")].State.ShouldBe(RecoveryStates.Succeeded);
+        _world.Ledger.Items[("learn", "2026-10-12")].State.ShouldBe(RecoveryStates.Succeeded);
+    }
+
+    [Fact]
+    public async Task A_service_paused_while_the_pass_runs_is_not_started_and_nothing_that_follows_it_runs()
+    {
+        var gate = _eod.Gate();
+        _world.SetClock(At(12, 17, 0));
+        _world.Application.StartedAt = At(12, 17, 0);
+        await _world.Scheduler.StartUpAsync(Ct);
+        await _eod.WhenStartedAsync();
+
+        (await _world.PauseAsync("learn")).IsSuccess.ShouldBeTrue();
+        gate.SetResult(ServiceOutcome.Succeeded());
+        await _world.SettleAsync();
+
+        _learn.Calls.ShouldBeEmpty();
+        _world.Ledger.Items.ContainsKey(("learn", "2026-10-12")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task A_later_step_closes_the_older_open_item_of_the_service_as_superseded()
+    {
+        var old = await _world.Ledger.BeginPassAsync("startup", At(9, 16, 0), Ct);
+        await _world.Ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), old, "eod", "2026-10-09", new DateOnly(2026, 10, 9), new DateOnly(2026, 10, 9), RecoveryStates.Failed, "down", 1, null), Ct);
+
+        await StartUpAtAsync(At(12, 17, 0));
+
+        _world.Ledger.Items[("eod", "2026-10-09")].State.ShouldBe(RecoveryStates.Superseded);
+        _world.Ledger.Items[("eod", "2026-10-12")].State.ShouldBe(RecoveryStates.Succeeded);
+    }
+
+    [Fact]
+    public async Task An_item_that_used_up_its_attempts_stays_failed_when_its_blocker_fails_again_and_a_blocked_item_runs_once_the_blocker_recovers()
+    {
+        var old = await _world.Ledger.BeginPassAsync("startup", At(12, 16, 0), Ct);
+        var day = new DateOnly(2026, 10, 12);
+        await _world.Ledger.SaveAsync(new RecoveryItemRow(Guid.NewGuid(), old, "learn", "2026-10-12", day, day, RecoveryStates.Failed, "boom", 3, null), Ct);
+        _eod.AlwaysFail("down");
+
+        await StartUpAtAsync(At(12, 17, 0));
+
+        _world.Ledger.Items[("learn", "2026-10-12")].State.ShouldBe(RecoveryStates.Failed); // not overwritten as blocked: its notice stays
+        _learn.Calls.ShouldBeEmpty();
     }
 }

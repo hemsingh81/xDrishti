@@ -62,7 +62,7 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
     /// (<see cref="ServiceStart.AlreadyRunning"/>). With <paramref name="dropWhenBusy"/> (the ticks of an interval or window schedule, ADR 0019 §5) a start that finds the service busy is only logged
     /// (<c>service.tick_dropped</c>) and leaves no run record. <paramref name="cancellationToken"/> only matters before the start: once the run record is written the work goes on whatever happens to the caller.
     /// </summary>
-    public async ValueTask<ServiceStart> StartAsync(string serviceId, ServiceRunTrigger trigger, string requestedBy, CancellationToken cancellationToken, bool dropWhenBusy = false)
+    public async ValueTask<ServiceStart> StartAsync(string serviceId, ServiceRunTrigger trigger, string requestedBy, CancellationToken cancellationToken, bool dropWhenBusy = false, bool startDependents = true)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (registry.Find(serviceId) is not { } service)
@@ -75,7 +75,7 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
             return ServiceStart.NotRunHere; // another process runs it and owns its run records
         }
 
-        var sequence = new Sequence(trigger, requestedBy);
+        var sequence = new Sequence(trigger, requestedBy) { StartDependents = startDependents };
         if (!TryReserve(serviceId, sequence))
         {
             return await BusyAsync(serviceId, trigger, dropWhenBusy);
@@ -325,9 +325,9 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
             if (!retry)
             {
                 Release(id);
-                if (outcome.Status == ServiceRunStatus.Succeeded)
+                if (outcome.Status == ServiceRunStatus.Succeeded && sequence.StartDependents)
                 {
-                    await StartDependentsAsync(id, sequence.Trigger);
+                    await StartDependentsAsync(id);
                 }
             }
         }
@@ -417,7 +417,7 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
         return true;
     }
 
-    private async Task StartDependentsAsync(string serviceId, ServiceRunTrigger cause)
+    private async Task StartDependentsAsync(string serviceId)
     {
         try
         {
@@ -429,8 +429,7 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
 
             foreach (var dependent in all.Where(s => s.Settings is { Enabled: true, Schedule: { Type: ScheduleType.After } schedule } && schedule.After == serviceId))
             {
-                // what a recovery pass sets going stays a recovered run (trigger catch_up), so a run-after chain cannot hand a made-up run to the unattended count (ADR 0240)
-                await StartAsync(dependent.Id, cause == ServiceRunTrigger.CatchUp ? ServiceRunTrigger.CatchUp : ServiceRunTrigger.After, $"system:after:{serviceId}", _stopping.Token);
+                await StartAsync(dependent.Id, ServiceRunTrigger.After, $"system:after:{serviceId}", _stopping.Token);
             }
         }
         catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
@@ -482,5 +481,8 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
         public Task? Task { get; set; }
 
         public DateTimeOffset? RetryAt { get; set; }
+
+        /// <summary>False for a run the recovery pass starts: the plan has a step for each dependent (TimeBound, paused, market hours and order are decided there), so no run-after chain starts them behind its back.</summary>
+        public bool StartDependents { get; init; } = true;
     }
 }

@@ -38,6 +38,7 @@ public sealed class RecoveryRunner(
     private Task? _pass;
     private DateTimeOffset? _lastAccepted;
     private DateTimeOffset? _resumeAt;
+    private RecoveryTrigger? _pending;
 
     /// <summary>The instant a step waiting for the market hours to end can go on; null when none waits. The scheduler asks for a pass with <see cref="RecoveryTrigger.Resume"/> when it has come.</summary>
     public DateTimeOffset? ResumeAt
@@ -65,6 +66,7 @@ public sealed class RecoveryRunner(
 
             if (_pass is { IsCompleted: false })
             {
+                _pending = trigger == RecoveryTrigger.Resume ? _pending : trigger; // a trigger refused for now is not lost: one trailing pass follows (no ledger row for it)
                 ServicesLog.RecoveryIgnored(logger, code, "a pass is running");
                 return false;
             }
@@ -72,20 +74,33 @@ public sealed class RecoveryRunner(
             var debounce = TimeSpan.FromMinutes(Math.Clamp(options.DebounceMinutes, 1, 120));
             if (trigger != RecoveryTrigger.Resume && _lastAccepted is { } last && now >= last && now - last < debounce)
             {
+                _pending = trigger;
                 ServicesLog.RecoveryIgnored(logger, code, "inside the debounce");
                 return false;
             }
 
             _lastAccepted = now;
             _resumeAt = null;
+            _pending = null;
             _pass = Task.Run(() => PassAsync(trigger, now), CancellationToken.None);
             return true;
         }
     }
 
-    /// <summary>Asks for the pass a step waiting for the close of the market hours needs, when that time has come. Cheap: no read.</summary>
+    /// <summary>Asks for the trailing pass of a trigger that was refused (a pass was running or the debounce was on), and for the pass a step waiting for the close of the market hours needs, when that time has come. Cheap: no read.</summary>
     public void ResumeIfDue()
     {
+        RecoveryTrigger? pending;
+        lock (_gate)
+        {
+            pending = _pending;
+        }
+
+        if (pending is { } trailing)
+        {
+            Request(trailing); // accepted once the pass has ended and the debounce is over; refused (and kept) until then
+        }
+
         if (ResumeAt is { } at && clock.GetUtcNow() >= at)
         {
             Request(RecoveryTrigger.Resume);
@@ -237,9 +252,16 @@ public sealed class RecoveryRunner(
             var id = step.ServiceId;
             var occurrence = step.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             var existing = await ledger.FindAsync(id, occurrence, cancellationToken);
-            if (existing is { State: RecoveryStates.Succeeded })
+            if (existing is { State: RecoveryStates.Succeeded or RecoveryStates.Superseded })
             {
                 continue;
+            }
+
+            if (existing is { State: RecoveryStates.Failed } && existing.Attempts >= maxAttempts)
+            {
+                failed[id] = existing.Reason ?? "failed";
+                allGood = false;
+                continue; // stays failed (never overwritten): the notice is derived from the ledger
             }
 
             var item = existing ?? new RecoveryItemRow(Guid.CreateVersion7(clock.GetUtcNow()), passId, id, occurrence, step.From, step.To, RecoveryStates.Running, null, 0, null);
@@ -266,24 +288,25 @@ public sealed class RecoveryRunner(
                 if (waiting.Contains(blocker))
                 {
                     waiting.Add(id);
-                    await ledger.SaveAsync(item with { State = RecoveryStates.Waiting, Reason = $"waiting: {blocker} waits for the market hours to end" }, cancellationToken);
+                    await ledger.SaveAsync(item with { State = RecoveryStates.Waiting, Reason = Clip($"waiting: {blocker} waits") }, cancellationToken);
                     ServicesLog.RecoveryStep(logger, id, occurrence, RecoveryStates.Waiting);
                 }
                 else
                 {
                     failed[id] = $"{blocker} did not run";
-                    await ledger.SaveAsync(item with { State = RecoveryStates.Blocked, Reason = $"blocked by {blocker}: {failed[blocker]}" }, cancellationToken);
+                    await ledger.SaveAsync(item with { State = RecoveryStates.Blocked, Reason = Clip($"blocked by {blocker}: {failed[blocker]}") }, cancellationToken);
                     ServicesLog.RecoveryBlocked(logger, id, occurrence, blocker);
                 }
 
                 continue;
             }
 
-            if (existing is { State: RecoveryStates.Failed or RecoveryStates.Blocked } && existing.Attempts >= maxAttempts)
+            // the settings are read again for each step: a service paused or with catch-up switched off while the pass runs is not started (paused stays paused), and the nightly's cutoff is checked again
+            if (!await StillEligibleAsync(services, planned, step, cancellationToken))
             {
-                failed[id] = existing.Reason ?? "failed";
+                failed[id] = "no longer eligible (paused, catch-up off or past its cutoff)";
                 allGood = false;
-                continue; // stays failed: the notice is derived from the ledger
+                continue;
             }
 
             if (InMarketHours(planned.Inputs[id], planned.Calendar) is { } resumeAt)
@@ -300,8 +323,14 @@ public sealed class RecoveryRunner(
                 continue;
             }
 
+            await ledger.SupersedeOlderAsync(id, occurrence, cancellationToken); // an older open item of the service is covered by this step, so it no longer holds the baseline back
             var done = await RunStepAsync(services, ledger, planned, step, item, cancellationToken);
-            if (done.State != RecoveryStates.Succeeded)
+            if (done.State == RecoveryStates.Waiting)
+            {
+                waiting.Add(id);
+                allGood = false;
+            }
+            else if (done.State != RecoveryStates.Succeeded)
             {
                 failed[id] = done.Reason ?? "failed";
                 allGood = false;
@@ -311,37 +340,84 @@ public sealed class RecoveryRunner(
         return allGood ? "succeeded" : "incomplete";
     }
 
+    private async Task<bool> StillEligibleAsync(IServiceProvider services, Planned planned, RecoveryStep step, CancellationToken cancellationToken)
+    {
+        var current = await services.GetRequiredService<ServiceSettingsReader>().ReadAsync(step.ServiceId, cancellationToken);
+        if (!current.Settings.Enabled || !current.Settings.CatchUp)
+        {
+            return false;
+        }
+
+        if (!string.Equals(step.ServiceId, RecoveryPlanner.NightlyId, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        // the nightly runs only before its review cutoff: plan again at this instant and keep the step only if it is still there
+        return await PlanAsync(services, clock.GetUtcNow(), cancellationToken) is { } again && again.Plan.Steps.Any(s => s.ServiceId == step.ServiceId && s.To == step.To);
+    }
+
     private async Task<RecoveryItemRow> RunStepAsync(IServiceProvider services, IRecoveryLedger ledger, Planned planned, RecoveryStep step, RecoveryItemRow item, CancellationToken cancellationToken)
     {
         var id = step.ServiceId;
         var runs = services.GetRequiredService<IServiceRunStore>();
         var due = planned.Plan.Items.Where(i => i.ServiceId == id && i.Status == RecoveryItemStatus.Planned).Max(i => i.Due);
 
-        // a run of the scheduler or of a run-after chain may be going: it is waited for, and when it made up the occurrence the step is done (one run per occurrence, never two)
+        // a run of the scheduler may be going: it is waited for, and when it made up the occurrence the step is done (one run per occurrence, never two)
         await runner.WhenServiceIdleAsync(id, cancellationToken);
-        if ((await runs.GetLatestAsync([id], cancellationToken)).GetValueOrDefault(id) is { Status: ServiceRunStatus.Succeeded } handled && handled.StartedAt >= due)
+        if ((await runs.GetLatestAsync([id], cancellationToken)).GetValueOrDefault(id) is { } handled && handled.StartedAt >= due && handled.Status != ServiceRunStatus.Running)
         {
-            var made = item with { State = RecoveryStates.Succeeded, Reason = null, RunId = handled.Id };
-            await ledger.SaveAsync(made, cancellationToken);
-            ServicesLog.RecoveryStep(logger, id, item.Occurrence, RecoveryStates.Succeeded);
-            return made;
+            if (handled.Status == ServiceRunStatus.Succeeded)
+            {
+                var made = item with { State = RecoveryStates.Succeeded, Reason = null, RunId = handled.Id };
+                await ledger.SaveAsync(made, cancellationToken);
+                ServicesLog.RecoveryStep(logger, id, item.Occurrence, RecoveryStates.Succeeded);
+                return made;
+            }
+
+            if (handled.Trigger != ServiceRunTrigger.CatchUp)
+            {
+                // the scheduler ran it at its time (it failed or was skipped, with its own notice and retries): the pass does not run it again behind it; what follows it is blocked
+                return item with { State = RecoveryStates.Failed, Reason = "its scheduled run did not succeed; see its history" };
+            }
         }
 
+        var before = item;
         item = item with { State = RecoveryStates.Running, Reason = null, Attempts = item.Attempts + 1, RunId = null };
         await ledger.SaveAsync(item, cancellationToken);
-        var start = await runner.StartAsync(id, ServiceRunTrigger.CatchUp, Requester, cancellationToken);
         RecoveryItemRow end;
-        if (start.Run is not { } run || start.AlreadyRunning)
+        try
         {
-            end = item with { State = RecoveryStates.Failed, Reason = "the service could not be started" };
+            // dependents are planned steps of their own: no run-after chain starts them behind the plan
+            var start = await runner.StartAsync(id, ServiceRunTrigger.CatchUp, Requester, cancellationToken, startDependents: false);
+            if (start.Run is not { } run || start.AlreadyRunning)
+            {
+                end = item with { State = RecoveryStates.Failed, Reason = "the service could not be started" };
+            }
+            else
+            {
+                await runner.WhenServiceIdleAsync(id, cancellationToken);
+                var last = (await runs.ListAsync(id, 0, 10, cancellationToken)).FirstOrDefault(r => r.StartedAt >= run.StartedAt && r.Trigger == ServiceRunTrigger.CatchUp) ?? run;
+                end = last.Status switch
+                {
+                    ServiceRunStatus.Succeeded => item with { State = RecoveryStates.Succeeded, Reason = null, RunId = last.Id },
+
+                    // the service could not do it now (no connected account, source down): not a failure and no attempt used; it is tried again at the next trigger and its dependents wait
+                    ServiceRunStatus.Skipped => before with { State = RecoveryStates.Waiting, Reason = Clip("waiting: " + (last.Message ?? "the service had nothing to run on")), RunId = last.Id },
+                    _ => item with { State = RecoveryStates.Failed, Reason = Clip(last.Message ?? "the run did not succeed"), RunId = last.Id },
+                };
+            }
         }
-        else
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await runner.WhenServiceIdleAsync(id, cancellationToken);
-            var last = (await runs.GetLatestAsync([id], cancellationToken)).GetValueOrDefault(id) ?? run;
-            end = last.Status == ServiceRunStatus.Succeeded
-                ? item with { State = RecoveryStates.Succeeded, Reason = null, RunId = last.Id }
-                : item with { State = RecoveryStates.Failed, Reason = Clip(last.Message ?? "the run did not succeed"), RunId = last.Id };
+            throw;
+        }
+#pragma warning disable CA1031 // one step that throws must not end the pass or leave its item running
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            ServicesLog.RecoveryCrashed(logger, id, ex);
+            end = item with { State = RecoveryStates.Failed, Reason = "the step failed unexpectedly" };
         }
 
         await ledger.SaveAsync(end, CancellationToken.None);
