@@ -44,3 +44,6 @@ None.
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`) and migration added, where this slice has them
 - [ ] Design docs/ADR updated if behaviour changed
+
+## Build note 2026-11-09 (partial, approved by delegation)
+Built: the five-row essentials view, the Advanced reveal, loading/empty/error states. AC3 and AC4 are not met yet: `auto.enabled` and `suggest.scope` have no store until AU-17 and AU-16, and `notices.failure` has none; the rows are read-only and offer no control. The change-history line and Reset to default follow with AU-10 (learned changes). Those slices must finish AC3 and AC4 here.

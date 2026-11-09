@@ -128,7 +128,7 @@ describe('app routes', () => {
     renderRoutes(routes, { initialPath: '/settings' });
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
-    expect(await screen.findByRole('tab', { name: 'Risk profiles', selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole('list', { name: 'Essential settings' })).toBeInTheDocument();
     expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
   });
 

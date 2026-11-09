@@ -7,7 +7,7 @@ import { createStepUpGate, problemResponse, server } from '@/test/server';
 import { SettingsPage } from './components/SettingsPage';
 
 function renderProfiles() {
-  return renderRoutes([{ path: '/settings', element: <SettingsPage /> }], { initialPath: '/settings' });
+  return renderRoutes([{ path: '/settings', element: <SettingsPage /> }], { initialPath: '/settings?tab=profiles' });
 }
 
 async function confirmPassword() {
