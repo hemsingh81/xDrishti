@@ -78,7 +78,12 @@ export function TopBar({ title, onMenu }: { title: string; onMenu: () => void })
             {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
           </IconButton>
         </Tooltip>
-        <UserMenu />
+        {/* About the size of the menu button, so it loading in does not move the other controls. */}
+        <Suspense
+          fallback={<Skeleton variant="rounded" sx={{ width: { xs: 44, lg: 150 }, height: { xs: 44, sm: 36 } }} />}
+        >
+          <UserMenu />
+        </Suspense>
       </Toolbar>
     </AppBar>
   );

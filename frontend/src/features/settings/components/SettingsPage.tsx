@@ -53,8 +53,16 @@ export function SettingsPage() {
         ))}
       </Tabs>
       <Box role="tabpanel" id={`settings-panel-${tab}`} aria-labelledby={`settings-tab-${tab}`}>
-        {tab === 'profiles' && <RiskProfilesView />}
-        {tab === 'roles' && <RoleMatrixView />}
+        {tab === 'profiles' && (
+          <Suspense fallback={<LoadingState label="Loading risk profiles" />}>
+            <RiskProfilesView />
+          </Suspense>
+        )}
+        {tab === 'roles' && (
+          <Suspense fallback={<LoadingState label="Loading the role matrix" />}>
+            <RoleMatrixView />
+          </Suspense>
+        )}
         {tab === 'actions' && <ActionThresholdsCard />}
         {tab === 'charge-sheet' && (
           <Suspense fallback={<LoadingState label="Loading the confirmation" />}>
