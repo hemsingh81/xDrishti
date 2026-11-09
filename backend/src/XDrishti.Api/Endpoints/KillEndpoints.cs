@@ -25,7 +25,13 @@ internal sealed class KillEndpoints : IEndpointModule
 
         group.MapPost("/kill-proposals/{id:long}/apply", ApplyAsync)
             .WithName("ApplyKillProposal")
-            .WithSummary("Apply a kill proposal as the owner: every cell it names that is still Paper or Active moves to Paused through the lifecycle, with a changelog row carrying the rule, the numbers and the settings hash. Needs the owner's session and the CSRF token. Applying twice changes nothing twice. It places no order. 404 confidence.proposal_not_found, 409 confidence.proposal_closed")
+            .WithSummary("Apply a kill proposal as the owner: every cell it names that is still Paper or Active moves to Paused through the lifecycle, with a changelog row carrying the rule, the numbers and the settings hash. Needs the owner's session and the CSRF token. Applying twice changes nothing twice. It places no order. 404 confidence.proposal_not_found, 409 confidence.proposal_closed, 409 confidence.proposal_dismissed_during_apply (dismissed meanwhile; the cells it paused stay paused)")
+            .ProducesRejections(conflict: true);
+
+        group.MapPost("/kill-proposals/{id:long}/dismiss", DismissAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy)
+            .WithName("DismissKillProposal")
+            .WithSummary("Dismiss a kill proposal as the owner: records the owner (from the session) and the reason, once, and changes no cell and no lifecycle state; a dismissed proposal can never be applied. Needs a session, the CSRF token and a fresh password in the body. Dismissing twice changes nothing twice (alreadyDismissed true, the first actor and reason stand). It places no order. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 429 auth.rate_limited, 400 confidence.reason_invalid, 404 confidence.proposal_not_found, 409 confidence.proposal_applied")
             .ProducesRejections(conflict: true);
 
         group.MapPut("/kill-settings", SwitchAsync)
@@ -70,6 +76,25 @@ internal sealed class KillEndpoints : IEndpointModule
         }
 
         var result = await handler.HandleAsync(new ApplyKillCommand(id, owner.Value), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<DismissKillOutcome>, ProblemHttpResult>> DismissAsync(
+        long id,
+        DismissKillRequest request,
+        HttpContext http,
+        ICommandHandler<StepUpCommand, StepUpResult> passwordCheck,
+        ICommandHandler<DismissKillCommand, DismissKillOutcome> handler,
+        CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var owner = await OwnerAct.FreshAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new DismissKillCommand(id, owner.Value, request.Reason ?? string.Empty), cancellationToken);
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 

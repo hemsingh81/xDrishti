@@ -26,6 +26,7 @@ public sealed record GetKillProposalsQuery(string? State, string? Strategy, int 
 /// <param name="Actor"><c>owner:...</c> or <c>auto</c> once applied, else null.</param>
 /// <param name="DecidedAt">When it was decided, or null.</param>
 /// <param name="AutoSettingId">For an automatic decision, the switch row in force; else null.</param>
+/// <param name="DismissReason">The owner's reason when the proposal was dismissed, else null.</param>
 public sealed record KillProposalView(
     long Id,
     string Strategy,
@@ -42,7 +43,8 @@ public sealed record KillProposalView(
     string State,
     string? Actor,
     DateTimeOffset? DecidedAt,
-    long? AutoSettingId);
+    long? AutoSettingId,
+    string? DismissReason = null);
 
 /// <summary>The automatic setting and the thresholds as they stand.</summary>
 /// <param name="Auto">Whether an automatic demotion is allowed now (default OFF).</param>

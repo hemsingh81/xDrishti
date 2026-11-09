@@ -12620,7 +12620,7 @@
         "tags": [
           "Confidence"
         ],
-        "summary": "Apply a kill proposal as the owner: every cell it names that is still Paper or Active moves to Paused through the lifecycle, with a changelog row carrying the rule, the numbers and the settings hash. Needs the owner's session and the CSRF token. Applying twice changes nothing twice. It places no order. 404 confidence.proposal_not_found, 409 confidence.proposal_closed",
+        "summary": "Apply a kill proposal as the owner: every cell it names that is still Paper or Active moves to Paused through the lifecycle, with a changelog row carrying the rule, the numbers and the settings hash. Needs the owner's session and the CSRF token. Applying twice changes nothing twice. It places no order. 404 confidence.proposal_not_found, 409 confidence.proposal_closed, 409 confidence.proposal_dismissed_during_apply (dismissed meanwhile; the cells it paused stay paused)",
         "operationId": "ApplyKillProposal",
         "parameters": [
           {
@@ -12640,6 +12640,78 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApplyKillOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/confidence/kill-proposals/{id}/dismiss": {
+      "post": {
+        "tags": [
+          "Confidence"
+        ],
+        "summary": "Dismiss a kill proposal as the owner: records the owner (from the session) and the reason, once, and changes no cell and no lifecycle state; a dismissed proposal can never be applied. Needs a session, the CSRF token and a fresh password in the body. Dismissing twice changes nothing twice (alreadyDismissed true, the first actor and reason stand). It places no order. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 429 auth.rate_limited, 400 confidence.reason_invalid, 404 confidence.proposal_not_found, 409 confidence.proposal_applied",
+        "operationId": "DismissKillProposal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissKillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DismissKillOutcome"
                 }
               }
             }
@@ -32223,6 +32295,80 @@
         },
         "description": "The discipline report of a window (spec P10-03, R19). Every R has its n and its state; there is no composite score."
       },
+      "DismissKillOutcome": {
+        "required": [
+          "proposalId",
+          "strategy",
+          "rule",
+          "state",
+          "alreadyDismissed",
+          "actor",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "proposalId": {
+            "type": "integer",
+            "description": "The proposal.",
+            "format": "int64"
+          },
+          "strategy": {
+            "type": "string",
+            "description": "Its strategy."
+          },
+          "rule": {
+            "type": "string",
+            "description": "Its rule."
+          },
+          "state": {
+            "type": "string",
+            "description": "The state after this call (`dismissed`)."
+          },
+          "alreadyDismissed": {
+            "type": "boolean",
+            "description": "True when it was dismissed before this call (nothing was changed now; the first actor and reason stand)."
+          },
+          "actor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who dismissed it (the first time)."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The reason given the first time."
+          }
+        },
+        "description": "What dismissing did."
+      },
+      "DismissKillRequest": {
+        "required": [
+          "reason",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 400 characters."
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's password, re-entered for THIS act. Missing: 403 auth.step_up_required; wrong: 401, counted toward the lockout."
+          }
+        },
+        "description": "The body of a dismissal of a kill proposal. The owner is never part of it: the actor comes from the signed-in session."
+      },
       "DistributionBinView": {
         "required": [
           "lowerR",
@@ -41819,6 +41965,13 @@
             ],
             "description": "For an automatic decision, the switch row in force; else null.",
             "format": "int64"
+          },
+          "dismissReason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's reason when the proposal was dismissed, else null."
           }
         },
         "description": "One kill proposal as the owner reads it."

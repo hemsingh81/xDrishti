@@ -328,6 +328,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(LoopReportView))]
 [JsonSerializable(typeof(KillProposalsView))]
 [JsonSerializable(typeof(ApplyKillOutcome))]
+[JsonSerializable(typeof(DismissKillOutcome))]
+[JsonSerializable(typeof(DismissKillRequest))]
 [JsonSerializable(typeof(KillSwitched))]
 [JsonSerializable(typeof(KillSwitchRequest))]
 [JsonSerializable(typeof(ReEnableOutcome))]

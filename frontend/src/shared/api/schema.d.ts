@@ -3824,8 +3824,25 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Apply a kill proposal as the owner: every cell it names that is still Paper or Active moves to Paused through the lifecycle, with a changelog row carrying the rule, the numbers and the settings hash. Needs the owner's session and the CSRF token. Applying twice changes nothing twice. It places no order. 404 confidence.proposal_not_found, 409 confidence.proposal_closed */
+    /** Apply a kill proposal as the owner: every cell it names that is still Paper or Active moves to Paused through the lifecycle, with a changelog row carrying the rule, the numbers and the settings hash. Needs the owner's session and the CSRF token. Applying twice changes nothing twice. It places no order. 404 confidence.proposal_not_found, 409 confidence.proposal_closed, 409 confidence.proposal_dismissed_during_apply (dismissed meanwhile; the cells it paused stay paused) */
     post: operations['ApplyKillProposal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/confidence/kill-proposals/{id}/dismiss': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Dismiss a kill proposal as the owner: records the owner (from the session) and the reason, once, and changes no cell and no lifecycle state; a dismissed proposal can never be applied. Needs a session, the CSRF token and a fresh password in the body. Dismissing twice changes nothing twice (alreadyDismissed true, the first actor and reason stand). It places no order. 403 auth.step_up_required (no password), 401 auth.invalid_credentials, 423 auth.locked, 429 auth.rate_limited, 400 confidence.reason_invalid, 404 confidence.proposal_not_found, 409 confidence.proposal_applied */
+    post: operations['DismissKillProposal'];
     delete?: never;
     options?: never;
     head?: never;
@@ -10243,6 +10260,33 @@ export interface components {
       /** @description The honest limits. */
       limits: string[];
     };
+    /** @description What dismissing did. */
+    DismissKillOutcome: {
+      /**
+       * Format: int64
+       * @description The proposal.
+       */
+      proposalId: number;
+      /** @description Its strategy. */
+      strategy: string;
+      /** @description Its rule. */
+      rule: string;
+      /** @description The state after this call (`dismissed`). */
+      state: string;
+      /** @description True when it was dismissed before this call (nothing was changed now; the first actor and reason stand). */
+      alreadyDismissed: boolean;
+      /** @description Who dismissed it (the first time). */
+      actor: null | string;
+      /** @description The reason given the first time. */
+      reason: null | string;
+    };
+    /** @description The body of a dismissal of a kill proposal. The owner is never part of it: the actor comes from the signed-in session. */
+    DismissKillRequest: {
+      /** @description Why, 1 to 400 characters. */
+      reason: null | string;
+      /** @description The owner's password, re-entered for THIS act. Missing: 403 auth.step_up_required; wrong: 401, counted toward the lockout. */
+      password: null | string;
+    };
     /** @description One bin of an R distribution: trades with R from LowerR (included) to UpperR (excluded); a null edge is open. */
     DistributionBinView: {
       /**
@@ -13576,6 +13620,8 @@ export interface components {
        * @description For an automatic decision, the switch row in force; else null.
        */
       autoSettingId: null | number;
+      /** @description The owner's reason when the proposal was dismissed, else null. */
+      dismissReason?: null | string;
     };
     /** @description The proposals and the settings beside them. */
     KillProposalsView: {
@@ -31665,6 +31711,59 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApplyKillOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DismissKillProposal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DismissKillRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DismissKillOutcome'];
         };
       };
       /** @description Bad Request */

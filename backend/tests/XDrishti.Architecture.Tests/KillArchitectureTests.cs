@@ -437,11 +437,11 @@ public sealed class KillArchitectureTests
     public void The_switch_has_one_writer_the_owners_handler_and_the_proposals_have_two()
     {
         Dependents(Application, typeof(IKillSwitchStore).FullName!).ShouldBe(["XDrishti.Application.Confidence.ChangeKillSwitchHandler"]);
-        Dependents(Application, typeof(IKillProposalStore).FullName!).ShouldBe(["XDrishti.Application.Confidence.ApplyKillHandler", "XDrishti.Application.Confidence.ProposeKillHandler"]);
+        Dependents(Application, typeof(IKillProposalStore).FullName!).ShouldBe(["XDrishti.Application.Confidence.ApplyKillHandler", "XDrishti.Application.Confidence.DismissKillHandler", "XDrishti.Application.Confidence.ProposeKillHandler"]);
         Dependents(Application, typeof(IKillSettings).FullName!).ShouldBe(["XDrishti.Application.Confidence.ApplyKillHandler", "XDrishti.Application.Confidence.GetKillProposalsHandler", "XDrishti.Application.Confidence.ProposeKillHandler"]);
         Dependents(Application, typeof(IKillProposalReader).FullName!).ShouldBe(
         [
-            "XDrishti.Application.Confidence.ApplyKillHandler", "XDrishti.Application.Confidence.GetDecayReportHandler", "XDrishti.Application.Confidence.GetKillProposalsHandler", "XDrishti.Application.Confidence.KillProposalNotices",
+            "XDrishti.Application.Confidence.ApplyKillHandler", "XDrishti.Application.Confidence.DismissKillHandler", "XDrishti.Application.Confidence.GetDecayReportHandler", "XDrishti.Application.Confidence.GetKillProposalsHandler", "XDrishti.Application.Confidence.KillProposalNotices",
             "XDrishti.Application.Confidence.ProposeKillHandler", "XDrishti.Application.Confidence.ReEnableCellHandler",
         ]);
         Dependents(Application, typeof(IDecayCheckStore).FullName!).ShouldBe(["XDrishti.Application.Confidence.ProposeKillHandler"]);
@@ -531,7 +531,7 @@ public sealed class KillArchitectureTests
         var source = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Endpoints", "KillEndpoints.cs"));
 
         source.Split("MapGet(").Length.ShouldBe(2);
-        source.Split("MapPost(").Length.ShouldBe(3, "apply and re-enable");
+        source.Split("MapPost(").Length.ShouldBe(4, "apply, dismiss and re-enable");
         source.Split("MapPut(").Length.ShouldBe(2, "the switch");
         foreach (var verb in new[] { "MapDelete", "MapPatch", "MapMethods" })
         {
@@ -539,9 +539,10 @@ public sealed class KillArchitectureTests
         }
 
         source.ShouldContain("/kill-proposals/{id:long}/apply");
+        source.ShouldContain("/kill-proposals/{id:long}/dismiss");
         source.ShouldContain("/{key}/re-enable");
         source.ShouldContain("/kill-settings");
-        source.Split("OwnerAct.FreshAsync(").Length.ShouldBe(3, "the two acts that raise or allow risk, through the one shared step-up helper");
+        source.Split("OwnerAct.FreshAsync(").Length.ShouldBe(4, "the two acts that raise or allow risk and the dismissal, through the one shared step-up helper");
         File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Endpoints", "OwnerAct.cs")).ShouldContain("AuthErrors.StepUpRequired"); // a missing password is 403 in the helper
         source.ShouldContain("OwnerAct.SessionOwner(http)"); // apply: the session's owner, no password (the safe direction)
         source.ShouldNotContain("request.Actor");
@@ -554,6 +555,14 @@ public sealed class KillArchitectureTests
         KillActors.Auto.ShouldBe("auto");
         typeof(PauseCellCommand).GetProperties().Select(p => p.Name).ShouldNotContain("To");
         typeof(PauseCellCommand).GetProperties().Select(p => p.Name).ShouldNotContain("Facts");
+    }
+
+    [Fact]
+    public void The_dismissal_takes_only_the_proposal_reader_and_store_and_a_logger()
+    {
+        var handler = typeof(ApplyKillHandler).Assembly.GetType("XDrishti.Application.Confidence.DismissKillHandler")!;
+
+        handler.GetConstructors().Single().GetParameters().Select(p => p.ParameterType).ShouldBe([typeof(IKillProposalReader), typeof(IKillProposalStore), typeof(Microsoft.Extensions.Logging.ILogger<>).MakeGenericType(handler)]);
     }
 
     [Fact]

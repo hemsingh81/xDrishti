@@ -989,6 +989,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<PauseCellCommand, ChangelogOutcome>, PauseCellHandler>(); // the pause of a cell: the one lifecycle move the automatic kill path can ask for (CF-12 part 12b, ADR 0219)
         services.AddScoped<ICommandHandler<ProposeKillCommand, ProposeKillOutcome>, ProposeKillHandler>(); // one strategy's daily kill evaluation: a proposal per firing rule; applies only with the owner's setting ON (CF-12 part 12b)
         services.AddScoped<ICommandHandler<ApplyKillCommand, ApplyKillOutcome>, ApplyKillHandler>(); // applies a kill proposal: demote first, then compare-and-set; owner or the automatic setting (CF-12 part 12b)
+        services.AddScoped<ICommandHandler<DismissKillCommand, DismissKillOutcome>, DismissKillHandler>(); // dismisses a kill proposal: the owner's act, a reason, insert-only decision, no lifecycle change (CF-12 leftover, ADR 0234)
         services.AddScoped<ICommandHandler<ReEnableCellCommand, ReEnableOutcome>, ReEnableCellHandler>(); // Paused to Paper: the owner's act only, never automatic (CF-12 part 12b)
         services.AddScoped<ICommandHandler<ChangeKillSwitchCommand, KillSwitched>, ChangeKillSwitchHandler>(); // the owner's switch confidence.kill.auto (default OFF) (CF-12 part 12b)
         services.AddScoped<ICommandHandler<EvaluateDecayCommand, DecayRunOutcome>, EvaluateDecayHandler>(); // the daily run over every strategy with shadow candidates (CF-12 part 12b)

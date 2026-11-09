@@ -53,6 +53,9 @@ const passwordCheckPaths = new Set<string>([
   '/api/selection/event-filter',
   '/api/lab/runs/{id}/holdout-unlock',
   '/api/confidence/readiness-settings',
+  '/api/confidence/kill-proposals/{id}/dismiss',
+  '/api/confidence/kill-settings',
+  '/api/learning/cells/{key}/re-enable',
 ]);
 
 api.use({
