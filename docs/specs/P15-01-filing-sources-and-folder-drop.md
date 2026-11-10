@@ -1,6 +1,6 @@
 # P15-01 — Filing sources and the folder drop: the port, one local adapter, the owner's drop script, and the public-page fetcher designed but not built
 
-- **Status:** Approved (owner, 2026-11-02: pre-approved in the autonomous loop; open questions resolved with the recommended/safer answers listed in the spec)
+- **Status:** Built 2026-11-02 (ADR 0179). Approved (owner, 2026-11-02: pre-approved in the autonomous loop; open questions resolved with the recommended/safer answers listed in the spec)
 - **Phase / roadmap row:** P15 — slice P15-01 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Point-in-time filings ...").
 - **Design refs:** docs/design/20 §D · 19 §1, §5 · ADR 0133 (allow-list rule), 0097 (pinned list), 0083 (no order). P15-00 decisions D1 (folder drop is the default source) and D3 (point in time by broadcast time). New ADR: **next free number at build time** (the folder-drop sidecar contract and the recorded decision not to fetch).
 - **Needs:** P1 (instruments by symbol, only for P15-02). **Needed by:** P15-02 (the store ingests what this adapter lists), P15-04 (the CSV drops).

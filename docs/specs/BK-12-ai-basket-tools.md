@@ -83,3 +83,14 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 - Scope now says eight questions (matches criterion 10).
 - Golden answers and the model stub must not contain "outperform" or "excess" (nor "best" without a ranked lower bound); the eval forbidden-phrase list gets both words.
 - Size unchanged: 2 agent-days.
+
+## Review 2026-11-10
+- **Needs, now built:** P9-02 (ADR 0137), P9-03 (ADR 0138), P9-05 (ADR 0139), P9-09 (ADR 0143).
+  - `get_report` is served by `ReportToolReader` through the port `IAiReportReader`, which calls the Reports handlers. Its `report` values today are `summary`, `groups`, `pivot`, `what_works`, `equity`, `distribution` and `insights`.
+  - `get_basket` exists (`XDrishti.Mcp/GetBasketTool.cs`). There are 16 tools (15 on the server plus `make_chart`), with a schema budget under 2,200 tokens and descriptions of at most 40 words.
+  - P9-05's log events are 6120 to 6123, so this slice takes the next free ids in that block (6124 on), not "6120 to 6159".
+  - The eval questions go to `eval/sets/data-questions.jsonl`.
+  - The adapter is `IAiReportReader` (Decision 1 of ADR 0139), not a new `Application/Ai/BasketReportTools` path.
+- **Gross only (ADR 0139 §2):** the assistant serves gross figures. Profile figures are price returns, so this does not affect them, but the strategy panel's figures are gross.
+- **Grounding (ADR 0139 §12/13):** a derived number must come from `calc` with grounded operands. AC 12's stub ("about 12 % better") is refused by that rule.
+- **Training fence:** the `aiv` views and the report handlers already read research runs only (ADR 0243).

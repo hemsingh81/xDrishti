@@ -1,6 +1,6 @@
 # CF-08 — Shadow paper trading of every nightly candidate (forward-only, written before the open, a separate "edge" count)
 
-- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
+- **Status:** Built 2026-11-05 to 2026-11-09 (ADRs 0211, 0212, 0232). Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** CF — Confidence programme (row added by CF-00; UNVERIFIED). Extends P10 (paper) without changing its exit criterion.
 - **Design refs:** docs/design/18-roadmap.md (P10 row) · 09-learning-engine.md §5, §9 · docs/research/confidence-learning-and-validation-speed.md §2.1, §2.2, §2.6 · P10-00 (D2, D4, D6, D8, D11), P10-01 (AC2), P10-05, P7-03, P7-13 · ADRs 0090 (one replay path), 0099 (count once), 0116 (paper capture), 0119 (fingerprint)
 - **Needs:** P7 nightly plan, plan record and `TicketReplayer` (built), P10-01/04/05 (built), CF-00. Feeds CF-09, CF-10, CF-11, CF-12. CF-01 supplies the effective-n estimator (this slice stores what it needs and uses a placeholder rho of 0.3 until then).

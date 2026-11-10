@@ -94,3 +94,10 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 - The thresholds 0.67 (`mom_rank`) and rank <= 3 (`sector_rs`) in the `RS_ROTATION` text are fixed in this spec; changing either is a new variant and counts in N.
 - State t is the last closed session; the DSL's one-session lag must not apply a second shift to these stored values (a test with a known-value fixture proves the feature at decision day D equals the stored row of D-1, not D-2).
 - `rule version` replaced by `params_hash` in the body. Size unchanged: 5 agent-days.
+
+## Review 2026-11-10
+- **P3-02f is built** (lag on feature calls, ADR 0108). The review-fix test "D equals the stored row of D-1, not D-2" stands. P3-01c/d are built (`market.context_daily`, Nifty 50 index legs).
+- **Trials:** besides `MultipleTesting.Factor`, CF-06 (ADR 0207) counts every look in `lab.test_ledger` (`TrialCounts`). The universe is part of a version's plan hash, so a run of `RS_ROTATION` on another basket is a `replan` row. AC 11's count is that ledger count, and it enters `Factor` only when the owner's `CountInFactor` switch is ON (default OFF; otherwise it is shown beside the verdict). CF-03's deflated Sharpe and PBO read the same count.
+- **Pre-registration (ADR 0207 D1):** `RS_ROTATION`'s version needs a `lab.registrations` row before its first full or robust run. Without one, the run carries `not_registered`, or is refused while `Confidence:Registration:Enforce` is on.
+- **Recovery class (ADR 0240):** if the daily step is a separate service, it declares `Convergent` (insert-once rows per missing date); as a post-step of `eod` it needs none.
+- **Corporate actions:** the exclusion uses the same rule as `BreadthCalculator` (ex-date in the window) or BK-02's `corporate_action_unresolved`. Name one at build.

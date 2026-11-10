@@ -92,7 +92,9 @@ monitoring comes early because it is useful on its own while the trading engine 
     P12 Execution service                :p12, after p11, 6w
     P13 Tick/depth features              :p13, after p12, 5w
     P14 Options and stat-arb             :p14, after p13, 8w
-    P15 Fundamentals and events          :p15, after p14, 4w</pre></figure>
+    P15 Fundamentals and events          :p15, after p14, 4w
+    section Automation
+    AU Automation and simplicity         :done, au, 2026-11-09, 2d</pre></figure>
 <table>
 <thead>
 <tr>
@@ -158,7 +160,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td><strong>P11 Small live</strong> (≥ 8w)</td>
-<td>25–50% of intended risk; live vs paper slippage; <strong>execution feedback</strong> (grade on fills, slippage per liquidity bucket, capacity score)</td>
+<td>25–50% of intended risk; live vs paper slippage; <strong>execution feedback</strong> (grade on fills, slippage per liquidity bucket, capacity score); the static-IP and SEBI enquiry starts at week 0 (P11-05 built 2026-10-28: <a href="../research/p11-static-ip-and-sebi-runbook.html">runbook</a> and a compliance record in the app)</td>
 <td>Live within expectations ⇒ scale gradually</td>
 </tr>
 <tr>
@@ -168,18 +170,169 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td><strong>P13 Tick/depth features</strong> (5w)</td>
-<td>Microstructure features from ≥ 6 months recorded data; depth-based slippage</td>
+<td>Microstructure features from ≥ 6 months recorded data; depth-based slippage. <em>Status 2026-11-10: P13-05 built (ADR 0183); the depth and tick recorders are built (P7-16, P7-16b) and ship OFF; the other nine slices (about 20 agent-days) wait for about 11 months of recordings from the day the owner switches the recorders on.</em></td>
 <td>Kept only if OOS intraday expectancy improves</td>
 </tr>
 <tr>
 <td><strong>P14 Options &amp; stat-arb</strong> (8w)</td>
-<td>Option-chain archive, expired-options backtests, instrument-expression dimension, defined-risk structures; <code>PAIRS</code>/<code>BASIS</code></td>
+<td>Option-chain archive, expired-options backtests, instrument-expression dimension, defined-risk structures; <code>PAIRS</code>/<code>BASIS</code>. <em>P14-17 phase check built 2026-11-04: <code>xd options phase-check [--cut FAMILY,...] [--json]</code> reads the newest stored verdict of each of the seven families (<code>expr:option_buy</code>, <code>expr:debit_spread</code>, <code>expr:credit_spread</code>, <code>expr:iron_condor</code>, <code>ext:iv-1</code>, <code>pairs:intraday-1</code>, <code>basis:carry-1</code>, which is not built and reads <code>none stored</code>) for the current versions only (a record of an older re-mark version, engine, archive watermark, spread model, cost sheet or profile is stale), and prints MET, NOT MET or NOT EVALUABLE with each open family and its missing quantity. A family is resolved only by a net DROP or a KEEP confirmed on the one reading of the hold-out (a development KEEP is <code>hold-out not read</code>); every expression family DROP is MET as <code>option expressions stay disabled</code>; a stored plan item or paper entry whose cell key has a non-cash eighth part is NOT MET with its row id. It always prints years of bars held against 5, usable chain sessions against 60, backfill progress, costs net or gross, N, hold-out read or not, the derived-expiry and model-price fallback shares, survivorship (ISS-22), the cut list and, after a full DROP, whether the archive is still recording. Read only, exit 0 (<a href="../adr/0202-the-p14-phase-check-reads-stored-verdicts-for-the-current-versions-only-closes-a-family-by-a-net-drop-or-a-hold-out-confirmed-keep-counts-every-expression-dropped-as-met-and-finds-a-non-cash-expression-in-use-by-a-select-of-the-stored-cell-keys.html">ADR 0202</a>). Expected answer for months: NOT EVALUABLE.</em> <em>Status 2026-11-10: P14-01 to P14-13, P14-16 and P14-17 are built (ADRs 0175 to 0178, 0191 to 0202; recorders and backfill behind default-off gates, no order); P14-14 and P14-15 (basis, first to be cut) are not built, so the exit stays open until basis is cut (<code>--cut basis:carry-1</code>, owner question) or built.</em></td>
 <td>An option expression beats cash/futures OOS after costs, else stays disabled</td>
 </tr>
 <tr>
 <td><strong>P15 Fundamentals &amp; events</strong> (4w)</td>
-<td>Point-in-time filings, quality filters, earnings features, <code>PEAD</code>, LLM extraction with validation</td>
+<td>Point-in-time filings, quality filters, earnings features, <code>PEAD</code>, LLM extraction with validation. <em>P15-12 phase check built 2026-11-03: <code>xd events phase-check [--cut FAMILY,...] [--json]</code> reads the newest stored verdict of each of the five families for the current versions only (a verdict of an older rule, catalog, parser, engine or lag version is stale), prints MET, NOT MET or NOT EVALUABLE with each open family and its missing quantity, the violations (the event filter ON without a current KEEP, with the decision row and who made it), seasons of bars held against the 20 needed, filings and calendar coverage, the share lost to <code>no_upcoming_entry</code> and the limits; read only, never MET on missing, thin, stale or unreadable evidence, exit 0 (<a href="../adr/0190-the-p15-phase-check-reads-stored-verdicts-for-the-current-versions-only-reports-a-filter-in-use-without-a-keep-and-is-never-met-on-thin-stale-or-unreadable-evidence.html">ADR 0190</a>).</em></td>
 <td>Features/filters improve OOS or are dropped</td>
+</tr>
+<tr>
+<td><strong>AU Automation &amp; simplicity</strong> (about 40 agent-days; <strong>built 2026-11-09/10</strong>, ADRs 0240 to 0253)</td>
+<td>Multi-day recovery and its screen; unused-code audit and removal; few visible settings with learned tightening; simulate everything with a training report; one Auto switch for next-day suggestions (OFF; turning it on is an owner act with a password). No orders</td>
+<td><code>xd auto check</code> (AU-19): each item MET on stored facts, none assumed</td>
+</tr>
+</tbody></table>
+<h2 id="au-programme-automation-and-simplicity-built-2026-11-0910">AU programme: automation and simplicity (built 2026-11-09/10)<a class="hash" href="#au-programme-automation-and-simplicity-built-2026-11-0910" aria-label="Link to this section">#</a></h2>
+<p>The owner asked for this on 2026-11-09 in chat: plan <a href="../specs/AU-00-automation-and-simplicity-plan.html">AU-00</a>, ADRs 0240 to 0244. Order: recovery, unused-code audit, settings simplification, simulate everything, Auto switch; then P3-09d and BK-00..BK-12. Auto only suggests and places no orders. The P10 rule that configuration changes go through the hypothesis loop now has one exception, the automatic tightening of ADR 0242.</p>
+<table>
+<thead>
+<tr>
+<th>Id</th>
+<th>What</th>
+<th>Size</th>
+<th>Needs</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AU-01</td>
+<td><a href="../specs/AU-01-recovery-planner-pure.html">Recovery planner (pure)</a></td>
+<td>2 d</td>
+<td>built services framework</td>
+<td>Built 2026-11-09 (ADR 0240)</td>
+</tr>
+<tr>
+<td>AU-02</td>
+<td><a href="../specs/AU-02-recovery-runner-and-triggers.html">Recovery runner and its three triggers</a></td>
+<td>3 d</td>
+<td>AU-01</td>
+<td>Built 2026-11-09 (ADR 0240)</td>
+</tr>
+<tr>
+<td>AU-03</td>
+<td><a href="../specs/AU-03-recovery-of-multi-day-data-proof.html">Multi-day data proof for the end-of-day service</a></td>
+<td>1 d</td>
+<td>AU-02</td>
+<td>Built 2026-11-09 (ADR 0240)</td>
+</tr>
+<tr>
+<td>AU-04</td>
+<td><a href="../specs/AU-04-recovery-screen.html">Recovery screen</a></td>
+<td>2 d</td>
+<td>AU-02, AU-03</td>
+<td>Built 2026-11-09</td>
+</tr>
+<tr>
+<td>AU-05</td>
+<td><a href="../specs/AU-05-unused-code-audit-and-removal-list.html">Unused-code audit and the recorded removal list</a></td>
+<td>2 d</td>
+<td>none</td>
+<td>Built 2026-11-09 (ADR 0245)</td>
+</tr>
+<tr>
+<td>AU-06</td>
+<td><a href="../specs/AU-06-remove-unused-backend.html">Remove unused backend code, slice by slice</a></td>
+<td>1 to 3 d</td>
+<td>AU-05</td>
+<td>Built 2026-11-09 (ADR 0245)</td>
+</tr>
+<tr>
+<td>AU-07</td>
+<td><a href="../specs/AU-07-remove-unused-frontend-and-config.html">Remove unused frontend code and settings keys</a></td>
+<td>1 to 2 d</td>
+<td>AU-05, AU-06</td>
+<td>Built 2026-11-09 (ADR 0245)</td>
+</tr>
+<tr>
+<td>AU-08</td>
+<td><a href="../specs/AU-08-settings-inventory-and-tiers.html">Settings inventory and visibility tiers</a></td>
+<td>2 d</td>
+<td>AU-05</td>
+<td>Built 2026-11-09 (ADR 0246)</td>
+</tr>
+<tr>
+<td>AU-09</td>
+<td><a href="../specs/AU-09-simple-settings-screen.html">Simple settings screen</a></td>
+<td>2 d</td>
+<td>AU-08</td>
+<td>Built 2026-11-09; partial on its own, its criteria 3 and 4 delivered by AU-10, AU-16 and AU-17</td>
+</tr>
+<tr>
+<td>AU-10</td>
+<td><a href="../specs/AU-10-learned-tightening-with-password-to-loosen.html">Learned tightening and password-gated loosening</a></td>
+<td>3 d</td>
+<td>AU-08</td>
+<td>Built 2026-11-10 (ADR 0247)</td>
+</tr>
+<tr>
+<td>AU-11</td>
+<td><a href="../specs/AU-11-training-simulation-record-and-evidence-fence.html">Training-simulation record and evidence fence</a></td>
+<td>2 d</td>
+<td>built simulator, ADR 0207</td>
+<td>Built 2026-11-10 (ADR 0243)</td>
+</tr>
+<tr>
+<td>AU-12</td>
+<td><a href="../specs/AU-12-simulate-everything-job.html">Simulate-everything job, resumable and yielding</a></td>
+<td>3 d</td>
+<td>AU-11</td>
+<td>Built 2026-11-10 (ADR 0248)</td>
+</tr>
+<tr>
+<td>AU-13</td>
+<td><a href="../specs/AU-13-walk-forward-training-from-simulation.html">Walk-forward training from the simulation</a></td>
+<td>3 d</td>
+<td>AU-11, AU-12</td>
+<td>Built 2026-11-10 (ADR 0249)</td>
+</tr>
+<tr>
+<td>AU-14</td>
+<td><a href="../specs/AU-14-simulation-report-api.html">Simulation report API</a></td>
+<td>2 d</td>
+<td>AU-11</td>
+<td>Built 2026-11-10 (ADR 0250)</td>
+</tr>
+<tr>
+<td>AU-15</td>
+<td><a href="../specs/AU-15-simulation-report-screen.html">Simulation report screen</a></td>
+<td>2 d</td>
+<td>AU-12, AU-14</td>
+<td>Built 2026-11-10</td>
+</tr>
+<tr>
+<td>AU-16</td>
+<td><a href="../specs/AU-16-auto-scope-and-reasoned-suggestions.html">Auto scope and reasoned next-day suggestions</a></td>
+<td>3 d</td>
+<td>built P7 pipeline</td>
+<td>Built 2026-11-10 (ADR 0251)</td>
+</tr>
+<tr>
+<td>AU-17</td>
+<td><a href="../specs/AU-17-the-auto-switch.html">The Auto switch</a></td>
+<td>3 d</td>
+<td>AU-02, AU-10, AU-13, AU-16</td>
+<td>Built 2026-11-10 (ADR 0252); OFF until the owner turns it on with a password</td>
+</tr>
+<tr>
+<td>AU-18</td>
+<td><a href="../specs/AU-18-auto-suggestions-screen.html">Auto and next-day suggestions screen</a></td>
+<td>2 d</td>
+<td>AU-16, AU-17</td>
+<td>Built 2026-11-10</td>
+</tr>
+<tr>
+<td>AU-19</td>
+<td><a href="../specs/AU-19-programme-check.html">AU programme check</a></td>
+<td>1 d</td>
+<td>AU-01 to AU-18</td>
+<td>Built 2026-11-10 (ADR 0253); <code>xd auto check</code> reads stored facts only, an unreadable or empty fact is NOT EVALUABLE</td>
 </tr>
 </tbody></table>
 <h2 id="p3-slices">P3 slices<a class="hash" href="#p3-slices" aria-label="Link to this section">#</a></h2>
@@ -359,7 +512,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td>check<code>with</code>scripts/cost-sheet.sh<code>, and the </code>simulate<code>flags</code>--gross<code>, </code>--costs<code>, </code>--capital<code>, </code>--profile<code>and</code>--max-cost-r`; the exit check below is open. Needs P3-03c, P3-04a and P2-17 (built) and the verb host of P3-04b2; <strong>needs the owner&#39;s charge sheet (Q3, ISS-25).</strong></td>
 <td>2 (C), after P3-03c and P3-04b2</td>
 <td>1.6 d</td>
-<td>Built except the exit check (2026-10-19)</td>
+<td>Built 2026-10-19, except the exit check (criterion 14), which waits for the owner&#39;s charge sheet and bills</td>
 </tr>
 <tr>
 <td>P3-03e</td>
@@ -510,7 +663,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Strategy file, built 2026-10-22 (<a href="../adr/0055-the-strategy-file-its-schema-and-the-content-hash.html">ADR 0055</a>)</strong>: read the YAML sections of doc 11 §2 into the P3-02b model with located problems (untrusted YAML is parsed to a generic tree first; the package lives outside <code>XDrishti.Strategies</code>, which allows Superpower only), generate the JSON Schema from the model types (ADR 0002), canonical text and SHA-256 taken from the plan, not from the printed text. Needed by P5 (Lab editor, upload, <code>xd</code> CLI).</td>
 <td>free capacity</td>
 <td>3 d</td>
-<td>Later</td>
+<td>Built 2026-10-22 (ADR 0055)</td>
 <td><a href="../specs/P3-02c-the-strategy-file-yaml-schema-and-hash.html">spec</a> (Approved and built, 2026-10-22)</td>
 <td>The doc 11 §2 example parses verbatim and round-trips; the schema accepts it and rejects 10 mutations with located messages; alias and anchor bombs and oversize input are refused; the hash is stable under white space and key order; the run records of P3 can be re-keyed without losing their meaning</td>
 </tr>
@@ -600,7 +753,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Regime labels on trades and regime cells</strong>; lights the Lab <code>by_regime</code> block. Needs P3-01d.</td>
 <td>P6</td>
 <td>2 d</td>
-<td>Draft (plan)</td>
+<td>Built (ADR 0146)</td>
 <td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
 <td>Regime of the previous session only; coverage printed</td>
 </tr>
@@ -915,9 +1068,9 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Start depth recording</strong> in <code>xd-feed</code>. <strong>SAFETY (new WebSocket endpoint on the allow-list, Data account token, disk): stops for the owner (Q9); first on the cut line.</strong></td>
 <td>P7</td>
 <td>4 d</td>
-<td>Draft (plan)</td>
+<td>Built 2026-10-27 (ADR 0135); ships OFF behind its gates</td>
 <td><a href="../specs/P7-00-selection-accounts-and-nightly-plan.html">plan</a></td>
-<td>Not started before the owner&#39;s answer</td>
+<td>Recorder off until the owner enables it</td>
 </tr>
 <tr>
 <td>P7-17</td>
@@ -1077,7 +1230,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Responsive, accessibility and performance pass</strong> 360 px to 4K with a real-browser checklist per screen.</td>
 <td>P8</td>
 <td>3 d</td>
-<td>Partial 2026-10-26 (<a href="../adr/0124-the-browser-runner-is-playwright-and-axe-over-the-installed-chrome-answered-from-the-msw-handlers-and-kept-out-of-check-sh.html">ADR 0124</a>): global rules and the Playwright and axe runner are built; C14 load time and some layout-shift cells still fail</td>
+<td>Partial 2026-10-26 (<a href="../adr/0124-the-browser-runner-is-playwright-and-axe-over-the-installed-chrome-answered-from-the-msw-handlers-and-kept-out-of-check-sh.html">ADR 0124</a>): global rules and the Playwright and axe runner are built; C14 load time and some layout-shift cells still fail Follow-up 2026-11-09: first-load JS 188.8 KB gzip and a failed lazy chunk stays local (<code>LazyBoundary</code>); C14 still fails in all 94 cells (median 5.4 s on a busy Mac) and 12 cells shift above 0.2; reserved heights are open. Review 2026-11-10: the open item is check C14 under criterion 13.</td>
 <td><a href="../specs/P8-16-responsive-accessibility-and-performance-pass.html">spec</a>, <a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
 <td>No horizontal page scroll; keyboard; chart tables</td>
 </tr>
@@ -1158,7 +1311,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Index basket catalogue, fetcher and versioned membership</strong> (adds <code>kind</code>/<code>system</code> to baskets; NSE index lists, forward-only dated membership). <strong>SAFETY (network fetch of NSE files; <code>Baskets:System:Fetch:Enabled</code> OFF until the owner reads the terms and records an ADR).</strong></td>
 <td>P1/P8 baskets</td>
 <td>4 d</td>
-<td>Spec Draft</td>
+<td>Spec Approved 2026-11-03; in build on branch <code>feature/bk-01</code>, not merged</td>
 <td><a href="../specs/BK-01-index-basket-catalogue-fetcher-and-versioned-membership.html">spec</a></td>
 <td>Zero HTTP calls with the setting OFF</td>
 </tr>
@@ -1167,7 +1320,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Derived baskets engine (pure)</strong>: fourteen behaviour baskets from daily bars, every exclusion named, parameters versioned.</td>
 <td>P1/P8 baskets</td>
 <td>5 d</td>
-<td>Spec Draft</td>
+<td>Built 2026-11-10 (ADR 0255; pure, nothing calls it until BK-03)</td>
 <td><a href="../specs/BK-02-derived-baskets-engine-pure.html">spec</a></td>
 <td>Hand-worked rankings; no look-ahead</td>
 </tr>
@@ -1176,7 +1329,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Derived baskets refresh job and scores</strong>: immutable dated versions after the EOD bars. <strong>SAFETY (scheduled job writing rows; <code>Baskets:System:Derived:Enabled</code> OFF).</strong></td>
 <td>P1/P8 baskets</td>
 <td>4 d</td>
-<td>Spec Draft</td>
+<td>Spec Approved 2026-11-03; not built; next in the BK order after BK-01</td>
 <td><a href="../specs/BK-03-derived-baskets-refresh-job-and-scores.html">spec</a></td>
 <td>Past date reads what was published then</td>
 </tr>
@@ -1185,7 +1338,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>System baskets on the Baskets screen</strong>: read-only cards, provenance, members-as-of label, source status.</td>
 <td>P8</td>
 <td>4 d</td>
-<td>Spec Draft</td>
+<td>Spec Approved 2026-11-03; not built; next in the BK order after BK-01</td>
 <td><a href="../specs/BK-04-system-baskets-on-the-baskets-screen.html">spec</a></td>
 <td>No card without its as-of date</td>
 </tr>
@@ -1194,7 +1347,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Broker flags and F&amp;O baskets</strong> (ASM/GSM, MTF/MIS, F&amp;O stocks, lot sizes, ban list). <strong>SAFETY (two NSE file fetches OFF; no order, no margin constant).</strong></td>
 <td>P1/P8 baskets</td>
 <td>3 d</td>
-<td>Spec Draft</td>
+<td>Spec Approved 2026-11-03; not built; next in the BK order after BK-01</td>
 <td><a href="../specs/BK-05-broker-flag-and-fo-baskets.html">spec</a></td>
 <td>Lists dated; ban-list fetch off by default</td>
 </tr>
@@ -1203,7 +1356,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Basket index and profile metrics engine (pure)</strong> (m1b to m16; honest state of every figure; difference to the index, see JOURNEY section 4).</td>
 <td>P8</td>
 <td>4 d</td>
-<td>Spec Draft</td>
+<td>Spec Approved 2026-11-03; not built; next in the BK order after BK-01</td>
 <td><a href="../specs/BK-06-basket-index-and-profile-metrics-engine-pure.html">spec</a></td>
 <td>Hand-worked tables</td>
 </tr>
@@ -1212,7 +1365,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Basket profile endpoints and screen</strong> (<code>/baskets/:basketId/profile</code>; 3 d backend + 4 d screen if split).</td>
 <td>P8</td>
 <td>7 d</td>
-<td>Spec Draft</td>
+<td>Spec Approved 2026-11-03; not built; next in the BK order after BK-01</td>
 <td><a href="../specs/BK-07-basket-profile-endpoints-and-screen.html">spec</a></td>
 <td>Every figure with n or its state</td>
 </tr>
@@ -1221,7 +1374,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Correlation clusters and caps, and basket breadth in the market gate</strong>; <code>market.basket_context_daily</code>. <strong>SAFETY (changes the fill and the gate input; all new limits OFF; loosening is an owner act with a fresh password).</strong></td>
 <td>P7/P3-01e</td>
 <td>5 d</td>
-<td>Spec Draft</td>
+<td>Spec Approved 2026-11-03; not built; next in the BK order after BK-01</td>
 <td><a href="../specs/BK-08-correlation-clusters-and-caps-and-basket-breadth-in-the-market-gate.html">spec</a></td>
 <td>Five banking longs counted as one cluster</td>
 </tr>
@@ -1230,7 +1383,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Relative-strength features and sector strength</strong> (in-basket and sector RS, as of the previous close; <code>RS_ROTATION</code> as stored text).</td>
 <td>P8-P9 window</td>
 <td>5 d</td>
-<td>Spec Draft</td>
+<td>Spec Approved 2026-11-03; not built; next in the BK order after BK-01</td>
 <td><a href="../specs/BK-09-relative-strength-features-and-sector-strength.html">spec</a></td>
 <td>Truncation test: no look-ahead</td>
 </tr>
@@ -1239,7 +1392,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Volatility-targeted sizing and basket risk budgets</strong>. <strong>SAFETY (sizing scales down only; no path scales up or loosens a limit without an owner act with a fresh password; settings OFF; no order).</strong></td>
 <td>P7/P10</td>
 <td>5 d</td>
-<td>Spec Draft</td>
+<td>Spec Approved 2026-11-03; not built; next in the BK order after BK-01</td>
 <td><a href="../specs/BK-10-volatility-targeted-sizing-and-basket-risk-budgets.html">spec</a></td>
 <td>Quantity never larger than the fixed-risk rule</td>
 </tr>
@@ -1248,7 +1401,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Universe cell dimension and strategy-universe link</strong> (liquidity tier becomes the 7th cell-key part <code>universe</code>; P14 <code>expression</code> becomes the 8th). A universe restriction is only ever a proposal.</td>
 <td>P6/P9</td>
 <td>4 d</td>
-<td>Spec Draft</td>
+<td>Spec Approved 2026-11-03; not built; next in the BK order after BK-01</td>
 <td><a href="../specs/BK-11-universe-cell-dimension-and-strategy-universe-link.html">spec</a></td>
 <td>Child cell shrunk toward parent</td>
 </tr>
@@ -1257,7 +1410,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>AI basket tools</strong> (addendum on P9-05; read only; schema budget 2,200 to 2,300 tokens). <strong>SAFETY (class C1/C2 data reaches the model).</strong></td>
 <td>P9</td>
 <td>2 d</td>
-<td>Spec Draft</td>
+<td>Spec Approved 2026-11-03; not built; next in the BK order after BK-01</td>
 <td><a href="../specs/BK-12-ai-basket-tools.html">spec</a></td>
 <td>Six eval questions; budget test</td>
 </tr>
@@ -1266,7 +1419,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Effective sample size, power and minimum track record</strong> (pure; shown beside n, ReportOnly).</td>
 <td>P6 / P5 stats</td>
 <td>5.5 d</td>
-<td>Spec Draft</td>
+<td>Built (ADR 0203; ReportOnly)</td>
 <td><a href="../specs/CF-01-effective-sample-size-power-and-minimum-track-record.html">spec</a></td>
 <td>n=34 reads &quot;effective 11&quot;; smallest detectable edge printed</td>
 </tr>
@@ -1275,7 +1428,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Empirical-Bayes shrinkage of expectancy; parent-child pooling</strong> (edits <code>CellStatsCalculator</code>; run after CF-01).</td>
 <td>P6</td>
 <td>4 d</td>
-<td>Spec Draft</td>
+<td>Built (ADR 0204; ReportOnly)</td>
 <td><a href="../specs/CF-02-empirical-bayes-shrinkage-of-expectancy-and-parent-child-pooling.html">spec</a></td>
 <td>Hand-worked: +0.40 R on 10 trades reads +0.165 R</td>
 </tr>
@@ -1284,16 +1437,16 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Deflated Sharpe, PBO and block bootstrap</strong> (A 3.5 d, B 3 d; edits <code>VerdictEvaluator</code>; run after CF-02).</td>
 <td>P5 stats</td>
 <td>7 d</td>
-<td>Spec Draft</td>
+<td>Built (Part A ADR 0205, Part B CSCV PBO ADR 0228; ReportOnly)</td>
 <td><a href="../specs/CF-03-deflated-sharpe-pbo-and-block-bootstrap.html">spec</a></td>
-<td>Luck bar for 16 variants replaces the uncalibrated factor; known-null data</td>
+<td>Luck bar for 16 variants shown beside the factor and decides nothing; known-null 0.25%, power arm fails, Gate refused</td>
 </tr>
 <tr>
 <td>CF-04</td>
 <td><strong>History backfill to five years</strong>: daily bhavcopy and corporate actions (A 4 d), Dhan 1-minute backfill with a seam test (B 5 d), C 0.5 d; takes the ISS-19 history. <strong>SAFETY (network fetches; <code>Data:History:Nse:Enabled</code> and <code>Data:History:Backfill:Enabled</code> OFF; allow-list is the owner&#39;s act).</strong></td>
 <td>P1 data / ISS-19</td>
 <td>10.5 d</td>
-<td>Spec Draft</td>
+<td>Part A built (ADR 0195), fetch OFF until the owner&#39;s acts; Parts B and C Draft, not built; review 2026-11-10: Part B is 6 d (not 5), <code>history-backfill</code> must be a <code>Convergent</code> service and visible to the AU-12 gate</td>
 <td><a href="../specs/CF-04-history-backfill-to-five-years-daily-bhavcopy-and-corporate-actions.html">spec</a></td>
 <td>Zero HTTP calls with the switches OFF; seam test</td>
 </tr>
@@ -1302,7 +1455,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Cost stress gate (1x/1.5x/2x), slippage tiers, fill-one-minute-later test</strong> (report-only until the owner blocks).</td>
 <td>P5 Lab / P3 fills</td>
 <td>5.5 d</td>
-<td>Spec Draft</td>
+<td>Stress, delay and tier mechanics built (ADR 0206; ReportOnly, Enforce off); <strong>tier and capacity counts of a robust Lab run built from day bars (S2, ADR 0223; optional <code>tiers</code> member, tighten-only settings <code>TierACutCrore</code>, <code>TierBCutCrore</code>, <code>CapacityFillShare</code>, <code>CapacityDailyShare</code>); the fill-minute cap is unread and fails closed</strong>; since built: the fill-minute read (S2b, ADR 0224), conservative tiered slippage and the <code>stress</code> request field (ADR 0229), <code>min_turnover</code> and the slippage settings (ADR 0230); the hard fail &quot;evidence only from tier C&quot; is CF-11&#39;s (ADR 0225)</td>
 <td><a href="../specs/CF-05-cost-stress-gate-and-fill-one-minute-later-test.html">spec</a></td>
 <td>Edge survives 1.5x cost and a one-minute-later fill</td>
 </tr>
@@ -1311,7 +1464,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Pre-registration, trial ledger, locked hold-out</strong> in the Lab (light <strong>SAFETY</strong>: irreversible unlock record; report-only first).</td>
 <td>P5 Lab / P6-05</td>
 <td>6 d</td>
-<td>Spec Draft</td>
+<td>Built 2026-11-04/05 (parts A to C, ADR 0207); Enforce off</td>
 <td><a href="../specs/CF-06-preregistration-trial-ledger-and-locked-holdout-in-the-lab.html">spec</a></td>
 <td>Hold-out unlock is recorded once; trial count rises with every look</td>
 </tr>
@@ -1320,7 +1473,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Random-entry null, placebo/mirror runs, plateau gate</strong> (looks counted in the CF-06 ledger).</td>
 <td>P5 Lab</td>
 <td>5.5 d</td>
-<td>Spec Draft</td>
+<td>Parts A (ADR 0208; random-entry null), B (ADR 0209; placebo set, mirror gate) and C (ADR 0210; plateau gate) built, ReportOnly, Enforce off; remainder built 2026-11-09 (ADR 0231): <code>nulls</code>/<code>draws</code> request fields and the &quot;Chance and plateau&quot; block of the Lab screen; swing and non-fixed-target trades stay left out and counted (no honest &quot;same exit&quot; null)</td>
 <td><a href="../specs/CF-07-random-entry-null-placebo-runs-and-plateau-gate.html">spec</a></td>
 <td>Strategy beats the 95th percentile of 1000 random-entry seeds</td>
 </tr>
@@ -1329,16 +1482,16 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Shadow paper trading of every nightly candidate</strong> (forward-only; separate edge count, the P10 exit criterion is untouched). <strong>SAFETY (light: automatic writer, starts paused, changes nothing the plan reads; no order).</strong></td>
 <td>P10 shadow paper</td>
 <td>6 d</td>
-<td>Spec Draft</td>
+<td><strong>Built</strong> (ReportOnly, switch OFF, services paused): part A write side (migration <code>AddPaperShadow</code>, <code>shadow-write</code>; ADR 0211) and part B (grader <code>shadow-grade</code> through the one replayer, <code>GET /api/paper/shadow/summary</code>, owner switch <code>PUT /api/paper/shadow/settings</code> with a fresh password, migration <code>StampShadowSettingInCommitOrder</code>, `xd paper shadow verify</td>
+<td>summary<code>; ADR 0212); leftovers built 2026-11-09 (ADR 0232): the shadow digest outside the database checked against the chain, the gap acknowledgement and the </code>/paper` Shadow tab</td>
 <td><a href="../specs/CF-08-shadow-paper-trading-of-every-nightly-candidate.html">spec</a></td>
-<td>Shadow rows chained and graded; plan unchanged</td>
 </tr>
 <tr>
 <td>CF-09</td>
 <td><strong>Sequential failure test for paper trading</strong> (flags only; action is CF-12&#39;s).</td>
 <td>P10</td>
 <td>3 d</td>
-<td>Spec Draft</td>
+<td><strong>Built</strong> (report only; no mode, no switch: <code>GET /api/paper/sequential</code>, <code>xd paper sequential</code>, one extra line after <code>xd paper phase-check</code>, settings <code>Confidence:Sequential</code>; ADR 0213); since built: the sequential line on <code>/paper</code> (ADR 0232) and the kill rule that reads the failure boundary (CF-12, <code>KillRules.FailureBoundary</code>); the scorecard has a <code>FailureBoundary</code> hard-fail input (CF-11)</td>
 <td><a href="../specs/CF-09-sequential-failure-test-for-paper-trading.html">spec</a></td>
 <td>Boundary hand-worked; changes no state</td>
 </tr>
@@ -1347,7 +1500,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>ML safety: calibration, evidence ladder, champion/challenger, rollback</strong> (10a 2 d, 10b 4 d, 10c 4.5 d, 10d 3 d). <strong>SAFETY (automatic rollback writer; <code>MlMayInfluence</code> predicate; default OFF; ML stays advisory; no order).</strong></td>
 <td>P6</td>
 <td>13.5 d</td>
-<td>Spec Draft</td>
+<td><strong>Parts 10a, 10b, 10c, 10d-1, 10d-2a, 10d-2b built</strong> (calibration by sample size: Platt below 500 calibration rows, isotonic from 500, the ECE with a day-cluster bootstrap interval, <code>Confidence:Calibration</code>; ADR 0214; owner to-do: retrain and re-designate the champion, which reads as &quot;no policy&quot; until then); 10b built (the complexity ladder, the events-per-variable cap, the population stability index and the direction check, evidence only in the validation report, <code>Confidence:Ladder</code>; ADR 0215); 10c-1 built (the paired day-cluster bootstrap, the fold sign test and the uniqueness weights, the ladder now reads its probability, evidence only, <code>Confidence:PairedBootstrap</code>; ADR 0216); 10c-2 built (the pure <code>MlMayInfluence</code> predicate with its truth table and reasons, <code>IMlInfluenceGate</code> as the only door for Planning, Selection and Autonomy with the architecture rule, the one hold-out look per model family, <code>research.ml_influence_checks</code>, <code>GET /api/learning/models/{id}/influence</code>, <code>Confidence:MlInfluence</code>; the gate refuses every model today: the hold-out, forward and calibration figures have no source yet; ADR 0217); 10d-1 built (backend: the promotion rule <code>MlPromotion</code> and <code>POST /api/learning/models/{id}/promote</code>, the rollback triggers as the P6-09 detectors themselves, <code>research.rollback_proposals</code>, <code>GET /api/learning/rollback/proposals</code>, <code>POST /api/learning/rollback/{id}/apply</code>, the daily service <code>ml-monitor</code>, the three stored owner switches <code>ml.influence.enabled</code> / <code>ml.auto_promote</code> / <code>ml.auto_rollback</code> (all OFF, <code>PUT /api/learning/ml-settings</code>), the regime rule; automatic acts recorded as <code>auto</code> with the switch row, never as an owner; no source of challenger or champion evidence exists yet, so promotion is refused with the reasons and no trigger can fire; migration <code>AddMlRollback</code>; ADR 0220); 10d-2a built (the read-only verbs <code>xd learn influence MODEL-ID</code> and <code>xd learn rollback</code>); 10d-2b built (the Models-screen additions on the Learning screen: the Influence section and calibration facts in the model drawer, the ML switches and Rollback panels on the Models tab, with the owner acts behind lazy dialogs in <code>owner-acts</code>; <code>calibration_kind</code> is not built and reads <em>Not available</em>, and there is no promote button: promotion stays with the API and <code>xd learn</code>)</td>
 <td><a href="../specs/CF-10-ml-safety-calibration-ladder-and-champion-challenger-rollback.html">spec</a></td>
 <td>No model influences anything without the hold-out predicate and an owner switch</td>
 </tr>
@@ -1356,7 +1509,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Readiness scorecard per strategy and system</strong> (Gate R, Gate S; <code>unavailable</code> counts as fail). <strong>SAFETY (light: can block owner acts once <code>enforce</code> is ON; never raises size).</strong></td>
 <td>P8 / P10</td>
 <td>7 d</td>
-<td>Spec Draft</td>
+<td><strong>Part 1 built (backend)</strong>: the pure calculators (15-row checklist, six sub-scores and their minimum, hard fails, four labels, gates R and S, system level), the assembly from the existing producers with every input that has no producer behind one port that says <code>unavailable</code> (benchmark, capacity and tier, the 20-trade check, the by-quarter and per-instrument shares, the Monte Carlo 90th percentile, the integrity checks, tier-C evidence, the risk share), <code>GET /api/confidence/scorecards</code>, <code>GET .../scorecards/{strategyId}/versions/{version}</code>, <code>GET</code> and <code>PUT /api/confidence/readiness-settings</code> (fresh password both ways; default OFF), the gate on the lifecycle moves Candidate to Paper, the owner&#39;s re-enable and Paper to Active (warns with enforce OFF, 409 <code>confidence.gate_failed</code> with it ON), the <code>readiness-snapshot</code> service (paused at start), <code>readiness.settings</code> / <code>scorecard_snapshots</code> (migration <code>AddReadiness</code>), settings <code>Confidence:Readiness</code> (tighten-only); ADR 0221. <strong>Part 2a built: <code>xd readiness [system]</code> and <code>xd readiness STRATEGY [--version N]</code> (read only, unavailable is a fail), and the architecture pin on delegate types in the automatic path&#39;s closure.</strong> <strong>Part 2b built (frontend)</strong>: the lazy <code>/readiness</code> screen (system card, sortable strategy table, per-strategy scorecard with the six sub-scores, the 15-row checklist, gates R and S, what it is waiting for and the stored snapshots; every unavailable input reads &quot;Not available&quot; with the server&#39;s reason and counts as a fail; today every score reads 0 and the screen says why) and the owner&#39;s enforce switch (fresh password and reason both ways). <strong>Sources S1 built (2026-11-07, <a href="../adr/0222-the-lab-verdict-stores-the-90th-percentile-drawdown-the-quarter-means-and-the-instrument-share-at-run-time-so-rows-10-and-11-of-the-scorecard-have-a-source-and-an-older-verdict-reads-unavailable-until-it-is-re-run.html">ADR 0222</a>)</strong>: rows 10 and 11 have data: the Lab verdict stores the Monte Carlo 90th percentile drawdown, the mean R per calendar quarter and the largest instrument&#39;s share at run time (the port loses those three, nine to six); a version run before S1 reads <code>unavailable ... re-run</code> and is never re-run by itself. <strong>Row 14 has its source (S2, ADR 0223): the tier and capacity counts of the Lab verdict; S2b (ADR 0224) reads the fill minute so it can pass when every minute is read; <code>unavailable</code> for a verdict produced before it (re-run).</strong> Since built: the two hard fails (S3, ADR 0225; the owner decided tier C is judged on both Lab and forward trades), row 15 from the recorded verify-pack gate (S4a, ADR 0226) and row 13 the benchmark (S4b, ADR 0227). Open: <code>auto_to_paper</code> (not built: no path moves a cell without the owner) and the owner question whether an existing version may be re-run to fill the new figures</td>
 <td><a href="../specs/CF-11-readiness-scorecard-per-strategy-and-system.html">spec</a></td>
 <td>Missing input never counts as a pass</td>
 </tr>
@@ -1365,7 +1518,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Decay monitor, kill rules, &quot;is the loop helping&quot;</strong> (three-arm test, learning curve). <strong>SAFETY (automatic demotion only behind a setting, OFF; re-enabling is an owner act with a fresh password; no order).</strong></td>
 <td>P6 / P8-P10</td>
 <td>9 d</td>
-<td>Spec Draft</td>
+<td><strong>Part 12a built (read-only evidence)</strong>: the decay monitor, the kill-rule evaluations, the three-arm loop test, the learning curve, the reliability slope and the decision lift as pure calculators; <code>GET /api/confidence/decay?strategy=</code> and <code>GET /api/confidence/loop</code>; settings <code>Confidence:Decay</code> and <code>Confidence:Loop</code> (tighten-only); the loop report is <code>unavailable</code> until a score source exists; ADR 0218. <strong>Part 12b built (proposals, apply, the owner&#39;s re-enable)</strong>: the <code>decay-monitor</code> service (paused at start), <code>confidence.kill_proposals</code> / <code>decay_checks</code> / <code>kill_settings</code> (migration <code>AddDecayAndKill</code>), <code>GET /api/confidence/kill-proposals</code>, <code>POST .../apply</code>, <code>PUT /api/confidence/kill-settings</code> (fresh password, default OFF), <code>POST /api/learning/cells/{key}/re-enable</code> (fresh password, never automatic), the lifecycle move Paper to Paused and the changelog actor <code>auto</code>; ADR 0219. <strong>Part 12c-1 built: <code>xd learn decay --strategy ID</code>, <code>xd learn loop</code>, <code>xd learn curve</code> (read only, unavailable stated with its reason)</strong>; <strong>Part 12c-2 built: the Learning tabs &quot;Decay&quot; and &quot;Loop&quot; (read only, lazy; <code>unavailable</code> shown as &quot;Not available&quot; with its reason)</strong>; the dismiss route and the owner-act screens for apply, re-enable, dismiss and the switch built 2026-11-09 (ADR 0234); open owner questions: the kill triggers and 2 times per 100 trades as written</td>
 <td><a href="../specs/CF-12-decay-monitor-kill-rules-and-is-the-loop-helping.html">spec</a></td>
 <td>Demotion lowers risk only; re-enable never automatic</td>
 </tr>
@@ -1392,18 +1545,18 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Optional</strong>: a k-bar lag on a catalog feature written as a call (<code>highest(20)[1]</code>) with the meaning of <code>x[k]</code> on a reference, and a warning for comparisons that cannot be true by construction (<code>close &gt; highest(n)</code>, <code>low &lt; lowest(n)</code>) with the working spelling as the suggestion (ISS-24). Only if asked for: it supersedes an approved restriction (spec P3-02 criterion 1, ADR 0034 Amendment 8), so it needs the owner&#39;s decision and an ADR.</td>
 <td>free capacity</td>
 <td>2 d</td>
-<td>Later (optional)</td>
+<td>Built 2026-10-25 (ADR 0108)</td>
 <td>Built 2026-10-25 (<a href="../adr/0108-a-lag-on-a-feature-call-and-a-warning-for-comparisons-that-cannot-be-true.html">ADR 0108</a>)</td>
 <td>The pinned invalid sources <code>rsi(14)[1]</code> and <code>tf(&quot;1h&quot;).ema(20)[1]</code> become valid with hand-calculated values; the interpreter oracle, the tree audit and the compiler warm-up coverage tests include the new shape; at least 10 failing and 10 near-miss lint examples</td>
 </tr>
 </tbody></table>
 <p><strong>P5 specs (2026-10-22; P5-01 to P5-07 are built, the rest are Drafts):</strong> plan <a href="../specs/P5-00-strategy-lab-plan.html">P5-00</a> (slice split, sizes, seam, owner questions); first slices <a href="../specs/P5-01-lab-api-validate-and-strategy-library.html">P5-01</a> (Lab API: validate and the strategy library; needs P3-02c and P3-02d) and <a href="../specs/P5-02-lab-runs-job-run-record-and-quick-test.html">P5-02</a> (Lab runs: job, run record, quick test), <a href="../specs/P5-03-test-ledger-and-the-gates.html">P5-03</a> (test ledger and the gates).</p>
-<p><strong>P6 status (2026-10-23): P6-01, 03 to 16, 17a and 18 built; P6-02 (needs P3-01d) and P6-17b are open, and the exit criteria are not yet evaluable on the owner&#39;s data (no model or experiment stored; see ADR 0080).</strong> <strong>P6 specs (2026-10-23; Draft, owner questions open):</strong> plan <a href="../specs/P6-00-learning-engine-and-ml-plan.html">P6-00</a> (slice split P6-01 to P6-18, sizes about 53.5 d plus P3-01d 3.5 d, the seam, honest limits, cut order, 13 owner questions). Can start with no owner decision: the P3-01d probe, P6-01, P6-03, then P6-04 and P6-05; P6-02 needs P3-01d.
-<strong>P7 status (2026-10-24): P7-01 to P7-15, 17 and 18 built (auto-approval exists only behind the owner&#39;s setting, default OFF); P7-16 (depth recording, SAFETY) is not started and waits for the owner; the exit criterion &quot;plans published 10 consecutive sessions unattended&quot; is NOT MET on the owner&#39;s data (<code>xd plan phase-check</code>, ADR 0097: no scheduled session has published yet; the selection builder and the review, pre-open, expiry and weekly services are still OFF or paused; wall-clock time and the owner&#39;s switches are what it needs).</strong> <strong>P7 specs (2026-10-23; Draft, owner questions open):</strong> plan <a href="../specs/P7-00-selection-accounts-and-nightly-plan.html">P7-00</a> (slice split P7-01 to P7-18, sizes about 58 d plus P3-01d 3.5 d and P3-01e 2 d, the seam, what P7 may and may not do (no order at any broker), honest limits, cut order, 19 owner questions of which Q1 to Q6 and Q9 are SAFETY and need the owner&#39;s own answer: the standing run instruction does not cover them). Can start with no owner decision: P7-01, P7-02, P7-03 and the P7-08 skeleton, then P7-05, 06, 04, 10, 13, 15; P7-12 and P7-16 and the real-account wiring and reserve promotion wait for the owner.
+<p><strong>P6 status (2026-10-23; P6-02 was built later, ADR 0146): P6-01, 03 to 16, 17a and 18 built; P6-17b is open, and the exit criteria are not yet evaluable on the owner&#39;s data (no model or experiment stored; see ADR 0080).</strong> <strong>P6 specs (2026-10-23; Draft, owner questions open):</strong> plan <a href="../specs/P6-00-learning-engine-and-ml-plan.html">P6-00</a> (slice split P6-01 to P6-18, sizes about 53.5 d plus P3-01d 3.5 d, the seam, honest limits, cut order, 13 owner questions). Can start with no owner decision: the P3-01d probe, P6-01, P6-03, then P6-04 and P6-05; P6-02 needs P3-01d.
+<strong>P7 status (2026-10-24): P7-01 to P7-15, 17 and 18 built (auto-approval exists only behind the owner&#39;s setting, default OFF); P7-16 (depth recording, SAFETY) was built later, 2026-10-27, and ships off (ADR 0135); the exit criterion &quot;plans published 10 consecutive sessions unattended&quot; is NOT MET on the owner&#39;s data (<code>xd plan phase-check</code>, ADR 0097: no scheduled session has published yet; the selection builder and the review, pre-open, expiry and weekly services are still OFF or paused; wall-clock time and the owner&#39;s switches are what it needs).</strong> <strong>P7 specs (2026-10-23; Draft, owner questions open):</strong> plan <a href="../specs/P7-00-selection-accounts-and-nightly-plan.html">P7-00</a> (slice split P7-01 to P7-18, sizes about 58 d plus P3-01d 3.5 d and P3-01e 2 d, the seam, what P7 may and may not do (no order at any broker), honest limits, cut order, 19 owner questions of which Q1 to Q6 and Q9 are SAFETY and need the owner&#39;s own answer: the standing run instruction does not cover them). Can start with no owner decision: P7-01, P7-02, P7-03 and the P7-08 skeleton, then P7-05, 06, 04, 10, 13, 15; P7-12 and P7-16 and the real-account wiring and reserve promotion wait for the owner.
 <strong>P8 specs (2026-10-24; Draft, owner questions open):</strong> plan <a href="../specs/P8-00-reports-and-ui-plan.html">P8-00</a> (slice split P8-01 to P8-22, sizes about 62.5 d not owner-gated plus 14.5 d owner-gated plus 3 d optional, about 23.5 d for the exit path alone; the seam: server-side numbers with an evidence block, six honest states and never a digit for a non-value, one population rule shared with P6, read-only by construction; what exists and what does not, verified; honest limits; cut order; 21 owner questions of which Q1 to Q8 are SAFETY (writes from the UI, autonomy and builder / service toggles, job starts, exports, push, offline caching, LAN exposure) and need the owner&#39;s own answer: the standing run instruction does not cover them). First-load JavaScript measured at 195.3 KB gzip against the 200 KB rule, so all P8 code is lazy and P8-01 adds a guard. Can start with no owner decision: P8-01 to P8-04 (read-only screens over endpoints that exist today), P8-05 and P8-06 (pure core, read endpoints), then P8-07 to P8-17; P8-18 to P8-21 wait for the owner. **P8-05 (report engine core, pure) built 2026-10-24 (<a href="../adr/0099-the-report-engine-is-a-pure-core-with-one-population-rule-six-honest-states-and-a-ranking-by-the-credible-lower-bound.html">ADR 0099</a>); <strong>P8-06 (report read endpoints) built 2026-10-24 (<a href="../adr/0100-the-report-endpoints-read-the-stored-runs-through-one-query-model-with-an-evidence-block-and-net-only-by-the-owners-stored-confirmation.html">ADR 0100</a>).</strong></p>
-<p><strong>Confidence programme (2026-10-27; Draft, owner questions open).</strong> Programme plan <a href="../specs/CF-00-confidence-programme-plan.html">CF-00</a> and slices CF-01 to CF-12 (rows after BK-12; about 80 agent-days, uncalibrated), with research in <a href="../research/confidence-data-and-small-sample.html">confidence-data-and-small-sample</a>, <a href="../research/confidence-edge-realism.html">confidence-edge-realism</a> and <a href="../research/confidence-learning-and-validation-speed.html">confidence-learning-and-validation-speed</a>. It makes the verdicts of P5/P6/P10 honest on a thin history (about 2.1 years): CF-01 to CF-03 add effective n, power, shrinkage and deflation to the stats of P5/P6 (shown beside the old figures, never replacing them); CF-04 backfills history (ISS-19; daily bhavcopy first, then Dhan 1-minute); CF-05 to CF-07 attack edge-after-costs in the Lab (P5); CF-08 and CF-09 add shadow paper trading and a sequential failure test beside P10 (its exit criterion is untouched); CF-10 gates ML in P6; CF-11 and CF-12 are the readiness scorecard and decay/kill rules across P8 to P10. Every new setting is OFF or report-only (<code>Off | ReportOnly | Gate</code>), <code>Gate</code> is an owner act, an <code>unavailable</code> input never counts as a pass, the NSE and backfill fetches stay OFF until the owner records the terms ADR and the allow-list act, and no slice places an order. Order and owner questions are in <a href="../specs/JOURNEY.html">JOURNEY</a>. All Draft until the owner sets each slice Approved.</p>
-<p><strong>System baskets (2026-10-25; Draft, owner questions open).</strong> Programme plan <a href="../specs/BK-00-system-baskets-plan.html">BK-00</a> and slices BK-01 to BK-12 (rows after P8-22), with research in <a href="../research/system-baskets-nse.html">system-baskets-nse</a> and <a href="../research/basket-leverage-uses.html">basket-leverage-uses</a>. BK-01 to BK-05 (18 agent-days) give the Baskets screen read-only index, derived and list baskets with dated membership that starts at the first fetch (never invented history); BK-06 to BK-12 (33 agent-days) use them: basket profile, correlation clusters and market-gate breadth (P7), relative strength (P3/P9), volatility-targeted sizing (down only), a liquidity universe dimension in the learning cells (P6) and AI tools (P9-05 addendum). The NSE fetches, the derived job and every new limit default OFF; no slice places an order. Elapsed order and owner questions are in <a href="../specs/JOURNEY.html">JOURNEY</a>. All Draft until the owner sets each slice Approved.</p>
-<p><strong>Spec journey (2026-10-25; Draft, reviewed once by three independent readers).</strong> The remaining slices of P8 and every later phase now have specs in <a href="../specs/README.html"><code>docs/specs</code></a>, indexed in <a href="../specs/JOURNEY.html">JOURNEY</a>: the rest of P8 (P8-03 to P8-22 plus the small P8-02b and P8-15b), P9 (P9-00 to P9-10), P10 (P10-00 to P10-06), P11 (P11-00 to P11-06), P12 (P12-00 to P12-12) and the leftovers P3-01d, P3-01e, P3-02e, P3-02f, P3-04d, P7-16, P7-19, P7-20 and P8-22; P13, P14 and P15 have a plan spec each (P13-00, P14-00, P15-00). About 290 agent-days in all, uncalibrated. Every open question was answered inside its spec under <em>Decisions (researched)</em>; the owner&#39;s Approved is still what lets an agent build, and the owner-only acts are listed in JOURNEY section 5. P8-02, P8-06 and P8-15 were built from their own specs while these were written; the longer-named Drafts for them are marked superseded.</p>
+<p><strong>Confidence programme (2026-10-27; specs Approved 2026-11-03 except CF-04 parts B and C; built 2026-11-03 to 2026-11-09 except CF-04 parts B and C).</strong> Programme plan <a href="../specs/CF-00-confidence-programme-plan.html">CF-00</a> and slices CF-01 to CF-12 (rows after BK-12; about 80 agent-days, uncalibrated), with research in <a href="../research/confidence-data-and-small-sample.html">confidence-data-and-small-sample</a>, <a href="../research/confidence-edge-realism.html">confidence-edge-realism</a> and <a href="../research/confidence-learning-and-validation-speed.html">confidence-learning-and-validation-speed</a>. It makes the verdicts of P5/P6/P10 honest on a thin history (about 2.1 years): CF-01 to CF-03 add effective n, power, shrinkage and deflation to the stats of P5/P6 (shown beside the old figures, never replacing them); CF-04 backfills history (ISS-19; daily bhavcopy first, then Dhan 1-minute); CF-05 to CF-07 attack edge-after-costs in the Lab (P5); CF-08 and CF-09 add shadow paper trading and a sequential failure test beside P10 (its exit criterion is untouched); CF-10 gates ML in P6; CF-11 and CF-12 are the readiness scorecard and decay/kill rules across P8 to P10. Every new setting is OFF or report-only (<code>Off | ReportOnly | Gate</code>), <code>Gate</code> is an owner act, an <code>unavailable</code> input never counts as a pass, the NSE and backfill fetches stay OFF until the owner records the terms ADR and the allow-list act, and no slice places an order. Order and owner questions are in <a href="../specs/JOURNEY.html">JOURNEY</a>.</p>
+<p><strong>System baskets (2026-10-25; specs Approved 2026-11-03; BK-02 built 2026-11-10, BK-01 in build, the rest not built).</strong> Programme plan <a href="../specs/BK-00-system-baskets-plan.html">BK-00</a> and slices BK-01 to BK-12 (rows after P8-22), with research in <a href="../research/system-baskets-nse.html">system-baskets-nse</a> and <a href="../research/basket-leverage-uses.html">basket-leverage-uses</a>. BK-01 to BK-05 (18 agent-days) give the Baskets screen read-only index, derived and list baskets with dated membership that starts at the first fetch (never invented history); BK-06 to BK-12 (33 agent-days) use them: basket profile, correlation clusters and market-gate breadth (P7), relative strength (P3/P9), volatility-targeted sizing (down only), a liquidity universe dimension in the learning cells (P6) and AI tools (P9-05 addendum). The NSE fetches, the derived job and every new limit default OFF; no slice places an order. Elapsed order and owner questions are in <a href="../specs/JOURNEY.html">JOURNEY</a>. <em>Review 2026-11-10 (<a href="../specs/REVIEW-2026-11-10.html">REVIEW-2026-11-10</a>):</em> 52 agent-days in all, about 43 left (BK-02 built, BK-01 in build), about 41.5 if owner questions 2, 5 and 9 are taken as recommended; recommended order BK-01, BK-05, BK-03, BK-04, then BK-06 onward.</p>
+<p><strong>Spec journey (2026-10-25; Draft, reviewed once by three independent readers).</strong> The remaining slices of P8 and every later phase now have specs in <a href="../specs/README.html"><code>docs/specs</code></a>, indexed in <a href="../specs/JOURNEY.html">JOURNEY</a>: the rest of P8 (P8-03 to P8-22 plus the small P8-02b and P8-15b), P9 (P9-00 to P9-10), P10 (P10-00 to P10-06), P11 (P11-00 to P11-06), P12 (P12-00 to P12-12) and the leftovers P3-01d, P3-01e, P3-02e, P3-02f, P3-04d, P7-16, P7-19, P7-20 and P8-22; P13, P14 and P15 have a plan spec each (P13-00, P14-00, P15-00). About 290 agent-days in all, uncalibrated. Every open question was answered inside its spec under <em>Decisions (researched)</em>; the owner&#39;s Approved is still what lets an agent build, and the owner-only acts are listed in JOURNEY section 5. P8-02, P8-06 and P8-15 were built from their own specs while these were written; the longer-named Drafts for them are marked superseded. The not-yet-built specs were reviewed again against the built code on 2026-11-10: <a href="../specs/REVIEW-2026-11-10.html">REVIEW-2026-11-10</a>.</p>
 <p>There is no slice P3-07: the number is not used.</p>
 <p><strong>Order and size.</strong> A size is in <em>agent-days</em>: a day of an AI coding agent&#39;s work on a slice, the unit of the 1 to 3 days that the <a href="../specs/README.html">specs README</a> allows one slice; the owner&#39;s reading, decisions and checks are not in it. The sizes are estimates; how they were derived is not written down, and they were not calibrated. For scale: the four slices P3-01 to P3-02 were committed between 2026-10-15 23:29 and 2026-10-16 21:50, and the close-out of P3-02 ran until 2026-10-17 06:32. The exit path (P3-02b, P3-03, P3-03a, P3-03b, P3-04, P3-04a, P3-04b1, P3-04b2, P3-04c, P3-03d, P3-03c, P3-03f, P3-03e, P3-05, P3-06, P3-08, P3-09) is 42.2 agent-days, of which the critical path is about 24.65 (P3-02b, P3-03, P3-03a, P3-03b, P3-03d, P3-03c, P3-03e, P3-05, P3-06, P3-09: P3-06 uses the range mechanism of P3-05); the chain through the cards, P3-02b, P3-03, P3-03a, P3-04, P3-04a, P3-04b1, P3-04b2, P3-04c, P3-09, is 21.55, and the oracle P3-08 ends at 17.75, so neither binds. The <em>Later</em> slices add 21.4 (P3-04d 1.3, P3-10 3.0, P3-02b2 1.6 and the rest of the list), 63.6 in all. P3-04d is counted in the <em>Later</em> slices because the exit path does not need it unless the owner wants the conditions on the cards; with it the exit path is 43.5 and the critical path stays 24.65, because the conditions on the cards (19.4) are ready before P3-06 ends (21.2). The 5 weeks of the chart above are indicative and were not recalculated. <em>(Note, 2026-10-18: the totals and the agent-day marks of this section were recalculated from the sizes of the table. The earlier figures, 26.5, 14.5, 17.5 and 44, assumed 2.5 agent-days for P3-02b and 3 each for P3-03 and P3-04. P3-02b is 3 after its review (+0.5 on the exit path and on the critical path), P3-02b2 adds 1 to the <em>Later</em> slices, and the reviews of the specs split P3-03 and P3-04 in two: P3-03 1.2 plus P3-03a 3 is 4.2 against the 3 budgeted (+1.2) and P3-04 1.5 plus P3-04a 2.5 is 4 against 3 (+1), +2.2 together. So 26.5 + 0.5 + 2.2 = 29.2; 14.5 + 0.5 + 1.2 = 16.2; 17.5 + 1 = 18.5; 29.2 + 18.5 = 47.7. An agent-day mark is the sum of the sizes in front of the slice on its chain.)</em> <em>(Note, 2026-10-18, second recalculation, after the specs (Approved the same day) for the export, the cards, the costs and the swing positions; the sizes are those the specs state. The former row P3-04b (3) is P3-04b1 2.4 + P3-04b2 2.0 + P3-04c 2.5 = 6.9 on the exit path, +3.9, and P3-04d 1.3 apart: 8.2 in all, +5.2. The former row P3-03c (2) is P3-03c 2.3 + P3-03f 1.6 = 3.9, +1.9; the specs themselves say 3.8, because they add the itemised 2.25 and 1.55. The former row P3-03d (2) is P3-03d 3.5, +1.5, and P3-03e is new, +1.5 (it is on the exit path only while P3-06 is). So the exit path is 29.2 + 3.9 + 1.9 + 1.5 + 1.5 = 38.0, and the table rows add up to the same: 3 + 1.2 + 3 + 2 + 1.5 + 2.5 + 2.4 + 2.0 + 2.5 + 3.5 + 2.3 + 1.6 + 1.5 + 2 + 2 + 3 + 2 = 38.0. The <em>Later</em> slices are 18.5 + 1.3 = 19.8; the total is 38.0 + 19.8 = 57.8 = 47.7 + 5.2 + 1.9 + 1.5 + 1.5. Marks are serial sums along a chain, an upper bound where work can overlap: the first ORB run 3 + 1.2 + 3 = 7.2 (unchanged); P3-03b done 9.2; P3-04a done 7.2 + 1.5 + 2.5 = 11.2; P3-04b1 done 13.6; <strong>first real-data trades (P3-04b2) 15.6</strong>; <strong>first cards (P3-04c) 18.1</strong>; conditions on cards (P3-04d) 19.4; P3-03d done 9.2 + 3.5 = 12.7; P3-03c done 12.7 + 2.3 = 15.0 (it merges after P3-03d; the parts that do not touch <code>SimTrade</code> can be built earlier, which this does not credit); P3-03e done 16.5; P3-03f starts 15.6 (after P3-03c and P3-04b2) and is done 17.2; P3-08 12.7 to 15.7; P3-05 and P3-06 16.5 to 18.5 (after the stop-kind lift of P3-03e); P3-09 starts at the latest of 18.5 (P3-06), 18.1 (cards), 17.2 (sheet) and 15.7 (oracle), so 18.5, and is done at 20.5; with P3-04d before it, 19.4 + 2 = 21.4. If P3-06 slides to P4 and takes P3-03e with it, the exit path is 38.0 − 1.5 − 2 = 34.5 and the check is at 18.1 + 2 = 20.1.)</em> <em>(Note, 2026-10-19, third recalculation, after the six Draft specs P3-02b2, P3-05, P3-06, P3-08, P3-09 and P3-10; sizes as the specs state them. P3-02b2 1 to 1.6 (+0.6), P3-05 2 to 2.7 (+0.7), P3-06 2 to 2.0 (0), P3-08 3 to 5.05 (+2.05; 2.9 + 1.3 + 0.85), P3-09 2 to 3.45 (+1.45; 2.85 + 0.6), P3-10 2 to 3.0 (+1.0). On the exit path P3-05, P3-06, P3-08 and P3-09 are counted, P3-02b2 and P3-10 are not (they are <em>Later</em>, before P4, though the central build order puts them first and before P3-09): 38.0 + 0.7 + 0 + 2.05 + 1.45 = 42.2, and the table rows add up to the same: 3 + 1.2 + 3 + 2 + 1.5 + 2.5 + 2.4 + 2.0 + 2.5 + 3.5 + 2.3 + 1.6 + 1.5 + 2.7 + 2.0 + 5.05 + 3.45 = 42.2. <em>Later</em>: 19.8 + 0.6 + 1.0 = 21.4. Total: 42.2 + 21.4 = 63.6 = 57.8 + 5.8. Marks: P3-03e done 16.5 (built); P3-05 16.5 to 19.2; P3-06 19.2 to 21.2; P3-08 12.7 to 17.75; P3-09 starts at the latest of 21.2 (P3-06), 18.1 (cards), 17.2 (sheet) and 17.75 (oracle), so 21.2, and is done at 21.2 + 3.45 = <strong>24.65</strong> (the old 20.5 + 4.15: 2.7 for P3-05 on the chain and 1.45 for P3-09). Work left in the central build order, one agent, P3-02b2, P3-05, P3-06, P3-08, P3-10, P3-09: 1.6 + 2.7 + 2.0 + 5.05 + 3.0 + 3.45 = 17.8. If P3-06 slides to P4 (P3-03e is built and stays): the exit path is 42.2 − 2.0 = 40.2 and the check is at 19.2 + 3.45 = 22.65.)</em> The owner&#39;s time (10 to 12 hours a week) is the real constraint and is <strong>not estimated here (an open item)</strong>. It is Wave 0 (reading the Goal and the Open questions of four specs of about 30,000 words in all, and answering), the early look at 3 to 5 trade cards, and the 20-trade check (at most 29 cards, at least 5 of the 20 against an external chart). Up to three slices (the P3-04b family, P3-03c and P3-08, and P3-05 if the stop-kind lift is left to it) are built at once between agent-days 12.7 and 15.0, each in its own worktree, and merged by hand one at a time.</p>
 <ul>
@@ -1451,6 +1604,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <li><strong>Questions inside the specs</strong> (numbered per spec; each spec gives its recommendation; answer &quot;P3-02b 3: yes&quot;, or &quot;yes to all recommendations&quot; in one line). <em>P3-02b (blocks the first slice):</em> 1 setup is evaluated together with the trigger at every closed bar (this rewords doc 07 §1, &quot;evaluated tonight&quot;); 2 <code>time_rules</code> is the one place for entry windows and square-off; 3 an optional <code>invalidate</code> list; 4 the filters <code>not_event_day</code> and <code>min_turnover</code> compile with a warning and a run that uses one is refused; 5 a swing stop is the lowest low or highest high of the last N bars, not a confirmed pivot. <em>P3-03b:</em> 2 resting limit orders (targets, limit entries) do not slip (its question 1 is Q1). <em>P3-04:</em> 1 sessions under 90 % of their 375 minutes are skipped; 2 an overnight open more than 20 % from the previous close with no applied action is flagged; 3 a flagged day restarts the indicators. Questions 1 and 2 of P3-03 are Q1 and Q2.</li>
 <li><strong>The specs of 2026-10-18 — approved; what is still open.</strong> The owner answered &quot;yes to all recommendations&quot; on 2026-10-18 for the seven specs <a href="../specs/P3-04b1-the-export-library-files-labels-and-folder-writer.html">P3-04b1</a>, <a href="../specs/P3-04b2-the-simulate-verb.html">P3-04b2</a>, <a href="../specs/P3-04c-trade-cards-selection-chart-and-static-html.html">P3-04c</a>, <a href="../specs/P3-03c-costs-and-sizing-the-charge-sheet-the-quantity-and-net-r.html">P3-03c</a>, <a href="../specs/P3-03f-the-cost-choice-the-stored-charge-sheet-the-verbs-and-the-bill-check.html">P3-03f</a>, <a href="../specs/P3-03d-swing-positions-held-across-sessions.html">P3-03d</a> and <a href="../specs/P3-03e-the-daily-evaluation-and-the-overnight-entry-order.html">P3-03e</a>. That accepts the splits (the former row P3-04b into P3-04b1, P3-04b2 and P3-04c; P3-03c into P3-03c and P3-03f; P3-03d into P3-03d and P3-03e) and every recommended answer in them, among them: <code>--fills no-slippage</code> also turns off the tick rounding of fills and says so in its label; the run key does not contain the basket id; an equal-weight round-robin over the strata for the cards and <code>--cards 200</code> as the default; a swing trade that costing skipped still blocks the position gate (the named limit <code>swing_gate_before_costing</code>); a flat <code>dp_charge_per_sell</code>, 0 allowed; the entry session is session 1 of a <code>MAX_HOLD</code> count; an overnight gap through a target fills at the target; a position open at <code>To</code> is reported as open (strict); a 15:30 decision rests overnight; the four level stop kinds are accepted in P3-03e; an order pending at the end of the data is its own outcome. <em>Still open, and only you can supply them:</em> (a) <strong>the charge sheet (Q3) and bills</strong>, which is the only thing the exit check of P3-03f waits for (everything else of it is built). Send, in one message: the sheet id and its source; the first date you can vouch for (ideally 2024-04-01) and every later date on which a line changed; for each date and each segment (intraday MIS, delivery CNC) the ten lines: brokerage % / cap / minimum per order, STT buy % and sell %, exchange %, SEBI per crore, stamp duty buy %, other %, DP charge per delivery sale; GST % and its base; the rounding level (order, trade or bill) and rule (<code>half_away_from_zero</code>, <code>half_even</code> or <code>down</code>); whether brokerage has a cap and a flat per-order fee; the DP amount and whether it includes GST; two or three printed bills; the original global transaction report CSVs, one per financial year; and a confirmation that the sheet is for NSE cash equity (<a href="../specs/P3-03f-the-cost-choice-the-stored-charge-sheet-the-verbs-and-the-bill-check.html">P3-03f</a> F6). <em>The day the files arrive</em> (deploy is done): write the sheet as JSON; run <code>scripts/cost-sheet.sh load &lt;file&gt;</code>, <code>show &lt;id&gt;</code> and <code>check &lt;id&gt; &lt;report files…&gt;</code>; read the classes, the differences and the implied rates; fix the sheet and load it again with <code>--replace</code>; when every classified row is within 0.05 rupee, or the rows beyond it have a reason, set <code>checked</code>; add six worked examples (three intraday, three delivery) to the <code>CostModel</code> tests; write the evidence into the P3-03f row. Until then every real run must use <code>--gross</code>; (b) <strong>P3-04d</strong>, the conditions on the cards, which is proposed and not approved: it has no spec, and whether the 20-trade check needs it is your choice (<a href="../specs/P3-04c-trade-cards-selection-chart-and-static-html.html">P3-04c</a> question 2 recommended the cards first and the conditions after); (c) your own timed run of the 214 instruments and whether a basket of them exists (the verb is built); (d) the six Draft specs of 2026-10-19: see item 6. The tick unit, which was open here, is closed: paise, verified on your database on 2026-10-19 (ADR 0038 item 6).</li>
 <li><strong>What is left of P3, and it is yours (2026-10-19).</strong> The six specs P3-02b2, P3-05, P3-06, P3-08, P3-09 and P3-10 were approved and built (see their rows); the sizes and the totals above are the specs&#39; and were not recalculated, because no <em>As built</em> section states a different size. Open: (a) <strong>the real pack of <a href="../specs/P3-09-verification-pack-and-the-20-trade-check.html">P3-09</a></strong>: your seed, Q6 and Q7 (the external chart and its history depth, the pack, the instruments and the window, the exit rule and gross against net, the hold-out before the draw), the check itself is now the automated gate (P3-09d: you run <code>verify-pack --gate</code> on the pack and act on its status; your own chart check, 7.5 to 12 hours by the spec&#39;s estimate, UNVERIFIED, is optional extra evidence); (b) <strong>the charge sheet (Q3)</strong> of item 5, which closes the exit check of P3-03f; (c) <strong>the 214-instrument timing run</strong>; (d) <strong>decisions:</strong> the open class B entry Q3-MFE of the oracle log (MFE below R in one corner; ISS-28): engine <code>sim-6</code> or amend the rule; your readings of Q1, Q2, Q3 and Q10 of the <a href="../research/p3-08-disagreements.html">oracle log</a> (the engine and the oracle agree on all four, and tests pin them); the three class A entries D-01 to D-03 of <a href="../adr/0047-the-oracle-and-the-rule-table-gaps.html">ADR 0047</a>; <strong>P3-04d</strong>, the conditions at the decision bar on the cards, yes or no (the check of <code>BASE_BREAKOUT</code> needs it or a hand recompute); <strong>closing P3 on ORB alone, or with <code>VWAP_PULLBACK</code> and <code>BASE_BREAKOUT</code> (Round A and Round B)</strong>, the former being an explicit amendment of the exit criterion; the weekly trend gate of <code>BASE_BREAKOUT</code> (it depends on the weekday); <code>swing_low</code> against <code>bar_low</code> as its stop (a smoke on your data gave 54 candidates, 28 trades and 27 exits at the 5-session cap, data-quality facts only); whether to run <code>simulate --store</code>; and the push and pull request of the branch.</li>
+<li><strong>Spec review of 2026-11-10 (the not-yet-built specs; record in <a href="../specs/REVIEW-2026-11-10.html">REVIEW-2026-11-10</a>).</strong> Eighteen specs were corrected for facts (built dependencies, the AU recovery classes and settings catalog, the CF tiers and ledger, ADR numbers). Fourteen questions wait for the owner, each with a recommendation: (1) build BK-05 before BK-03 (yes); (2) BK-03 intraday baskets formed after the close from stored bars, since no live 1-minute bar source exists (yes, −0.5 d); (3) Auto scope expands basket members as of the plan session (yes, a small AU-16 follow-up); (4) <code>fetchEnabled</code>/<code>derivedEnabled</code> on <code>GET /api/baskets</code> (yes, in BK-03); (5) BK-05 reuses <code>options.lot_sizes</code> (yes, −0.5 d); (6) one capacity share across the app, CF-05&#39;s, with BK-10 only tightening (yes); (7) BK-11 uses the CF-05 tiers A/B/C, not terciles (yes); (8) BK-11 keeps the child-versus-parent choice report-only on the CF-02 chain (yes); (9) BK-11 re-worded and re-sized to about 3.5 d; (10) CF-04 B: unfinished backfill chunks block AU-12, failing closed (yes); (11) P13: switch on the depth and tick recorders and pin the 30 names, and drop the <code>md1_in_scoring</code> switch (yes, drop); (12) cut basis, <code>xd options phase-check --cut basis:carry-1</code> (yes); (13) P3-01d fallback D uses the local inbox (yes; the probe is yours to run); (14) P8-16 measures C14 load time without the Fast 4G profile, since the app is local (yes; the layout-shift work is about 1 d).</li>
 </ol>
 <h2 id="open-issues-log">Open issues log<a class="hash" href="#open-issues-log" aria-label="Link to this section">#</a></h2>
 <p>Findings from the first real runs that are not fixed yet. Each entry says what was seen, why it matters and the direction to take; none blocks the current work. New entries go at the bottom with the next number; closed ones are marked <strong>Closed</strong> with the story that fixed them, never deleted. Figures from the owner&#39;s own accounts are kept out of this file (they live in the local, uncommitted analysis under <code>data/dhan/</code>).</p>
@@ -1590,8 +1744,8 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>The frame-step, evaluation and cold-start budgets have no automated guard.</strong> A frame step at most 1 µs, evaluation at most 0.3 µs per set, warm compile at most 3 ms, first compile after the compiler warm-up at most 20 ms and the warm-up at most 150 ms are asserted only by explicit benchmarks and <code>scripts/bench-coldstart.sh</code>, which <code>scripts/check.sh</code> skips because they need a quiet machine. Only the allocation tests (0 bytes) stand guard in the gates. <em>(Note, 2026-10-18, P3-02b: the same holds for three more budgets, named in ISS-12: the warm strategy compile (3 ms), the first strategy compile after the warm-up (20 ms) and the evaluation of a side of ten simple items (0.4 µs per call); the allocation test of <code>BoundSide</code> is in the gates.)</em></td>
 <td>Closing ISS-12 and ISS-13 (2026-10-17).</td>
 <td>A slowdown, or a regression of the cold start, passes every normal gate. The 300 ns of the evaluation share is the difference of two separately minimised timings, a guide and not a regression gate. Open minor findings of the ISS-12 review: the 20 ms gate is about six times the measured 3.3 ms, so a regression to 15 ms would pass; no test shows that <code>CompilerWarmup.Run()</code> itself does the work (the tests call the internal <code>Warm()</code>; one calls <code>Run()</code> only to show that it does not throw); the warm-up covers compile and bind but not the first frame <code>Step</code> and <code>Evaluate</code> (about 106 methods, about 2.3 ms), which the library may not step by an architecture rule.</td>
-<td>Run the explicit benchmarks before a release on a quiet machine, as <a href="../engineering/README.html">engineering README</a> §3 already does for the cold start, with a lower bound near the measured values; tighten the 20 ms gate toward the measured value; add a test that shows that <code>Run()</code> does the work; let the host that steps frames (the simulator) warm the first step. Or the owner accepts the gap.</td>
-<td>Open</td>
+<td>Run the explicit benchmarks before a release on a quiet machine, as <a href="../engineering/README.html">engineering README</a> §3 already does for the cold start, with a lower bound near the measured values; tighten the 20 ms gate toward the measured value; add a test that shows that <code>Run()</code> does the work; let the host that steps frames (the simulator) warm the first step. Or the owner accepts the gap. <strong>Decided 2026-11-09 (<a href="../adr/0233-a-same-time-of-day-relative-volume-feature-rel-volume-tod-and-an-owner-invoked-bounded-repair-of-old-bar-holes-that-is-off-by-default-the-budget-guard-stays-opt-in-and-the-rising-falling-lint-stays-deferred.html">ADR 0233</a>):</strong> no timing assertion goes into the gate, because a wall-clock budget flakes on a loaded machine; allocation counts are the stable guard and already cover the frame, the evaluation and <code>rel_volume_tod</code>. The timing budgets stay in the explicit benchmarks and <code>scripts/bench-coldstart.sh</code>, run before a release on a quiet machine; the minor findings above stay recorded.</td>
+<td>Open (accepted gap; timing checks opt-in)</td>
 </tr>
 <tr>
 <td>ISS-17</td>
@@ -1646,12 +1800,12 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>There is no time-of-day relative volume.</strong> <code>rel_volume(n)</code> divides by the previous n bars of the feature&#39;s own timeframe, not by the same time of day, while <a href="07-strategies.html">doc 07</a> §5 (the Volume row) and the ticket example in §2 (&quot;rel-volume 1.8×&quot;) promise a same-time-of-day measure. On 15m the 09:30 bar is compared with yesterday&#39;s afternoon bars.</td>
 <td>P3 re-plan (2026-10-18): reading the catalog against doc 07.</td>
 <td>A volume filter on an intraday timeframe does not mean what doc 07 says, and the ORB filter &quot;relative volume&quot; of doc 07 would be read wrongly.</td>
-<td>The first strategies use <code>tf(&quot;1D&quot;).rel_volume(20)</code> (yesterday against the 20 days before it, as doc 07 §1 wants) or evaluate on 1D; doc 07 §5 is reworded; a time-of-day catalog name is not planned until a strategy needs one.</td>
-<td>Open</td>
+<td><strong>Done (2026-11-09, <a href="../adr/0233-a-same-time-of-day-relative-volume-feature-rel-volume-tod-and-an-owner-invoked-bounded-repair-of-old-bar-holes-that-is-off-by-default-the-budget-guard-stays-opt-in-and-the-rising-falling-lint-stays-deferred.html">ADR 0233</a>; decided on research under the owner&#39;s delegation; the owner may revert).</strong> A new name, <code>rel_volume_tod(n)</code>: volume over the mean volume at the same time of day in the previous n sessions (n 1 to 250, default 20; intraday only; unavailable until n sessions have been seen at that time of day; no look-ahead; a missing bar is skipped). <code>rel_volume(n)</code> is unchanged, so no existing strategy or run key changes. Doc 07 section 5 and doc 11 say which one to use.</td>
+<td><strong>Closed</strong></td>
 </tr>
 <tr>
 <td>ISS-24</td>
-<td><strong>Traps of the rules language.</strong> (1) <strong>Built in P3-02f (ADR 0108): a lag on a feature call is accepted</strong> (<code>highest(20)[1]</code>); before it, it was refused: <code>highest(20)[1]</code>, <code>ema(20)[1]</code>, <code>rsi(14)[1]</code> give the syntax problem <code>subscript_on_non_reference</code> (the approved restriction; spec P3-02 criterion 1, ADR 0034 Amendment 8). <code>highest(n)</code> includes the current bar, so &quot;close above the previous N-bar high&quot; has no spelling on one timeframe and <code>crosses_above(close, highest(20))</code> is never true. The spellings that exist are <code>close &gt;= highest(n, source=close)</code> (a new n-bar closing high, ties count) and <code>tf(&quot;1D&quot;).highest(n)</code> read from an intraday strategy (the last closed day, today excluded). (2) <strong>Built in P3-02f: the warning <code>never_true</code></strong>; before it, comparisons that could not be true by construction were not linted (<code>close &gt; highest(n)</code>, <code>crosses_above(close, highest(n))</code>, <code>low &lt; lowest(n)</code>, <code>rsi(14) &gt; 100</code>): constant detection sees literals and parameters only. (3) Smaller gaps: a condition is boolean only, so a stop, target or level cannot be written in the language (stops are typed kinds in P3-02b); <code>or_high(m)</code> needs m to be a whole number of bars of the evaluation timeframe (<code>or_high(15)</code> is <code>bad_arguments</code> on 30m); a time of day or a lag cannot be a parameter (windows live in <code>time_rules</code>); there is no average volume, turnover or event calendar, so the filters <code>min_turnover</code> and <code>not_event_day</code> cannot be evaluated and results days are not excluded; the BUY to SELL mirror is defined nowhere (P3-02e).</td>
+<td><strong>Traps of the rules language.</strong> (1) <strong>Built in P3-02f (ADR 0108): a lag on a feature call is accepted</strong> (<code>highest(20)[1]</code>); before it, it was refused: <code>highest(20)[1]</code>, <code>ema(20)[1]</code>, <code>rsi(14)[1]</code> give the syntax problem <code>subscript_on_non_reference</code> (the approved restriction; spec P3-02 criterion 1, ADR 0034 Amendment 8). <code>highest(n)</code> includes the current bar, so &quot;close above the previous N-bar high&quot; has no spelling on one timeframe and <code>crosses_above(close, highest(20))</code> is never true. The spellings that exist are <code>close &gt;= highest(n, source=close)</code> (a new n-bar closing high, ties count) and <code>tf(&quot;1D&quot;).highest(n)</code> read from an intraday strategy (the last closed day, today excluded). (2) <strong>Built in P3-02f: the warning <code>never_true</code></strong>; before it, comparisons that could not be true by construction were not linted (<code>close &gt; highest(n)</code>, <code>crosses_above(close, highest(n))</code>, <code>low &lt; lowest(n)</code>, <code>rsi(14) &gt; 100</code>): constant detection sees literals and parameters only. (3) Smaller gaps: a condition is boolean only, so a stop, target or level cannot be written in the language (stops are typed kinds in P3-02b); <code>or_high(m)</code> needs m to be a whole number of bars of the evaluation timeframe (<code>or_high(15)</code> is <code>bad_arguments</code> on 30m); a time of day or a lag cannot be a parameter (windows live in <code>time_rules</code>); there is no average volume or turnover, so the filter <code>min_turnover</code> cannot be evaluated (the simulator refuses it); <strong>built in P15-06 (<a href="../adr/0182-the-event-risk-filter-reads-the-results-calendar-in-the-simulator-and-behind-an-owner-switch-in-the-plan-and-the-results-loss-tag-describes-the-past-and-unavailable-is-never-a-pass.html">ADR 0182</a>): the filter <code>not_event_day</code> is evaluated from the stored results calendar</strong> (sim-7), so results days are excluded in the simulator for a strategy that names it, and in the plan selection once the owner switches the event filter on; the BUY to SELL mirror is defined nowhere (P3-02e).</td>
 <td>P3 re-plan (2026-10-18): the review of the plan found that <a href="11-strategy-lab.html">doc 11</a> §2 writes <code>ema(20)[1]</code> in its &quot;A lag counts bars&quot; paragraph, which the parser refuses; <code>InvalidSources.cs</code> pins <code>rsi(14)[1]</code> and <code>tf(&quot;1h&quot;).ema(20)[1]</code>.</td>
 <td>A rule that never fires gives zero trades and zero losses and looks safe; an example in the documentation that does not compile misleads the author.</td>
 <td>The example in doc 11 §2 is reworded (done in the documentation pass of 2026-10-18). The dynamic guard is built in P3-03 and P3-04: per-condition true, false, unknown and not-ready counters in every result and run record, and a rule in each spec that the strategy&#39;s fixtures show at least one true. The static lint and the grammar change are the optional slice P3-02f (an owner decision and an ADR). The P3-02b model accepts the filter names and the simulator refuses a run that uses one (<code>filter_not_available</code>); liquidity belongs to the universe layer (<a href="10-trade-selection.html">doc 10</a> §2) and events to P15.</td>
@@ -1670,7 +1824,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>The cost lint for <code>rising</code>/<code>falling</code> runs was deferred.</strong> <a href="../adr/0034-the-rules-expression-language-lint-and-compiler.html">ADR 0034</a> Amendment 18 built no lint that sums the n × reads of the <code>rising</code>/<code>falling</code> runs of a condition (a run costs about 1.75 ns per value read) and left the question to the simulator: reopen it when evaluation is above about 20 percent of a run, or when a sweep over a <code>rising</code>/<code>falling</code> count makes it a leading term.</td>
 <td>P3-03a build (2026-10-18, <a href="../adr/0037-simulation-conventions-and-the-two-stage-seam.html">ADR 0037</a> Amendment 1): for ORB v1 the evaluation and counting of the non-frame work take about 35 % of a one-side scan (the frame alone does about 16.8 million minutes per second, the scan of one side 10.9 million), against the trigger of about 20 %. ORB uses no <code>rising</code> or <code>falling</code>, so the figure measures the entry window, the counters and the two truths per step, not such a run.</td>
 <td>On its face the trigger is passed; but the 35 % is not the cost the lint is for, and a lint now would guard a shape no built strategy has. A strategy with a long <code>rising</code>/<code>falling</code> run, or a sweep over its count (P5), could make one condition cost more than the whole ten-condition budget of 0.3 µs.</td>
-<td><strong>Deferred; the owner may reverse this deferral and ask for the lint now.</strong> Revisit when the first strategy that uses <code>rising</code> or <code>falling</code> is built (P3-05 or P3-06, if its spec writes one): measure the share of the scan on that strategy and decide then; the non-frame share of ORB (35 %) is the figure to compare with. <strong>Measured on P3-05 (2026-10-19):</strong> the non-frame share is 28.0 to 30.8 % for <code>VWAP_PULLBACK</code> against 32.3 to 36.9 % for ORB, still above the trigger of about 20 % but, as before, not a measure of a <code>rising</code>/<code>falling</code> run (neither strategy has one); the deferral stands.</td>
+<td><strong>Deferred; the owner may reverse this deferral and ask for the lint now.</strong> Revisit when the first strategy that uses <code>rising</code> or <code>falling</code> is built (P3-05 or P3-06, if its spec writes one): measure the share of the scan on that strategy and decide then; the non-frame share of ORB (35 %) is the figure to compare with. <strong>Measured on P3-05 (2026-10-19):</strong> the non-frame share is 28.0 to 30.8 % for <code>VWAP_PULLBACK</code> against 32.3 to 36.9 % for ORB, still above the trigger of about 20 % but, as before, not a measure of a <code>rising</code>/<code>falling</code> run (neither strategy has one); the deferral stands. <strong>Checked again 2026-11-09 (<a href="../adr/0233-a-same-time-of-day-relative-volume-feature-rel-volume-tod-and-an-owner-invoked-bounded-repair-of-old-bar-holes-that-is-off-by-default-the-budget-guard-stays-opt-in-and-the-rising-falling-lint-stays-deferred.html">ADR 0233</a>):</strong> the trigger is not met, since none of the fifteen built-in strategies writes <code>rising</code> or <code>falling</code> and no sweep over such a count exists; no lint built.</td>
 <td>Open (deferred)</td>
 </tr>
 <tr>
@@ -1694,8 +1848,8 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>Stored-bar holes older than the backfill lookback are not repairable by the existing backfill; and a flaky frontend test.</strong> The gap backfill covers only the last <code>Data:Gaps:LookbackSessions</code> sessions (default 30, at most 250), so it can never repair a 2024 day. Found by the first real <code>verify-pack --gate</code> on <code>p3-check-1</code>: KALYANKJIL 2024-04-23 is missing 10:52 to 10:57 in the stored bars. Also seen once: <code>AddTrade.test.tsx &gt; Rebuild lots</code> failed in a full frontend run (a request escaped the network mock, <code>/api/live/status</code>) and passed alone 3 of 3.</td>
 <td>The first real gate run (2026-10-21).</td>
 <td>A hole is a data finding of the gate (ADR 0048, <code>PASS_WITH_DATA_FINDINGS</code>), not a P3 blocker; the owner does not want the stored history edited for the gate. No repair command exists for old days. The frontend test is a flake in a test that does not mock one request.</td>
-<td>A repair command for old holes is a later decision; the flaky test needs its mock completed (not done).</td>
-<td>Open</td>
+<td><strong>Done (2026-11-09, <a href="../adr/0233-a-same-time-of-day-relative-volume-feature-rel-volume-tod-and-an-owner-invoked-bounded-repair-of-old-bar-holes-that-is-off-by-default-the-budget-guard-stays-opt-in-and-the-rising-falling-lint-stays-deferred.html">ADR 0233</a>).</strong> Owner-invoked <code>POST /api/data/instruments/{id}/repair-holes</code> with <code>{from, to}</code>: bounded by <code>Data:Repair:MaxSessions</code> (default 0 = off, 0 to 60), needs a step-up, holds the data-job slot, is audited, and stores (insert-only) only the missing minutes (repaired bars change the bars hash: stored runs stay intact but are no longer reproducible, see ADR 0233) through the existing Dhan Data API read (no new endpoint), a stored bar is never changed, an aggregate and quality job follows. Never automatic. The flaky <code>AddTrade.test.tsx</code> is not reproduced: <code>/api/live/status</code> is in the default test handlers since P2-10a and <code>test/setup.ts</code> names any escaped request; the file passes 22 of 22; no change made. The real KALYANKJIL 2024-04-23 repair is the owner&#39;s to run (set <code>Data:Repair:MaxSessions</code>, call the endpoint).</td>
+<td><strong>Closed</strong> (the real repair run is the owner&#39;s)</td>
 </tr>
 </tbody></table>
 
@@ -1704,9 +1858,10 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-27 03:12</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-11-10 18:35</footer>
 </main>
-<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#au-programme-automation-and-simplicity-built-2026-11-0910" class="d2">AU programme: automation and simplicity (built 2026-11-09/10)</a>
+<a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>
 <a href="#open-issues-log" class="d2">Open issues log</a></aside>
 </div>

@@ -1,6 +1,6 @@
 # CF-11 — Readiness scorecard, per strategy and for the system
 
-- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
+- **Status:** Built 2026-11-06 to 2026-11-07 (ADRs 0221–0227). Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** CF — Confidence programme (row added by CF-00; UNVERIFIED). Reads P5, P6, P10 and the other CF slices; adds one lazy screen.
 - **Design refs:** docs/design/09-learning-engine.md §7 (cell lifecycle) · 11-strategy-lab.md §5 · 13-reports-and-ui.md · 18-roadmap.md · docs/research/confidence-edge-realism.md §4 · confidence-learning-and-validation-speed.md §2.4, §3 · P6-08, P10-00 (D5, D6, D7), P10-04, P10-06, P5-06
 - **Needs:** CF-01 (n_eff, power), CF-05 (rows 4, 5, 14), CF-06 (rows 1, 12, trial factor), CF-07 (rows 7 to 9), CF-08 (edge series), CF-09 (hard fail), CF-10 (calibration), CF-12 (kill-rule state, optional). Until a producer exists its input is `unavailable`, which counts as fail.

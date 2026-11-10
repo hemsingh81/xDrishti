@@ -89,3 +89,14 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 - Criterion 9 counts k variants "from a base of 1 variant".
 - Rule: the P14-00 and doc 09 seventh/eighth-part edit goes in the same change set as this slice. The P14-00 text is already updated to say `expression` is the eighth part (check at Approval); doc 09 is edited by this slice.
 - `rule version`/`rule_version` -> `params_hash`; `members_now` -> `single_snapshot` (BK-01 vocabulary). Size unchanged: 4 agent-days.
+
+## Review 2026-11-10
+Factual corrections. Three design conflicts with built work are owner questions (REVIEW-2026-11-10.md, BK-11 Q1 to Q3); this section does not resolve them.
+- **Key, built (ADR 0193):** `CellId` has `Universe` (default `*`) and `Expression` (default `cash`) after `Regime`. The canonical key uses the fewest trailing parts. A seven-part key is refused until this slice widens the value list, and `Problems()` refuses any universe but `*`. Only cash cells reach decision paths (`CashCells.Only`). Decision 5's built note is accurate. AC 1's "eighth part rejected until P14 defines it" is out of date: P14 has defined `expression` as the eighth part.
+- **P6-02 is built** (ADR 0146): the regime part is real, read from the day before the decision.
+- **Shrinkage, built twice:** P6-01's Beta shrinkage, strength 20, and CF-02's `NormalShrinkage` / `CellShrinker` (ADR 0204). CF-02 has a leave-one-out parent (the review-fix "exclusion method") and the chain `star`, then `strategy`, then `system`. It runs in `ReportOnly` mode, and `Gate` is refused until the lower bound is validated by a coverage simulation. A universe child must join that chain; see Q2.
+- **Effective n (ADR 0203):** a cell's `Enough` flag compares `ceil(n_eff)` when `Confidence:EffectiveN:Mode` is `Gate`. The "child thin" rule reads the cell's `Enough` flag, not a raw trade count.
+- **Trials:** the CF-06 ledger counts them (ADR 0207). The universe is part of the plan hash, so a new basket is a `replan` row and is counted in `TrialCounts`. AC 9 reads that count, not run labels. The honest count enters `Factor` only with the owner's `CountInFactor` ON.
+- **Liquidity tiers, built (CF-05, ADR 0229/0230):** `LiquidityTiers` uses fixed rupee cuts (A 100 crore, B 20 crore), not terciles. See Q1.
+- **Settings catalog (ADR 0246, required):** `learning.universe_registered_baskets`, `learning.universe_min_trades_child` and `learning.universe_link_min_trades` get `Stored` descriptors, tier Advanced, safer direction `none`, not learnable.
+- **Training fence (ADR 0243):** the tagger runs inside cell statistics, which read research runs only. Training runs carry no universe evidence.

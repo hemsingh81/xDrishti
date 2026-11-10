@@ -1,5 +1,7 @@
 # Journey — the remaining specs, in order (index written 2026-10-24; reviewed and corrected 2026-10-25)
 
+**Status 2026-11-11.** Most specs indexed below are now built: P8 (except the P8-16 remainder), P9, P10, P11, P12 (reduced), P14 (except basis P14-14/15), P15, CF (except CF-04 Parts B and C) and the later AU programme. Not built: P13 (except P13-05; waits for recorded depth), BK (BK-02 built 2026-11-10, BK-01 in build), P14-14/15, CF-04 B/C, the P3-01d probe. Those were reviewed against the built code on 2026-11-10; corrections and the 14 open owner questions are in [REVIEW-2026-11-10](REVIEW-2026-11-10.md), and live status is in the [roadmap](../design/18-roadmap.md) and the delivery plan (`docs/prototype/delivery/`).
+
 All files below are **Draft**: written under the owner's delegation ("do your own research for the best answers and write them into the specs"). Every design question was answered inside its spec under **Decisions (researched)** with reason, rejected alternative and source. An agent builds a slice only after the owner sets it **Approved**. SAFETY slices keep every new setting default OFF.
 
 Sizes are agent-days, uncalibrated estimates (earlier phases overran). Total of the new specs: about **431 agent-days** (295 plus the system-baskets programme BK-01..BK-12, 51 days, plus the confidence programme CF-00..CF-12, 80 days) from the specs' own Size lines (P8 rest about 66, P3 leftovers 13, P7 leftovers 9, P9 33.5, P10 20, P11 20, P12 34.5, P13 to P15 about 97 as plans).

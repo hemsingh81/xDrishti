@@ -1,6 +1,6 @@
 # P15-02 — Point-in-time filing store: insert-only tables, the supersedes chain, and `AsOf` with the broadcast-time rule
 
-- **Status:** Approved (owner, 2026-11-02: pre-approved in the autonomous loop; open questions resolved with the recommended/safer answers listed in the spec)
+- **Status:** Built 2026-11-02 (ADR 0180). Approved (owner, 2026-11-02: pre-approved in the autonomous loop; open questions resolved with the recommended/safer answers listed in the spec)
 - **Phase / roadmap row:** P15 — slice P15-02 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Point-in-time filing store").
 - **Design refs:** docs/design/20 §D · 05 §10 · 19 §1 · P15-00 "Point-in-time rule (D3)" · ADR 0017, 0045 (insert-only for `xd_app`), 0066 (side-table pattern), 0173-0178 (recorder, disk guard, insert-only discipline). New ADR: **next free number at build time** (the point-in-time rule, the visibility definition, the unavailable states).
 - **Needs:** P15-01 (the listing). **Needed by:** P15-03 (facts), P15-04 (calendar, shareholding), P15-05 (features), P15-06 (event filter).

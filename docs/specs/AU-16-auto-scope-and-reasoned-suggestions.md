@@ -1,6 +1,6 @@
 # AU-16 — Auto scope and reasoned next-day suggestions
 
-- **Status:** Approved (owner, 2026-11-09, in chat)
+- **Status:** Built 2026-11-10 (ADR 0251). Approved (owner, 2026-11-09, in chat)
 - **Phase / roadmap row:** AU — Automation and simplicity programme, row AU-16 (plan: [AU-00](AU-00-automation-and-simplicity-plan.md))
 - **Size:** 3 agent-days (an estimate, not calibrated) · **Needs:** built P7 pipeline
 - **Decisions:** [ADR 0244](../adr/0244-one-auto-switch-runs-the-chain-and-only-suggests.md)

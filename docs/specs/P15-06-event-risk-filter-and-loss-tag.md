@@ -1,6 +1,6 @@
 # P15-06 — Event-risk filter and loss tag: `not_event_day`, `exclude.results_within_days`, the plan check "results within N days" and the results loss tag, `unavailable` never a pass, behind a default-off switch with an auto option
 
-- **Status:** Approved (owner, 2026-11-02: pre-approved in the autonomous loop; open questions resolved with the recommended/safer answers listed in the spec)
+- **Status:** Built 2026-11-02 (ADR 0182). Approved (owner, 2026-11-02: pre-approved in the autonomous loop; open questions resolved with the recommended/safer answers listed in the spec)
 - **Phase / roadmap row:** P15 — slice P15-06 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Event-risk filter and loss tag").
 - **Design refs:** docs/design/07 §1 (`filters`), 10 §2 (events excluded), 09 §14 (smart rules, loss tags), 11 §2, 15, 16 (`exclude.results_within_days`, `smart_rules`), 19 §1, §5 · ADR 0037 (engine version, run key), 0071 (loss tags), 0082 (selection filters, `unavailable`), 0087 (pre-trade checks, `unavailable` never passes), 0091/0128 (fresh password), 0083 (no order) · ISS-24 (the refusal) · CLAUDE.md "Approvals have an auto option". New ADR: **next free number at build time**, plus an ADR 0037 amendment (engine `sim-7`).
 - **Needs:** P15-02, P15-04 (`IResultsCalendar`, the stored calendar). **Needed by:** P15-10 (protocol F evaluates this filter and may switch it on by KEEP), P15-11 (screens).

@@ -1,6 +1,6 @@
 # P15-07 — Announcement eval set and labelling: an announcements loader, a pre-registered category baseline, a stratified sample of 200, the owner's labels, and set D of the P9-09 eval
 
-- **Status:** Approved (owner, 2026-11-03, blanket approval of all stories)
+- **Status:** Built 2026-11-03 (ADR 0188). Approved (owner, 2026-11-03, blanket approval of all stories)
 - **Phase / roadmap row:** P15 — slice P15-07 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Announcement eval set and labelling"), the first slice of the LLM branch (cut line: cut before PEAD).
 - **Design refs:** docs/design/14 §4 item 5, §5 (200 labelled announcements, precision on "material" ≥ 80 %) · 20 §D · P15-00 protocol L, D10 · P9-09 (set D, `announcements.schema.json`, `AnnouncementGrader`) · ADR 0143 (the eval), 0179 (the inbox and sidecar), 0180 (envelopes). New ADR: **next free number at build time** (the announcements csv, the sample and the baseline), plus an ADR 0179 amendment (a third `row_level_ts` kind).
 - **Needs:** P15-02 (built), P9-09 (built: set D grades no rows today and says `not_evaluable`). **Owner acts:** the announcements csv files (the owner prepares them from the exchange pages, as for P15-04), and the labels (an estimated 2 to 3 hours, UNVERIFIED). **Needed by:** P15-08 (protocol L).
