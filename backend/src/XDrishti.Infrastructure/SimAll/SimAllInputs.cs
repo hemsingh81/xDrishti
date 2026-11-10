@@ -1,5 +1,6 @@
 using Npgsql;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.SimAll;
 
 namespace XDrishti.Infrastructure.SimAll;
@@ -30,7 +31,7 @@ internal sealed class SimAllUniverse(NpgsqlDataSource dataSource) : ISimAllUnive
 /// <summary>
 /// Backfill is complete when a bar-history job is not running and every instrument the history phase fetches has stored bars (spec AU-12, ADR 0243 point 7). Anything else, including nothing tracked, is not complete: fail closed.
 /// </summary>
-internal sealed class SimAllBackfillGate(IFetchTargets targets, IDataJobStore jobs) : ISimAllBackfillGate
+internal sealed class SimAllBackfillGate(IFetchTargets targets, IDataJobStore jobs, IRecoveryLedger recovery) : ISimAllBackfillGate
 {
     public async ValueTask<string?> IncompleteReasonAsync(CancellationToken cancellationToken)
     {
@@ -49,7 +50,9 @@ internal sealed class SimAllBackfillGate(IFetchTargets targets, IDataJobStore jo
         return missing == 0 ? null : $"{missing} of {list.Count} tracked instruments have no stored bars yet.";
     }
 
-    public async ValueTask<bool> DataJobRunningAsync(CancellationToken cancellationToken) => await jobs.GetRunningAsync(cancellationToken) is not null;
+    /// <summary>A bar-history job (the end-of-day fetch is one) or a missed-day recovery pass is running: both use the broker and the database, so the simulation waits (accepted contention otherwise: ADR 0248).</summary>
+    public async ValueTask<bool> DataJobRunningAsync(CancellationToken cancellationToken) =>
+        await jobs.GetRunningAsync(cancellationToken) is not null || await recovery.LatestPassAsync(cancellationToken) is { FinishedAt: null };
 }
 
 /// <summary>Free space of the root volume, as the recorders measure it (the database volume is the same disk in the compose stack).</summary>

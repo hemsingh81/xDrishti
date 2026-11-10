@@ -73,7 +73,11 @@ public sealed class SimulatorComparison
 
     /// <summary>Scans the minutes of one instrument once per side and walks every entry candidate under every member. Same arguments and same refusals as <see cref="Simulator.Run"/>.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<ComparisonResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null)
+    public Result<ComparisonResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null) =>
+        RunUntilCancelled(instrument, bars, tick, calendar, quantity, context, events, resultsDays, tierOn, turnoverOn, CancellationToken.None);
+
+    /// <summary>As <c>Run</c>, looking at <paramref name="cancellationToken"/> every few thousand minutes of the scan; a stop raises <see cref="OperationCanceledException"/> (AU-12). A separate overload so that existing callers are unchanged.</summary>
+    public Result<ComparisonResult> RunUntilCancelled(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, ScanContext? context, EventCalendarSnapshot? events, ResultsDayInputs? resultsDays, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
@@ -113,6 +117,11 @@ public sealed class SimulatorComparison
             var scanner = created.Value;
             for (var i = 0; i < bars.Count; i++)
             {
+                if ((i & Simulator.CancelMask) == 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested(); // a stop is seen every few thousand minutes, so a long replay can be abandoned (AU-12)
+                }
+
                 scanner.Step(bars[i]);
             }
 

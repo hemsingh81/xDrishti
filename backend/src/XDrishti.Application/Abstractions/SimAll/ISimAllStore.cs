@@ -26,6 +26,12 @@ public interface ISimAllStore
     /// <summary>Puts the chunks left running by a stopped host back to pending; returns how many.</summary>
     ValueTask<int> RedoRunningChunksAsync(CancellationToken cancellationToken);
 
+    /// <summary>Puts chunks that have been running since before <paramref name="startedBefore"/> back to pending (a worker that died or lost its database without the host restarting); returns how many.</summary>
+    ValueTask<int> RedoStaleChunksAsync(DateTimeOffset startedBefore, CancellationToken cancellationToken);
+
+    /// <summary>Puts one claimed chunk back to pending (its result could not be recorded, or the market opened under it).</summary>
+    ValueTask ReleaseChunkAsync(SimAllChunk chunk, CancellationToken cancellationToken);
+
     /// <summary>Claims the next pending chunk of a job that is running (<c>FOR UPDATE SKIP LOCKED</c>); null when none is left or the job is not running.</summary>
     ValueTask<SimAllChunk?> ClaimChunkAsync(Guid jobId, DateTimeOffset now, CancellationToken cancellationToken);
 

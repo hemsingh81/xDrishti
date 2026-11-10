@@ -82,7 +82,11 @@ internal sealed class StartSimAllHandler(
 
         SimAllLog.Started(logger, job.Id, chunks.Count, versions.Count);
         events.Record(AccountEvent.Record(AccountEventType.SimulateAllStarted, null, $"chunks={chunks.Count} strategies={versions.Count}", command.Actor, now));
-        await unitOfWork.TrySaveChangesAsync(cancellationToken);
+        if (!await unitOfWork.TrySaveChangesAsync(cancellationToken))
+        {
+            SimAllLog.AuditFailed(logger, "SimulateAllStarted"); // the job state is already changed (a separate store); say so loudly rather than lose the record silently
+        }
+
         return Result.Success(SimAllView.Of(new SimAllSnapshot(job, new SimAllCounts(chunks.Count, 0, 0, 0, chunks.Count, 0, 0, 0))));
     }
 
@@ -122,7 +126,11 @@ internal sealed class PauseSimAllHandler(ISimAllStore store, IAccountEventLog ev
 
         SimAllLog.Paused(logger, job.Id, SimAllPause.Owner);
         events.Record(AccountEvent.Record(AccountEventType.SimulateAllPaused, null, null, command.Actor, now));
-        await unitOfWork.TrySaveChangesAsync(cancellationToken);
+        if (!await unitOfWork.TrySaveChangesAsync(cancellationToken))
+        {
+            SimAllLog.AuditFailed(logger, "SimulateAllPaused"); // the job state is already changed (a separate store); say so loudly rather than lose the record silently
+        }
+
         return await SimAllRead.CurrentAsync(store, cancellationToken);
     }
 }
@@ -161,7 +169,11 @@ internal sealed class ResumeSimAllHandler(ISimAllStore store, ISimAllBackfillGat
 
         SimAllLog.Resumed(logger, job.Id);
         events.Record(AccountEvent.Record(AccountEventType.SimulateAllResumed, null, null, command.Actor, now));
-        await unitOfWork.TrySaveChangesAsync(cancellationToken);
+        if (!await unitOfWork.TrySaveChangesAsync(cancellationToken))
+        {
+            SimAllLog.AuditFailed(logger, "SimulateAllResumed"); // the job state is already changed (a separate store); say so loudly rather than lose the record silently
+        }
+
         return await SimAllRead.CurrentAsync(store, cancellationToken);
     }
 }
@@ -190,7 +202,11 @@ internal sealed class CancelSimAllHandler(ISimAllStore store, IAccountEventLog e
 
         SimAllLog.Cancelled(logger, job.Id);
         events.Record(AccountEvent.Record(AccountEventType.SimulateAllCancelled, null, null, command.Actor, now));
-        await unitOfWork.TrySaveChangesAsync(cancellationToken);
+        if (!await unitOfWork.TrySaveChangesAsync(cancellationToken))
+        {
+            SimAllLog.AuditFailed(logger, "SimulateAllCancelled"); // the job state is already changed (a separate store); say so loudly rather than lose the record silently
+        }
+
         return await SimAllRead.CurrentAsync(store, cancellationToken);
     }
 }

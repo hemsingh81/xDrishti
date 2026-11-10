@@ -104,7 +104,7 @@ public sealed class SimAllApiTests(ApiFactory factory) : DataTestBase(factory)
     public async Task A_job_runs_every_latest_strategy_over_every_instrument_as_training_runs_and_a_repeat_writes_nothing_more()
     {
         await SeedUniverseAsync();
-        var versions = await ScalarAsync<long>("SELECT count(*) FROM lab.strategies");
+        var versions = await ScalarAsync<long>("SELECT count(*) FROM lab.strategies s WHERE EXISTS (SELECT 1 FROM lab.strategy_versions v WHERE v.strategy_id = s.id)");
 
         var started = await PostAsync(string.Empty, HttpStatusCode.Accepted);
 

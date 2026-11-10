@@ -134,6 +134,29 @@ internal sealed class FakeSimAllStore : ISimAllStore
         }
     }
 
+    public Dictionary<string, DateTimeOffset> StartedAt { get; } = [];
+
+    public ValueTask<int> RedoStaleChunksAsync(DateTimeOffset startedBefore, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            var stale = Chunks.Where(c => c.State == SimAllStates.ChunkRunning && StartedAt.TryGetValue(c.Chunk.StrategyId + c.Chunk.InstrumentId, out var at) && at < startedBefore).ToList();
+            stale.ForEach(c => c.State = SimAllStates.Pending);
+            return ValueTask.FromResult(stale.Count);
+        }
+    }
+
+    public ValueTask ReleaseChunkAsync(SimAllChunk chunk, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            Chunks.Single(c => c.Chunk.StrategyId == chunk.StrategyId && c.Chunk.InstrumentId == chunk.InstrumentId).State = SimAllStates.Pending;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    public Exception? FinishFails { get; set; }
+
     public ValueTask<SimAllChunk?> ClaimChunkAsync(Guid jobId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         lock (_gate)
@@ -144,6 +167,7 @@ internal sealed class FakeSimAllStore : ISimAllStore
             }
 
             row.State = SimAllStates.ChunkRunning;
+            StartedAt[row.Chunk.StrategyId + row.Chunk.InstrumentId] = now;
             return ValueTask.FromResult<SimAllChunk?>(new SimAllChunk(jobId, row.Chunk.StrategyId, row.Chunk.Version, row.Chunk.StrategyHash, row.Chunk.InstrumentId));
         }
     }
@@ -152,6 +176,11 @@ internal sealed class FakeSimAllStore : ISimAllStore
     {
         lock (_gate)
         {
+            if (FinishFails is not null)
+            {
+                throw FinishFails;
+            }
+
             var row = Chunks.Single(c => c.Chunk.StrategyId == chunk.StrategyId && c.Chunk.InstrumentId == chunk.InstrumentId);
             row.State = result.State;
             row.Result = result;
@@ -247,6 +276,12 @@ internal sealed class FakeExecutor : ISimAllChunkExecutor
 
     public Action<SimAllChunk>? OnRun { get; set; }
 
+    /// <summary>Throws for a chunk (a failure outside the executor's own handling).</summary>
+    public Func<SimAllChunk, Exception?>? Throw { get; set; }
+
+    /// <summary>Waits for the token to be cancelled (a chunk that is still running when the market opens).</summary>
+    public bool Hang { get; set; }
+
     public async ValueTask<SimAllChunkResult> ExecuteAsync(SimAllJob job, SimAllChunk chunk, CancellationToken hostStop)
     {
         var now = Interlocked.Increment(ref _current);
@@ -257,6 +292,24 @@ internal sealed class FakeExecutor : ISimAllChunkExecutor
         }
 
         OnRun?.Invoke(chunk);
+        if (Throw?.Invoke(chunk) is { } failure)
+        {
+            Interlocked.Decrement(ref _current);
+            throw failure;
+        }
+
+        if (Hang)
+        {
+            try
+            {
+                await Task.Delay(Timeout.Infinite, hostStop);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _current);
+            }
+        }
+
         if (BarrierSize > 0 && Interlocked.Increment(ref _arrived) <= BarrierSize)
         {
             if (_arrived == BarrierSize)
@@ -284,4 +337,17 @@ internal sealed class FakeScopes(params (Type Type, object Instance)[] services)
     public void Dispose()
     {
     }
+}
+
+internal sealed class CountingGate : ISimAllBackfillGate
+{
+    public int BackfillAsks { get; private set; }
+
+    public ValueTask<string?> IncompleteReasonAsync(CancellationToken cancellationToken)
+    {
+        BackfillAsks++;
+        return ValueTask.FromResult<string?>(null);
+    }
+
+    public ValueTask<bool> DataJobRunningAsync(CancellationToken cancellationToken) => ValueTask.FromResult(false);
 }

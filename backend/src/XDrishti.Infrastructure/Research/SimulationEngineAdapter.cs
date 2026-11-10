@@ -57,7 +57,9 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine, IRandomEntryE
             : Result.Failure<StrategyDescription>(SimulationErrors.StrategyInvalid(Fields(inspection.Problems)));
     }
 
-    public InstrumentReplay Replay(IPreparedStrategy strategy, InstrumentReplayInput input)
+    public InstrumentReplay Replay(IPreparedStrategy strategy, InstrumentReplayInput input) => ReplayUntilCancelled(strategy, input, CancellationToken.None);
+
+    public InstrumentReplay ReplayUntilCancelled(IPreparedStrategy strategy, InstrumentReplayInput input, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(strategy);
         ArgumentNullException.ThrowIfNull(input);
@@ -66,7 +68,7 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine, IRandomEntryE
             throw new ArgumentException("The strategy was not prepared by this engine.", nameof(strategy));
         }
 
-        return InstrumentReplayer.Replay(handle.Strategy, input);
+        return InstrumentReplayer.ReplayUntilCancelled(handle.Strategy, input, cancellationToken);
     }
 
     public ExplainResult Explain(IPreparedStrategy strategy, InstrumentReplayInput input, IReadOnlyList<ExplainRequest> requests)
@@ -82,7 +84,9 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine, IRandomEntryE
         return InstrumentReplayer.Explain(handle.Strategy, input, requests);
     }
 
-    public ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input)
+    public ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input) => ReplayComparisonUntilCancelled(strategy, input, CancellationToken.None);
+
+    public ComparisonReplay ReplayComparisonUntilCancelled(IPreparedStrategy strategy, InstrumentReplayInput input, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(strategy);
         ArgumentNullException.ThrowIfNull(input);
@@ -91,7 +95,7 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine, IRandomEntryE
             throw new ArgumentException("The strategy was not prepared by this engine.", nameof(strategy));
         }
 
-        return InstrumentReplayer.ReplayAll(handle.Strategy, input);
+        return InstrumentReplayer.ReplayAllUntilCancelled(handle.Strategy, input, cancellationToken);
     }
 
     public NullWalkResult WalkRandomEntries(IPreparedStrategy strategy, InstrumentReplayInput input, NullWalkPlan plan, IProgress<int>? tradeDone, CancellationToken cancellationToken)

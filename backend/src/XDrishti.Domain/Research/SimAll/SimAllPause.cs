@@ -1,4 +1,5 @@
 using XDrishti.Domain.Market;
+using XDrishti.Domain.Market.Calendar;
 
 namespace XDrishti.Domain.Research.SimAll;
 
@@ -20,17 +21,39 @@ public static class SimAllPause
     /// <summary>The backfill is no longer complete.</summary>
     public const string Backfill = "backfill";
 
-    /// <summary>The first minute of the session window (09:00 IST); the cash market opens at 09:15 and closes 15:30, the window adds the pre-open and a margin.</summary>
-    public static readonly TimeSpan MarketOpen = TimeSpan.FromHours(9);
+    /// <summary>The margin before the real session opens and after it closes that the job also keeps clear (the pre-open and the close auction: a regular session 09:15 to 15:30 gives 09:00 to 15:45 IST).</summary>
+    public static readonly TimeSpan Margin = TimeSpan.FromMinutes(15);
 
-    /// <summary>The end of the window (15:45 IST).</summary>
-    public static readonly TimeSpan MarketClose = new(15, 45, 0);
-
-    /// <summary>True when the instant is inside the market-hours window on a trading day.</summary>
-    public static bool InMarketHours(DateTimeOffset now, bool tradingDay)
+    /// <summary>The window the job keeps clear on a date, from the real session of the calendar (a special session or a holiday is respected); null on a day with no session.</summary>
+    public static (DateTimeOffset Start, DateTimeOffset End)? WindowOf(TradingCalendar calendar, DateOnly date)
     {
-        var time = IndiaTime.ToIst(now).TimeOfDay;
-        return tradingDay && time >= MarketOpen && time < MarketClose;
+        ArgumentNullException.ThrowIfNull(calendar);
+        if (calendar.SessionOf(date) is not { } session)
+        {
+            return null;
+        }
+
+        var midnight = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset);
+        return (midnight.AddMinutes(session.FromMinute) - Margin, midnight.AddMinutes(session.ToMinute) + Margin);
+    }
+
+    /// <summary>True when the instant is inside the window of a session.</summary>
+    public static bool InMarketHours(TradingCalendar calendar, DateTimeOffset now) =>
+        WindowOf(calendar, IndiaTime.Today(now)) is { } w && now >= w.Start && now < w.End;
+
+    /// <summary>The start of the next window after the instant (looked for ten days ahead, enough to cross a long holiday), or null.</summary>
+    public static DateTimeOffset? NextWindowStart(TradingCalendar calendar, DateTimeOffset now)
+    {
+        var today = IndiaTime.Today(now);
+        for (var d = 0; d <= 10; d++)
+        {
+            if (WindowOf(calendar, today.AddDays(d)) is { } w && w.Start > now)
+            {
+                return w.Start;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>True for a reason the system lifts by itself.</summary>

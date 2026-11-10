@@ -293,7 +293,7 @@ internal sealed class RunSimulationHandler(
 
             var many = input is null
                 ? new ComparisonReplay(candidates.Select(_ => new InstrumentReplay(InstrumentRun.NotFound(id), [], [])).ToList(), candidates.Select(_ => 0L).ToList())
-                : candidates.Count == 1 ? new ComparisonReplay([engine.Replay(prepared.Value, input)], [0L]) : engine.ReplayComparison(prepared.Value, input);
+                : candidates.Count == 1 ? new ComparisonReplay([engine.ReplayUntilCancelled(prepared.Value, input, cancellationToken)], [0L]) : engine.ReplayComparisonUntilCancelled(prepared.Value, input, cancellationToken);
             replayTime += time.GetElapsedTime(replayStart);
             if (many.Members[0].Record.Skipped is { } reason)
             {

@@ -31,7 +31,7 @@ One job runs every active strategy version over every tracked stock across all u
 - **Events/jobs:** Runs under the services framework on `xd-worker` or the existing Lab dispatcher, whichever the build finds has capacity.
 
 ## Non-functional
-Throughput and storage per chunk are UNVERIFIED: the first 1 % of the job is measured and an estimate of time and disk is shown before the rest continues.
+Throughput and storage per chunk are UNVERIFIED: the first 1 % of the job is measured and an estimate of time and disk is shown with the progress. The job keeps running while it is shown; it does not wait for the owner to confirm (decided by delegation for simplicity, ADR 0248 point 8: the owner can pause or cancel from the estimate).
 
 ## Safety
 The job writes `training` runs only. **No orders.** Nothing in this slice places, modifies or cancels an order, adds a broker order endpoint, or references `XDrishti.Execution`; the P12 live path stays separate and owner-only.

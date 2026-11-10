@@ -34,4 +34,10 @@ internal static partial class SimAllLog
 
     [LoggerMessage(EventId = 7339, Level = LogLevel.Error, Message = "simulate_all.loop_failed")]
     public static partial void LoopFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 7340, Level = LogLevel.Error, Message = "simulate_all.record_failed {JobId}: the result of a chunk could not be recorded; the chunk goes back to pending")]
+    public static partial void RecordFailed(ILogger logger, Guid jobId, Exception exception);
+
+    [LoggerMessage(EventId = 7341, Level = LogLevel.Error, Message = "simulate_all.audit_failed {Event}: the change was made but its audit event could not be saved")]
+    public static partial void AuditFailed(ILogger logger, string @event);
 }

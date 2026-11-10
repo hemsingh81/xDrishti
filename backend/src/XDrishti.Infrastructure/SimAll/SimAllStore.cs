@@ -104,6 +104,24 @@ internal sealed class SimAllStore(NpgsqlDataSource dataSource) : ISimAllStore
         return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async ValueTask<int> RedoStaleChunksAsync(DateTimeOffset startedBefore, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("UPDATE research.sim_all_chunks SET state = 'pending', started_at = NULL WHERE state = 'running' AND started_at < @before");
+        command.Parameters.AddWithValue("before", NpgsqlDbType.TimestampTz, startedBefore);
+        return await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async ValueTask ReleaseChunkAsync(SimAllChunk chunk, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(chunk);
+        await using var command = dataSource.CreateCommand("UPDATE research.sim_all_chunks SET state = 'pending', started_at = NULL WHERE job_id = @job AND strategy_id = @strategy AND version = @version AND instrument_id = @instrument AND state = 'running'");
+        command.Parameters.AddWithValue("job", NpgsqlDbType.Uuid, chunk.JobId);
+        command.Parameters.AddWithValue("strategy", NpgsqlDbType.Varchar, chunk.StrategyId);
+        command.Parameters.AddWithValue("version", NpgsqlDbType.Integer, chunk.Version);
+        command.Parameters.AddWithValue("instrument", NpgsqlDbType.Uuid, chunk.InstrumentId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async ValueTask<SimAllChunk?> ClaimChunkAsync(Guid jobId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand("""

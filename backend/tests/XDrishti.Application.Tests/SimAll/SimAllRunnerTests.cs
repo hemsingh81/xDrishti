@@ -24,13 +24,13 @@ public sealed class SimAllRunnerTests
     private readonly FakeGate _gate = new();
     private readonly FakeDisk _disk = new();
     private readonly FakeExecutor _executor = new();
-    private readonly FakeTimeProvider _time = new(MarketMorning); // each test sets the hour it needs; the clock can only move forward
+    private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 10, 1, 0, 0, TimeSpan.Zero)); // 06:30 IST; each test sets the hour it needs, and the clock can only move forward
 
-    private SimAllRunner Runner(SimAllSettings? settings = null)
+    private SimAllRunner Runner(SimAllSettings? settings = null, ISimAllBackfillGate? gate = null)
     {
         var calendar = Substitute.For<ITradingCalendar>();
         calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new TradingCalendar());
-        var scopes = new FakeScopes((typeof(ISimAllStore), _store), (typeof(ITestLedger), _ledger), (typeof(ISimAllBackfillGate), _gate), (typeof(IFreeDiskProbe), _disk), (typeof(ISimAllChunkExecutor), _executor), (typeof(ITradingCalendar), calendar));
+        var scopes = new FakeScopes((typeof(ISimAllStore), _store), (typeof(ITestLedger), _ledger), (typeof(ISimAllBackfillGate), gate ?? _gate), (typeof(IFreeDiskProbe), _disk), (typeof(ISimAllChunkExecutor), _executor), (typeof(ITradingCalendar), calendar));
         return new SimAllRunner(scopes, settings ?? new SimAllSettings(), _time, NullLogger<SimAllRunner>.Instance);
     }
 
@@ -101,6 +101,7 @@ public sealed class SimAllRunnerTests
     [Fact]
     public async Task In_market_hours_the_job_pauses_and_after_the_close_it_resumes_by_itself()
     {
+        _time.SetUtcNow(MarketMorning);
         _store.Seed(1, 3);
         var runner = Runner();
 
@@ -120,6 +121,7 @@ public sealed class SimAllRunnerTests
     [Fact]
     public async Task The_market_hours_rule_can_be_switched_off_by_the_setting()
     {
+        _time.SetUtcNow(MarketMorning);
         _store.Seed(1, 2);
 
         await Runner(new SimAllSettings { RunInMarketHours = true }).TickAsync(Ct);
@@ -170,12 +172,14 @@ public sealed class SimAllRunnerTests
         _store.Job!.PauseReason.ShouldBe(SimAllPause.DataJob);
 
         _gate.DataJob = false;
+        _time.Advance(TimeSpan.FromMinutes(2)); // the backfill is asked once a minute at most
         _gate.Incomplete = "3 of 10 tracked instruments have no stored bars yet.";
         await runner.TickAsync(Ct);
         _store.Job!.State.ShouldBe(SimAllStates.Paused); // the backfill is not complete, so it keeps waiting
         _executor.Ran.ShouldBeEmpty();
 
         _gate.Incomplete = null;
+        _time.Advance(TimeSpan.FromMinutes(2));
         await runner.TickAsync(Ct);
         _store.Job!.State.ShouldBe(SimAllStates.Completed);
     }
@@ -220,5 +224,109 @@ public sealed class SimAllRunnerTests
 
         _executor.Ran.ShouldBeEmpty();
         _ledger.Rows.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_backfill_is_asked_at_most_once_a_minute()
+    {
+        _time.SetUtcNow(Evening);
+        _store.Seed(1, 2);
+        var gate = new CountingGate();
+        var runner = Runner(gate: gate);
+
+        await runner.TickAsync(Ct);
+        _store.Job = _store.Job! with { State = SimAllStates.Running, FinishedAt = null };
+        await runner.TickAsync(Ct);
+
+        gate.BackfillAsks.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_chunk_that_throws_past_the_executor_is_failed_and_the_job_goes_on()
+    {
+        _time.SetUtcNow(Evening);
+        _store.Seed(1, 3);
+        _executor.Throw = c => c.InstrumentId == _store.Chunks[1].Chunk.InstrumentId ? new InvalidOperationException("boom") : null;
+
+        await Runner().TickAsync(Ct);
+
+        _store.Count(SimAllStates.ChunkRunning).ShouldBe(0);
+        _store.Chunks[1].Result!.FailCode.ShouldBe(SimAllErrors.ChunkCrashedCode);
+        _store.Job!.State.ShouldBe(SimAllStates.CompletedWithFailures);
+    }
+
+    [Fact]
+    public async Task A_result_that_cannot_be_recorded_puts_the_chunk_back_and_does_not_strand_it_running()
+    {
+        _time.SetUtcNow(Evening);
+        _store.Seed(1, 1);
+        _store.FinishFails = new InvalidOperationException("database lost");
+
+        await Runner().TickAsync(Ct);
+
+        _store.Count(SimAllStates.ChunkRunning).ShouldBe(0);
+        _store.Count(SimAllStates.Pending).ShouldBe(1);
+        _store.Job!.State.ShouldBe(SimAllStates.Running);
+    }
+
+    [Fact]
+    public async Task A_tick_takes_back_a_chunk_that_has_been_running_longer_than_the_limit_and_its_margin()
+    {
+        _time.SetUtcNow(Evening);
+        _store.Seed(1, 2);
+        _store.Chunks[0].State = SimAllStates.ChunkRunning;
+        _store.StartedAt[_store.Chunks[0].Chunk.StrategyId + _store.Chunks[0].Chunk.InstrumentId] = Evening - TimeSpan.FromMinutes(36); // limit 30 + margin 5
+
+        await Runner().TickAsync(Ct);
+
+        _executor.Ran.Count.ShouldBe(2);
+        _store.Job!.State.ShouldBe(SimAllStates.Completed);
+    }
+
+    [Fact]
+    public async Task A_chunk_is_not_claimed_when_less_than_its_time_limit_remains_before_the_session_window()
+    {
+        _store.Seed(1, 2);
+        _time.SetUtcNow(new DateTimeOffset(2026, 11, 10, 3, 10, 0, TimeSpan.Zero)); // 08:40 IST, 20 minutes before the window opens at 09:00
+
+        await Runner().TickAsync(Ct);
+
+        _store.Job!.PauseReason.ShouldBe(SimAllPause.MarketHours);
+        _executor.Ran.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_holiday_has_no_window_so_the_job_runs_through_it()
+    {
+        _store.Seed(1, 2);
+        _time.SetUtcNow(new DateTimeOffset(2026, 11, 14, 5, 0, 0, TimeSpan.Zero)); // a Saturday, 10:30 IST
+
+        await Runner().TickAsync(Ct);
+
+        _store.Job!.State.ShouldBe(SimAllStates.Completed);
+    }
+
+    [Fact]
+    public async Task The_market_opening_under_a_chunk_cancels_it_puts_it_back_and_pauses_and_the_job_resumes_after_the_close()
+    {
+        _store.Seed(1, 3);
+        _time.SetUtcNow(new DateTimeOffset(2026, 11, 10, 2, 0, 0, TimeSpan.Zero)); // 07:30 IST, 90 minutes before the window
+        _executor.Hang = true;
+        _executor.OnRun = _ => _time.Advance(TimeSpan.FromMinutes(100)); // the window opens while the chunk runs
+        var runner = Runner();
+
+        await runner.TickAsync(Ct);
+
+        _store.Job!.PauseReason.ShouldBe(SimAllPause.MarketHours);
+        _store.Count(SimAllStates.ChunkRunning).ShouldBe(0);
+        _store.Count(SimAllStates.Done).ShouldBe(0);
+
+        _executor.Hang = false;
+        _executor.OnRun = null;
+        _time.SetUtcNow(Evening);
+        await runner.TickAsync(Ct);
+
+        _store.Job!.State.ShouldBe(SimAllStates.Completed);
+        _store.Count(SimAllStates.Done).ShouldBe(3);
     }
 }

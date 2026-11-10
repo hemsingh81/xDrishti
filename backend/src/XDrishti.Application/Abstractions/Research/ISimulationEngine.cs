@@ -58,6 +58,15 @@ public interface ISimulationEngine
     ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input);
 
     /// <summary>
+    /// <see cref="Replay"/> that looks at the token every few thousand minutes and raises <see cref="OperationCanceledException"/> when it is cancelled (AU-12: a chunk past its time limit must stop the CPU, not only be abandoned).
+    /// The default ignores the token, so an engine that cannot be interrupted still works; the adapter of the real engine overrides it.
+    /// </summary>
+    InstrumentReplay ReplayUntilCancelled(IPreparedStrategy strategy, InstrumentReplayInput input, CancellationToken cancellationToken) => Replay(strategy, input);
+
+    /// <summary>The comparison replay that looks at the token as <see cref="ReplayUntilCancelled"/> does.</summary>
+    ComparisonReplay ReplayComparisonUntilCancelled(IPreparedStrategy strategy, InstrumentReplayInput input, CancellationToken cancellationToken) => ReplayComparison(strategy, input);
+
+    /// <summary>
     /// Replays as <see cref="Replay"/> does and explains the requested trades (P3-04d): for each request whose decision is a candidate of the scan, the conditions of its side at the decision bar with the values they read, from the replay's
     /// own frame. A request that matches no candidate has no entry in the answer. Pure and synchronous; the errors of <see cref="Replay"/> apply.
     /// </summary>
