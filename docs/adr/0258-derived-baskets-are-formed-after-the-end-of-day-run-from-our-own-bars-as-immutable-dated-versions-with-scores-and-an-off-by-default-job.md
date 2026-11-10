@@ -25,6 +25,9 @@ The fourteen derived baskets of ADR 0255 are pure functions. Something has to fe
 - **No live 1-minute bar hook exists** (`bars_1m_live` is not built), so the 09:20 and 09:30 intraday freezes (acceptance criterion 6) are **not built**: baskets 4 and 12 are never due here and cannot be switched on. Owner question in the spec review.
 - Basket 13 stays disabled until BK-05 supplies the flags.
 - The settings `DailyRunAfter` (an event, not a clock) and `IntradayFreezeTimes` of the spec have no key: the first is the `after eod` schedule, the second belongs to the unbuilt freeze.
-- The backfill runs inside the request (a bounded number of evaluations of one basket) and answers 202 with the finished run, not a run id to poll.
-- A backfill of the same dates with a changed parameter set adds a second, overlapping `recomputed` series (the versions stay distinct by hash).
+- **shortcut:** the backfill runs inside the request (a bounded number of evaluations of one basket) and answers 202 with the finished run, not a run id to poll; the services framework has no parameterised manual run. It holds the run lock meanwhile, so a scheduled run meeting it **fails** (not skips) and the service's three retries form the day's version once the lock is free; only a manual refresh is skipped.
+- A backfill over dates that already hold `recomputed` versions under another parameter hash is refused (`baskets.backfill_overlap`); the same hash skips existing dates and seeds the buffer from the stored version before them. Dates with no universe are counted in the answer.
+- Basket 14's cluster number is stored in the member's `score` column (members only) to rebuild the previous clustering for the stability figure.
+- Refresh now forms only baskets that are due on the as_of (a weekly or monthly basket is not formed on another day); the manual flag only names the actor.
+- `PUT .../params` writes owner data (parameter sets, the switch) even while `Baskets:System:Derived:Enabled` is off; nothing runs until the setting is on.
 - Backfilled versions are `recomputed`: retroactively restated adjustments make them differ slightly from what was knowable on the date.

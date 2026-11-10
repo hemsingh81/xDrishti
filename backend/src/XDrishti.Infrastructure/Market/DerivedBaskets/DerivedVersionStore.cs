@@ -29,10 +29,10 @@ internal sealed class DerivedVersionStore(XDrishtiDbContext db, IAccountEventLog
         return [.. rows.Select(r => new DerivedDefinitionRow(r.BasketId, r.Name, r.DefinitionNo, r.Enabled, r.ParamsSetId, ParseOverrides(r.Params)))];
     }
 
-    public async ValueTask<PreviousVersion?> PreviousAsync(Guid basketId, DateOnly asOf, CancellationToken cancellationToken)
+    public async ValueTask<PreviousVersion?> PreviousAsync(Guid basketId, DateOnly asOf, CancellationToken cancellationToken, string provenance = BasketProvenance.Derived)
     {
         var version = await db.BasketVersions.AsNoTracking()
-            .Where(v => v.BasketId == basketId && v.Provenance == BasketProvenance.Derived && v.Outcome == VersionOutcomes.Applied && v.AsOf < asOf)
+            .Where(v => v.BasketId == basketId && v.Provenance == provenance && v.Outcome == VersionOutcomes.Applied && v.AsOf < asOf)
             .OrderByDescending(v => v.AsOf).ThenByDescending(v => v.CreatedAt).FirstOrDefaultAsync(cancellationToken);
         if (version is null)
         {
@@ -48,6 +48,9 @@ internal sealed class DerivedVersionStore(XDrishtiDbContext db, IAccountEventLog
         var published = db.BasketVersions.AsNoTracking().Where(v => v.BasketId == basketId && v.Provenance == BasketProvenance.Derived);
         return (await published.MinAsync(v => (DateOnly?)v.EffectiveFrom, cancellationToken), await published.MaxAsync(v => (DateOnly?)v.AsOf, cancellationToken));
     }
+
+    public async ValueTask<bool> HasOtherRecomputedAsync(Guid basketId, DateOnly from, DateOnly to, string paramsHash, CancellationToken cancellationToken) =>
+        await db.BasketVersions.AsNoTracking().AnyAsync(v => v.BasketId == basketId && v.Provenance == BasketProvenance.Recomputed && v.AsOf >= from && v.AsOf <= to && v.ParamsHash != paramsHash, cancellationToken);
 
     public async ValueTask<bool> ExistsAsync(Guid basketId, DateOnly asOf, string paramsHash, CancellationToken cancellationToken) =>
         await db.BasketVersions.AsNoTracking().AnyAsync(v => v.BasketId == basketId && v.AsOf == asOf && v.ParamsHash == paramsHash && v.FormedAt == null, cancellationToken);

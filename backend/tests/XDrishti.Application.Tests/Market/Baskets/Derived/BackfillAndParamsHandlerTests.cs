@@ -39,6 +39,19 @@ public sealed class BackfillAndParamsHandlerTests
     }
 
     [Fact]
+    public async Task A_backfill_under_another_parameter_set_over_recomputed_dates_is_a_conflict()
+    {
+        var world = DerivedWorld.WithLiquidBasket(12, bars: 140);
+        await world.Backfill().HandleAsync(new BackfillDerivedBasketCommand(world.Liquid.BasketId, From, To, "owner"), TestContext.Current.CancellationToken);
+        await world.SetParams().HandleAsync(new SetDerivedParamsCommand(world.Liquid.BasketId, new Dictionary<string, double> { ["Basket3.TopK"] = 5 }, null, "owner"), TestContext.Current.CancellationToken);
+
+        var result = await world.Backfill().HandleAsync(new BackfillDerivedBasketCommand(world.Liquid.BasketId, From, To, "owner"), TestContext.Current.CancellationToken);
+
+        result.Error.Code.ShouldBe(BasketErrors.BackfillOverlapCode);
+        world.Store.Versions.Count.ShouldBe(10);
+    }
+
+    [Fact]
     public async Task A_backfill_that_reaches_the_first_published_version_is_a_conflict()
     {
         var world = DerivedWorld.WithLiquidBasket(12, bars: 140);

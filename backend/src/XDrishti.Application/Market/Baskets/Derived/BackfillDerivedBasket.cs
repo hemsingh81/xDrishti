@@ -87,6 +87,11 @@ internal sealed class BackfillDerivedBasketHandler(
             return Result.Failure<DerivedRun>(BasketErrors.BackfillOverlap);
         }
 
+        if (await store.HasOtherRecomputedAsync(definition.BasketId, from, to, parameters.Value.Hash, cancellationToken))
+        {
+            return Result.Failure<DerivedRun>(BasketErrors.BackfillOverlap); // a second series under another parameter set would overlap the first
+        }
+
         await using var held = await runLock.TryAcquireAsync(cancellationToken);
         if (held is null)
         {
@@ -95,9 +100,11 @@ internal sealed class BackfillDerivedBasketHandler(
 
         var bars = await universe.ReadAsync(from.AddDays(-DerivedComputation.LookbackDays), to, cancellationToken);
         var now = clock.GetUtcNow();
-        PreviousVersion? previous = null;
+        var previous = await store.PreviousAsync(definition.BasketId, dates[0], cancellationToken, BasketProvenance.Recomputed);
         var written = 0;
         var unchanged = 0;
+        var reload = false;
+        var failed = 0;
         for (var i = 0; i < dates.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -105,13 +112,22 @@ internal sealed class BackfillDerivedBasketHandler(
             if (await store.ExistsAsync(definition.BasketId, asOf, parameters.Value.Hash, cancellationToken))
             {
                 unchanged++;
+                previous = null; // the stored version is the incumbent of the next date
+                reload = true;
                 continue;
+            }
+
+            if (reload)
+            {
+                previous = await store.PreviousAsync(definition.BasketId, asOf, cancellationToken, BasketProvenance.Recomputed);
+                reload = false;
             }
 
             var validTo = i + 1 < dates.Count ? DerivedSchedule.NextSession(calendar, dates[i + 1]) : windowEnd;
             var built = DerivedComputation.Build(definition, parameters.Value, bars, asOf, DerivedSchedule.NextSession(calendar, asOf), validTo, previous, settings.ScoresKeptBeyondMembers, BasketProvenance.Recomputed, now, command.Actor);
             if (built.IsFailure || built.Value.UniverseSize == 0)
             {
+                failed++;
                 continue;
             }
 
@@ -124,6 +140,6 @@ internal sealed class BackfillDerivedBasketHandler(
         }
 
         var outcome = new DerivedBasketOutcome(definition.BasketId, definition.BasketName, written > 0 ? VersionOutcomes.Applied : VersionOutcomes.Unchanged, null, 0, 0, 0);
-        return Result.Success(new DerivedRun(to, [outcome], $"{written} recomputed versions written, {unchanged} existed already, from {from:yyyy-MM-dd} to {to:yyyy-MM-dd}", RestatedNote));
+        return Result.Success(new DerivedRun(to, [outcome], $"{written} recomputed versions written, {unchanged} existed already, {failed} dates not formed (no universe), from {from:yyyy-MM-dd} to {to:yyyy-MM-dd}", RestatedNote));
     }
 }

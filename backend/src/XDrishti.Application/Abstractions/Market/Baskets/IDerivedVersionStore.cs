@@ -50,7 +50,10 @@ public interface IDerivedVersionStore
     ValueTask<IReadOnlyList<DerivedDefinitionRow>> ListDefinitionsAsync(CancellationToken cancellationToken);
 
     /// <summary>The newest published (<c>derived</c>) version with an as_of before <paramref name="asOf"/>, with its scores; null when there is none.</summary>
-    ValueTask<PreviousVersion?> PreviousAsync(Guid basketId, DateOnly asOf, CancellationToken cancellationToken);
+    ValueTask<PreviousVersion?> PreviousAsync(Guid basketId, DateOnly asOf, CancellationToken cancellationToken, string provenance = "derived");
+
+    /// <summary>Whether a <c>recomputed</c> version of the basket with an as_of from <paramref name="from"/> to <paramref name="to"/> exists under a different parameter hash (a second series would overlap the first).</summary>
+    ValueTask<bool> HasOtherRecomputedAsync(Guid basketId, DateOnly from, DateOnly to, string paramsHash, CancellationToken cancellationToken);
 
     /// <summary>The effective date of the first and the as_of of the newest published version of the basket (both null when there is none).</summary>
     ValueTask<(DateOnly? FirstEffectiveFrom, DateOnly? NewestAsOf)> PublishedRangeAsync(Guid basketId, CancellationToken cancellationToken);

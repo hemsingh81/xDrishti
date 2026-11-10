@@ -11,7 +11,7 @@ namespace XDrishti.Application.Market.Baskets;
 
 /// <summary>
 /// Forms the derived baskets (BK-03) from our own daily bars after the end-of-day run: each enabled basket that is due on the last closed session (or on <paramref name="AsOf"/>) gets one immutable dated version, effective from the next
-/// session. <paramref name="Manual"/> (refresh now) forms every enabled basket whatever its cadence. Fails with <c>baskets.derived_disabled</c> before reading anything while <c>Baskets:System:Derived:Enabled</c> is off. It never places an order.
+/// session. <paramref name="Manual"/> (refresh now) only names the actor: a weekly or monthly basket is formed on its due dates only, never on another day. Fails with <c>baskets.derived_disabled</c> before reading anything while <c>Baskets:System:Derived:Enabled</c> is off. It never places an order.
 /// </summary>
 public sealed record RefreshDerivedBasketsCommand(string Actor, bool Manual, DateOnly? AsOf = null) : ICommand;
 
@@ -49,7 +49,7 @@ internal sealed class RefreshDerivedBasketsHandler(
             {
                 outcomes.Add(Skipped(definition, why));
             }
-            else if (!command.Manual && !DerivedSchedule.IsDue(catalogue.Cadence, calendar, asOf))
+            else if (!DerivedSchedule.IsDue(catalogue.Cadence, calendar, asOf))
             {
                 outcomes.Add(Skipped(definition, "not_due"));
             }

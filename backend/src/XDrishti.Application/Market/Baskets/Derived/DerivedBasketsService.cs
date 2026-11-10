@@ -22,7 +22,7 @@ public sealed class DerivedBasketsService(IServiceScopeFactory scopes) : ISchedu
         "After the end-of-day run, forms the behaviour baskets (most liquid, most volatile, momentum and the like) from our own daily bars: one dated version per basket, effective from the next session, with its scores and named exclusions. No network. Off by default; it never places an order.",
         "xd-api",
         [ScheduleType.After, ScheduleType.Daily],
-        new ServiceSettings(false, Schedule.AfterService(EodService.Id), 0, 20, false, true, new Dictionary<string, System.Text.Json.JsonElement>()),
+        new ServiceSettings(false, Schedule.AfterService(EodService.Id), 3, 20, false, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
         new ServiceConstraints { RecoveryClass = RecoveryClass.LatestOnly, MustFollow = [EodService.Id], CatchUpReach = CatchUpReach.Latest });
 
@@ -39,8 +39,9 @@ public sealed class DerivedBasketsService(IServiceScopeFactory scopes) : ISchedu
         var result = await handler.HandleAsync(new RefreshDerivedBasketsCommand(manual ? context.RequestedBy : "system:derived-baskets", manual), cancellationToken);
         if (result.IsFailure)
         {
+            // A held lock (a long backfill) fails the run, so the service's retries (3) form the day's version once it is free, instead of losing the day.
             return result.Error.Code == BasketErrors.DerivedDisabledCode ? ServiceOutcome.Skipped("disabled")
-                : result.Error.Code == BasketErrors.DerivedRunningCode ? ServiceOutcome.Skipped("already running") : ServiceOutcome.Failed(result.Error.Message);
+                : result.Error.Code == BasketErrors.DerivedRunningCode && manual ? ServiceOutcome.Skipped("already running") : ServiceOutcome.Failed(result.Error.Message);
         }
 
         return ServiceOutcome.Succeeded(result.Value.Summary);

@@ -75,9 +75,9 @@ internal sealed class FakeVersionStore : IDerivedVersionStore
         return ValueTask.FromResult<IReadOnlyList<DerivedDefinitionRow>>([.. Definitions]);
     }
 
-    public ValueTask<PreviousVersion?> PreviousAsync(Guid basketId, DateOnly asOf, CancellationToken cancellationToken)
+    public ValueTask<PreviousVersion?> PreviousAsync(Guid basketId, DateOnly asOf, CancellationToken cancellationToken, string provenance = BasketProvenance.Derived)
     {
-        var version = Versions.Where(v => v.BasketId == basketId && v.Provenance == BasketProvenance.Derived && v.AsOf < asOf).OrderByDescending(v => v.AsOf).FirstOrDefault();
+        var version = Versions.Where(v => v.BasketId == basketId && v.Provenance == provenance && v.AsOf < asOf).OrderByDescending(v => v.AsOf).FirstOrDefault();
         return ValueTask.FromResult(version is null ? null : DerivedPrevious(version));
     }
 
@@ -86,6 +86,9 @@ internal sealed class FakeVersionStore : IDerivedVersionStore
         var live = Versions.Where(v => v.BasketId == basketId && v.Provenance == BasketProvenance.Derived).ToList();
         return ValueTask.FromResult<(DateOnly?, DateOnly?)>(live.Count == 0 ? (null, null) : (live.Min(v => v.EffectiveFrom), live.Max(v => v.AsOf)));
     }
+
+    public ValueTask<bool> HasOtherRecomputedAsync(Guid basketId, DateOnly from, DateOnly to, string paramsHash, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Versions.Any(v => v.BasketId == basketId && v.Provenance == BasketProvenance.Recomputed && v.AsOf >= from && v.AsOf <= to && v.ParamsHash != paramsHash));
 
     public ValueTask<bool> ExistsAsync(Guid basketId, DateOnly asOf, string paramsHash, CancellationToken cancellationToken) =>
         ValueTask.FromResult(Versions.Any(v => v.BasketId == basketId && v.AsOf == asOf && v.ParamsHash == paramsHash));

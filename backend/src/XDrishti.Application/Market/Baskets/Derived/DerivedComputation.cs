@@ -89,6 +89,7 @@ internal static class DerivedComputation
             universe.Count, result.BelowThreshold.Count, excluded.Count, JsonSerializer.Serialize(excluded), provenance, VersionOutcomes.Applied, scores, now, actor));
     }
 
+    // shortcut: basket 14's cluster number is stored in the member's score column (members only), so the next run can rebuild the previous clustering for the stability figure without a column of its own (ADR 0258).
     /// <summary>The previous version as the engine's input: the members with the sessions they have held (the engine counts one more) and, for the clusters, the cluster of each member (kept in the score).</summary>
     private static DerivedResult? PreviousResult(PreviousVersion? previous, Dictionary<Guid, string> symbols, string hash)
     {
