@@ -820,7 +820,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Owner act, needs step-up: fetch the index lists now (the given basketIds, which this turns on, or every enabled source) and return one outcome per file; force overrides only the tripwire and is recorded. 409 baskets.fetch_disabled while Baskets:System:Fetch:Enabled is off (no request is made) */
+    /** Owner act, needs step-up: fetch the index lists now (the given basketIds that are already on, or every enabled source; fetch-now never turns a source on) and return one outcome per file; force overrides only the tripwire and is recorded. 409 baskets.fetch_disabled while Baskets:System:Fetch:Enabled is off (no request is made) */
     post: operations['FetchSystemBaskets'];
     delete?: never;
     options?: never;

@@ -22,6 +22,7 @@ internal sealed class RunBasketFetchHandler(
     IBasketSourceFetcher fetcher,
     IBasketStore baskets,
     IBasketMembershipApplier applier,
+    IBasketRunLock runLock,
     TimeProvider clock,
     ILogger<RunBasketFetchHandler> logger) : ICommandHandler<RunBasketFetchCommand, BasketFetchRun>
 {
@@ -37,6 +38,13 @@ internal sealed class RunBasketFetchHandler(
         if (string.IsNullOrWhiteSpace(settings.UserAgent))
         {
             return Result.Failure<BasketFetchRun>(BasketErrors.Invalid("userAgent", "Set Baskets:System:Fetch:UserAgent (a descriptive name and a contact) before fetching."));
+        }
+
+        // One run at a time (fetch-now and the schedule, across processes): a second one is refused, not queued.
+        await using var held = await runLock.TryAcquireAsync(cancellationToken);
+        if (held is null)
+        {
+            return Result.Failure<BasketFetchRun>(BasketErrors.FetchRunning);
         }
 
         var manual = command.BasketIds is { Count: > 0 };

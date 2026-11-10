@@ -27,5 +27,7 @@ Official NSE index constituent lists (Nifty 50, 100, 500, sector and strategy in
 - A basket created by the owner cannot take a system basket's name (names are unique among active baskets); the seeded names start with `NSE `.
 
 ## Known limits
+- One run at a time: a database advisory lock (`baskets.fetch_running` 409 for fetch-now; the scheduled run ends as skipped).
+- `fetchEnabled` and `derivedEnabled` on `GET /api/baskets` (spec review fixes) move to BK-04 (the screen); the list stays an array.
 - NSE terms and non-browser User-Agent acceptance are UNVERIFIED; Alpha 50 / High Beta 50 files are not seeded (link unknown).
 - The exact retry times (5, 30, 120 minutes) of the spec are the scheduler's retries here (three retries, its own spacing); only the 403/429 rest is kept per source.

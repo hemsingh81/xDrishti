@@ -476,6 +476,7 @@ public static class DependencyInjection
         services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IBasketFetchSettings, XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchSettings>();
         services.AddScoped<XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceStore>();
         services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IBasketSourceStore>(sp => sp.GetRequiredService<XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceStore>());
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IBasketRunLock, XDrishti.Infrastructure.Market.SystemBaskets.BasketRunLock>();
         services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IBasketMembershipApplier, XDrishti.Infrastructure.Market.SystemBaskets.BasketMembershipApplier>();
 
         if (!configuration.GetSection(XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchOptions.SectionName).GetValue<bool>("Enabled"))

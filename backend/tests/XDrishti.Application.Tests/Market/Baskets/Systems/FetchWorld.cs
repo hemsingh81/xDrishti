@@ -94,6 +94,19 @@ internal sealed class FakeFetcher : IBasketSourceFetcher
     }
 }
 
+internal sealed class FakeRunLock : IBasketRunLock
+{
+    public bool Held { get; set; }
+
+    public ValueTask<IAsyncDisposable?> TryAcquireAsync(CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IAsyncDisposable?>(Held ? null : new Handle());
+
+    private sealed class Handle : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+}
+
 internal sealed class FakeApplier : IBasketMembershipApplier
 {
     public List<MembershipApplication> Applied { get; } = [];
@@ -119,6 +132,8 @@ internal sealed class FetchWorld
     public FakeFetcher Fetcher { get; } = new();
 
     public FakeApplier Applier { get; } = new();
+
+    public FakeRunLock RunLock { get; } = new();
 
     public InMemoryBasketData Baskets { get; } = new(new InMemoryTrackingData());
 
@@ -155,7 +170,7 @@ internal sealed class FetchWorld
     public BasketSourceInfo Source(bool enabled = true, DateTimeOffset? lastOk = null, DateTimeOffset? next = null, string? sha = null, string? etag = null, DateTimeOffset? checkedAt = null, int fails = 0, string? alt = null) =>
         new BasketSourceInfo(BasketId, "NSE Nifty 50", "ind_nifty50list.csv", "https://nsearchives.nseindia.com/content/indices/ind_nifty50list.csv", null, 50, 50, enabled, "never", lastOk, checkedAt, etag, null, sha, next, fails, Current.Count) with { HostAlt = alt };
 
-    public RunBasketFetchHandler Handler => new(Settings, Store, Fetcher, Baskets, Applier, Clock, NullLogger<RunBasketFetchHandler>.Instance);
+    public RunBasketFetchHandler Handler => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, Clock, NullLogger<RunBasketFetchHandler>.Instance);
 
     /// <summary>The members now: instruments 1 to <paramref name="count"/> of the master.</summary>
     public void Members(int from, int count)

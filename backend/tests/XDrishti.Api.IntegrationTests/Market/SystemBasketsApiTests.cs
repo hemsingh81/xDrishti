@@ -1,9 +1,12 @@
 using System.Net;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using XDrishti.Api.IntegrationTests.Infrastructure;
+using XDrishti.Application.Abstractions.Market.Baskets;
 using XDrishti.Application.Market.Baskets;
 using XDrishti.Domain.Accounts;
+using XDrishti.Domain.Market.Baskets;
 
 namespace XDrishti.Api.IntegrationTests.Market;
 
@@ -134,6 +137,51 @@ public sealed class SystemBasketsApiTests(ApiFactory factory) : BasketsTestBase(
         (missing.StatusCode, invalid.StatusCode).ShouldBe((HttpStatusCode.NotFound, HttpStatusCode.BadRequest));
         var events = await Factory.WithDbAsync(db => db.AccountEvents.AsNoTracking().Where(e => e.Event == AccountEventType.BasketSourceSwitched).ToListAsync(Ct));
         events.Count.ShouldBe(2); // on, off; the repeat changed nothing
+    }
+
+    [Fact]
+    public async Task While_one_run_holds_the_lock_a_second_is_409_and_asks_nothing_and_after_release_it_runs()
+    {
+        Factory.BasketSources.Enabled = true;
+        Factory.BasketSources.Serve(File, Csv(1, 50));
+        using var scope = Factory.Services.CreateScope();
+        var held = await scope.ServiceProvider.GetRequiredService<IBasketRunLock>().TryAcquireAsync(Ct);
+        held.ShouldNotBeNull();
+        (await scope.ServiceProvider.GetRequiredService<IBasketRunLock>().TryAcquireAsync(Ct)).ShouldBeNull();
+        using var on = await Client.PutJsonAsync($"/api/baskets/{_basketId}/source", new { enabled = true }, Ct);
+
+        using var refused = await Client.PostJsonAsync("/api/baskets/system/fetch", new { basketIds = new[] { _basketId } }, Ct);
+        await held.DisposeAsync();
+
+        refused.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await refused.ReadProblemAsync(Ct)).Code.ShouldBe("baskets.fetch_running");
+        Factory.BasketSources.Calls.ShouldBe(0);
+        (await FetchAsync()).View.Outcome.ShouldBe("applied");
+    }
+
+    [Fact]
+    public async Task A_failure_after_the_inserts_leaves_nothing_half_written()
+    {
+        var ids = await Factory.WithDbAsync(db => db.Instruments.AsNoTracking().Where(i => i.CanonicalSymbol.StartsWith("NSE:T")).Select(i => i.Id).Take(3).ToListAsync(Ct));
+        var now = Factory.Clock.GetUtcNow();
+        var fetchId = Guid.CreateVersion7();
+        var fetch = new FetchRecord(fetchId, _basketId, now, 200, null, null, "abc", 3, "applied", 3, 0, 0, "[]", null, false, "system:test", null);
+        var source = new SourceUpdate(_basketId, true, "ok", now, now, null, null, "abc", null, 0);
+        // The last instrument does not exist: the database refuses the insert after the others went in.
+        var application = new MembershipApplication(
+            _basketId, "NSE Nifty 50", new MembershipChange([.. ids, Guid.CreateVersion7()], []), [.. ids, Guid.CreateVersion7()], now, now, source, fetch);
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var applier = scope.ServiceProvider.GetRequiredService<IBasketMembershipApplier>();
+
+            await Should.ThrowAsync<DbUpdateException>(async () => await applier.ApplyAsync(application, Ct));
+        }
+
+        (await Factory.WithDbAsync(db => db.BasketMembers.CountAsync(m => m.BasketId == _basketId, Ct))).ShouldBe(0);
+        (await Factory.WithDbAsync(db => db.Set<XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchRecord>().CountAsync(f => f.BasketId == _basketId, Ct))).ShouldBe(0);
+        (await Factory.WithDbAsync(db => db.Set<XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceRecord>().Where(s => s.BasketId == _basketId).Select(s => s.State).SingleAsync(Ct))).ShouldBe("never");
+        (await Factory.WithDbAsync(db => db.Baskets.AsNoTracking().Where(b => b.Id == _basketId).Select(b => b.Revision).SingleAsync(Ct))).ShouldBe(0);
+        (await MembershipEventsAsync()).ShouldBeEmpty();
     }
 
     [Fact]

@@ -44,6 +44,18 @@ public sealed class RunBasketFetchHandlerTests
     }
 
     [Fact]
+    public async Task A_run_while_another_holds_the_lock_is_refused_and_asks_nothing()
+    {
+        _w.RunLock.Held = true;
+        _w.Serve(FetchWorld.Csv(1, 50));
+
+        var result = await _w.Handler.HandleAsync(new RunBasketFetchCommand(null, false, "system:x"), FetchWorld.Ct);
+
+        result.Error.Code.ShouldBe(BasketErrors.FetchRunningCode);
+        (_w.Fetcher.Calls, _w.Store.Recorded.Count, _w.Applier.Applied.Count).ShouldBe((0, 0, 0));
+    }
+
+    [Fact]
     public async Task An_empty_user_agent_refuses_to_run()
     {
         _w.Settings.UserAgent = " ";

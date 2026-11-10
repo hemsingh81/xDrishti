@@ -37,7 +37,7 @@ public sealed class SystemBasketsService(IServiceScopeFactory scopes) : ISchedul
         var result = await handler.HandleAsync(new RunBasketFetchCommand(null, false, "system:system-baskets"), cancellationToken);
         if (result.IsFailure)
         {
-            return result.Error.Code == BasketErrors.FetchDisabledCode ? ServiceOutcome.Skipped("disabled") : ServiceOutcome.Failed(result.Error.Message);
+            return result.Error.Code == BasketErrors.FetchDisabledCode ? ServiceOutcome.Skipped("disabled") : result.Error.Code == BasketErrors.FetchRunningCode ? ServiceOutcome.Skipped("already running") : ServiceOutcome.Failed(result.Error.Message);
         }
 
         return result.Value.Outcomes.Any(o => o.Outcome == FetchOutcomes.Failed) ? ServiceOutcome.Failed(result.Value.Summary) : ServiceOutcome.Succeeded(result.Value.Summary);
