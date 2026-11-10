@@ -38,6 +38,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/auto': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The Auto switch: on or off, the chain of services with which ones Auto resumed, whether the chain is complete, the preconditions (pass, fail or unavailable), the builder, the last night and the recorded changes */
+    get: operations['GetAuto'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auto/on': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Turn Auto ON as the owner with a fresh password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 409 auto.preconditions_failed names each item that is not a pass; 409 auto.chain_failed leaves nothing changed. Suggestions only, no order is placed */
+    post: operations['TurnAutoOn'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auto/off': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Turn Auto OFF as the owner (session and CSRF token, no password: the safe direction); pauses only the services the last ON resumed */
+    post: operations['TurnAutoOff'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/auto/scope': {
     parameters: {
       query?: never;
@@ -63,7 +114,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The next-day suggestions of the newest plan of forDate (or the newest plan): what, why and on what evidence; missing figures read unavailable, tickets without required evidence are listed as not suggested; reserve and rejected stay visible. Suggestion only, no order is placed. 404 auto.no_plan */
+    /** The next-day suggestions of the newest plan of forDate (or the newest plan): what, why and on what evidence; missing figures read unavailable, tickets without required evidence are listed as not suggested; reserve and rejected stay visible. Suggestion only, no order is placed. 404 auto.no_plan; 409 auto.night_failed (the newest night failed closed: no suggestions are shown and the gate and reason are given) */
     get: operations['GetAutoSuggestions'];
     put?: never;
     post?: never;
@@ -98,7 +149,7 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Turn Failure notices (notices.failure) on or off as the owner. Turning it OFF needs the password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 409 settings.not_here for any other key */
+    /** Turn Failure notices (notices.failure) or Auto (auto.enabled) on or off as the owner. Turning Failure notices OFF, or Auto ON, needs the password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 409 settings.not_here for any other key */
     put: operations['ChangeEssentialSetting'];
     post?: never;
     delete?: never;
@@ -7023,6 +7074,26 @@ export interface components {
       /** Format: date */
       to: string;
     };
+    /** @description One service of the chain. `ResumedByAuto` is true when turning Auto ON resumed it (OFF pauses it again). */
+    AutoChainItemView: {
+      serviceId: string;
+      name: string;
+      enabled: boolean;
+      resumedByAuto: boolean;
+    };
+    /** @description One recorded change. */
+    AutoChangeView: {
+      /** Format: int64 */
+      id: number;
+      kind: string;
+      actor: string;
+      /** Format: date-time */
+      at: string;
+      changed: string[];
+      snapshot: {
+        [key: string]: string;
+      };
+    };
     /** @description The evidence figures as text; a missing figure reads `unavailable` and is never a pass. */
     AutoEvidenceView: {
       /** @description Trades in the cell. */
@@ -7035,6 +7106,21 @@ export interface components {
       regime: string;
       /** @description The date the cell statistics are as of. */
       dataAsOf: string;
+    };
+    /** @description The newest nightly run: `no_run`, `published` or `failed_closed` (then no suggestions are shown and `Reason` says why). */
+    AutoNightView: {
+      state: string;
+      /** Format: date */
+      forDate: null | string;
+      failedGate: null | string;
+      reason: null | string;
+    };
+    /** @description One thing Auto needs. `Status` is `pass`, `fail` or `unavailable`; only `pass` lets Auto turn ON. */
+    AutoPreconditionView: {
+      id: string;
+      label: string;
+      status: string;
+      detail: string;
     };
     /** @description The daily automatic refresh: whether it is on, at what India time, and when it runs next. */
     AutoRefreshView: {
@@ -7124,6 +7210,18 @@ export interface components {
       reserve: components['schemas']['AutoSuggestionView'][];
       /** @description Rejected candidates with reasons. */
       rejected: components['schemas']['AutoSuggestionView'][];
+    };
+    /** @description The whole readout. `Complete` is true only when Auto is ON and every chain service is on; with Auto ON and a service paused it is false and `Note` names the service. */
+    AutoView: {
+      on: boolean;
+      complete: boolean;
+      note: null | string;
+      builder: string;
+      chain: components['schemas']['AutoChainItemView'][];
+      preconditions: components['schemas']['AutoPreconditionView'][];
+      night: components['schemas']['AutoNightView'];
+      changes: components['schemas']['AutoChangeView'][];
+      noOrderNotice: string;
     };
     /** @description One change in the history. */
     AutonomyChangeView: {
@@ -23144,6 +23242,10 @@ export interface components {
       honestCountApplied: boolean;
       text: string;
     };
+    /** @description The body of `POST /api/auto/on`: the owner's password, typed again for this act. */
+    TurnAutoOnRequest: {
+      password: null | string;
+    };
     /**
      * @description What the filter `min_turnover` left out of a Lab verdict (CF-05, ADR 0230): candidates whose 20-day median traded value was under the threshold or unknown have no trade, so the trades behind the verdict are the survivors of a liquidity filter, not a clean tier sample.
      *     Present only for a strategy that names the filter (null otherwise, so the stored JSON of every other verdict is unchanged). Counts only; the candidates are those of the first exit of every timeframe, which every exit candidate shares.
@@ -23410,6 +23512,106 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SettingsCatalogResponse'];
+        };
+      };
+    };
+  };
+  GetAuto: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AutoView'];
+        };
+      };
+    };
+  };
+  TurnAutoOn: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TurnAutoOnRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AutoView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  TurnAutoOff: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AutoView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

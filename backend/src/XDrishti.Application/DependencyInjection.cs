@@ -994,7 +994,14 @@ public static class DependencyInjection
         services.AddScoped<INightlyGate, SelectionInputsGate>();
         services.AddScoped<NullPlanBuilder>();
         services.AddScoped<SelectionPlanBuilder>(); // P7-04, ADR 0088: registered, not the default
-        services.AddScoped<IPlanBuilder>(sp => sp.GetService<IPlanBuilderSettings>()?.UseSelection == true ? sp.GetRequiredService<SelectionPlanBuilder>() : sp.GetRequiredService<NullPlanBuilder>());
+        // the selection builder when configured on; else, where the Auto switch can be read, the builder follows the switch at build time (AU-17, ADR 0252); else the skeleton
+        services.AddScoped<IPlanBuilder>(sp => sp.GetService<IPlanBuilderSettings>()?.UseSelection == true ? sp.GetRequiredService<SelectionPlanBuilder>()
+            : sp.GetService<XDrishti.Application.Abstractions.LearnedSettings.IAutoSwitch>() is not null ? ActivatorUtilities.CreateInstance<XDrishti.Application.AutoSwitch.SwitchedPlanBuilder>(sp)
+            : sp.GetRequiredService<NullPlanBuilder>());
+        services.AddScoped<XDrishti.Application.AutoSwitch.AutoSwitchService>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.AutoSwitch.GetAutoQuery, XDrishti.Application.AutoSwitch.AutoView>, XDrishti.Application.AutoSwitch.GetAutoHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.AutoSwitch.TurnAutoOnCommand, XDrishti.Application.AutoSwitch.AutoView>, XDrishti.Application.AutoSwitch.TurnAutoOnHandler>();
+        services.AddScoped<ICommandHandler<XDrishti.Application.AutoSwitch.TurnAutoOffCommand, XDrishti.Application.AutoSwitch.AutoView>, XDrishti.Application.AutoSwitch.TurnAutoOffHandler>();
         services.AddScoped<ICommandHandler<RunNightlyPlanCommand, NightlyRunView>, RunNightlyPlanHandler>();
         services.AddScoped<ICommandHandler<GenerateSuggestionsCommand, SuggestionsOutcome>, GenerateSuggestionsHandler>(); // deterministic suggestions into the append-only inbox (P7-09, ADR 0092)
         services.AddScoped<IQueryHandler<ListPlanRunsQuery, Result<IReadOnlyList<PlanRunView>>>, ListPlanRunsHandler>();

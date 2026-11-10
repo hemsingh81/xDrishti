@@ -5,6 +5,7 @@ using XDrishti.Application.Abstractions.ChargeSheet;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.SettingsCatalog;
+using XDrishti.Application.AutoSwitch;
 using XDrishti.Application.Planning;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
@@ -87,7 +88,7 @@ internal sealed class GetEssentialSettingsHandler(IEssentialSettingStore store, 
     }
 }
 
-internal sealed class ChangeEssentialSettingHandler(IEssentialSettingStore store, IAccountEventLog events, IAccountUnitOfWork unitOfWork, TimeProvider clock, ILogger<ChangeEssentialSettingHandler> logger) : ICommandHandler<ChangeEssentialSettingCommand, EssentialSettingView>
+internal sealed class ChangeEssentialSettingHandler(IEssentialSettingStore store, AutoSwitchService auto, IAccountEventLog events, IAccountUnitOfWork unitOfWork, TimeProvider clock, ILogger<ChangeEssentialSettingHandler> logger) : ICommandHandler<ChangeEssentialSettingCommand, EssentialSettingView>
 {
     public async ValueTask<Result<EssentialSettingView>> HandleAsync(ChangeEssentialSettingCommand command, CancellationToken cancellationToken)
     {
@@ -95,6 +96,15 @@ internal sealed class ChangeEssentialSettingHandler(IEssentialSettingStore store
         if (!EssentialAudit.IsOwner(command.Actor))
         {
             return Result.Failure<EssentialSettingView>(Error.Forbidden("settings.owner_only", "Only the signed-in owner changes a setting."));
+        }
+
+        if (command.Key == EssentialKeys.Auto)
+        {
+            // the one Auto switch (AU-17): ON needs the fresh password, OFF a session only; the switch runs the chain and records the change itself
+            var switched = command.On
+                ? await auto.TurnOnAsync(new TurnAutoOnCommand(command.Actor, command.FreshPassword), cancellationToken)
+                : await auto.TurnOffAsync(new TurnAutoOffCommand(command.Actor), cancellationToken);
+            return switched.IsFailure ? Result.Failure<EssentialSettingView>(switched.Error) : Result.Success(await EssentialAudit.AutoRowAsync(store, cancellationToken));
         }
 
         if (command.Key != EssentialKeys.Failure)
@@ -115,7 +125,7 @@ internal sealed class ChangeEssentialSettingHandler(IEssentialSettingStore store
     }
 }
 
-internal sealed class ResetEssentialSettingHandler(IEssentialSettingStore store, IAccountEventLog events, IAccountUnitOfWork unitOfWork, TimeProvider clock, ILogger<ResetEssentialSettingHandler> logger) : ICommandHandler<ResetEssentialSettingCommand, EssentialSettingView>
+internal sealed class ResetEssentialSettingHandler(IEssentialSettingStore store, AutoSwitchService auto, IAccountEventLog events, IAccountUnitOfWork unitOfWork, TimeProvider clock, ILogger<ResetEssentialSettingHandler> logger) : ICommandHandler<ResetEssentialSettingCommand, EssentialSettingView>
 {
     public async ValueTask<Result<EssentialSettingView>> HandleAsync(ResetEssentialSettingCommand command, CancellationToken cancellationToken)
     {
@@ -130,6 +140,13 @@ internal sealed class ResetEssentialSettingHandler(IEssentialSettingStore store,
         if (descriptor is null)
         {
             return Result.Failure<EssentialSettingView>(Error.NotFound("settings.not_found", "No such Essential setting."));
+        }
+
+        if (command.Key == EssentialKeys.Auto)
+        {
+            // Reset to default is Auto OFF, through the switch, so the chain it resumed is paused again (AU-17)
+            var off = await auto.TurnOffAsync(new TurnAutoOffCommand(command.Actor), cancellationToken);
+            return off.IsFailure ? Result.Failure<EssentialSettingView>(off.Error) : Result.Success(await EssentialAudit.AutoRowAsync(store, cancellationToken));
         }
 
         if (EssentialKeys.StoredDefaults.TryGetValue(command.Key, out var def))
@@ -156,6 +173,14 @@ internal sealed class ResetEssentialSettingHandler(IEssentialSettingStore store,
 
 internal static partial class EssentialAudit
 {
+    /// <summary>The Auto row as the Essential list shows it, after the switch changed it.</summary>
+    public static async ValueTask<EssentialSettingView> AutoRowAsync(IEssentialSettingStore store, CancellationToken cancellationToken)
+    {
+        var row = await store.GetAsync(EssentialKeys.Auto, cancellationToken);
+        var def = EssentialKeys.StoredDefaults[EssentialKeys.Auto];
+        return new EssentialSettingView(EssentialKeys.Auto, "Auto", row?.Value ?? def, def, row is null || row.Value == def, row?.UpdatedBy, row?.UpdatedAt, true, null);
+    }
+
     public static bool IsOwner(string actor) => actor.StartsWith("owner:", StringComparison.Ordinal) && actor.Length > "owner:".Length;
 
     /// <summary>One audit row; the change stands and a failed audit write is logged, not hidden.</summary>
