@@ -262,6 +262,7 @@ export const navHue: Record<string, IconHueName> = {
   '/': 'today',
   '/plans': 'review',
   '/suggestions': 'suggestions',
+  '/auto': 'suggestions',
   '/portfolio': 'portfolio',
   '/paper': 'portfolio',
   '/live': 'portfolio',

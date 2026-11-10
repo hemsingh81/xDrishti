@@ -6,6 +6,7 @@ import { findWrites } from './writeScan';
 const WRITER_FEATURES = new Set([
   'accounts',
   'assistant',
+  'auto',
   'auth',
   'baskets',
   'data',
