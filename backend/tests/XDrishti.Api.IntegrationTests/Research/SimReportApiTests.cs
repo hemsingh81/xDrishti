@@ -214,6 +214,15 @@ public sealed class SimReportApiTests(ApiFactory factory) : DataTestBase(factory
 
             answer.GetProperty("evidence").GetProperty("completeness").GetProperty("kind").GetString().ShouldBe("training_simulation", route);
         }
+
+        using var created = await Client.PostJsonAsync("/api/baskets", new { name = "TrainingBench" }, Ct);
+        created.StatusCode.ShouldBe(HttpStatusCode.Created, await created.Content.ReadAsStringAsync(Ct));
+        var basketId = (await created.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("id").GetGuid();
+        using var added = await Client.PostJsonAsync($"/api/baskets/{basketId}/members", new { instrumentIds = new[] { _a, _b } }, Ct);
+        added.StatusCode.ShouldBeOneOf(HttpStatusCode.OK, HttpStatusCode.Created);
+        var benchmarks = await OkAsync($"/api/reports/benchmarks?basket={basketId}&from=2026-03-02&to=2026-12-31&{Training()}");
+        benchmarks.GetProperty("evidence").GetProperty("completeness").GetProperty("kind").GetString().ShouldBe("training_simulation");
+        benchmarks.GetProperty("window").GetProperty("to").GetString().ShouldBe("2026-04-30", "the window is cut before the hold-out");
     }
 
     [Fact]
@@ -251,7 +260,7 @@ public sealed class SimReportApiTests(ApiFactory factory) : DataTestBase(factory
     [Fact]
     public async Task The_report_indexes_exist()
     {
-        (await ScalarAsync<long>("SELECT count(*) FROM pg_indexes WHERE schemaname = 'research' AND indexname IN ('ix_sim_all_chunks_instrument', 'ix_sim_all_chunks_run_key', 'ix_sim_trades_basket_ids')")).ShouldBe(3);
+        (await ScalarAsync<long>("SELECT count(*) FROM pg_indexes WHERE schemaname = 'research' AND indexname IN ('ix_sim_all_chunks_instrument', 'ix_sim_all_chunks_run_key')")).ShouldBe(2);
     }
 
     [Fact]

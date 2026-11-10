@@ -23,7 +23,7 @@ internal sealed class GetReportBenchmarksHandler(
     IBarQueries bars,
     IPortfolioBenchmark benchmark,
     IReportTradeSource source,
-    ISimAllStore simJobs,
+    ITrainingJobProgress simJobs,
     ReportBenchmarkOptions settings,
     TimeProvider time,
     ILogger<GetReportBenchmarksHandler> logger) : IQueryHandler<GetReportBenchmarksQuery, Result<ReportBenchmarksView>>

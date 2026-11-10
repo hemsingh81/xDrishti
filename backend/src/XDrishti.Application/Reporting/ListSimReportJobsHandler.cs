@@ -8,7 +8,7 @@ using XDrishti.Domain.Reporting;
 namespace XDrishti.Application.Reporting;
 
 /// <summary>Lists the jobs a training report can read (AU-14), a bounded page at a time: the one place a screen finds the job id to pass as <c>simJob</c>. Read only.</summary>
-internal sealed partial class ListSimReportJobsHandler(ISimAllStore store) : IQueryHandler<ListSimReportJobsQuery, Result<SimReportJobsView>>
+internal sealed partial class ListSimReportJobsHandler(ITrainingJobProgress store) : IQueryHandler<ListSimReportJobsQuery, Result<SimReportJobsView>>
 {
     private const int DefaultLimit = 20;
     private const int MaxLimit = 50;

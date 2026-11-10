@@ -160,6 +160,20 @@ public sealed class TrainingReportLoaderTests
     }
 
     [Fact]
+    public async Task A_training_report_over_more_runs_than_one_header_read_may_hold_is_refused_and_never_cut()
+    {
+        Job_is("completed", 10, 0, 0, 0);
+        var many = Enumerable.Range(0, ReportLoader.MaxTrainingRuns + 1).Select(i => Trade('a', 0, 1) with { RunKey = "r" + i, TradeKey = "k" + i });
+        _world.Training.StreamTradesAsync(Job, Arg.Any<DateTimeOffset>(), Arg.Any<ReportTradeFilter>(), Arg.Any<CancellationToken>()).Returns(many.ToAsyncEnumerable());
+
+        var result = await _world.Loader.LoadAsync(Training(), "summary", Ct);
+
+        result.Error.Code.ShouldBe("reports.too_large");
+        result.Error.Message.ShouldContain("runs");
+        await _world.Training.DidNotReceive().ListRunsAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Runs_of_different_stocks_are_different_universes_so_they_are_never_taken_for_one_population()
     {
         // two strategies over two stocks: the same strategy over two instruments must not be refused as an overlap

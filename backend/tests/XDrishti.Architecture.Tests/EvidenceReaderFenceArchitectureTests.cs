@@ -239,7 +239,7 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
         // AU-14 (ADR 0250): the report engine is evidence code. It may name the PORT of training reports (one place, the loader), never the reader, and no statement of it may name the training purpose; the evidence report source stays research-only.
         var port = Sources().Where(f => File.ReadAllText(f).Contains("ITrainingReportSource", StringComparison.Ordinal)).Select(Rel).Order(StringComparer.Ordinal).ToList();
 
-        port.ShouldBe(["XDrishti.Application/Abstractions/Reporting/ITrainingReportSource.cs", "XDrishti.Application/Reporting/ReportLoader.cs", "XDrishti.Infrastructure/DependencyInjection.cs", "XDrishti.Infrastructure/SimAll/TrainingReportSource.cs"]);
+        port.ShouldBe(["XDrishti.Application/Abstractions/Reporting/ITrainingReportSource.cs", "XDrishti.Application/Reporting/ReportLoader.cs", "XDrishti.Infrastructure/Ai/ReadOnly/AiReadOnlyRegistration.cs", "XDrishti.Infrastructure/Ai/ReadOnly/NoTrainingReports.cs", "XDrishti.Infrastructure/DependencyInjection.cs", "XDrishti.Infrastructure/SimAll/TrainingReportSource.cs"]);
         foreach (var file in Sources().Where(f => Rel(f).StartsWith("XDrishti.Application/Reporting/", StringComparison.Ordinal) || Rel(f).EndsWith("Research/ReportTradeSource.cs", StringComparison.Ordinal)))
         {
             var text = File.ReadAllText(file);

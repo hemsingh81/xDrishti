@@ -175,6 +175,7 @@ public static class DependencyInjection
         services.AddScoped<ICapabilityLog>(sp => sp.GetRequiredService<CapabilityLogStore>());
         services.AddScoped<ICapabilityLogWriter>(sp => sp.GetRequiredService<CapabilityLogStore>());
         services.AddScoped<ISimAllStore, XDrishti.Infrastructure.SimAll.SimAllStore>(); // the simulate-everything job: its tables are the queue and the progress (AU-12, ADR 0248)
+        services.AddScoped<ITrainingJobProgress>(sp => sp.GetRequiredService<ISimAllStore>()); // the job progress the reports read (AU-14)
         services.AddScoped<ISimAllUniverse, XDrishti.Infrastructure.SimAll.SimAllUniverse>();
         services.AddScoped<ISimAllBackfillGate, XDrishti.Infrastructure.SimAll.SimAllBackfillGate>();
         services.AddSingleton<IFreeDiskProbe, XDrishti.Infrastructure.SimAll.FreeDiskProbe>();

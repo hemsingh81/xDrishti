@@ -59,6 +59,7 @@ public sealed record TrainingCompletenessView(
         "Only chunks finished at the as-of instant are read; while the job runs, the figures change as chunks finish, and a stock or basket may be only partly covered.",
         $"The hold-out block from {holdOutStart:yyyy-MM-dd} is locked: no trade reaching it is read and no number from inside it is shown.",
         "The latest stored version of each strategy is replayed over the past, so it was shaped knowing the past: these figures are in-sample, and no claim of out-of-sample performance or of freedom from look-ahead is made.",
+        "While the job runs, a trade-list cursor is refused once another chunk finishes (the report it belongs to has changed); read the list again from its first page.",
         "Gross R only; the charge sheet confirmation covers evidence runs, not training simulations.",
     ];
 }
