@@ -25,7 +25,7 @@ public sealed class ComplianceArchitectureTests
         start.ShouldBeGreaterThan(-1, heading);
         var end = text.IndexOf("\n### ", start + heading.Length, StringComparison.Ordinal);
         var section = end < 0 ? text[start..] : text[start..end];
-        return [.. section.Split('\n').Where(l => Regex.IsMatch(l, @"^\| " + idPattern + @" \|", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1))).Select(l => l.Trim().Trim('|').Split(" | ").Select(c => c.Trim()).ToArray())];
+        return [.. section.Split('\n').Where(l => Regex.IsMatch(l, @"^\| " + idPattern + @" \|", RegexOptions.CultureInvariant, ScanRegex.Timeout)).Select(l => l.Trim().Trim('|').Split(" | ").Select(c => c.Trim()).ToArray())];
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class ComplianceArchitectureTests
         {
             var cells = fact.Trim().Trim('|').Split(" | ").Select(c => c.Trim()).ToArray();
             cells.Length.ShouldBe(3, fact);
-            Regex.IsMatch(cells[1], @"\d{4}-\d{2}-\d{2}", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBeTrue("the date it was read: " + fact[..40]);
+            Regex.IsMatch(cells[1], @"\d{4}-\d{2}-\d{2}", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeTrue("the date it was read: " + fact[..40]);
             (cells[1].Contains("https://", StringComparison.Ordinal) || cells[2].Contains("UNVERIFIED", StringComparison.Ordinal)).ShouldBeTrue("a source URL or UNVERIFIED: " + fact[..40]);
         }
 
@@ -73,8 +73,8 @@ public sealed class ComplianceArchitectureTests
     {
         var text = Runbook();
 
-        Regex.IsMatch(text, @"(?<![\d.])(?!100\.64\.0\.0)(\d{1,3}\.){3}\d{1,3}(?![\d.])", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBeFalse("an IPv4 address");
-        Regex.IsMatch(text, @"(?<![A-Za-z0-9])\d{7,12}(?![A-Za-z0-9])", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBeFalse("a client-id-like number");
+        Regex.IsMatch(text, @"(?<![\d.])(?!100\.64\.0\.0)(\d{1,3}\.){3}\d{1,3}(?![\d.])", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeFalse("an IPv4 address");
+        Regex.IsMatch(text, @"(?<![A-Za-z0-9])\d{7,12}(?![A-Za-z0-9])", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeFalse("a client-id-like number");
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public sealed class ComplianceArchitectureTests
                 text.ShouldNotContain(forbidden, Case.Sensitive, file);
             }
 
-            Regex.IsMatch(text, @"(?i)\b\w*(placeorder|submitorder|cancelorder|modifyorder|neworder)\w*\b", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBeFalse(file);
+            Regex.IsMatch(text, @"(?i)\b\w*(placeorder|submitorder|cancelorder|modifyorder|neworder)\w*\b", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeFalse(file);
         }
     }
 
@@ -98,8 +98,8 @@ public sealed class ComplianceArchitectureTests
         var endpoints = Source("XDrishti.Api/Endpoints/LiveTradingEndpoints.cs");
 
         // five owner writes in this module: the compliance record (P11-05), the ramp step and the live switches (P11-04a), clear-hold and exit-confirmed (P11-04b), each behind the same gate and fresh password
-        Regex.Count(endpoints, @"\.Map(Post|Put|Delete|Patch)\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBe(5);
-        Regex.Count(endpoints, @"\.MapPost\(""/compliance""", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBe(1);
+        Regex.Count(endpoints, @"\.Map(Post|Put|Delete|Patch)\(", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBe(5);
+        Regex.Count(endpoints, @"\.MapPost\(""/compliance""", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBe(1);
         endpoints.ShouldContain("RequireRateLimiting(");
         var gate = endpoints.IndexOf("gate.Enabled", StringComparison.Ordinal);
         var password = endpoints.IndexOf("OwnerAct.AuthorizeAsync(", StringComparison.Ordinal);
@@ -109,7 +109,7 @@ public sealed class ComplianceArchitectureTests
         handler.ShouldBeGreaterThan(password);
         endpoints.ShouldNotContain("SessionOwner(");
         endpoints.ShouldNotContain("Actor =");
-        Regex.IsMatch(endpoints, @"MapGroup\(""[^""]*(order|execute|square)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)).ShouldBeFalse();
+        Regex.IsMatch(endpoints, @"MapGroup\(""[^""]*(order|execute|square)", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, ScanRegex.Timeout).ShouldBeFalse();
     }
 
     [Fact]

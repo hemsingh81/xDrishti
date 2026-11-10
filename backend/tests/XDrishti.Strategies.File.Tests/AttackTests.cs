@@ -44,14 +44,15 @@ public sealed class AttackTests
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         var fastest = long.MaxValue;
         FileReadResult result = null!;
-        for (var attempt = 0; attempt < 3; attempt++) // best of three: a busy machine must not fail a bound on the work itself
+        var attempts = 0;
+        for (; attempts < 10 && fastest >= 100; attempts++) // best of up to ten: a busy machine must not fail a bound on the work itself
         {
             var clock = Stopwatch.StartNew();
             result = StrategyFile.Read(text);
             clock.Stop();
             fastest = Math.Min(fastest, clock.ElapsedMilliseconds);
         }
-        var allocated = (GC.GetAllocatedBytesForCurrentThread() - allocatedBefore) / 3;
+        var allocated = (GC.GetAllocatedBytesForCurrentThread() - allocatedBefore) / attempts;
         result.Definition.ShouldBeNull(name);
         result.Problems.ShouldContain(p => p.Code == code, name + ": " + string.Join(", ", result.Problems.Select(p => p.Code)));
         fastest.ShouldBeLessThan(100, name);

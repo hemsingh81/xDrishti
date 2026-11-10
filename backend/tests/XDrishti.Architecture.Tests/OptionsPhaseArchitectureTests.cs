@@ -88,10 +88,10 @@ public sealed class OptionsPhaseArchitectureTests
         queries.ShouldAllBe(q => q.Contains("= ANY(@ids)", StringComparison.Ordinal) || q.Contains("LIMIT @limit", StringComparison.Ordinal) || q.Contains("ORDER BY id DESC LIMIT 1", StringComparison.Ordinal) || q.Contains("SELECT max(ended_at) FROM options.fetch_log WHERE outcome IN", StringComparison.Ordinal));
         foreach (var column in BannedColumns)
         {
-            Regex.IsMatch(string.Join(' ', queries), @"\b" + column + @"\b", RegexOptions.None, TimeSpan.FromSeconds(2)).ShouldBeFalse(column);
+            Regex.IsMatch(string.Join(' ', queries), @"\b" + column + @"\b", RegexOptions.None, ScanRegex.Timeout).ShouldBeFalse(column);
         }
 
-        Regex.Matches(text, @"(?:FROM|JOIN)\s+(\w+\.\w+)", RegexOptions.None, TimeSpan.FromSeconds(2)).Select(m => m.Groups[1].Value).Distinct().Order(StringComparer.Ordinal)
+        Regex.Matches(text, @"(?:FROM|JOIN)\s+(\w+\.\w+)", RegexOptions.None, ScanRegex.Timeout).Select(m => m.Groups[1].Value).Distinct().Order(StringComparer.Ordinal)
             .ShouldBe(["options.backfill_switch", "options.chain_recorder_switch", "options.fetch_log", "paper.entries", "research.expression_runs", "trading.plan_items"]);
     }
 
@@ -102,9 +102,9 @@ public sealed class OptionsPhaseArchitectureTests
         var models = Source("XDrishti.Infrastructure", "OptionPhaseCheck", "SpreadModelIds.cs");
         var sheets = Source("XDrishti.Infrastructure", "OptionPhaseCheck", "CostSheetHashes.cs");
 
-        Regex.Matches(cash, @"runs\.(\w+)\(", RegexOptions.None, TimeSpan.FromSeconds(1)).Select(m => m.Groups[1].Value).ShouldBe(["FindAsync"]);
-        Regex.Matches(models, @"models\.(\w+)\(", RegexOptions.None, TimeSpan.FromSeconds(1)).Select(m => m.Groups[1].Value).ShouldBe(["LatestAsync"]);
-        Regex.Matches(sheets, @"sheets\.(\w+)\(", RegexOptions.None, TimeSpan.FromSeconds(1)).Select(m => m.Groups[1].Value).ShouldBe(["FindAsync"]);
+        Regex.Matches(cash, @"runs\.(\w+)\(", RegexOptions.None, ScanRegex.Timeout).Select(m => m.Groups[1].Value).ShouldBe(["FindAsync"]);
+        Regex.Matches(models, @"models\.(\w+)\(", RegexOptions.None, ScanRegex.Timeout).Select(m => m.Groups[1].Value).ShouldBe(["LatestAsync"]);
+        Regex.Matches(sheets, @"sheets\.(\w+)\(", RegexOptions.None, ScanRegex.Timeout).Select(m => m.Groups[1].Value).ShouldBe(["FindAsync"]);
         typeof(ICashRunHeaders).GetMethods().Select(m => m.Name).ShouldBe(["FindAsync"]);
         typeof(ISpreadModelIds).GetMethods().Select(m => m.Name).ShouldBe(["LatestAsync"]);
     }

@@ -130,7 +130,7 @@ public sealed class ExecutionBoundaryArchitectureTests
         var all = SourceFiles(ExecutionSource);
         var outside = all.Where(f => !SrcRelative(f).StartsWith("XDrishti.Execution/Dhan/", StringComparison.Ordinal)).ToList();
 
-        outside.Where(f => Regex.IsMatch(File.ReadAllText(f), @"HttpClient|HttpMessageHandler|System\.Net\.Http|(https?|wss?)://|access-token|\.dhan\.co", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)))
+        outside.Where(f => Regex.IsMatch(File.ReadAllText(f), @"HttpClient|HttpMessageHandler|System\.Net\.Http|(https?|wss?)://|access-token|\.dhan\.co", RegexOptions.CultureInvariant, ScanRegex.Timeout))
             .Select(Path.GetFileName).ShouldBeEmpty();
 
         var hostFiles = all.Where(f => File.ReadAllText(f).Contains("dhan.co", StringComparison.OrdinalIgnoreCase)).Select(f => SrcRelative(f)).ToList();
@@ -138,20 +138,20 @@ public sealed class ExecutionBoundaryArchitectureTests
 
         var text = File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "ExecutionEndpoints.cs"));
         text.ShouldContain("\"sandbox.dhan.co\"");
-        Regex.Matches(text, @"[a-z0-9.-]+\.dhan\.co", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2)).Select(m => m.Value).Distinct().ShouldBe(["sandbox.dhan.co", "api.dhan.co"]);
-        Regex.Count(text, "api\\.dhan\\.co", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2)).ShouldBe(1, "the live host is one constant");
+        Regex.Matches(text, @"[a-z0-9.-]+\.dhan\.co", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, ScanRegex.Timeout).Select(m => m.Value).Distinct().ShouldBe(["sandbox.dhan.co", "api.dhan.co"]);
+        Regex.Count(text, "api\\.dhan\\.co", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, ScanRegex.Timeout).ShouldBe(1, "the live host is one constant");
         text.ShouldContain("public const string LiveHost = \"api.dhan.co\";");
         text.ShouldNotContain("api-order-update");
         text.ShouldNotContain("wss://");
         all.Where(f => File.ReadAllText(f).Contains("api.dhan.co", StringComparison.OrdinalIgnoreCase)).Select(f => SrcRelative(f)).ShouldBe(["XDrishti.Execution/Dhan/ExecutionEndpoints.cs"], "the live host string exists in the guard file only");
 
         // The live rows: exactly the two readiness GETs, no id (ADR 0172). Widening this table needs its own ADR.
-        var liveBlock = Regex.Match(text, @"LiveTable =\s*\[(?<rows>[^\]]*)\];", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
+        var liveBlock = Regex.Match(text, @"LiveTable =\s*\[(?<rows>[^\]]*)\];", RegexOptions.CultureInvariant, ScanRegex.Timeout);
         liveBlock.Success.ShouldBeTrue();
-        Regex.Matches(liveBlock.Groups["rows"].Value, @"\(DhanCall\.(?<c>\w+), HttpMethod\.(?<m>\w+), ""(?<p>[^""]+)""\)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2))
+        Regex.Matches(liveBlock.Groups["rows"].Value, @"\(DhanCall\.(?<c>\w+), HttpMethod\.(?<m>\w+), ""(?<p>[^""]+)""\)", RegexOptions.CultureInvariant, ScanRegex.Timeout)
             .Select(m => $"{m.Groups["c"].Value} {m.Groups["m"].Value} {m.Groups["p"].Value}").ShouldBe(["ProfileGet Get /v2/profile", "StaticIpGet Get /v2/ip/getIP"]);
-        Regex.Count(liveBlock.Groups["rows"].Value, @"\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBe(2, "two rows and nothing else");
-        all.ShouldNotContain(f => Regex.IsMatch(File.ReadAllText(f), "AddHttpClient|WebSocket|ClientWebSocket|AllowAutoRedirect\\s*=\\s*true", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)));
+        Regex.Count(liveBlock.Groups["rows"].Value, @"\(", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBe(2, "two rows and nothing else");
+        all.ShouldNotContain(f => Regex.IsMatch(File.ReadAllText(f), "AddHttpClient|WebSocket|ClientWebSocket|AllowAutoRedirect\\s*=\\s*true", RegexOptions.CultureInvariant, ScanRegex.Timeout));
     }
 
     [Fact]
@@ -164,7 +164,7 @@ public sealed class ExecutionBoundaryArchitectureTests
         var callers = SourceFiles(ExecutionSource).Where(f => File.ReadAllText(f).Contains("AddDhanSandbox(", StringComparison.Ordinal)).Select(Path.GetFileName).Order().ToList();
         callers.ShouldBe(["DhanSandboxRegistration.cs", "ExecServices.cs"]);
         var services = File.ReadAllText(Path.Combine(ExecutionSource, "Host", "ExecServices.cs"));
-        Regex.IsMatch(services, @"environment == ExecEnvironment\.Sandbox\)\s*\{\s*services\.AddDhanSandbox", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBeTrue();
+        Regex.IsMatch(services, @"environment == ExecEnvironment\.Sandbox\)\s*\{\s*services\.AddDhanSandbox", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeTrue();
         services.ShouldNotContain("AddLegSender");
         // the readiness reads (ADR 0170) are composed only inside the sandbox registration, never by the host files
         SourceFiles(ExecutionSource).Where(f => File.ReadAllText(f).Contains("new DhanBrokerFacts(", StringComparison.Ordinal)).Select(Path.GetFileName).ShouldBe(["DhanSandboxRegistration.cs"]);
@@ -174,7 +174,7 @@ public sealed class ExecutionBoundaryArchitectureTests
         File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "DhanOrderClient.cs")).ShouldContain("environment != ExecEnvironment.Sandbox");
         File.ReadAllText(Path.Combine(ExecutionSource, "Application", "LegSender.cs")).ShouldContain("environment != ExecEnvironment.Sandbox");
         // ADR 0172: the guard file names live in exactly three places (the Build branch to the two live rows, the host switch and the row check of IsAllowed); the reader carries no write.
-        Regex.Count(File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "ExecutionEndpoints.cs")), @"ExecEnvironment\.Live\b", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBe(3);
+        Regex.Count(File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "ExecutionEndpoints.cs")), @"ExecEnvironment\.Live\b", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBe(3);
         var reader = File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "DhanReader.cs"));
         reader.ShouldNotContain("HttpMethod.Post");
         reader.ShouldNotContain("Content =");
@@ -189,7 +189,7 @@ public sealed class ExecutionBoundaryArchitectureTests
 
         sources.Where(f => File.ReadAllText(f).Contains("new LiveBrokerFacts(", StringComparison.Ordinal)).Select(f => SrcRelative(f)).ShouldBe(["XDrishti.Execution/Host/ExecServices.cs"]);
         var services = File.ReadAllText(Path.Combine(ExecutionSource, "Host", "ExecServices.cs"));
-        Regex.IsMatch(services, @"== ExecEnvironment\.Live && ExecOptions\.IsReadinessLiveEnabled\(configuration\)\)\s*\{[^}]*new LiveBrokerFacts\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBeTrue();
+        Regex.IsMatch(services, @"== ExecEnvironment\.Live && ExecOptions\.IsReadinessLiveEnabled\(configuration\)\)\s*\{[^}]*new LiveBrokerFacts\(", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeTrue();
         sources.Where(f => File.ReadAllText(f).Contains("ILiveTokenSource", StringComparison.Ordinal)).Select(f => SrcRelative(f)).Order(StringComparer.Ordinal).ShouldBe(
             ["XDrishti.Execution/Application/Ports/ILiveTokenSource.cs", "XDrishti.Execution/Dhan/DhanBrokerFacts.cs", "XDrishti.Execution/Host/ExecServices.cs", "XDrishti.Execution/Persistence/PgExecTokenHandover.cs"]);
         File.ReadAllText(Path.Combine(ExecutionSource, "appsettings.json")).ShouldNotContain("ReadinessLiveEnabled\": true");
@@ -197,8 +197,8 @@ public sealed class ExecutionBoundaryArchitectureTests
         // ADR 0172: the proxy setting is read in one place and used only by the live reads; every other client of the process keeps UseProxy = false.
         sources.Where(f => File.ReadAllText(f).Contains("\"HTTPS_PROXY\"", StringComparison.Ordinal)).Select(f => SrcRelative(f)).ShouldBe(["XDrishti.Execution/Host/ExecOptions.cs"]);
         sources.Where(f => File.ReadAllText(f).Contains("LiveProxy(configuration)", StringComparison.Ordinal)).Select(f => SrcRelative(f)).ShouldBe(["XDrishti.Execution/Host/ExecServices.cs"]);
-        Regex.IsMatch(services, @"IsReadinessLiveEnabled\(configuration\)\)\s*\{[^}]*LiveProxy\(configuration\)[^}]*ProxySocket\(proxy\)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBeTrue();
-        sources.Where(f => Regex.IsMatch(File.ReadAllText(f), @"UseProxy\s*=\s*true", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2))).Select(f => SrcRelative(f)).ShouldBe(["XDrishti.Execution/Dhan/DhanBrokerFacts.cs"]);
+        Regex.IsMatch(services, @"IsReadinessLiveEnabled\(configuration\)\)\s*\{[^}]*LiveProxy\(configuration\)[^}]*ProxySocket\(proxy\)", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeTrue();
+        sources.Where(f => Regex.IsMatch(File.ReadAllText(f), @"UseProxy\s*=\s*true", RegexOptions.CultureInvariant, ScanRegex.Timeout)).Select(f => SrcRelative(f)).ShouldBe(["XDrishti.Execution/Dhan/DhanBrokerFacts.cs"]);
         File.ReadAllText(Path.Combine(ExecutionSource, "Dhan", "DhanSandboxRegistration.cs")).ShouldContain("UseProxy = false");
     }
 
@@ -208,15 +208,15 @@ public sealed class ExecutionBoundaryArchitectureTests
     {
         var sources = SourceFiles(ExecutionSource).ToList();
 
-        sources.Where(f => Regex.IsMatch(File.ReadAllText(f), @"Add(Singleton|Scoped|Transient)(<|\()[^;]*IBrokerOrders|TryAdd(Singleton|Scoped|Transient)(<|\()[^;]*IBrokerOrders", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)))
+        sources.Where(f => Regex.IsMatch(File.ReadAllText(f), @"Add(Singleton|Scoped|Transient)(<|\()[^;]*IBrokerOrders|TryAdd(Singleton|Scoped|Transient)(<|\()[^;]*IBrokerOrders", RegexOptions.CultureInvariant, ScanRegex.Timeout))
             .Select(Path.GetFileName).ShouldBeEmpty();
         sources.Where(f => File.ReadAllText(f).Contains("broker_secrets", StringComparison.OrdinalIgnoreCase)).Select(Path.GetFileName).ShouldBeEmpty();
         File.ReadAllText(Path.Combine(ExecutionSource, "appsettings.json")).ShouldNotContain("SendEnabled\": true");
 
         var migration = string.Join('\n', File.ReadAllLines(Path.Combine(Backend, "src", "XDrishti.Infrastructure", "Persistence", "Migrations", "20261029170000_AddExecutionBrokerLog.cs")).Where(l => !l.TrimStart().StartsWith("//", StringComparison.Ordinal) && !l.TrimStart().StartsWith("--", StringComparison.Ordinal)));
-        Regex.Matches(migration, @"GRANT[^;]*broker_secrets", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2)).ShouldBeEmpty();
+        Regex.Matches(migration, @"GRANT[^;]*broker_secrets", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, ScanRegex.Timeout).ShouldBeEmpty();
         migration.ShouldContain("GRANT SELECT (account_id, status, expires_at) ON accounts.broker_connections TO xd_exec");
-        Regex.Matches(migration, @"GRANT[^;]*(UPDATE|DELETE|TRUNCATE)[^;]*broker_calls", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2)).ShouldBeEmpty();
+        Regex.Matches(migration, @"GRANT[^;]*(UPDATE|DELETE|TRUNCATE)[^;]*broker_calls", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, ScanRegex.Timeout).ShouldBeEmpty();
     }
 
     [Fact]
@@ -358,7 +358,7 @@ public sealed class ExecutionBoundaryArchitectureTests
         // P12-02 (ADR 0157): System.Net.Http is allowed, but its use is limited to the Dhan folder (Http_a_host_name_... above); no HTTP server, no Microsoft.Extensions.Http.
         // P12-01b (ADR 0156): plain Npgsql is allowed for the order record (Persistence/), as the role xd_exec; EF Core, the shared Infrastructure and any HTTP library are not.
         references.ShouldNotContain(r => r == "Microsoft.Extensions.Http" || r.Contains("EntityFramework", StringComparison.Ordinal));
-        references.ShouldNotContain(r => Regex.IsMatch(r, "dhan|kite|zerodha|upstox|fyers|smartapi|angelone|alpaca|ibapi|ccxt|5paisa|groww|quickfix", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)));
+        references.ShouldNotContain(r => Regex.IsMatch(r, "dhan|kite|zerodha|upstox|fyers|smartapi|angelone|alpaca|ibapi|ccxt|5paisa|groww|quickfix", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, ScanRegex.Timeout));
         references.ShouldNotContain("XDrishti.Infrastructure");
         references.ShouldNotContain("XDrishti.Api");
 
@@ -371,7 +371,7 @@ public sealed class ExecutionBoundaryArchitectureTests
     public void The_domain_and_application_folders_use_no_clock_random_file_network_or_database()
     {
         var banned = new Regex(@"DateTime(Offset)?\.(Now|UtcNow|Today)|\bnew Random\b|Random\.Shared|System\.IO|File\.|Directory\.|System\.Net|Npgsql|EntityFrameworkCore|Environment\.GetEnvironmentVariable|Thread\.Sleep",
-            RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
+            RegexOptions.CultureInvariant, ScanRegex.Timeout);
 
         var offenders = Folders
             .SelectMany(d => SourceFiles(Path.Combine(ExecutionSource, d)))
@@ -387,19 +387,19 @@ public sealed class ExecutionBoundaryArchitectureTests
     public void The_execution_container_role_secret_and_network_appear_only_in_their_own_blocks()
     {
         var compose = string.Join('\n', File.ReadAllLines(RepositoryFiles.RepositoryFile("deploy", "compose.yaml")).Where(l => !l.TrimStart().StartsWith('#')));
-        var blocks = Regex.Split(compose, @"\n(?=  [a-z][a-z0-9-]*:\n)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
+        var blocks = Regex.Split(compose, @"\n(?=  [a-z][a-z0-9-]*:\n)", RegexOptions.CultureInvariant, ScanRegex.Timeout);
 
         string[] Holders(string needle) => [.. blocks.Where(b => b.Contains(needle, StringComparison.Ordinal)).Select(b => b.Trim().Split(':')[0])];
 
         // the password file: set as the login by xd-migrate, read by xd-exec only; the role name only in xd-exec's own connection string; the network only between xd-db and xd-exec.
         Holders("source: db_exec_password").ShouldBe(["xd-migrate", "xd-exec"], ignoreOrder: true);
         Holders("Username=xd_exec").ShouldBe(["xd-exec"]);
-        blocks.Where(b => Regex.IsMatch(b, @"networks: \[[^\]]*\bexec\b", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2))).Select(b => b.Trim().Split(':')[0]).ShouldBe(["xd-db", "xd-exec"], ignoreOrder: true);
+        blocks.Where(b => Regex.IsMatch(b, @"networks: \[[^\]]*\bexec\b", RegexOptions.CultureInvariant, ScanRegex.Timeout)).Select(b => b.Trim().Split(':')[0]).ShouldBe(["xd-db", "xd-exec"], ignoreOrder: true);
         Holders("XDrishti.Execution.dll").ShouldBe(["xd-exec"]);
 
         // ADR 0172: the overlay of the live route adds exactly one member to exec (the proxy), which is also the only one on egress there; xd-exec gains no network.
         var overlay = string.Join('\n', File.ReadAllLines(RepositoryFiles.RepositoryFile("deploy", "compose.exec-live.yaml")).Where(l => !l.TrimStart().StartsWith('#')));
-        var overlayBlocks = Regex.Split(overlay, @"\n(?=  [a-z][a-z0-9-]*:\n)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
+        var overlayBlocks = Regex.Split(overlay, @"\n(?=  [a-z][a-z0-9-]*:\n)", RegexOptions.CultureInvariant, ScanRegex.Timeout);
         overlayBlocks.Where(b => b.Contains("networks:", StringComparison.Ordinal)).Select(b => b.Trim().Split(':')[0]).ShouldBe(["xd-exec-proxy"]);
         overlay.ShouldContain("networks: [exec, egress]");
         overlay.ShouldNotContain("secrets");

@@ -45,7 +45,7 @@ public sealed class OptionEvaluationArchitectureTests
         result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
         foreach (var file in Directory.GetFiles(Src("XDrishti.Domain", "Options", "Evaluation"), "*.cs"))
         {
-            Regex.IsMatch(File.ReadAllText(file), @"\b(DateTime(Offset)?\.(UtcNow|Now)|TimeProvider|Random\.Shared|new Random\(|Environment\.|File\.|Stopwatch)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBeFalse(Path.GetFileName(file));
+            Regex.IsMatch(File.ReadAllText(file), @"\b(DateTime(Offset)?\.(UtcNow|Now)|TimeProvider|Random\.Shared|new Random\(|Environment\.|File\.|Stopwatch)", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeFalse(Path.GetFileName(file));
         }
     }
 
@@ -142,14 +142,14 @@ public sealed class OptionEvaluationArchitectureTests
         typeof(IExpressionReader).GetProperties().ShouldBeEmpty();
         var sql = File.ReadAllText(Src("XDrishti.Infrastructure", "OptionExpression", "ExpressionReader.cs"));
 
-        Regex.Matches(sql, @"FROM research\.(\w+)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).Select(m => m.Groups[1].Value).Distinct().Order(StringComparer.Ordinal).ShouldBe(["expression_runs", "expression_trades"]);
+        Regex.Matches(sql, @"FROM research\.(\w+)", RegexOptions.CultureInvariant, ScanRegex.Timeout).Select(m => m.Groups[1].Value).Distinct().Order(StringComparer.Ordinal).ShouldBe(["expression_runs", "expression_trades"]);
         foreach (var banned in new[] { "INSERT", "UPDATE ", "DELETE", "TRUNCATE", "DROP " })
         {
             sql.ShouldNotContain(banned, Case.Sensitive);
         }
 
         sql.ShouldContain("(side = @s{i} AND entry_ts >= @a{i} AND entry_ts < @b{i})");
-        Regex.Count(sql, @"AND \(""? \+ Predicate\(windows\)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBe(2);
+        Regex.Count(sql, @"AND \(""? \+ Predicate\(windows\)", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBe(2);
         sql.ShouldContain("ToUniversalTime()");
     }
 

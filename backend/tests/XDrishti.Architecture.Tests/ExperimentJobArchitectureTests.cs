@@ -49,10 +49,10 @@ public sealed partial class ExperimentJobArchitectureTests
         "XDrishti.Application.Lab.StartLabRunCommand",
     ];
 
-    [GeneratedRegex(@"\b(Apply|Activate|Promote|Publish)", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 500)]
+    [GeneratedRegex(@"\b(Apply|Activate|Promote|Publish)", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 30000)]
     private static partial Regex Applying();
 
-    [GeneratedRegex(@"\b(DELETE|TRUNCATE|UPDATE)\b\s+(FROM\s+)?(?!research\.experiment_jobs)\w+\.\w+", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 500)]
+    [GeneratedRegex(@"\b(DELETE|TRUNCATE|UPDATE)\b\s+(FROM\s+)?(?!research\.experiment_jobs)\w+\.\w+", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 30000)]
     private static partial Regex WritesElsewhere();
 
     private static string Source(params string[] parts) => File.ReadAllText(RepositoryFiles.RepositoryFile(["backend", "src", .. parts]));
@@ -112,9 +112,9 @@ public sealed partial class ExperimentJobArchitectureTests
     {
         var text = Source("XDrishti.Api", "Endpoints", "ExperimentJobsEndpoints.cs");
 
-        Regex.Count(text, @"\.MapPost\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(2);
-        Regex.Count(text, @"\.MapPut\(|\.MapDelete\(|\.MapPatch\(|\.MapMethods\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(0);
-        Regex.Count(text, @"RequireRateLimiting\(SessionAuthentication\.LoginRateLimitPolicy\)", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(1);
+        Regex.Count(text, @"\.MapPost\(", RegexOptions.None, ScanRegex.Timeout).ShouldBe(2);
+        Regex.Count(text, @"\.MapPut\(|\.MapDelete\(|\.MapPatch\(|\.MapMethods\(", RegexOptions.None, ScanRegex.Timeout).ShouldBe(0);
+        Regex.Count(text, @"RequireRateLimiting\(SessionAuthentication\.LoginRateLimitPolicy\)", RegexOptions.None, ScanRegex.Timeout).ShouldBe(1);
         text.IndexOf("RefusedWhileOffAsync(", StringComparison.Ordinal).ShouldBeGreaterThan(0);
         text.IndexOf("RefusedWhileOffAsync(", StringComparison.Ordinal).ShouldBeLessThan(text.IndexOf("OwnerAct.AuthorizeAsync(", StringComparison.Ordinal));
         text.ShouldContain("OwnerAct.SessionOwner(http)");

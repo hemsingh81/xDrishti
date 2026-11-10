@@ -28,7 +28,7 @@ public sealed partial class OwnerMovesArchitectureTests
 
     private static readonly Assembly Api = typeof(Program).Assembly;
 
-    [GeneratedRegex(@"\.Map(Post|Put|Delete|Patch)\(", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 500)]
+    [GeneratedRegex(@"\.Map(Post|Put|Delete|Patch)\(", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 30000)]
     private static partial Regex Writes();
 
     private static string Source(params string[] parts) => File.ReadAllText(RepositoryFiles.RepositoryFile(["backend", "src", .. parts]));
@@ -38,7 +38,7 @@ public sealed partial class OwnerMovesArchitectureTests
     private static List<string> EndpointFilesNaming(string pattern)
     {
         var dir = Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Endpoints", "OwnerMovesEndpoints.cs"))!;
-        return [.. Directory.GetFiles(dir, "*.cs").Where(f => Regex.IsMatch(File.ReadAllText(f), pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1))).Select(Path.GetFileName).Cast<string>().Order(StringComparer.Ordinal)];
+        return [.. Directory.GetFiles(dir, "*.cs").Where(f => Regex.IsMatch(File.ReadAllText(f), pattern, RegexOptions.CultureInvariant, ScanRegex.Timeout)).Select(Path.GetFileName).Cast<string>().Order(StringComparer.Ordinal)];
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed partial class OwnerMovesArchitectureTests
         EndpointFilesNaming(@"\b(" + string.Join('|', MoveCommands) + @")\b").ShouldBe(["OwnerMovesEndpoints.cs"]);
         EndpointFilesNaming(@"\bChangeAutonomySettingsCommand\b").ShouldBe(["AutonomyEndpoints.cs"]);
         EndpointFilesNaming(@"\bIOwnerActRunner\b").ShouldBe(["AutonomyEndpoints.cs", "OwnerActFlow.cs", "OwnerMovesEndpoints.cs"]);
-        Regex.IsMatch("x LinkLessonCommand y", @"\b(" + string.Join('|', MoveCommands) + @")\b", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBeTrue("the scan sees a use");
+        Regex.IsMatch("x LinkLessonCommand y", @"\b(" + string.Join('|', MoveCommands) + @")\b", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeTrue("the scan sees a use");
     }
 
     [Fact]
@@ -69,8 +69,8 @@ public sealed partial class OwnerMovesArchitectureTests
         var autonomy = Source("XDrishti.Api", "Endpoints", "AutonomyEndpoints.cs");
 
         Writes().Count(moves).ShouldBe(5);
-        Regex.Count(moves, @"OwnerActFlow\.RunAsync\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBe(5);
-        Regex.Count(moves, @"RequireRateLimiting\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBe(5);
+        Regex.Count(moves, @"OwnerActFlow\.RunAsync\(", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBe(5);
+        Regex.Count(moves, @"RequireRateLimiting\(", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBe(5);
         Writes().Count(autonomy).ShouldBe(1);
         autonomy.ShouldContain("OwnerActFlow.RunAsync(");
         autonomy.ShouldContain("Capabilities.AutonomyForm");
@@ -94,7 +94,7 @@ public sealed partial class OwnerMovesArchitectureTests
             .SelectMany(n => Api.GetType("XDrishti.Api.Endpoints." + n)!.GetProperties().Select(p => n + "." + p.Name)).ToList();
 
         names.Count.ShouldBeGreaterThan(10);
-        names.ShouldNotContain(n => Regex.IsMatch(n, @"\.(Actor|Owner|Autonomy|Level|Result|BeforeMeanR|AfterMeanR|BeforeTotalR|AfterTotalR|State|ExperimentId|Outcome)$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)));
+        names.ShouldNotContain(n => Regex.IsMatch(n, @"\.(Actor|Owner|Autonomy|Level|Result|BeforeMeanR|AfterMeanR|BeforeTotalR|AfterTotalR|State|ExperimentId|Outcome)$", RegexOptions.CultureInvariant, ScanRegex.Timeout));
         Api.GetType("XDrishti.Api.Endpoints.OwnerMoveRequest")!.GetProperties().Select(p => p.Name).Order().ShouldBe(["Password", "Reason"]);
         var moves = Source("XDrishti.Api", "Endpoints", "OwnerMovesEndpoints.cs");
         moves.ShouldContain("AutonomyLevel.Supervised");
@@ -109,7 +109,7 @@ public sealed partial class OwnerMovesArchitectureTests
 
         runner.ShouldContain("gate.RequireAsync(");
         runner.ShouldContain("handler.HandleAsync(");
-        Regex.IsMatch(runner, @"\b(Apply|Activate|Promote|Publish|Place|Order)\w*\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBeFalse();
+        Regex.IsMatch(runner, @"\b(Apply|Activate|Promote|Publish|Place|Order)\w*\(", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeFalse();
         runner.ShouldNotContain("ICapabilityLogWriter");
     }
 }

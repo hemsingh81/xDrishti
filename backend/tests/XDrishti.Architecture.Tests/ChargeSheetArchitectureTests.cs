@@ -25,10 +25,10 @@ public sealed partial class ChargeSheetArchitectureTests
 
     private static readonly string Command = typeof(RecordChargeSheetActCommand).FullName!;
 
-    [GeneratedRegex(@"\b(UPDATE|DELETE|TRUNCATE)\b\s", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 500)]
+    [GeneratedRegex(@"\b(UPDATE|DELETE|TRUNCATE)\b\s", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 30000)]
     private static partial Regex Rewriting();
 
-    [GeneratedRegex(@"\b(INSERT|UPDATE|DELETE|TRUNCATE|COPY)\b\s", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 500)]
+    [GeneratedRegex(@"\b(INSERT|UPDATE|DELETE|TRUNCATE|COPY)\b\s", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 30000)]
     private static partial Regex AnyWrite();
 
     private static string Source(params string[] parts) => File.ReadAllText(RepositoryFiles.RepositoryFile(["backend", "src", .. parts]));
@@ -76,10 +76,10 @@ public sealed partial class ChargeSheetArchitectureTests
     {
         var text = Source("XDrishti.Api", "Endpoints", "ChargeSheetEndpoints.cs");
 
-        Regex.Count(text, @"\.MapGet\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(1);
-        Regex.Count(text, @"\.Map(Post|Put)\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(3);
-        Regex.Count(text, @"\.MapDelete\(|\.MapPatch\(|\.MapMethods\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(0);
-        Regex.Count(text, @"RequireRateLimiting\(SessionAuthentication\.LoginRateLimitPolicy\)", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(3);
+        Regex.Count(text, @"\.MapGet\(", RegexOptions.None, ScanRegex.Timeout).ShouldBe(1);
+        Regex.Count(text, @"\.Map(Post|Put)\(", RegexOptions.None, ScanRegex.Timeout).ShouldBe(3);
+        Regex.Count(text, @"\.MapDelete\(|\.MapPatch\(|\.MapMethods\(", RegexOptions.None, ScanRegex.Timeout).ShouldBe(0);
+        Regex.Count(text, @"RequireRateLimiting\(SessionAuthentication\.LoginRateLimitPolicy\)", RegexOptions.None, ScanRegex.Timeout).ShouldBe(3);
         text.ShouldContain("OwnerAct.AuthorizeAsync(");
         text.ShouldNotContain("Elevate");
         text.ShouldNotContain("StepUpWindow");

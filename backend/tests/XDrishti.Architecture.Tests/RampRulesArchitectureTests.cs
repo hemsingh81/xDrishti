@@ -48,7 +48,7 @@ public sealed class RampRulesArchitectureTests
                 text.ShouldNotContain(forbidden, Case.Sensitive, file);
             }
 
-            Regex.IsMatch(text, @"(?i)\b\w*(placeorder|submitorder|cancelorder|modifyorder|neworder|squareoff)\w*\b", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBeFalse(file);
+            Regex.IsMatch(text, @"(?i)\b\w*(placeorder|submitorder|cancelorder|modifyorder|neworder|squareoff)\w*\b", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeFalse(file);
         }
     }
 
@@ -83,7 +83,7 @@ public sealed class RampRulesArchitectureTests
         act.ShouldBeGreaterThan(password);
         endpoints.ShouldContain("ClearLiveRampHold");
         endpoints.ShouldContain("ConfirmLiveRampExit");
-        Regex.Count(endpoints, @"RequireRateLimiting\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBe(5);
+        Regex.Count(endpoints, @"RequireRateLimiting\(", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBe(5);
     }
 
     [Fact]

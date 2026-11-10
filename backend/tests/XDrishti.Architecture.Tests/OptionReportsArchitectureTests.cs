@@ -44,7 +44,7 @@ public sealed class OptionReportsArchitectureTests
 
     private static IEnumerable<Type> ViewTypes() => Application.GetTypes().Where(t => t.Namespace == "XDrishti.Application.OptionReports" && t.IsPublic && t.IsSealed && t.GetProperties().Length > 0 && !t.IsAbstract && t.Name != "OptionReportErrors" && !t.Name.EndsWith("Query", StringComparison.Ordinal));
 
-    private static IEnumerable<string> Tokens(string name) => Regex.Matches(name, "[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+", RegexOptions.None, TimeSpan.FromSeconds(1)).Select(m => m.Value.ToLowerInvariant());
+    private static IEnumerable<string> Tokens(string name) => Regex.Matches(name, "[A-Z]+(?![a-z])|[A-Z]?[a-z]+|[0-9]+", RegexOptions.None, ScanRegex.Timeout).Select(m => m.Value.ToLowerInvariant());
 
     [Fact]
     public void The_handlers_take_read_ports_only()
@@ -81,14 +81,14 @@ public sealed class OptionReportsArchitectureTests
 
         queries.Count.ShouldBe(5);
         // Each query filters by a date range, a run id or a profile in a WHERE; the one exception is the newest-N list of runs, ordered by its time and cut by a limit.
-        queries.ShouldAllBe(q => Regex.IsMatch(q, @"WHERE[^;]*(session_date >= @from|window_to >= @from|run_id = @id|run_id = ANY\(@ids\)|profile_hash = @profile)", RegexOptions.Singleline, TimeSpan.FromSeconds(2)) || q.Contains("ORDER BY created_at DESC, run_id DESC LIMIT @limit", StringComparison.Ordinal));
+        queries.ShouldAllBe(q => Regex.IsMatch(q, @"WHERE[^;]*(session_date >= @from|window_to >= @from|run_id = @id|run_id = ANY\(@ids\)|profile_hash = @profile)", RegexOptions.Singleline, ScanRegex.Timeout) || q.Contains("ORDER BY created_at DESC, run_id DESC LIMIT @limit", StringComparison.Ordinal));
         queries.ShouldAllBe(q => q.Contains("LIMIT @limit", StringComparison.Ordinal) || q.Contains("run_id = @id", StringComparison.Ordinal) || q.Contains("run_id = ANY(@ids)", StringComparison.Ordinal));
         foreach (var column in BannedColumns.Where(c => c is not "value" and not "threshold"))
         {
-            Regex.IsMatch(string.Join(' ', queries.Select(q => q[..Math.Max(0, q.IndexOf("command.", StringComparison.Ordinal) is var k and > 0 ? k : q.Length)])), @"\b" + column + @"\b", RegexOptions.None, TimeSpan.FromSeconds(2)).ShouldBeFalse(column);
+            Regex.IsMatch(string.Join(' ', queries.Select(q => q[..Math.Max(0, q.IndexOf("command.", StringComparison.Ordinal) is var k and > 0 ? k : q.Length)])), @"\b" + column + @"\b", RegexOptions.None, ScanRegex.Timeout).ShouldBeFalse(column);
         }
 
-        Regex.Matches(text, @"(?:FROM|JOIN)\s+(\w+\.\w+)", RegexOptions.None, TimeSpan.FromSeconds(2)).Select(m => m.Groups[1].Value).Distinct().Order(StringComparer.Ordinal)
+        Regex.Matches(text, @"(?:FROM|JOIN)\s+(\w+\.\w+)", RegexOptions.None, ScanRegex.Timeout).Select(m => m.Groups[1].Value).Distinct().Order(StringComparer.Ordinal)
             .ShouldBe(["options.quality_results", "research.expression_runs", "research.expression_trades", "research.pair_formations"]);
     }
 
@@ -109,13 +109,13 @@ public sealed class OptionReportsArchitectureTests
     {
         var text = File.ReadAllText(Src("XDrishti.Api", "Endpoints", "OptionReportEndpoints.cs"));
 
-        Regex.Count(text, @"\.MapGet\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(4);
+        Regex.Count(text, @"\.MapGet\(", RegexOptions.None, ScanRegex.Timeout).ShouldBe(4);
         foreach (var banned in new[] { "MapPost", "MapPut", "MapDelete", "MapPatch", "IOptionReportReader", "IBackfillFetchLog", "IOptionQualityStore", "IExtensionEvaluationReader", "rolling_bars", "fetch_log", "quality_results" })
         {
             text.Replace("/options", string.Empty, StringComparison.Ordinal).Replace("/research", string.Empty, StringComparison.Ordinal).ShouldNotContain(banned, Case.Sensitive);
         }
 
-        Regex.IsMatch(text, @"(FROM|JOIN)\s+\w+\.\w+", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBeFalse();
+        Regex.IsMatch(text, @"(FROM|JOIN)\s+\w+\.\w+", RegexOptions.None, ScanRegex.Timeout).ShouldBeFalse();
         text.ShouldContain("\"/summary\"");
         text.ShouldContain("\"/expression-runs\"");
         text.ShouldContain("\"/expression-runs/{id}\"");
