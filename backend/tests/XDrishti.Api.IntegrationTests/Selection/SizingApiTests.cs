@@ -24,8 +24,8 @@ public sealed class SizingApiTests(ApiFactory factory) : DataTestBase(factory)
         return (response.StatusCode, text.Length == 0 ? default : JsonDocument.Parse(text).RootElement.Clone());
     }
 
-    private Task<(HttpStatusCode Status, JsonElement Body)> ChangeAsync(string? password, bool? vol = null, double? floor = null, bool? cap = null, double? pct = null) =>
-        PutAsync(Settings.OriginalString, new { volTargetEnabled = vol, floor, capacityEnabled = cap, capacityPct = pct, password, actor = "owner:evil@example.test" });
+    private Task<(HttpStatusCode Status, JsonElement Body)> ChangeAsync(string? password, bool? vol = null, double? floor = null, bool? cap = null, double? pct = null, double? minFit = null) =>
+        PutAsync(Settings.OriginalString, new { volTargetEnabled = vol, floor, capacityEnabled = cap, capacityPct = pct, minFit, password, actor = "owner:evil@example.test" });
 
     private Task<long> RowsAsync(string table) => ScalarAsync<long>($"SELECT count(*) FROM selection.{table}");
 
@@ -60,7 +60,8 @@ public sealed class SizingApiTests(ApiFactory factory) : DataTestBase(factory)
         view.GetProperty("volTargetEnabled").GetBoolean().ShouldBeFalse();
         view.GetProperty("capacityEnabled").GetBoolean().ShouldBeFalse();
         view.GetProperty("floor").GetDouble().ShouldBe(0.5);
-        view.GetProperty("capacityPct").GetDouble().ShouldBe(0.01);
+        view.GetProperty("capacityPct").GetDouble().ShouldBe(0.005);
+        view.GetProperty("minFit").GetDouble().ShouldBe(0.5);
         view.GetProperty("version").GetInt64().ShouldBe(0);
         view.GetProperty("latestLoosening").ValueKind.ShouldBe(JsonValueKind.Null);
         view.GetProperty("history").GetArrayLength().ShouldBe(0);
@@ -82,7 +83,7 @@ public sealed class SizingApiTests(ApiFactory factory) : DataTestBase(factory)
     [Fact]
     public async Task The_right_password_appends_a_row_per_changed_key_for_the_session_owner_with_its_direction_and_the_database_time()
     {
-        var result = await ChangeAsync(Factory.OwnerPassword, vol: true, cap: true, floor: 0.75);
+        var result = await ChangeAsync(Factory.OwnerPassword, vol: true, cap: true, minFit: 0.75);
 
         result.Status.ShouldBe(HttpStatusCode.OK);
         (await RowsAsync("sizing_settings_changes")).ShouldBe(3);
@@ -92,8 +93,10 @@ public sealed class SizingApiTests(ApiFactory factory) : DataTestBase(factory)
         var view = await Client.GetFromJsonAsync<JsonElement>(Settings, Ct);
         view.GetProperty("volTargetEnabled").GetBoolean().ShouldBeTrue();
         view.GetProperty("capacityEnabled").GetBoolean().ShouldBeTrue();
-        view.GetProperty("floor").GetDouble().ShouldBe(0.75);
+        view.GetProperty("minFit").GetDouble().ShouldBe(0.75);
         view.GetProperty("history").GetArrayLength().ShouldBe(3);
+        (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'SizingChanged'")).ShouldBeGreaterThanOrEqualTo(3, "one audit event per accepted change");
+        (await ScalarAsync<long>("SELECT count(*) FROM accounts.account_events WHERE event = 'SizingChanged' AND detail LIKE '%' || @pw || '%'", ("pw", Factory.OwnerPassword))).ShouldBe(0, "never the password");
     }
 
     [Fact]

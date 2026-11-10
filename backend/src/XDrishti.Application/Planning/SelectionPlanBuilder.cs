@@ -117,7 +117,7 @@ internal sealed class SelectionPlanBuilder(
         if (sizing is not null && fill.Primary.Count > 0)
         {
             var inputs = await sizing.ReadAsync(request.Session, request.ForDate, [.. fill.Primary.Select(d => new ContextInstrument(ids.GetValueOrDefault(d.Candidate.Symbol), d.Candidate.Symbol))], cancellationToken);
-            var all = SizeScaler.Apply([.. fill.Primary.Select(d => (d, drafts[Key(d.Candidate.Ranked.Merged.Winner.Candidate)].IndicativeEntry))], ctx, inputs, smart.RiskMultiplier, (fillConstraints ?? new FillConstraints()).MaxTotalOpenRiskPct);
+            var all = SizeScaler.Apply([.. fill.Primary.Select(d => (d, drafts[Key(d.Candidate.Ranked.Merged.Winner.Candidate)].IndicativeEntry, drafts[Key(d.Candidate.Ranked.Merged.Winner.Candidate)].StopLevel))], ctx, inputs, smart.RiskMultiplier, (fillConstraints ?? new FillConstraints()).MaxTotalOpenRiskPct);
             scaled = [.. all.Where(t => !t.IsReserved)];
             sizedOut = [.. all.Where(t => t.IsReserved)];
             taken = [.. scaled.Select(t => t.Decision)];
@@ -138,7 +138,7 @@ internal sealed class SelectionPlanBuilder(
                 notApplied.AddRange(scaled[i].Flags);
             }
 
-            items.Add(Item(items.Count + 1, TicketGroup.Primary, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, taken[i].Candidate.Ranked.Caveats, scaled.Count > 0 ? scaled[i].Notes : [], taken[i].Candidate.Ranked.AdvisoryPWin, notApplied, [.. wired[i].Standings, PlanWiring.IndicativeEntry, .. (ctx.Book is { Count: 0 } && !ctx.BookFromLedger ? [PlanWording.OpenBookAssumedEmpty] : (string[])[])], wired[i].Allocations));
+            items.Add(Item(items.Count + 1, TicketGroup.Primary, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, taken[i].Candidate.Ranked.Caveats, [], taken[i].Candidate.Ranked.AdvisoryPWin, notApplied, [.. wired[i].Standings, PlanWiring.IndicativeEntry, .. (ctx.Book is { Count: 0 } && !ctx.BookFromLedger ? [PlanWording.OpenBookAssumedEmpty] : (string[])[])], wired[i].Allocations, scaled.Count > 0 ? scaled[i].Note : null));
         }
 
         var reserve = smart.Reserve.Select(r => new ReserveEntry(r.Ranked, [r.Code], false))
@@ -260,7 +260,7 @@ internal sealed class SelectionPlanBuilder(
         return list;
     }
 
-    private static NewPlanItem Item(int rank, TicketGroup group, TicketDraft draft, PlanCandidate candidate, double? expectancy, IReadOnlyList<string> caveats, IReadOnlyList<string> reasons, double? advisory, List<string> notApplied, IReadOnlyList<string> standings, IReadOnlyList<NewAllocation> allocations)
+    private static NewPlanItem Item(int rank, TicketGroup group, TicketDraft draft, PlanCandidate candidate, double? expectancy, IReadOnlyList<string> caveats, IReadOnlyList<string> reasons, double? advisory, List<string> notApplied, IReadOnlyList<string> standings, IReadOnlyList<NewAllocation> allocations, PlanSizingNote? sizing = null)
     {
         var cell = candidate.Cell;
         var stats = candidate.Stats;
@@ -280,7 +280,7 @@ internal sealed class SelectionPlanBuilder(
             stats?.AsOf);
         return new NewPlanItem(
             rank, group, draft.Symbol, draft.Side, draft.StrategyId, draft.StrategyVersionHash,
-            Clamp(draft.TriggerText, 500), Clamp(draft.StopText, 500), Clamp(draft.TargetText, 500), Clamp(draft.ValidityText, 200), reasons, evidence, allocations, levels);
+            Clamp(draft.TriggerText, 500), Clamp(draft.StopText, 500), Clamp(draft.TargetText, 500), Clamp(draft.ValidityText, 200), reasons, evidence, allocations, levels, sizing);
     }
 
     // The numbers of the draft, or the reason there are none (P7-19): never a guess, the text is unchanged either way.
@@ -337,6 +337,11 @@ internal sealed class SelectionPlanBuilder(
         foreach (var i in items)
         {
             sb.Append(CultureInfo.InvariantCulture, $"\n{i.Rank}|{i.Group}|{i.Symbol}|{i.Side}|{i.StrategyVersionHash}|{i.Trigger}|{i.Stop}|{i.Target}|{i.Evidence.CellKey}|{string.Join(',', i.Reasons)}|{string.Join(',', i.Evidence.Unavailable)}|{string.Join(',', i.Allocations.Select(a => a.AccountId.ToString("N", CultureInfo.InvariantCulture) + ":" + a.Quantity.ToString(CultureInfo.InvariantCulture)))}");
+            if (i.Sizing is { } n)
+            {
+                sb.Append(CultureInfo.InvariantCulture, $"|S:{n.Text}");
+            }
+
             if (i.Levels is { } l)
             {
                 sb.Append(CultureInfo.InvariantCulture, $"|L:{l.EntryRef}|{l.Stop}|{l.Anchor?.Code()}|{l.Target}|{l.RewardRisk}|{l.Session:yyyy-MM-dd}");

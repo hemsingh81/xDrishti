@@ -15,11 +15,12 @@ public sealed record SizingChangeView(long Id, string Key, string OldValue, stri
 /// <param name="Floor"><c>sizing.vol_target.floor</c>.</param>
 /// <param name="CapacityEnabled"><c>sizing.capacity.enabled</c>.</param>
 /// <param name="CapacityPct"><c>sizing.capacity.pct</c>.</param>
+/// <param name="MinFit"><c>sizing.budget.min_fit</c>.</param>
 /// <param name="Version">The newest settings row id (0 when none).</param>
 /// <param name="Notice">Down-only, advisory, no order.</param>
 /// <param name="LatestLoosening">The newest change with direction loosen.</param>
 /// <param name="History">The changes, newest first.</param>
-public sealed record SizingSettingsView(bool VolTargetEnabled, double Floor, bool CapacityEnabled, double CapacityPct, long Version, string Notice, SizingChangeView? LatestLoosening, IReadOnlyList<SizingChangeView> History);
+public sealed record SizingSettingsView(bool VolTargetEnabled, double Floor, bool CapacityEnabled, double CapacityPct, double MinFit, long Version, string Notice, SizingChangeView? LatestLoosening, IReadOnlyList<SizingChangeView> History);
 
 /// <summary>The budget of one basket: its share of the total open risk limit, in percent.</summary>
 public sealed record BasketBudgetView(Guid BasketId, double BudgetPct);
@@ -39,7 +40,7 @@ public sealed record GetBasketRiskBudgetsQuery : IQuery<BasketRiskBudgetsView>;
 /// <summary>
 /// The owner's change of the sizing settings (BK-10). The endpoint checked the session and the CSRF token and built the actor from the session; the fresh password is checked here for EVERY change, without opening the elevation window. A value left null stays.
 /// </summary>
-public sealed record ChangeSizingSettingsCommand(string Actor, Guid SessionId, ClientInfo Client, bool? VolTargetEnabled, double? Floor, bool? CapacityEnabled, double? CapacityPct, string? Password) : ICommand;
+public sealed record ChangeSizingSettingsCommand(string Actor, Guid SessionId, ClientInfo Client, bool? VolTargetEnabled, double? Floor, bool? CapacityEnabled, double? CapacityPct, string? Password, double? MinFit = null) : ICommand;
 
 /// <summary>The owner's change of one basket's budget (BK-10), 1 to 100 or null to remove it; the same checks as <see cref="ChangeSizingSettingsCommand"/>.</summary>
 public sealed record ChangeBasketRiskBudgetCommand(string Actor, Guid SessionId, ClientInfo Client, Guid BasketId, double? BudgetPct, string? Password) : ICommand;

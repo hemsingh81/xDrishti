@@ -2,11 +2,13 @@
 #pragma warning disable xUnit1051 // The NSubstitute matchers take Arg.Any<CancellationToken>(), not a token
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Sizing;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Market.Baskets;
 
 namespace XDrishti.Application.Tests.Sizing;
@@ -34,13 +36,13 @@ public sealed class SizingHandlersTests
         new(actor, Guid.NewGuid(), new ClientInfo("127.0.0.1", "test"), BasketId, pct, password);
 
     private static ChangeSizingSettingsHandler SettingsHandler(FakeSizingStore store, bool passwordOk = true) =>
-        new(store, Password(passwordOk), NullLogger<ChangeSizingSettingsHandler>.Instance);
+        new(store, Password(passwordOk), Substitute.For<IAccountEventLog>(), Substitute.For<IAccountUnitOfWork>(), TimeProvider.System, new CostStressOptions(), NullLogger<ChangeSizingSettingsHandler>.Instance);
 
     private static ChangeBasketRiskBudgetHandler BudgetHandler(FakeSizingStore store, bool passwordOk = true, bool basketExists = true)
     {
         var baskets = Substitute.For<IBasketStore>();
         baskets.FindAsync(BasketId, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(basketExists ? (Basket?)Basket.CreateSystem("Nifty", BasketKinds.Index, DateTimeOffset.UnixEpoch) : null));
-        return new ChangeBasketRiskBudgetHandler(store, baskets, Password(passwordOk), NullLogger<ChangeBasketRiskBudgetHandler>.Instance);
+        return new ChangeBasketRiskBudgetHandler(store, baskets, Password(passwordOk), Substitute.For<IAccountEventLog>(), Substitute.For<IAccountUnitOfWork>(), TimeProvider.System, NullLogger<ChangeBasketRiskBudgetHandler>.Instance);
     }
 
     [Fact]
@@ -48,7 +50,7 @@ public sealed class SizingHandlersTests
     {
         var view = await new GetSizingSettingsHandler(new FakeSizingStore()).HandleAsync(new GetSizingSettingsQuery(), Ct);
 
-        (view.VolTargetEnabled, view.CapacityEnabled, view.Floor, view.CapacityPct, view.Version).ShouldBe((false, false, 0.5, 0.01, 0));
+        (view.VolTargetEnabled, view.CapacityEnabled, view.Floor, view.CapacityPct, view.MinFit, view.Version).ShouldBe((false, false, 0.5, 0.005, 0.5, 0));
         view.History.ShouldBeEmpty();
         view.LatestLoosening.ShouldBeNull();
     }
@@ -84,7 +86,7 @@ public sealed class SizingHandlersTests
     public async Task The_password_is_checked_for_this_change_without_opening_the_elevation_window()
     {
         var password = Password(true);
-        var handler = new ChangeSizingSettingsHandler(new FakeSizingStore(), password, NullLogger<ChangeSizingSettingsHandler>.Instance);
+        var handler = new ChangeSizingSettingsHandler(new FakeSizingStore(), password, Substitute.For<IAccountEventLog>(), Substitute.For<IAccountUnitOfWork>(), TimeProvider.System, new CostStressOptions(), NullLogger<ChangeSizingSettingsHandler>.Instance);
 
         await handler.HandleAsync(Settings(Owner, vol: true), Ct);
 
@@ -117,7 +119,7 @@ public sealed class SizingHandlersTests
         var handler = SettingsHandler(store);
 
         (await handler.HandleAsync(Settings(Owner, floor: 0.1), Ct)).Error.Code.ShouldBe("selection.invalid");
-        (await handler.HandleAsync(Settings(Owner, pct: 0.5), Ct)).Error.Code.ShouldBe("selection.invalid");
+        (await handler.HandleAsync(Settings(Owner, pct: 0.006), Ct)).Error.Code.ShouldBe("selection.invalid");
         (await handler.HandleAsync(Settings(Owner, vol: false), Ct)).Error.Code.ShouldBe("selection.invalid");
 
         store.Appends.ShouldBe(0);
@@ -129,7 +131,7 @@ public sealed class SizingHandlersTests
         var store = new FakeSizingStore();
         var stale = new RacingStore(store);
 
-        var result = await new ChangeSizingSettingsHandler(stale, Password(true), NullLogger<ChangeSizingSettingsHandler>.Instance).HandleAsync(Settings(Owner, vol: true), Ct);
+        var result = await new ChangeSizingSettingsHandler(stale, Password(true), Substitute.For<IAccountEventLog>(), Substitute.For<IAccountUnitOfWork>(), TimeProvider.System, new CostStressOptions(), NullLogger<ChangeSizingSettingsHandler>.Instance).HandleAsync(Settings(Owner, vol: true), Ct);
 
         result.Error.Code.ShouldBe("selection.stale");
     }

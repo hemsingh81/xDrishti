@@ -100,11 +100,11 @@ public sealed partial class SizeScalingArchitectureTests
     }
 
     [Fact]
-    public void The_four_settings_keys_are_exactly_the_stored_ones_and_all_default_off_or_neutral()
+    public void The_five_settings_keys_are_exactly_the_stored_ones_and_all_default_off_or_neutral()
     {
         var keys = typeof(SizingSettings).GetFields().Where(f => f.IsLiteral && f.Name.EndsWith("Key", StringComparison.Ordinal)).Select(f => (string)f.GetRawConstantValue()!).Order().ToList();
 
-        keys.ShouldBe(["sizing.capacity.enabled", "sizing.capacity.pct", "sizing.vol_target.enabled", "sizing.vol_target.floor"]);
+        keys.ShouldBe(["sizing.budget.min_fit", "sizing.capacity.enabled", "sizing.capacity.pct", "sizing.vol_target.enabled", "sizing.vol_target.floor"]);
         SizingSettings.Defaults.VolTargetEnabled.ShouldBeFalse();
         SizingSettings.Defaults.CapacityEnabled.ShouldBeFalse();
     }

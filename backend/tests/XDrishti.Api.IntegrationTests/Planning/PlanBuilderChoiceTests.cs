@@ -25,6 +25,7 @@ public sealed class PlanBuilderChoiceTests
         services.AddScoped<ICalendarRows, NoRows>();
         services.AddScoped<ITradingCalendar, PlainCalendar>();
         services.AddSingleton<IFilingSettings, NoSettings>();
+        services.AddScoped<XDrishti.Application.Abstractions.Planning.ISizingInputs, NoSizing>(); // the down-only sizing (BK-10) reads the stores and the bars
         services.AddScoped<IAutoScopeSource, NoScope>(); // the owner's scope (AU-16) reads the scope store and the baskets
         if (flag is { } value)
         {
@@ -56,6 +57,12 @@ public sealed class PlanBuilderChoiceTests
     private sealed class AutoSwitch : XDrishti.Application.Abstractions.LearnedSettings.IAutoSwitch
     {
         public ValueTask<bool> IsOnAsync(CancellationToken cancellationToken) => ValueTask.FromResult(false);
+    }
+
+    private sealed class NoSizing : XDrishti.Application.Abstractions.Planning.ISizingInputs
+    {
+        public ValueTask<XDrishti.Application.Abstractions.Planning.SizingInputs> ReadAsync(DateOnly session, DateOnly forDate, IReadOnlyList<XDrishti.Application.Abstractions.Planning.ContextInstrument> instruments, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new XDrishti.Application.Abstractions.Planning.SizingInputs(XDrishti.Domain.Selection.SizeScaling.SizingSettings.Defaults, 0, new Dictionary<string, XDrishti.Application.Abstractions.Planning.SymbolSizingInputs>()));
     }
 
     private sealed class NoScope : IAutoScopeSource

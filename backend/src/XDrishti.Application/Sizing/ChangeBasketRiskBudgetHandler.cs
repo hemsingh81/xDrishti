@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Selection;
@@ -13,7 +14,7 @@ namespace XDrishti.Application.Sizing;
 /// The owner's change of one basket's risk budget (BK-10, criterion 9): the actor is an owner, the fresh password for THIS change, the basket exists, the budget is 1 to 100 (or null to remove it), then one row with its direction is appended if nobody changed
 /// that basket's budget meanwhile. Raising or removing a budget is a loosening and is recorded so. Nothing here places an order.
 /// </summary>
-internal sealed class ChangeBasketRiskBudgetHandler(ISizingStore store, IBasketStore baskets, ICommandHandler<StepUpCommand, StepUpResult> passwordCheck, ILogger<ChangeBasketRiskBudgetHandler> logger) : ICommandHandler<ChangeBasketRiskBudgetCommand, BasketRiskBudgetsView>
+internal sealed class ChangeBasketRiskBudgetHandler(ISizingStore store, IBasketStore baskets, ICommandHandler<StepUpCommand, StepUpResult> passwordCheck, IAccountEventLog events, IAccountUnitOfWork unitOfWork, TimeProvider clock, ILogger<ChangeBasketRiskBudgetHandler> logger) : ICommandHandler<ChangeBasketRiskBudgetCommand, BasketRiskBudgetsView>
 {
     public async ValueTask<Result<BasketRiskBudgetsView>> HandleAsync(ChangeBasketRiskBudgetCommand command, CancellationToken cancellationToken)
     {
@@ -49,6 +50,7 @@ internal sealed class ChangeBasketRiskBudgetHandler(ISizingStore store, IBasketS
         }
 
         SizingLog.BudgetChanged(logger, change.Value.Direction);
+        await SizingAudit.RecordAsync(events, unitOfWork, clock, logger, [change.Value], 0);
         return Result.Success(await SizingViews.BudgetsAsync(store, cancellationToken));
     }
 

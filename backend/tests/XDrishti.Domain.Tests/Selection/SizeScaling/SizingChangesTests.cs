@@ -12,7 +12,7 @@ public sealed class SizingChangesTests
     [Fact]
     public void With_no_row_everything_is_off_and_neutral()
     {
-        SizingSettings.Defaults.ShouldBe(new SizingSettings(false, 0.5, false, 0.01));
+        SizingSettings.Defaults.ShouldBe(new SizingSettings(false, 0.5, false, 0.005, 0.5));
     }
 
     [Theory]
@@ -36,7 +36,7 @@ public sealed class SizingChangesTests
     public void Enabling_is_tighten_and_disabling_is_loosen_for_both_switches()
     {
         var on = SizingChanges.ForSettings(Owner, SizingSettings.Defaults, true, null, true, null).Value;
-        var off = SizingChanges.ForSettings(Owner, new SizingSettings(true, 0.5, true, 0.01), false, null, false, null).Value;
+        var off = SizingChanges.ForSettings(Owner, new SizingSettings(true, 0.5, true, 0.004, 0.5), false, null, false, null).Value;
 
         on.Select(r => (r.Key, r.Direction)).ShouldBe([("sizing.vol_target.enabled", "tighten"), ("sizing.capacity.enabled", "tighten")]);
         off.ShouldAllBe(r => r.Direction == "loosen");
@@ -45,12 +45,14 @@ public sealed class SizingChangesTests
     [Fact]
     public void Floor_and_capacity_percent_follow_the_spec_direction_rule()
     {
-        var current = new SizingSettings(true, 0.5, true, 0.01);
+        var current = new SizingSettings(true, 0.5, true, 0.004, 0.5);
 
-        SizingChanges.ForSettings(Owner, current, null, 0.25, null, null).Value.Single().Direction.ShouldBe("loosen"); // lowered
-        SizingChanges.ForSettings(Owner, current, null, 0.75, null, null).Value.Single().Direction.ShouldBe("tighten"); // raised
-        SizingChanges.ForSettings(Owner, current, null, null, null, 0.02).Value.Single().Direction.ShouldBe("loosen"); // raised
-        SizingChanges.ForSettings(Owner, current, null, null, null, 0.005).Value.Single().Direction.ShouldBe("tighten"); // lowered
+        SizingChanges.ForSettings(Owner, current, null, 0.75, null, null).Value.Single().Direction.ShouldBe("loosen"); // volatility floor raised: less cut
+        SizingChanges.ForSettings(Owner, current, null, 0.25, null, null).Value.Single().Direction.ShouldBe("tighten"); // lowered
+        SizingChanges.ForSettings(Owner, current, null, null, null, null, 0.25).Value.Single().Direction.ShouldBe("loosen"); // budget minimum fit lowered: fewer reserves
+        SizingChanges.ForSettings(Owner, current, null, null, null, null, 0.75).Value.Single().Direction.ShouldBe("tighten"); // raised
+        SizingChanges.ForSettings(Owner, current, null, null, null, 0.005).Value.Single().Direction.ShouldBe("loosen"); // capacity share raised (still within the ceiling)
+        SizingChanges.ForSettings(Owner, current, null, null, null, 0.002).Value.Single().Direction.ShouldBe("tighten"); // lowered
     }
 
     [Theory]
@@ -69,8 +71,9 @@ public sealed class SizingChangesTests
     [Theory]
     [InlineData(0.0)]
     [InlineData(-0.1)]
-    [InlineData(0.11)]
-    public void The_capacity_percent_is_validated(double pct)
+    [InlineData(0.006)]
+    [InlineData(0.01)]
+    public void The_capacity_percent_can_only_be_tightened_below_the_one_capacity_share_of_the_app(double pct)
     {
         SizingChanges.ForSettings(Owner, SizingSettings.Defaults, null, null, null, pct).Error.Code.ShouldBe("selection.invalid");
     }
@@ -78,7 +81,7 @@ public sealed class SizingChangesTests
     [Fact]
     public void A_change_that_changes_nothing_is_refused_not_written()
     {
-        SizingChanges.ForSettings(Owner, SizingSettings.Defaults, false, 0.5, false, 0.01).Error.Code.ShouldBe("selection.invalid");
+        SizingChanges.ForSettings(Owner, SizingSettings.Defaults, false, 0.5, false, 0.005, 0.5).Error.Code.ShouldBe("selection.invalid");
     }
 
     [Fact]

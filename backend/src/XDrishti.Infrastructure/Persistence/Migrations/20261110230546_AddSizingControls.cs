@@ -24,8 +24,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     changed_at timestamptz NOT NULL DEFAULT now(),
                     hash varchar(64) NOT NULL,
                     CONSTRAINT pk_sizing_settings_changes PRIMARY KEY (id),
-                    CONSTRAINT ck_sizing_settings_changes_key CHECK (key IN ('sizing.vol_target.enabled', 'sizing.vol_target.floor', 'sizing.capacity.enabled', 'sizing.capacity.pct')),
-                    CONSTRAINT ck_sizing_settings_changes_direction CHECK (direction IN ('tighten', 'loosen', 'neutral')),
+                    CONSTRAINT ck_sizing_settings_changes_key CHECK (key IN ('sizing.vol_target.enabled', 'sizing.vol_target.floor', 'sizing.capacity.enabled', 'sizing.capacity.pct', 'sizing.budget.min_fit')),
+                    CONSTRAINT ck_sizing_settings_changes_direction CHECK (direction IN ('tighten', 'loosen')),
                     CONSTRAINT ck_sizing_settings_changes_owner CHECK (changed_by LIKE 'owner:%')
                 )
                 """);
@@ -40,7 +40,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     hash varchar(64) NOT NULL,
                     CONSTRAINT pk_basket_risk_budgets PRIMARY KEY (id),
                     CONSTRAINT ck_basket_risk_budgets_pct CHECK (budget_pct IS NULL OR budget_pct BETWEEN 1 AND 100),
-                    CONSTRAINT ck_basket_risk_budgets_direction CHECK (direction IN ('tighten', 'loosen', 'neutral')),
+                    CONSTRAINT ck_basket_risk_budgets_direction CHECK (direction IN ('tighten', 'loosen')),
                     CONSTRAINT ck_basket_risk_budgets_owner CHECK (changed_by LIKE 'owner:%')
                 )
                 """);
@@ -55,6 +55,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     END IF;
                 END $$;
                 """);
+            // AC 10: the structured sizing note of a plan item (what the scaling did to the ticket). Null when nothing acted, so a plan with every setting OFF is stored as it was. Not mapped in the EF model (like n_eff).
+            migrationBuilder.Sql("ALTER TABLE trading.plan_items ADD COLUMN sizing_note jsonb NULL");
             migrationBuilder.GrantTableToAppRole(Schemas.Selection, "sizing_settings_changes");
             migrationBuilder.MakeAppendOnlyForAppRole(Schemas.Selection, "sizing_settings_changes");
             migrationBuilder.GrantTableToAppRole(Schemas.Selection, "basket_risk_budgets");
@@ -64,6 +66,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("ALTER TABLE trading.plan_items DROP COLUMN IF EXISTS sizing_note");
             migrationBuilder.Sql("DROP SCHEMA IF EXISTS selection CASCADE");
         }
     }

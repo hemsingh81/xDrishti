@@ -19067,7 +19067,7 @@
         "tags": [
           "Selection"
         ],
-        "summary": "The sizing settings in force (volatility targeting and the capacity cap, both OFF by default, the floor 0.5, the capacity share 0.01) with the version, the newest loosening change and the latest 50 changes (key, old and new value, direction tighten, loosen or neutral, actor, time, hash). Sizing only scales a suggestion down. Read only",
+        "summary": "The sizing settings in force (volatility targeting and the capacity cap, both OFF by default, the volatility floor 0.5, the capacity share 0.005, the budget minimum fit 0.5) with the version, the newest loosening change and the latest 50 changes (key, old and new value, direction tighten or loosen, actor, time, hash). Sizing only scales a suggestion down. Read only",
         "operationId": "GetSizingSettings",
         "responses": {
           "200": {
@@ -19086,7 +19086,7 @@
         "tags": [
           "Selection"
         ],
-        "summary": "The owner changes the sizing settings (volTargetEnabled, floor 0.25 to 1.0, capacityEnabled, capacityPct above 0 and at most 0.10); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row with its direction. 400 selection.invalid, 403 selection.owner_only, 409 selection.stale",
+        "summary": "The owner changes the sizing settings (volTargetEnabled, floor 0.25 to 1.0, capacityEnabled, capacityPct above 0 and at most 0.005, the one capacity share of the app: it can only be tightened, minFit 0.25 to 1.0, the lowest share of its size a basket budget may cut a candidate to); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row with its direction. 400 selection.invalid, 403 selection.owner_only, 409 selection.stale",
         "operationId": "ChangeSizingSettings",
         "requestBody": {
           "content": {
@@ -54764,6 +54764,17 @@
                 "$ref": "#/components/schemas/TicketLevelsView"
               }
             ]
+          },
+          "sizing": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "What the down-only size scaling did (BK-10), or null when nothing acted.",
+                "$ref": "#/components/schemas/PlanSizingNote"
+              }
+            ]
           }
         },
         "description": "One candidate of a plan."
@@ -55263,6 +55274,73 @@
           }
         },
         "description": "One recorded attempt."
+      },
+      "PlanSizingNote": {
+        "required": [
+          "volScale",
+          "gateScale",
+          "factor",
+          "capacityShares",
+          "budgetRoom",
+          "budgetUsesPct",
+          "settingsVersion",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "volScale": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The volatility scale applied (floor to 1.0); null when not applied or unavailable.",
+            "format": "double"
+          },
+          "gateScale": {
+            "type": "number",
+            "description": "The gate's scale, 0.75 in reduced mode, else 1.",
+            "format": "double"
+          },
+          "factor": {
+            "type": "number",
+            "description": "min(volatility scale, gate scale) times the budget ratio, at most 1.",
+            "format": "double"
+          },
+          "capacityShares": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The capacity cap in shares; null when off or unavailable.",
+            "format": "int64"
+          },
+          "budgetRoom": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The room left in the tightest basket budget, percent of capital; null when there is no budget or it is unavailable.",
+            "format": "double"
+          },
+          "budgetUsesPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Share of that budget used after this ticket; null as above.",
+            "format": "double"
+          },
+          "settingsVersion": {
+            "type": "integer",
+            "description": "The newest settings row id the scaling read (0 when none).",
+            "format": "int64"
+          },
+          "text": {
+            "type": "string",
+            "description": "The same in words, for the ticket."
+          }
+        },
+        "description": "What the down-only size scaling did to a ticket (spec BK-10, AC 10), stored as JSON on the plan item. Every figure is a factor at most 1 or a count; none is an amount of capital."
       },
       "PlanView": {
         "required": [
@@ -65437,6 +65515,13 @@
               "null",
               "string"
             ]
+          },
+          "minFit": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
           }
         },
         "description": "The owner's change of the sizing settings. A value left out stays as it is. The password is needed for every change. The actor is never taken from the body."
@@ -65447,6 +65532,7 @@
           "floor",
           "capacityEnabled",
           "capacityPct",
+          "minFit",
           "version",
           "notice",
           "latestLoosening",
@@ -65470,6 +65556,11 @@
           "capacityPct": {
             "type": "number",
             "description": "`sizing.capacity.pct`.",
+            "format": "double"
+          },
+          "minFit": {
+            "type": "number",
+            "description": "`sizing.budget.min_fit`.",
             "format": "double"
           },
           "version": {

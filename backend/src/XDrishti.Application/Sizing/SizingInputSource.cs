@@ -3,6 +3,7 @@ using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Selection;
+using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Actions;
 using XDrishti.Domain.Research;
@@ -15,7 +16,7 @@ namespace XDrishti.Application.Sizing;
 /// The inputs of the down-only size scaling for a plan (spec BK-10): the owner's settings and budgets, and for each instrument the volatility and the 20-session median traded value from the stored day bars, as of the close of the session (a bar after it is dropped, so
 /// there is no look-ahead). Read only. A figure that cannot be computed is null (unavailable), never a default.
 /// </summary>
-internal sealed class SizingInputSource(ISizingStore store, IBarQueries bars, ITradingCalendar calendars, IHoldingClassifications classifications) : ISizingInputs
+internal sealed class SizingInputSource(ISizingStore store, IBarQueries bars, ITradingCalendar calendars, IHoldingClassifications classifications, CostStressOptions costStress) : ISizingInputs
 {
     /// <summary>Calendar days of day bars read: the 20 seed returns, the 252 sessions of the target and room for holidays and halts.</summary>
     internal const int LookBackDays = 520;
@@ -26,6 +27,15 @@ internal sealed class SizingInputSource(ISizingStore store, IBarQueries bars, IT
         ArgumentNullException.ThrowIfNull(instruments);
         var state = await store.CurrentAsync(cancellationToken);
         var budgets = await store.BudgetsAsync(cancellationToken);
+
+        // The one capacity share of the app (ADR 0223) is the ceiling: the owner's value can only be lower.
+        state = state with { Settings = state.Settings with { CapacityPct = Math.Min(state.Settings.CapacityPct, (double)costStress.CapacityDailyShare) } };
+        if (!state.Settings.VolTargetEnabled && !state.Settings.CapacityEnabled && budgets.Count == 0)
+        {
+            // Everything OFF and no budget: nothing would be used, so no bar is read and the plan is what it was.
+            return new SizingInputs(state.Settings, state.Version, new Dictionary<string, SymbolSizingInputs>(StringComparer.Ordinal));
+        }
+
         var ids = instruments.Where(i => i.Id is not null).Select(i => i.Id!.Value).Distinct().ToList();
         var baskets = budgets.Count == 0 || ids.Count == 0
             ? new Dictionary<Guid, IReadOnlyList<BasketRef>>()

@@ -5549,9 +5549,9 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The sizing settings in force (volatility targeting and the capacity cap, both OFF by default, the floor 0.5, the capacity share 0.01) with the version, the newest loosening change and the latest 50 changes (key, old and new value, direction tighten, loosen or neutral, actor, time, hash). Sizing only scales a suggestion down. Read only */
+    /** The sizing settings in force (volatility targeting and the capacity cap, both OFF by default, the volatility floor 0.5, the capacity share 0.005, the budget minimum fit 0.5) with the version, the newest loosening change and the latest 50 changes (key, old and new value, direction tighten or loosen, actor, time, hash). Sizing only scales a suggestion down. Read only */
     get: operations['GetSizingSettings'];
-    /** The owner changes the sizing settings (volTargetEnabled, floor 0.25 to 1.0, capacityEnabled, capacityPct above 0 and at most 0.10); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row with its direction. 400 selection.invalid, 403 selection.owner_only, 409 selection.stale */
+    /** The owner changes the sizing settings (volTargetEnabled, floor 0.25 to 1.0, capacityEnabled, capacityPct above 0 and at most 0.005, the one capacity share of the app: it can only be tightened, minFit 0.25 to 1.0, the lowest share of its size a basket budget may cut a candidate to); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row with its direction. 400 selection.invalid, 403 selection.owner_only, 409 selection.stale */
     put: operations['ChangeSizingSettings'];
     post?: never;
     delete?: never;
@@ -18200,6 +18200,7 @@ export interface components {
       /** @description Size per account. */
       allocations: components['schemas']['PlanAllocationView'][];
       levels?: null | components['schemas']['TicketLevelsView'];
+      sizing?: null | components['schemas']['PlanSizingNote'];
     };
     /** @description The journal of one plan. */
     PlanJournalView: {
@@ -18433,6 +18434,46 @@ export interface components {
        * @description End.
        */
       finishedAt: string;
+    };
+    /** @description What the down-only size scaling did to a ticket (spec BK-10, AC 10), stored as JSON on the plan item. Every figure is a factor at most 1 or a count; none is an amount of capital. */
+    PlanSizingNote: {
+      /**
+       * Format: double
+       * @description The volatility scale applied (floor to 1.0); null when not applied or unavailable.
+       */
+      volScale: null | number;
+      /**
+       * Format: double
+       * @description The gate's scale, 0.75 in reduced mode, else 1.
+       */
+      gateScale: number;
+      /**
+       * Format: double
+       * @description min(volatility scale, gate scale) times the budget ratio, at most 1.
+       */
+      factor: number;
+      /**
+       * Format: int64
+       * @description The capacity cap in shares; null when off or unavailable.
+       */
+      capacityShares: null | number;
+      /**
+       * Format: double
+       * @description The room left in the tightest basket budget, percent of capital; null when there is no budget or it is unavailable.
+       */
+      budgetRoom: null | number;
+      /**
+       * Format: double
+       * @description Share of that budget used after this ticket; null as above.
+       */
+      budgetUsesPct: null | number;
+      /**
+       * Format: int64
+       * @description The newest settings row id the scaling read (0 when none).
+       */
+      settingsVersion: number;
+      /** @description The same in words, for the ticket. */
+      text: string;
     };
     /** @description A plan as the API shows it (P7-03, ADR 0083): header, current state, the sentences it carries as data, and for one plan the tickets and the trail. */
     PlanView: {
@@ -22245,6 +22286,8 @@ export interface components {
       /** Format: double */
       capacityPct: null | number;
       password: null | string;
+      /** Format: double */
+      minFit?: null | number;
     };
     /** @description The sizing settings in force with their history (newest first, the latest 50). With no row everything is OFF. SizingChangeView? SizingSettingsView.LatestLoosening is the newest change that can only raise a suggested quantity or remove a limit, or null when none was ever made. */
     SizingSettingsView: {
@@ -22262,6 +22305,11 @@ export interface components {
        * @description `sizing.capacity.pct`.
        */
       capacityPct: number;
+      /**
+       * Format: double
+       * @description `sizing.budget.min_fit`.
+       */
+      minFit: number;
       /**
        * Format: int64
        * @description The newest settings row id (0 when none).

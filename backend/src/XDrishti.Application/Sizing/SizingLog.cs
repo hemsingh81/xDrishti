@@ -17,6 +17,9 @@ internal static partial class SizingLog
     [LoggerMessage(EventId = 7383, Level = LogLevel.Warning, Message = "sizing.refused {Code}")]
     public static partial void Refused(ILogger logger, string code);
 
+    [LoggerMessage(EventId = 7385, Level = LogLevel.Warning, Message = "sizing.audit_failed {Failure}")]
+    public static partial void AuditFailed(ILogger logger, string failure);
+
     [LoggerMessage(EventId = 7384, Level = LogLevel.Information, Message = "sizing.study {Trades} trades, {Instruments} instruments")]
     public static partial void Study(ILogger logger, int trades, int instruments);
 }

@@ -70,7 +70,7 @@ internal static class PlanWiring
         var live = context.Accounts.Where(a => a.Mode == TradingMode.ManualLive).ToList();
         var result = live.Count == 0
             ? paper
-            : new AllocationResult([.. paper.Decisions, .. PerAccountAllocator.Allocate(ticket, [.. live.Select(a => ToAllocationAccount(a, symbol, riskMultiplier, addedRisk, addedCost))], PoolMode.Live).Decisions], paper.TicketQuantity);
+            : new AllocationResult([.. paper.Decisions, .. PerAccountAllocator.Allocate(LiveTicket(ticket, scale?.PoolCap, paper), [.. live.Select(a => ToAllocationAccount(a, symbol, riskMultiplier, addedRisk, addedCost))], PoolMode.Live).Decisions], paper.TicketQuantity);
         var standings = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var d in result.Decisions.Where(d => !d.IsAllocated))
         {
@@ -97,6 +97,10 @@ internal static class PlanWiring
 
         return new WiredTicket(AllocationRows.ToNew(result), [.. standings]);
     }
+
+    // BK-10: the capacity cap is for the whole ticket, so the live pool gets only what the paper accounts left of it (never a second full cap).
+    private static AllocationTicket LiveTicket(AllocationTicket ticket, long? cap, AllocationResult paper) =>
+        cap is { } c && ticket.Quantity is { } pool ? ticket with { Quantity = (int)Math.Max(0, Math.Min(pool, c - paper.Allocated.Sum(d => (long)d.Quantity))) } : ticket;
 
     private static int? Capped(int? pool, long? cap) => pool is { } p && cap is { } c ? (int)Math.Min(p, c) : pool;
 

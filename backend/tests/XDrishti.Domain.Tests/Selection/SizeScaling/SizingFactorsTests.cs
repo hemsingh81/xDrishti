@@ -45,22 +45,24 @@ public sealed class SizingFactorsTests
     }
 
     [Fact]
-    public void Capacity_cap_by_hand_cuts_380_to_200()
+    public void Capacity_cap_by_hand_at_the_one_capacity_share_cuts_380_to_100()
     {
-        var cap = CapacityCap.Quantity(2_000_000, 100, 0.01);
+        var cap = CapacityCap.Quantity(2_000_000, 100, 0.005);
 
-        cap.ShouldBe(200);
-        Math.Min(380, cap!.Value).ShouldBe(200);
+        cap.ShouldBe(100); // floor(0.005 * 2,000,000 / 100)
+        Math.Min(380, cap!.Value).ShouldBe(100);
+        CapacityCap.Quantity(2_000_000, 100, 0.004).ShouldBe(80); // tighter is allowed
     }
 
     [Theory]
-    [InlineData(null, 100.0, 0.01)]
-    [InlineData(2_000_000.0, null, 0.01)]
-    [InlineData(0.0, 100.0, 0.01)]
-    [InlineData(2_000_000.0, 0.0, 0.01)]
+    [InlineData(null, 100.0, 0.005)]
+    [InlineData(2_000_000.0, null, 0.005)]
+    [InlineData(0.0, 100.0, 0.005)]
+    [InlineData(2_000_000.0, 0.0, 0.005)]
     [InlineData(2_000_000.0, 100.0, 0.0)]
     [InlineData(2_000_000.0, 100.0, 0.5)]
-    [InlineData(double.NaN, 100.0, 0.01)]
+    [InlineData(2_000_000.0, 100.0, 0.01)] // above the one capacity share: refused, never a looser cap
+    [InlineData(double.NaN, 100.0, 0.005)]
     public void A_capacity_that_cannot_be_computed_is_unavailable_never_a_number(double? adv, double? entry, double pct)
     {
         CapacityCap.Quantity(adv, entry, pct).ShouldBeNull();

@@ -8,7 +8,7 @@ namespace XDrishti.Domain.Selection.SizeScaling;
 
 /// <summary>
 /// The owner acts of the size scaling (spec BK-10, criterion 9): the only way a settings row or a budget row comes to be. An actor that is not <c>owner:...</c> is refused before anything is stored, values are checked, and each change carries its direction:
-/// <c>loosen</c> is anything that can only raise a suggested quantity or remove a limit (disabling, lowering the floor, raising the capacity percent, raising or removing a budget), <c>tighten</c> the opposite.
+/// <c>loosen</c> is anything that can only raise a suggested quantity or remove a limit (disabling, raising the volatility floor, lowering the budget minimum fit, raising the capacity percent, raising or removing a budget), <c>tighten</c> the opposite.
 /// </summary>
 public static class SizingChanges
 {
@@ -28,7 +28,7 @@ public static class SizingChanges
     public static string BudgetKey(Guid basketId) => "budget:" + basketId.ToString("D", CultureInfo.InvariantCulture);
 
     /// <summary>The rows for the keys that change (a value left null stays). Fails for a non-owner, a value out of range, or when nothing changes.</summary>
-    public static Result<IReadOnlyList<SizingChange>> ForSettings(string? actor, SizingSettings current, bool? volTargetEnabled, double? floor, bool? capacityEnabled, double? capacityPct)
+    public static Result<IReadOnlyList<SizingChange>> ForSettings(string? actor, SizingSettings current, bool? volTargetEnabled, double? floor, bool? capacityEnabled, double? capacityPct, double? minFit = null, double capacityPctCeiling = SizingOptions.HighestCapacityPct)
     {
         ArgumentNullException.ThrowIfNull(current);
         if (!OwnerConfirmation.IsOwnerActor(actor) || actor!.Length > 100)
@@ -41,9 +41,14 @@ public static class SizingChanges
             return Result.Failure<IReadOnlyList<SizingChange>>(Error.Validation(InvalidCode, "floor: 0.25 to 1.0."));
         }
 
-        if (capacityPct is { } p && !SizingOptions.CapacityPctIsValid(p))
+        if (minFit is { } m && !SizingOptions.FloorIsValid(m))
         {
-            return Result.Failure<IReadOnlyList<SizingChange>>(Error.Validation(InvalidCode, "capacityPct: above 0 and at most 0.10."));
+            return Result.Failure<IReadOnlyList<SizingChange>>(Error.Validation(InvalidCode, "minFit: 0.25 to 1.0."));
+        }
+
+        if (capacityPct is { } p && !SizingOptions.CapacityPctIsValid(p, capacityPctCeiling))
+        {
+            return Result.Failure<IReadOnlyList<SizingChange>>(Error.Validation(InvalidCode, "capacityPct: above 0 and at most the configured capacity share (0.005); it can only be tightened."));
         }
 
         var rows = new List<SizingChange>();
@@ -54,7 +59,12 @@ public static class SizingChanges
 
         if (floor is { } nf && Math.Abs(nf - current.Floor) > 1e-12)
         {
-            rows.Add(Row(SizingSettings.FloorKey, Text(current.Floor), Text(nf), nf > current.Floor ? SizingChange.Tighten : SizingChange.Loosen, actor));
+            rows.Add(Row(SizingSettings.FloorKey, Text(current.Floor), Text(nf), nf > current.Floor ? SizingChange.Loosen : SizingChange.Tighten, actor));
+        }
+
+        if (minFit is { } nm && Math.Abs(nm - current.MinFit) > 1e-12)
+        {
+            rows.Add(Row(SizingSettings.MinFitKey, Text(current.MinFit), Text(nm), nm < current.MinFit ? SizingChange.Loosen : SizingChange.Tighten, actor));
         }
 
         if (capacityEnabled is { } c && c != current.CapacityEnabled)
@@ -92,13 +102,8 @@ public static class SizingChanges
             return Result.Failure<SizingChange>(Error.Validation(InvalidCode, "Nothing changes: the budget given is the budget in force."));
         }
 
-        var direction = (old, next) switch
-        {
-            (null, not null) => SizingChange.Tighten,
-            (not null, null) => SizingChange.Loosen,
-            ({ } a, { } z) => z < a ? SizingChange.Tighten : SizingChange.Loosen,
-            _ => SizingChange.Neutral,
-        };
+        // next differs from old, so: adding is tighten, removing is loosen, otherwise lower is tighten and raise is loosen.
+        var direction = old is not { } a ? SizingChange.Tighten : next is not { } z ? SizingChange.Loosen : z < a ? SizingChange.Tighten : SizingChange.Loosen;
         return Result.Success(Row(BudgetKey(basketId), old is { } ov ? Text(ov) : SizingChange.None, next is { } nv ? Text(nv) : SizingChange.None, direction, actor));
     }
 

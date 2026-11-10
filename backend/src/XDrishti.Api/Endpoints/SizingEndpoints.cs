@@ -19,7 +19,7 @@ internal sealed class SizingEndpoints : IEndpointModule
 
         selection.MapGet("/sizing-settings", GetSettingsAsync)
             .WithName("GetSizingSettings")
-            .WithSummary("The sizing settings in force (volatility targeting and the capacity cap, both OFF by default, the floor 0.5, the capacity share 0.01) with the version, the newest loosening change and the latest 50 changes (key, old and new value, direction tighten, loosen or neutral, actor, time, hash). Sizing only scales a suggestion down. Read only");
+            .WithSummary("The sizing settings in force (volatility targeting and the capacity cap, both OFF by default, the volatility floor 0.5, the capacity share 0.005, the budget minimum fit 0.5) with the version, the newest loosening change and the latest 50 changes (key, old and new value, direction tighten or loosen, actor, time, hash). Sizing only scales a suggestion down. Read only");
 
         selection.MapPut("/sizing-settings", ChangeSettingsAsync)
             .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy) // a password is checked here, so the sign-in limit applies
@@ -29,7 +29,7 @@ internal sealed class SizingEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status423Locked)
-            .WithSummary("The owner changes the sizing settings (volTargetEnabled, floor 0.25 to 1.0, capacityEnabled, capacityPct above 0 and at most 0.10); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row with its direction. 400 selection.invalid, 403 selection.owner_only, 409 selection.stale");
+            .WithSummary("The owner changes the sizing settings (volTargetEnabled, floor 0.25 to 1.0, capacityEnabled, capacityPct above 0 and at most 0.005, the one capacity share of the app: it can only be tightened, minFit 0.25 to 1.0, the lowest share of its size a basket budget may cut a candidate to); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row with its direction. 400 selection.invalid, 403 selection.owner_only, 409 selection.stale");
 
         selection.MapGet("/basket-risk-budgets", GetBudgetsAsync)
             .WithName("GetBasketRiskBudgets")
@@ -75,7 +75,7 @@ internal sealed class SizingEndpoints : IEndpointModule
             return ProblemResults.From(owner.IsFailure ? owner.Error : AuthErrors.Unauthenticated, http);
         }
 
-        var result = await handler.HandleAsync(new ChangeSizingSettingsCommand(owner.Value, session.SessionId, http.GetClientInfo(), request.VolTargetEnabled, request.Floor, request.CapacityEnabled, request.CapacityPct, request.Password), cancellationToken);
+        var result = await handler.HandleAsync(new ChangeSizingSettingsCommand(owner.Value, session.SessionId, http.GetClientInfo(), request.VolTargetEnabled, request.Floor, request.CapacityEnabled, request.CapacityPct, request.Password, request.MinFit), cancellationToken);
         return result.IsSuccess ? TypedResults.Ok(result.Value) : ProblemResults.From(result.Error, http);
     }
 
