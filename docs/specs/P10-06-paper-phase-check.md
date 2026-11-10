@@ -1,6 +1,6 @@
 # P10-06 — The paper phase check
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-26 under the owner's standing run instruction (ADR 0123). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P10 — Paper trading, slice P10-06 of [P10-00](P10-00-paper-trading-plan.md)
 - **Design refs:** docs/design/18 (P10 exit: "≥ 60 graded trades; positive expectancy after costs within backtest band; drawdown within Monte Carlo 90th pct"; deliverable "≥ 12w"), 19 §3, §6; ADR 0097 and P7-18 (the pattern: three outcomes, caveat in the label, limits always printed), ADR 0080 (never MET on thin data), P6-18
 - **Needs:** P10-01 to P10-05 (their endpoints/ports); P7-18 handler (read). ADR: "the paper phase check" (next free ADR number at build time)

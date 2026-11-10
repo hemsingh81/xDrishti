@@ -1,6 +1,6 @@
 # P11-06 — The small-live phase check
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-29 under the owner's standing run instruction (ADR 0153). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P11 — Small live capital, slice P11-06 of [P11-00](P11-00-small-live-plan.md). Exit: "Live within expectations => scale gradually".
 - **Design refs:** docs/design/18-roadmap.md (P11 row) · 19 §5 · 09 §9, §12 · ADR 0097 and P7-18 (the pattern: three outcomes, caveat in the label, limits always printed, the allow-list pin), ADR 0080 (never MET on thin data), P10-06 (the sibling for the paper phase: criteria C1 to C4 and I, caveat labels, resets printed), P11-02, P11-03, P11-04, P11-05.
 - **Needs:** P11-01 to P11-05 (their stores and handlers, read through ports), the P7-18 allow-list facts, P10-06 (the paper report, read). **Size:** 2 agent-days plus wall-clock time (at least 8 weeks of live sessions). **Safety:** no — read only; a verb, one GET and a read-only tab; writes nothing, runs no replay, changes no setting, moves no ramp step.

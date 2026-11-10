@@ -1,6 +1,6 @@
 # P9-04 — Assistant chat screen
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-27 under the owner's standing run instruction (ADR 0138). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P9 — AI assistant, slice P9-04 of [P9-00](P9-00-ai-assistant-plan.md)
 - **Design refs:** docs/design/13-reports-and-ui.md (Assistant row: "chat over your data; answers show numbers, query and chart; streaming chat panel") · 14 §4(2) · frontend/CLAUDE.md (structure, bundle, a11y, tests) · P8-00 D3 (honest states), D6 (read-only by construction), D7 (bundle) · P8-01 / ADR 0098 (`@/shared/analytics`, `npm run size`) · P9-00 citation rule, D7, D8, D15
 - **Needs:** P9-03 (contract: the stream, `status`, `settings`, conversations, tool-calls; generated `schema.d.ts`; the fixture `assistant-turn.sse`), P8-01 (built). `get_report` and the other tools of P9-05 only change what the stored rows look like; the screen is generic over envelopes.

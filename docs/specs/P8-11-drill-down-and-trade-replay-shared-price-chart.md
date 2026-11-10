@@ -1,6 +1,6 @@
 # P8-11 — Drill-down, trade replay and the shared price chart
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-26 under the owner's standing run instruction (ADR 0125). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-11 of [P8-00](P8-00-reports-and-ui-plan.md)
 - **Design refs:** docs/design/13-reports-and-ui.md §2 "Drill-down" (heatmap cell, cell detail, trade list, trade replay: entry, stop, target, trail path, exit reason, feature snapshot), §4 ("Lightweight Charts for anything price-based; ECharts for analytics"), §1d · docs/design/09-learning-engine.md §3 (decision-time features) · ADR 0037/0040/0049 (the trade record, legs), 0066 (feature rows), 0042 (costing) · P8-00 D1, D3, D6, D7, Q15
 - **Needs:** P8-01 (analytics kit, bundle guard), P8-06 (`ReportQuery`, `Evidence`, `GET /api/reports/trades`; its names are **UNVERIFIED** here, re-read its spec first), P8-08 (the Reports frame owns the URL state and the cell click). Feeds P8-14 (ticket charts reuse `PriceChart`).

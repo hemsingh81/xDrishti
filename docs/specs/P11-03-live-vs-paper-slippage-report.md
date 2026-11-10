@@ -1,6 +1,6 @@
 # P11-03 — The live-versus-paper report: paired tickets, slippage distribution and the execution gap (R14, R32)
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-29 under the owner's standing run instruction (ADR 0152). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P11 — Small live capital, slice P11-03 of [P11-00](P11-00-small-live-plan.md). Row: "live vs paper slippage".
 - **Design refs:** docs/design/13-reports-and-ui.md §2 (R14 backtest vs paper vs live, R32 execution gap, R19 discipline) · 09 §9 (waterfall, "a setup profitable on plan prices but not after execution is not profitable"), §12 (shadow) · 19 §4 · ADR 0099 (report engine states and evidence), P8-00 D1 to D3, P8-05; P10-01 (`paper.entries`, `paper.exits`), P10-02, P10-04 (the sibling report backtest-vs-paper), P10-03 (discipline).
 - **Needs:** P11-02 (executions, fill grades), P11-01 (outcomes), P10-01 and P10-02 (paper entries and exits; shapes as in the Draft specs of 2026-10-24, to be re-read at build), P8-05 (`Metric`, `MetricState`, `EvidenceBlock`), P8-01 (honest-state kit, `TimeSeriesChart`, `CategoryChart`). **Size:** 3 agent-days. **Safety:** no — read only; no table, no setting, nothing applied.

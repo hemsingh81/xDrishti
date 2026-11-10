@@ -1,6 +1,6 @@
 # P8-08 — Reports screen: frame, Overview and What works
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-25 under the owner's standing run instruction (ADR 0104). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-08 of [P8-00](P8-00-reports-and-ui-plan.md) (carries the phase exit: "what works, in which basket, on which timeframe, with which exit")
 - **Design refs:** docs/design/13-reports-and-ui.md §1 (Reports), §1c, §1d, §2 (R3, R4) · docs/design/15-smart-insights-and-automation.md §6 · prototype `docs/prototype/assets/app-pages-3.js` (Reports: filter bar, catalogue, Overview) · P8-00 D1, D3, D4, D5, D7, accessibility rules · ADR 0098, 0099
 - **Needs:** P8-01 (built: `@/shared/analytics`), P8-06 (built, ADR 0100: `ReportsEndpoints`: `runs`, `summary`, `groups`, `pivot`, `equity`, `distribution`, `insights`, `what-works`, `trades`), P8-02 (built: `useUrlState` in `shared/analytics`, the learning feature's `Heatmap.tsx`/`HeatTile.tsx`) and **P8-02b** (extracts `HeatGrid` into `shared/analytics` and a tab registry from the built `LearningPage`; 0.5 to 1 d; this slice's strategy-by-timeframe grid uses that `HeatGrid`). P8-09, P8-10, P8-11 add catalogue entries.

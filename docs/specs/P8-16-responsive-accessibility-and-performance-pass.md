@@ -1,6 +1,6 @@
 # P8-16 — Responsive, accessibility and performance pass over every P8 screen
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Partial: built 2026-10-26 and 2026-11-09 under the owner's standing run instruction (ADR 0124); criterion 14 (load time) and 12 layout-shift cells still fail, see the review follow-up of 2026-11-09 at the end. Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-16 of [P8-00](P8-00-reports-and-ui-plan.md) (360 px to 4K)
 - **Design refs:** docs/design/13-reports-and-ui.md §1d (responsive bands), §1e (visual system), "Notifications and pop-ups" · P8-00 "Accessibility and responsive rules", acceptance criteria 3 and 8, risk 9, Q16 · frontend/CLAUDE.md (a11y, tests, bundle) · P7-17 honest limit ("looked at only through tests; not seen in a browser") · WCAG 2.2 AA
 - **Needs:** P8-01 (kit, guard). Runs as the screens land: P8-02, 03, 04, 08, 09, 10, 11, 12, 13, 14, 15 each add their checklist rows to its Done; this slice builds the machinery and the global fixes first and makes the final pass. P8-05, 06, 07 have no screen (rows say so).

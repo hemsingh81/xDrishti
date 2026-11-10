@@ -1,6 +1,6 @@
 # P10-01 — Paper fill capture: an armed ticket becomes a timed, priced paper trade with no order
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-26 under the owner's standing run instruction (ADR 0116). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P10 — Paper trading, slice P10-01 of [P10-00](P10-00-paper-trading-plan.md)
 - **Design refs:** docs/design/04 §4.2 (ticket states), 09 §9 (graded on fills), 10 §8, 15 §1 ("graded on fills"), 18 (P10 row), 19 §3, §6; ADR 0037/0038 (fill rules), 0042/0044 (costs), 0083 (plan record), 0090 (grading), 0093 (journal), 0096 (arming, expiry), 0024 (live feed: last price only)
 - **Needs:** P7-03, P7-07, P7-10, P7-11, P7-13 (built); ADR: one new ADR "paper fills are the grading replay, captured per armed allocation" (next free ADR number at build time)

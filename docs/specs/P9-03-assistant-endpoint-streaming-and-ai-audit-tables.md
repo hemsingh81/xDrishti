@@ -1,6 +1,6 @@
 # P9-03 — Assistant endpoint: streaming chat, the tool loop, the grounding check and the `ai.*` audit tables
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-27 under the owner's standing run instruction (ADR 0138). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P9 — AI assistant, slice P9-03 of [P9-00](P9-00-ai-assistant-plan.md)
 - **Design refs:** docs/design/14-ai-assistant.md §3, §4(2), §5 · 03 §6 (`POST /api/assistant/chat`), §8 · 19 §3 · ADR 0091 (owner-only settings with the password in the body) · P9-00 D1, D2, D8, D11 to D15, the citation rule, the `ai.*` tables
 - **Needs:** P9-01 (`IChatClient`, `ILlmHealth`), P9-02 (`xd-mcp`, `ai.settings`, `Assistant:Mcp:*` secrets). Used by: P9-04 (UI), P9-05 (tools), P9-06 to P9-09 (the tokenizer, `ai.model_calls`, `IAssistantTurnRunner`, the prompt registry), P9-10.

@@ -1,6 +1,6 @@
 # P10-03 — Weekly review and the discipline report (R19), deterministic
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-26 under the owner's standing run instruction (ADR 0121). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P10 — Paper trading, slice P10-03 of [P10-00](P10-00-paper-trading-plan.md)
 - **Design refs:** docs/design/13 §2 (R19 Discipline, R26 Decisions review, R32 Execution gap), 19 §3 (skipping/adding trades), 09 §9 (execution feedback, "your overrides"), 09 §13, 15 §1; ADR 0090 (decision groups), 0093 (journal, discretionary fills), 0094 (weekly digest pattern), 0099 (report states); P7-13, P7-14, P7-15, P8-00 D1/D3/D10
 - **Needs:** P10-01, P10-02; P7-13, P7-14, P7-15 (built). ADR: "the weekly paper review and the discipline report" (next free ADR number at build time)
