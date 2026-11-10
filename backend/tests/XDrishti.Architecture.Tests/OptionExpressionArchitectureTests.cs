@@ -47,7 +47,7 @@ public sealed class OptionExpressionArchitectureTests
         result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
         foreach (var file in Directory.GetFiles(Src("XDrishti.Domain", "Options", "Remark"), "*.cs"))
         {
-            Regex.IsMatch(File.ReadAllText(file), @"\b(DateTime(Offset)?\.(UtcNow|Now)|TimeProvider|Random\.Shared|new Random\(|Environment\.|File\.|Stopwatch)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBeFalse(Path.GetFileName(file));
+            Regex.IsMatch(File.ReadAllText(file), @"\b(DateTime(Offset)?\.(UtcNow|Now)|TimeProvider|Random\.Shared|new Random\(|Environment\.|File\.|Stopwatch)", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeFalse(Path.GetFileName(file));
         }
     }
 
@@ -133,7 +133,7 @@ public sealed class OptionExpressionArchitectureTests
         sql.ShouldContain("MaxDailyRangeDays");
         sql.ShouldContain("atm_offset = 0 AND ts >= @from AND ts < @to");
         sql.ShouldContain("SELECT EXISTS (SELECT 1 FROM options.rolling_bars WHERE underlying_id = @u)");
-        Regex.Matches(sql, @"FROM options\.(\w+)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).Select(m => m.Groups[1].Value).Distinct().Order(StringComparer.Ordinal).ShouldBe(["fetch_log", "rolling_bars"]);
+        Regex.Matches(sql, @"FROM options\.(\w+)", RegexOptions.CultureInvariant, ScanRegex.Timeout).Select(m => m.Groups[1].Value).Distinct().Order(StringComparer.Ordinal).ShouldBe(["fetch_log", "rolling_bars"]);
         foreach (var banned in new[] { "INSERT", "UPDATE ", "DELETE", "TRUNCATE", "DROP " })
         {
             sql.ShouldNotContain(banned, Case.Sensitive);
@@ -169,7 +169,7 @@ public sealed class OptionExpressionArchitectureTests
     public void Only_the_store_the_migration_and_the_comments_of_the_ports_name_the_two_tables_and_the_migration_is_insert_only_for_the_runtime_role_and_nothing_for_any_other()
     {
         var named = Directory.EnumerateFiles(Src(), "*.cs", SearchOption.AllDirectories)
-            .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.EndsWith(".Designer.cs", StringComparison.Ordinal) && Regex.IsMatch(File.ReadAllText(f), @"expression_runs|expression_trades|expression_legs", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(5)))
+            .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.EndsWith(".Designer.cs", StringComparison.Ordinal) && Regex.IsMatch(File.ReadAllText(f), @"expression_runs|expression_trades|expression_legs", RegexOptions.CultureInvariant, ScanRegex.Timeout))
             .Select(f => Path.GetFileName(f)).Order(StringComparer.Ordinal).ToList();
         var migration = File.ReadAllText(Directory.EnumerateFiles(Src("XDrishti.Infrastructure", "Persistence", "Migrations"), "*_AddExpressionTrades.cs").Single());
 

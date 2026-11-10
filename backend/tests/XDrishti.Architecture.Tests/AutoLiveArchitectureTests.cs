@@ -84,8 +84,8 @@ public sealed class AutoLiveArchitectureTests
         }
 
         reads.ShouldNotContain("INSERT INTO");
-        Regex.Matches(exec, @"INSERT INTO ([a-z_.]+)", RegexOptions.None, TimeSpan.FromSeconds(2)).Select(m => m.Groups[1].Value).Distinct().Order().ShouldBe(["execution.action_log", "execution.ledger_entries"]);
-        Regex.Matches(api, @"INSERT INTO ([a-z_.]+)", RegexOptions.None, TimeSpan.FromSeconds(2)).Select(m => m.Groups[1].Value).Distinct().ShouldBe(["execution.limits"]);
+        Regex.Matches(exec, @"INSERT INTO ([a-z_.]+)", RegexOptions.None, ScanRegex.Timeout).Select(m => m.Groups[1].Value).Distinct().Order().ShouldBe(["execution.action_log", "execution.ledger_entries"]);
+        Regex.Matches(api, @"INSERT INTO ([a-z_.]+)", RegexOptions.None, ScanRegex.Timeout).Select(m => m.Groups[1].Value).Distinct().ShouldBe(["execution.limits"]);
     }
 
     [Fact]

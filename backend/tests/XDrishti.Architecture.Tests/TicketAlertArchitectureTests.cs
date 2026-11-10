@@ -98,7 +98,7 @@ public sealed class TicketAlertArchitectureTests
         }
 
         var source = File.ReadAllText(Path.Combine(dir.ShouldNotBeNull().FullName, "src", "XDrishti.Infrastructure", "Planning", "TicketAlertStore.cs"));
-        var writes = System.Text.RegularExpressions.Regex.Matches(source, @"(INSERT\s+INTO|UPDATE|DELETE\s+FROM|TRUNCATE(?:\s+TABLE)?)\s+([a-z_]+\.[a-z_]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2))
+        var writes = System.Text.RegularExpressions.Regex.Matches(source, @"(INSERT\s+INTO|UPDATE|DELETE\s+FROM|TRUNCATE(?:\s+TABLE)?)\s+([a-z_]+\.[a-z_]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant, ScanRegex.Timeout)
             .Select(m => $"{m.Groups[1].Value.Split(' ')[0].ToUpperInvariant()} {m.Groups[2].Value}").Distinct().Order().ToList();
 
         writes.ShouldBe(["INSERT trading.ticket_alerts", "INSERT trading.ticket_notice_acks", "INSERT trading.ticket_prompts"]);

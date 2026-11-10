@@ -24,7 +24,7 @@ public sealed partial class CapabilityArchitectureTests
 
     private static readonly string Command = typeof(ChangeCapabilityCommand).FullName!;
 
-    [GeneratedRegex(@"\b(UPDATE|DELETE|TRUNCATE)\b\s", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 500)]
+    [GeneratedRegex(@"\b(UPDATE|DELETE|TRUNCATE)\b\s", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 30000)]
     private static partial Regex Rewriting();
 
     private static string Source(params string[] parts) => File.ReadAllText(RepositoryFiles.RepositoryFile(["backend", "src", .. parts]));
@@ -70,10 +70,10 @@ public sealed partial class CapabilityArchitectureTests
     {
         var text = Source("XDrishti.Api", "Endpoints", "CapabilitiesEndpoints.cs");
 
-        Regex.Count(text, @"\.MapGet\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(1);
-        Regex.Count(text, @"\.MapPut\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(1);
-        Regex.Count(text, @"\.MapPost\(|\.MapDelete\(|\.MapPatch\(|\.MapMethods\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(0);
-        Regex.Count(text, @"RequireRateLimiting\(", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBe(0, "the kill switch never answers 429: only the ON direction is limited, in the handler");
+        Regex.Count(text, @"\.MapGet\(", RegexOptions.None, ScanRegex.Timeout).ShouldBe(1);
+        Regex.Count(text, @"\.MapPut\(", RegexOptions.None, ScanRegex.Timeout).ShouldBe(1);
+        Regex.Count(text, @"\.MapPost\(|\.MapDelete\(|\.MapPatch\(|\.MapMethods\(", RegexOptions.None, ScanRegex.Timeout).ShouldBe(0);
+        Regex.Count(text, @"RequireRateLimiting\(", RegexOptions.None, ScanRegex.Timeout).ShouldBe(0, "the kill switch never answers 429: only the ON direction is limited, in the handler");
         text.ShouldContain("request.Enabled && !limiter.TryAcquire(");
         text.ShouldContain("request.Enabled\n            ? await OwnerAct.AuthorizeAsync(");
         text.ShouldContain(": OwnerAct.SessionOwner(http)");
@@ -146,7 +146,7 @@ public sealed partial class CapabilityArchitectureTests
         var text = File.ReadAllText(Directory.GetFiles(migrations, "*AddCapabilityChanges.cs").Single());
 
         text.ShouldNotContain("experiments_ui");
-        XDrishti.Domain.Capabilities.Capabilities.All.ShouldAllBe(c => Regex.IsMatch(c.Name, "^[a-z][a-z0-9_]{0,39}$", RegexOptions.None, TimeSpan.FromSeconds(1)));
+        XDrishti.Domain.Capabilities.Capabilities.All.ShouldAllBe(c => Regex.IsMatch(c.Name, "^[a-z][a-z0-9_]{0,39}$", RegexOptions.None, ScanRegex.Timeout));
     }
 }
 

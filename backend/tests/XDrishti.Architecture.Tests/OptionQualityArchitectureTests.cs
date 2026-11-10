@@ -143,7 +143,7 @@ public sealed class OptionQualityArchitectureTests
                 text.ShouldNotContain(write, Case.Sensitive);
             }
 
-            Regex.IsMatch(text, "\\binto\\s+options\\.", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5)).ShouldBeFalse();
+            Regex.IsMatch(text, "\\binto\\s+options\\.", RegexOptions.IgnoreCase, ScanRegex.Timeout).ShouldBeFalse();
         }
 
         var store = Source("XDrishti.Infrastructure", "OptionQuality", "OptionQualityStore.cs");
@@ -161,7 +161,7 @@ public sealed class OptionQualityArchitectureTests
     public void Only_the_quality_reader_and_the_recorders_own_stores_name_the_archive_tables_and_only_the_quality_store_and_reader_name_the_result_tables()
     {
         var files = SourceFiles();
-        string[] Naming(string table) => [.. files.Where(f => Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN)\\s+options\\." + table + "\\b", RegexOptions.None, TimeSpan.FromSeconds(5))).Select(Path.GetFileName).Order(StringComparer.Ordinal)!];
+        string[] Naming(string table) => [.. files.Where(f => Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN)\\s+options\\." + table + "\\b", RegexOptions.None, ScanRegex.Timeout)).Select(Path.GetFileName).Order(StringComparer.Ordinal)!];
 
         // Pinned per table: the recorder's own store and the quality reader, nothing else. The positive control is that each list names the quality reader (or, for chain_sessions, that it does not).
         // P14-07 (ADR 0194) adds exactly one file to chain_snapshots: ChainSpreadReader, the half-spread model's read of bid, ask and bucket keys of usable sessions.

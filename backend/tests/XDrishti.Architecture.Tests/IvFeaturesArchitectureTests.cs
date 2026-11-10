@@ -43,7 +43,7 @@ public sealed class IvFeaturesArchitectureTests
         result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
         foreach (var file in Directory.GetFiles(Src("XDrishti.Domain", "Options", "Iv"), "*.cs").Append(Src("XDrishti.Domain", "Learning", "Extensions", "IvFeatureCatalog.cs")).Append(Src("XDrishti.Domain", "Learning", "Extensions", "IvSourceNotes.cs")))
         {
-            Regex.IsMatch(File.ReadAllText(file), @"\b(DateTime(Offset)?\.(UtcNow|Now)|TimeProvider|Random\.Shared|new Random\(|Environment\.|File\.|Stopwatch)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBeFalse(Path.GetFileName(file));
+            Regex.IsMatch(File.ReadAllText(file), @"\b(DateTime(Offset)?\.(UtcNow|Now)|TimeProvider|Random\.Shared|new Random\(|Environment\.|File\.|Stopwatch)", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeFalse(Path.GetFileName(file));
         }
     }
 

@@ -18,13 +18,13 @@ public sealed class NoOrderPlacementArchitectureTests
     private const BindingFlags AllMembers = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
 
     // An order verb on a broker-style noun. "Create" or "add" with "trade" is the owner's own trade journal and is not matched.
-    private static readonly Regex Verbs = new("(create|send|post|execute|buy|sell|route|transmit)orders?|(execute|buy|sell|send|post|transmit)trades?(?!s?(batch|import|card|history))", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
+    private static readonly Regex Verbs = new("(create|send|post|execute|buy|sell|route|transmit)orders?|(execute|buy|sell|send|post|transmit)trades?(?!s?(batch|import|card|history))", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, ScanRegex.Timeout);
 
     // Route segments of the API that would be an order endpoint (plural "orders": the baskets reorder routes are singular "order").
-    private static readonly Regex RouteSegments = new(@"(^|/)(orders|place-?orders?|send-to-broker|execute|square-?off|basket-orders?)(/|\{|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
+    private static readonly Regex RouteSegments = new(@"(^|/)(orders|place-?orders?|send-to-broker|execute|square-?off|basket-orders?)(/|\{|$)", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, ScanRegex.Timeout);
 
     // Libraries of brokers and order routing.
-    private static readonly Regex BrokerLibraries = new(@"dhan|kite|zerodha|upstox|fyers|smartapi|angelone|alpaca|ibapi|interactivebrokers|binance|ccxt|tradier|5paisa|groww|quickfix|brokerapi", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
+    private static readonly Regex BrokerLibraries = new(@"dhan|kite|zerodha|upstox|fyers|smartapi|angelone|alpaca|ibapi|interactivebrokers|binance|ccxt|tradier|5paisa|groww|quickfix|brokerapi", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, ScanRegex.Timeout);
 
     /// <summary>Test-only type used to prove the rule fails; it is never shipped.</summary>
     internal static class Planted
@@ -102,7 +102,7 @@ public sealed class NoOrderPlacementArchitectureTests
     {
         var anchor = RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Endpoints", "PlansEndpoints.cs");
         var routes = Directory.GetFiles(Path.GetDirectoryName(anchor)!, "*.cs")
-            .SelectMany(f => Regex.Matches(File.ReadAllText(f), "Map(?:Get|Post|Put|Delete|Patch|Group)\\(\"([^\"]*)\"", RegexOptions.None, TimeSpan.FromSeconds(5)).Select(m => (File: Path.GetFileName(f), Route: m.Groups[1].Value)))
+            .SelectMany(f => Regex.Matches(File.ReadAllText(f), "Map(?:Get|Post|Put|Delete|Patch|Group)\\(\"([^\"]*)\"", RegexOptions.None, ScanRegex.Timeout).Select(m => (File: Path.GetFileName(f), Route: m.Groups[1].Value)))
             .ToList();
 
         routes.Count.ShouldBeGreaterThan(100);
@@ -130,7 +130,7 @@ public sealed class NoOrderPlacementArchitectureTests
         var snapshot = RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Infrastructure", "Persistence", "Migrations", "XDrishtiDbContextModelSnapshot.cs");
         var offenders = Directory.GetFiles(Path.GetDirectoryName(snapshot)!, "*.cs")
             .Where(f => !f.EndsWith(".Designer.cs", StringComparison.Ordinal) && !Path.GetFileName(f).Contains("AddPlanRecord", StringComparison.Ordinal))
-            .Where(f => Regex.IsMatch(File.ReadAllText(f), "GrantSchemaUsageToAppRole\\(\\s*(Schemas\\.(Trading|Workflow)|\"(trading|workflow)\")", RegexOptions.None, TimeSpan.FromSeconds(5)))
+            .Where(f => Regex.IsMatch(File.ReadAllText(f), "GrantSchemaUsageToAppRole\\(\\s*(Schemas\\.(Trading|Workflow)|\"(trading|workflow)\")", RegexOptions.None, ScanRegex.Timeout))
             .Select(f => Path.GetFileName(f))
             .ToList();
 

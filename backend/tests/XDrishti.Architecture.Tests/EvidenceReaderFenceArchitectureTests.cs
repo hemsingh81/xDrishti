@@ -18,7 +18,7 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
 
     /// <summary>The source of a file without whole-line comments, split into statements at ';' (a const SQL text, an EF query and a method call are each one statement).</summary>
     private static string StripComments(string text) =>
-        Regex.Replace(Regex.Replace(text, @"/\*.*?\*/", " ", RegexOptions.Singleline, TimeSpan.FromSeconds(2)), @"(?<=^|\s)//[^\n]*", " ", RegexOptions.Multiline, TimeSpan.FromSeconds(2));
+        Regex.Replace(Regex.Replace(text, @"/\*.*?\*/", " ", RegexOptions.Singleline, ScanRegex.Timeout), @"(?<=^|\s)//[^\n]*", " ", RegexOptions.Multiline, ScanRegex.Timeout);
 
     /// <summary>The code of a file without any comment (whole-line, trailing or block), split into statements at ';' (a const SQL text, an EF query and a method call are each one statement).</summary>
     private static string[] Statements(string file) => StripComments(File.ReadAllText(file)).Split(';');
@@ -33,12 +33,12 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
     [GeneratedRegex(@"\.Sim(Runs|Trades|TradeLegs|TradeLegCharges)\b|Set<\s*Sim(Run|Trade|TradeLeg|TradeLegCharge)Row\s*>")]
     private static partial Regex EfSet();
 
-    private static readonly Regex WriteVerb = new(@"(INSERT\s+INTO|COPY|DELETE\s+FROM|UPDATE|TRUNCATE)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
+    private static readonly Regex WriteVerb = new(@"(INSERT\s+INTO|COPY|DELETE\s+FROM|UPDATE|TRUNCATE)\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, ScanRegex.Timeout);
 
     /// <summary>The fence as a conjunct: <c>WHERE/AND purpose = 'research'</c> in SQL, or <c>Purpose == RunPurposes.ResearchText</c> in a Where; an <c>OR</c> beside it is not a fence.</summary>
     private static bool HasFence(string statement) =>
-        Regex.IsMatch(statement, @"\b(WHERE|AND)\s+(\w+\.)?purpose\s*=\s*'research'|\.Where\(\s*\w+\s*=>\s*\w+\.Purpose\s*==\s*RunPurposes\.ResearchText\s*\)", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2))
-        && !Regex.IsMatch(statement, @"\bOR\s+(\w+\.)?purpose\b|\|\|\s*\w+\.Purpose", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
+        Regex.IsMatch(statement, @"\b(WHERE|AND)\s+(\w+\.)?purpose\s*=\s*'research'|\.Where\(\s*\w+\s*=>\s*\w+\.Purpose\s*==\s*RunPurposes\.ResearchText\s*\)", RegexOptions.IgnoreCase, ScanRegex.Timeout)
+        && !Regex.IsMatch(statement, @"\bOR\s+(\w+\.)?purpose\b|\|\|\s*\w+\.Purpose", RegexOptions.IgnoreCase, ScanRegex.Timeout);
 
     /// <summary>
     /// Files allowed to name the run child tables (trades, legs, charges) or to write: they take their run ids from a fenced lookup (<c>FindRunAsync</c>, the fenced run-id statement of the report source) or write research runs. A new file is not on this list.
@@ -58,8 +58,8 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
     private const string TrainingReader = "XDrishti.Infrastructure/SimAll/TrainingRunReader.cs";
 
     private static bool HasTrainingFence(string statement) =>
-        Regex.IsMatch(statement, @"\bWHERE\s+(\w+\.)?purpose\s*=\s*'training'\s+AND\b", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2))
-        && !Regex.IsMatch(statement, @"\bOR\s+(\w+\.)?purpose\b", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
+        Regex.IsMatch(statement, @"\bWHERE\s+(\w+\.)?purpose\s*=\s*'training'\s+AND\b", RegexOptions.IgnoreCase, ScanRegex.Timeout)
+        && !Regex.IsMatch(statement, @"\bOR\s+(\w+\.)?purpose\b", RegexOptions.IgnoreCase, ScanRegex.Timeout);
 
     private static IEnumerable<(string File, string Statement, string Table)> TableReads() =>
         Sources().SelectMany(f => Statements(f).SelectMany(st =>
@@ -127,7 +127,7 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
         statements.ShouldNotBeEmpty();
 
         // a read passes only by leaving training sweeps out (<> 'training_sweep') or by naming an evidence kind; "= 'training_sweep'" is the separate count and is not a fence
-        var unfenced = statements.Where(st => st.Split('\n').Where(l => l.Contains("FROM lab.test_ledger", StringComparison.OrdinalIgnoreCase)).Any(l => !(l.Contains("trial_kind <> 'training_sweep'", StringComparison.Ordinal) || Regex.IsMatch(l, "trial_kind = '(run|replan|null)'", RegexOptions.None, TimeSpan.FromSeconds(2)) || Regex.IsMatch(l, "trial_kind = 'training_sweep'", RegexOptions.None, TimeSpan.FromSeconds(2))))).ToList();
+        var unfenced = statements.Where(st => st.Split('\n').Where(l => l.Contains("FROM lab.test_ledger", StringComparison.OrdinalIgnoreCase)).Any(l => !(l.Contains("trial_kind <> 'training_sweep'", StringComparison.Ordinal) || Regex.IsMatch(l, "trial_kind = '(run|replan|null)'", RegexOptions.None, ScanRegex.Timeout) || Regex.IsMatch(l, "trial_kind = 'training_sweep'", RegexOptions.None, ScanRegex.Timeout)))).ToList();
         unfenced.Count.ShouldBe(1, "exactly one ledger statement is unfiltered: the listing, which shows training sweeps beside the looks (ADR 0243)");
         unfenced[0].ShouldContain("ORDER BY created_at DESC");
 
@@ -138,15 +138,15 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
             File.ReadAllText(Path.Combine(Src, user)).ShouldContain("IsTrainingSweep", Case.Sensitive, $"{user} takes hashes from the ledger listing and must skip training sweeps");
         }
 
-        var others = Sources().Where(f => !f.EndsWith("TestLedger.cs", StringComparison.Ordinal) && Regex.IsMatch(File.ReadAllText(f), @"FROM\s+""?lab""?\s*\.\s*""?test_ledger", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2))).Select(Rel).ToList();
+        var others = Sources().Where(f => !f.EndsWith("TestLedger.cs", StringComparison.Ordinal) && Regex.IsMatch(File.ReadAllText(f), @"FROM\s+""?lab""?\s*\.\s*""?test_ledger", RegexOptions.IgnoreCase, ScanRegex.Timeout)).Select(Rel).ToList();
         others.ShouldBeEmpty("Only TestLedger reads lab.test_ledger; a second reader needs the fence and a test.");
     }
 
     [Fact]
     public void No_source_names_a_run_table_without_its_schema_or_with_an_interpolated_schema()
     {
-        var bare = new Regex(@"(?<![\w.])sim_(runs|trades|trade_legs|trade_leg_charges)\b", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
-        var interpolated = new Regex(@"\{[^}]+\}\s*\.\s*""?sim_(runs|trades|trade_legs|trade_leg_charges)|Schemas\.Research\s*\+", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
+        var bare = new Regex(@"(?<![\w.])sim_(runs|trades|trade_legs|trade_leg_charges)\b", RegexOptions.IgnoreCase, ScanRegex.Timeout);
+        var interpolated = new Regex(@"\{[^}]+\}\s*\.\s*""?sim_(runs|trades|trade_legs|trade_leg_charges)|Schemas\.Research\s*\+", RegexOptions.IgnoreCase, ScanRegex.Timeout);
         foreach (var file in Sources().Where(f => !NotEvidenceReads.Contains(Rel(f)) && !Rel(f).EndsWith("RunStore.Legs.cs", StringComparison.Ordinal) /* the leg tables are named by a variable there and found by the concatenation rule */ && !Rel(f).Contains("/Persistence/Configurations/", StringComparison.Ordinal)))
         {
             var code = StripComments(File.ReadAllText(file));
@@ -165,8 +165,8 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
         var fenceAt = migrations.FindIndex(f => Path.GetFileName(f).Contains("AddSimRunPurpose", StringComparison.Ordinal));
         fenceAt.ShouldBeGreaterThan(0);
 
-        var viewStatement = new Regex(@"CREATE\s+(OR\s+REPLACE\s+)?(MATERIALIZED\s+)?VIEW\s+(?<name>[\w.]+)", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
-        var runTables = new Regex(@"sim_(runs|trades|trade_legs|trade_leg_charges)\b", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
+        var viewStatement = new Regex(@"CREATE\s+(OR\s+REPLACE\s+)?(MATERIALIZED\s+)?VIEW\s+(?<name>[\w.]+)", RegexOptions.IgnoreCase, ScanRegex.Timeout);
+        var runTables = new Regex(@"sim_(runs|trades|trade_legs|trade_leg_charges)\b", RegexOptions.IgnoreCase, ScanRegex.Timeout);
         var checkedViews = 0;
         foreach (var file in migrations.Skip(fenceAt))
         {

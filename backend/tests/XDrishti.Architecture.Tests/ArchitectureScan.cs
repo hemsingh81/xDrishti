@@ -7,6 +7,12 @@ using Mono.Cecil;
 
 namespace XDrishti.Architecture.Tests;
 
+/// <summary>One generous match timeout for every source scan: a loaded machine must not turn a slow scan into a RegexMatchTimeoutException (the rules stay as strict, only the clock is looser).</summary>
+internal static class ScanRegex
+{
+    public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+}
+
 /// <summary>The checkouts and project files the architecture rules read: where a file of the repository is, which projects a project file references, what is build output.</summary>
 internal static class RepositoryFiles
 {

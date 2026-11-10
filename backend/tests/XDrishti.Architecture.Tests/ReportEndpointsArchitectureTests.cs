@@ -23,10 +23,10 @@ public sealed partial class ReportEndpointsArchitectureTests
 
     private static readonly string ConfirmationSource = typeof(IChargeSheetConfirmationSource).FullName!;
 
-    [GeneratedRegex(@"\.Map(Post|Put|Delete|Patch)\b|\.MapMethods\b", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 500)]
+    [GeneratedRegex(@"\.Map(Post|Put|Delete|Patch)\b|\.MapMethods\b", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 30000)]
     private static partial Regex WritingRoute();
 
-    [GeneratedRegex(@"\.MapGet\(", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 500)]
+    [GeneratedRegex(@"\.MapGet\(", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 30000)]
     private static partial Regex ReadingRoute();
 
     private static string EndpointsSource => File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Endpoints", "ReportsEndpoints.cs"));
@@ -111,7 +111,7 @@ public sealed partial class ReportEndpointsArchitectureTests
 
         foreach (var text in new[] { Code(source), Code(confirmation), Code(comparisons) })
         {
-            Regex.IsMatch(text, @"\b(INSERT|UPDATE|DELETE|TRUNCATE|COPY)\b\s", RegexOptions.None, TimeSpan.FromSeconds(1)).ShouldBeFalse();
+            Regex.IsMatch(text, @"\b(INSERT|UPDATE|DELETE|TRUNCATE|COPY)\b\s", RegexOptions.None, ScanRegex.Timeout).ShouldBeFalse();
             text.ShouldNotContain("SaveChanges");
             text.ShouldNotContain("ExecuteNonQuery");
         }

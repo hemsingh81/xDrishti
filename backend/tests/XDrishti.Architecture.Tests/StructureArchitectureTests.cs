@@ -43,7 +43,7 @@ public sealed class StructureArchitectureTests
         result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
         foreach (var file in Directory.GetFiles(Src("XDrishti.Domain", "Options", "Structures"), "*.cs"))
         {
-            Regex.IsMatch(File.ReadAllText(file), @"\b(DateTime(Offset)?\.(UtcNow|Now)|TimeProvider|Random\.Shared|new Random\(|Environment\.|File\.|Stopwatch)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBeFalse(Path.GetFileName(file));
+            Regex.IsMatch(File.ReadAllText(file), @"\b(DateTime(Offset)?\.(UtcNow|Now)|TimeProvider|Random\.Shared|new Random\(|Environment\.|File\.|Stopwatch)", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeFalse(Path.GetFileName(file));
         }
     }
 
@@ -107,7 +107,7 @@ public sealed class StructureArchitectureTests
             .Concat([Src("XDrishti.Application", "OptionExpression", "RemarkStructureHandler.cs"), Src("XDrishti.Application", "OptionExpression", "SimulateCondorsHandler.cs"), Src("XDrishti.Application", "OptionExpression", "RemarkDispatchHandler.cs"), Src("XDrishti.Api", "Cli", "OptionsCondorsCommand.cs")]);
         foreach (var file in files)
         {
-            var code = Regex.Replace(Regex.Replace(File.ReadAllText(file), "/\\*.*?\\*/", string.Empty, RegexOptions.Singleline, TimeSpan.FromSeconds(5)), "//.*$|///.*$", string.Empty, RegexOptions.Multiline, TimeSpan.FromSeconds(5));
+            var code = Regex.Replace(Regex.Replace(File.ReadAllText(file), "/\\*.*?\\*/", string.Empty, RegexOptions.Singleline, ScanRegex.Timeout), "//.*$|///.*$", string.Empty, RegexOptions.Multiline, ScanRegex.Timeout);
             foreach (var word in OrderWords)
             {
                 code.ShouldNotContain(word, Case.Sensitive, Path.GetFileName(file));
@@ -121,7 +121,7 @@ public sealed class StructureArchitectureTests
         // the one type that builds legs lists them in pairs: a short leg is always followed (or preceded) by a long leg of the same kind; there is no constructor of a lone short leg.
         var text = File.ReadAllText(Src("XDrishti.Domain", "Options", "Structures", "StructureRemark.cs"));
 
-        Regex.Count(text, @"new\(false,", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBe(Regex.Count(text, @"new\(true,", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)), "every short leg has a long leg built beside it");
+        Regex.Count(text, @"new\(false,", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBe(Regex.Count(text, @"new\(true,", RegexOptions.CultureInvariant, ScanRegex.Timeout), "every short leg has a long leg built beside it");
         text.ShouldContain("There is no naked short leg");
     }
 
