@@ -1,19 +1,23 @@
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { ReactNode } from 'react';
 import { useCallback, useMemo } from 'react';
+import type { Score } from '../hooks/useLatestVersion';
 import type { BasketMember } from '@/shared/api';
 import { Grid, type GridRowExtras } from '@/shared/ui/grid';
 import { stateAlpha } from '@/theme';
 import { useBasketDrag } from '../hooks/basketDragContext';
-import { editableColumns, lookBackColumns, portfolioColumns } from './memberColumns';
+import { editableColumns, lookBackColumns, portfolioColumns, systemColumns } from './memberColumns';
 
 interface MembersGridProps {
   members: readonly BasketMember[];
   /**
    * `edit`: the owner's basket now (grip, copy / move / remove). `lookback`: a past date, read only. `portfolio`: a
-   * portfolio basket, read only apart from copying out (quantity and account instead of the added date).
+   * portfolio basket, read only apart from copying out (quantity and account instead of the added date). `system`: a
+   * stored system basket, read only apart from copying out.
    */
-  mode: 'edit' | 'lookback' | 'portfolio';
+  mode: 'edit' | 'lookback' | 'portfolio' | 'system';
+  /** Rank and score by instrument (a derived basket): adds the "Why" column. */
+  scores?: ReadonlyMap<string, Score>;
   /** Selection is on when `onSelectionChange` is given. */
   selectedIds?: ReadonlySet<string>;
   onSelectionChange?: (ids: ReadonlySet<string>) => void;
@@ -46,6 +50,7 @@ const getRowLabel = (member: BasketMember) => member.instrument.symbol;
 export function MembersGrid({
   members,
   mode,
+  scores,
   selectedIds,
   onSelectionChange,
   loading,
@@ -62,17 +67,18 @@ export function MembersGrid({
       if (session?.kind !== 'member') return undefined;
       const id = getRowId(member);
       if (dragged.has(id)) return draggingRow;
-      if (mode === 'portfolio') return undefined;
+      if (mode === 'portfolio' || mode === 'system') return undefined;
       if (over?.data.type !== 'member' || over.id !== id) return undefined;
       return ids.indexOf(id) > ids.indexOf(session.activeId) ? dropBelow : dropAbove;
     },
     [session, dragged, over, ids, mode],
   );
 
+  const systemCols = useMemo(() => systemColumns(scores), [scores]);
   const grid = (
     <Grid
       label="Basket members"
-      columns={columns[mode]}
+      columns={mode === 'system' ? systemCols : columns[mode]}
       rows={members}
       getRowId={getRowId}
       getRowLabel={getRowLabel}

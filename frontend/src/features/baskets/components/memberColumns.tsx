@@ -1,9 +1,10 @@
 import { Chip, Link } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
 import type { BasketMember } from '@/shared/api';
-import { formatDate, formatNumber } from '@/shared/lib/format';
+import { formatDate, formatNumber, formatPrice } from '@/shared/lib/format';
 import type { GridColumn } from '@/shared/ui/grid';
 import { monoFontFamily } from '@/theme';
+import type { Score } from '../hooks/useLatestVersion';
 import { typeLabel } from '../lib/labels';
 import { MemberActions } from './MemberActions';
 import { MemberHandle } from './MemberHandle';
@@ -135,6 +136,28 @@ export const editableColumns: readonly Column[] = [orderColumn, ...identity, act
 
 /** The columns of a look-back view: read only, so no grip and no actions. */
 export const lookBackColumns: readonly Column[] = [...shared, removedColumn];
+
+/** Derived baskets only: why the instrument is in (or just out of) the list, as rank and score (2 decimals). */
+const whyColumn = (scores: ReadonlyMap<string, Score>): Column => ({
+  id: 'why',
+  header: 'Why',
+  accessor: (m) => {
+    const s = scores.get(m.instrument.id);
+    return s ? `Rank ${formatNumber(s.rank)} · score ${formatPrice(s.score)}` : dash;
+  },
+});
+
+/** The columns of a stored system basket (index, list, derived): copy grip first, then the identity, then Copy; derived ones add the why. */
+export const systemColumns = (scores?: ReadonlyMap<string, Score>): readonly Column[] => [
+  copyHandleColumn,
+  symbolColumn,
+  nameColumn,
+  portfolioTypeColumn,
+  sectorColumn,
+  statusColumn,
+  ...(scores ? [whyColumn(scores)] : []),
+  actionsColumn,
+];
 
 /** The columns of a portfolio basket: copy grip first, quantity and account instead of the added date, then Copy. */
 export const portfolioColumns: readonly Column[] = [

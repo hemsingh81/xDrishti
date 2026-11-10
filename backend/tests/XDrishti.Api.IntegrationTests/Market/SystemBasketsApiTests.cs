@@ -114,6 +114,21 @@ public sealed class SystemBasketsApiTests(ApiFactory factory) : BasketsTestBase(
     }
 
     [Fact]
+    public async Task The_system_settings_route_tells_the_screen_which_switches_are_on_and_needs_a_session()
+    {
+        using var anonymous = await Factory.CreateAnonymousClient().GetAsync("/api/baskets/system/settings", Ct);
+        anonymous.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        using var response = await Owner.Client.GetAsync("/api/baskets/system/settings", Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync(Ct);
+        body.ShouldContain("\"fetchEnabled\"");
+        body.ShouldContain("\"listFetchEnabled\"");
+        body.ShouldContain("\"derivedEnabled\"");
+    }
+
+    [Fact]
     public async Task The_owner_switches_a_source_on_and_off_with_a_step_up_and_it_is_audited_and_fetch_now_never_does_it()
     {
         var plain = await Factory.SignInAsync(Ct);

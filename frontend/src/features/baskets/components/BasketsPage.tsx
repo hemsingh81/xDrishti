@@ -28,7 +28,7 @@ export function BasketsPage() {
 function BasketsContent() {
   const { notify } = useToast();
   const list = useQuery(basketsQuery);
-  const { basketId, asOf, select, setAsOf } = useBasketParams();
+  const { basketId, asOf, kind, select, setAsOf, setKind } = useBasketParams();
   const archive = useArchiveBasket();
   const [editor, setEditor] = useState<Editor>(null);
   const [archiving, setArchiving] = useState<Basket | null>(null);
@@ -106,6 +106,8 @@ function BasketsContent() {
           onSelect={select}
           asOf={asOf}
           onAsOfChange={setAsOf}
+          kind={kind}
+          onKindChange={setKind}
           onEdit={() => {
             setEditor({ kind: 'edit', basket: selected });
           }}

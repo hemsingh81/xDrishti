@@ -16,11 +16,16 @@ const optionOf = (basket: Basket) => (
 );
 
 /**
- * The phone version of the basket cards: one select, in two groups when there are portfolio baskets. (Reordering
+ * The phone version of the basket cards: one select, in groups (Portfolio, System, Your baskets) when there is more than one. (Reordering
  * baskets and dropping on them need the wider layout.)
  */
 export function BasketSelect({ groups, selectedId, onSelect }: BasketSelectProps) {
-  const { portfolio, manual } = groups;
+  const { portfolio, system, manual } = groups;
+  const sections = [
+    { label: 'Portfolio', baskets: portfolio },
+    { label: 'System', baskets: system },
+    { label: 'Your baskets', baskets: manual },
+  ].filter((section) => section.baskets.length > 0);
   return (
     <TextField
       select
@@ -32,16 +37,13 @@ export function BasketSelect({ groups, selectedId, onSelect }: BasketSelectProps
       }}
       slotProps={{ select: { native: true } }}
     >
-      {portfolio.length > 0
-        ? [
-            <optgroup key="portfolio" label="Portfolio">
-              {portfolio.map(optionOf)}
-            </optgroup>,
-            <optgroup key="manual" label="Your baskets">
-              {manual.map(optionOf)}
-            </optgroup>,
-          ]
-        : manual.map(optionOf)}
+      {sections.length > 1
+        ? sections.map((section) => (
+            <optgroup key={section.label} label={section.label}>
+              {section.baskets.map(optionOf)}
+            </optgroup>
+          ))
+        : sections.flatMap((section) => section.baskets.map(optionOf))}
     </TextField>
   );
 }

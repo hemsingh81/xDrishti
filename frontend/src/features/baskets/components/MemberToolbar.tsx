@@ -1,9 +1,10 @@
-import { Button, Stack, Typography } from '@mui/material';
+import { Button, Stack, Tooltip, Typography } from '@mui/material';
 import { useState } from 'react';
 import type { BasketMember } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
 import { useMemberPanel } from '../hooks/memberPanelContext';
 import { subject } from '../lib/messages';
+import { isStored, systemMoveTip } from '../lib/system';
 import { TransferMenu } from './TransferMenu';
 
 interface MemberToolbarProps {
@@ -27,6 +28,7 @@ export function MemberToolbar({ members, selectedIds, onClear }: MemberToolbarPr
   const label = subject(count, picked[0]?.instrument.symbol ?? '');
   // A portfolio basket's rows can only be copied out: no Move to…, no Remove.
   const readOnly = basket.system;
+  const stored = isStored(basket);
   const guard = (action: () => void) => () => {
     if (!busy) action();
   };
@@ -72,6 +74,15 @@ export function MemberToolbar({ members, selectedIds, onClear }: MemberToolbarPr
             {mode === 'copy' ? 'Copy to…' : 'Move to…'}
           </Button>
         ))}
+        {stored && (
+          <Tooltip title={systemMoveTip}>
+            <span>
+              <Button size="small" variant="outlined" disabled>
+                Move to…
+              </Button>
+            </span>
+          </Tooltip>
+        )}
         {!readOnly && (
           <Button
             size="small"

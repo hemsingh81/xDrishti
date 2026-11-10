@@ -50,6 +50,10 @@ internal sealed class BasketsEndpoints : IEndpointModule
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapGet("/system/settings", GetSystemSettingsAsync)
+            .WithName("GetSystemBasketSettings")
+            .WithSummary("Which owner-act switches are on (read only): fetchEnabled (Baskets:System:Fetch:Enabled, index lists), listFetchEnabled (Baskets:System:Lists:FetchEnabled, the NSE F&O files), derivedEnabled (Baskets:System:Derived:Enabled); the Baskets screen disables its Fetch now and Recompute now buttons from them");
+
         group.MapPost("/system/derived/refresh", RefreshDerivedAsync)
             .RequireStepUp()
             .WithName("RefreshDerivedBaskets")
@@ -276,6 +280,15 @@ internal sealed class BasketsEndpoints : IEndpointModule
 
         var result = await handler.HandleAsync(new SetBasketSourceEnabledCommand(id, enabled, http.GetActor()), cancellationToken);
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<SystemBasketSettingsView>> GetSystemSettingsAsync(
+        HttpContext http,
+        IQueryHandler<GetSystemBasketSettingsQuery, SystemBasketSettingsView> handler,
+        CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        return TypedResults.Ok(await handler.HandleAsync(new GetSystemBasketSettingsQuery(), cancellationToken));
     }
 
     private static async Task<Results<Ok<BasketSourceView>, ProblemHttpResult>> GetSourceAsync(

@@ -3,7 +3,9 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Basket, BasketMembers } from '@/shared/api';
 import { formatDate } from '@/shared/lib/format';
+import { useLatestVersion } from '../hooks/useLatestVersion';
 import { basketProblemText } from '../lib/errors';
+import { isPortfolio, isStored } from '../lib/system';
 import { AddInstrumentRow } from './AddInstrumentRow';
 import { AddInstrumentsDialog } from './AddInstrumentsDialog';
 import { BasketHeader } from './BasketHeader';
@@ -11,6 +13,8 @@ import { EmptyMembers } from './EmptyMembers';
 import { HistoryDrawer } from './HistoryDrawer';
 import { MemberToolbar } from './MemberToolbar';
 import { MembersGrid } from './MembersGrid';
+import { SystemDetail } from './SystemDetail';
+import { VersionDrawer } from './VersionDrawer';
 
 interface MembersPanelProps {
   basket: Basket;
@@ -45,6 +49,11 @@ export function MembersPanel({
   const [adding, setAdding] = useState<string | null>(null);
   const [history, setHistory] = useState(false);
   const readOnly = basket.system;
+  const stored = isStored(basket);
+  const { scores, derived } = useLatestVersion(basket);
+  // Before the first known date a stored basket answers with its first known members: say so instead of looking empty.
+  const knownSince = basket.membersKnownSince ?? null;
+  const beforeKnown = stored && asOf !== null && knownSince !== null && asOf < knownSince;
   const editable = asOf === null;
   const items = members.data?.items ?? [];
   const failed = members.isError && !members.data;
@@ -64,7 +73,13 @@ export function MembersPanel({
         }}
         onArchive={onArchive}
       />
+      {stored && <SystemDetail basket={basket} />}
       {!readOnly && editable && <AddInstrumentRow onAdd={openAdd} />}
+      {beforeKnown && knownSince && (
+        <Alert severity="info" sx={{ mx: 2, mb: 1.5 }}>
+          {`Members are known from ${formatDate(knownSince)}: earlier dates use these members (ISS-22).`}
+        </Alert>
+      )}
       {asOf && (
         <Alert severity="info" sx={{ mx: 2, mb: 1.5 }}>
           {`Showing the members as they were at the end of ${formatDate(asOf)}. This view is read only; choose Back to today to make changes.`}
@@ -76,7 +91,8 @@ export function MembersPanel({
       <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, maxHeight: 'min(68vh, 720px)' }}>
         <MembersGrid
           members={items}
-          mode={readOnly ? 'portfolio' : editable ? 'edit' : 'lookback'}
+          mode={isPortfolio(basket) ? 'portfolio' : stored && editable ? 'system' : editable ? 'edit' : 'lookback'}
+          scores={derived ? scores : undefined}
           selectedIds={editable ? selectedIds : undefined}
           onSelectionChange={editable ? onSelectionChange : undefined}
           loading={members.isPending}
@@ -88,6 +104,7 @@ export function MembersPanel({
             <EmptyMembers
               asOf={asOf}
               readOnly={readOnly}
+              readOnlyText={stored ? 'No members yet: nothing has been fetched or formed for this basket.' : undefined}
               onAdd={() => {
                 openAdd();
               }}
@@ -102,6 +119,15 @@ export function MembersPanel({
           initialQuery={adding}
           onClose={() => {
             setAdding(null);
+          }}
+        />
+      )}
+      {stored && (
+        <VersionDrawer
+          basket={basket}
+          open={history}
+          onClose={() => {
+            setHistory(false);
           }}
         />
       )}

@@ -828,6 +828,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/baskets/system/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Which owner-act switches are on (read only): fetchEnabled (Baskets:System:Fetch:Enabled, index lists), listFetchEnabled (Baskets:System:Lists:FetchEnabled, the NSE F&O files), derivedEnabled (Baskets:System:Derived:Enabled); the Baskets screen disables its Fetch now and Recompute now buttons from them */
+    get: operations['GetSystemBasketSettings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/baskets/system/derived/refresh': {
     parameters: {
       query?: never;
@@ -22574,6 +22591,12 @@ export interface components {
       /** Format: date-time */
       retryAt?: null | string;
     };
+    /** @description Which owner-act switches are on (BK-04): `fetchEnabled` = Baskets:System:Fetch:Enabled (index lists), `listFetchEnabled` = Baskets:System:Lists:FetchEnabled (the two NSE F&amp;O files), `derivedEnabled` = Baskets:System:Derived:Enabled. The screen disables its buttons from these; the API stays the authority. */
+    SystemBasketSettingsView: {
+      fetchEnabled: boolean;
+      listFetchEnabled: boolean;
+      derivedEnabled: boolean;
+    };
     /** @description The system card (spec CF-11 D5). */
     SystemScorecardView: {
       /**
@@ -25898,6 +25921,26 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetSystemBasketSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SystemBasketSettingsView'];
         };
       };
     };
