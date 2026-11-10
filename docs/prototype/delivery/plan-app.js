@@ -5,7 +5,7 @@
   const KEY = "xd-plan-v1";
   const DAY = 864e5;
   const CAL_BOUND = ["P10", "P11", "P12", "OPS"]; // calendar-bound epics: duration is waiting/reviewing time, not build effort
-  const SHORT = { P0: "Foundations", P1: "Data platform", P2: "Portfolio & live", P3: "Simulator & DSL", P4: "Exits", P5: "Strategy Lab", P6: "Learning engine", P7: "Nightly plan", P8: "Reports & UI", P9: "AI assistant", P10: "Paper trading", P11: "Small live", P12: "Execution", P13: "Tick & depth", P14: "Options", P15: "Fundamentals", BK: "System baskets", CF: "Confidence", OPS: "Operations" };
+  const SHORT = { P0: "Foundations", P1: "Data platform", P2: "Portfolio & live", P3: "Simulator & DSL", P4: "Exits", P5: "Strategy Lab", P6: "Learning engine", P7: "Nightly plan", P8: "Reports & UI", P9: "AI assistant", P10: "Paper trading", P11: "Small live", P12: "Execution", P13: "Tick & depth", P14: "Options", P15: "Fundamentals", AU: "Automation", BK: "System baskets", CF: "Confidence", OPS: "Operations" };
   const DOCS = ["01-overview", "02-requirements", "03-target-architecture", "04-accounts-access-and-operations", "05-data-and-brokers", "06-instruments-and-baskets", "07-strategies", "08-exits-and-risk", "09-learning-engine", "10-trade-selection", "11-strategy-lab", "12-portfolio-monitoring", "13-reports-and-ui", "14-ai-assistant", "15-smart-insights-and-automation", "16-configuration", "17-deployment-and-operations", "18-roadmap", "19-risks-and-compliance", "20-extended-modules", "21-glossary"];
   const NAV = [
     ["progress", "✓", "Progress"], ["overview", "◉", "Overview"], ["roadmap", "▤", "Roadmap"], ["flow", "⇢", "Flow"], ["backlog", "☰", "Backlog"],
@@ -155,7 +155,7 @@
     const sOwner = sDraft.filter((x) => meta(x).o);
     const sDays = sDraft.reduce((a, x) => a + (meta(x).d || 0), 0);
     const builtIds = phases.filter((p) => p.state === "built").map((p) => p.id);
-    const sPhases = [...new Set(slices.map((x) => x[0].match(/^(P\d+|BK|CF)/)[0]))];
+    const sPhases = [...new Set(slices.map((x) => x[0].match(/^(P\d+|AU|BK|CF)/)[0]))];
     return `
     <section class="hero"><h2>Where we are — ${esc(P.asOf)}</h2><p class="lead">${esc(P.now)}</p></section>
     <div class="tiles">
@@ -196,7 +196,7 @@
         <span><b>${fmt(core.end, { year: "numeric" })}</b>core system complete (P0–P9)</span>
         <span><b>${fmt(paper.start, { year: "numeric" })}</b>paper trading starts</span>
         <span><b>${fmt(live.start, { year: "numeric" })}</b>earliest small live capital</span>
-        <span><b>${fmt(M.end, { year: "numeric" })}</b>full roadmap (P0–P15, BK, CF)</span>
+        <span><b>${fmt(M.end, { year: "numeric" })}</b>full roadmap (P0–P15, AU, BK, CF)</span>
       </div>
     </section>
     <div class="tiles">
