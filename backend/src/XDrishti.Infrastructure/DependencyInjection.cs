@@ -212,6 +212,7 @@ public static class DependencyInjection
         services.AddScoped<ILearningReportStore, LearningReportStore>(); // the insert-only learning reports, kind-keyed (spec P8-12, ADR 0110)
         services.AddScoped<IDigestStore, DigestStore>(); // the insert-only weekly digests (spec P7-15, ADR 0094)
         services.AddScoped<IPlanStore, PlanStore>(); // the insert-only plan record (spec P7-03, ADR 0083); no order of any kind
+        services.AddScoped<IAutoScopeStore, AutoScopeStore>(); // planning.auto_scopes: the owner's scope, insert-only (AU-16)
         services.AddScoped<IGradeStore, GradeStore>(); // insert-only grades of tickets (P7-13, ADR 0090)
         services.AddScoped<IGradeReader>(sp => sp.GetRequiredService<IGradeStore>()); // read-only view of the same store (P10-04)
         services.AddScoped<IBacktestPaperData, BacktestPaperData>(); // read-only paper entries for the backtest comparison (P10-04, ADR 0122)

@@ -105,7 +105,7 @@ public sealed class MlInfluenceArchitectureTests
 
         public static double? ShadowFigure(XDrishti.Application.Abstractions.Planning.NewPlanItem item) => XDrishti.Application.Shadow.ShadowPlanFacts.AdvisoryPWin(item);
 
-        public static void Deconstruct(XDrishti.Application.Abstractions.Planning.PlanEvidence evidence) => evidence.Deconstruct(out _, out _, out _, out _, out _, out _, out _, out _, out _);
+        public static void Deconstruct(XDrishti.Application.Abstractions.Planning.PlanEvidence evidence) => evidence.Deconstruct(out _, out _, out _, out _, out _, out _, out _, out _, out _, out _, out _);
     }
 
 

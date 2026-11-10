@@ -46,3 +46,6 @@ None.
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Contract regenerated (`scripts/gen-api.sh`) and migration added, where this slice has them
 - [ ] Design docs/ADR updated if behaviour changed
+
+## Build note 2026-11-10
+Built (backend): the scope store and `GET|PUT /api/auto/scope` (ADR 0251), the filter in the selection builder with the scope hash stored on the plan, `GET /api/auto/suggestions`, `n_eff` and the statistics as-of stored per plan item, and the `suggest.scope` Essential row read from the scope store (no reset: the row says to set another scope). A plan stored before this change has no n_eff, so its primary tickets read as not suggested. The UI is AU-18; the Essential row's control is a frontend step there (AU-09 AC3/AC4 for `suggest.scope` rest on this store).

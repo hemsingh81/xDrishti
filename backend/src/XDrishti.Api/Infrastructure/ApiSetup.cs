@@ -76,6 +76,7 @@ internal static class ApiSetup
         // Endpoint modules are registered explicitly — one line per feature module.
         services.AddSingleton<IEndpointModule, SystemEndpoints>();
         services.AddSingleton<IEndpointModule, SettingsEndpoints>(); // the settings catalog (AU-08, ADR 0242)
+        services.AddSingleton<IEndpointModule, AutoEndpoints>(); // the auto scope and the reasoned next-day suggestions; no order (AU-16)
         services.AddSingleton<IEndpointModule, EssentialSettingsEndpoints>(); // the Essential settings with who/when and Reset to default (AU-10)
         services.AddSingleton<Application.Abstractions.SettingsCatalog.ISettingsCatalogSource, Settings.SettingsCatalogSource>();
         services.AddSettingsCatalogHandler(); // registered with its source, in the Api only

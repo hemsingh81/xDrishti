@@ -52,7 +52,9 @@ public sealed record NewPlanItem(int Rank, TicketGroup Group, string Symbol, str
 /// <param name="Unavailable">Inputs that were missing; never a pass.</param>
 /// <param name="AdvisoryNote">A model's figure shown beside, labelled advisory, or empty.</param>
 /// <param name="PWinLower">The lower bound of the shrunk cell estimate of the win rate (P7-12: the only P(win) the auto-approval rule reads); null when not known.</param>
-public sealed record PlanEvidence(string CellKey, int Trades, string DataRange, string PWinBasis, double? PWin, double? ConservativeExpectancyR, IReadOnlyList<string> Unavailable, string? AdvisoryNote, double? PWinLower = null);
+/// <param name="NEff">Independent n of the cell (CF-01), or null when not computed (AU-16: never read as a pass).</param>
+/// <param name="StatsAsOf">The as-of date of the cell statistics, or null when there are none.</param>
+public sealed record PlanEvidence(string CellKey, int Trades, string DataRange, string PWinBasis, double? PWin, double? ConservativeExpectancyR, IReadOnlyList<string> Unavailable, string? AdvisoryNote, double? PWinLower = null, double? NEff = null, DateOnly? StatsAsOf = null);
 
 /// <summary>Size for one Trading account: paper, or manual live with its ramp scale (P11-04). The database repeats both rules.</summary>
 /// <param name="AccountId">The broker account.</param>

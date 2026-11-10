@@ -38,6 +38,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/auto/scope': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The baskets and stocks the system may suggest (suggest.scope); with none set, every eligible instrument is considered */
+    get: operations['GetAutoScope'];
+    /** Set the scope as the owner (session and CSRF token); appends a version and an audit row. 400 auto.scope_empty, auto.scope_too_large, auto.scope_unknown (an id that does not exist), 403 auto.owner_only */
+    put: operations['SetAutoScope'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auto/suggestions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The next-day suggestions of the newest plan of forDate (or the newest plan): what, why and on what evidence; missing figures read unavailable, tickets without required evidence are listed as not suggested; reserve and rejected stay visible. Suggestion only, no order is placed. 404 auto.no_plan */
+    get: operations['GetAutoSuggestions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/settings/essentials': {
     parameters: {
       query?: never;
@@ -6971,12 +7006,107 @@ export interface components {
       /** Format: date */
       to: string;
     };
+    /** @description The evidence figures as text; a missing figure reads `unavailable` and is never a pass. */
+    AutoEvidenceView: {
+      /** @description Trades in the cell. */
+      n: string;
+      /** @description Independent n. */
+      nEff: string;
+      /** @description Conservative expectancy in R. */
+      conservativeExpectancyR: string;
+      /** @description The regime of the cell, `all regimes` for a cell that spans them. */
+      regime: string;
+      /** @description The date the cell statistics are as of. */
+      dataAsOf: string;
+    };
     /** @description The daily automatic refresh: whether it is on, at what India time, and when it runs next. */
     AutoRefreshView: {
       enabled: boolean;
       timeIst: string;
       /** Format: date-time */
       nextRunAt: null | string;
+    };
+    /** @description The scope in force. With none set, `IsSet` is false and every eligible instrument is considered. */
+    AutoScopeView: {
+      /** @description Whether a scope was ever set. */
+      isSet: boolean;
+      /**
+       * Format: int64
+       * @description The version row, or null.
+       */
+      version: null | number;
+      /** @description The baskets. */
+      basketIds: string[];
+      /** @description The individual instruments. */
+      instrumentIds: string[];
+      /** @description The scope hash that plans carry, or null. */
+      hash: null | string;
+      /** @description Who set it, or null. */
+      changedBy: null | string;
+      /**
+       * Format: date-time
+       * @description When, or null.
+       */
+      changedAt: null | string;
+      /** @description `eligible` with no scope, else the counts in words. */
+      summary: string;
+    };
+    /** @description One suggestion: what, why and on what evidence. */
+    AutoSuggestionView: {
+      /**
+       * Format: int64
+       * @description The plan item.
+       */
+      itemId: number;
+      /**
+       * Format: int32
+       * @description Order in the plan.
+       */
+      rank: number;
+      /** @description Instrument. */
+      symbol: string;
+      /** @description BUY or SELL. */
+      side: string;
+      /** @description Strategy. */
+      strategyId: string;
+      /** @description Strategy version. */
+      strategyVersionHash: string;
+      levels: null | components['schemas']['TicketLevelsView'];
+      /** @description Why, in words. */
+      reasons: string[];
+      /** @description The evidence figures. */
+      evidence: components['schemas']['AutoEvidenceView'];
+      /** @description For a ticket not suggested: which evidence is missing; otherwise null. */
+      why: null | string;
+    };
+    /** @description What to look at for one session, with the basis and the words that no order is placed. */
+    AutoSuggestionsView: {
+      /**
+       * Format: date
+       * @description The session.
+       */
+      forDate: string;
+      /**
+       * Format: int64
+       * @description The plan the suggestions come from.
+       */
+      planId: number;
+      /** @description The state of that plan. */
+      planState: string;
+      /** @description The plan's basis text. */
+      basis: string;
+      /** @description Always string AutoSuggestionRules.NoOrderNotice. */
+      notice: string;
+      /** @description The scope hash stored on the plan, or null when it was built without a scope. */
+      scopeHash: null | string;
+      /** @description Primary tickets with all required evidence. */
+      suggestions: components['schemas']['AutoSuggestionView'][];
+      /** @description Primary tickets missing required evidence, with why. */
+      notSuggested: components['schemas']['AutoSuggestionView'][];
+      /** @description Reserve tickets with reasons. */
+      reserve: components['schemas']['AutoSuggestionView'][];
+      /** @description Rejected candidates with reasons. */
+      rejected: components['schemas']['AutoSuggestionView'][];
     };
     /** @description One change in the history. */
     AutonomyChangeView: {
@@ -21100,6 +21230,11 @@ export interface components {
       /** Format: int32 */
       sessions: number;
     };
+    /** @description The body of `PUT /api/auto/scope`: ids of baskets and of individual instruments; at least one in all. */
+    SetAutoScopeRequest: {
+      basketIds: null | string[];
+      instrumentIds: null | string[];
+    };
     /** @description The outcome of one set: the state and, for a failure, the thresholds that did not hold, in words. */
     SetOutcome: {
       set: string;
@@ -23109,6 +23244,81 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SettingsCatalogResponse'];
+        };
+      };
+    };
+  };
+  GetAutoScope: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AutoScopeView'];
+        };
+      };
+    };
+  };
+  SetAutoScope: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetAutoScopeRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AutoScopeView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAutoSuggestions: {
+    parameters: {
+      query?: {
+        forDate?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AutoSuggestionsView'];
         };
       };
     };

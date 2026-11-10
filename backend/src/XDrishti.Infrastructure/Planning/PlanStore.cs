@@ -31,7 +31,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
     private const string ItemColumns = $"""
         i.id, i.plan_id, i.item_rank, i.item_group, i.symbol, i.side, i.strategy_id, i.strategy_version_hash, i.trigger_text, i.stop_text, i.target_text, i.validity_text, i.reasons,
         i.cell_key, i.trades, i.data_range, i.p_win_basis, i.p_win, i.conservative_expectancy_r, i.unavailable, i.advisory_note, {ItemStateSql}, i.p_win_lower,
-        i.entry_ref_price, i.stop_level, i.stop_anchor, i.target_level, i.reward_risk, i.levels_session
+        i.entry_ref_price, i.stop_level, i.stop_anchor, i.target_level, i.reward_risk, i.levels_session, i.n_eff, i.stats_as_of
         """;
 
     public ValueTask<PlanPublished> PublishAsync(NewPlan plan, CancellationToken cancellationToken) => PublishCoreAsync(plan, null, cancellationToken);
@@ -550,8 +550,8 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
         await using (var insert = new NpgsqlCommand("""
             INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons,
                 cell_key, trades, data_range, p_win_basis, p_win, conservative_expectancy_r, unavailable, advisory_note, p_win_lower,
-                entry_ref_price, stop_level, stop_anchor, target_level, reward_risk, levels_session)
-            VALUES (@plan, @rank, @group, @symbol, @side, @sid, @shash, @trigger, @stop, @target, @validity, @reasons, @cell, @trades, @range, @basis, @pwin, @er, @unavail, @note, @pwl, @erp, @stl, @sta, @tgl, @rr, @ls) RETURNING id
+                entry_ref_price, stop_level, stop_anchor, target_level, reward_risk, levels_session, n_eff, stats_as_of)
+            VALUES (@plan, @rank, @group, @symbol, @side, @sid, @shash, @trigger, @stop, @target, @validity, @reasons, @cell, @trades, @range, @basis, @pwin, @er, @unavail, @note, @pwl, @erp, @stl, @sta, @tgl, @rr, @ls, @neff, @sao) RETURNING id
             """, connection, transaction))
         {
             var e = item.Evidence;
@@ -584,6 +584,8 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
             p.Add(new NpgsqlParameter("tgl", NpgsqlDbType.Numeric) { Value = lv?.Target is { } tv ? (object)tv : DBNull.Value });
             p.Add(new NpgsqlParameter("rr", NpgsqlDbType.Numeric) { Value = lv?.RewardRisk is { } rv ? (object)rv : DBNull.Value });
             p.Add(new NpgsqlParameter("ls", NpgsqlDbType.Date) { Value = lv is null ? DBNull.Value : (object)lv.Session });
+            p.Add(new NpgsqlParameter("neff", NpgsqlDbType.Double) { Value = e.NEff is { } ne ? ne : DBNull.Value });
+            p.Add(new NpgsqlParameter("sao", NpgsqlDbType.Date) { Value = e.StatsAsOf is { } sa ? sa : DBNull.Value });
             itemId = (long)(await insert.ExecuteScalarAsync(cancellationToken))!;
         }
 
@@ -607,7 +609,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time, 
         {
             while (await reader.ReadAsync(cancellationToken))
             {
-                var evidence = new PlanEvidence(reader.GetString(13), reader.GetInt32(14), reader.GetString(15), reader.GetString(16), Real(reader, 17), Real(reader, 18), reader.GetFieldValue<string[]>(19), Text(reader, 20), Real(reader, 22));
+                var evidence = new PlanEvidence(reader.GetString(13), reader.GetInt32(14), reader.GetString(15), reader.GetString(16), Real(reader, 17), Real(reader, 18), reader.GetFieldValue<string[]>(19), Text(reader, 20), Real(reader, 22), Real(reader, 29), reader.IsDBNull(30) ? null : reader.GetFieldValue<DateOnly>(30));
                 var item = new NewPlanItem(
                     reader.GetInt32(2), TicketGroupText.TryParse(reader.GetString(3)) ?? TicketGroup.Rejected, reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7),
                     reader.GetString(8), reader.GetString(9), reader.GetString(10), reader.GetString(11), reader.GetFieldValue<string[]>(12), evidence, [], LevelsOf(reader, Text(reader, 5)));

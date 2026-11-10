@@ -84,6 +84,9 @@ public sealed class DataEodRunTests(ApiFactory factory) : DataTestBase(factory)
     /// <summary>The scheduled jobs only, newest first (a test may have started others to arrange its data).</summary>
     private async Task<List<DataJobView>> DailyJobsAsync() => [.. (await JobsAsync()).Where(j => j.Trigger == "daily")];
 
+    // AU-02 recovery may add a partial-recovery warning when the shared database holds instruments seeded by other tests; this class asserts the service's own notices.
+    private static bool IsNotRecovery(ServiceNotice notice) => notice.Kind != "recovery_partial";
+
     private async Task<ServiceNotices> ServiceNoticesAsync()
     {
         using var response = await Client.GetAsync("/api/services/notices", Ct);
@@ -265,7 +268,7 @@ public sealed class DataEodRunTests(ApiFactory factory) : DataTestBase(factory)
         (run.Status, run.Trigger).ShouldBe(("failed", "daily"));
         var failedRun = (await EodRunsAsync()).ShouldHaveSingleItem();
         (failedRun.Status, failedRun.Message).ShouldBe(("failed", job.Error));
-        var notice = (await ServiceNoticesAsync()).Items.ShouldHaveSingleItem();
+        var notice = (await ServiceNoticesAsync()).Items.Where(IsNotRecovery).ShouldHaveSingleItem();
         (notice.Kind, notice.Severity, notice.Id).ShouldBe(("service_failed", "error", "service:failed:eod:2026-10-12"));
         notice.Text.ShouldStartWith("End-of-day data run failed on 12 Oct: ");
 
@@ -273,7 +276,7 @@ public sealed class DataEodRunTests(ApiFactory factory) : DataTestBase(factory)
         Factory.Dhan.UseSource(t => new IntradayResult(t.InstrumentId, [], 1));
         await TickAtAsync(At(13, 15, 50));
         (await NoticesAsync()).Items.ShouldBeEmpty();
-        (await ServiceNoticesAsync()).Items.ShouldBeEmpty();
+        (await ServiceNoticesAsync()).Items.Where(IsNotRecovery).ShouldBeEmpty();
     }
 
     [Fact]
