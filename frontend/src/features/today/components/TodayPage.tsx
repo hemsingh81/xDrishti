@@ -3,6 +3,7 @@ import WbSunnyIcon from '@mui/icons-material/WbSunnyOutlined';
 import { Box, Button, Card, CardContent, Stack, Typography } from '@mui/material';
 import { lazy, Suspense } from 'react';
 import { Link as RouterLink } from 'react-router';
+import { AutoTile } from '@/features/auto';
 import { LiveTile } from '@/features/live';
 import { PlanTile } from '@/features/plans';
 import { useSystemStatus } from '@/features/system-status';
@@ -45,6 +46,9 @@ export function TodayPage() {
       </Card>
       <Box sx={{ mt: 2 }}>
         <PlanTile />
+      </Box>
+      <Box sx={{ mt: 2 }}>
+        <AutoTile />
       </Box>
       <Box sx={{ mt: 2 }}>
         <LiveTile />

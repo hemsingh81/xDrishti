@@ -1,4 +1,5 @@
 import AccountBalanceIcon from '@mui/icons-material/AccountBalanceOutlined';
+import AutoModeIcon from '@mui/icons-material/AutoModeOutlined';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import BiotechIcon from '@mui/icons-material/BiotechOutlined';
 import ChatIcon from '@mui/icons-material/ChatOutlined';
@@ -45,6 +46,7 @@ export const navigation: NavSection[] = [
     title: 'Decisions',
     items: [
       { path: '/plans', label: 'Plan review', icon: ChecklistIcon },
+      { path: '/auto', label: 'Auto', icon: AutoModeIcon },
       { path: '/suggestions', label: 'Suggestions', icon: AutoAwesomeIcon },
     ],
   },

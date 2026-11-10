@@ -33,6 +33,7 @@ import { buildTimeline, sampleServicesWithQuotes } from './servicesFixtures';
 import { eventsHandlers } from './eventsFixtures';
 import { executionHandlers } from './executionFixtures';
 import { planHandlers } from './planFixtures';
+import { autoHandlers } from './autoFixtures';
 import { tradeHandlers } from './tradeFixtures';
 
 /** A made-up Dhan consent page URL (the documented form, with a fake consentAppId). */
@@ -51,6 +52,8 @@ export const handlers = [
   http.get('/api/system/status', () => HttpResponse.json(buildSystemStatus())),
   // Plans (P7-17): only the list, empty; a plan's own endpoints are never defaulted (see planFixtures).
   ...planHandlers,
+  // Auto (AU-18): off, no scope, no plan.
+  ...autoHandlers,
   // Results calendar and event filter (P15-11): no meetings, filter off; the tests of those screens bring their own.
   ...eventsHandlers,
   // Execution (P12-10): off, nothing to show; the execution tests bring their own.

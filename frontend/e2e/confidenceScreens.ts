@@ -4,6 +4,7 @@ import { learningFull } from './learningMounts';
 import type { Screen } from './matrix';
 import { p15Screens } from './p15Screens';
 import { recoveryScreens } from './recoveryScreen';
+import { autoScreens } from './autoMounts';
 import { simulationScreens } from './simulationMounts';
 import { settingsScreens } from './settingsScreen';
 
@@ -60,4 +61,5 @@ export const laterScreens: Screen[] = [
   ...recoveryScreens,
   ...settingsScreens,
   ...simulationScreens,
+  ...autoScreens,
 ];
