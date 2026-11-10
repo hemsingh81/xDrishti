@@ -41,6 +41,18 @@ internal sealed class FakeSimAllStore : ISimAllStore
         }
     }
 
+    public ValueTask<SimAllJob?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Job is { } job && job.Id == id ? job : null);
+
+    public ValueTask<SimAllFinished> ListFinishedAsync(Guid jobId, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            var done = Chunks.Where(c => c.State == SimAllStates.Done && c.Result?.RunKey is not null).Select(c => c.Result!.RunKey!).Order(StringComparer.Ordinal).ToList();
+            return ValueTask.FromResult(new SimAllFinished(done, Chunks.Count - done.Count));
+        }
+    }
+
     public ValueTask<SimAllInsert> InsertAsync(NewSimAllJob job, CancellationToken cancellationToken)
     {
         lock (_gate)

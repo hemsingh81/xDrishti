@@ -9,6 +9,7 @@ using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Learning;
 
@@ -48,51 +49,60 @@ internal sealed class ExtractTradeFeaturesHandler(
         }
 
         var started = time.GetTimestamp();
-        var trades = new List<SimTradeView>();
-        await foreach (var runTrade in runs.StreamTradesAsync(command.RunKey, false, cancellationToken))
-        {
-            var t = runTrade.Trade;
-            trades.Add(new SimTradeView(t.InstrumentId, t.Key, t.StrategyId, t.TriggerTimeframe, t.Side, t.TradeDate, t.DecisionEpochSeconds, t.StopPrice, t.TargetPrice));
-        }
-
         var runKey = command.RunKey;
-        var calendar = await calendars.GetAsync(cancellationToken);
-        var rows = new List<TradeFeatureRow>(trades.Count);
-        var noBars = 0;
         try
         {
-            foreach (var group in trades.GroupBy(t => t.InstrumentId))
-            {
-                var last = group.Max(t => SessionClock.DateOf(t.DecisionEpochSeconds));
-                var raw = await bars.ReadAsync(group.Key, SimulationBounds.From, SimulationBounds.Until(last), cancellationToken);
-                if (raw.Count == 0)
-                {
-                    noBars += group.Count();
-                    continue;
-                }
-
-                var factors = await adjustments.GetAsync(group.Key, cancellationToken);
-                var decisions = group.Select(t => new TradeFeatureDecision(t.Key, t.Timeframe, t.DecisionEpochSeconds, t.Side, t.StopPrice, t.TargetPrice)).ToList();
-                var values = extractor.Extract(raw, factors, calendar, decisions);
-                foreach (var t in group)
-                {
-                    if (values.TryGetValue(t.Key, out var v))
-                    {
-                        rows.Add(new TradeFeatureRow(runKey, t.Key, t.Strategy, t.Timeframe.ToCode(), t.Side.ToString().ToUpperInvariant(), t.TradeDate, t.DecisionEpochSeconds, v));
-                    }
-                }
-            }
-
-            var stored = await store.StoreAsync(rows, time.GetUtcNow(), cancellationToken);
+            var outcome = await ExtractAsync(runs.StreamTradesAsync(runKey, false, cancellationToken), runKey, bars, adjustments, calendars, extractor, store, time, cancellationToken);
             var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
-            FeatureLog.Extracted(logger, runKey[..12], trades.Count, stored, noBars, elapsedMs);
-            return Result.Success(new TradeFeaturesOutcome(trades.Count, stored, noBars));
+            FeatureLog.Extracted(logger, runKey[..12], outcome.Trades, outcome.Stored, outcome.NoBars, elapsedMs);
+            return Result.Success(outcome);
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
             FeatureLog.Failed(logger, runKey[..12]);
             throw;
         }
+    }
+
+    /// <summary>
+    /// The extraction itself, shared with the training from the simulation (AU-13): the trades of one run come from the caller (evidence or training reader), and a trade is described to the extractor by its decision instant, side, stop and target only.
+    /// </summary>
+    internal static async ValueTask<TradeFeaturesOutcome> ExtractAsync(IAsyncEnumerable<RunTrade> runTrades, string runKey, IBarStore bars, IAdjustmentFactors adjustments, ITradingCalendar calendars, ITradeFeatureExtractor extractor, ITradeFeatureStore store, TimeProvider time, CancellationToken cancellationToken)
+    {
+        var trades = new List<SimTradeView>();
+        await foreach (var runTrade in runTrades.WithCancellation(cancellationToken))
+        {
+            var t = runTrade.Trade;
+            trades.Add(new SimTradeView(t.InstrumentId, t.Key, t.StrategyId, t.TriggerTimeframe, t.Side, t.TradeDate, t.DecisionEpochSeconds, t.StopPrice, t.TargetPrice));
+        }
+
+        var calendar = await calendars.GetAsync(cancellationToken);
+        var rows = new List<TradeFeatureRow>(trades.Count);
+        var noBars = 0;
+        foreach (var group in trades.GroupBy(t => t.InstrumentId))
+        {
+            var last = group.Max(t => SessionClock.DateOf(t.DecisionEpochSeconds));
+            var raw = await bars.ReadAsync(group.Key, SimulationBounds.From, SimulationBounds.Until(last), cancellationToken);
+            if (raw.Count == 0)
+            {
+                noBars += group.Count();
+                continue;
+            }
+
+            var factors = await adjustments.GetAsync(group.Key, cancellationToken);
+            var decisions = group.Select(t => new TradeFeatureDecision(t.Key, t.Timeframe, t.DecisionEpochSeconds, t.Side, t.StopPrice, t.TargetPrice)).ToList();
+            var values = extractor.Extract(raw, factors, calendar, decisions);
+            foreach (var t in group)
+            {
+                if (values.TryGetValue(t.Key, out var v))
+                {
+                    rows.Add(new TradeFeatureRow(runKey, t.Key, t.Strategy, t.Timeframe.ToCode(), t.Side.ToString().ToUpperInvariant(), t.TradeDate, t.DecisionEpochSeconds, v));
+                }
+            }
+        }
+
+        var stored = await store.StoreAsync(rows, time.GetUtcNow(), cancellationToken);
+        return new TradeFeaturesOutcome(trades.Count, stored, noBars);
     }
 
     private sealed record SimTradeView(Guid InstrumentId, string Key, string Strategy, Timeframe Timeframe, Domain.Research.Side Side, DateOnly TradeDate, long DecisionEpochSeconds, double StopPrice, double? TargetPrice);

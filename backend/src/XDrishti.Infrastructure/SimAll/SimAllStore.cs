@@ -89,6 +89,37 @@ internal sealed class SimAllStore(NpgsqlDataSource dataSource) : ISimAllStore
         return await ReadJobAsync(connection, null, $"SELECT {JobColumns} FROM research.sim_all_jobs WHERE state IN ('running', 'paused') LIMIT 1", cancellationToken);
     }
 
+    public async ValueTask<SimAllJob?> GetAsync(Guid id, CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand($"SELECT {JobColumns} FROM research.sim_all_jobs WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadJob(reader) : null;
+    }
+
+    public async ValueTask<SimAllFinished> ListFinishedAsync(Guid jobId, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT run_key, state FROM research.sim_all_chunks WHERE job_id = @job ORDER BY run_key NULLS LAST, ordinal");
+        command.Parameters.AddWithValue("job", NpgsqlDbType.Uuid, jobId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var keys = new List<string>();
+        var notFinished = 0;
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (!reader.IsDBNull(0) && reader.GetString(1) == "done")
+            {
+                keys.Add(reader.GetString(0));
+            }
+            else
+            {
+                notFinished++;
+            }
+        }
+
+        return new SimAllFinished(keys, notFinished);
+    }
+
     public ValueTask<bool> PauseAsync(Guid id, string reason, DateTimeOffset now, CancellationToken cancellationToken) =>
         ChangeAsync("UPDATE research.sim_all_jobs SET state = 'paused', pause_reason = @reason, updated_at = @now WHERE id = @id AND (state = 'running' OR (state = 'paused' AND pause_reason <> 'owner' AND @reason = 'owner'))", id, reason, now, cancellationToken);
 
@@ -207,8 +238,9 @@ internal sealed class SimAllStore(NpgsqlDataSource dataSource) : ISimAllStore
     {
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken)
-            ? new SimAllJob(reader.GetGuid(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2), reader.GetFieldValue<DateOnly>(3), reader.GetFieldValue<DateOnly>(4), reader.GetFieldValue<DateOnly>(5), reader.GetInt32(6), reader.GetString(7), reader.GetFieldValue<DateTimeOffset>(8), reader.GetFieldValue<DateTimeOffset>(9), reader.IsDBNull(10) ? null : reader.GetFieldValue<DateTimeOffset>(10))
-            : null;
+        return await reader.ReadAsync(cancellationToken) ? ReadJob(reader) : null;
     }
+
+    private static SimAllJob ReadJob(NpgsqlDataReader reader) =>
+        new(reader.GetGuid(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2), reader.GetFieldValue<DateOnly>(3), reader.GetFieldValue<DateOnly>(4), reader.GetFieldValue<DateOnly>(5), reader.GetInt32(6), reader.GetString(7), reader.GetFieldValue<DateTimeOffset>(8), reader.GetFieldValue<DateTimeOffset>(9), reader.IsDBNull(10) ? null : reader.GetFieldValue<DateTimeOffset>(10));
 }

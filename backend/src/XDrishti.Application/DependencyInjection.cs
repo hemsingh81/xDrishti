@@ -42,6 +42,7 @@ using XDrishti.Application.Filings;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
+using XDrishti.Application.Learning.SimTraining;
 using XDrishti.Application.LearningPhase;
 using XDrishti.Application.Live;
 using XDrishti.Application.Live.Push;
@@ -792,6 +793,9 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ResumeSimAllCommand, SimAllView>, ResumeSimAllHandler>();
         services.AddScoped<ICommandHandler<CancelSimAllCommand, SimAllView>, CancelSimAllHandler>();
         services.AddScoped<IQueryHandler<GetSimAllQuery, Result<SimAllView>>, GetSimAllHandler>();
+        services.TryAddSingleton(new SimTrainingSettings()); // training from the simulation is off until the host's configuration turns it on (AU-13, ADR 0249)
+        services.AddScoped<ICommandHandler<TrainFromSimulationCommand, SimTrainingView>, TrainFromSimulationHandler>();
+        services.AddScoped<IQueryHandler<GetSimTrainingQuery, Result<SimTrainingView>>, GetSimTrainingHandler>();
     }
 
     /// <summary>The chunk executor and the runner of the simulate-everything job (AU-12): only the host that runs the job (the API) calls this.</summary>

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using XDrishti.Api.Auth;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Learning.SimTraining;
 using XDrishti.Application.SimAll;
 using XDrishti.Domain.Common;
 
@@ -25,6 +26,11 @@ internal sealed class SimAllEndpoints : IEndpointModule
         group.MapGet("/current", GetAsync)
             .WithName("GetSimulateAll")
             .WithSummary("The active job, else the newest one: state, why it waits, the window, the range covered, chunks done, failed, running and remaining, and the measured estimate of time and disk once 1 % of the chunks is done. Read while it runs. 404 simulate_all.no_active_job when there never was a job")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/{id:guid}/training", GetTrainingAsync)
+            .WithName("GetSimulateAllTraining")
+            .WithSummary("The training from the simulation of a job (AU-13): folds, rows, the out-of-fold score beside the baseline, that the hold-out was not read, and the challenger it registered (never a champion). state not_evaluable names the missing quantity. 404 sim_training.not_found")
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapPost("/pause", (HttpContext http, ICommandHandler<PauseSimAllCommand, SimAllView> handler, CancellationToken ct) => ControlAsync(http, a => handler.HandleAsync(new PauseSimAllCommand(a), ct)))
@@ -61,6 +67,13 @@ internal sealed class SimAllEndpoints : IEndpointModule
     private static async Task<Results<Ok<SimAllView>, ProblemHttpResult>> GetAsync(HttpContext http, IQueryHandler<GetSimAllQuery, Result<SimAllView>> handler, CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(new GetSimAllQuery(), cancellationToken);
+        http.Response.Headers.CacheControl = "no-store";
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<SimTrainingView>, ProblemHttpResult>> GetTrainingAsync(Guid id, HttpContext http, IQueryHandler<GetSimTrainingQuery, Result<SimTrainingView>> handler, CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetSimTrainingQuery(id), cancellationToken);
         http.Response.Headers.CacheControl = "no-store";
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }

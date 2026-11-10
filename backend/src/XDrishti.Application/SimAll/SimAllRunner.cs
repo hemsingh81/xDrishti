@@ -5,7 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Market.Calendar;
+using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.SimAll;
+using XDrishti.Application.Learning.SimTraining;
 using XDrishti.Domain.Research.SimAll;
 
 namespace XDrishti.Application.SimAll;
@@ -25,6 +27,7 @@ public sealed class SimAllRunner(IServiceScopeFactory scopes, SimAllSettings set
 
     private DateTimeOffset? _backfillCheckedAt;
     private bool _backfillIncomplete;
+    private readonly HashSet<Guid> _trainingAttempted = [];
     private int _active;
     private int _peak;
 
@@ -67,6 +70,7 @@ public sealed class SimAllRunner(IServiceScopeFactory scopes, SimAllSettings set
         var store = scope.ServiceProvider.GetRequiredService<ISimAllStore>();
         if (await store.GetActiveAsync(cancellationToken) is not { } job)
         {
+            await TrainAfterJobAsync(scope.ServiceProvider, store, cancellationToken);
             return;
         }
 
@@ -103,6 +107,79 @@ public sealed class SimAllRunner(IServiceScopeFactory scopes, SimAllSettings set
         }
     }
 
+    /// <summary>
+    /// After a job has completed, trains from it once per host start (AU-13): only when the owner turned <c>Training:Enabled</c> on, and only while the yield rules (market hours, disk, a bar-history job) allow. The handler is idempotent by input hash, so a restart that repeats the
+    /// attempt writes nothing. A failure is logged and not retried until the next start. It trains a challenger at most and places no order.
+    /// </summary>
+    private async Task TrainAfterJobAsync(IServiceProvider services, ISimAllStore store, CancellationToken cancellationToken)
+    {
+        if (services.GetService<SimTrainingSettings>() is not { Enabled: true } || await store.GetCurrentAsync(cancellationToken) is not { Job: { } last }
+            || last.State is not (SimAllStates.Completed or SimAllStates.CompletedWithFailures) || _trainingAttempted.Contains(last.Id))
+        {
+            return;
+        }
+
+        var yield = await YieldAsync(services, false, cancellationToken);
+        if (yield.Reason is not null)
+        {
+            return;
+        }
+
+        _trainingAttempted.Add(last.Id);
+
+        // as for a chunk: the market opening is a deadline, and a watcher looks at disk and the bar-history job while training runs; either cancels it and the attempt is released, so it resumes at a later tick
+        using var stop = new CancellationTokenSource();
+        using var deadline = yield.Deadline is { } at ? new CancellationTokenSource(TimeSpan.FromTicks(Math.Max(0, (at - time.GetUtcNow()).Ticks)), time) : new CancellationTokenSource();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token, stop.Token);
+        var watcher = WatchTrainingAsync(stop, linked.Token);
+        try
+        {
+            await services.GetRequiredService<ICommandHandler<TrainFromSimulationCommand, SimTrainingView>>().HandleAsync(new TrainFromSimulationCommand(last.Id), linked.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _trainingAttempted.Remove(last.Id); // the market opened or a yield rule says wait: nothing was stored, a later tick tries again
+        }
+        catch (OperationCanceledException)
+        {
+            _trainingAttempted.Remove(last.Id);
+            throw;
+        }
+#pragma warning disable CA1031 // a failed training must not stop the job loop; it is logged and tried again at the next start
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            SimTrainingLog.Failed(logger, last.Id, ex);
+        }
+        finally
+        {
+            await linked.CancelAsync();
+            await watcher;
+        }
+    }
+
+    /// <summary>Looks at the yield rules (disk, a running bar-history job) every poll interval while training runs and cancels it when one says wait.</summary>
+    private async Task WatchTrainingAsync(CancellationTokenSource stop, CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await Task.Delay(settings.PollInterval, time, token);
+                await using var scope = scopes.CreateAsyncScope();
+                if ((await YieldAsync(scope.ServiceProvider, false, token)).Reason is not null)
+                {
+                    await stop.CancelAsync();
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // training ended or the host stops
+        }
+    }
+
     private async Task WorkerAsync(SimAllJob job, CancellationToken hostStop)
     {
         while (!hostStop.IsCancellationRequested)
@@ -125,8 +202,8 @@ public sealed class SimAllRunner(IServiceScopeFactory scopes, SimAllSettings set
             InterlockedMax(ref _peak, concurrent);
             try
             {
-                // the market opening is a deadline for the chunk in flight: it is cancelled and put back, not left to run into the session
-                using var open = yield.Deadline is { } at ? new CancellationTokenSource(at - time.GetUtcNow(), time) : new CancellationTokenSource();
+                // the market opening is a deadline for the chunk in flight: it is cancelled and put back, not left to run into the session (a deadline that has just passed cancels at once; a negative delay would throw)
+                using var open = yield.Deadline is { } at ? new CancellationTokenSource(TimeSpan.FromTicks(Math.Max(0, (at - time.GetUtcNow()).Ticks)), time) : new CancellationTokenSource();
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(hostStop, open.Token);
                 var outcome = await RunChunkAsync(scope.ServiceProvider, store, job, chunk, linked.Token, hostStop);
                 if (outcome != ChunkOutcome.Recorded)
@@ -179,6 +256,8 @@ public sealed class SimAllRunner(IServiceScopeFactory scopes, SimAllSettings set
         catch (Exception ex)
 #pragma warning restore CA1031
         {
+            // shortcut: a chunk whose result keeps failing to record is retried at every tick with no attempt count and no backoff (ADR 0248 point 3). Add a per-chunk attempt count (a column on sim_all_chunks) and a growing delay
+            // the first time one chunk is seen failing to record more than a handful of times in the log (event RecordFailed), since each retry re-runs the whole chunk and holds a worker.
             SimAllLog.RecordFailed(logger, chunk.JobId, ex);
             await ReleaseQuietlyAsync(store, chunk);
             return ChunkOutcome.RecordFailed;

@@ -42,7 +42,7 @@ public sealed class SimAllApiTests(ApiFactory factory) : DataTestBase(factory)
     {
         await using var connection = await OpenAsync();
         const string training = "SELECT id FROM research.sim_runs WHERE purpose = 'training'";
-        await ExecuteAsync(connection, $"DELETE FROM research.sim_all_chunks; DELETE FROM research.sim_all_jobs; DELETE FROM research.sim_trade_leg_charges WHERE run_id IN ({training}); DELETE FROM research.sim_trade_legs WHERE run_id IN ({training}); DELETE FROM research.sim_trades WHERE run_id IN ({training}); DELETE FROM research.sim_runs WHERE purpose = 'training'; DELETE FROM lab.test_ledger WHERE trial_kind = 'training_sweep'; DELETE FROM lab.strategy_versions WHERE strategy_id IN (SELECT id FROM lab.strategies WHERE built_in); DELETE FROM lab.strategies WHERE built_in; DELETE FROM lab.holdout_unlocks; DELETE FROM lab.holdout_blocks; DELETE FROM accounts.account_events WHERE event LIKE 'SimulateAll%'");
+        await ExecuteAsync(connection, $"DELETE FROM research.training_sim_cell_stats; DELETE FROM research.sim_training_runs; DELETE FROM research.sim_all_chunks; DELETE FROM research.sim_all_jobs; DELETE FROM research.sim_trade_leg_charges WHERE run_id IN ({training}); DELETE FROM research.sim_trade_legs WHERE run_id IN ({training}); DELETE FROM research.sim_trades WHERE run_id IN ({training}); DELETE FROM research.sim_runs WHERE purpose = 'training'; DELETE FROM lab.test_ledger WHERE trial_kind = 'training_sweep'; DELETE FROM lab.strategy_versions WHERE strategy_id IN (SELECT id FROM lab.strategies WHERE built_in); DELETE FROM lab.strategies WHERE built_in; DELETE FROM lab.holdout_unlocks; DELETE FROM lab.holdout_blocks; DELETE FROM accounts.account_events WHERE event LIKE 'SimulateAll%'");
     }
 
     private async Task<Guid> TrackedAsync(string ticker, IEnumerable<Bar> bars)
@@ -207,5 +207,35 @@ public sealed class SimAllApiTests(ApiFactory factory) : DataTestBase(factory)
         await PostAsync("/cancel", HttpStatusCode.OK);
         var reopened = await Should.ThrowAsync<Npgsql.PostgresException>(() => ExecuteAsync(connection, "UPDATE research.sim_all_jobs SET state = 'running', pause_reason = NULL, finished_at = NULL"));
         reopened.MessageText.ShouldContain("finished simulate-everything job");
+    }
+
+    [Fact]
+    public async Task The_training_of_a_job_is_read_by_its_id_with_the_summary_the_card_shows_and_an_unknown_job_is_404()
+    {
+        var job = Guid.NewGuid();
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(connection, "INSERT INTO research.sim_all_jobs (id, state, window_from, window_to, hold_out_start, workers, started_by, created_at, updated_at, finished_at) VALUES (@id, 'completed', '2026-01-01', '2030-10-31', '2031-01-01', 2, 'owner:me@example.com', now(), now(), now())", ("id", job));
+        }
+
+        var missing = await ReadAsync(await Client.GetAsync(new Uri($"/api/simulate-all/{job}/training", UriKind.Relative), Ct), HttpStatusCode.NotFound);
+        missing.GetProperty("code").GetString().ShouldBe("sim_training.not_found");
+
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var record = new SimTrainingRecord(new string('a', 64), job, "trained", null, 4, 0, 5000, 1, 7, 8, 5, 7, new DateOnly(2026, 1, 1), new DateOnly(2030, 10, 31), new DateOnly(2031, 1, 1), 0.61, 0.64, "base_rate", 0.21, 0.22, "Inconclusive", 7, new string('c', 64), "summary text", DateTimeOffset.UtcNow);
+            await scope.ServiceProvider.GetRequiredService<ISimTrainingStore>().StoreAsync(record, new DateOnly(2030, 10, 31), [], Ct);
+        }
+
+        var found = await ReadAsync(await Client.GetAsync(new Uri($"/api/simulate-all/{job}/training", UriKind.Relative), Ct), HttpStatusCode.OK);
+        found.GetProperty("state").GetString().ShouldBe("trained");
+        found.GetProperty("role").GetString().ShouldBe("challenger");
+        found.GetProperty("holdOutRead").GetBoolean().ShouldBeFalse();
+        found.GetProperty("foldsUsed").GetInt32().ShouldBe(7);
+        found.GetProperty("rows").GetInt32().ShouldBe(5000);
+        found.GetProperty("score").GetProperty("baselineName").GetString().ShouldBe("base_rate");
+        found.GetProperty("verdict").GetString().ShouldBe("Inconclusive");
+        using var anonymous = await Factory.CreateAnonymousClient().GetAsync(new Uri($"/api/simulate-all/{job}/training", UriKind.Relative), Ct);
+        anonymous.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 }

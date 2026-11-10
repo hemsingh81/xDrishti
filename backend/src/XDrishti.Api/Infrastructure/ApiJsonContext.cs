@@ -30,6 +30,7 @@ using XDrishti.Application.Filings;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Learning.Jobs;
+using XDrishti.Application.Learning.SimTraining;
 using XDrishti.Application.Live.Push;
 using XDrishti.Application.LiveTrading;
 using XDrishti.Application.Market.Actions;
@@ -281,6 +282,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ExperimentPreviewView))]
 [JsonSerializable(typeof(SimAllView))]
 [JsonSerializable(typeof(SimAllEstimate))]
+[JsonSerializable(typeof(SimTrainingView))]
+[JsonSerializable(typeof(SimTrainingScore))]
 [JsonSerializable(typeof(ExperimentJobView))]
 [JsonSerializable(typeof(ExperimentJobList))]
 [JsonSerializable(typeof(StartExperimentRequest))]

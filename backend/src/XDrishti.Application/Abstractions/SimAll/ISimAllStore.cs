@@ -43,4 +43,10 @@ public interface ISimAllStore
 
     /// <summary>Ends a running job whose chunks are all finished, with its end state; null when chunks are left or the job is not running.</summary>
     ValueTask<string?> CompleteIfFinishedAsync(Guid jobId, DateTimeOffset now, CancellationToken cancellationToken);
+
+    /// <summary>A job by id (any state), or null (AU-13).</summary>
+    ValueTask<SimAllJob?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>The finished chunks of a job with their run keys, in a fixed order (by run key), and how many chunks did not finish (failed or never run). AU-13 trains on the finished ones only and says how complete that is.</summary>
+    ValueTask<SimAllFinished> ListFinishedAsync(Guid jobId, CancellationToken cancellationToken);
 }
