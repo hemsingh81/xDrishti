@@ -99,7 +99,7 @@ public sealed class CorrelationTable
             .Concat(y.Where(kv => !x.ContainsKey(kv.Key)))
             .ToDictionary(kv => kv.Key, kv => kv.Value);
 
-    private static double? Pearson(double[] x, double[] y)
+    internal static double? Pearson(double[] x, double[] y)
     {
         var mx = x.Average();
         var my = y.Average();
