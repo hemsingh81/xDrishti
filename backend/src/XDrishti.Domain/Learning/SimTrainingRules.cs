@@ -50,7 +50,7 @@ public static class SimTrainingRules
             longest = Math.Max(longest, days[i].DayNumber - days[i - sessions].DayNumber);
         }
 
-        return longest == 0 ? (sessions * 7 + 4) / 5 : longest; // no calendar information (too short a window): five sessions a week
+        return longest == 0 ? (sessions * 7 + 4) / 5 : longest; // no calendar information (window too short to hold more sessions than the embargo): sessions x 7/5 days, rounded up. Holidays are unknown here, so this is a floor that can be a day or two short; the calendar branch above is exact
     }
 
     /// <summary>

@@ -226,11 +226,26 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
     {
         // AU-12 (ADR 0243 point 7, ADR 0248): the reader of training runs is not evidence. Only its port, its implementation, the registration and the learning side may name it; Lab, Confidence, Selection, Reporting,
         // Planning, Research (the run store) and the readiness scorecard may not. AU-13 added the one handler of the learning side (SimTrainingArchitectureTests pins what it may name).
-        var allowed = new[] { "XDrishti.Application/Abstractions/SimAll/ITrainingRunReader.cs", "XDrishti.Infrastructure/SimAll/TrainingRunReader.cs", "XDrishti.Infrastructure/DependencyInjection.cs", "XDrishti.Application/Learning/SimTraining/TrainFromSimulationHandler.cs" };
+        var allowed = new[] { "XDrishti.Application/Abstractions/SimAll/ITrainingRunReader.cs", "XDrishti.Infrastructure/SimAll/TrainingRunReader.cs", "XDrishti.Infrastructure/SimAll/TrainingReportSource.cs", "XDrishti.Infrastructure/DependencyInjection.cs", "XDrishti.Application/Learning/SimTraining/TrainFromSimulationHandler.cs" };
         var users = Sources().Where(f => File.ReadAllText(f).Contains("TrainingRunReader", StringComparison.Ordinal)).Select(Rel).Order(StringComparer.Ordinal).ToList();
 
         users.ShouldBe([.. allowed.Order(StringComparer.Ordinal)]);
         Sources().Where(f => Rel(f).StartsWith("XDrishti.Application/SimAll/", StringComparison.Ordinal)).Select(f => File.ReadAllText(f)).ShouldAllBe(t => !t.Contains("ITrainingRunReader", StringComparison.Ordinal), "the job writes training runs and never reads them back");
+    }
+
+    [Fact]
+    public void The_report_engine_reaches_training_runs_only_through_the_training_report_port_and_the_evidence_source_never_reads_them()
+    {
+        // AU-14 (ADR 0250): the report engine is evidence code. It may name the PORT of training reports (one place, the loader), never the reader, and no statement of it may name the training purpose; the evidence report source stays research-only.
+        var port = Sources().Where(f => File.ReadAllText(f).Contains("ITrainingReportSource", StringComparison.Ordinal)).Select(Rel).Order(StringComparer.Ordinal).ToList();
+
+        port.ShouldBe(["XDrishti.Application/Abstractions/Reporting/ITrainingReportSource.cs", "XDrishti.Application/Reporting/ReportLoader.cs", "XDrishti.Infrastructure/Ai/ReadOnly/AiReadOnlyRegistration.cs", "XDrishti.Infrastructure/Ai/ReadOnly/NoTrainingReports.cs", "XDrishti.Infrastructure/DependencyInjection.cs", "XDrishti.Infrastructure/SimAll/TrainingReportSource.cs"]);
+        foreach (var file in Sources().Where(f => Rel(f).StartsWith("XDrishti.Application/Reporting/", StringComparison.Ordinal) || Rel(f).EndsWith("Research/ReportTradeSource.cs", StringComparison.Ordinal)))
+        {
+            var text = File.ReadAllText(file);
+            text.ShouldNotContain("ITrainingRunReader", Case.Sensitive, Rel(file));
+            text.ShouldNotContain("purpose = 'training'", Case.Sensitive, Rel(file));
+        }
     }
 
     [Fact]

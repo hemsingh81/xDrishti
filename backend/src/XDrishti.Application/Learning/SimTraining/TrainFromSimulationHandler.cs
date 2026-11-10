@@ -111,6 +111,7 @@ internal sealed class TrainFromSimulationHandler(
         var training = data.Training!;
         var rows = data.Rows;
         var trainingSetId = training.Id;
+        cancellationToken.ThrowIfCancellationRequested(); // a cancelled train stores nothing more (a training set already stored is content-addressed and harmless)
         await trainingSets.StoreAsync(new TrainingSetToStore(training, $"sim-all:{c.Job.Id:D}", data.Options, data.Unresolved, data.NoTarget, Actor, c.Now), cancellationToken);
 
         var validation = SimTrainingRules.Options(c.EmbargoDays, 1);
@@ -165,6 +166,7 @@ internal sealed class TrainFromSimulationHandler(
             versionKey, model.Sha256, model.Bytes.Length, model.Trainer, model.Note, trainingSetId, training.FeatureVersion, model.Width, model.FitRows, model.CalibrationRows, rows.Count, from, to, c.Job.HoldOutStart,
             outcome, verdict.UsedFolds, verdict.FoldsBeatingBoth, verdict.FoldsNeeded, verdict.PooledBeatsBoth, verdict.PooledEcePp, pooled.LogLoss, pooled.Brier, string.Join('\n', reasons), reportText, parameters,
             model.CalibrationScores, model.CalibrationValues, model.Importance, validation.Trials, 0, c.Now, Actor);
+        cancellationToken.ThrowIfCancellationRequested(); // an orphan model file is content-addressed and harmless, but a cancelled train writes no more
         var written = await files.WriteAsync(model.Sha256, model.Bytes, cancellationToken);
         if (written.IsFailure)
         {

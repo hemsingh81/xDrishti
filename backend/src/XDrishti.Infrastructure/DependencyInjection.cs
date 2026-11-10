@@ -175,10 +175,12 @@ public static class DependencyInjection
         services.AddScoped<ICapabilityLog>(sp => sp.GetRequiredService<CapabilityLogStore>());
         services.AddScoped<ICapabilityLogWriter>(sp => sp.GetRequiredService<CapabilityLogStore>());
         services.AddScoped<ISimAllStore, XDrishti.Infrastructure.SimAll.SimAllStore>(); // the simulate-everything job: its tables are the queue and the progress (AU-12, ADR 0248)
+        services.AddScoped<ITrainingJobProgress>(sp => sp.GetRequiredService<ISimAllStore>()); // the job progress the reports read (AU-14)
         services.AddScoped<ISimAllUniverse, XDrishti.Infrastructure.SimAll.SimAllUniverse>();
         services.AddScoped<ISimAllBackfillGate, XDrishti.Infrastructure.SimAll.SimAllBackfillGate>();
         services.AddSingleton<IFreeDiskProbe, XDrishti.Infrastructure.SimAll.FreeDiskProbe>();
         services.AddScoped<ITrainingRunReader, XDrishti.Infrastructure.SimAll.TrainingRunReader>(); // the one NON-evidence reader of training runs (ADR 0243 point 7)
+        services.AddScoped<ITrainingReportSource, XDrishti.Infrastructure.SimAll.TrainingReportSource>(); // the training runs for the reports, through that reader only (AU-14, ADR 0250)
         services.AddScoped<ISimTrainingStore, XDrishti.Infrastructure.SimAll.SimTrainingStore>(); // training from the simulation: its record and its training_sim cell statistics (AU-13, ADR 0249)
         services.AddScoped<IExperimentJobStore, ExperimentJobStore>(); // the replay jobs the owner started: table is the queue (P8-18 Part B, ADR 0129)
         services.AddScoped<IHeavyJobProbe, LabHeavyJobProbe>();
@@ -197,6 +199,8 @@ public static class DependencyInjection
         services.AddScoped<ITrainingSetStore, TrainingSetStore>(); // the training-set records (spec P6-04)
         services.AddOptions<ReportBenchmarkOptions>().Bind(configuration.GetSection(ReportBenchmarkOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // basket benchmarks (spec P8-07)
         services.AddScoped(sp => sp.GetRequiredService<IOptions<ReportBenchmarkOptions>>().Value);
+        services.AddOptions<ReportTrainingOptions>().Bind(configuration.GetSection(ReportTrainingOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // reports over a simulate-everything job (AU-14, ADR 0250)
+        services.AddScoped(sp => sp.GetRequiredService<IOptions<ReportTrainingOptions>>().Value);
         services.AddOptions<RecoverySettings>().Bind(configuration.GetSection(RecoverySettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // the reach, debounce and attempts of the recovery pass (ADR 0240)
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<RecoverySettings>>().Value);
         services.AddOptions<PlanVsActualSettings>().Bind(configuration.GetSection(PlanVsActualSettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // plan versus actual (spec P8-04)

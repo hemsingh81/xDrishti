@@ -36,13 +36,12 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
 
     private const string RunIdsSql = "SELECT id, run_key FROM research.sim_runs WHERE run_key = ANY(@keys) AND purpose = 'research'";
 
-    private const string TradesSelect = """
-        SELECT t.run_id, t.trade_key, t.strategy_id, t.trigger_timeframe, t.side, t.instrument_id, t.symbol, t.basket_ids, t.trade_date, t.exit_epoch_seconds, t.r_filled, t.r_net, t.sessions_held, t.ordinal
-        FROM research.sim_trades t
-        WHERE t.run_id = ANY(@run_ids) AND t.open_at_end = false
-        """;
+    /// <summary>The columns of a report trade, in the order <see cref="Read"/> takes them (AU-14: the reader of training runs selects the same ones).</summary>
+    internal const string TradeColumnList = "t.run_id, t.trade_key, t.strategy_id, t.trigger_timeframe, t.side, t.instrument_id, t.symbol, t.basket_ids, t.trade_date, t.exit_epoch_seconds, t.r_filled, t.r_net, t.sessions_held, t.ordinal";
 
-    private const string ExcursionColumns = ", t.mae_r, t.mfe_r, t.entry_epoch_seconds, t.exit_reason";
+    private const string TradesSelect = "SELECT " + TradeColumnList + " FROM research.sim_trades t WHERE t.run_id = ANY(@run_ids) AND t.open_at_end = false";
+
+    internal const string ExcursionColumns = ", t.mae_r, t.mfe_r, t.entry_epoch_seconds, t.exit_reason";
 
     private static readonly ValueList<string> NoBaskets = new([]);
 
@@ -116,6 +115,23 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
         await using var command = new NpgsqlCommand { Connection = connection };
         var sql = new StringBuilder(filter.WithExcursions ? TradesSelect.Replace("t.ordinal", "t.ordinal" + ExcursionColumns, StringComparison.Ordinal) : TradesSelect);
         command.Parameters.AddWithValue("run_ids", NpgsqlDbType.Array | NpgsqlDbType.Bigint, runs.Keys.ToArray());
+        ApplyFilter(sql, command, filter);
+
+        sql.Append(" ORDER BY t.run_id, t.ordinal");
+        command.CommandText = sql.ToString();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var timeframes = new Dictionary<string, string>(StringComparer.Ordinal);
+        var strings = new Dictionary<string, string>(StringComparer.Ordinal);
+        var singleBasket = new Dictionary<Guid, ValueList<string>>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            yield return Read(reader, runs, timeframes, strings, singleBasket, filter.WithExcursions);
+        }
+    }
+
+    /// <summary>The filter of a report as parameters of the statement, never text in it (shared with the reader of training runs, AU-14).</summary>
+    internal static void ApplyFilter(StringBuilder sql, NpgsqlCommand command, ReportTradeFilter filter)
+    {
         AnyOf(sql, command, "strategy_id", filter.Strategies);
         AnyOf(sql, command, "trigger_timeframe", [.. filter.Timeframes.Select(CodeToName)]);
         AnyOf(sql, command, "side", [.. filter.Sides.Select(s => s.ToLowerInvariant())]);
@@ -137,20 +153,9 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
             sql.Append(" AND t.trade_date <= @date_to");
             command.Parameters.AddWithValue("date_to", NpgsqlDbType.Date, to);
         }
-
-        sql.Append(" ORDER BY t.run_id, t.ordinal");
-        command.CommandText = sql.ToString();
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        var timeframes = new Dictionary<string, string>(StringComparer.Ordinal);
-        var strings = new Dictionary<string, string>(StringComparer.Ordinal);
-        var singleBasket = new Dictionary<Guid, ValueList<string>>();
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            yield return Read(reader, runs, timeframes, strings, singleBasket, filter.WithExcursions);
-        }
     }
 
-    private static ReportTrade Read(NpgsqlDataReader reader, Dictionary<long, string> runs, Dictionary<string, string> timeframes, Dictionary<string, string> strings, Dictionary<Guid, ValueList<string>> singleBasket, bool excursions)
+    internal static ReportTrade Read(NpgsqlDataReader reader, Dictionary<long, string> runs, Dictionary<string, string> timeframes, Dictionary<string, string> strings, Dictionary<Guid, ValueList<string>> singleBasket, bool excursions)
     {
         var timeframeName = reader.GetString(3);
         if (!timeframes.TryGetValue(timeframeName, out var timeframe))
@@ -205,7 +210,7 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
             Ordinal: reader.GetInt32(13));
     }
 
-    private static string Intern(Dictionary<string, string> strings, string value)
+    internal static string Intern(Dictionary<string, string> strings, string value)
     {
         if (strings.TryGetValue(value, out var known))
         {
@@ -216,10 +221,10 @@ internal sealed class ReportTradeSource(NpgsqlDataSource dataSource) : IReportTr
         return value;
     }
 
-    private static string CodeToName(string code) =>
+    internal static string CodeToName(string code) =>
         Timeframes.TryParse(code, out var timeframe) ? EnumText<Timeframe>.Name(timeframe) : throw new ArgumentException("A timeframe filter is a code the query parser accepted.", nameof(code));
 
-    private static void AnyOf(StringBuilder sql, NpgsqlCommand command, string column, IReadOnlyList<string> values)
+    internal static void AnyOf(StringBuilder sql, NpgsqlCommand command, string column, IReadOnlyList<string> values)
     {
         if (values.Count == 0)
         {

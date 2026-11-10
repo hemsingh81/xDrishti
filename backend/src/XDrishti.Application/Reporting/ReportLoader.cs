@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
+using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Reporting;
 
@@ -11,13 +12,16 @@ namespace XDrishti.Application.Reporting;
 /// A net basis is allowed only by the owner's stored confirmation of the charge sheet (<see cref="IChargeSheetConfirmationSource"/>), read here and nowhere else; nothing in the query can supply it. The load is bounded: the closed trades of the runs, from their stored
 /// headers, may not exceed <see cref="MaxClosedTrades"/> (refused before one trade is read), and one report at a time holds a population in memory (<see cref="ReportGate"/>).
 /// </summary>
-internal sealed class ReportLoader(IReportTradeSource source, IChargeSheetConfirmationSource confirmations, IHoldingClassifications classifications, ReportGate gate, TimeProvider time, ILogger<ReportLoader> logger)
+internal sealed class ReportLoader(IReportTradeSource source, ITrainingReportSource trainingSource, ITrainingJobProgress simJobs, IChargeSheetConfirmationSource confirmations, IHoldingClassifications classifications, ReportTrainingOptions trainingSettings, ReportGate gate, TimeProvider time, ILogger<ReportLoader> logger)
 {
     /// <summary>
     /// The most closed trades (by the run headers, before any filter) one request reads. Chosen from the measured peak of one request (ADR 0100): the population of 500,000 trades takes about the figure the ADR states above the idle process, which, with one report in memory at a
     /// time, stays well inside the 1 GB limit of the API container. A run above it is refused with 422 <c>reports.too_large</c>, never cut. P8-10 added five optional fields to each trade (about 56 bytes a trade, 28 MB at the limit, by the field sizes; the columns behind them are read only by the excursion report and an hour lens, see ReportTradeFilter.WithExcursions); the peak was not re-measured.
     /// </summary>
     public const int MaxClosedTrades = 500_000;
+
+    /// <summary>The most distinct training runs one training report may hold: the headers of the runs are read in one statement of at most this many keys (the reader refuses more). Past it the report is refused to narrow, never cut.</summary>
+    public const int MaxTrainingRuns = 100_000;
 
     public async ValueTask<Result<LoadedReport>> LoadAsync(ReportQuery query, string kind, CancellationToken cancellationToken)
     {
@@ -37,6 +41,11 @@ internal sealed class ReportLoader(IReportTradeSource source, IChargeSheetConfir
 
     private async ValueTask<Result<LoadedReport>> BuildAsync(ReportQuery query, long started, string kind, CancellationToken cancellationToken)
     {
+        if (query.Sim is { } sim)
+        {
+            return await BuildTrainingAsync(query, sim, started, kind, cancellationToken);
+        }
+
         var all = await source.ListRunsAsync(cancellationToken);
         List<ReportRunInfo> chosen;
         var isDefault = query.Runs.Count == 0;
@@ -119,6 +128,86 @@ internal sealed class ReportLoader(IReportTradeSource source, IChargeSheetConfir
             var milliseconds = (long)time.GetElapsedTime(started).TotalMilliseconds;
             ReportLog.Loaded(logger, kind, used.Count, trades.Count, basis, milliseconds);
             return Result.Success(new LoadedReport(population.Value, used, isDefault, lease));
+        }
+        catch
+        {
+            lease.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// A report over a simulate-everything job (AU-14, ADR 0250): a training simulation, never evidence. Only chunks done at the as-of instant are read; the range is cut to the training window, which ends before the hold-out block, so no trade of the block is asked for; the closed trades
+    /// are streamed up to <see cref="ReportTrainingOptions.MaxTrades"/> and a larger answer is refused, never cut (narrow by stock, basket or date). Each run is its own universe (one strategy over one instrument), so runs of different stocks are never taken for the same population.
+    /// </summary>
+    private async ValueTask<Result<LoadedReport>> BuildTrainingAsync(ReportQuery query, TrainingSelector sim, long started, string kind, CancellationToken cancellationToken)
+    {
+        var progress = await simJobs.GetProgressAsync(sim.JobId, cancellationToken);
+        if (progress is null)
+        {
+            return Result.Failure<LoadedReport>(Error.NotFound("reports.not_found", sim.JobId is { } id ? $"No simulate-everything job {id:D}." : "There is no simulate-everything job yet."));
+        }
+
+        var asOf = time.GetUtcNow();
+        var asked = query.Filters;
+        var scope = TrainingScope.Of(progress, asked.From, asked.To);
+        var (job, from, to, nothing) = (scope.Job, scope.From, scope.To, scope.Nothing);
+
+        var lease = await gate.EnterAsync(cancellationToken);
+        try
+        {
+            var filter = asked.ToTradeFilter() with { From = from, To = to, WithExcursions = NeedsExcursions(query, kind) };
+            var trades = new List<ReportTrade>();
+            var runKeys = new HashSet<string>(StringComparer.Ordinal);
+            if (!nothing)
+            {
+                await foreach (var trade in trainingSource.StreamTradesAsync(job.Id, asOf, filter, cancellationToken))
+                {
+                    trades.Add(trade);
+                    if (runKeys.Add(trade.RunKey) && runKeys.Count > MaxTrainingRuns)
+                    {
+                        lease.Dispose();
+                        return Result.Failure<LoadedReport>(Error.Validation("reports.too_large", $"This training report spans more than {MaxTrainingRuns} runs; narrow it by stock, basket or strategy."));
+                    }
+
+                    if (trades.Count > trainingSettings.MaxTrades)
+                    {
+                        lease.Dispose();
+                        return Result.Failure<LoadedReport>(Error.Validation("reports.too_large", $"This training report holds more than {trainingSettings.MaxTrades} closed trades; narrow it by stock, basket, strategy or a shorter date range."));
+                    }
+                }
+            }
+
+            if (trades.Count > 0 && query.Lens.Contains(ReportDimension.Sector))
+            {
+                await AttachSectorsAsync(trades, cancellationToken);
+            }
+
+            var instrumentOf = new Dictionary<string, (Guid Id, string Symbol)>(StringComparer.Ordinal);
+            foreach (var trade in trades)
+            {
+                instrumentOf.TryAdd(trade.RunKey, (trade.InstrumentId, trade.Symbol));
+            }
+
+            var headers = await trainingSource.ListRunsAsync([.. instrumentOf.Keys], cancellationToken);
+            var infos = headers.Where(h => instrumentOf.ContainsKey(h.RunKey)).Select(h =>
+            {
+                var (instrument, symbol) = instrumentOf[h.RunKey];
+                return new ReportRunInfo(h.RunKey, h.StrategyId, "training", symbol + " (training simulation)", "training:" + instrument.ToString("D"), h.From, h.To, null, null, null, null, null, h.TradeCount, h.OpenAtEndCount, h.CreatedAt);
+            }).ToList();
+
+            var population = ReportPopulation.Create([.. infos.Select(r => r.ToReportRun())], trades, new ReportOptions { Basis = ReportBasis.Gross });
+            if (population.IsFailure)
+            {
+                lease.Dispose();
+                return Result.Failure<LoadedReport>(population.Error);
+            }
+
+            var seen = trades.Select(t => t.Symbol).ToHashSet(StringComparer.Ordinal);
+            var completeness = scope.Completeness(asOf, [.. asked.Symbols.Where(x => !seen.Contains(x)).Order(StringComparer.Ordinal)]);
+            var milliseconds = (long)time.GetElapsedTime(started).TotalMilliseconds;
+            ReportLog.Loaded(logger, kind, infos.Count, trades.Count, "gross", milliseconds);
+            return Result.Success(new LoadedReport(population.Value, infos, false, lease, completeness));
         }
         catch
         {

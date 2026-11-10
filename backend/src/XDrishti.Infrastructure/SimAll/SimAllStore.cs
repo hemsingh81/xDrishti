@@ -83,6 +83,73 @@ internal sealed class SimAllStore(NpgsqlDataSource dataSource) : ISimAllStore
         return new SimAllSnapshot(job, new SimAllCounts(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2), reader.GetInt32(3), reader.GetInt32(4), reader.GetInt64(5), reader.GetInt64(6), reader.GetInt64(7)));
     }
 
+    public async ValueTask<SimAllSnapshot?> GetProgressAsync(Guid? id, CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var find = new NpgsqlCommand(id is null
+            ? $"SELECT {JobColumns} FROM research.sim_all_jobs ORDER BY (state IN ('running', 'paused')) DESC, created_at DESC LIMIT 1"
+            : $"SELECT {JobColumns} FROM research.sim_all_jobs WHERE id = @id", connection);
+        if (id is { } value)
+        {
+            find.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, value);
+        }
+
+        SimAllJob? job;
+        await using (var reader = await find.ExecuteReaderAsync(cancellationToken))
+        {
+            job = await reader.ReadAsync(cancellationToken) ? ReadJob(reader) : null;
+        }
+
+        return job is null ? null : new SimAllSnapshot(job, (await LightCountsAsync(connection, [job.Id], cancellationToken))[job.Id]);
+    }
+
+    public async ValueTask<IReadOnlyList<SimAllSnapshot>> ListProgressAsync(int skip, int take, CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        var jobs = new List<SimAllJob>();
+        await using (var find = new NpgsqlCommand($"SELECT {JobColumns} FROM research.sim_all_jobs ORDER BY created_at DESC, id OFFSET @skip LIMIT @take", connection))
+        {
+            find.Parameters.AddWithValue("skip", NpgsqlDbType.Integer, Math.Max(0, skip));
+            find.Parameters.AddWithValue("take", NpgsqlDbType.Integer, Math.Clamp(take, 1, 50));
+            await using var reader = await find.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                jobs.Add(ReadJob(reader));
+            }
+        }
+
+        var counts = await LightCountsAsync(connection, [.. jobs.Select(j => j.Id)], cancellationToken);
+        return [.. jobs.Select(j => new SimAllSnapshot(j, counts[j.Id]))];
+    }
+
+    private static async Task<Dictionary<Guid, SimAllCounts>> LightCountsAsync(NpgsqlConnection connection, Guid[] ids, CancellationToken cancellationToken)
+    {
+        var result = ids.ToDictionary(i => i, _ => new SimAllCounts(0, 0, 0, 0, 0, 0, 0, 0));
+        if (ids.Length == 0)
+        {
+            return result;
+        }
+
+        await using var command = new NpgsqlCommand("SELECT job_id, state, count(*)::int FROM research.sim_all_chunks WHERE job_id = ANY(@ids) GROUP BY job_id, state", connection);
+        command.Parameters.AddWithValue("ids", NpgsqlDbType.Array | NpgsqlDbType.Uuid, ids);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var (job, state, n) = (reader.GetGuid(0), reader.GetString(1), reader.GetInt32(2));
+            var c = result[job];
+            result[job] = c with
+            {
+                Total = c.Total + n,
+                Done = c.Done + (state == "done" ? n : 0),
+                Failed = c.Failed + (state == "failed" ? n : 0),
+                Running = c.Running + (state == "running" ? n : 0),
+                Pending = c.Pending + (state == "pending" ? n : 0),
+            };
+        }
+
+        return result;
+    }
+
     public async ValueTask<SimAllJob?> GetActiveAsync(CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);

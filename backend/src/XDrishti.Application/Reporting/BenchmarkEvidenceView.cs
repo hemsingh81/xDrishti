@@ -6,4 +6,6 @@ namespace XDrishti.Application.Reporting;
 /// <param name="Range">The window.</param>
 /// <param name="Limits">The honest limits, as text.</param>
 /// <param name="UnavailableInputs">Inputs that do not exist, each with the reason.</param>
-public sealed record BenchmarkEvidenceView(string Basis, int N, BenchmarkWindowView Range, IReadOnlyList<string> Limits, IReadOnlyList<string> UnavailableInputs);
+/// <param name="Completeness">Only on a training benchmark (AU-14): that it is a training simulation, not evidence, and the range cut to the training window; absent from the evidence benchmarks.</param>
+public sealed record BenchmarkEvidenceView(string Basis, int N, BenchmarkWindowView Range, IReadOnlyList<string> Limits, IReadOnlyList<string> UnavailableInputs,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] TrainingCompletenessView? Completeness = null);

@@ -55,6 +55,11 @@ internal static class ReportViews
         var block = evidence.Population;
         var openLeftOut = report.Runs.Sum(r => r.OpenAtEnd);
         var limits = new List<string>(evidence.Limits) { UniverseLimit, SourcesLimit };
+        if (report.Completeness is { } training)
+        {
+            limits.InsertRange(0, TrainingCompletenessView.Limits(training.HoldOutStart));
+        }
+
         if (openLeftOut > 0)
         {
             limits.Add(string.Create(CultureInfo.InvariantCulture, $"{openLeftOut} {(openLeftOut == 1 ? "trade" : "trades")} still open at the end of the data in these runs {(openLeftOut == 1 ? "is" : "are")} left out (counted over the whole runs, before any date, symbol or basket filter of this report)."));
@@ -73,7 +78,8 @@ internal static class ReportViews
             [.. evidence.UnavailableInputs],
             evidence.DuplicateTradesDropped,
             openLeftOut,
-            evidence.NetBasisConfirmation?.Text);
+            evidence.NetBasisConfirmation?.Text,
+            report.Completeness);
     }
 
     public static GroupsView Groups(ReportGrouping grouping, LoadedReport report) => new(

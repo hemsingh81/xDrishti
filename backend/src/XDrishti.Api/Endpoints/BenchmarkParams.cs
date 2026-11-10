@@ -7,4 +7,6 @@ internal sealed record BenchmarkParams(
     [FromQuery(Name = "basket")] string? Basket = null,
     [FromQuery(Name = "from")] string? From = null,
     [FromQuery(Name = "to")] string? To = null,
-    [FromQuery(Name = "membersAsOf")] string? MembersAsOf = null);
+    [FromQuery(Name = "membersAsOf")] string? MembersAsOf = null,
+    [FromQuery(Name = "purpose")] string? Purpose = null,
+    [FromQuery(Name = "simJob")] string? SimJob = null);

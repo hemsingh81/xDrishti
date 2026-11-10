@@ -5,7 +5,9 @@ using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
+using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Application.Ai;
+using XDrishti.Application.Reporting;
 using XDrishti.Infrastructure.Ai.ReadOnly.DataReader;
 using XDrishti.Infrastructure.Lab;
 using XDrishti.Infrastructure.Research;
@@ -33,6 +35,10 @@ public static class AiReadOnlyRegistration
         // The typed tools (spec P9-05, ADR 0139): the report engine over the very reader of the Reports screen (under the read login, column grants), and the reviewed views.
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IReportTradeSource>(sp => new ReportTradeSource(sp.GetRequiredService<AiDataSources>().Read));
+        services.TryAddSingleton<NoTrainingReports>(); // this host never reads a training run, and the read login has no grant on the job tables
+        services.TryAddSingleton<ITrainingReportSource>(sp => sp.GetRequiredService<NoTrainingReports>());
+        services.TryAddSingleton<ITrainingJobProgress>(sp => sp.GetRequiredService<NoTrainingReports>());
+        services.TryAddSingleton(new ReportTrainingOptions());
         services.TryAddSingleton<IChargeSheetConfirmationSource, NoChargeSheetConfirmation>();
         services.TryAddSingleton<IHoldingClassifications, ReportClassifications>();
         services.AddAssistantReportTools();

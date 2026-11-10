@@ -18,8 +18,10 @@ internal sealed record ReportFilterParams(
     [FromQuery(Name = "basket")] string? Basket = null,
     [FromQuery(Name = "symbol")] string? Symbol = null,
     [FromQuery(Name = "from")] string? From = null,
-    [FromQuery(Name = "to")] string? To = null)
+    [FromQuery(Name = "to")] string? To = null,
+    [FromQuery(Name = "purpose")] string? Purpose = null,
+    [FromQuery(Name = "simJob")] string? SimJob = null)
 {
     /// <summary>The raw input for the Application.</summary>
-    public ReportQueryInput ToInput() => new(Runs, Basis, null, Strategy, Timeframe, Side, Style, Exit, Basket, Symbol, From, To);
+    public ReportQueryInput ToInput() => new(Runs, Basis, null, Strategy, Timeframe, Side, Style, Exit, Basket, Symbol, From, To, Purpose: Purpose, SimJob: SimJob);
 }

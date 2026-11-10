@@ -4315,7 +4315,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The headline figures of the whole report population: trades, win rate, average win and loss R, expectancy, profit factor, total R, maximum drawdown, longest loss streak, holding sessions, the shrunk win rate with its credible lower bound. Each figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) and carries a number only for a value; the evidence block says what stands behind it. Read only. Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** The headline figures of the whole report population: trades, win rate, average win and loss R, expectancy, profit factor, total R, maximum drawdown, longest loss streak, holding sessions, the shrunk win rate with its credible lower bound. Each figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) and carries a number only for a value; the evidence block says what stands behind it. Read only. Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. Add purpose=training (and simJob=<guid>; default the active, else the newest job) to read a simulate-everything job instead of the evidence runs: a training simulation, not evidence, gross R only, labelled so in evidence.completeness (kind, label, job state, complete, chunks done of total, failed, as-of, the window, the range actually read, whether it was cut before the locked hold-out block and the sentence that says so, stocks asked for with no result, the route of the training record). Only chunks finished at the as-of instant are read; filter by stock (symbol) or basket; a larger answer than 500,000 closed trades is refused (422 reports.too_large), never cut. Without purpose=training the answer is the evidence reports as before and no training run is ever in it. */
     get: operations['GetReportSummary'];
     put?: never;
     post?: never;
@@ -4332,7 +4332,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The report grouped by the lens, in a fixed order (a value that was not recorded last). A trade in several baskets appears under each, so basket totals are not additive (nonAdditive says so). Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** The report grouped by the lens, in a fixed order (a value that was not recorded last). A trade in several baskets appears under each, so basket totals are not additive (nonAdditive says so). Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. Add purpose=training (and simJob=<guid>; default the active, else the newest job) to read a simulate-everything job instead of the evidence runs: a training simulation, not evidence, gross R only, labelled so in evidence.completeness (kind, label, job state, complete, chunks done of total, failed, as-of, the window, the range actually read, whether it was cut before the locked hold-out block and the sentence that says so, stocks asked for with no result, the route of the training record). Only chunks finished at the as-of instant are read; filter by stock (symbol) or basket; a larger answer than 500,000 closed trades is refused (422 reports.too_large), never cut. Without purpose=training the answer is the evidence reports as before and no training run is ever in it. */
     get: operations['GetReportGroups'];
     put?: never;
     post?: never;
@@ -4349,7 +4349,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** A pivot of the two dimensions of the lens (rows first; exactly two) by one figure (metric, snake case, default expectancy_r): every cell of the grid, empty where no trade fell and masked (insufficient, with its count) below the minimum sample, never a zero. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** A pivot of the two dimensions of the lens (rows first; exactly two) by one figure (metric, snake case, default expectancy_r): every cell of the grid, empty where no trade fell and masked (insufficient, with its count) below the minimum sample, never a zero. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. Add purpose=training (and simJob=<guid>; default the active, else the newest job) to read a simulate-everything job instead of the evidence runs: a training simulation, not evidence, gross R only, labelled so in evidence.completeness (kind, label, job state, complete, chunks done of total, failed, as-of, the window, the range actually read, whether it was cut before the locked hold-out block and the sentence that says so, stocks asked for with no result, the route of the training record). Only chunks finished at the as-of instant are read; filter by stock (symbol) or basket; a larger answer than 500,000 closed trades is refused (422 reports.too_large), never cut. Without purpose=training the answer is the evidence reports as before and no training run is ever in it. */
     get: operations['GetReportPivot'];
     put?: never;
     post?: never;
@@ -4366,7 +4366,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The equity curve (running R at the end of each exit date) and the deepest drawdown of each date for each group of the lens. A group below the minimum sample has no curve, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** The equity curve (running R at the end of each exit date) and the deepest drawdown of each date for each group of the lens. A group below the minimum sample has no curve, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. Add purpose=training (and simJob=<guid>; default the active, else the newest job) to read a simulate-everything job instead of the evidence runs: a training simulation, not evidence, gross R only, labelled so in evidence.completeness (kind, label, job state, complete, chunks done of total, failed, as-of, the window, the range actually read, whether it was cut before the locked hold-out block and the sentence that says so, stocks asked for with no result, the route of the training record). Only chunks finished at the as-of instant are read; filter by stock (symbol) or basket; a larger answer than 500,000 closed trades is refused (422 reports.too_large), never cut. Without purpose=training the answer is the evidence reports as before and no training run is ever in it. */
     get: operations['GetReportEquity'];
     put?: never;
     post?: never;
@@ -4383,7 +4383,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The distribution of R of each group of the lens in bins of half an R from -4 R to 6 R with an open bin at each end. A group below the minimum sample has no bins, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** The distribution of R of each group of the lens in bins of half an R from -4 R to 6 R with an open bin at each end. A group below the minimum sample has no bins, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. Add purpose=training (and simJob=<guid>; default the active, else the newest job) to read a simulate-everything job instead of the evidence runs: a training simulation, not evidence, gross R only, labelled so in evidence.completeness (kind, label, job state, complete, chunks done of total, failed, as-of, the window, the range actually read, whether it was cut before the locked hold-out block and the sentence that says so, stocks asked for with no result, the route of the training record). Only chunks finished at the as-of instant are read; filter by stock (symbol) or basket; a larger answer than 500,000 closed trades is refused (422 reports.too_large), never cut. Without purpose=training the answer is the evidence reports as before and no training run is ever in it. */
     get: operations['GetReportDistribution'];
     put?: never;
     post?: never;
@@ -4400,8 +4400,25 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The excursions of each group of the lens as counts, never one point per trade: a grid of the maximum adverse excursion (0.25 R bins to 2 R, then 2 R or more) by the result R (half an R, -5 R to +5 R with a tail at each end), a histogram of the maximum favourable excursion (half an R to 5 R, then 5 R or more), how many trades reached +1, +2 and +3 R at some point, and the 90th percentile (nearest rank) of the adverse excursion of the winners. Trades with no recorded excursion are left out and counted apart (excursionN). A group below the minimum sample has no counts, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** The excursions of each group of the lens as counts, never one point per trade: a grid of the maximum adverse excursion (0.25 R bins to 2 R, then 2 R or more) by the result R (half an R, -5 R to +5 R with a tail at each end), a histogram of the maximum favourable excursion (half an R to 5 R, then 5 R or more), how many trades reached +1, +2 and +3 R at some point, and the 90th percentile (nearest rank) of the adverse excursion of the winners. Trades with no recorded excursion are left out and counted apart (excursionN). A group below the minimum sample has no counts, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. Add purpose=training (and simJob=<guid>; default the active, else the newest job) to read a simulate-everything job instead of the evidence runs: a training simulation, not evidence, gross R only, labelled so in evidence.completeness (kind, label, job state, complete, chunks done of total, failed, as-of, the window, the range actually read, whether it was cut before the locked hold-out block and the sentence that says so, stocks asked for with no result, the route of the training record). Only chunks finished at the as-of instant are read; filter by stock (symbol) or basket; a larger answer than 500,000 closed trades is refused (422 reports.too_large), never cut. Without purpose=training the answer is the evidence reports as before and no training run is ever in it. */
     get: operations['GetReportMaeMfe'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/sim-jobs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The simulate-everything jobs a training report can read, newest first, a page at a time (limit 1 to 50, default 20; cursor from the previous page): id (pass it as simJob), state, whether it is complete (completed, every chunk done, none failed), chunks done of total and failed, the training window and the locked hold-out start. A training simulation, not evidence. Read only. 422 reports.invalid */
+    get: operations['ListReportSimJobs'];
     put?: never;
     post?: never;
     delete?: never;
@@ -4451,7 +4468,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The eight auto-insights (best and weakest strategy, basket gap, side bias, best exit, weekday, regime, calibration) as fixed sentences. A figure is stated only when every group compared has at least 15 trades; otherwise the insight says why it states nothing. The insights compare fixed groupings, so there is no lens. Read only. Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** The eight auto-insights (best and weakest strategy, basket gap, side bias, best exit, weekday, regime, calibration) as fixed sentences. A figure is stated only when every group compared has at least 15 trades; otherwise the insight says why it states nothing. The insights compare fixed groupings, so there is no lens. Read only. Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. Add purpose=training (and simJob=<guid>; default the active, else the newest job) to read a simulate-everything job instead of the evidence runs: a training simulation, not evidence, gross R only, labelled so in evidence.completeness (kind, label, job state, complete, chunks done of total, failed, as-of, the window, the range actually read, whether it was cut before the locked hold-out block and the sentence that says so, stocks asked for with no result, the route of the training record). Only chunks finished at the as-of instant are read; filter by stock (symbol) or basket; a larger answer than 500,000 closed trades is refused (422 reports.too_large), never cut. Without purpose=training the answer is the evidence reports as before and no training run is ever in it. */
     get: operations['GetReportInsights'];
     put?: never;
     post?: never;
@@ -4468,7 +4485,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** What works, in which basket, on which timeframe, with which exit: the cells (the dimensions of the lens, or basket, strategy, timeframe, side and exit by default) ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and the answer 'nothing has enough evidence yet' when no cell qualifies (a 200, not an error). Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** What works, in which basket, on which timeframe, with which exit: the cells (the dimensions of the lens, or basket, strategy, timeframe, side and exit by default) ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and the answer 'nothing has enough evidence yet' when no cell qualifies (a 200, not an error). Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday, sector (as of today), hour (the entry hour in India time, intraday runs only) (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. Add purpose=training (and simJob=<guid>; default the active, else the newest job) to read a simulate-everything job instead of the evidence runs: a training simulation, not evidence, gross R only, labelled so in evidence.completeness (kind, label, job state, complete, chunks done of total, failed, as-of, the window, the range actually read, whether it was cut before the locked hold-out block and the sentence that says so, stocks asked for with no result, the route of the training record). Only chunks finished at the as-of instant are read; filter by stock (symbol) or basket; a larger answer than 500,000 closed trades is refused (422 reports.too_large), never cut. Without purpose=training the answer is the evidence reports as before and no training run is ever in it. */
     get: operations['GetReportWhatWorks'];
     put?: never;
     post?: never;
@@ -4485,7 +4502,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** What simply holding each basket would have done over a window (equal weight, bought at the first close and held, price return, dividends not included) beside the benchmark index in force, each with the instruments behind it and every instrument left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price, too_few_bars). Takes basket (ids, comma separated, at most 12), from, to (default the window of the default run set; window.source says which) and membersAsOf (default the India date of the newest run of the basket, else today; members as of that date, not as of each trading day). Fewer than 3 included instruments gives no number. Baskets share instruments, so nonAdditive is true and there is no total. Read only. 422 reports.invalid; 404 reports.not_found. */
+    /** What simply holding each basket would have done over a window (equal weight, bought at the first close and held, price return, dividends not included) beside the benchmark index in force, each with the instruments behind it and every instrument left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price, too_few_bars). Takes basket (ids, comma separated, at most 12), from, to (default the window of the default run set; window.source says which) and membersAsOf (default the India date of the newest run of the basket, else today; members as of that date, not as of each trading day). Fewer than 3 included instruments gives no number. Baskets share instruments, so nonAdditive is true and there is no total. Read only. 422 reports.invalid; 404 reports.not_found. Add purpose=training (and simJob=<guid>; default the active, else the newest job) to read a simulate-everything job instead of the evidence runs: a training simulation, not evidence, gross R only, labelled so in evidence.completeness (kind, label, job state, complete, chunks done of total, failed, as-of, the window, the range actually read, whether it was cut before the locked hold-out block and the sentence that says so, stocks asked for with no result, the route of the training record). Only chunks finished at the as-of instant are read; filter by stock (symbol) or basket; a larger answer than 500,000 closed trades is refused (422 reports.too_large), never cut. Without purpose=training the answer is the evidence reports as before and no training run is ever in it. */
     get: operations['GetReportBenchmarks'];
     put?: never;
     post?: never;
@@ -4519,7 +4536,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** A page of the closed trades the report counts, in the order of the exits (limit 1 to 1,000, default 100; cursor from the previous page, which belongs to that report and is refused for another): the very set the figures were computed from, open-at-end trades excluded. Every page recomputes the population. There is no lens. Read only. Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
+    /** A page of the closed trades the report counts, in the order of the exits (limit 1 to 1,000, default 100; cursor from the previous page, which belongs to that report and is refused for another): the very set the figures were computed from, open-at-end trades excluded. Every page recomputes the population. There is no lens. Read only. Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. Add purpose=training (and simJob=<guid>; default the active, else the newest job) to read a simulate-everything job instead of the evidence runs: a training simulation, not evidence, gross R only, labelled so in evidence.completeness (kind, label, job state, complete, chunks done of total, failed, as-of, the window, the range actually read, whether it was cut before the locked hold-out block and the sentence that says so, stocks asked for with no result, the route of the training record). Only chunks finished at the as-of instant are read; filter by stock (symbol) or basket; a larger answer than 500,000 closed trades is refused (422 reports.too_large), never cut. Without purpose=training the answer is the evidence reports as before and no training run is ever in it. */
     get: operations['ListReportTrades'];
     put?: never;
     post?: never;
@@ -7320,6 +7337,7 @@ export interface components {
       limits: string[];
       /** @description Inputs that do not exist, each with the reason. */
       unavailableInputs: string[];
+      completeness?: null | components['schemas']['TrainingCompletenessView'];
     };
     /** @description An instrument left out; Reason is no_bars, too_few_bars, starts_late, ends_early, discontinuity or bad_price. */
     BenchmarkExclusionView: {
@@ -19793,6 +19811,7 @@ export interface components {
       openAtEndLeftOut: number;
       /** @description What the owner confirmed, for a net report; null for a gross one. */
       netBasisConfirmation: null | string;
+      completeness?: null | components['schemas']['TrainingCompletenessView'];
     };
     /** @description The stored out-of-sample exit choices (spec P8-10 part b, ADR 0054): which exit won each fold of a walk-forward, whether the choice is stable, and what the record itself says it is worth. */
     ReportExitSelectionsView: {
@@ -19874,6 +19893,10 @@ export interface components {
       limit?: null | string;
       /** @description The cursor the previous page of the trade list returned. */
       cursor?: null | string;
+      /** @description `research` (default: the evidence reports) or `training` (a simulate-everything job: a training simulation, not evidence, AU-14). */
+      purpose?: null | string;
+      /** @description The job a training report reads (a guid); the active-else-newest job when empty. Only with `purpose=training`. */
+      simJob?: null | string;
     };
     /** @description The registration row of a report (spec CF-06, AC12): `registered` or `not_registered`, and the texts when registered. */
     ReportRegistrationView: {
@@ -21481,6 +21504,67 @@ export interface components {
       finishedAt: null | string;
       estimate: null | components['schemas']['SimAllEstimate'];
     };
+    /** @description One job a training report can read: what it covers and how far it has got. A training simulation, not evidence. */
+    SimReportJobView: {
+      /**
+       * Format: uuid
+       * @description The job; pass it as `simJob`.
+       */
+      id: string;
+      /** @description running, paused, completed, completed_with_failures or cancelled. */
+      state: string;
+      /** @description The job is completed with every chunk done and none failed. */
+      complete: boolean;
+      /**
+       * Format: int32
+       * @description Chunks finished.
+       */
+      chunksDone: number;
+      /**
+       * Format: int32
+       * @description Chunks of the job.
+       */
+      chunksTotal: number;
+      /**
+       * Format: int32
+       * @description Chunks that failed.
+       */
+      chunksFailed: number;
+      /**
+       * Format: date
+       * @description First date of the training window.
+       */
+      windowFrom: string;
+      /**
+       * Format: date
+       * @description Last date of the training window.
+       */
+      windowTo: string;
+      /**
+       * Format: date
+       * @description First date of the locked hold-out block.
+       */
+      holdOutStart: string;
+      /**
+       * Format: date-time
+       * @description When the job was started.
+       */
+      startedAt: string;
+      /**
+       * Format: date-time
+       * @description When it ended; null while active.
+       */
+      finishedAt: null | string;
+    };
+    /** @description A page of jobs. */
+    SimReportJobsView: {
+      /** @description Always the training-simulation label. */
+      label: string;
+      /** @description The jobs, newest first. */
+      items: components['schemas']['SimReportJobView'][];
+      /** @description The cursor of the next page; null on the last. */
+      nextCursor: null | string;
+    };
     /** @description The out-of-fold score of the model beside the best baseline (log loss and Brier score: lower is better). */
     SimTrainingScore: {
       /** Format: double */
@@ -22783,6 +22867,88 @@ export interface components {
       styles: string[];
       instruments: components['schemas']['InstrumentsView'];
       overrides: components['schemas']['AccountOverrides'];
+    };
+    /**
+     * @description What a report over a simulate-everything job says about itself (spec AU-14, ADR 0243, ADR 0250): that it is a training simulation and not evidence, how much of the job it could read at the as-of instant, and what part of the asked range it could not answer.
+     *     Only finished chunks are read; while the job runs the figures change as chunks finish.
+     */
+    TrainingCompletenessView: {
+      /** @description Always `training_simulation`. */
+      kind: string;
+      /** @description The sentence a screen shows beside every figure: a training simulation, not evidence. */
+      label: string;
+      /**
+       * Format: uuid
+       * @description The job read.
+       */
+      simJob: string;
+      /** @description running, paused, completed, completed_with_failures or cancelled. */
+      jobState: string;
+      /** @description True only when the job is final, every chunk is done and none failed: the report then holds the whole job; false while it runs, after a failure and after a cancel. */
+      complete: boolean;
+      /**
+       * Format: int32
+       * @description Chunks finished (the ones this report reads).
+       */
+      chunksDone: number;
+      /**
+       * Format: int32
+       * @description Chunks of the job.
+       */
+      chunksTotal: number;
+      /**
+       * Format: int32
+       * @description Chunks that failed (never read).
+       */
+      chunksFailed: number;
+      /**
+       * Format: int32
+       * @description Chunks being run now (not read yet).
+       */
+      chunksRunning: number;
+      /**
+       * Format: int32
+       * @description Chunks not started.
+       */
+      chunksPending: number;
+      /**
+       * Format: date-time
+       * @description The instant of the read: a chunk finished after it is not in the figures.
+       */
+      asOf: string;
+      /**
+       * Format: date
+       * @description First date of the job's training window.
+       */
+      windowFrom: string;
+      /**
+       * Format: date
+       * @description Last date of the job's training window.
+       */
+      windowTo: string;
+      /**
+       * Format: date
+       * @description First date of the locked hold-out block: no number from it is read, ever.
+       */
+      holdOutStart: string;
+      /**
+       * Format: date
+       * @description First entry date actually read; null when the asked range holds none of the window.
+       */
+      rangeFrom: null | string;
+      /**
+       * Format: date
+       * @description Last entry date actually read; null when the asked range holds none of the window.
+       */
+      rangeTo: null | string;
+      /** @description The asked range reached past the window (into the hold-out block or beyond): the answer is the part before it. */
+      rangeCut: boolean;
+      /** @description The sentence that says the rest is locked, when the asked range reached into the hold-out block; else null. */
+      locked: null | string;
+      /** @description Stocks asked for with no trade in the finished chunks within the range (not run yet, not tracked, or no signal); each is named, never silently dropped. */
+      symbolsWithoutResults: string[];
+      /** @description The route of the training record of the job (what was trained from this simulation). */
+      trainingRecord: string;
     };
     /** @description Instruments (1 to 500) to copy or move from one basket to another; `mode` = copy · move. */
     TransferInput: {
@@ -33394,6 +33560,8 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
+        purpose?: string;
+        simJob?: string;
       };
       header?: never;
       path?: never;
@@ -33454,6 +33622,8 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
+        purpose?: string;
+        simJob?: string;
       };
       header?: never;
       path?: never;
@@ -33515,6 +33685,8 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
+        purpose?: string;
+        simJob?: string;
       };
       header?: never;
       path?: never;
@@ -33575,6 +33747,8 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
+        purpose?: string;
+        simJob?: string;
       };
       header?: never;
       path?: never;
@@ -33635,6 +33809,8 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
+        purpose?: string;
+        simJob?: string;
       };
       header?: never;
       path?: never;
@@ -33695,6 +33871,8 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
+        purpose?: string;
+        simJob?: string;
       };
       header?: never;
       path?: never;
@@ -33727,6 +33905,38 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListReportSimJobs: {
+    parameters: {
+      query?: {
+        limit?: string;
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimReportJobsView'];
         };
       };
       /** @description Unprocessable Entity */
@@ -33794,6 +34004,8 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
+        purpose?: string;
+        simJob?: string;
       };
       header?: never;
       path?: never;
@@ -33854,6 +34066,8 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
+        purpose?: string;
+        simJob?: string;
       };
       header?: never;
       path?: never;
@@ -33906,6 +34120,8 @@ export interface operations {
         from?: string;
         to?: string;
         membersAsOf?: string;
+        purpose?: string;
+        simJob?: string;
       };
       header?: never;
       path?: never;
@@ -33990,6 +34206,8 @@ export interface operations {
         to?: string;
         limit?: string;
         cursor?: string;
+        purpose?: string;
+        simJob?: string;
       };
       header?: never;
       path?: never;

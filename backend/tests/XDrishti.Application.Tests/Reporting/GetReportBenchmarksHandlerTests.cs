@@ -27,6 +27,7 @@ public sealed class GetReportBenchmarksHandlerTests
     private readonly IBarQueries _bars = Substitute.For<IBarQueries>();
     private readonly IPortfolioBenchmark _benchmark = Substitute.For<IPortfolioBenchmark>();
     private readonly IReportTradeSource _source = Substitute.For<IReportTradeSource>();
+    private readonly XDrishti.Application.Abstractions.SimAll.ISimAllStore _jobs = Substitute.For<XDrishti.Application.Abstractions.SimAll.ISimAllStore>();
     private readonly Dictionary<Guid, (double First, double Last)> _prices = [];
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -44,7 +45,7 @@ public sealed class GetReportBenchmarksHandlerTests
     }
 
     private GetReportBenchmarksHandler Handler(ReportBenchmarkOptions? options = null) =>
-        new(_baskets, _bars, _benchmark, _source, options ?? new ReportBenchmarkOptions(), new FakeTimeProvider(Now), NullLogger<GetReportBenchmarksHandler>.Instance);
+        new(_baskets, _bars, _benchmark, _source, _jobs, options ?? new ReportBenchmarkOptions(), new FakeTimeProvider(Now), NullLogger<GetReportBenchmarksHandler>.Instance);
 
     private static BarRow Bar(DateOnly day, double close) =>
         new(new DateTimeOffset(day.Year, day.Month, day.Day, 0, 0, 0, TimeSpan.FromMinutes(330)), close, close, close, close, 1, 1, true, null);
@@ -88,6 +89,53 @@ public sealed class GetReportBenchmarksHandlerTests
     }
 
     private static GetReportBenchmarksQuery Query(string? basket, string? from = "2026-01-05", string? to = "2026-03-31", string? asOf = null) => new(basket, from, to, asOf);
+
+    private static readonly Guid JobId = Guid.Parse("cccccccc-0000-0000-0000-000000000001");
+
+    private void Job_exists()
+    {
+        var job = new XDrishti.Application.Abstractions.SimAll.SimAllJob(JobId, "running", null, From, To, new DateOnly(2026, 4, 15), 1, "owner:x", Now, Now, null);
+        _jobs.GetProgressAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(new ValueTask<XDrishti.Application.Abstractions.SimAll.SimAllSnapshot?>(new XDrishti.Application.Abstractions.SimAll.SimAllSnapshot(job, new XDrishti.Application.Abstractions.SimAll.SimAllCounts(4, 3, 0, 0, 1, 0, 0, 0))));
+    }
+
+    [Fact]
+    public async Task A_training_benchmark_is_cut_to_the_training_window_labelled_and_never_reads_the_hold_out_range()
+    {
+        Job_exists();
+        Basket(B1, "Banks", null, Instrument("A", 100, 110), Instrument("B", 50, 45), Instrument("C", 200, 250));
+
+        var view = await OkAsync(new GetReportBenchmarksQuery(B1.ToString(), "2026-01-01", "2026-12-31", null, "training", JobId.ToString("D")));
+
+        view.Window.From.ShouldBe(From);
+        view.Window.To.ShouldBe(To);
+        var c = view.Evidence.Completeness!;
+        c.Label.ShouldContain("not evidence");
+        c.RangeCut.ShouldBeTrue();
+        c.Complete.ShouldBeFalse();
+        c.HoldOutStart.ShouldBe(new DateOnly(2026, 4, 15));
+        view.Evidence.Limits.ShouldContain(l => l.Contains("hold-out block", StringComparison.Ordinal));
+        await _source.DidNotReceive().ListRunsAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_training_benchmark_with_a_range_wholly_past_the_window_is_refused()
+    {
+        Job_exists();
+
+        var error = await RefusedAsync(new GetReportBenchmarksQuery(B1.ToString(), "2026-04-20", "2026-05-30", null, "training", null));
+
+        error.Code.ShouldBe("reports.invalid");
+    }
+
+    [Fact]
+    public async Task A_bad_or_unknown_job_and_a_job_without_the_training_purpose_are_refused()
+    {
+        (await RefusedAsync(new GetReportBenchmarksQuery(B1.ToString(), "2026-01-05", "2026-03-31", null, "training", "nope"))).Code.ShouldBe("reports.invalid");
+        (await RefusedAsync(new GetReportBenchmarksQuery(B1.ToString(), "2026-01-05", "2026-03-31", null, null, JobId.ToString("D")))).Code.ShouldBe("reports.invalid");
+        (await RefusedAsync(new GetReportBenchmarksQuery(B1.ToString(), "2026-01-05", "2026-03-31", null, "other", null))).Code.ShouldBe("reports.invalid");
+        _jobs.GetProgressAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>()).Returns(new ValueTask<XDrishti.Application.Abstractions.SimAll.SimAllSnapshot?>((XDrishti.Application.Abstractions.SimAll.SimAllSnapshot?)null));
+        (await RefusedAsync(new GetReportBenchmarksQuery(B1.ToString(), "2026-01-05", "2026-03-31", null, "training", JobId.ToString("D")))).Code.ShouldBe("reports.not_found");
+    }
 
     [Fact]
     public async Task A_basket_of_three_is_the_mean_of_its_returns_with_the_evidence_block()

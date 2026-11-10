@@ -111,7 +111,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
             "ix_expression_runs_cash_run", "ix_expression_trades_fate", "ix_extension_evaluations_family_created", "ix_hypotheses_experiment_id", "ix_hypotheses_hypothesis_id_id",
             "ix_learning_changelog_created_at", "ix_learning_changelog_subject_id", "ix_learning_reports_kind_created", "ix_lessons_lesson_id_id", "ix_ml_influence_checks_model_id_id",
             "ix_ml_switch_settings_name_id", "ix_model_designations_model_id_id", "ix_model_versions_sha256", "ix_model_versions_training_set_id", "ix_pair_formations_family_quarter",
-            "ix_pair_trades_entry", "ix_rollback_proposals_model_id_id", "ix_rollback_proposals_state_id", "ix_sim_all_chunks_pending", "ix_sim_all_chunks_state", "ix_sim_comparisons_entries_key",
+            "ix_pair_trades_entry", "ix_rollback_proposals_model_id_id", "ix_rollback_proposals_state_id", "ix_sim_all_chunks_instrument", "ix_sim_all_chunks_pending", "ix_sim_all_chunks_run_key", "ix_sim_all_chunks_state", "ix_sim_comparisons_entries_key",
             "ix_sim_runs_strategy_created", "ix_sim_runs_training", "ix_sim_training_runs_job", "ix_trade_features_ext_version_run", "ix_training_sets_created_at", "pk_cell_stats", "pk_digests",
             "pk_exit_selection_folds", "pk_exit_selections", "pk_experiment_jobs", "pk_experiments", "pk_expression_legs", "pk_expression_runs", "pk_expression_trades", "pk_extension_evaluations",
             "pk_extension_extractions", "pk_hypotheses", "pk_learning_changelog", "pk_learning_reports", "pk_lessons", "pk_ml_influence_checks", "pk_ml_monitor_checks", "pk_ml_switch_settings",

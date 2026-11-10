@@ -1,3 +1,5 @@
+using XDrishti.Application.Abstractions.Reporting;
+using XDrishti.Domain.Reporting;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Abstractions.SimAll;
@@ -19,4 +21,13 @@ public interface ITrainingRunReader
 
     /// <summary>The closed trades of a training run in stored order (cash trades; none for a research run or an unknown key). Memory-bounded: streamed, one row at a time.</summary>
     IAsyncEnumerable<RunTrade> StreamTradesAsync(string runKey, CancellationToken cancellationToken);
+
+    /// <summary>The headers of the training runs with these keys (at most 100,000 keys; a key that is not a training run gives no header), in the order of the keys asked (AU-14).</summary>
+    ValueTask<IReadOnlyList<TrainingRunHeader>> ListByKeysAsync(IReadOnlyList<string> runKeys, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The closed trades, in the report shape, of the runs of the chunks of one job that were done by <paramref name="finishedBy"/> and pass the filter (AU-14): a streamed projection, one row at a time, in the order of run then ordinal.
+    /// The filter is applied in the database: symbols narrow the chunks by instrument first, baskets are the baskets stored on the trade.
+    /// </summary>
+    IAsyncEnumerable<ReportTrade> StreamJobTradesAsync(Guid jobId, DateTimeOffset finishedBy, ReportTradeFilter filter, CancellationToken cancellationToken);
 }

@@ -3,7 +3,7 @@ namespace XDrishti.Application.Abstractions.SimAll;
 /// <summary>
 /// <c>research.sim_all_jobs</c> and <c>research.sim_all_chunks</c> behind a port (spec AU-12). The tables are the queue and the progress: a restart reads them and goes on. At most one job is active (running or paused), enforced by the database.
 /// </summary>
-public interface ISimAllStore
+public interface ISimAllStore : ITrainingJobProgress
 {
     /// <summary>Creates the job and all its chunks in one transaction, or answers the active job (nothing is written then).</summary>
     ValueTask<SimAllInsert> InsertAsync(NewSimAllJob job, CancellationToken cancellationToken);

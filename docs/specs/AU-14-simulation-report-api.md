@@ -20,7 +20,7 @@ Read simulation results by stock or basket, for any from-to range, while the job
 3. Every response during a job carries `complete: false`, chunks done of total and the as-of time; only finished chunks are read.
 4. A range overlapping the hold-out answers with the part before it and says the rest is locked; no number from inside it.
 5. Basket membership follows the trade's stored basket as today; a stock with no results says so.
-6. Bad ranges answer 400 `reports.invalid`.
+6. Bad ranges answer 422 `reports.invalid` (amended 2026-11-10: every `reports.*` refusal of the engine is 422; ADR 0250).
 
 ## Contract
 - **API:** additive query parameters and `completeness` on the response; `scripts/gen-api.sh`.

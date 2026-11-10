@@ -17,8 +17,10 @@ internal sealed record ReportTradesParams(
     [FromQuery(Name = "from")] string? From = null,
     [FromQuery(Name = "to")] string? To = null,
     [FromQuery(Name = "limit")] string? Limit = null,
-    [FromQuery(Name = "cursor")] string? Cursor = null)
+    [FromQuery(Name = "cursor")] string? Cursor = null,
+    [FromQuery(Name = "purpose")] string? Purpose = null,
+    [FromQuery(Name = "simJob")] string? SimJob = null)
 {
     /// <summary>The raw input for the Application.</summary>
-    public ReportQueryInput ToInput() => new(Runs, Basis, null, Strategy, Timeframe, Side, Style, Exit, Basket, Symbol, From, To, null, Limit, Cursor);
+    public ReportQueryInput ToInput() => new(Runs, Basis, null, Strategy, Timeframe, Side, Style, Exit, Basket, Symbol, From, To, null, Limit, Cursor, Purpose, SimJob);
 }
