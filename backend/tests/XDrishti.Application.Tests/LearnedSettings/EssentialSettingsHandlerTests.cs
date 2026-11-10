@@ -15,6 +15,7 @@ public sealed class EssentialSettingsHandlerTests
     private readonly InMemoryEssentialStore _store = new();
     private readonly FakeAccountEvents _events = new();
     private readonly IChargeSheetLog _log = Substitute.For<IChargeSheetLog>();
+    private readonly FakeScopes _scopes = new();
 
     public EssentialSettingsHandlerTests()
     {
@@ -28,7 +29,7 @@ public sealed class EssentialSettingsHandlerTests
     [Fact]
     public async Task The_five_rows_start_at_their_defaults_with_no_who_and_when()
     {
-        var view = await new GetEssentialSettingsHandler(_store, _log).HandleAsync(new GetEssentialSettingsQuery(), Ct);
+        var view = await new GetEssentialSettingsHandler(_store, _log, _scopes).HandleAsync(new GetEssentialSettingsQuery(), Ct);
 
         view.Items.Select(i => i.Key).ShouldBe(["auto.enabled", "suggest.scope", "risk.profile", "chargesheet.gate", "notices.failure"], ignoreOrder: true);
         view.Items.ShouldAllBe(i => i.IsDefault && i.ChangedBy == null && i.ChangedAt == null);
@@ -46,7 +47,7 @@ public sealed class EssentialSettingsHandlerTests
         var done = await Change().HandleAsync(new ChangeEssentialSettingCommand("notices.failure", false, Owner, FreshPassword: true), Ct);
 
         done.IsSuccess.ShouldBeTrue();
-        var view = await new GetEssentialSettingsHandler(_store, _log).HandleAsync(new GetEssentialSettingsQuery(), Ct);
+        var view = await new GetEssentialSettingsHandler(_store, _log, _scopes).HandleAsync(new GetEssentialSettingsQuery(), Ct);
         var row = view.Items.Single(i => i.Key == "notices.failure");
         (row.Value, row.IsDefault, row.ChangedBy).ShouldBe(("false", false, Owner));
         row.ChangedAt.ShouldNotBeNull();
@@ -105,9 +106,32 @@ public sealed class EssentialSettingsHandlerTests
         var entry = new ChargeSheetEntry(7, ChargeSheetActKind.GateOn, null, null, null, Owner, "why", at);
         _log.ReadAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new ChargeSheetLedger(true, entry, [entry]));
 
-        var view = await new GetEssentialSettingsHandler(_store, _log).HandleAsync(new GetEssentialSettingsQuery(), Ct);
+        var view = await new GetEssentialSettingsHandler(_store, _log, _scopes).HandleAsync(new GetEssentialSettingsQuery(), Ct);
 
         var row = view.Items.Single(i => i.Key == "chargesheet.gate");
         (row.ChangedBy, row.ChangedAt, row.IsDefault, row.CanReset).ShouldBe((Owner, at, false, false));
     }
+
+    [Fact]
+    public async Task The_scope_row_reads_the_scope_store_with_who_and_when_and_reset_points_to_the_scope_request()
+    {
+        var at = new DateTimeOffset(2026, 11, 9, 9, 0, 0, TimeSpan.Zero);
+        _scopes.Row = new XDrishti.Application.Abstractions.Planning.StoredAutoScope(3, [Guid.NewGuid()], [Guid.NewGuid(), Guid.NewGuid()], new string('a', 64), Owner, at);
+
+        var view = await new GetEssentialSettingsHandler(_store, _log, _scopes).HandleAsync(new GetEssentialSettingsQuery(), Ct);
+
+        var row = view.Items.Single(i => i.Key == "suggest.scope");
+        (row.Value, row.IsDefault, row.ChangedBy, row.ChangedAt, row.CanReset).ShouldBe(("1 baskets, 2 stocks", false, Owner, at, false));
+        (await Reset().HandleAsync(new ResetEssentialSettingCommand("suggest.scope", Owner), Ct)).Error.Code.ShouldBe("settings.reset_elsewhere");
+    }
+}
+
+internal sealed class FakeScopes : XDrishti.Application.Abstractions.Planning.IAutoScopeStore
+{
+    public XDrishti.Application.Abstractions.Planning.StoredAutoScope? Row { get; set; }
+
+    public ValueTask<XDrishti.Application.Abstractions.Planning.StoredAutoScope?> LatestAsync(CancellationToken cancellationToken) => ValueTask.FromResult(Row);
+
+    public ValueTask<XDrishti.Application.Abstractions.Planning.StoredAutoScope> AppendAsync(XDrishti.Domain.Planning.AutoScope scope, string actor, DateTimeOffset now, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
 }

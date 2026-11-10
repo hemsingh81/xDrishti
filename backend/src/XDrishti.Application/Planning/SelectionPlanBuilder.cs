@@ -24,7 +24,8 @@ internal sealed class SelectionPlanBuilder(
     SelectionRules? rules = null,
     SmartRulesOptions? smartOptions = null,
     FillConstraints? fillConstraints = null,
-    PlanEventFilter? eventFilter = null) : IPlanBuilder
+    PlanEventFilter? eventFilter = null,
+    IAutoScopeSource? scopeSource = null) : IPlanBuilder
 {
     public const string BuilderId = "selection";
 
@@ -57,11 +58,12 @@ internal sealed class SelectionPlanBuilder(
         }
 
         var found = read.Value;
+        var scope = scopeSource is null ? null : await scopeSource.ResolveAsync(cancellationToken); // AU-16: the owner's scope is a filter on the candidates; nothing after it changes
         // One ticket per (symbol, cell): a duplicate from the source is ignored, never an exception.
         var drafts = new Dictionary<(string, string), TicketDraft>();
         var ids = new Dictionary<string, Guid?>(StringComparer.OrdinalIgnoreCase);
         var candidates = new List<PlanCandidate>();
-        foreach (var c in found.Candidates)
+        foreach (var c in AutoScopeFilter.Apply(found.Candidates, scope))
         {
             if (drafts.TryAdd((c.Draft.Symbol, c.Cell.Key), c.Draft))
             {
@@ -150,7 +152,7 @@ internal sealed class SelectionPlanBuilder(
         var basis = BasisText(smart, ctx, events.Note);
         var plan = new NewPlan(NightlyRules.PlanKey(request.ForDate, BuilderId), request.ForDate, request.ReviewCutoff, 1, Hash(request, basis, items), basis, true, CreatedBy, request.Now, items)
         {
-            BasisFlags = PlanBasisFlags.From(smart, ctx.Book is null ? PlanBasisFlags.OpenBookUnavailable : ctx.Book.Count == 0 && !ctx.BookFromLedger ? PlanBasisFlags.OpenBookAssumedEmpty : PlanBasisFlags.OpenBookKnown, [.. fill.Primary.Select(d => d.Candidate.Ranked)]),
+            BasisFlags = PlanBasisFlags.From(smart, ctx.Book is null ? PlanBasisFlags.OpenBookUnavailable : ctx.Book.Count == 0 && !ctx.BookFromLedger ? PlanBasisFlags.OpenBookAssumedEmpty : PlanBasisFlags.OpenBookKnown, [.. fill.Primary.Select(d => d.Candidate.Ranked)]) with { ScopeHash = scope?.Hash },
         };
         return Result.Success(plan);
     }
@@ -232,7 +234,9 @@ internal sealed class SelectionPlanBuilder(
             expectancy,
             unavailable,
             advisory is { } p ? AdvisoryNote(p) : null,
-            stats?.WinRateLower);
+            stats?.WinRateLower,
+            stats?.IndependentN,
+            stats?.AsOf);
         return new NewPlanItem(
             rank, group, draft.Symbol, draft.Side, draft.StrategyId, draft.StrategyVersionHash,
             Clamp(draft.TriggerText, 500), Clamp(draft.StopText, 500), Clamp(draft.TargetText, 500), Clamp(draft.ValidityText, 200), reasons, evidence, allocations, levels);

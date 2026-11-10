@@ -25,6 +25,7 @@ public sealed class PlanBuilderChoiceTests
         services.AddScoped<ICalendarRows, NoRows>();
         services.AddScoped<ITradingCalendar, PlainCalendar>();
         services.AddSingleton<IFilingSettings, NoSettings>();
+        services.AddScoped<IAutoScopeSource, NoScope>(); // the owner's scope (AU-16) reads the scope store and the baskets
         if (flag is { } value)
         {
             services.AddSingleton<IPlanBuilderSettings>(new Settings(value));
@@ -42,6 +43,11 @@ public sealed class PlanBuilderChoiceTests
 
     [Fact]
     public void The_selection_builder_is_used_only_when_the_flag_is_on() => Assert.IsType<SelectionPlanBuilder>(Resolve(true));
+
+    private sealed class NoScope : IAutoScopeSource
+    {
+        public ValueTask<ResolvedAutoScope?> ResolveAsync(CancellationToken cancellationToken) => ValueTask.FromResult<ResolvedAutoScope?>(null);
+    }
 
     private sealed class NoTickets : ITicketSource
     {

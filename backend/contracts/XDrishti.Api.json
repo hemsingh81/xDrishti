@@ -47,6 +47,97 @@
         }
       }
     },
+    "/api/auto/scope": {
+      "get": {
+        "tags": [
+          "Auto"
+        ],
+        "summary": "The baskets and stocks the system may suggest (suggest.scope); with none set, every eligible instrument is considered",
+        "operationId": "GetAutoScope",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoScopeView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Auto"
+        ],
+        "summary": "Set the scope as the owner (session and CSRF token); appends a version and an audit row. 400 auto.scope_empty, auto.scope_too_large, auto.scope_unknown (an id that does not exist), 403 auto.owner_only",
+        "operationId": "SetAutoScope",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAutoScopeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoScopeView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auto/suggestions": {
+      "get": {
+        "tags": [
+          "Auto"
+        ],
+        "summary": "The next-day suggestions of the newest plan of forDate (or the newest plan): what, why and on what evidence; missing figures read unavailable, tickets without required evidence are listed as not suggested; reserve and rejected stay visible. Suggestion only, no order is placed. 404 auto.no_plan",
+        "operationId": "GetAutoSuggestions",
+        "parameters": [
+          {
+            "name": "forDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoSuggestionsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/essentials": {
       "get": {
         "tags": [
@@ -23985,6 +24076,39 @@
         },
         "description": "The days a response covers (India dates, inclusive)."
       },
+      "AutoEvidenceView": {
+        "required": [
+          "n",
+          "nEff",
+          "conservativeExpectancyR",
+          "regime",
+          "dataAsOf"
+        ],
+        "type": "object",
+        "properties": {
+          "n": {
+            "type": "string",
+            "description": "Trades in the cell."
+          },
+          "nEff": {
+            "type": "string",
+            "description": "Independent n."
+          },
+          "conservativeExpectancyR": {
+            "type": "string",
+            "description": "Conservative expectancy in R."
+          },
+          "regime": {
+            "type": "string",
+            "description": "The regime of the cell, `all regimes` for a cell that spans them."
+          },
+          "dataAsOf": {
+            "type": "string",
+            "description": "The date the cell statistics are as of."
+          }
+        },
+        "description": "The evidence figures as text; a missing figure reads `unavailable` and is never a pass."
+      },
       "AutoRefreshView": {
         "required": [
           "enabled",
@@ -24008,6 +24132,224 @@
           }
         },
         "description": "The daily automatic refresh: whether it is on, at what India time, and when it runs next."
+      },
+      "AutoScopeView": {
+        "required": [
+          "isSet",
+          "version",
+          "basketIds",
+          "instrumentIds",
+          "hash",
+          "changedBy",
+          "changedAt",
+          "summary"
+        ],
+        "type": "object",
+        "properties": {
+          "isSet": {
+            "type": "boolean",
+            "description": "Whether a scope was ever set."
+          },
+          "version": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The version row, or null.",
+            "format": "int64"
+          },
+          "basketIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The baskets."
+          },
+          "instrumentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The individual instruments."
+          },
+          "hash": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The scope hash that plans carry, or null."
+          },
+          "changedBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who set it, or null."
+          },
+          "changedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When, or null.",
+            "format": "date-time"
+          },
+          "summary": {
+            "type": "string",
+            "description": "`eligible` with no scope, else the counts in words."
+          }
+        },
+        "description": "The scope in force. With none set, `IsSet` is false and every eligible instrument is considered."
+      },
+      "AutoSuggestionView": {
+        "required": [
+          "itemId",
+          "rank",
+          "symbol",
+          "side",
+          "strategyId",
+          "strategyVersionHash",
+          "levels",
+          "reasons",
+          "evidence",
+          "why"
+        ],
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "integer",
+            "description": "The plan item.",
+            "format": "int64"
+          },
+          "rank": {
+            "type": "integer",
+            "description": "Order in the plan.",
+            "format": "int32"
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Instrument."
+          },
+          "side": {
+            "type": "string",
+            "description": "BUY or SELL."
+          },
+          "strategyId": {
+            "type": "string",
+            "description": "Strategy."
+          },
+          "strategyVersionHash": {
+            "type": "string",
+            "description": "Strategy version."
+          },
+          "levels": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Indicative levels as of the close of the session, or null.",
+                "$ref": "#/components/schemas/TicketLevelsView"
+              }
+            ]
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why, in words."
+          },
+          "evidence": {
+            "description": "The evidence figures.",
+            "$ref": "#/components/schemas/AutoEvidenceView"
+          },
+          "why": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "For a ticket not suggested: which evidence is missing; otherwise null."
+          }
+        },
+        "description": "One suggestion: what, why and on what evidence."
+      },
+      "AutoSuggestionsView": {
+        "required": [
+          "forDate",
+          "planId",
+          "planState",
+          "basis",
+          "notice",
+          "scopeHash",
+          "suggestions",
+          "notSuggested",
+          "reserve",
+          "rejected"
+        ],
+        "type": "object",
+        "properties": {
+          "forDate": {
+            "type": "string",
+            "description": "The session.",
+            "format": "date"
+          },
+          "planId": {
+            "type": "integer",
+            "description": "The plan the suggestions come from.",
+            "format": "int64"
+          },
+          "planState": {
+            "type": "string",
+            "description": "The state of that plan."
+          },
+          "basis": {
+            "type": "string",
+            "description": "The plan's basis text."
+          },
+          "notice": {
+            "type": "string",
+            "description": "Always string AutoSuggestionRules.NoOrderNotice."
+          },
+          "scopeHash": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The scope hash stored on the plan, or null when it was built without a scope."
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutoSuggestionView"
+            },
+            "description": "Primary tickets with all required evidence."
+          },
+          "notSuggested": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutoSuggestionView"
+            },
+            "description": "Primary tickets missing required evidence, with why."
+          },
+          "reserve": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutoSuggestionView"
+            },
+            "description": "Reserve tickets with reasons."
+          },
+          "rejected": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutoSuggestionView"
+            },
+            "description": "Rejected candidates with reasons."
+          }
+        },
+        "description": "What to look at for one session, with the basis and the words that no order is placed."
       },
       "AutonomyChangeView": {
         "required": [
@@ -62086,6 +62428,36 @@
         },
         "description": "How many sessions ended in an outcome (`pass`, `warn`, `fail`, `unavailable` with its reason)."
       },
+      "SetAutoScopeRequest": {
+        "required": [
+          "basketIds",
+          "instrumentIds"
+        ],
+        "type": "object",
+        "properties": {
+          "basketIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "instrumentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "description": "The body of `PUT /api/auto/scope`: ids of baskets and of individual instruments; at least one in all."
+      },
       "SetOutcome": {
         "required": [
           "set",
@@ -67603,6 +67975,9 @@
     },
     {
       "name": "Settings"
+    },
+    {
+      "name": "Auto"
     },
     {
       "name": "Auth"

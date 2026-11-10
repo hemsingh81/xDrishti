@@ -30,6 +30,9 @@ public sealed record PlanBasisFlags(
     string CostBasis,
     IReadOnlyList<string> Banner)
 {
+    /// <summary>The hash of the auto scope the plan was built under (AU-16), or null when no scope was set; the plan then covers every eligible instrument.</summary>
+    public string? ScopeHash { get; init; }
+
     /// <summary>The open book is known.</summary>
     public const string OpenBookKnown = "known";
 

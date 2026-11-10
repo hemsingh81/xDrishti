@@ -952,6 +952,10 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetCellStateQuery, Result<CellStateView>>, GetCellStateHandler>();
         services.AddScoped<IQueryHandler<ListPlansQuery, Result<IReadOnlyList<PlanView>>>, ListPlansHandler>(); // the plan record (P7-03, ADR 0083)
         services.AddScoped<IQueryHandler<GetPlanQuery, Result<PlanView>>, GetPlanHandler>();
+        services.AddScoped<IAutoScopeSource, AutoScopeResolver>(); // the stored auto scope with its baskets expanded, read by the selection builder at the nightly run (AU-16)
+        services.AddScoped<IQueryHandler<GetAutoScopeQuery, AutoScopeView>, GetAutoScopeHandler>();
+        services.AddScoped<ICommandHandler<SetAutoScopeCommand, AutoScopeView>, SetAutoScopeHandler>();
+        services.AddScoped<IQueryHandler<GetAutoSuggestionsQuery, Result<AutoSuggestionsView>>, GetAutoSuggestionsHandler>(); // the next-day suggestions read model; no order
         services.AddScoped<IQueryHandler<GetPlanItemChartQuery, Result<TicketChartView>>, GetPlanItemChartHandler>();
         services.AddScoped<ICommandHandler<MoveTicketCommand, TicketMoveOutcome>, MoveTicketHandler>(); // owner decisions and service moves along the ticket table; no path to a broker
         services.AddScoped<ICommandHandler<MovePlanCommand, PlanMoveOutcome>, MovePlanHandler>();

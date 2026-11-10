@@ -3,7 +3,9 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.ChargeSheet;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.SettingsCatalog;
+using XDrishti.Application.Planning;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Reporting;
@@ -41,16 +43,17 @@ internal static class EssentialKeys
     public static readonly IReadOnlyDictionary<string, string> StoredDefaults = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         [Auto] = "false",
-        [Scope] = "eligible",
         [Failure] = "true",
     };
+
+    public const string ScopeNote = "The scope is set with PUT /api/auto/scope (baskets and stocks, at least one); there is no reset to default, set another scope.";
 
     public const string GateNote = "The charge-sheet switch is changed on the Charge sheet screen only; its default is Off.";
 
     public const string RiskNote = "Risk profiles belong to accounts and have no single default; change them on the Risk profiles screen.";
 }
 
-internal sealed class GetEssentialSettingsHandler(IEssentialSettingStore store, IChargeSheetLog chargeSheet) : IQueryHandler<GetEssentialSettingsQuery, EssentialSettingsView>
+internal sealed class GetEssentialSettingsHandler(IEssentialSettingStore store, IChargeSheetLog chargeSheet, IAutoScopeStore scopes) : IQueryHandler<GetEssentialSettingsQuery, EssentialSettingsView>
 {
     public async ValueTask<EssentialSettingsView> HandleAsync(GetEssentialSettingsQuery query, CancellationToken cancellationToken)
     {
@@ -61,6 +64,12 @@ internal sealed class GetEssentialSettingsHandler(IEssentialSettingStore store, 
             {
                 var row = await store.GetAsync(d.Key, cancellationToken);
                 items.Add(new EssentialSettingView(d.Key, d.Label, row?.Value ?? def, def, row is null || row.Value == def, row?.UpdatedBy, row?.UpdatedAt, true, null));
+            }
+            else if (d.Key == EssentialKeys.Scope)
+            {
+                var scope = await scopes.LatestAsync(cancellationToken);
+                var view = AutoScopeViews.Of(scope);
+                items.Add(new EssentialSettingView(d.Key, d.Label, view.Summary, AutoScopeViews.NoScope, !view.IsSet, view.ChangedBy, view.ChangedAt, false, EssentialKeys.ScopeNote));
             }
             else if (d.Key == EssentialKeys.Gate)
             {
@@ -128,6 +137,11 @@ internal sealed class ResetEssentialSettingHandler(IEssentialSettingStore store,
             await store.SetAsync(command.Key, def, command.Actor, now, cancellationToken);
             await EssentialAudit.RecordAsync(events, unitOfWork, AccountEventType.EssentialSettingReset, $"{command.Key} reset to default", command.Actor, now, logger);
             return Result.Success(new EssentialSettingView(command.Key, descriptor.Label, def, def, true, command.Actor, now, true, null));
+        }
+
+        if (command.Key == EssentialKeys.Scope)
+        {
+            return Result.Failure<EssentialSettingView>(Error.Conflict("settings.reset_elsewhere", EssentialKeys.ScopeNote));
         }
 
         if (command.Key == EssentialKeys.Gate)
