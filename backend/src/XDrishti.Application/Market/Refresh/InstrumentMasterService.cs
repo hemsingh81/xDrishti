@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Platform.Services;
@@ -69,6 +70,8 @@ public sealed class InstrumentMasterService(IServiceScopeFactory scopes, IInstru
 
             if (!run.IsRunning)
             {
+                // The lists read from the master (BK-05) follow its refresh, in their own transaction: a failure there never touches the master.
+                await RefreshListsAsync(runId, run.Status != RefreshStatus.Failed, cancellationToken);
                 return run.Status switch
                 {
                     RefreshStatus.Failed => ServiceOutcome.Failed(run.Error ?? "The refresh failed."),
@@ -80,5 +83,12 @@ public sealed class InstrumentMasterService(IServiceScopeFactory scopes, IInstru
             await Task.Delay(wait, clock, cancellationToken);
             wait = JobPolling.Next(wait);
         }
+    }
+
+    private async ValueTask RefreshListsAsync(Guid refreshId, bool masterOk, CancellationToken cancellationToken)
+    {
+        await using var scope = scopes.CreateAsyncScope();
+        var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<RefreshFlagListsCommand, FlagListRun>>();
+        await handler.HandleAsync(new RefreshFlagListsCommand(masterOk, refreshId, Requester), cancellationToken);
     }
 }

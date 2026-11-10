@@ -4,13 +4,14 @@ using XDrishti.Application.Abstractions.Market.Baskets;
 using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Domain.Baskets.Derived;
 using XDrishti.Domain.Market;
+using XDrishti.Domain.Market.Baskets.Lists;
 
 namespace XDrishti.Infrastructure.Market.DerivedBaskets;
 
 /// <summary>
 /// The universe of the derived baskets (BK-03), read from our own tables only (no network): every share with complete daily rows (<c>1D</c> of <c>market.bars_agg</c>) in the window, <b>retired ones included</b>, in one query. The raw prices are adjusted by the applied corporate actions
 /// (bars before the ex-date times the factor, volume divided by it; an action on or before the date the owner's CSV files reach is skipped, those files are adjusted already). An unresolved suggestion with an ex-date in the window marks the instrument <c>CorporateActionUnresolved</c>.
-/// The Nifty 50 (basket 5 and 14) comes from the context source. Flags stay null until BK-05: a missing flag is not a pass.
+/// The Nifty 50 (basket 5 and 14) comes from the context source. The point-in-time flags of basket 13 come from the dated list baskets of BK-05 (ASM/GSM, ban, trade-for-trade); until all three have been recorded there are none (a missing flag is not a pass).
 /// </summary>
 internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorporateActionQueries actions, IContextBarSource context, IContextSettings contextSettings) : IDerivedUniverseReader
 {
@@ -28,6 +29,7 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
         var legs = await context.ReadAsync(contextSettings.IndexSymbols, contextSettings.VixSymbols, cancellationToken);
         var benchmark = legs.IndexLegs.Where(l => l.Complete && l.Date >= from && l.Date <= to).OrderBy(l => l.Date).Select(l => new Bar(l.Date, l.Close, l.High, l.Low, l.Close, 0)).ToArray();
 
+        var flags = await FlagsAsync(ids, cancellationToken);
         var result = new List<UniverseInstrument>(rows.Count);
         foreach (var row in rows)
         {
@@ -35,8 +37,10 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
             var skipThrough = csvThrough.TryGetValue(row.Id, out var through) ? through : (DateOnly?)null;
             var daily = row.Bars.Select(b => Adjust(b, applied.Where(a => a.Applied && (skipThrough is null || a.ExDate > skipThrough)).ToList())).ToArray();
             var tick = row.TickPaise is { } paise && paise > 0 ? (double)paise / 100.0 : 0.05;
+            var dayFlags = flags is null ? null : DayFlagBuilder.Build(
+                flags.Since, row.Series, flags.Stays(ListBaskets.AsmGsm.Id, row.Id), flags.Stays(ListBaskets.Ban.Id, row.Id), flags.Stays(ListBaskets.TradeForTrade.Id, row.Id));
             result.Add(new UniverseInstrument(row.Id, new InstrumentBars(
-                row.Symbol, daily, null, null, benchmark.Length > 0 ? benchmark : null, applied.Any(a => !a.Applied), row.Sector, tick)));
+                row.Symbol, daily, null, dayFlags, benchmark.Length > 0 ? benchmark : null, applied.Any(a => !a.Applied), row.Sector, tick)));
         }
 
         return result;
@@ -57,7 +61,7 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
     {
         await using var command = dataSource.CreateCommand(
             """
-            SELECT i.id, i.canonical_symbol, i.sector, i.tick_size, a.ts, a.open, a.high, a.low, a.close, a.volume
+            SELECT i.id, i.canonical_symbol, i.sector, i.tick_size, a.ts, a.open, a.high, a.low, a.close, a.volume, i.series
             FROM market.instruments i
             JOIN market.bars_agg a ON a.instrument_id = i.id AND a.timeframe = '1D' AND a.complete AND a.ts >= @from AND a.ts < @to
             WHERE i.type = 'share'
@@ -74,7 +78,8 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
             if (current is null || current.Id != id)
             {
                 var symbol = reader.GetString(1);
-                current = new InstrumentRows(id, symbol.StartsWith("NSE:", StringComparison.Ordinal) ? symbol[4..] : symbol, reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetDecimal(3));
+                current = new InstrumentRows(
+                    id, symbol.StartsWith("NSE:", StringComparison.Ordinal) ? symbol[4..] : symbol, reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetDecimal(3), reader.IsDBNull(10) ? null : reader.GetString(10));
                 rows.Add(current);
             }
 
@@ -113,9 +118,60 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
         return result;
     }
 
+    /// <summary>
+    /// The dated stays of the three flag lists and the first date all three are known (BK-05): each list needs one recorded check (an applied or unchanged fetch row); the ban list, whose file is for the next trading day, is known from the day after its first check.
+    /// Null when any list has never been recorded.
+    /// </summary>
+    private async ValueTask<FlagStays?> FlagsAsync(List<Guid> ids, CancellationToken cancellationToken)
+    {
+        var lists = new[] { ListBaskets.AsmGsm.Id, ListBaskets.Ban.Id, ListBaskets.TradeForTrade.Id };
+        var first = new Dictionary<Guid, DateOnly>();
+        await using (var command = dataSource.CreateCommand(
+            "SELECT basket_id, min(fetched_at) FROM market.basket_fetches WHERE basket_id = ANY(@lists) AND outcome IN ('applied', 'unchanged') GROUP BY basket_id"))
+        {
+            command.Parameters.AddWithValue("lists", lists);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                first[reader.GetGuid(0)] = IndiaTime.Today(reader.GetFieldValue<DateTimeOffset>(1));
+            }
+        }
+
+        if (lists.Any(l => !first.ContainsKey(l)))
+        {
+            return null;
+        }
+
+        var since = new[] { first[ListBaskets.AsmGsm.Id], first[ListBaskets.Ban.Id].AddDays(1), first[ListBaskets.TradeForTrade.Id] }.Max();
+        var stays = new Dictionary<(Guid List, Guid Instrument), List<ListStay>>();
+        await using (var command = dataSource.CreateCommand("SELECT basket_id, instrument_id, valid_from, valid_to FROM market.basket_members WHERE basket_id = ANY(@lists) AND instrument_id = ANY(@ids)"))
+        {
+            command.Parameters.AddWithValue("lists", lists);
+            command.Parameters.AddWithValue("ids", ids.ToArray());
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var key = (reader.GetGuid(0), reader.GetGuid(1));
+                if (!stays.TryGetValue(key, out var list))
+                {
+                    stays[key] = list = [];
+                }
+
+                list.Add(new ListStay(IndiaTime.Today(reader.GetFieldValue<DateTimeOffset>(2)), reader.IsDBNull(3) ? null : IndiaTime.Today(reader.GetFieldValue<DateTimeOffset>(3))));
+            }
+        }
+
+        return new FlagStays(since, stays);
+    }
+
+    private sealed record FlagStays(DateOnly Since, Dictionary<(Guid List, Guid Instrument), List<ListStay>> All)
+    {
+        public List<ListStay> Stays(Guid list, Guid instrument) => All.TryGetValue((list, instrument), out var found) ? found : [];
+    }
+
     private sealed record CorporateAction(DateOnly ExDate, double Factor, bool Applied);
 
-    private sealed class InstrumentRows(Guid id, string symbol, string? sector, decimal? tickPaise)
+    private sealed class InstrumentRows(Guid id, string symbol, string? sector, decimal? tickPaise, string? series)
     {
         public Guid Id { get; } = id;
 
@@ -124,6 +180,8 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
         public string? Sector { get; } = sector;
 
         public decimal? TickPaise { get; } = tickPaise;
+
+        public string? Series { get; } = series;
 
         public List<Bar> Bars { get; } = [];
     }

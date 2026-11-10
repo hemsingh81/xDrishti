@@ -5746,6 +5746,42 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.SystemBaskets.FoLotSizeRecord", b =>
+                {
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<string>("ExpiryLabel")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("expiry_label");
+
+                    b.Property<Guid>("FetchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fetch_id");
+
+                    b.Property<int>("LotSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("lot_size");
+
+                    b.HasKey("InstrumentId", "EffectiveFrom")
+                        .HasName("pk_fo_lot_sizes");
+
+                    b.HasIndex("FetchId")
+                        .HasDatabaseName("ix_fo_lot_sizes_fetch_id");
+
+                    b.ToTable("fo_lot_sizes", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_fo_lot_sizes_lot_size", "lot_size > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Paper.ConfigChangeRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -11565,6 +11601,23 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_basket_sources_baskets_basket_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.SystemBaskets.FoLotSizeRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchRecord", null)
+                        .WithMany()
+                        .HasForeignKey("FetchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_fo_lot_sizes_basket_fetches_fetch_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Market.InstrumentRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstrumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_fo_lot_sizes_instruments_instrument_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Paper.ConfigChangeRecord", b =>

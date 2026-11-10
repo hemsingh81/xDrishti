@@ -72,7 +72,7 @@ public sealed class DerivedScheduleTests
     }
 
     [Theory]
-    [InlineData(13, "flags_unavailable")]
+    [InlineData(13, null)]
     [InlineData(4, "intraday_unavailable")]
     [InlineData(12, "intraday_unavailable")]
     [InlineData(3, null)]

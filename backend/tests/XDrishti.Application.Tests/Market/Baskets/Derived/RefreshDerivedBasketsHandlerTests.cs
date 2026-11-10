@@ -1,5 +1,6 @@
 using System.Text.Json;
 using XDrishti.Application.Market.Baskets;
+using XDrishti.Domain.Baskets.Derived;
 using XDrishti.Domain.Market.Baskets;
 
 namespace XDrishti.Application.Tests.Market.Baskets.Derived;
@@ -173,6 +174,24 @@ public sealed class RefreshDerivedBasketsHandlerTests
 
         run.Value.Baskets.Single(b => b.Name.Contains("proxy", StringComparison.Ordinal)).Reason.ShouldBe("flags_unavailable");
         world.Store.Versions.ShouldHaveSingleItem(); // only the liquid basket
+    }
+
+    [Fact]
+    public async Task Basket_13_forms_from_the_dated_flags_and_leaves_out_the_flagged_and_the_unflagged_unknown()
+    {
+        var world = DerivedWorld.WithLiquidBasket(1);
+        world.Store.Definitions.Add(new(Guid.NewGuid(), "Derived: Intraday-tradable (proxy)", 13, true, null, new Dictionary<string, double>()));
+        var since = new DateOnly(2026, 9, 1);
+        var clean = world.AddInstrument("CLEAN", 1_000_000, 70);
+        var surveilled = world.AddInstrument("ASM", 1_000_000, 70);
+        world.Universe.Instruments[^2] = clean with { Bars = clean.Bars with { Flags = [new DayFlag(since, false, false, "EQ")] } };
+        world.Universe.Instruments[^1] = surveilled with { Bars = surveilled.Bars with { Flags = [new DayFlag(since, true, false, "EQ")] } };
+
+        var run = await world.Refresh().HandleAsync(Run, TestContext.Current.CancellationToken);
+
+        var outcome = run.Value.Baskets.Single(b => b.Name.Contains("proxy", StringComparison.Ordinal));
+        outcome.Outcome.ShouldNotBe("skipped");
+        world.Store.Versions.Single(v => v.BasketId == outcome.BasketId).Scores.Where(s => s.IsMember).Select(s => s.InstrumentId).ShouldNotContain(surveilled.InstrumentId);
     }
 
     [Fact]

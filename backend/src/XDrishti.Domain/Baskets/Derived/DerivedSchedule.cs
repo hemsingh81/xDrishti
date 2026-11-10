@@ -65,11 +65,11 @@ public static class DerivedSchedule
         return after.AddDays(400);
     }
 
-    /// <summary>Why a basket cannot be formed by this build; null when it can. Basket 13 needs BK-05's dated ban and ASM/GSM lists (a missing flag is not a pass); the intraday ones need live minute bars that are not recorded.</summary>
+    /// <summary>Why a basket cannot be formed by this build; null when it can. Basket 13 reads BK-05's dated lists (a missing flag is not a pass: until they are recorded every share is excluded); the intraday ones need live minute bars that are not recorded.</summary>
     public static string? WhyNotRunnable(DerivedDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
-        return definition.Id == 13 ? "flags_unavailable" : definition.NeedsIntraday ? "intraday_unavailable" : null;
+        return definition.NeedsIntraday ? "intraday_unavailable" : null;
     }
 
     private static (int Year, int Week) WeekOf(DateOnly date)

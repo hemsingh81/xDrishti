@@ -36,6 +36,49 @@ internal sealed class FakeFetchSettings : IBasketFetchSettings
     public string Snapshot() => "{}";
 }
 
+/// <summary>Settings of the two NSE F&amp;O files for the tests (on unless a test turns it off).</summary>
+internal sealed class FakeListSettings : IListSettings
+{
+    public bool FetchEnabled { get; set; } = true;
+
+    public IReadOnlyList<TimeOnly> BanRunTimes => [new(19, 0), new(8, 30)];
+
+    public TimeOnly LotSizeRunAt => new(8, 50);
+}
+
+/// <summary>The stored master's shares as the list baskets see them.</summary>
+internal sealed class FakeMasterReader : IListMasterReader
+{
+    public List<MasterShare> Shares { get; } = [];
+
+    public int Reads { get; private set; }
+
+    public ValueTask<IReadOnlyList<MasterShare>> ReadSharesAsync(DateOnly today, CancellationToken cancellationToken)
+    {
+        Reads++;
+        return ValueTask.FromResult<IReadOnlyList<MasterShare>>([.. Shares]);
+    }
+}
+
+/// <summary>The dated lot sizes in memory.</summary>
+internal sealed class FakeLotStore : IFoLotSizeStore
+{
+    public Dictionary<Guid, int> Latest { get; } = [];
+
+    public List<(DateOnly Date, LotWrite Row)> Written { get; } = [];
+
+    public List<(SourceUpdate Source, FetchRecord Fetch)> Applied { get; } = [];
+
+    public ValueTask<IReadOnlyDictionary<Guid, int>> LatestAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyDictionary<Guid, int>>(Latest);
+
+    public ValueTask ApplyAsync(SourceUpdate source, FetchRecord fetch, DateOnly effectiveFrom, IReadOnlyList<LotWrite> rows, CancellationToken cancellationToken)
+    {
+        Applied.Add((source, fetch));
+        Written.AddRange(rows.Select(r => (effectiveFrom, r)));
+        return ValueTask.CompletedTask;
+    }
+}
+
 /// <summary>An in-memory catalogue, master and fetch log; counts what is written.</summary>
 internal sealed class FakeSourceStore : IBasketSourceStore
 {
@@ -170,7 +213,13 @@ internal sealed class FetchWorld
     public BasketSourceInfo Source(bool enabled = true, DateTimeOffset? lastOk = null, DateTimeOffset? next = null, string? sha = null, string? etag = null, DateTimeOffset? checkedAt = null, int fails = 0, string? alt = null) =>
         new BasketSourceInfo(BasketId, "NSE Nifty 50", "ind_nifty50list.csv", "https://nsearchives.nseindia.com/content/indices/ind_nifty50list.csv", null, 50, 50, enabled, "never", lastOk, checkedAt, etag, null, sha, next, fails, Current.Count) with { HostAlt = alt };
 
-    public RunBasketFetchHandler Handler => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, Clock, NullLogger<RunBasketFetchHandler>.Instance);
+    public FakeListSettings ListSettings { get; } = new();
+
+    public FakeMasterReader MasterShares { get; } = new();
+
+    public FakeLotStore Lots { get; } = new();
+
+    public RunBasketFetchHandler Handler => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, ListSettings, new ListFileProcessor(Store, Baskets, MasterShares, Lots), Lots, Clock, NullLogger<RunBasketFetchHandler>.Instance);
 
     /// <summary>The members now: instruments 1 to <paramref name="count"/> of the master.</summary>
     public void Members(int from, int count)

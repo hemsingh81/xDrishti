@@ -165,6 +165,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddHttpClient(MasterDataHttpClientNames.NseApi).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
             services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IBasketFetchSettings>(BasketSources);
             services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IBasketSourceFetcher>(BasketSources);
+            services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IListSettings>(BasketSources);
             services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IDerivedSettings>(DerivedSettings);
             services.AddSingleton<IRefreshJobChannel>(RefreshJobs);
             services.AddSingleton<IDataJobChannel>(DataJobs);
@@ -464,6 +465,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.basket_param_sets;
                 DELETE FROM market.basket_member_scores;
                 DELETE FROM market.basket_versions;
+                DELETE FROM market.fo_lot_sizes;
                 DELETE FROM market.basket_fetches;
                 DELETE FROM market.basket_sources;
                 DELETE FROM market.basket_members;

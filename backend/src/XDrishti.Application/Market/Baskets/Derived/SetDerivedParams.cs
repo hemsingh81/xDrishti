@@ -9,7 +9,7 @@ namespace XDrishti.Application.Market.Baskets;
 
 /// <summary>
 /// An owner act (the endpoint needs a step-up): a new parameter set for a derived basket (a set is never edited: new numbers make a new row, validated by the engine's ranges) and/or the basket's switch. Audited with the setting snapshot and the old and new
-/// hash. Baskets that this build cannot form (13, which needs BK-05's flags, and the intraday 4 and 12) cannot be switched on.
+/// hash. Baskets that this build cannot form (the intraday 4 and 12) cannot be switched on; 13 can, and forms only once the dated lists of BK-05 are recorded.
 /// </summary>
 public sealed record SetDerivedParamsCommand(Guid BasketId, IReadOnlyDictionary<string, double>? Overrides, bool? Enabled, string Actor) : ICommand;
 

@@ -1,5 +1,6 @@
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Tests.Platform.Services;
@@ -19,6 +20,7 @@ public sealed class InstrumentMasterServiceTests : IDisposable
     private readonly FakeRefreshSettings _settings = new();
     private readonly InMemoryMarketData _data = new();
     private readonly List<StartRefreshCommand> _started = [];
+    private readonly List<RefreshFlagListsCommand> _listRuns = [];
     private readonly ServicesWorld _world;
     private SettableClock _clock = null!;
     private Func<StartRefreshCommand, Result<RefreshStarted>>? _answer;
@@ -35,7 +37,8 @@ public sealed class InstrumentMasterServiceTests : IDisposable
             },
             provider => provider
                 .Singleton<IRefreshRunStore>(_data)
-                .Singleton<ICommandHandler<StartRefreshCommand, RefreshStarted>>(new FakeStartHandler(this)));
+                .Singleton<ICommandHandler<StartRefreshCommand, RefreshStarted>>(new FakeStartHandler(this))
+                .Singleton<ICommandHandler<RefreshFlagListsCommand, FlagListRun>>(new FakeListsHandler(this)));
         _world.SetClock(At(11, 7, 30));
         _world.Application.StartedAt = At(11, 7, 30);
     }
@@ -269,6 +272,49 @@ public sealed class InstrumentMasterServiceTests : IDisposable
 
         (definition.Defaults.Schedule.StartTime, definition.Defaults.Schedule.TradingDaysOnly, definition.Defaults.Schedule.DaySet).ShouldBe((new TimeOnly(8, 45), false, Weekdays.EveryDay));
         definition.Constraints.CatchUpReach.ShouldBe(CatchUpReach.Latest);
+    }
+
+    [Fact]
+    public async Task The_lists_read_from_the_master_are_refreshed_after_a_master_run_that_finished()
+    {
+        _work = run => run.MarkUnchanged(_clock.GetUtcNow(), SourceStamp.None, SourceStamp.None, 10);
+
+        await _world.RunNowAsync("instrument-master");
+        await _world.SettleAsync();
+
+        var listRun = _listRuns.ShouldHaveSingleItem();
+        (listRun.MasterOk, listRun.RefreshId).ShouldBe((true, _data.Runs.Single().Id));
+    }
+
+    [Fact]
+    public async Task A_failed_master_run_tells_the_lists_so_that_they_keep_the_previous_membership()
+    {
+        _work = run => run.Fail(_clock.GetUtcNow(), "the file was not reachable");
+
+        await _world.RunNowAsync("instrument-master");
+        await _world.SettleAsync();
+
+        _listRuns.ShouldHaveSingleItem().MasterOk.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task A_refresh_that_was_running_already_does_not_touch_the_lists()
+    {
+        _answer = _ => Result.Failure<RefreshStarted>(MarketErrors.RefreshRunning);
+
+        await _world.RunNowAsync("instrument-master");
+        await _world.SettleAsync();
+
+        _listRuns.ShouldBeEmpty();
+    }
+
+    private sealed class FakeListsHandler(InstrumentMasterServiceTests test) : ICommandHandler<RefreshFlagListsCommand, FlagListRun>
+    {
+        public ValueTask<Result<FlagListRun>> HandleAsync(RefreshFlagListsCommand command, CancellationToken cancellationToken)
+        {
+            test._listRuns.Add(command);
+            return ValueTask.FromResult(Result.Success(new FlagListRun([])));
+        }
     }
 
     private sealed class FakeStartHandler(InstrumentMasterServiceTests test) : ICommandHandler<StartRefreshCommand, RefreshStarted>

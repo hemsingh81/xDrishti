@@ -39,12 +39,18 @@ public sealed class BasketSourceHttpTests : HttpMessageHandler, IHttpClientFacto
     [InlineData("https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%2050", false)]
     [InlineData("https://nsearchives.nseindia.com/content/indices/ind_nifty50list.csv?x=1", false)]
     [InlineData("http://nsearchives.nseindia.com/content/indices/ind_nifty50list.csv", false)]
-    [InlineData("https://nsearchives.nseindia.com/content/fo/fo_mktlots.csv", false)]
+    [InlineData("https://nsearchives.nseindia.com/content/fo/fo_mktlots.csv", true)]
+    [InlineData("https://nsearchives.nseindia.com/content/fo/fo_secban.csv", true)]
+    [InlineData("https://nsearchives.nseindia.com/content/fo/fo_secban.csv?d=1", false)]
+    [InlineData("https://nsearchives.nseindia.com/content/fo/fo_other.csv", false)]
+    [InlineData("https://nsearchives.nseindia.com/content/fo/fo_mktlots.csv/x", false)]
+    [InlineData("https://niftyindices.com/content/fo/fo_secban.csv", false)]
+    [InlineData("https://www.nseindia.com/content/fo/fo_secban.csv", false)]
     [InlineData("https://nsearchives.nseindia.com/content/indices/../fo/x.csv", false)]
     [InlineData("https://niftyindices.com/content/indices/ind_nifty50list.csv", false)]
     [InlineData("https://nsearchives.nseindia.com:8443/content/indices/ind_nifty50list.csv", false)]
     [InlineData("https://evil.example.invalid/content/indices/ind_nifty50list.csv", false)]
-    public void Only_a_plain_csv_of_the_two_index_folders_is_allowed(string url, bool allowed)
+    public void Only_a_plain_csv_of_the_index_folders_or_the_two_fo_files_is_allowed(string url, bool allowed)
     {
         BasketSourceEndpointGuard.IsAllowed(HttpMethod.Get, new Uri(url)).ShouldBe(allowed);
     }
@@ -148,6 +154,47 @@ public sealed class BasketSourceHttpTests : HttpMessageHandler, IHttpClientFacto
         provider.GetRequiredService<IBasketFetchSettings>().Enabled.ShouldBeFalse();
         var response = await provider.GetRequiredService<IBasketSourceFetcher>().GetAsync(Source(), Ct);
         (response.Status, response.Error).ShouldBe((0, "disabled"));
+    }
+
+    private static ServiceProvider Wired(params (string Key, string Value)[] settings)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<TimeProvider>(new FakeTimeProvider());
+        services.AddSystemBasketSources(new ConfigurationBuilder().AddInMemoryCollection(settings.ToDictionary(s => s.Key, s => (string?)s.Value)).Build());
+        return services.BuildServiceProvider();
+    }
+
+    [Fact]
+    public void The_lists_settings_default_to_the_two_nse_files_off_with_the_researched_times()
+    {
+        using var provider = Wired();
+
+        var lists = provider.GetRequiredService<IListSettings>();
+
+        (lists.FetchEnabled, lists.LotSizeRunAt).ShouldBe((false, new TimeOnly(8, 50)));
+        lists.BanRunTimes.ShouldBe([new TimeOnly(19, 0), new TimeOnly(8, 30)]);
+        provider.GetService<IHttpClientFactory>().ShouldBeNull(); // no client while both gates are off
+    }
+
+    [Fact]
+    public void Turning_only_the_lists_setting_on_registers_the_guarded_client()
+    {
+        using var provider = Wired(("Baskets:System:Lists:FetchEnabled", "true"), ("Baskets:System:Fetch:UserAgent", "xDrishti (owner@example.invalid)"));
+        using var scope = provider.CreateScope();
+
+        scope.ServiceProvider.GetRequiredService<IBasketSourceFetcher>().GetType().Name.ShouldBe("NseBasketSourceFetcher");
+        scope.ServiceProvider.GetRequiredService<IListSettings>().FetchEnabled.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("25:00")]
+    [InlineData("8:5")]
+    public void A_bad_lot_size_time_fails_validation_at_start_up(string time)
+    {
+        using var provider = Wired(("Baskets:System:Lists:LotSizeRunAt", time));
+
+        Should.Throw<Microsoft.Extensions.Options.OptionsValidationException>(() => provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<BasketListOptions>>().Value);
     }
 
     [Fact]

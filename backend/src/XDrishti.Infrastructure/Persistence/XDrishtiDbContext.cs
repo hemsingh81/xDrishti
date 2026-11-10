@@ -68,6 +68,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchRecord> BasketFetches => Set<XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchRecord>();
 
+    internal DbSet<XDrishti.Infrastructure.Market.SystemBaskets.FoLotSizeRecord> FoLotSizes => Set<XDrishti.Infrastructure.Market.SystemBaskets.FoLotSizeRecord>();
+
     internal DbSet<XDrishti.Infrastructure.Market.DerivedBaskets.BasketVersionRecord> BasketVersions => Set<XDrishti.Infrastructure.Market.DerivedBaskets.BasketVersionRecord>();
 
     internal DbSet<XDrishti.Infrastructure.Market.DerivedBaskets.BasketMemberScoreRecord> BasketMemberScores => Set<XDrishti.Infrastructure.Market.DerivedBaskets.BasketMemberScoreRecord>();
