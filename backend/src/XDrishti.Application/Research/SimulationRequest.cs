@@ -20,6 +20,7 @@ namespace XDrishti.Application.Research;
 /// <param name="Exits">The exits to use in place of the built-in's own (P4-05); null is the built-in as it is. Two or more candidates are a comparison (<see cref="RunComparisonQuery"/>).</param>
 /// <param name="StrategyVersion">The version of the stored strategy <paramref name="StrategyId"/>; null is the latest (spec P3-02d, D7).</param>
 /// <param name="StrategyHash">A stored version by its content hash instead of by id and version; <paramref name="StrategyId"/> may then be empty, and if given must be that version's family.</param>
+/// <param name="Purpose">Why the run exists (AU-11, ADR 0243): <c>Research</c> unless the simulate-everything job asks for <c>Training</c>. The one place the header's purpose comes from.</param>
 public sealed record SimulationRequest(
     string StrategyId,
     IReadOnlyDictionary<string, double>? Parameters,
@@ -34,4 +35,5 @@ public sealed record SimulationRequest(
     FillRulesInput? Fills = null,
     ExitChoice? Exits = null,
     int? StrategyVersion = null,
-    string? StrategyHash = null);
+    string? StrategyHash = null,
+    RunPurpose Purpose = RunPurpose.Research);

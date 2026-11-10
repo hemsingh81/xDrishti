@@ -93,6 +93,7 @@ using XDrishti.Application.Research;
 using XDrishti.Application.Research.CostSheets;
 using XDrishti.Application.Selection;
 using XDrishti.Application.Shadow;
+using XDrishti.Application.SimAll;
 using XDrishti.Application.Ticks;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
@@ -747,6 +748,7 @@ public static class DependencyInjection
         services.TryAddSingleton<ILabProgress, NullLabProgress>(); // the host that sends events replaces it
 
         // Replay jobs started from the screen (P8-18 Part B, ADR 0129): the API's use cases; the executor and dispatcher are AddExperimentJobRunner, called by the host that runs them. The start needs the capability, which only the owner switches on.
+        services.AddSimAll();
         services.TryAddSingleton(new ExperimentJobSettings()); // the host replaces it with its configuration
         services.TryAddSingleton<IExperimentJobProgress, NullExperimentJobProgress>(); // the host that sends events replaces it
         services.AddScoped<ReplayPlanner>();
@@ -778,6 +780,25 @@ public static class DependencyInjection
         services.AddScoped<LabBenchmark>(); // the daily Sharpe of the out-of-sample net R against the buy-and-hold of the universe, read by the Lab runner only (CF-11 row 13, ADR 0227)
         services.AddScoped<LabDeflation>(); // the deflated Sharpe ratio beside the factor (CF-03, ADR 0205)
         services.AddSingleton<LabRunDispatcher>();
+        return services;
+    }
+
+    /// <summary>The use cases of the simulate-everything job (AU-12, ADR 0248): start, pause, resume, cancel and read. The loop that works the job is <see cref="AddSimAllRunner"/>, called by the host that runs it.</summary>
+    private static void AddSimAll(this IServiceCollection services)
+    {
+        services.TryAddSingleton(new SimAllSettings()); // the host replaces it with its configuration
+        services.AddScoped<ICommandHandler<StartSimAllCommand, SimAllView>, StartSimAllHandler>();
+        services.AddScoped<ICommandHandler<PauseSimAllCommand, SimAllView>, PauseSimAllHandler>();
+        services.AddScoped<ICommandHandler<ResumeSimAllCommand, SimAllView>, ResumeSimAllHandler>();
+        services.AddScoped<ICommandHandler<CancelSimAllCommand, SimAllView>, CancelSimAllHandler>();
+        services.AddScoped<IQueryHandler<GetSimAllQuery, Result<SimAllView>>, GetSimAllHandler>();
+    }
+
+    /// <summary>The chunk executor and the runner of the simulate-everything job (AU-12): only the host that runs the job (the API) calls this.</summary>
+    public static IServiceCollection AddSimAllRunner(this IServiceCollection services)
+    {
+        services.AddScoped<ISimAllChunkExecutor, SimAllChunkExecutor>();
+        services.AddSingleton<SimAllRunner>();
         return services;
     }
 

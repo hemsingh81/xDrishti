@@ -3100,6 +3100,91 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/simulate-all': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start the simulate-everything job: the latest version of every stored strategy over every tracked instrument, as training runs in the window that ends before the hold-out and its embargo. 202 with the job. 422 simulate_all.backfill_incomplete (the history backfill is not complete), simulate_all.nothing_to_run; 409 simulate_all.active, or lab.holdout_unavailable (no hold-out block can be determined) */
+    post: operations['StartSimulateAll'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/simulate-all/current': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The active job, else the newest one: state, why it waits, the window, the range covered, chunks done, failed, running and remaining, and the measured estimate of time and disk once 1 % of the chunks is done. Read while it runs. 404 simulate_all.no_active_job when there never was a job */
+    get: operations['GetSimulateAll'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/simulate-all/pause': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Pause the job; a chunk in flight finishes. Only the owner resumes it. 404 simulate_all.no_active_job, 409 simulate_all.not_pausable */
+    post: operations['PauseSimulateAll'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/simulate-all/resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resume a paused job, whatever the reason; the backfill is checked again (422 simulate_all.backfill_incomplete). Hours and disk rules still apply at the next look. 404 simulate_all.no_active_job, 409 simulate_all.not_paused */
+    post: operations['ResumeSimulateAll'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/simulate-all/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel the job; chunks not done are never run, stored runs stay. 404 simulate_all.no_active_job */
+    post: operations['CancelSimulateAll'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/experiments/preview': {
     parameters: {
       query?: never;
@@ -21328,6 +21413,57 @@ export interface components {
       pValue: number;
       label: string;
     };
+    /** @description The measured estimate (spec AU-12 non-functional): taken from the finished chunks once at least 1 % of the job (and one chunk) is done. An estimate, not a promise: throughput and storage per chunk were unverified until measured. */
+    SimAllEstimate: {
+      /** Format: int32 */
+      sampledChunks: number;
+      /** Format: int64 */
+      averageChunkMilliseconds: number;
+      /** Format: int64 */
+      remainingSeconds: number;
+      /** Format: int64 */
+      averageStoredBytes: number;
+      /** Format: int64 */
+      remainingStoredBytes: number;
+      basis: string;
+    };
+    /** @description Progress of the job, read by the report view while it runs (AU-14, AU-15). */
+    SimAllView: {
+      /** Format: uuid */
+      id: string;
+      state: string;
+      pauseReason: null | string;
+      /** Format: date */
+      windowFrom: string;
+      /** Format: date */
+      windowTo: string;
+      /** Format: date */
+      holdOutStart: string;
+      /** Format: date */
+      coveredFrom: null | string;
+      /** Format: date */
+      coveredTo: null | string;
+      /** Format: int32 */
+      chunksTotal: number;
+      /** Format: int32 */
+      chunksDone: number;
+      /** Format: int32 */
+      chunksFailed: number;
+      /** Format: int32 */
+      chunksRunning: number;
+      /** Format: int32 */
+      chunksRemaining: number;
+      /** Format: int32 */
+      workers: number;
+      startedBy: string;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      estimate: null | components['schemas']['SimAllEstimate'];
+    };
     /** @description The owner's skip, with an optional plain-text reason of at most 200 characters. */
     SkipTicketBody: {
       reason: null | string;
@@ -30575,6 +30711,187 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ExperimentView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  StartSimulateAll: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimAllView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetSimulateAll: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimAllView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  PauseSimulateAll: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimAllView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ResumeSimulateAll: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimAllView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  CancelSimulateAll: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimAllView'];
         };
       };
       /** @description Not Found */

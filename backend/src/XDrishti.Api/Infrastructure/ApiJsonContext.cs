@@ -66,6 +66,7 @@ using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Application.Reporting;
 using XDrishti.Application.Selection;
 using XDrishti.Application.Shadow;
+using XDrishti.Application.SimAll;
 using XDrishti.Application.Ticks;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Portfolio;
@@ -278,6 +279,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(CapabilityChangeOutcome))]
 [JsonSerializable(typeof(ChangeCapabilityRequest))]
 [JsonSerializable(typeof(ExperimentPreviewView))]
+[JsonSerializable(typeof(SimAllView))]
+[JsonSerializable(typeof(SimAllEstimate))]
 [JsonSerializable(typeof(ExperimentJobView))]
 [JsonSerializable(typeof(ExperimentJobList))]
 [JsonSerializable(typeof(StartExperimentRequest))]

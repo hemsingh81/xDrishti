@@ -25,5 +25,8 @@ Approved by delegation (owner, 2026-11-09: unsettled decisions are researched, t
 7. **A training run may fix the block first.** The resolver stores the block if none exists, as the first Lab post does; the block never moves earlier, so this is safe but it is a side effect of training. **AU-12 must** require backfill completion before it starts, and give the learning job a separate, explicitly non-evidence reader of training runs (nothing in this slice reads them).
 8. **Down migration** refuses while a training run exists (dropping the column would turn it into evidence).
 
+## Built in AU-12
+The entry conditions of point 7, the sweep row of point 3 and the job itself are decided in [0248](0248-the-simulate-everything-job-is-a-resumable-table-driven-queue-of-training-chunks-that-yields-to-market-hours-disk-and-the-broker.md).
+
 ## Consequences
 All history is slightly less than all. The job pauses for market hours and low disk, so it may take days.

@@ -10508,6 +10508,201 @@
         }
       }
     },
+    "/api/simulate-all": {
+      "post": {
+        "tags": [
+          "Simulate"
+        ],
+        "summary": "Start the simulate-everything job: the latest version of every stored strategy over every tracked instrument, as training runs in the window that ends before the hold-out and its embargo. 202 with the job. 422 simulate_all.backfill_incomplete (the history backfill is not complete), simulate_all.nothing_to_run; 409 simulate_all.active, or lab.holdout_unavailable (no hold-out block can be determined)",
+        "operationId": "StartSimulateAll",
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimAllView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulate-all/current": {
+      "get": {
+        "tags": [
+          "Simulate"
+        ],
+        "summary": "The active job, else the newest one: state, why it waits, the window, the range covered, chunks done, failed, running and remaining, and the measured estimate of time and disk once 1 % of the chunks is done. Read while it runs. 404 simulate_all.no_active_job when there never was a job",
+        "operationId": "GetSimulateAll",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimAllView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulate-all/pause": {
+      "post": {
+        "tags": [
+          "Simulate"
+        ],
+        "summary": "Pause the job; a chunk in flight finishes. Only the owner resumes it. 404 simulate_all.no_active_job, 409 simulate_all.not_pausable",
+        "operationId": "PauseSimulateAll",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimAllView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulate-all/resume": {
+      "post": {
+        "tags": [
+          "Simulate"
+        ],
+        "summary": "Resume a paused job, whatever the reason; the backfill is checked again (422 simulate_all.backfill_incomplete). Hours and disk rules still apply at the next look. 404 simulate_all.no_active_job, 409 simulate_all.not_paused",
+        "operationId": "ResumeSimulateAll",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimAllView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulate-all/cancel": {
+      "post": {
+        "tags": [
+          "Simulate"
+        ],
+        "summary": "Cancel the job; chunks not done are never run, stored runs stay. 404 simulate_all.no_active_job",
+        "operationId": "CancelSimulateAll",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimAllView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/experiments/preview": {
       "get": {
         "tags": [
@@ -62399,6 +62594,161 @@
         },
         "description": "The sign-flip baseline: lenient (mean R against 0 given the trade sizes), not a re-run with random entries."
       },
+      "SimAllEstimate": {
+        "required": [
+          "sampledChunks",
+          "averageChunkMilliseconds",
+          "remainingSeconds",
+          "averageStoredBytes",
+          "remainingStoredBytes",
+          "basis"
+        ],
+        "type": "object",
+        "properties": {
+          "sampledChunks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "averageChunkMilliseconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "remainingSeconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "averageStoredBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "remainingStoredBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "basis": {
+            "type": "string"
+          }
+        },
+        "description": "The measured estimate (spec AU-12 non-functional): taken from the finished chunks once at least 1 % of the job (and one chunk) is done. An estimate, not a promise: throughput and storage per chunk were unverified until measured."
+      },
+      "SimAllView": {
+        "required": [
+          "id",
+          "state",
+          "pauseReason",
+          "windowFrom",
+          "windowTo",
+          "holdOutStart",
+          "coveredFrom",
+          "coveredTo",
+          "chunksTotal",
+          "chunksDone",
+          "chunksFailed",
+          "chunksRunning",
+          "chunksRemaining",
+          "workers",
+          "startedBy",
+          "startedAt",
+          "updatedAt",
+          "finishedAt",
+          "estimate"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "pauseReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "windowFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "windowTo": {
+            "type": "string",
+            "format": "date"
+          },
+          "holdOutStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "coveredFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "coveredTo": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "chunksTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chunksDone": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chunksFailed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chunksRunning": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "chunksRemaining": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "workers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startedBy": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "estimate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SimAllEstimate"
+              }
+            ]
+          }
+        },
+        "description": "Progress of the job, read by the report view while it runs (AU-14, AU-15)."
+      },
       "SkipTicketBody": {
         "required": [
           "reason"
@@ -66654,6 +67004,9 @@
     },
     {
       "name": "Learning"
+    },
+    {
+      "name": "Simulate"
     },
     {
       "name": "Exports"

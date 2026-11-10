@@ -54,6 +54,13 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
 
     private static readonly string[] NotEvidenceReads = ["XDrishti.Infrastructure/Ai/Evaluation/FixtureSeeder.cs", "XDrishti.Domain/Assistant/ManifestViews.cs"];
 
+    /// <summary>AU-12 (ADR 0248): the one reader of training runs. It is the mirror of the fence: each of its statements carries <c>purpose = 'training'</c>.</summary>
+    private const string TrainingReader = "XDrishti.Infrastructure/SimAll/TrainingRunReader.cs";
+
+    private static bool HasTrainingFence(string statement) =>
+        Regex.IsMatch(statement, @"\bWHERE\s+(\w+\.)?purpose\s*=\s*'training'\s+AND\b", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2))
+        && !Regex.IsMatch(statement, @"\bOR\s+(\w+\.)?purpose\b", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
+
     private static IEnumerable<(string File, string Statement, string Table)> TableReads() =>
         Sources().SelectMany(f => Statements(f).SelectMany(st =>
             NamedTable().Matches(st).Where(m => !WriteVerb.IsMatch(st[..m.Index])).Select(m => (Rel(f), st, m.Value.ToLowerInvariant()))));
@@ -68,6 +75,13 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
             if (NotEvidenceReads.Contains(file))
             {
                 continue; // the fixture writes research runs; the manifest only names a source table
+            }
+
+            if (file == TrainingReader)
+            {
+                table.ShouldContain("sim_runs", Case.Sensitive, $"{file} reads only the header table");
+                HasTrainingFence(statement).ShouldBeTrue($"{file}: a statement reads research.sim_runs without a purpose = 'training' fence (ADR 0248)");
+                continue;
             }
 
             if (table.Contains("sim_runs", StringComparison.Ordinal))
@@ -102,7 +116,7 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
         // an addition to this list is a decision: the new reader is fenced and has a test in TrainingRunFenceTests
         var readers = TableReads().Where(r => r.Table.Contains("sim_runs", StringComparison.Ordinal) && !NotEvidenceReads.Contains(r.File) && !(r.File.EndsWith("RunStore.Write.cs", StringComparison.Ordinal) && r.Statement.Contains("SelectStored =", StringComparison.Ordinal))).Select(r => r.File).Distinct().Order(StringComparer.Ordinal).ToList();
 
-        readers.ShouldBe(["XDrishti.Infrastructure/Research/ReportTradeSource.cs", "XDrishti.Infrastructure/Research/RunStore.Comparisons.cs"]);
+        readers.ShouldBe(["XDrishti.Infrastructure/Research/ReportTradeSource.cs", "XDrishti.Infrastructure/Research/RunStore.Comparisons.cs", TrainingReader]);
     }
 
     [Fact]
@@ -208,11 +222,38 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
     }
 
     [Fact]
+    public void The_training_reader_is_named_only_by_the_learning_side_and_never_by_evidence_code()
+    {
+        // AU-12 (ADR 0243 point 7, ADR 0248): the reader of training runs is not evidence. Only its port, its implementation, the registration and the learning side may name it; Lab, Confidence, Selection, Reporting,
+        // Planning, Research (the run store) and the readiness scorecard may not. AU-13 adds its folder to Allowed with its own test.
+        var allowed = new[] { "XDrishti.Application/Abstractions/SimAll/ITrainingRunReader.cs", "XDrishti.Infrastructure/SimAll/TrainingRunReader.cs", "XDrishti.Infrastructure/DependencyInjection.cs" };
+        var users = Sources().Where(f => File.ReadAllText(f).Contains("TrainingRunReader", StringComparison.Ordinal)).Select(Rel).Order(StringComparer.Ordinal).ToList();
+
+        users.ShouldBe([.. allowed.Order(StringComparer.Ordinal)]);
+        Sources().Where(f => Rel(f).StartsWith("XDrishti.Application/SimAll/", StringComparison.Ordinal)).Select(f => File.ReadAllText(f)).ShouldAllBe(t => !t.Contains("ITrainingRunReader", StringComparison.Ordinal), "the job writes training runs and never reads them back");
+    }
+
+    [Fact]
+    public void The_simulate_everything_job_has_no_order_path_and_no_reference_to_the_execution_service()
+    {
+        var files = Sources().Where(f => Rel(f).StartsWith("XDrishti.Application/SimAll/", StringComparison.Ordinal) || Rel(f).StartsWith("XDrishti.Infrastructure/SimAll/", StringComparison.Ordinal) || Rel(f).EndsWith("Endpoints/SimAllEndpoints.cs", StringComparison.Ordinal)).ToList();
+        files.Count.ShouldBeGreaterThan(5);
+        foreach (var file in files)
+        {
+            var code = StripComments(File.ReadAllText(file));
+            code.ShouldNotContain("XDrishti.Execution", Case.Sensitive, Rel(file));
+            code.ShouldNotContain("IBrokerOrder", Case.Sensitive, Rel(file));
+            code.ShouldNotContain("PlaceOrder", Case.Sensitive, Rel(file));
+            code.ShouldNotContain("IBroker", Case.Sensitive, Rel(file) + ": the job reads stored bars and calls no broker");
+        }
+    }
+
+    [Fact]
     public void The_training_purpose_is_set_by_no_endpoint_and_no_existing_writer()
     {
-        // the purpose is chosen only where a RunToStore or RunHeader is made for training; today nothing does (AU-12 will), so no source outside the model names Training
+        // the purpose is chosen only where a RunToStore or RunHeader is made for training; only the simulate-everything chunk executor does (AU-12), so no source outside the model and it names Training
         var users = Sources().Where(f => File.ReadAllText(f).Contains("RunPurpose.Training", StringComparison.Ordinal)).Select(Path.GetFileName).Order(StringComparer.Ordinal).ToList();
 
-        users.ShouldBe(["RunAssembler.cs", "RunPurposes.cs", "RunStore.Write.cs", "RunToStore.cs"]);
+        users.ShouldBe(["RunAssembler.cs", "RunPurposes.cs", "RunStore.Write.cs", "RunToStore.cs", "SimAllChunkExecutor.cs"]);
     }
 }

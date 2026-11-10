@@ -101,4 +101,8 @@ public enum AccountEventType
     LearnedSettingDecided,
     EssentialSettingReset,
     EssentialSettingChanged,
+    SimulateAllStarted,
+    SimulateAllPaused,
+    SimulateAllResumed,
+    SimulateAllCancelled,
 }
