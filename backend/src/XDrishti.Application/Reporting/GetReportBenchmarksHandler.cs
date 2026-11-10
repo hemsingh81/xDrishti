@@ -5,6 +5,7 @@ using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
+using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Application.Market.Baskets;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
@@ -22,6 +23,7 @@ internal sealed class GetReportBenchmarksHandler(
     IBarQueries bars,
     IPortfolioBenchmark benchmark,
     IReportTradeSource source,
+    ISimAllStore simJobs,
     ReportBenchmarkOptions settings,
     TimeProvider time,
     ILogger<GetReportBenchmarksHandler> logger) : IQueryHandler<GetReportBenchmarksQuery, Result<ReportBenchmarksView>>
@@ -58,7 +60,40 @@ internal sealed class GetReportBenchmarksHandler(
             }
         }
 
-        var runs = RunSelection.Default(await source.ListRunsAsync(cancellationToken)).Chosen.Where(r => r.ClosedTrades > 0).ToList();
+        TrainingScope? training = null;
+        var runs = new List<ReportRunInfo>();
+        if (query.Purpose is "training")
+        {
+            // a training simulation (AU-14): the window of the job, cut before the hold-out block; what the baskets would have done by holding is market data, but the range and the label are the job's
+            var jobId = Guid.TryParseExact(query.SimJob, "D", out var parsedJob) ? parsedJob : (Guid?)null;
+            if (!string.IsNullOrEmpty(query.SimJob) && jobId is null)
+            {
+                return Result.Failure<ReportBenchmarksView>(ReportErrors.Invalid("simJob is a guid"));
+            }
+
+            var progress = await simJobs.GetProgressAsync(jobId, cancellationToken);
+            if (progress is null)
+            {
+                return Result.Failure<ReportBenchmarksView>(Error.NotFound("reports.not_found", "There is no such simulate-everything job."));
+            }
+
+            training = TrainingScope.Of(progress, from.Value, to.Value);
+            if (training.Nothing)
+            {
+                return Result.Failure<ReportBenchmarksView>(ReportErrors.Invalid(training.Locked ?? "The asked range holds none of the training window."));
+            }
+
+            (from, to) = (Result.Success<DateOnly?>(training.From), Result.Success<DateOnly?>(training.To));
+        }
+        else if (!string.IsNullOrEmpty(query.SimJob) || query.Purpose is not (null or "" or "research"))
+        {
+            return Result.Failure<ReportBenchmarksView>(ReportErrors.Invalid("purpose is research or training, and simJob needs purpose=training"));
+        }
+        else
+        {
+            runs = RunSelection.Default(await source.ListRunsAsync(cancellationToken)).Chosen.Where(r => r.ClosedTrades > 0).ToList();
+        }
+
         var window = ResolveWindow(from.Value, to.Value, runs);
         if (window.IsFailure)
         {
@@ -110,7 +145,7 @@ internal sealed class GetReportBenchmarksHandler(
             index,
             true,
             settings.MinMembers,
-            new BenchmarkEvidenceView(Basis, included.Count, range, [.. Limits], unavailable)));
+            new BenchmarkEvidenceView(Basis, included.Count, range, training is null ? [.. Limits] : [.. TrainingCompletenessView.Limits(training.Job.HoldOutStart), .. Limits], unavailable, training?.Completeness(time.GetUtcNow(), []))));
     }
 
     /// <summary>The India date of the newest run (default run set, with trades) of the asked baskets, else today.</summary>

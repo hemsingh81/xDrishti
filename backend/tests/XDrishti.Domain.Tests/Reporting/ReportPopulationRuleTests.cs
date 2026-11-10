@@ -63,6 +63,30 @@ public sealed class ReportPopulationRuleTests
     }
 
     [Fact]
+    public void Thousands_of_runs_of_distinct_universes_are_checked_without_pairing_them_all_and_the_first_overlapping_pair_is_still_the_one_named()
+    {
+        // 3,000 runs, each its own universe and strategy: no pair is formed across universes. Two later runs of one universe share a strategy: the pair is named.
+        var runs = new List<ReportRun>();
+        var trades = new List<ReportTrade>();
+        for (var i = 0; i < 3_000; i++)
+        {
+            runs.Add(Run("u" + i, universe: "U" + i));
+            trades.AddRange(Series("u" + i, "S" + i, Repeat(1, 2)));
+        }
+
+        var clean = Create(runs, trades);
+        clean.IsSuccess.ShouldBeTrue(clean.IsFailure ? clean.Error.Message : string.Empty);
+
+        runs.Add(Run("x1", universe: "U7"));
+        trades.AddRange(Series("x1", "S7", Repeat(1, 2), firstDay: 20));
+        var refused = Create(runs, trades);
+
+        refused.Error.Code.ShouldBe("reports.run_overlap");
+        refused.Error.Message.ShouldContain("u7");
+        refused.Error.Message.ShouldContain("x1");
+    }
+
+    [Fact]
     public void A_run_listed_twice_with_different_definitions_is_refused()
     {
         var result = Create([Run("r1"), Run("r1", exit: "TRAIL")], []);

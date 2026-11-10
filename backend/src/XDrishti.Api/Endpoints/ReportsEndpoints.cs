@@ -18,6 +18,8 @@ internal sealed class ReportsEndpoints : IEndpointModule
 
     private const string Caps = " An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn.";
 
+    private const string Training = " Add purpose=training (and simJob=<guid>; default the active, else the newest job) to read a simulate-everything job instead of the evidence runs: a training simulation, not evidence, gross R only, labelled so in evidence.completeness (kind, label, job state, complete, chunks done of total, failed, as-of, the window, the range actually read, whether it was cut before the locked hold-out block and the sentence that says so, stocks asked for with no result, the route of the training record). Only chunks finished at the as-of instant are read; filter by stock (symbol) or basket; a larger answer than 500,000 closed trades is refused (422 reports.too_large), never cut. Without purpose=training the answer is the evidence reports as before and no training run is ever in it.";
+
     private const string Errors = " 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis.";
 
     public void Map(IEndpointRouteBuilder api)
@@ -30,45 +32,50 @@ internal sealed class ReportsEndpoints : IEndpointModule
 
         reports.MapGet("/summary", SummaryAsync)
             .WithName("GetReportSummary")
-            .WithSummary("The headline figures of the whole report population: trades, win rate, average win and loss R, expectancy, profit factor, total R, maximum drawdown, longest loss streak, holding sessions, the shrunk win rate with its credible lower bound. Each figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) and carries a number only for a value; the evidence block says what stands behind it. Read only." + Common + Caps + Errors)
+            .WithSummary("The headline figures of the whole report population: trades, win rate, average win and loss R, expectancy, profit factor, total R, maximum drawdown, longest loss streak, holding sessions, the shrunk win rate with its credible lower bound. Each figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) and carries a number only for a value; the evidence block says what stands behind it. Read only." + Common + Caps + Errors + Training)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         reports.MapGet("/groups", GroupsAsync)
             .WithName("GetReportGroups")
-            .WithSummary("The report grouped by the lens, in a fixed order (a value that was not recorded last). A trade in several baskets appears under each, so basket totals are not additive (nonAdditive says so). Read only." + Lens + Common + Caps + Errors)
+            .WithSummary("The report grouped by the lens, in a fixed order (a value that was not recorded last). A trade in several baskets appears under each, so basket totals are not additive (nonAdditive says so). Read only." + Lens + Common + Caps + Errors + Training)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         reports.MapGet("/pivot", PivotAsync)
             .WithName("GetReportPivot")
-            .WithSummary("A pivot of the two dimensions of the lens (rows first; exactly two) by one figure (metric, snake case, default expectancy_r): every cell of the grid, empty where no trade fell and masked (insufficient, with its count) below the minimum sample, never a zero. Read only." + Lens + Common + Caps + Errors)
+            .WithSummary("A pivot of the two dimensions of the lens (rows first; exactly two) by one figure (metric, snake case, default expectancy_r): every cell of the grid, empty where no trade fell and masked (insufficient, with its count) below the minimum sample, never a zero. Read only." + Lens + Common + Caps + Errors + Training)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         reports.MapGet("/equity", EquityAsync)
             .WithName("GetReportEquity")
-            .WithSummary("The equity curve (running R at the end of each exit date) and the deepest drawdown of each date for each group of the lens. A group below the minimum sample has no curve, only the reason. Read only." + Lens + Common + Caps + Errors)
+            .WithSummary("The equity curve (running R at the end of each exit date) and the deepest drawdown of each date for each group of the lens. A group below the minimum sample has no curve, only the reason. Read only." + Lens + Common + Caps + Errors + Training)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         reports.MapGet("/distribution", DistributionAsync)
             .WithName("GetReportDistribution")
-            .WithSummary("The distribution of R of each group of the lens in bins of half an R from -4 R to 6 R with an open bin at each end. A group below the minimum sample has no bins, only the reason. Read only." + Lens + Common + Caps + Errors)
+            .WithSummary("The distribution of R of each group of the lens in bins of half an R from -4 R to 6 R with an open bin at each end. A group below the minimum sample has no bins, only the reason. Read only." + Lens + Common + Caps + Errors + Training)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         reports.MapGet("/mae-mfe", MaeMfeAsync)
             .WithName("GetReportMaeMfe")
-            .WithSummary("The excursions of each group of the lens as counts, never one point per trade: a grid of the maximum adverse excursion (0.25 R bins to 2 R, then 2 R or more) by the result R (half an R, -5 R to +5 R with a tail at each end), a histogram of the maximum favourable excursion (half an R to 5 R, then 5 R or more), how many trades reached +1, +2 and +3 R at some point, and the 90th percentile (nearest rank) of the adverse excursion of the winners. Trades with no recorded excursion are left out and counted apart (excursionN). A group below the minimum sample has no counts, only the reason. Read only." + Lens + Common + Caps + Errors)
+            .WithSummary("The excursions of each group of the lens as counts, never one point per trade: a grid of the maximum adverse excursion (0.25 R bins to 2 R, then 2 R or more) by the result R (half an R, -5 R to +5 R with a tail at each end), a histogram of the maximum favourable excursion (half an R to 5 R, then 5 R or more), how many trades reached +1, +2 and +3 R at some point, and the 90th percentile (nearest rank) of the adverse excursion of the winners. Trades with no recorded excursion are left out and counted apart (excursionN). A group below the minimum sample has no counts, only the reason. Read only." + Lens + Common + Caps + Errors + Training)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        reports.MapGet("/sim-jobs", SimJobsAsync)
+            .WithName("ListReportSimJobs")
+            .WithSummary("The simulate-everything jobs a training report can read, newest first, a page at a time (limit 1 to 50, default 20; cursor from the previous page): id (pass it as simJob), state, whether it is complete (completed, every chunk done, none failed), chunks done of total and failed, the training window and the locked hold-out start. A training simulation, not evidence. Read only. 422 reports.invalid")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         reports.MapGet("/comparisons", ComparisonsAsync)
             .WithName("ListReportComparisons")
@@ -80,21 +87,21 @@ internal sealed class ReportsEndpoints : IEndpointModule
 
         reports.MapGet("/insights", InsightsAsync)
             .WithName("GetReportInsights")
-            .WithSummary("The eight auto-insights (best and weakest strategy, basket gap, side bias, best exit, weekday, regime, calibration) as fixed sentences. A figure is stated only when every group compared has at least 15 trades; otherwise the insight says why it states nothing. The insights compare fixed groupings, so there is no lens. Read only." + Common + Caps + Errors)
+            .WithSummary("The eight auto-insights (best and weakest strategy, basket gap, side bias, best exit, weekday, regime, calibration) as fixed sentences. A figure is stated only when every group compared has at least 15 trades; otherwise the insight says why it states nothing. The insights compare fixed groupings, so there is no lens. Read only." + Common + Caps + Errors + Training)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         reports.MapGet("/what-works", WhatWorksAsync)
             .WithName("GetReportWhatWorks")
-            .WithSummary("What works, in which basket, on which timeframe, with which exit: the cells (the dimensions of the lens, or basket, strategy, timeframe, side and exit by default) ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and the answer 'nothing has enough evidence yet' when no cell qualifies (a 200, not an error). Read only." + Lens + Common + Caps + Errors)
+            .WithSummary("What works, in which basket, on which timeframe, with which exit: the cells (the dimensions of the lens, or basket, strategy, timeframe, side and exit by default) ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and the answer 'nothing has enough evidence yet' when no cell qualifies (a 200, not an error). Read only." + Lens + Common + Caps + Errors + Training)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         reports.MapGet("/benchmarks", BenchmarksAsync)
             .WithName("GetReportBenchmarks")
-            .WithSummary("What simply holding each basket would have done over a window (equal weight, bought at the first close and held, price return, dividends not included) beside the benchmark index in force, each with the instruments behind it and every instrument left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price, too_few_bars). Takes basket (ids, comma separated, at most 12), from, to (default the window of the default run set; window.source says which) and membersAsOf (default the India date of the newest run of the basket, else today; members as of that date, not as of each trading day). Fewer than 3 included instruments gives no number. Baskets share instruments, so nonAdditive is true and there is no total. Read only. 422 reports.invalid; 404 reports.not_found.")
+            .WithSummary("What simply holding each basket would have done over a window (equal weight, bought at the first close and held, price return, dividends not included) beside the benchmark index in force, each with the instruments behind it and every instrument left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price, too_few_bars). Takes basket (ids, comma separated, at most 12), from, to (default the window of the default run set; window.source says which) and membersAsOf (default the India date of the newest run of the basket, else today; members as of that date, not as of each trading day). Fewer than 3 included instruments gives no number. Baskets share instruments, so nonAdditive is true and there is no total. Read only. 422 reports.invalid; 404 reports.not_found." + Training)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -105,7 +112,7 @@ internal sealed class ReportsEndpoints : IEndpointModule
 
         reports.MapGet("/trades", TradesAsync)
             .WithName("ListReportTrades")
-            .WithSummary("A page of the closed trades the report counts, in the order of the exits (limit 1 to 1,000, default 100; cursor from the previous page, which belongs to that report and is refused for another): the very set the figures were computed from, open-at-end trades excluded. Every page recomputes the population. There is no lens. Read only." + Common + Caps + Errors)
+            .WithSummary("A page of the closed trades the report counts, in the order of the exits (limit 1 to 1,000, default 100; cursor from the previous page, which belongs to that report and is refused for another): the very set the figures were computed from, open-at-end trades excluded. Every page recomputes the population. There is no lens. Read only." + Common + Caps + Errors + Training)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -168,6 +175,17 @@ internal sealed class ReportsEndpoints : IEndpointModule
         CancellationToken cancellationToken) =>
         ReadAsync(input.ToInput(), http, q => handler.HandleAsync(new GetReportMaeMfeQuery(q), cancellationToken));
 
+    private static async Task<Results<Ok<SimReportJobsView>, ProblemHttpResult>> SimJobsAsync(
+        string? limit,
+        string? cursor,
+        HttpContext http,
+        IQueryHandler<ListSimReportJobsQuery, Result<SimReportJobsView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ListSimReportJobsQuery(limit, cursor), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<ReportComparisonsView>, ProblemHttpResult>> ComparisonsAsync(
         HttpContext http,
         IQueryHandler<ListReportComparisonsQuery, Result<ReportComparisonsView>> handler,
@@ -206,7 +224,7 @@ internal sealed class ReportsEndpoints : IEndpointModule
         IQueryHandler<GetReportBenchmarksQuery, Result<ReportBenchmarksView>> handler,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(new GetReportBenchmarksQuery(input.Basket, input.From, input.To, input.MembersAsOf), cancellationToken);
+        var result = await handler.HandleAsync(new GetReportBenchmarksQuery(input.Basket, input.From, input.To, input.MembersAsOf, input.Purpose, input.SimJob), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 

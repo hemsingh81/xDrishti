@@ -19,6 +19,8 @@ namespace XDrishti.Application.Reporting;
 /// <param name="Metric">The figure of a pivot (snake case, <c>expectancy_r</c> by default).</param>
 /// <param name="Limit">Page size of the trade list, 1 to 1,000 (100 by default).</param>
 /// <param name="Cursor">The cursor the previous page of the trade list returned.</param>
+/// <param name="Purpose"><c>research</c> (default: the evidence reports) or <c>training</c> (a simulate-everything job: a training simulation, not evidence, AU-14).</param>
+/// <param name="SimJob">The job a training report reads (a guid); the active-else-newest job when empty. Only with <c>purpose=training</c>.</param>
 public sealed record ReportQueryInput(
     string? Runs = null,
     string? Basis = null,
@@ -34,4 +36,6 @@ public sealed record ReportQueryInput(
     string? To = null,
     string? Metric = null,
     string? Limit = null,
-    string? Cursor = null);
+    string? Cursor = null,
+    string? Purpose = null,
+    string? SimJob = null);

@@ -1,8 +1,12 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 using Npgsql;
 using NpgsqlTypes;
+using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.SimAll;
+using XDrishti.Domain.Common;
+using XDrishti.Domain.Reporting;
 using XDrishti.Domain.Research;
 using XDrishti.Infrastructure.Research;
 
@@ -71,6 +75,66 @@ internal sealed class TrainingRunReader(NpgsqlDataSource dataSource) : ITraining
             }
 
             yield return TradeColumns.Materialise(values, costsSheet);
+        }
+    }
+
+    public async ValueTask<IReadOnlyList<TrainingRunHeader>> ListByKeysAsync(IReadOnlyList<string> runKeys, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(runKeys);
+        if (runKeys.Count == 0)
+        {
+            return [];
+        }
+
+        if (runKeys.Count > 100_000)
+        {
+            throw new ArgumentOutOfRangeException(nameof(runKeys), runKeys.Count, "At most 100,000 run keys are read in one call.");
+        }
+
+        await using var command = dataSource.CreateCommand("SELECT r.run_key, r.strategy_id, r.definition_sha256, r.from_date, r.to_date, r.instruments, r.instruments_run, r.trade_count, r.open_at_end_count, r.created_at FROM research.sim_runs r WHERE r.purpose = 'training' AND r.run_key = ANY(@keys)");
+        command.Parameters.AddWithValue("keys", NpgsqlDbType.Array | NpgsqlDbType.Char, runKeys.ToArray());
+        var headers = await ReadAsync(command, cancellationToken);
+        var order = runKeys.Select((k, i) => (k, i)).ToDictionary(x => x.k, x => x.i, StringComparer.Ordinal);
+        return [.. headers.OrderBy(h => order.GetValueOrDefault(h.RunKey, int.MaxValue))];
+    }
+
+    public async IAsyncEnumerable<ReportTrade> StreamJobTradesAsync(Guid jobId, DateTimeOffset finishedBy, ReportTradeFilter filter, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand { Connection = connection };
+
+        // the training fence is the WHERE; only chunks of this job that were done by the as-of instant are read, so a report during the job never sees a half-written chunk
+        var sql = new StringBuilder("SELECT " + ReportTradeSource.TradeColumnList + (filter.WithExcursions ? ReportTradeSource.ExcursionColumns : string.Empty) + ", r.run_key"
+            + " FROM research.sim_all_chunks c JOIN research.sim_runs r ON r.run_key = c.run_key JOIN research.sim_trades t ON t.run_id = r.id"
+            + " WHERE r.purpose = 'training' AND c.job_id = @job AND c.state = 'done' AND c.finished_at <= @by AND t.open_at_end = false");
+        command.Parameters.AddWithValue("job", NpgsqlDbType.Uuid, jobId);
+        command.Parameters.AddWithValue("by", NpgsqlDbType.TimestampTz, finishedBy);
+        if (filter.Symbols.Count > 0)
+        {
+            // narrow by instrument first: the chunk index (job, instrument) reaches the few runs of a stock without reading the trades of the others
+            sql.Append(" AND c.instrument_id IN (SELECT i.id FROM market.instruments i WHERE i.canonical_symbol = ANY(@symbols_master))");
+            command.Parameters.AddWithValue("symbols_master", NpgsqlDbType.Array | NpgsqlDbType.Text, filter.Symbols.ToArray());
+        }
+
+        ReportTradeSource.ApplyFilter(sql, command, filter);
+        sql.Append(" ORDER BY t.run_id, t.ordinal");
+        command.CommandText = sql.ToString();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var keyColumn = filter.WithExcursions ? 18 : 14;
+        var runs = new Dictionary<long, string>();
+        var timeframes = new Dictionary<string, string>(StringComparer.Ordinal);
+        var strings = new Dictionary<string, string>(StringComparer.Ordinal);
+        var singleBasket = new Dictionary<Guid, ValueList<string>>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var runId = reader.GetInt64(0);
+            if (!runs.ContainsKey(runId))
+            {
+                runs[runId] = reader.GetString(keyColumn).Trim();
+            }
+
+            yield return ReportTradeSource.Read(reader, runs, timeframes, strings, singleBasket, filter.WithExcursions);
         }
     }
 

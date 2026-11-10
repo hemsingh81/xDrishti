@@ -17,13 +17,15 @@ namespace XDrishti.Application.Reporting;
 /// <param name="Filters">The filters.</param>
 /// <param name="Metric">The figure of a pivot.</param>
 /// <param name="Page">The page of a trade list.</param>
+/// <param name="Sim">Set when the report reads a simulate-everything job (AU-14): a training simulation, not evidence; null for the evidence reports.</param>
 public sealed partial record ReportQuery(
     IReadOnlyList<string> Runs,
     ReportBasis Basis,
     IReadOnlyList<ReportDimension> Lens,
     ReportFilters Filters,
     ReportMetric Metric,
-    PageRequest Page)
+    PageRequest Page,
+    TrainingSelector? Sim = null)
 {
     /// <summary>The page size of a trade list when none is asked for.</summary>
     public const int DefaultLimit = 100;
@@ -73,13 +75,14 @@ public sealed partial record ReportQuery(
             problems.Add("the cursor is not one this endpoint returned");
         }
 
+        var sim = ParseSim(input, basis, runs.Count, styles.Count + exits.Count, problems);
         if (problems.Count > 0)
         {
             return Result.Failure<ReportQuery>(ReportErrors.Invalid(string.Join("; ", problems)));
         }
 
         var filters = new ReportFilters(strategies, timeframes, sides, styles, exits, [.. baskets.Select(Guid.Parse)], symbols, from, to);
-        return Result.Success(new ReportQuery(runs, basis, lens, filters, parsedMetric, new PageRequest(limit, input.Cursor)));
+        return Result.Success(new ReportQuery(runs, basis, lens, filters, parsedMetric, new PageRequest(limit, input.Cursor), sim));
     }
 
     /// <summary>The offset a trade-list cursor stands for (0 for the first page).</summary>
@@ -100,6 +103,57 @@ public sealed partial record ReportQuery(
     {
         var text = string.Join('|', runKeys.Order(StringComparer.Ordinal)) + "#" + trades.ToString(CultureInfo.InvariantCulture);
         return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text)))[..8];
+    }
+
+    /// <summary>The training selector (AU-14): <c>purpose=training</c> reads a job, gross R only, with no named runs and no run labels (a training run records none); a job without that purpose, or a purpose that is neither, is refused.</summary>
+    private static TrainingSelector? ParseSim(ReportQueryInput input, ReportBasis basis, int runs, int labels, List<string> problems)
+    {
+        var purpose = string.IsNullOrEmpty(input.Purpose) ? "research" : input.Purpose;
+        if (purpose is not ("research" or "training"))
+        {
+            problems.Add($"purpose '{Trim(input.Purpose)}' is research or training");
+            return null;
+        }
+
+        if (purpose == "research")
+        {
+            if (!string.IsNullOrEmpty(input.SimJob))
+            {
+                problems.Add("simJob needs purpose=training");
+            }
+
+            return null;
+        }
+
+        Guid? job = null;
+        if (!string.IsNullOrEmpty(input.SimJob))
+        {
+            if (Guid.TryParseExact(input.SimJob, "D", out var id))
+            {
+                job = id;
+            }
+            else
+            {
+                problems.Add("simJob is a guid");
+            }
+        }
+
+        if (runs > 0)
+        {
+            problems.Add("runs names evidence runs; a training report is selected by simJob");
+        }
+
+        if (basis == ReportBasis.Net)
+        {
+            problems.Add("a training simulation is reported gross; the charge sheet confirmation covers evidence runs only");
+        }
+
+        if (labels > 0)
+        {
+            problems.Add("style and exit are labels of evidence runs; a training run records none");
+        }
+
+        return new TrainingSelector(job);
     }
 
     private static ReportBasis ParseBasis(string? text, List<string> problems)

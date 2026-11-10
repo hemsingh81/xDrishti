@@ -49,4 +49,12 @@ public interface ISimAllStore
 
     /// <summary>The finished chunks of a job with their run keys, in a fixed order (by run key), and how many chunks did not finish (failed or never run). AU-13 trains on the finished ones only and says how complete that is.</summary>
     ValueTask<SimAllFinished> ListFinishedAsync(Guid jobId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// A job by id, or the active-else-newest one when <paramref name="id"/> is null, with the counts of its chunks by state only (the sums of time, bytes and trades are 0): an index-only count, cheap enough for every report call (AU-14). Null when there is no such job.
+    /// </summary>
+    ValueTask<SimAllSnapshot?> GetProgressAsync(Guid? id, CancellationToken cancellationToken);
+
+    /// <summary>The jobs, newest first, with light counts (see <see cref="GetProgressAsync"/>); <paramref name="take"/> is 1 to 50 (AU-14).</summary>
+    ValueTask<IReadOnlyList<SimAllSnapshot>> ListProgressAsync(int skip, int take, CancellationToken cancellationToken);
 }

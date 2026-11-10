@@ -701,26 +701,45 @@ public sealed class ReportPopulation
             current.Add(t.Strategy);
         }
 
+        // Only runs of one universe can overlap, so the pairs are formed inside each universe (a training report holds thousands of runs, each its own universe, AU-14); the pair first in (i, j) order is still the one reported.
+        var byUniverse = new Dictionary<string, List<int>>(StringComparer.Ordinal);
         for (var i = 0; i < runs.Count; i++)
         {
-            for (var j = i + 1; j < runs.Count; j++)
+            if (!byUniverse.TryGetValue(runs[i].Universe, out var members))
             {
-                var a = runs[i];
-                var b = runs[j];
-                if (a.Universe != b.Universe || a.Style != b.Style || a.Exit != b.Exit || a.WindowStart > b.WindowEnd || b.WindowStart > a.WindowEnd)
-                {
-                    continue;
-                }
+                byUniverse[runs[i].Universe] = members = [];
+            }
 
-                if (strategies.TryGetValue(a.RunKey, out var sa) && strategies.TryGetValue(b.RunKey, out var sb))
+            members.Add(i);
+        }
+
+        (int I, int J, string Strategy)? first = null;
+        foreach (var members in byUniverse.Values.Where(m => m.Count > 1))
+        {
+            for (var x = 0; x < members.Count; x++)
+            {
+                for (var y = x + 1; y < members.Count; y++)
                 {
-                    var shared = sa.Intersect(sb, StringComparer.Ordinal).Order(StringComparer.Ordinal).FirstOrDefault();
-                    if (shared is not null)
+                    var (i, j) = (members[x], members[y]);
+                    var a = runs[i];
+                    var b = runs[j];
+                    if (a.Style != b.Style || a.Exit != b.Exit || a.WindowStart > b.WindowEnd || b.WindowStart > a.WindowEnd)
                     {
-                        return ReportErrors.RunOverlap(a.RunKey, b.RunKey, shared);
+                        continue;
+                    }
+
+                    if (strategies.TryGetValue(a.RunKey, out var sa) && strategies.TryGetValue(b.RunKey, out var sb) && sa.Overlaps(sb)
+                        && (first is null || (i, j).CompareTo((first.Value.I, first.Value.J)) < 0))
+                    {
+                        first = (i, j, sa.Intersect(sb, StringComparer.Ordinal).Order(StringComparer.Ordinal).First());
                     }
                 }
             }
+        }
+
+        if (first is { } found)
+        {
+            return ReportErrors.RunOverlap(runs[found.I].RunKey, runs[found.J].RunKey, found.Strategy);
         }
 
         return null;

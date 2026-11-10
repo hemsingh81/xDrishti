@@ -27,6 +27,7 @@ public sealed class GetReportBenchmarksHandlerTests
     private readonly IBarQueries _bars = Substitute.For<IBarQueries>();
     private readonly IPortfolioBenchmark _benchmark = Substitute.For<IPortfolioBenchmark>();
     private readonly IReportTradeSource _source = Substitute.For<IReportTradeSource>();
+    private readonly XDrishti.Application.Abstractions.SimAll.ISimAllStore _jobs = Substitute.For<XDrishti.Application.Abstractions.SimAll.ISimAllStore>();
     private readonly Dictionary<Guid, (double First, double Last)> _prices = [];
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -44,7 +45,7 @@ public sealed class GetReportBenchmarksHandlerTests
     }
 
     private GetReportBenchmarksHandler Handler(ReportBenchmarkOptions? options = null) =>
-        new(_baskets, _bars, _benchmark, _source, options ?? new ReportBenchmarkOptions(), new FakeTimeProvider(Now), NullLogger<GetReportBenchmarksHandler>.Instance);
+        new(_baskets, _bars, _benchmark, _source, _jobs, options ?? new ReportBenchmarkOptions(), new FakeTimeProvider(Now), NullLogger<GetReportBenchmarksHandler>.Instance);
 
     private static BarRow Bar(DateOnly day, double close) =>
         new(new DateTimeOffset(day.Year, day.Month, day.Day, 0, 0, 0, TimeSpan.FromMinutes(330)), close, close, close, close, 1, 1, true, null);

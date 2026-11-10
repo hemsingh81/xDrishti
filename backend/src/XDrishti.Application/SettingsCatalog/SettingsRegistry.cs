@@ -93,7 +93,7 @@ public static class SettingsRegistry
             "Live", "Live:Buckets", "Live:Estimates", "Live:Capacity", "Live:Report", "Live:Ramp", "Live:Capture", "Live:Match", "Live:Protect",
             "Ticks", "Depth", "Options", "Options:Liquidity", "Options:Costs", "Options:PhaseCheck", "Options:Remark", "Options:Quality",
             "Pairs", "Models", "Filings", "StrategyLab", "Experiments", "Recovery", "Shadow", "Heartbeat", "Exports", "Mcp", "Eval",
-            "Learned", "Simulate", "Training", "Planning:TicketAlerts", "Reports:PlanVsActual", "Reports:Benchmark",
+            "Learned", "Simulate", "Training", "Planning:TicketAlerts", "Reports:PlanVsActual", "Reports:Benchmark", "Reports:Training",
             "Portfolio:Heal", "Portfolio:BrokerHistory", "Portfolio:AutoRefresh", "Instruments:AutoRefresh", "Data", "Data:History",
             "Assistant:Mcp", "Assistant:Llm", "Assistant:Briefing", "Assistant:Turn", "Assistant:Proposals", "Assistant:Drafts", "AiRoles",
             "Brokers", "BrokerVault", "ExecHandover", "ExecRole", "Execution", "Execution:Sandbox", "Database", "Auth:Owner",

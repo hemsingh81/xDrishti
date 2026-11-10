@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace XDrishti.Application.Reporting;
 
 /// <summary>
@@ -17,6 +19,7 @@ namespace XDrishti.Application.Reporting;
 /// <param name="DuplicateTradesDropped">Identical repeated records of one trade in one run, counted once.</param>
 /// <param name="OpenAtEndLeftOut">Trades still open at the end of the data in the runs used, which no report counts; counted over the whole runs from their stored headers, before any date, symbol or basket filter of the report.</param>
 /// <param name="NetBasisConfirmation">What the owner confirmed, for a net report; null for a gross one.</param>
+/// <param name="Completeness">Only on a report over a simulate-everything job (AU-14): that it is a training simulation, not evidence, how much of the job was read and what part of the range is locked; absent from every evidence report.</param>
 public sealed record ReportEvidenceView(
     string Basis,
     int N,
@@ -30,4 +33,5 @@ public sealed record ReportEvidenceView(
     IReadOnlyList<string> UnavailableInputs,
     int DuplicateTradesDropped,
     int OpenAtEndLeftOut,
-    string? NetBasisConfirmation);
+    string? NetBasisConfirmation,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] TrainingCompletenessView? Completeness = null);

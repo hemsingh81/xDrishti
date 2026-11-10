@@ -41,6 +41,12 @@ internal sealed class FakeSimAllStore : ISimAllStore
         }
     }
 
+    public async ValueTask<SimAllSnapshot?> GetProgressAsync(Guid? id, CancellationToken cancellationToken) =>
+        await GetCurrentAsync(cancellationToken) is { } current && (id is null || current.Job.Id == id) ? current : null;
+
+    public async ValueTask<IReadOnlyList<SimAllSnapshot>> ListProgressAsync(int skip, int take, CancellationToken cancellationToken) =>
+        await GetCurrentAsync(cancellationToken) is { } current ? [current] : [];
+
     public ValueTask<SimAllJob?> GetAsync(Guid id, CancellationToken cancellationToken) =>
         ValueTask.FromResult(Job is { } job && job.Id == id ? job : null);
 

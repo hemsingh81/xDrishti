@@ -36,7 +36,16 @@ internal sealed class ReportWorld : IReportTradeSource, IChargeSheetConfirmation
     /// <summary>The one gate of the world: loaders made by <see cref="Loader"/> share it, as the scoped loaders of the host share the singleton.</summary>
     public ReportGate Gate { get; } = new();
 
-    public ReportLoader Loader => new(this, this, this, Gate, new FakeTimeProvider(T0), NullLogger<ReportLoader>.Instance);
+    /// <summary>The training side of the world (AU-14): nothing is stored in it unless a test says so.</summary>
+    public ITrainingReportSource Training { get; } = NSubstitute.Substitute.For<ITrainingReportSource>();
+
+    /// <summary>The jobs of the world (AU-14).</summary>
+    public XDrishti.Application.Abstractions.SimAll.ISimAllStore Jobs { get; } = NSubstitute.Substitute.For<XDrishti.Application.Abstractions.SimAll.ISimAllStore>();
+
+    /// <summary>The settings of the training reports; a test lowers the cap to show a refusal.</summary>
+    public ReportTrainingOptions TrainingSettings { get; } = new();
+
+    public ReportLoader Loader => new(this, Training, Jobs, this, this, TrainingSettings, Gate, new FakeTimeProvider(T0), NullLogger<ReportLoader>.Instance);
 
     /// <summary>A stand-in for the hash of the rates of a sheet: stable per name, 64 lower-case hex characters.</summary>
     public static string Rates(string sheet) => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(sheet)));

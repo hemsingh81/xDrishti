@@ -699,6 +699,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetReportWhatWorksQuery, Result<WhatWorksView>>, GetReportWhatWorksHandler>();
         services.AddScoped<IQueryHandler<PageReportTradesQuery, Result<TradesView>>, PageReportTradesHandler>();
         services.AddScoped<IQueryHandler<GetReportBenchmarksQuery, Result<ReportBenchmarksView>>, GetReportBenchmarksHandler>();
+        services.AddScoped<IQueryHandler<ListSimReportJobsQuery, Result<SimReportJobsView>>, ListSimReportJobsHandler>(); // the jobs a training report can read (AU-14)
         services.AddScoped<IQueryHandler<EvaluateReportsPhaseCheckQuery, Result<ReportsPhaseCheckView>>, EvaluateReportsPhaseCheckHandler>(); // the P8 exit judged from what can be read; MET only on real evidence, read only (P8-17, ADR 0126)
         services.TryAddSingleton<IEndpointCatalogue, NoEndpointCatalogue>(); // a host without a route table says so; the API host replaces it
         services.AddScoped<IQueryHandler<GetTradeReplayQuery, Result<TradeReplayView>>, GetTradeReplayHandler>(); // one stored trade on its bars, read only (P8-11, ADR 0125)

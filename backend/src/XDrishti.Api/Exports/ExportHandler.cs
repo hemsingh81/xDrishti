@@ -54,6 +54,12 @@ internal sealed class ExportHandler(
             return Result.Failure<ExportFile>(parsed.Error);
         }
 
+        if (parsed.Value.Sim is not null)
+        {
+            // a training simulation is not evidence and leaves no file that could be taken for it (AU-14, ADR 0250)
+            return Result.Failure<ExportFile>(XDrishti.Domain.Reporting.ReportErrors.Invalid("a training simulation is not exported; purpose=training is read on screen only"));
+        }
+
         var limits = new Limits(options.Value.MaxCsvRows, options.Value.MaxCsvBytes);
         var body = new ArrayBufferWriter<byte>();
         var built = command.Kind switch
