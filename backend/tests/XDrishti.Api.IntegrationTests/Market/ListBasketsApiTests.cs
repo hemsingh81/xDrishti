@@ -5,6 +5,7 @@ using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Application.Abstractions.Market.Baskets;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Baskets;
+using XDrishti.Domain.Baskets.Derived;
 using XDrishti.Domain.Market.Baskets;
 using XDrishti.Domain.Market.Baskets.Lists;
 using XDrishti.Infrastructure.Persistence;
@@ -280,13 +281,13 @@ public sealed class ListBasketsApiTests(ApiFactory factory) : BasketsTestBase(fa
         (await StaysAsync(ListBaskets.Ban.Id)).ShouldBeEmpty();
     }
 
-    // ---- the lot sizes (AC 7, 8, 9) ----
+    // ---- the lot sizes (AC 7, 8, 9): a fetch record only, no table ----
 
     private static string Lots(params string[] rows) =>
         "UNDERLYING      ,SYMBOL    ,OCT-26   ,NOV-26   ,\r\n" + string.Concat(rows.Select(r => r + "\r\n"));
 
     [Fact]
-    public async Task The_lot_file_is_stored_dated_with_the_mismatch_and_universe_warnings_and_the_master_lot_is_untouched()
+    public async Task The_lot_file_is_recorded_with_a_summary_and_the_mismatch_and_universe_warnings_and_the_master_lot_is_untouched()
     {
         await RefreshListsAsync(); // the master's F&O shares: L001, L002, L004, L005
         Factory.BasketSources.FetchEnabled = true;
@@ -295,28 +296,20 @@ public sealed class ListBasketsApiTests(ApiFactory factory) : BasketsTestBase(fa
 
         var outcome = await FetchListAsync(ListBaskets.LotSizes.Id);
 
-        outcome.Outcome.ShouldBe("applied");
-        var rows = await Factory.WithDbAsync(db => db.FoLotSizes.AsNoTracking().ToListAsync(Ct));
-        rows.Select(r => (r.InstrumentId, r.EffectiveFrom, r.LotSize, r.ExpiryLabel)).Order().ShouldBe(
-            new[] { (_shares["L001"], new DateOnly(2026, 10, 26), 275, "OCT-26"), (_shares["L002"], new DateOnly(2026, 10, 26), 100, "OCT-26") }.Order());
+        outcome.Outcome.ShouldBe("unchanged"); // nothing is stored but the record
         var warnings = await WarningsAsync(ListBaskets.LotSizes.Id);
+        warnings.ShouldContain("lots_summary:shares=2,nearest=OCT-26,mismatches=1");
         warnings.ShouldContain("lot_size_mismatch:L001:master=250:nse=275");
         warnings.ShouldNotContain("lot_size_mismatch:L002");
         warnings.ShouldContain("index_rows_skipped:1");
         warnings.ShouldContain("fo_universe_diff:onlyMaster=2,onlyNse=0");
         (await Factory.WithDbAsync(db => db.Instruments.AsNoTracking().Where(i => i.Type == "future" && i.UnderlyingSymbol == "L001").Select(i => i.LotSize).SingleAsync(Ct))).ShouldBe(250);
         (await SymbolsAsync(ListBaskets.FnoStocks.Id)).Length.ShouldBe(4); // the membership is not corrected
-
-        await MoveToAsync(At(10, 27, 8, 50)); // the same numbers the next day: nothing new is written
-        Factory.BasketSources.Serve("fo_mktlots.csv", Lots("L001 CO         , L001     , 275       , 275       , ", "L002 CO         , L002     , 100       , 100       , ", "NIFTY          , NIFTY    , 25        , 25        ,"));
-        var next = await FetchListAsync(ListBaskets.LotSizes.Id);
-
-        next.Outcome.ShouldBe("unchanged");
-        (await Factory.WithDbAsync(db => db.FoLotSizes.CountAsync(Ct))).ShouldBe(2);
+        (await Factory.WithDbAsync(db => db.Database.SqlQuery<int>($"SELECT count(*)::int AS \"Value\" FROM information_schema.tables WHERE table_name = 'fo_lot_sizes'").SingleAsync(Ct))).ShouldBe(0);
     }
 
     [Fact]
-    public async Task A_lot_file_with_a_bad_lot_is_rejected_and_nothing_is_stored()
+    public async Task A_lot_file_with_a_bad_lot_is_rejected()
     {
         Factory.BasketSources.FetchEnabled = true;
         await MoveToAsync(At(10, 26, 8, 50));
@@ -325,48 +318,107 @@ public sealed class ListBasketsApiTests(ApiFactory factory) : BasketsTestBase(fa
         var outcome = await FetchListAsync(ListBaskets.LotSizes.Id);
 
         (outcome.Outcome, outcome.Error).ShouldBe(("rejected", "bad_lot"));
-        (await Factory.WithDbAsync(db => db.FoLotSizes.CountAsync(Ct))).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task The_archived_lot_source_basket_is_not_listed_and_cannot_be_copied_from()
+    {
+        var manual = await CreateBasketAsync("Mine");
+
+        (await ListBasketsAsync()).ShouldNotContain(b => b.Id == ListBaskets.LotSizes.Id);
+        using var copy = await SendAsync(HttpMethod.Post, "/api/baskets/transfer", new { fromBasketId = ListBaskets.LotSizes.Id, toBasketId = manual.Id, instrumentIds = new[] { _shares["L001"] }, mode = "copy" });
+
+        copy.IsSuccessStatusCode.ShouldBeFalse();
+        (await MemberIdsAsync(manual.Id)).ShouldBeEmpty();
     }
 
     // ---- the flags of basket 13 (AC 13 of BK-03, wired by BK-05) ----
 
-    [Fact]
-    public async Task The_universe_reader_has_no_flags_until_the_three_lists_are_recorded_and_then_the_dated_state()
+    private async Task SeedBarsAsync() => await SqlAsync($"""
+        INSERT INTO market.bars_agg (instrument_id, timeframe, ts, open, high, low, close, volume, bars, complete)
+        SELECT i.id, '1D', (d::timestamp AT TIME ZONE 'Asia/Kolkata'), 100, 101, 99, 100, 1000, 375, true
+        FROM market.instruments i, generate_series(date '2026-10-01', date '2026-10-23', interval '1 day') AS d WHERE i.type = 'share' AND extract(dow FROM d) NOT IN (0, 6)
+        """);
+
+    /// <summary>The three lists were first checked on 20 Oct; the master lists last on <paramref name="masterLast"/>, the ban list's newest trade date is <paramref name="banThrough"/>; L002 is under surveillance from 22 to 25 Oct and banned from 24 Oct.</summary>
+    private async Task SeedListsAsync(DateTimeOffset masterLast, DateOnly banThrough)
     {
-        await SqlAsync($"""
-            INSERT INTO market.bars_agg (instrument_id, timeframe, ts, open, high, low, close, volume, bars, complete)
-            SELECT i.id, '1D', (d::timestamp AT TIME ZONE 'Asia/Kolkata'), 100, 101, 99, 100, 1000, 375, true
-            FROM market.instruments i, generate_series(date '2026-10-01', date '2026-10-23', interval '1 day') AS d WHERE i.type = 'share' AND extract(dow FROM d) NOT IN (0, 6)
-            """);
-        using var scope = Factory.Services.CreateScope();
-        var reader = scope.ServiceProvider.GetRequiredService<IDerivedUniverseReader>();
-
-        var before = await reader.ReadAsync(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 23), Ct);
-        before.ShouldNotBeEmpty();
-        before.ShouldAllBe(u => u.Bars.Flags == null); // a missing flag is not a pass
-
-        // The three lists were each checked on 20 Oct (the ban list counts from the day after); L002 is under surveillance from 22 Oct to 25 Oct and banned from 24 Oct.
         foreach (var list in new[] { ListBaskets.AsmGsm.Id, ListBaskets.Ban.Id, ListBaskets.TradeForTrade.Id })
         {
-            var at = At(10, 20);
-            await SqlAsync($"""
-                INSERT INTO market.basket_fetches (id, basket_id, fetched_at, rows, outcome, added, removed, unmatched, warnings, forced, actor)
-                VALUES ({Guid.CreateVersion7()}, {list}, {at}, 0, 'unchanged', 0, 0, 0, '[]', false, 'seed')
-                """);
+            foreach (var at in new[] { At(10, 20), list == ListBaskets.Ban.Id ? At(10, 20) : masterLast })
+            {
+                await SqlAsync($"""
+                    INSERT INTO market.basket_fetches (id, basket_id, fetched_at, rows, outcome, added, removed, unmatched, warnings, forced, actor)
+                    VALUES ({Guid.CreateVersion7()}, {list}, {at}, 0, 'unchanged', 0, 0, 0, '[]', false, 'seed')
+                    """);
+            }
         }
 
+        await SqlAsync($"UPDATE market.basket_sources SET known_through = {banThrough} WHERE basket_id = {ListBaskets.Ban.Id}");
         var (from22, to25, from24) = (Midnight(10, 22).ToUniversalTime(), Midnight(10, 25).ToUniversalTime(), Midnight(10, 24).ToUniversalTime());
         await SqlAsync($"""
             INSERT INTO market.basket_members (id, basket_id, instrument_id, position, valid_from, valid_to, added_by, removed_by, provenance, source_kind)
             VALUES ({Guid.CreateVersion7()}, {ListBaskets.AsmGsm.Id}, {_shares["L002"]}, 0, {from22}, {to25}, 'seed', 'seed', 'derived', 'refresh'),
                    ({Guid.CreateVersion7()}, {ListBaskets.Ban.Id}, {_shares["L002"]}, 0, {from24}, NULL, 'seed', NULL, 'fetched', 'fetch')
             """);
+    }
 
-        var after = await reader.ReadAsync(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 23), Ct);
+    private async Task<DayFlag[]> FlagsOfAsync(string symbol)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var universe = await scope.ServiceProvider.GetRequiredService<IDerivedUniverseReader>().ReadAsync(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 23), Ct);
+        return universe.Single(u => u.InstrumentId == _shares[symbol]).Bars.Flags!;
+    }
 
-        var l002 = after.Single(u => u.InstrumentId == _shares["L002"]).Bars.Flags!;
-        l002.Select(f => (f.Date.Day, f.AsmGsm, f.InBan, f.Series)).ShouldBe([(21, false, false, "EQ"), (22, true, false, "EQ"), (24, true, true, "EQ"), (25, false, true, "EQ")]);
-        var l003 = after.Single(u => u.InstrumentId == _shares["L003"]).Bars.Flags!;
-        l003.Select(f => (f.Date.Day, f.Series)).ShouldBe([(21, "EQ")]); // BE now, but the list has no stay for it: it was EQ on every recorded date
+    [Fact]
+    public async Task The_universe_reader_has_no_flags_until_the_three_lists_are_recorded_and_then_the_dated_state_up_to_the_last_good_check()
+    {
+        await SeedBarsAsync();
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var before = await scope.ServiceProvider.GetRequiredService<IDerivedUniverseReader>().ReadAsync(new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 23), Ct);
+            before.ShouldNotBeEmpty();
+            before.ShouldAllBe(u => u.Bars.Flags == null); // a missing flag is not a pass
+        }
+
+        await SeedListsAsync(At(10, 25), new DateOnly(2026, 10, 25));
+
+        (await FlagsOfAsync("L002")).Select(f => (f.Date.Day, f.AsmGsm, f.InBan, f.Series, f.Unknown)).ShouldBe(
+            [(21, false, false, "EQ", false), (22, true, false, "EQ", false), (24, true, true, "EQ", false), (25, false, true, "EQ", false), (26, false, false, "", true)]);
+        (await FlagsOfAsync("L003")).Where(f => !f.Unknown).Select(f => (f.Date.Day, f.Series)).ShouldBe([(21, "EQ")]); // BE now, but the list has no stay for it: it was EQ on every recorded date
+    }
+
+    [Fact]
+    public async Task A_ban_list_whose_newest_trade_date_is_behind_leaves_the_later_days_unknown()
+    {
+        await SeedBarsAsync();
+        await SeedListsAsync(At(10, 25), new DateOnly(2026, 10, 23)); // fetched for 23 Oct, the fetch for 24 Oct failed
+
+        (await FlagsOfAsync("L002")).Select(f => (f.Date.Day, f.AsmGsm, f.InBan, f.Unknown)).ShouldBe([(21, false, false, false), (22, true, false, false), (24, false, false, true)]);
+    }
+
+    [Fact]
+    public async Task A_failed_master_run_leaves_the_days_after_the_last_good_check_unknown()
+    {
+        await SeedBarsAsync();
+        await SeedListsAsync(At(10, 22), new DateOnly(2026, 10, 25)); // the master lists were last checked on 22 Oct
+
+        (await FlagsOfAsync("L002")).Select(f => (f.Date.Day, f.AsmGsm, f.InBan, f.Unknown)).ShouldBe([(21, false, false, false), (22, true, false, false), (23, false, false, true)]);
+    }
+
+    [Fact]
+    public async Task The_ban_source_knows_its_newest_trade_date_and_a_failed_fetch_does_not_move_it()
+    {
+        Factory.BasketSources.FetchEnabled = true;
+        await MoveToAsync(At(10, 26, 19, 0));
+        Factory.BasketSources.Serve("fo_secban.csv", Ban("27-OCT-2026", "L001"));
+        await FetchListAsync(ListBaskets.Ban.Id);
+        await MoveToAsync(At(10, 27, 19, 0));
+        Factory.BasketSources.Serve("fo_secban.csv", "<html>busy</html>", 500, "text/html");
+
+        var failed = await FetchListAsync(ListBaskets.Ban.Id);
+
+        failed.Outcome.ShouldBe("failed");
+        (await Factory.WithDbAsync(db => db.BasketSources.AsNoTracking().Where(x => x.BasketId == ListBaskets.Ban.Id).Select(x => x.KnownThrough).SingleAsync(Ct))).ShouldBe(new DateOnly(2026, 10, 27));
     }
 }

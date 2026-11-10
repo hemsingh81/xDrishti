@@ -10,13 +10,13 @@ namespace XDrishti.Application.Market.Baskets;
 
 /// <summary>What the processor decided for one NSE list file: a rejection (nothing applied), a membership change (the ban list) or the lot rows to store (the lot file); the fetch row carries the counts and warnings.</summary>
 internal sealed record ListPlan(
-    FetchRecord Fetch, string? Reject, MembershipChange? Change = null, IReadOnlyList<Guid>? Order = null, DateTimeOffset Effective = default, ListOrigin? Origin = null, IReadOnlyList<LotWrite>? Lots = null, DateOnly LotDate = default);
+    FetchRecord Fetch, string? Reject, MembershipChange? Change = null, IReadOnlyList<Guid>? Order = null, DateTimeOffset Effective = default, ListOrigin? Origin = null, DateOnly? TradeDate = null);
 
 /// <summary>
-/// Reads the two NSE F&amp;O files (BK-05) into a plan without writing anything: <c>fo_secban.csv</c> into the ban list's membership dated by the trade date in its first line, <c>fo_mktlots.csv</c> into dated lot sizes with the cross-checks against the master
+/// Reads the two NSE F&amp;O files (BK-05) into a plan without writing anything: <c>fo_secban.csv</c> into the ban list's membership dated by the trade date in its first line, <c>fo_mktlots.csv</c> into a summary and the cross-checks against the master (nothing is stored but the fetch record; a lot table is deferred to the owner's question 5 of the spec review)
 /// (a mismatch and a universe difference are warnings; the master stays primary). The caller applies the plan through the same fail-closed steps as the index lists.
 /// </summary>
-internal sealed class ListFileProcessor(IBasketSourceStore sources, IBasketStore baskets, IListMasterReader master, IFoLotSizeStore lots)
+internal sealed class ListFileProcessor(IBasketSourceStore sources, IBasketStore baskets, IListMasterReader master)
 {
     public const string StaleTradeDate = "stale_trade_date";
     public const int MaxWarnings = 200;
@@ -70,16 +70,17 @@ internal sealed class ListFileProcessor(IBasketSourceStore sources, IBasketStore
             }
         }
 
-        var open = await baskets.ListActiveMembersAsync(source.BasketId, cancellationToken);
-        if (open.Any(m => IndiaTime.Today(m.ValidFrom) > date))
+        if (source.KnownThrough is { } held && date < held)
         {
-            return new ListPlan(fetch, StaleTradeDate); // an older file than the list we hold
+            return new ListPlan(fetch, StaleTradeDate); // an older file than the last one applied (an empty list counts: the date is the source's)
         }
+
+        var open = await baskets.ListActiveMembersAsync(source.BasketId, cancellationToken);
 
         var change = MembershipDiff.Compute([.. open.Select(m => m.InstrumentId)], ids);
         fetch = fetch with { Unmatched = unmatched, Added = change.Added.Count, Removed = change.Removed.Count, WarningsJson = Json(warnings) };
         var effective = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).ToUniversalTime(); // the trade date NSE states
-        return new ListPlan(fetch, null, change, ids, effective, new ListOrigin(BasketProvenance.Fetched, "fetch", new Dictionary<Guid, string?>(), fetch.Id));
+        return new ListPlan(fetch, null, change, ids, effective, new ListOrigin(BasketProvenance.Fetched, "fetch", new Dictionary<Guid, string?>(), fetch.Id), date);
     }
 
     private async ValueTask<ListPlan> LotsAsync(BasketSourceInfo source, string text, FetchRecord fetch, DateTimeOffset now, CancellationToken cancellationToken)
@@ -111,10 +112,10 @@ internal sealed class ListFileProcessor(IBasketSourceStore sources, IBasketStore
             warnings.AddRange(diff.OnlyNse.Select(s => $"only_nse:{s}"));
         }
 
-        var latest = await lots.LatestAsync(cancellationToken);
-        var writes = shareRows.Select(r => new LotWrite(shares[r.Symbol].Flags.Id, r.LotSize, r.ExpiryLabel)).Where(w => !latest.TryGetValue(w.InstrumentId, out var last) || last != w.LotSize).ToList();
-        fetch = fetch with { Added = writes.Count, WarningsJson = Json(warnings) };
-        return new ListPlan(fetch, null, Lots: writes, LotDate: today);
+        var mismatches = LotChecks.Mismatches(nse, masterLots).Count;
+        warnings.Insert(0, $"lots_summary:shares={shareRows.Count},nearest={shareRows.FirstOrDefault()?.ExpiryLabel},mismatches={mismatches},withoutLot={file.RowsWithoutLot}");
+        fetch = fetch with { WarningsJson = Json(warnings) };
+        return new ListPlan(fetch, null);
     }
 
     private static string Json(List<string> warnings) =>

@@ -115,11 +115,11 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
         await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "ALTER TABLE market.basket_members ADD COLUMN x int"), PostgresErrorCodes.InsufficientPrivilege);
         await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "CREATE INDEX ix_intruder ON market.baskets (name)"), PostgresErrorCodes.InsufficientPrivilege);
 
-        foreach (var table in new[] { "instruments", "instrument_broker_ids", "master_refreshes", "tracked_instruments", "baskets", "basket_members", "basket_sources", "basket_fetches", "basket_versions", "basket_member_scores", "basket_param_sets", "derived_definitions", "fo_lot_sizes" })
+        foreach (var table in new[] { "instruments", "instrument_broker_ids", "master_refreshes", "tracked_instruments", "baskets", "basket_members", "basket_sources", "basket_fetches", "basket_versions", "basket_member_scores", "basket_param_sets", "derived_definitions" })
         {
             foreach (var privilege in new[] { "SELECT", "INSERT", "UPDATE", "DELETE" })
             {
-                var expected = table is "basket_fetches" or "basket_versions" or "basket_member_scores" or "basket_param_sets" or "fo_lot_sizes" ? privilege is "SELECT" or "INSERT" : privilege != "DELETE" || !KeptTables.Contains(table); // the fetch log and the derived versions, scores and parameter sets are insert-only
+                var expected = table is "basket_fetches" or "basket_versions" or "basket_member_scores" or "basket_param_sets" ? privilege is "SELECT" or "INSERT" : privilege != "DELETE" || !KeptTables.Contains(table); // the fetch log and the derived versions, scores and parameter sets are insert-only
                 (await ScalarAsync(connection, $"SELECT has_table_privilege('xd_app', 'market.{table}', '{privilege}')")).ShouldBe(expected, $"{privilege} on {table}");
             }
         }
@@ -212,7 +212,7 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
         (await ScalarAsync(connection, "SELECT count(*) FROM market.baskets WHERE kind = 'index' AND system")).ShouldBe(26L);
         (await ScalarAsync(connection, "SELECT count(*) FROM market.basket_sources WHERE format_version = 'nse-index-csv-1' AND source_url NOT LIKE 'https://nsearchives.nseindia.com/content/indices/%' AND source_url NOT LIKE 'https://niftyindices.com/IndexConstituent/%'")).ShouldBe(0L);
 
-        // BK-05: five list baskets with members (four read from the master and enabled, no network; the ban file OFF) and the archived source row of the lot file (OFF); the lot sizes are insert-only for the runtime role.
+        // BK-05: five list baskets with members (four read from the master and enabled, no network; the ban file OFF) and the archived source row of the lot file (OFF).
         (await ScalarAsync(connection, "SELECT count(*) FROM market.baskets WHERE kind = 'list' AND system AND archived_at IS NULL")).ShouldBe(5L);
         (await ScalarAsync(connection, "SELECT count(*) FROM market.baskets WHERE kind = 'list' AND archived_at IS NOT NULL")).ShouldBe(1L);
         (await ScalarAsync(connection, "SELECT count(*) FROM market.basket_sources WHERE format_version = 'dhan-master-flags-1' AND enabled AND source_url = ''")).ShouldBe(4L);
@@ -221,10 +221,6 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
         (await ScalarAsync(connection, "SELECT expected_min || '-' || expected_max FROM market.basket_sources WHERE file_name = 'fo_secban.csv'")).ShouldBe("0-200");
         (await ScalarAsync(connection, "SELECT count(*) FROM market.baskets WHERE kind = 'list' AND name ILIKE '%MIS%'")).ShouldBe(0L);
         (await ScalarAsync(connection, "SELECT count(*) FROM market.basket_sources s JOIN market.baskets b ON b.id = s.basket_id WHERE b.id = md5('market.basket:list:fo-ban')::uuid AND b.description LIKE 'Excluded from new positions: ban period%'")).ShouldBe(1L);
-        (await ScalarAsync(connection, "SELECT count(*) FROM market.fo_lot_sizes")).ShouldBe(0L);
-        (await ScalarAsync(connection, "SELECT has_table_privilege('xd_app', 'market.fo_lot_sizes', 'UPDATE')::int::bigint")).ShouldBe(0L);
-        (await ScalarAsync(connection, "SELECT has_table_privilege('xd_app', 'market.fo_lot_sizes', 'DELETE')::int::bigint")).ShouldBe(0L);
-        (await ScalarAsync(connection, "SELECT has_table_privilege('xd_app', 'market.fo_lot_sizes', 'INSERT')::int::bigint")).ShouldBe(1L);
         (await ScalarAsync(connection, "SELECT expected_min || '-' || expected_max FROM market.basket_sources WHERE file_name = 'ind_nifty50list.csv'")).ShouldBe("50-50");
         await ExecuteAsync(connection, "INSERT INTO market.basket_fetches (id, basket_id, fetched_at, rows, outcome, added, removed, unmatched, warnings, forced, actor) SELECT '00000000-0000-7000-8000-00000000d001', basket_id, now(), 0, 'failed', 0, 0, 0, '[]', false, 'probe' FROM market.basket_sources LIMIT 1");
         await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "UPDATE market.basket_fetches SET rows = 1"), PostgresErrorCodes.InsufficientPrivilege);

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace XDrishti.Infrastructure.Persistence.Migrations
 {
     /// <summary>
-    /// List baskets (BK-05, ADR 0256): the dated F&amp;O lot sizes <c>market.fo_lot_sizes</c> (insert-only for the runtime role) and the seeded list baskets (kind list, system) with their catalogue rows. The four lists read from the Dhan master are enabled (no network); the two NSE F&amp;O
+    /// List baskets (BK-05, ADR 0256): <c>basket_sources.known_through</c> (the ban list's newest applied or confirmed trade date) and the seeded list baskets (kind list, system) with their catalogue rows. The four lists read from the Dhan master are enabled (no network); the two NSE F&amp;O
     /// files are seeded DISABLED. The lot-size file has a catalogue row and a fetch log, so it has a basket row too: archived, no members, shown nowhere. The migration holds its own copy of the seed (a migration never changes); the ids are <c>md5('market.basket:list:' || key)::uuid</c>.
     /// </summary>
     public partial class AddListBaskets : Migration
@@ -27,45 +27,12 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "fo_lot_sizes",
+            migrationBuilder.AddColumn<DateOnly>(
+                name: "known_through",
                 schema: "market",
-                columns: table => new
-                {
-                    instrument_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    effective_from = table.Column<DateOnly>(type: "date", nullable: false),
-                    lot_size = table.Column<int>(type: "integer", nullable: false),
-                    expiry_label = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    fetch_id = table.Column<Guid>(type: "uuid", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_fo_lot_sizes", x => new { x.instrument_id, x.effective_from });
-                    table.CheckConstraint("ck_fo_lot_sizes_lot_size", "lot_size > 0");
-                    table.ForeignKey(
-                        name: "fk_fo_lot_sizes_basket_fetches_fetch_id",
-                        column: x => x.fetch_id,
-                        principalSchema: "market",
-                        principalTable: "basket_fetches",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_fo_lot_sizes_instruments_instrument_id",
-                        column: x => x.instrument_id,
-                        principalSchema: "market",
-                        principalTable: "instruments",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_fo_lot_sizes_fetch_id",
-                schema: "market",
-                table: "fo_lot_sizes",
-                column: "fetch_id");
-
-            // The dated lot sizes are insert-only for the runtime role (the schema grant gave it UPDATE and DELETE).
-            migrationBuilder.MakeAppendOnlyForAppRole("market", "fo_lot_sizes");
+                table: "basket_sources",
+                type: "date",
+                nullable: true);
 
             foreach (var (key, name, description, format, url, file, cadence, min, max, enabled, archived) in Lists)
             {
@@ -85,13 +52,14 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("DELETE FROM market.basket_members WHERE basket_id IN (SELECT id FROM market.baskets WHERE kind = 'list')");
-            migrationBuilder.DropTable(
-                name: "fo_lot_sizes",
-                schema: "market");
-
             migrationBuilder.Sql("DELETE FROM market.basket_fetches WHERE basket_id IN (SELECT id FROM market.baskets WHERE kind = 'list')");
             migrationBuilder.Sql("DELETE FROM market.basket_sources WHERE basket_id IN (SELECT id FROM market.baskets WHERE kind = 'list')");
             migrationBuilder.Sql("DELETE FROM market.baskets WHERE kind = 'list'");
+
+            migrationBuilder.DropColumn(
+                name: "known_through",
+                schema: "market",
+                table: "basket_sources");
         }
     }
 }

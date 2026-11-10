@@ -38,7 +38,7 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
             var daily = row.Bars.Select(b => Adjust(b, applied.Where(a => a.Applied && (skipThrough is null || a.ExDate > skipThrough)).ToList())).ToArray();
             var tick = row.TickPaise is { } paise && paise > 0 ? (double)paise / 100.0 : 0.05;
             var dayFlags = flags is null ? null : DayFlagBuilder.Build(
-                flags.Since, row.Series, flags.Stays(ListBaskets.AsmGsm.Id, row.Id), flags.Stays(ListBaskets.Ban.Id, row.Id), flags.Stays(ListBaskets.TradeForTrade.Id, row.Id));
+                flags.Since, flags.Until, row.Series, flags.Stays(ListBaskets.AsmGsm.Id, row.Id), flags.Stays(ListBaskets.Ban.Id, row.Id), flags.Stays(ListBaskets.TradeForTrade.Id, row.Id));
             result.Add(new UniverseInstrument(row.Id, new InstrumentBars(
                 row.Symbol, daily, null, dayFlags, benchmark.Length > 0 ? benchmark : null, applied.Any(a => !a.Applied), row.Sector, tick)));
         }
@@ -120,20 +120,23 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
 
     /// <summary>
     /// The dated stays of the three flag lists and the first date all three are known (BK-05): each list needs one recorded check (an applied or unchanged fetch row); the ban list, whose file is for the next trading day, is known from the day after its first check.
+    /// Known <b>until</b> the earliest of: the India date of the last good check of the two master lists and the ban list's newest applied or confirmed trade date (<c>known_through</c>, an empty list included); after that the flags are unknown, never a pass.
     /// Null when any list has never been recorded.
     /// </summary>
     private async ValueTask<FlagStays?> FlagsAsync(List<Guid> ids, CancellationToken cancellationToken)
     {
         var lists = new[] { ListBaskets.AsmGsm.Id, ListBaskets.Ban.Id, ListBaskets.TradeForTrade.Id };
         var first = new Dictionary<Guid, DateOnly>();
+        var last = new Dictionary<Guid, DateOnly>();
         await using (var command = dataSource.CreateCommand(
-            "SELECT basket_id, min(fetched_at) FROM market.basket_fetches WHERE basket_id = ANY(@lists) AND outcome IN ('applied', 'unchanged') GROUP BY basket_id"))
+            "SELECT basket_id, min(fetched_at), max(fetched_at) FROM market.basket_fetches WHERE basket_id = ANY(@lists) AND outcome IN ('applied', 'unchanged') GROUP BY basket_id"))
         {
             command.Parameters.AddWithValue("lists", lists);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
                 first[reader.GetGuid(0)] = IndiaTime.Today(reader.GetFieldValue<DateTimeOffset>(1));
+                last[reader.GetGuid(0)] = IndiaTime.Today(reader.GetFieldValue<DateTimeOffset>(2));
             }
         }
 
@@ -142,6 +145,23 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
             return null;
         }
 
+        DateOnly? banThrough = null;
+        await using (var command = dataSource.CreateCommand("SELECT known_through FROM market.basket_sources WHERE basket_id = @ban"))
+        {
+            command.Parameters.AddWithValue("ban", ListBaskets.Ban.Id);
+            await using var through = await command.ExecuteReaderAsync(cancellationToken);
+            if (await through.ReadAsync(cancellationToken) && !through.IsDBNull(0))
+            {
+                banThrough = through.GetFieldValue<DateOnly>(0);
+            }
+        }
+
+        if (banThrough is null)
+        {
+            return null;
+        }
+
+        var until = new[] { last[ListBaskets.AsmGsm.Id], last[ListBaskets.TradeForTrade.Id], banThrough.Value }.Min();
         var since = new[] { first[ListBaskets.AsmGsm.Id], first[ListBaskets.Ban.Id].AddDays(1), first[ListBaskets.TradeForTrade.Id] }.Max();
         var stays = new Dictionary<(Guid List, Guid Instrument), List<ListStay>>();
         await using (var command = dataSource.CreateCommand("SELECT basket_id, instrument_id, valid_from, valid_to FROM market.basket_members WHERE basket_id = ANY(@lists) AND instrument_id = ANY(@ids)"))
@@ -161,10 +181,10 @@ internal sealed class DerivedUniverseReader(NpgsqlDataSource dataSource, ICorpor
             }
         }
 
-        return new FlagStays(since, stays);
+        return new FlagStays(since, until, stays);
     }
 
-    private sealed record FlagStays(DateOnly Since, Dictionary<(Guid List, Guid Instrument), List<ListStay>> All)
+    private sealed record FlagStays(DateOnly Since, DateOnly Until, Dictionary<(Guid List, Guid Instrument), List<ListStay>> All)
     {
         public List<ListStay> Stays(Guid list, Guid instrument) => All.TryGetValue((list, instrument), out var found) ? found : [];
     }

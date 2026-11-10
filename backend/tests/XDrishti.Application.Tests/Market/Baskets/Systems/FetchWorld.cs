@@ -60,25 +60,6 @@ internal sealed class FakeMasterReader : IListMasterReader
     }
 }
 
-/// <summary>The dated lot sizes in memory.</summary>
-internal sealed class FakeLotStore : IFoLotSizeStore
-{
-    public Dictionary<Guid, int> Latest { get; } = [];
-
-    public List<(DateOnly Date, LotWrite Row)> Written { get; } = [];
-
-    public List<(SourceUpdate Source, FetchRecord Fetch)> Applied { get; } = [];
-
-    public ValueTask<IReadOnlyDictionary<Guid, int>> LatestAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyDictionary<Guid, int>>(Latest);
-
-    public ValueTask ApplyAsync(SourceUpdate source, FetchRecord fetch, DateOnly effectiveFrom, IReadOnlyList<LotWrite> rows, CancellationToken cancellationToken)
-    {
-        Applied.Add((source, fetch));
-        Written.AddRange(rows.Select(r => (effectiveFrom, r)));
-        return ValueTask.CompletedTask;
-    }
-}
-
 /// <summary>An in-memory catalogue, master and fetch log; counts what is written.</summary>
 internal sealed class FakeSourceStore : IBasketSourceStore
 {
@@ -217,9 +198,7 @@ internal sealed class FetchWorld
 
     public FakeMasterReader MasterShares { get; } = new();
 
-    public FakeLotStore Lots { get; } = new();
-
-    public RunBasketFetchHandler Handler => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, ListSettings, new ListFileProcessor(Store, Baskets, MasterShares, Lots), Lots, Clock, NullLogger<RunBasketFetchHandler>.Instance);
+    public RunBasketFetchHandler Handler => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, ListSettings, new ListFileProcessor(Store, Baskets, MasterShares), Clock, NullLogger<RunBasketFetchHandler>.Instance);
 
     /// <summary>The members now: instruments 1 to <paramref name="count"/> of the master.</summary>
     public void Members(int from, int count)

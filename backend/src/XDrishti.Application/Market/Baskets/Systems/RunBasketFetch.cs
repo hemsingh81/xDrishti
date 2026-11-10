@@ -26,7 +26,6 @@ internal sealed class RunBasketFetchHandler(
     IBasketRunLock runLock,
     IListSettings listSettings,
     ListFileProcessor lists,
-    IFoLotSizeStore lotStore,
     TimeProvider clock,
     ILogger<RunBasketFetchHandler> logger) : ICommandHandler<RunBasketFetchCommand, BasketFetchRun>
 {
@@ -173,19 +172,13 @@ internal sealed class RunBasketFetchHandler(
             return await RejectAsync(source, source.Enabled, plan.Fetch, reason, now, cancellationToken);
         }
 
-        var update = Updated(source, source.Enabled, now, ok: true, response.Etag, response.LastModified, sha, null, 0);
-        if (plan.Lots is { } rows)
+        var update = Updated(source, source.Enabled, now, ok: true, response.Etag, response.LastModified, sha, null, 0) with { KnownThrough = plan.TradeDate };
+        if (plan.Change is null)
         {
-            if (rows.Count == 0)
-            {
-                var same = plan.Fetch with { Outcome = FetchOutcomes.Unchanged, Added = 0 };
-                await sources.RecordAsync(update, same, cancellationToken);
-                return same;
-            }
-
-            var stored = plan.Fetch with { Outcome = FetchOutcomes.Applied };
-            await lotStore.ApplyAsync(update, stored, plan.LotDate, rows, cancellationToken);
-            return stored;
+            // The lot file: its summary and warnings are the fetch record; nothing else is stored (the master's lot is primary).
+            var summary = plan.Fetch with { Outcome = FetchOutcomes.Unchanged };
+            await sources.RecordAsync(update, summary, cancellationToken);
+            return summary;
         }
 
         if (plan.Change!.Added.Count == 0 && plan.Change.Removed.Count == 0)

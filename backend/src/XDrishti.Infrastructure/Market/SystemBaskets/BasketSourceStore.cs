@@ -27,7 +27,7 @@ internal sealed class BasketSourceStore(XDrishtiDbContext db) : IBasketSourceSto
             }).ToListAsync(cancellationToken);
         return [.. rows.Select(r => new BasketSourceInfo(
             r.s.BasketId, r.Name, r.s.FileName, r.s.SourceUrl, r.s.HostAlt, r.s.ExpectedMin, r.s.ExpectedMax, r.s.Enabled, r.s.State, r.s.LastOkAt, r.s.LastCheckedAt,
-            r.s.Etag, r.s.LastModified, r.s.Sha256, r.s.NextAttemptAt, r.s.FailCount, r.Members, r.s.FormatVersion))];
+            r.s.Etag, r.s.LastModified, r.s.Sha256, r.s.NextAttemptAt, r.s.FailCount, r.Members, r.s.FormatVersion, r.s.KnownThrough))];
     }
 
     public async ValueTask<IReadOnlyList<MasterInstrument>> FindInstrumentsAsync(IReadOnlyCollection<string> isins, IReadOnlyCollection<string> symbols, CancellationToken cancellationToken)
@@ -77,6 +77,7 @@ internal sealed class BasketSourceStore(XDrishtiDbContext db) : IBasketSourceSto
         record.Sha256 = source.Sha256;
         record.NextAttemptAt = source.NextAttemptAt;
         record.FailCount = source.FailCount;
+        record.KnownThrough = source.KnownThrough ?? record.KnownThrough;
         db.BasketFetches.Add(new BasketFetchRecord
         {
             Id = fetch.Id,

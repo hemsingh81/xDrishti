@@ -19,4 +19,5 @@ public sealed record BasketSourceInfo(
     DateTimeOffset? NextAttemptAt,
     int FailCount,
     int CurrentMembers,
-    string Format = "nse-index-csv-1");
+    string Format = "nse-index-csv-1",
+    DateOnly? KnownThrough = null);

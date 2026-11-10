@@ -80,10 +80,11 @@ public sealed class LotChecksAndScheduleTests
         var asm = new[] { new ListStay(new DateOnly(2026, 10, 22), new DateOnly(2026, 10, 25)) };
         var ban = new[] { new ListStay(new DateOnly(2026, 10, 26), null) };
 
-        var flags = DayFlagBuilder.Build(since, "EQ", asm, ban, []);
+        var flags = DayFlagBuilder.Build(since, new DateOnly(2026, 10, 27), "EQ", asm, ban, []);
 
         flags.Select(f => (f.Date.Day, f.AsmGsm, f.InBan, f.Series)).ShouldBe(
-            [(20, false, false, "EQ"), (22, true, false, "EQ"), (25, false, false, "EQ"), (26, false, true, "EQ")]);
+            [(20, false, false, "EQ"), (22, true, false, "EQ"), (25, false, false, "EQ"), (26, false, true, "EQ"), (28, false, false, "")]);
+        flags[^1].Unknown.ShouldBeTrue(); // nothing is known after the last good check
         flags.ShouldAllBe(f => f.Date >= since);
     }
 
@@ -93,15 +94,28 @@ public sealed class LotChecksAndScheduleTests
         var since = new DateOnly(2026, 10, 20);
         var t2t = new[] { new ListStay(new DateOnly(2026, 10, 24), null) };
 
-        var flags = DayFlagBuilder.Build(since, "BE", [], [], t2t);
+        var flags = DayFlagBuilder.Build(since, new DateOnly(2026, 10, 30), "BE", [], [], t2t);
 
-        flags.Select(f => (f.Date.Day, f.Series)).ShouldBe([(20, "EQ"), (24, "BE")]);
+        flags.Where(f => !f.Unknown).Select(f => (f.Date.Day, f.Series)).ShouldBe([(20, "EQ"), (24, "BE")]);
     }
 
     [Fact]
     public void A_series_that_is_unknown_is_never_EQ()
     {
-        DayFlagBuilder.Build(new DateOnly(2026, 10, 20), null, [], [], []).Single().Series.ShouldNotBe("EQ");
-        DayFlagBuilder.Build(new DateOnly(2026, 10, 20), "BL", [], [], []).Single().Series.ShouldBe("BL");
+        DayFlagBuilder.Build(new DateOnly(2026, 10, 20), new DateOnly(2026, 10, 21), null, [], [], []).First().Series.ShouldNotBe("EQ");
+        DayFlagBuilder.Build(new DateOnly(2026, 10, 20), new DateOnly(2026, 10, 21), "BL", [], [], []).First().Series.ShouldBe("BL");
+    }
+
+    [Fact]
+    public void Stay_changes_after_the_last_good_check_are_not_reported_and_a_range_that_ends_before_it_begins_vouches_for_nothing()
+    {
+        var since = new DateOnly(2026, 10, 20);
+        var ban = new[] { new ListStay(new DateOnly(2026, 10, 26), null) };
+
+        var cut = DayFlagBuilder.Build(since, new DateOnly(2026, 10, 24), "EQ", [], ban, []);
+        var none = DayFlagBuilder.Build(since, new DateOnly(2026, 10, 19), "EQ", [], [], []);
+
+        cut.Select(f => (f.Date.Day, f.InBan, f.Unknown)).ShouldBe([(20, false, false), (25, false, true)]);
+        none.ShouldHaveSingleItem().Unknown.ShouldBeTrue();
     }
 }

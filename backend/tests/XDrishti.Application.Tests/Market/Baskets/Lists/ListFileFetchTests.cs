@@ -173,14 +173,29 @@ public sealed class ListFileFetchTests
     }
 
     [Fact]
-    public async Task A_file_older_than_the_list_we_hold_is_rejected_as_stale()
+    public async Task A_file_older_than_the_last_applied_trade_date_is_rejected_as_stale_even_after_an_empty_list_day()
     {
-        var member = _w.Share("SAIL");
-        _w.Member(ListWorld.BanId, member, StartOf27Oct.AddDays(3)); // our list is dated 30 Oct
+        _w.Share("SAIL");
+        _w.BanSource(knownThrough: new DateOnly(2026, 10, 27)); // the last applied file was the empty list of 27 Oct: no member holds the date
+        _w.Serve(ListWorld.Ban("SAIL").Replace("27-OCT-2026", "25-OCT-2026", StringComparison.Ordinal));
+
+        Problem(await _w.RunOneAsync()).ShouldBe("rejected:stale_trade_date");
+        _w.Applier.Applied.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task An_applied_or_confirmed_file_moves_the_known_through_date_to_its_trade_date_and_a_rejected_one_does_not()
+    {
+        _w.Share("SAIL");
         _w.BanSource();
         _w.Serve(ListWorld.Ban("SAIL"));
 
-        Problem(await _w.RunOneAsync()).ShouldBe("rejected:stale_trade_date");
+        await _w.RunOneAsync();
+        _w.Applier.Applied.Single().Source.KnownThrough.ShouldBe(new DateOnly(2026, 10, 27));
+
+        _w.Serve("Securities in Ban For Trade Date soon:\r\n");
+        await _w.RunOneAsync();
+        _w.Store.Recorded.Last().Source.KnownThrough.ShouldBeNull(); // null leaves the stored date as it is
     }
 
     [Fact]
@@ -255,71 +270,56 @@ public sealed class ListFileFetchTests
         await _w.RunOneAsync();
 
         _w.Applier.Applied.ShouldHaveSingleItem().BasketId.ShouldBe(ListWorld.BanId); // the only write is the ban list's own membership
-        _w.Lots.Written.ShouldBeEmpty();
     }
 
     // ---- the lot sizes ----
 
     [Fact]
-    public async Task Share_rows_get_the_nearest_expiry_lot_dated_by_the_fetch_date_and_index_rows_are_skipped_and_counted()
+    public async Task The_lot_file_is_recorded_as_a_summary_with_index_rows_skipped_and_counted_and_nothing_else_is_stored()
     {
-        var reliance = _w.Share("RELIANCE", fno: true, lot: 250);
-        var sail = _w.Share("SAIL", fno: true, lot: 4700);
+        _w.Share("RELIANCE", fno: true, lot: 250);
+        _w.Share("SAIL", fno: true, lot: 4700);
         _w.LotSource();
         _w.Serve(ListWorld.Lot(("NIFTY BANK", "BANKNIFTY", "30"), ("RELIANCE INDUSTRIES", "RELIANCE", "250"), ("SAIL", "SAIL", "4700")));
 
         var outcome = await _w.RunOneAsync();
 
-        outcome.Outcome.ShouldBe(FetchOutcomes.Applied);
-        _w.Lots.Written.Select(w => (w.Date, w.Row.InstrumentId, w.Row.LotSize, w.Row.ExpiryLabel)).Order().ShouldBe(
-            new[] { (new DateOnly(2026, 10, 26), reliance, 250, "OCT-26"), (new DateOnly(2026, 10, 26), sail, 4700, "OCT-26") }.Order());
-        _w.Lots.Applied.Single().Fetch.WarningsJson.ShouldContain("index_rows_skipped:1");
+        outcome.Outcome.ShouldBe(FetchOutcomes.Unchanged);
+        outcome.Rows.ShouldBe(2);
+        var warnings = _w.Store.Recorded.Single().Fetch.WarningsJson;
+        warnings.ShouldContain("lots_summary:shares=2,nearest=OCT-26,mismatches=0");
+        warnings.ShouldContain("index_rows_skipped:1");
+        _w.Applier.Applied.ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task A_lot_that_differs_from_the_master_is_stored_as_NSE_gave_it_with_a_warning_and_the_master_is_not_touched()
+    public async Task A_lot_that_differs_from_the_master_is_a_warning_naming_both_values_and_the_master_is_not_touched()
     {
-        var reliance = _w.Share("RELIANCE", fno: true, lot: 250);
+        _w.Share("RELIANCE", fno: true, lot: 250);
         _w.Share("SAIL", fno: true, lot: 4700);
         _w.LotSource();
         _w.Serve(ListWorld.Lot(("RELIANCE INDUSTRIES", "RELIANCE", "275"), ("SAIL", "SAIL", "4700")));
 
         await _w.RunOneAsync();
 
-        _w.Lots.Written.Single(w => w.Row.InstrumentId == reliance).Row.LotSize.ShouldBe(275);
-        _w.Lots.Applied.Single().Fetch.WarningsJson.ShouldContain("lot_size_mismatch:RELIANCE:master=250:nse=275");
+        var warnings = _w.Store.Recorded.Single().Fetch.WarningsJson;
+        warnings.ShouldContain("lot_size_mismatch:RELIANCE:master=250:nse=275");
+        warnings.ShouldNotContain("lot_size_mismatch:SAIL");
+        warnings.ShouldContain("mismatches=1");
         _w.Master.Shares.Single(s => s.Symbol == "RELIANCE").MasterLot.ShouldBe(250); // the master is primary and has no write path here
     }
 
     [Fact]
-    public async Task Equal_lots_that_are_stored_already_write_no_row_and_the_fetch_is_unchanged()
+    public async Task Equal_lots_raise_no_warning()
     {
-        var reliance = _w.Share("RELIANCE", fno: true, lot: 250);
-        var sail = _w.Share("SAIL", fno: true, lot: 4700);
-        _w.Lots.Latest[reliance] = 250;
-        _w.Lots.Latest[sail] = 4700;
+        _w.Share("RELIANCE", fno: true, lot: 250);
+        _w.Share("SAIL", fno: true, lot: 4700);
         _w.LotSource();
         _w.Serve(ListWorld.Lot(("RELIANCE INDUSTRIES", "RELIANCE", "250"), ("SAIL", "SAIL", "4700")));
 
-        var outcome = await _w.RunOneAsync();
-
-        outcome.Outcome.ShouldBe(FetchOutcomes.Unchanged);
-        _w.Lots.Written.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public async Task A_lot_that_changed_since_the_last_stored_one_writes_a_new_dated_row()
-    {
-        var reliance = _w.Share("RELIANCE", fno: true, lot: 250);
-        var sail = _w.Share("SAIL", fno: true, lot: 4700);
-        _w.Lots.Latest[reliance] = 250;
-        _w.Lots.Latest[sail] = 4700;
-        _w.LotSource();
-        _w.Serve(ListWorld.Lot(("RELIANCE INDUSTRIES", "RELIANCE", "275"), ("SAIL", "SAIL", "4700")));
-
         await _w.RunOneAsync();
 
-        _w.Lots.Written.Select(w => w.Row.InstrumentId).ShouldBe([reliance]);
+        _w.Store.Recorded.Single().Fetch.WarningsJson.ShouldNotContain("lot_size_mismatch");
     }
 
     [Fact]
@@ -333,7 +333,7 @@ public sealed class ListFileFetchTests
 
         await _w.RunOneAsync();
 
-        _w.Lots.Applied.Single().Fetch.WarningsJson.ShouldContain("fo_universe_diff:onlyMaster=1,onlyNse=0");
+        _w.Store.Recorded.Single().Fetch.WarningsJson.ShouldContain("fo_universe_diff:onlyMaster=1,onlyNse=0");
         _w.Applier.Applied.ShouldBeEmpty();
     }
 
@@ -350,7 +350,7 @@ public sealed class ListFileFetchTests
         var outcome = await _w.RunOneAsync();
 
         Problem(outcome).ShouldBe($"rejected:{reason}");
-        (_w.Lots.Written.Count, _w.Lots.Applied.Count).ShouldBe((0, 0));
+        _w.Store.Recorded.Single().Fetch.Outcome.ShouldBe(FetchOutcomes.Rejected);
     }
 
     [Theory]
@@ -369,7 +369,6 @@ public sealed class ListFileFetchTests
         _w.Serve(ListWorld.Lot([.. rows]));
 
         Problem(await _w.RunOneAsync()).ShouldBe("rejected:row_count");
-        _w.Lots.Written.ShouldBeEmpty();
     }
 
     [Fact]

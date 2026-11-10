@@ -36,8 +36,6 @@ internal sealed class ListWorld
 
     public FakeMasterReader Master { get; } = new();
 
-    public FakeLotStore Lots { get; } = new();
-
     public FakeTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 10, 26, 19, 5, 0, TimeSpan.FromMinutes(330)));
 
     public static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -46,7 +44,7 @@ internal sealed class ListWorld
 
     public static Guid LotsId => ListBaskets.LotSizes.Id;
 
-    public RunBasketFetchHandler Fetch => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, ListSettings, new ListFileProcessor(Store, Baskets, Master, Lots), Lots, Clock, NullLogger<RunBasketFetchHandler>.Instance);
+    public RunBasketFetchHandler Fetch => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, ListSettings, new ListFileProcessor(Store, Baskets, Master), Clock, NullLogger<RunBasketFetchHandler>.Instance);
 
     public RefreshFlagListsHandler Refresh => new(Store, Master, Baskets, Applier, Clock, NullLogger<RefreshFlagListsHandler>.Instance);
 
@@ -63,8 +61,8 @@ internal sealed class ListWorld
     public BasketSourceInfo FlagSource(ListBasketDefinition definition, int members = 0) =>
         Register(new BasketSourceInfo(definition.Id, definition.Name, "instrument-master", string.Empty, null, 0, 100000, true, "never", null, null, null, null, null, null, 0, members, ListBaskets.MasterFlagsFormat));
 
-    public BasketSourceInfo BanSource(bool enabled = true, DateTimeOffset? checkedAt = null, string? sha = null, int min = 0, int max = 200) =>
-        Register(new BasketSourceInfo(BanId, ListBaskets.Ban.Name, "fo_secban.csv", "https://nsearchives.nseindia.com/content/fo/fo_secban.csv", null, min, max, enabled, "never", null, checkedAt, null, null, sha, null, 0, 0, ListBaskets.BanFormat));
+    public BasketSourceInfo BanSource(bool enabled = true, DateTimeOffset? checkedAt = null, string? sha = null, int min = 0, int max = 200, DateOnly? knownThrough = null) =>
+        Register(new BasketSourceInfo(BanId, ListBaskets.Ban.Name, "fo_secban.csv", "https://nsearchives.nseindia.com/content/fo/fo_secban.csv", null, min, max, enabled, "never", null, checkedAt, null, null, sha, null, 0, 0, ListBaskets.BanFormat, knownThrough));
 
     public BasketSourceInfo LotSource(bool enabled = true, DateTimeOffset? checkedAt = null, int min = 2, int max = 10) =>
         Register(new BasketSourceInfo(LotsId, ListBaskets.LotSizes.Name, "fo_mktlots.csv", "https://nsearchives.nseindia.com/content/fo/fo_mktlots.csv", null, min, max, enabled, "never", null, checkedAt, null, null, null, null, 0, 0, ListBaskets.LotsFormat));

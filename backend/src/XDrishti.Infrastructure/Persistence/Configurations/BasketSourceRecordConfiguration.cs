@@ -28,6 +28,7 @@ internal sealed class BasketSourceRecordConfiguration : IEntityTypeConfiguration
         builder.Property(x => x.LastModified).HasMaxLength(100);
         builder.Property(x => x.Sha256).HasMaxLength(64);
         builder.Property(x => x.FailCount).HasDefaultValue(0);
+        builder.Property(x => x.KnownThrough).HasColumnType("date");
         builder.HasOne<Basket>().WithOne().HasForeignKey<BasketSourceRecord>(x => x.BasketId).OnDelete(DeleteBehavior.Restrict);
     }
 }
