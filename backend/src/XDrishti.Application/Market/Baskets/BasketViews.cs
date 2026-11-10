@@ -6,11 +6,12 @@ namespace XDrishti.Application.Market.Baskets;
 /// A basket. <c>purpose</c>: trading · long_term · watch. <c>position</c> = place among the active baskets (0 first; the system baskets count on their own, in their group).
 /// <c>memberCount</c> = instruments in it now. <c>archivedAt</c> is null for an active basket (archived ones are only listed on request).
 /// <c>kind</c>: manual (the owner's) · portfolio (an account's portfolio bucket, ADR 0014); <c>system</c> = true for the latter: read-only, never archived, its members are the
-/// bucket's current holdings. <c>accountId</c>/<c>accountName</c> are set for the default bucket of an account.
+/// bucket's current holdings. The stored system baskets (kind index, list, derived; BK-01) are read-only too: <c>membersKnownSince</c> = the first date their membership is known (earlier dates show the first known members, ISS-22), <c>source</c> = the state of their file.
+/// <c>accountId</c>/<c>accountName</c> are set for the default bucket of an account.
 /// </summary>
 public sealed record BasketView(
     Guid Id, string Name, string Colour, string Purpose, string? Description, int Position, int MemberCount, DateTimeOffset CreatedAt, DateTimeOffset? ArchivedAt,
-    string Kind, bool System, Guid? AccountId, string? AccountName);
+    string Kind, bool System, Guid? AccountId, string? AccountName, DateOnly? MembersKnownSince = null, BasketSourceSummary? Source = null);
 
 /// <summary>
 /// One stay of an instrument in a basket: <c>validFrom</c> = when it was added, <c>validTo</c> = when it was removed (null while it is a member),
@@ -23,9 +24,9 @@ public sealed record BasketMemberView(
 
 /// <summary>
 /// The members of a basket, in their order. <c>asOf</c> is null for the current members, otherwise the India date they are as of (members at the end of that
-/// day; removed ones show their <c>validTo</c>). <c>total</c> counts the items.
+/// day; removed ones show their <c>validTo</c>). <c>total</c> counts the items. <c>membersKnownSince</c> is set for a stored system basket: before that date the first known members are shown.
 /// </summary>
-public sealed record BasketMembers(Guid BasketId, string Name, DateTimeOffset? ArchivedAt, DateOnly? AsOf, int Total, IReadOnlyList<BasketMemberView> Items);
+public sealed record BasketMembers(Guid BasketId, string Name, DateTimeOffset? ArchivedAt, DateOnly? AsOf, int Total, IReadOnlyList<BasketMemberView> Items, DateOnly? MembersKnownSince = null);
 
 /// <summary>An addition (<c>kind</c> = added, <c>by</c> = who added it) or removal (<c>kind</c> = removed, <c>by</c> = who removed it) of an instrument. Only additions carry a note (the one given when adding); a removal has none.</summary>
 public sealed record BasketHistoryEntry(

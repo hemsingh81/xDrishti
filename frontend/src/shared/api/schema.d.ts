@@ -811,6 +811,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/baskets/system/fetch': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Owner act, needs step-up: fetch the index lists now (the given basketIds, which this turns on, or every enabled source) and return one outcome per file; force overrides only the tripwire and is recorded. 409 baskets.fetch_disabled while Baskets:System:Fetch:Enabled is off (no request is made) */
+    post: operations['FetchSystemBaskets'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/baskets/{id}/source': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The source of a system basket: file name, state (never, ok, stale, rejected, failed), last checks and its last 20 fetch outcomes (no raw file); 404 baskets.not_found for a basket without one */
+    get: operations['GetBasketSource'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/baskets/{id}': {
     parameters: {
       query?: never;
@@ -7422,6 +7456,11 @@ export interface components {
       /** @description Members left out, each with its reason. */
       excluded: components['schemas']['BenchmarkExclusionView'][];
     };
+    /** @description What a fetch run did, one outcome per source it checked. */
+    BasketFetchRun: {
+      outcomes: components['schemas']['FetchOutcomeView'][];
+      summary?: null | string;
+    };
     /** @description The newest additions and removals of a basket, newest first. */
     BasketHistory: {
       /** Format: uuid */
@@ -7475,7 +7514,7 @@ export interface components {
     };
     /**
      * @description The members of a basket, in their order. `asOf` is null for the current members, otherwise the India date they are as of (members at the end of that
-     *     day; removed ones show their `validTo`). `total` counts the items.
+     *     day; removed ones show their `validTo`). `total` counts the items. `membersKnownSince` is set for a stored system basket: before that date the first known members are shown.
      */
     BasketMembers: {
       /** Format: uuid */
@@ -7488,16 +7527,50 @@ export interface components {
       /** Format: int32 */
       total: number;
       items: components['schemas']['BasketMemberView'][];
+      /** Format: date */
+      membersKnownSince?: null | string;
     };
     /** @description Every active basket exactly once, in the wanted order. */
     BasketOrderInput: {
       ids: null | string[];
     };
+    /** @description The state of a system basket's file: `state` never · ok · stale · rejected · failed; `unmatched` = members of the last applied or checked list that are not in the instrument list ("N members not in your instrument list"). */
+    BasketSourceSummary: {
+      state: string;
+      /** Format: date-time */
+      lastOkAt: null | string;
+      /** Format: date-time */
+      lastCheckedAt: null | string;
+      /** Format: int32 */
+      unmatched: number;
+    };
+    /** @description The source of a system basket and its last 20 fetches (no raw file). `enabled` = the owner has turned this file on. */
+    BasketSourceView: {
+      /** Format: uuid */
+      basketId: string;
+      name: string;
+      fileName: string;
+      sourceUrl: string;
+      enabled: boolean;
+      state: string;
+      /** Format: date-time */
+      lastOkAt: null | string;
+      /** Format: date-time */
+      lastCheckedAt: null | string;
+      /** Format: date-time */
+      nextAttemptAt: null | string;
+      /** Format: int32 */
+      expectedMin: number;
+      /** Format: int32 */
+      expectedMax: number;
+      fetches: components['schemas']['FetchOutcomeView'][];
+    };
     /**
      * @description A basket. `purpose`: trading · long_term · watch. `position` = place among the active baskets (0 first; the system baskets count on their own, in their group).
      *     `memberCount` = instruments in it now. `archivedAt` is null for an active basket (archived ones are only listed on request).
      *     `kind`: manual (the owner's) · portfolio (an account's portfolio bucket, ADR 0014); `system` = true for the latter: read-only, never archived, its members are the
-     *     bucket's current holdings. `accountId`/`accountName` are set for the default bucket of an account.
+     *     bucket's current holdings. The stored system baskets (kind index, list, derived; BK-01) are read-only too: `membersKnownSince` = the first date their membership is known (earlier dates show the first known members, ISS-22), `source` = the state of their file.
+     *     `accountId`/`accountName` are set for the default bucket of an account.
      */
     BasketView: {
       /** Format: uuid */
@@ -7519,6 +7592,9 @@ export interface components {
       /** Format: uuid */
       accountId: null | string;
       accountName: null | string;
+      /** Format: date */
+      membersKnownSince?: null | string;
+      source?: null | components['schemas']['BasketSourceSummary'];
     };
     /**
      * @description The strategy against the buy-and-hold of the same universe over the same days (CF-11 row 13, ADR 0227), measured when a full Lab run ends and carried on its verdict. Report-only: nothing that judges the verdict reads it; only the readiness scorecard's row 13 does. It carries the two daily
@@ -12614,6 +12690,31 @@ export interface components {
        * @description For a model the mean absolute contribution over its training rows; for one score the signed contribution.
        */
       meanAbsContribution: number;
+    };
+    /** @description Fetch now: the given baskets (the sources are turned on by this owner act) or, without ids, every enabled source; `force` overrides only the tripwire. An owner act: needs a step-up. */
+    FetchNowInput: {
+      basketIds: null | string[];
+      force: null | boolean;
+    };
+    /** @description One fetch: `outcome` unchanged · applied · rejected · failed · skipped; `error` is the short reason of a rejection (tripwire, too_many_changes, row_count, bad_header, unmatched, not_csv, http_404 ...) or failure. No file content. */
+    FetchOutcomeView: {
+      /** Format: uuid */
+      basketId: string;
+      /** Format: date-time */
+      at: string;
+      outcome: string;
+      /** Format: int32 */
+      httpStatus: null | number;
+      /** Format: int32 */
+      rows: number;
+      /** Format: int32 */
+      added: number;
+      /** Format: int32 */
+      removed: number;
+      /** Format: int32 */
+      unmatched: number;
+      error: null | string;
+      forced: boolean;
     };
     /** @description The coverage of the filing store between `From` and `To`: counts only. */
     FilingCoverageView: {
@@ -25548,6 +25649,88 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  FetchSystemBaskets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['FetchNowInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketFetchRun'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetBasketSource: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketSourceView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

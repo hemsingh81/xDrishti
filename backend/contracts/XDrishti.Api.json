@@ -2660,6 +2660,115 @@
         }
       }
     },
+    "/api/baskets/system/fetch": {
+      "post": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Owner act, needs step-up: fetch the index lists now (the given basketIds, which this turns on, or every enabled source) and return one outcome per file; force overrides only the tripwire and is recorded. 409 baskets.fetch_disabled while Baskets:System:Fetch:Enabled is off (no request is made)",
+        "operationId": "FetchSystemBaskets",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/FetchNowInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketFetchRun"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/baskets/{id}/source": {
+      "get": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "The source of a system basket: file name, state (never, ok, stale, rejected, failed), last checks and its last 20 fetch outcomes (no raw file); 404 baskets.not_found for a basket without one",
+        "operationId": "GetBasketSource",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketSourceView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/baskets/{id}": {
       "put": {
         "tags": [
@@ -25125,6 +25234,27 @@
         },
         "description": "The buy-and-hold of one basket with the instruments left out."
       },
+      "BasketFetchRun": {
+        "required": [
+          "outcomes"
+        ],
+        "type": "object",
+        "properties": {
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FetchOutcomeView"
+            }
+          },
+          "summary": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "What a fetch run did, one outcome per source it checked."
+      },
       "BasketHistory": {
         "required": [
           "basketId",
@@ -25340,9 +25470,16 @@
             "items": {
               "$ref": "#/components/schemas/BasketMemberView"
             }
+          },
+          "membersKnownSince": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
           }
         },
-        "description": "The members of a basket, in their order. `asOf` is null for the current members, otherwise the India date they are as of (members at the end of that\nday; removed ones show their `validTo`). `total` counts the items."
+        "description": "The members of a basket, in their order. `asOf` is null for the current members, otherwise the India date they are as of (members at the end of that\nday; removed ones show their `validTo`). `total` counts the items. `membersKnownSince` is set for a stored system basket: before that date the first known members are shown."
       },
       "BasketOrderInput": {
         "required": [
@@ -25362,6 +25499,113 @@
           }
         },
         "description": "Every active basket exactly once, in the wanted order."
+      },
+      "BasketSourceSummary": {
+        "required": [
+          "state",
+          "lastOkAt",
+          "lastCheckedAt",
+          "unmatched"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "lastOkAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastCheckedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "unmatched": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The state of a system basket's file: `state` never · ok · stale · rejected · failed; `unmatched` = members of the last applied or checked list that are not in the instrument list (\"N members not in your instrument list\")."
+      },
+      "BasketSourceView": {
+        "required": [
+          "basketId",
+          "name",
+          "fileName",
+          "sourceUrl",
+          "enabled",
+          "state",
+          "lastOkAt",
+          "lastCheckedAt",
+          "nextAttemptAt",
+          "expectedMin",
+          "expectedMax",
+          "fetches"
+        ],
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "sourceUrl": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          },
+          "lastOkAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastCheckedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "nextAttemptAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "expectedMin": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expectedMax": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fetches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FetchOutcomeView"
+            }
+          }
+        },
+        "description": "The source of a system basket and its last 20 fetches (no raw file). `enabled` = the owner has turned this file on."
       },
       "BasketView": {
         "required": [
@@ -25437,9 +25681,26 @@
               "null",
               "string"
             ]
+          },
+          "membersKnownSince": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BasketSourceSummary"
+              }
+            ]
           }
         },
-        "description": "A basket. `purpose`: trading · long_term · watch. `position` = place among the active baskets (0 first; the system baskets count on their own, in their group).\n`memberCount` = instruments in it now. `archivedAt` is null for an active basket (archived ones are only listed on request).\n`kind`: manual (the owner's) · portfolio (an account's portfolio bucket, ADR 0014); `system` = true for the latter: read-only, never archived, its members are the\nbucket's current holdings. `accountId`/`accountName` are set for the default bucket of an account."
+        "description": "A basket. `purpose`: trading · long_term · watch. `position` = place among the active baskets (0 first; the system baskets count on their own, in their group).\n`memberCount` = instruments in it now. `archivedAt` is null for an active basket (archived ones are only listed on request).\n`kind`: manual (the owner's) · portfolio (an account's portfolio bucket, ADR 0014); `system` = true for the latter: read-only, never archived, its members are the\nbucket's current holdings. The stored system baskets (kind index, list, derived; BK-01) are read-only too: `membersKnownSince` = the first date their membership is known (earlier dates show the first known members, ISS-22), `source` = the state of their file.\n`accountId`/`accountName` are set for the default bucket of an account."
       },
       "BenchmarkComparisonView": {
         "required": [
@@ -39325,6 +39586,93 @@
           }
         },
         "description": "The weight of one feature in a model or in one score: a path-based contribution in raw-score units (not exact, not SHAP)."
+      },
+      "FetchNowInput": {
+        "required": [
+          "basketIds",
+          "force"
+        ],
+        "type": "object",
+        "properties": {
+          "basketIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "force": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "description": "Fetch now: the given baskets (the sources are turned on by this owner act) or, without ids, every enabled source; `force` overrides only the tripwire. An owner act: needs a step-up."
+      },
+      "FetchOutcomeView": {
+        "required": [
+          "basketId",
+          "at",
+          "outcome",
+          "httpStatus",
+          "rows",
+          "added",
+          "removed",
+          "unmatched",
+          "error",
+          "forced"
+        ],
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "httpStatus": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "added": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "removed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unmatched": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "forced": {
+            "type": "boolean"
+          }
+        },
+        "description": "One fetch: `outcome` unchanged · applied · rejected · failed · skipped; `error` is the short reason of a rejection (tripwire, too_many_changes, row_count, bad_header, unmatched, not_csv, http_404 ...) or failure. No file content."
       },
       "FilingCoverageView": {
         "required": [

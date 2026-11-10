@@ -64,6 +64,10 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     public DbSet<BasketMember> BasketMembers => Set<BasketMember>();
 
+    internal DbSet<XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceRecord> BasketSources => Set<XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceRecord>();
+
+    internal DbSet<XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchRecord> BasketFetches => Set<XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchRecord>();
+
     public DbSet<DataJob> DataJobs => Set<DataJob>();
 
     public DbSet<TradingDay> TradingDays => Set<TradingDay>();

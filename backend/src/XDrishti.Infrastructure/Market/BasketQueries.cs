@@ -18,8 +18,22 @@ internal sealed class BasketQueries(XDrishtiDbContext db) : IBasketQueries
             baskets = baskets.Where(b => b.ArchivedAt == null);
         }
 
-        var rows = await Project(baskets.OrderBy(b => b.ArchivedAt != null).ThenBy(b => b.Position).ThenBy(b => b.CreatedAt).ThenBy(b => b.Id)).ToListAsync(cancellationToken);
-        return [.. rows.Select(ToView)];
+        var rows = await Project(baskets.OrderBy(b => b.ArchivedAt != null).ThenByDescending(b => b.IsSystem).ThenBy(b => b.IsSystem ? b.Name : null).ThenBy(b => b.Position).ThenBy(b => b.CreatedAt).ThenBy(b => b.Id)).ToListAsync(cancellationToken);
+        var systemIds = rows.Where(r => r.IsSystem).Select(r => r.Id).ToArray();
+        if (systemIds.Length == 0)
+        {
+            return [.. rows.Select(r => ToView(r, null, null))];
+        }
+
+        // Stored system baskets (BK-01): the first date their membership is known and the state of their file.
+        var firsts = await db.BasketMembers.AsNoTracking().Where(m => systemIds.Contains(m.BasketId)).GroupBy(m => m.BasketId).Select(g => new { Id = g.Key, First = g.Min(m => m.ValidFrom) }).ToDictionaryAsync(x => x.Id, x => x.First, cancellationToken);
+        var sources = await db.BasketSources.AsNoTracking().Where(s => systemIds.Contains(s.BasketId)).ToDictionaryAsync(s => s.BasketId, cancellationToken);
+        var latest = await db.BasketFetches.AsNoTracking().Where(f => systemIds.Contains(f.BasketId) && f.Outcome != "failed")
+            .GroupBy(f => f.BasketId).Select(g => new { Id = g.Key, Unmatched = g.OrderByDescending(f => f.FetchedAt).Select(f => f.Unmatched).First() }).ToDictionaryAsync(x => x.Id, x => x.Unmatched, cancellationToken);
+        return [.. rows.Select(r => ToView(
+            r,
+            firsts.TryGetValue(r.Id, out var first) ? IndiaTime.Today(first) : null,
+            sources.TryGetValue(r.Id, out var src) ? new BasketSourceSummary(src.State, src.LastOkAt, src.LastCheckedAt, latest.GetValueOrDefault(r.Id)) : null))];
     }
 
     public async ValueTask<BasketView?> GetAsync(Guid id, CancellationToken cancellationToken) =>
@@ -27,10 +41,21 @@ internal sealed class BasketQueries(XDrishtiDbContext db) : IBasketQueries
 
     public async ValueTask<BasketMembers?> MembersAsync(Guid basketId, DateTimeOffset? cutoff, DateOnly? asOf, CancellationToken cancellationToken)
     {
-        var basket = await db.Baskets.AsNoTracking().Where(b => b.Id == basketId).Select(b => new { b.Name, b.ArchivedAt }).FirstOrDefaultAsync(cancellationToken);
+        var basket = await db.Baskets.AsNoTracking().Where(b => b.Id == basketId).Select(b => new { b.Name, b.ArchivedAt, b.IsSystem }).FirstOrDefaultAsync(cancellationToken);
         if (basket is null)
         {
             return null;
+        }
+
+        // A stored system basket has membership only from its first fetch on (ISS-22): an earlier date shows the first known members and says since when they are known; never an empty list.
+        DateOnly? knownSince = null;
+        if (basket.IsSystem && await db.BasketMembers.AsNoTracking().Where(m => m.BasketId == basketId).MinAsync(m => (DateTimeOffset?)m.ValidFrom, cancellationToken) is { } firstFrom)
+        {
+            knownSince = IndiaTime.Today(firstFrom);
+            if (cutoff is { } asked && asked <= firstFrom)
+            {
+                cutoff = BasketMember.CutoffAfter(knownSince.Value);
+            }
         }
 
         var members = db.BasketMembers.AsNoTracking().Where(m => m.BasketId == basketId);
@@ -80,7 +105,7 @@ internal sealed class BasketQueries(XDrishtiDbContext db) : IBasketQueries
             r.AddedBy,
             null,
             null)).ToList();
-        return new BasketMembers(basketId, basket.Name, basket.ArchivedAt, asOf, items.Count, items);
+        return new BasketMembers(basketId, basket.Name, basket.ArchivedAt, asOf, items.Count, items, knownSince);
     }
 
     public async ValueTask<BasketHistory?> HistoryAsync(Guid basketId, int take, CancellationToken cancellationToken)
@@ -140,11 +165,13 @@ internal sealed class BasketQueries(XDrishtiDbContext db) : IBasketQueries
             b.Position,
             db.BasketMembers.Count(m => m.BasketId == b.Id && m.ValidTo == null),
             b.CreatedAt,
-            b.ArchivedAt));
+            b.ArchivedAt,
+            b.Kind,
+            b.IsSystem));
 
-    private static BasketView ToView(BasketRow r) =>
-        new(r.Id, r.Name, r.Colour, r.Purpose.ToCode(), r.Description, r.Position, r.MemberCount, r.CreatedAt, r.ArchivedAt, BasketKinds.Manual, false, null, null);
+    private static BasketView ToView(BasketRow r, DateOnly? knownSince = null, BasketSourceSummary? source = null) =>
+        new(r.Id, r.Name, r.Colour, r.Purpose.ToCode(), r.Description, r.Position, r.MemberCount, r.CreatedAt, r.ArchivedAt, r.Kind, r.IsSystem, null, null, knownSince, source);
 
     private sealed record BasketRow(
-        Guid Id, string Name, string Colour, BasketPurpose Purpose, string? Description, int Position, int MemberCount, DateTimeOffset CreatedAt, DateTimeOffset? ArchivedAt);
+        Guid Id, string Name, string Colour, BasketPurpose Purpose, string? Description, int Position, int MemberCount, DateTimeOffset CreatedAt, DateTimeOffset? ArchivedAt, string Kind, bool IsSystem);
 }

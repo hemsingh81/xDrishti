@@ -13,9 +13,14 @@ public sealed class BasketMember : Entity<Guid>
 
     // Parameter names match property names so EF Core can bind this constructor when materialising.
     private BasketMember(
-        Guid id, Guid basketId, Guid instrumentId, int position, DateTimeOffset validFrom, DateTimeOffset? validTo, string? note, string addedBy, string? removedBy)
+        Guid id, Guid basketId, Guid instrumentId, int position, DateTimeOffset validFrom, DateTimeOffset? validTo, string? note, string addedBy, string? removedBy,
+        string provenance, DateTimeOffset? detectedAt, Guid? sourceRef, string? sourceKind)
         : base(id)
     {
+        Provenance = provenance;
+        DetectedAt = detectedAt;
+        SourceRef = sourceRef;
+        SourceKind = sourceKind;
         BasketId = basketId;
         InstrumentId = instrumentId;
         Position = position;
@@ -46,6 +51,17 @@ public sealed class BasketMember : Entity<Guid>
     /// <summary>Who removed it; null while it is a member.</summary>
     public string? RemovedBy { get; private set; }
 
+    /// <summary>manual · fetched · imported · recomputed · derived (<see cref="BasketProvenance"/>).</summary>
+    public string Provenance { get; private set; }
+
+    /// <summary>When a fetch first saw this membership (the effective date is the India date of it); null for a manual one.</summary>
+    public DateTimeOffset? DetectedAt { get; private set; }
+
+    /// <summary>The record the row came from (for a fetch, the fetch id); null for a manual one.</summary>
+    public Guid? SourceRef { get; private set; }
+
+    public string? SourceKind { get; private set; }
+
     public bool IsActive => ValidTo is null;
 
     /// <summary>A note of up to <see cref="BasketLimits.MaxNoteLength"/> characters without control characters (blank = none).</summary>
@@ -59,7 +75,11 @@ public sealed class BasketMember : Entity<Guid>
 
     /// <summary>The instrument becomes a member from <paramref name="now"/>, at <paramref name="position"/> among the active members. <paramref name="note"/> is stored as given (see <see cref="CheckNote"/>).</summary>
     public static BasketMember Add(Guid basketId, Guid instrumentId, int position, string? note, string actor, DateTimeOffset now) =>
-        new(Guid.CreateVersion7(now), basketId, instrumentId, position, now, null, note, Limit(actor), null);
+        new(Guid.CreateVersion7(now), basketId, instrumentId, position, now, null, note, Limit(actor), null, BasketProvenance.Manual, null, null, null);
+
+    /// <summary>A member from a fetched list (BK-01): effective from <paramref name="validFrom"/> (the India date of the fetch), detected at <paramref name="detectedAt"/>, tied to the fetch <paramref name="fetchId"/>.</summary>
+    public static BasketMember Fetched(Guid basketId, Guid instrumentId, int position, DateTimeOffset validFrom, DateTimeOffset detectedAt, Guid fetchId, string actor) =>
+        new(Guid.CreateVersion7(detectedAt), basketId, instrumentId, position, validFrom, null, null, Limit(actor), null, BasketProvenance.Fetched, detectedAt, fetchId, "fetch");
 
     /// <summary>Ends the stay; false when it has ended already.</summary>
     public bool Remove(string actor, DateTimeOffset now)

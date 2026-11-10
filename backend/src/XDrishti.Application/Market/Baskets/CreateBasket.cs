@@ -38,7 +38,7 @@ internal sealed class CreateBasketHandler(
             }
 
             var now = clock.GetUtcNow();
-            var basket = Basket.Create(details.Value, active.Count == 0 ? 0 : active.Max(b => b.Position) + 1, now);
+            var basket = Basket.Create(details.Value, active.Where(b => !b.IsSystem).Select(b => b.Position + 1).DefaultIfEmpty(0).Max(), now);
             store.Add(basket);
             events.Record(AccountEvent.Record(AccountEventType.BasketCreated, null, $"Created {BasketChecks.Called(basket)} ({basket.Purpose.ToCode()})", command.Actor, now));
             if (await unitOfWork.TrySaveAsync(cancellationToken))

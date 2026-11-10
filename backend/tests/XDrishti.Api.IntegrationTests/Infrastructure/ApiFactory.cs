@@ -73,6 +73,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>Fake Dhan and NSE file servers: the API's master-data HTTP clients never reach the internet in tests.</summary>
     public FakeMasterData MasterData { get; } = new();
 
+    /// <summary>The system baskets' files and fetch setting (BK-01): in memory, OFF until a test turns it on, every request counted.</summary>
+    public FakeBasketSources BasketSources { get; } = new();
+
     /// <summary>Registered instrument refreshes wait here until a test runs them.</summary>
     public ManualRefreshJobs RefreshJobs { get; } = new();
 
@@ -157,6 +160,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddHttpClient(MasterDataHttpClientNames.Dhan).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
             services.AddHttpClient(MasterDataHttpClientNames.Nse).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
             services.AddHttpClient(MasterDataHttpClientNames.NseApi).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
+            services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IBasketFetchSettings>(BasketSources);
+            services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IBasketSourceFetcher>(BasketSources);
             services.AddSingleton<IRefreshJobChannel>(RefreshJobs);
             services.AddSingleton<IDataJobChannel>(DataJobs);
 
@@ -380,11 +385,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     /// <summary>
     /// Empties the instrument master (instruments, baskets and their members, tracking, broker ids and refresh records) and the fake file servers, so a
-    /// test starts from nothing. The three baskets the migration creates are put back, empty.
+    /// test starts from nothing. The three baskets the migration creates are put back, empty (the seeded system baskets and their sources are removed; a test that needs them seeds its own).
     /// </summary>
     public async Task ResetInstrumentsAsync()
     {
         MasterData.Reset();
+        BasketSources.Reset();
         RefreshJobs.Clear();
         DataJobs.Clear();
         Dhan.Reset();
@@ -449,6 +455,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.bars_agg;
                 DELETE FROM market.bars_1m;
                 DELETE FROM market.bar_coverage;
+                DELETE FROM market.basket_fetches;
+                DELETE FROM market.basket_sources;
                 DELETE FROM market.basket_members;
                 DELETE FROM market.baskets;
                 DELETE FROM market.tracked_instruments;

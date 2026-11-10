@@ -42,6 +42,18 @@ internal sealed class BasketsEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapPost("/system/fetch", FetchSystemAsync)
+            .RequireStepUp()
+            .WithName("FetchSystemBaskets")
+            .WithSummary("Owner act, needs step-up: fetch the index lists now (the given basketIds, which this turns on, or every enabled source) and return one outcome per file; force overrides only the tripwire and is recorded. 409 baskets.fetch_disabled while Baskets:System:Fetch:Enabled is off (no request is made)")
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapGet("/{id:guid}/source", GetSourceAsync)
+            .WithName("GetBasketSource")
+            .WithSummary("The source of a system basket: file name, state (never, ok, stale, rejected, failed), last checks and its last 20 fetch outcomes (no raw file); 404 baskets.not_found for a basket without one")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapPut("/{id:guid}", UpdateAsync)
             .WithName("UpdateBasket")
             .WithSummary("Replace the name, colour, purpose and description of a basket that is not archived; 409 baskets.system for a system basket")
@@ -140,6 +152,27 @@ internal sealed class BasketsEndpoints : IEndpointModule
     {
         var result = await handler.HandleAsync(new ReorderBasketsCommand(input ?? new BasketOrderInput(null), http.GetActor()), cancellationToken);
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Ok<BasketFetchRun>, ProblemHttpResult>> FetchSystemAsync(
+        HttpContext http,
+        ICommandHandler<RunBasketFetchCommand, BasketFetchRun> handler,
+        CancellationToken cancellationToken,
+        [FromBody] FetchNowInput? input = null)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var result = await handler.HandleAsync(new RunBasketFetchCommand(input?.BasketIds, input?.Force ?? false, http.GetActor()), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<BasketSourceView>, ProblemHttpResult>> GetSourceAsync(
+        Guid id,
+        HttpContext http,
+        IQueryHandler<GetBasketSourceQuery, Result<BasketSourceView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetBasketSourceQuery(id), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<BasketMembers>, ProblemHttpResult>> GetMembersAsync(

@@ -464,6 +464,39 @@ public static class DependencyInjection
             .RemoveAllLoggers();
     }
 
+    /// <summary>
+    /// The system baskets' file fetch (BK-01, ADR 0254). With <c>Baskets:System:Fetch:Enabled</c> off (default) no HTTP client is registered and the fetcher is the one that never reaches the network; the catalogue is only a table.
+    /// </summary>
+    internal static void AddSystemBasketSources(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchOptions>()
+            .Bind(configuration.GetSection(XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IBasketFetchSettings, XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchSettings>();
+        services.AddScoped<XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceStore>();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IBasketSourceStore>(sp => sp.GetRequiredService<XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceStore>());
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IBasketMembershipApplier, XDrishti.Infrastructure.Market.SystemBaskets.BasketMembershipApplier>();
+
+        if (!configuration.GetSection(XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchOptions.SectionName).GetValue<bool>("Enabled"))
+        {
+            services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IBasketSourceFetcher, XDrishti.Infrastructure.Market.SystemBaskets.DisabledBasketSourceFetcher>();
+            return;
+        }
+
+        services.AddTransient<XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceEndpointGuard>();
+        services.AddHttpClient(XDrishti.Infrastructure.Market.SystemBaskets.NseBasketSourceFetcher.ClientName, (sp, client) =>
+            {
+                client.Timeout = Timeout.InfiniteTimeSpan;
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchOptions>>().Value.UserAgent);
+                client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("text/csv"));
+            })
+            .ConfigurePrimaryHttpMessageHandler(MasterDataHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceEndpointGuard>()
+            .RemoveAllLoggers();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IBasketSourceFetcher, XDrishti.Infrastructure.Market.SystemBaskets.NseBasketSourceFetcher>();
+    }
+
     /// <summary>The holdings module (ADR 0012): lots and returns inputs, sync records, the unit of work and the automatic refresh setting.</summary>
     private static void AddPortfolio(this IServiceCollection services, IConfiguration configuration)
     {
@@ -544,6 +577,7 @@ public static class DependencyInjection
         services.AddScoped<IBasketStore, BasketStore>();
         services.AddScoped<IBasketQueries, BasketQueries>();
         services.AddScoped<IPortfolioBasketSource, PortfolioBasketSource>();
+        services.AddSystemBasketSources(configuration);
 
         services.AddTransient<MasterDataEndpointGuard>();
         services.AddHttpClient(MasterDataHttpClientNames.Dhan, MasterDataHttp.ConfigureDhan)

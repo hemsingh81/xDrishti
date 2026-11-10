@@ -54,13 +54,18 @@ internal static class BasketChecks
             : Result.Success(ids.ToArray());
     }
 
-    /// <summary>The basket, when it exists and may be changed (not archived). A portfolio bucket is a system basket: <c>baskets.system</c>, never changed.</summary>
-    public static async ValueTask<Result<Basket>> EditableAsync(IBasketStore store, IPortfolioBasketSource portfolio, Guid id, CancellationToken cancellationToken)
+    /// <summary>The basket, when it exists and may be changed (not archived). A portfolio bucket or a stored system basket (kind index, list, derived) is a system basket: <c>baskets.system</c>, never changed (<paramref name="allowSystem"/> for reading one as the source of a copy).</summary>
+    public static async ValueTask<Result<Basket>> EditableAsync(IBasketStore store, IPortfolioBasketSource portfolio, Guid id, CancellationToken cancellationToken, bool allowSystem = false)
     {
         var basket = await store.FindAsync(id, cancellationToken);
         if (basket is null)
         {
             return Result.Failure<Basket>(await portfolio.ExistsAsync(id, cancellationToken) ? BasketErrors.System : BasketErrors.NotFound);
+        }
+
+        if (basket.IsSystem && !allowSystem)
+        {
+            return Result.Failure<Basket>(BasketErrors.System);
         }
 
         return basket.IsArchived ? Result.Failure<Basket>(BasketErrors.Archived) : Result.Success(basket);

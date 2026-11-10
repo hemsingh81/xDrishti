@@ -19,6 +19,7 @@ public sealed class BasketsAccessTests(ApiFactory factory)
         { "GET", $"/api/baskets/{Id}/members" },
         { "GET", $"/api/baskets/{Id}/members?asOf=2026-10-11" },
         { "GET", $"/api/baskets/{Id}/history" },
+        { "GET", $"/api/baskets/{Id}/source" },
         { "GET", $"/api/instruments/{Id}/baskets" },
     };
 

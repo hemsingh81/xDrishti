@@ -25,6 +25,7 @@ public sealed class RecoveryClassTableTests
         ["suggestions"] = RecoveryClass.LatestOnly,
         ["briefing"] = RecoveryClass.LatestOnly,
         ["plan-expiry"] = RecoveryClass.LatestOnly,
+        ["system-baskets"] = RecoveryClass.LatestOnly,
         ["post-trade-prompts"] = RecoveryClass.LatestOnly,
         ["weekly"] = RecoveryClass.LatestOnly,
         ["weekly-review"] = RecoveryClass.LatestOnly,

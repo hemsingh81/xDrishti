@@ -862,6 +862,20 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("description");
 
+                    b.Property<bool>("IsSystem")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("system");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("manual")
+                        .HasColumnName("kind");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(60)
@@ -890,6 +904,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_baskets_colour", "colour ~ '^#[0-9a-f]{6}$'");
 
+                            t.HasCheckConstraint("ck_baskets_kind", "kind IN ('manual', 'index', 'list', 'derived')");
+
+                            t.HasCheckConstraint("ck_baskets_kind_system", "(kind = 'manual') = (NOT system)");
+
                             t.HasCheckConstraint("ck_baskets_position", "position >= 0");
 
                             t.HasCheckConstraint("ck_baskets_purpose", "purpose IN ('trading', 'long_term', 'watch')");
@@ -912,6 +930,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("basket_id");
 
+                    b.Property<DateTimeOffset?>("DetectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("detected_at");
+
                     b.Property<Guid>("InstrumentId")
                         .HasColumnType("uuid")
                         .HasColumnName("instrument_id");
@@ -925,10 +947,27 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("position");
 
+                    b.Property<string>("Provenance")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("manual")
+                        .HasColumnName("provenance");
+
                     b.Property<string>("RemovedBy")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
                         .HasColumnName("removed_by");
+
+                    b.Property<string>("SourceKind")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source_kind");
+
+                    b.Property<Guid?>("SourceRef")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_ref");
 
                     b.Property<DateTimeOffset>("ValidFrom")
                         .HasColumnType("timestamp with time zone")
@@ -954,6 +993,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_basket_members_dates", "valid_to IS NULL OR valid_to >= valid_from");
 
                             t.HasCheckConstraint("ck_basket_members_position", "position >= 0");
+
+                            t.HasCheckConstraint("ck_basket_members_provenance", "provenance IN ('fetched', 'imported', 'recomputed', 'derived', 'manual')");
 
                             t.HasCheckConstraint("ck_basket_members_removed_by", "(valid_to IS NULL) = (removed_by IS NULL)");
                         });
@@ -5300,6 +5341,203 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
 
                     NpgsqlEntityTypeBuilderExtensions.IsUnlogged(b, true);
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("actor");
+
+                    b.Property<int>("Added")
+                        .HasColumnType("integer")
+                        .HasColumnName("added");
+
+                    b.Property<Guid>("BasketId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("basket_id");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("error");
+
+                    b.Property<string>("Etag")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("etag");
+
+                    b.Property<DateTimeOffset>("FetchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fetched_at");
+
+                    b.Property<bool>("Forced")
+                        .HasColumnType("boolean")
+                        .HasColumnName("forced");
+
+                    b.Property<int?>("HttpStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("http_status");
+
+                    b.Property<string>("LastModified")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_modified");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("outcome");
+
+                    b.Property<int>("Removed")
+                        .HasColumnType("integer")
+                        .HasColumnName("removed");
+
+                    b.Property<int>("Rows")
+                        .HasColumnType("integer")
+                        .HasColumnName("rows");
+
+                    b.Property<string>("SettingsSnapshot")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("settings_snapshot");
+
+                    b.Property<string>("Sha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<int>("Unmatched")
+                        .HasColumnType("integer")
+                        .HasColumnName("unmatched");
+
+                    b.Property<string>("Warnings")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("warnings");
+
+                    b.HasKey("Id")
+                        .HasName("pk_basket_fetches");
+
+                    b.HasIndex("BasketId", "FetchedAt")
+                        .HasDatabaseName("ix_basket_fetches_basket_id_fetched_at");
+
+                    b.ToTable("basket_fetches", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_basket_fetches_outcome", "outcome IN ('unchanged', 'applied', 'rejected', 'failed', 'skipped')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceRecord", b =>
+                {
+                    b.Property<Guid>("BasketId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("basket_id");
+
+                    b.Property<string>("Cadence")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cadence");
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Etag")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("etag");
+
+                    b.Property<int>("ExpectedMax")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_max");
+
+                    b.Property<int>("ExpectedMin")
+                        .HasColumnType("integer")
+                        .HasColumnName("expected_min");
+
+                    b.Property<int>("FailCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("fail_count");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("file_name");
+
+                    b.Property<string>("FormatVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("format_version");
+
+                    b.Property<string>("HostAlt")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("host_alt");
+
+                    b.Property<DateTimeOffset?>("LastCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_checked_at");
+
+                    b.Property<string>("LastModified")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("last_modified");
+
+                    b.Property<DateTimeOffset?>("LastOkAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_ok_at");
+
+                    b.Property<string>("LicenseNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("license_note");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("Sha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<string>("SourceUrl")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("source_url");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("never")
+                        .HasColumnName("state");
+
+                    b.HasKey("BasketId")
+                        .HasName("pk_basket_sources");
+
+                    b.ToTable("basket_sources", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_basket_sources_bounds", "expected_min >= 0 AND expected_max >= expected_min");
+
+                            t.HasCheckConstraint("ck_basket_sources_state", "state IN ('ok', 'stale', 'rejected', 'failed', 'never')");
+                        });
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Paper.ConfigChangeRecord", b =>
@@ -11058,6 +11296,26 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_live_quotes_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchRecord", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Market.Baskets.Basket", null)
+                        .WithMany()
+                        .HasForeignKey("BasketId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_basket_fetches_baskets_basket_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceRecord", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Market.Baskets.Basket", null)
+                        .WithOne()
+                        .HasForeignKey("XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceRecord", "BasketId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_basket_sources_baskets_basket_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Paper.ConfigChangeRecord", b =>
