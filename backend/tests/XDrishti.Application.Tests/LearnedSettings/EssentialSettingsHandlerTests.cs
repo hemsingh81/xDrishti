@@ -22,9 +22,9 @@ public sealed class EssentialSettingsHandlerTests
         _log.ReadAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(new ChargeSheetLedger(false, null, []));
     }
 
-    private ChangeEssentialSettingHandler Change() => new(_store, _events, _events, new Microsoft.Extensions.Time.Testing.FakeTimeProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ChangeEssentialSettingHandler>.Instance);
+    private ChangeEssentialSettingHandler Change() => new(_store, new XDrishti.Application.Tests.AutoSwitch.AutoSwitchHarness().Service(), _events, _events, new Microsoft.Extensions.Time.Testing.FakeTimeProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ChangeEssentialSettingHandler>.Instance);
 
-    private ResetEssentialSettingHandler Reset() => new(_store, _events, _events, new Microsoft.Extensions.Time.Testing.FakeTimeProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ResetEssentialSettingHandler>.Instance);
+    private ResetEssentialSettingHandler Reset() => new(_store, new XDrishti.Application.Tests.AutoSwitch.AutoSwitchHarness().Service(), _events, _events, new Microsoft.Extensions.Time.Testing.FakeTimeProvider(), Microsoft.Extensions.Logging.Abstractions.NullLogger<ResetEssentialSettingHandler>.Instance);
 
     [Fact]
     public async Task The_five_rows_start_at_their_defaults_with_no_who_and_when()
@@ -65,10 +65,10 @@ public sealed class EssentialSettingsHandlerTests
     [Fact]
     public async Task Any_other_key_is_not_changed_here()
     {
-        var result = await Change().HandleAsync(new ChangeEssentialSettingCommand("auto.enabled", true, Owner, FreshPassword: true), Ct);
+        var result = await Change().HandleAsync(new ChangeEssentialSettingCommand("suggest.scope", true, Owner, FreshPassword: true), Ct);
 
         result.Error.Code.ShouldBe("settings.not_here");
-        (await _store.GetAsync("auto.enabled", Ct)).ShouldBeNull();
+        (await _store.GetAsync("suggest.scope", Ct)).ShouldBeNull();
     }
 
     [Fact]

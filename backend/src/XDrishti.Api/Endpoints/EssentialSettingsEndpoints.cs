@@ -29,7 +29,7 @@ internal sealed class EssentialSettingsEndpoints : IEndpointModule
         group.MapPut("/{key}", ChangeAsync)
             .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy)
             .WithName("ChangeEssentialSetting")
-            .WithSummary("Turn Failure notices (notices.failure) on or off as the owner. Turning it OFF needs the password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 409 settings.not_here for any other key")
+            .WithSummary("Turn Failure notices (notices.failure) or Auto (auto.enabled) on or off as the owner. Turning Failure notices OFF, or Auto ON, needs the password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 409 settings.not_here for any other key")
             .ProducesRejections(conflict: true);
 
         group.MapPost("/{key}/reset", ResetAsync)
@@ -54,7 +54,7 @@ internal sealed class EssentialSettingsEndpoints : IEndpointModule
         CancellationToken cancellationToken)
     {
         http.Response.Headers.CacheControl = "no-store";
-        var fresh = !request.On;
+        var fresh = key == "auto.enabled" ? request.On : !request.On; // Auto: ON needs the password, OFF a session (the safe direction); Failure notices: the other way round
         var owner = fresh ? await OwnerAct.FreshAsync(http, passwordCheck, request.Password, cancellationToken) : OwnerAct.SessionOwner(http);
         if (owner.IsFailure)
         {

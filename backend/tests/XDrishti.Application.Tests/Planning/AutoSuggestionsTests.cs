@@ -19,15 +19,18 @@ public sealed class AutoSuggestionsTests
     private static PlanItemRow Row(long id, TicketGroup group, string symbol, PlanEvidence evidence, params string[] reasons) =>
         new(id, 1, new NewPlanItem((int)id, group, symbol, "BUY", "ORB", new string('a', 64), "t", "s", "g", "v", reasons, evidence, []), TicketState.Proposed);
 
-    private static GetAutoSuggestionsHandler Handler(params PlanItemRow[] items)
+    private static GetAutoSuggestionsHandler Handler(params PlanItemRow[] items) => Handler(null, items);
+
+    private static GetAutoSuggestionsHandler Handler(NewPlanRun? run, params PlanItemRow[] items)
     {
         var plan = new NewPlan("k", new DateOnly(2026, 11, 9), DateTimeOffset.UnixEpoch, 1, new string('c', 64), "Cell statistics only (shrunk replayed-history estimates); tickets are conditional on tomorrow's bars.", true, "t", DateTimeOffset.UnixEpoch, [])
         {
             BasisFlags = new PlanBasisFlags(1, "normal", [], "clear", "applied", 0, "known", 1, false, "gross", []) { ScopeHash = "abc" },
         };
         var store = Substitute.For<IPlanStore>();
-        store.ListAsync(new DateOnly(2026, 11, 9), null, 1, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<PlanRow>>([new PlanRow(1, plan, PlanState.Published, 0, 0, 0)]));
+        store.ListAsync(Arg.Any<DateOnly?>(), null, 1, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<PlanRow>>([new PlanRow(1, plan, PlanState.Published, 0, 0, 0)]));
         store.ItemsAsync(1, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<PlanItemRow>>(items));
+        store.ListRunsAsync(Arg.Any<DateOnly?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<PlanRunRow>>(run is null ? [] : [new PlanRunRow(1, 1, run)]));
         return new GetAutoSuggestionsHandler(store);
     }
 
@@ -46,6 +49,28 @@ public sealed class AutoSuggestionsTests
         view.Basis.ShouldContain("tomorrow's bars");
         view.ScopeHash.ShouldBe("abc");
         view.NotSuggested.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_night_that_failed_closed_shows_no_older_plan_and_gives_the_reason()
+    {
+        var failed = new NewPlanRun(new DateOnly(2026, 11, 10), null, "failed_closed", "eod", "The end-of-day data is not fresh.", null, false, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch);
+
+        var result = await Handler(failed, Row(1, TicketGroup.Primary, "AAA", Full())).HandleAsync(new GetAutoSuggestionsQuery(null), Ct);
+
+        result.Error.Code.ShouldBe("auto.night_failed");
+        result.Error.Message.ShouldContain("end-of-day data is not fresh");
+        result.Error.Message.ShouldContain("No suggestions are shown");
+    }
+
+    [Fact]
+    public async Task A_failed_attempt_for_a_night_that_has_a_plan_does_not_hide_the_plan()
+    {
+        var failed = new NewPlanRun(new DateOnly(2026, 11, 9), null, "failed_closed", "eod", "late retry failed", null, false, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch);
+
+        var result = await Handler(failed, Row(1, TicketGroup.Primary, "AAA", Full())).HandleAsync(new GetAutoSuggestionsQuery(new DateOnly(2026, 11, 9)), Ct);
+
+        result.IsSuccess.ShouldBeTrue();
     }
 
     [Fact]
@@ -92,6 +117,7 @@ public sealed class AutoSuggestionsTests
     {
         var store = Substitute.For<IPlanStore>();
         store.ListAsync(Arg.Any<DateOnly?>(), Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<PlanRow>>([]));
+        store.ListRunsAsync(Arg.Any<DateOnly?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<IReadOnlyList<PlanRunRow>>([]));
 
         var result = await new GetAutoSuggestionsHandler(store).HandleAsync(new GetAutoSuggestionsQuery(null), Ct);
 

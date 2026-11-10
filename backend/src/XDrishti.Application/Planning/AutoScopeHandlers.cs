@@ -88,11 +88,21 @@ internal sealed class GetAutoSuggestionsHandler(IPlanStore plans) : IQueryHandle
 {
     public const string NoPlanCode = "auto.no_plan";
 
+    public const string NightFailedCode = "auto.night_failed";
+
     public async ValueTask<Result<AutoSuggestionsView>> HandleAsync(GetAutoSuggestionsQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
         var newest = await plans.ListAsync(query.ForDate, null, 1, cancellationToken);
         var plan = newest.Count == 0 ? null : newest[0];
+        var runs = await plans.ListRunsAsync(query.ForDate, 1, cancellationToken);
+        if (runs.Count > 0 && runs[0].Run.Outcome == NightlyOutcomes.FailedClosed && (plan is null || plan.Plan.ForDate < runs[0].Run.ForDate))
+        {
+            // a night that failed closed published nothing: an older plan is not shown as if it were the suggestions of that night (AU-17)
+            var failed = runs[0].Run;
+            return Result.Failure<AutoSuggestionsView>(Error.Conflict(NightFailedCode, $"The nightly run for {failed.ForDate:yyyy-MM-dd} failed closed{(failed.FailedGate is null ? string.Empty : " at " + failed.FailedGate)}: {failed.Reason} No suggestions are shown."));
+        }
+
         if (plan is null)
         {
             return Result.Failure<AutoSuggestionsView>(Error.NotFound(NoPlanCode, query.ForDate is { } d ? $"No plan is recorded for {d:yyyy-MM-dd}." : "No plan is recorded."));
