@@ -90,8 +90,9 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
             await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, $"DELETE FROM market.{table}"), PostgresErrorCodes.InsufficientPrivilege);
         }
 
+        await CheckSystemBasketCatalogueAsync(connection);
         await AsOwnerAsync(connection, "DELETE FROM market.basket_members; DELETE FROM market.baskets WHERE name = 'Probe'; DELETE FROM market.tracked_instruments");
-        (await ScalarAsync(connection, "SELECT count(*) FROM market.baskets")).ShouldBe(3L);
+        (await ScalarAsync(connection, "SELECT count(*) FROM market.baskets")).ShouldBe(29L); // the three of the design and the 26 seeded index baskets
         await ExecuteAsync(connection, "DELETE FROM market.instruments");
 
         await InsertRunAsync(connection, "00000000-0000-7000-8000-00000000b001", "running");
@@ -114,11 +115,11 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
         await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "ALTER TABLE market.basket_members ADD COLUMN x int"), PostgresErrorCodes.InsufficientPrivilege);
         await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "CREATE INDEX ix_intruder ON market.baskets (name)"), PostgresErrorCodes.InsufficientPrivilege);
 
-        foreach (var table in new[] { "instruments", "instrument_broker_ids", "master_refreshes", "tracked_instruments", "baskets", "basket_members" })
+        foreach (var table in new[] { "instruments", "instrument_broker_ids", "master_refreshes", "tracked_instruments", "baskets", "basket_members", "basket_sources", "basket_fetches" })
         {
             foreach (var privilege in new[] { "SELECT", "INSERT", "UPDATE", "DELETE" })
             {
-                var expected = privilege != "DELETE" || !KeptTables.Contains(table);
+                var expected = table == "basket_fetches" ? privilege is "SELECT" or "INSERT" : privilege != "DELETE" || !KeptTables.Contains(table); // the fetch log is insert-only
                 (await ScalarAsync(connection, $"SELECT has_table_privilege('xd_app', 'market.{table}', '{privilege}')")).ShouldBe(expected, $"{privilege} on {table}");
             }
         }
@@ -163,6 +164,8 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
         // Baskets as the runtime role: the seeded ones are listed, an add tracks the instrument and saves the membership and both audit entries, then copy, reorder, remove, archive.
         using var seeded = await client.GetAsync("/api/baskets", Ct);
         var baskets = await seeded.ReadAsync<List<XDrishti.Application.Market.Baskets.BasketView>>(Ct);
+        baskets.Count(b => b.System).ShouldBe(26); // the seeded index baskets come first, read-only
+        baskets = [.. baskets.Where(b => !b.System)];
         baskets.Select(b => b.Name).ShouldBe(["MyChoice", "MyLongTerm", "Best stocks"]);
         using var created = await client.PostJsonAsync("/api/baskets", new { name = "Probe", purpose = "watch" }, Ct);
         created.StatusCode.ShouldBe(HttpStatusCode.Created, await created.Content.ReadAsStringAsync(Ct));
@@ -187,7 +190,7 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
     /// <summary>The migration created the three baskets of the design (the values of <see cref="DefaultBaskets"/>), empty and active.</summary>
     private static async Task CheckSeededBasketsAsync(NpgsqlConnection connection)
     {
-        await using var command = new NpgsqlCommand("SELECT id, name, colour, purpose, position, description, archived_at, revision FROM market.baskets ORDER BY position", connection);
+        await using var command = new NpgsqlCommand("SELECT id, name, colour, purpose, position, description, archived_at, revision FROM market.baskets WHERE NOT system ORDER BY position", connection);
         await using var reader = await command.ExecuteReaderAsync(Ct);
         var rows = new List<(Guid Id, string Name, string Colour, string Purpose, int Position)>();
         while (await reader.ReadAsync(Ct))
@@ -199,6 +202,21 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
         }
 
         rows.ShouldBe([.. DefaultBaskets.All.Select(b => (b.Id, b.Name, b.Colour, b.Purpose.ToCode(), b.Position))]);
+    }
+
+    /// <summary>The migration seeds the 26 index lists, every source disabled; the fetch log accepts inserts but no update or delete for the runtime role.</summary>
+    private static async Task CheckSystemBasketCatalogueAsync(NpgsqlConnection connection)
+    {
+        (await ScalarAsync(connection, "SELECT count(*) FROM market.basket_sources")).ShouldBe(26L);
+        (await ScalarAsync(connection, "SELECT count(*) FROM market.basket_sources WHERE enabled OR state <> 'never'")).ShouldBe(0L);
+        (await ScalarAsync(connection, "SELECT count(*) FROM market.baskets WHERE kind = 'index' AND system")).ShouldBe(26L);
+        (await ScalarAsync(connection, "SELECT count(*) FROM market.basket_sources WHERE source_url NOT LIKE 'https://nsearchives.nseindia.com/content/indices/%' AND source_url NOT LIKE 'https://niftyindices.com/IndexConstituent/%'")).ShouldBe(0L);
+        (await ScalarAsync(connection, "SELECT expected_min || '-' || expected_max FROM market.basket_sources WHERE file_name = 'ind_nifty50list.csv'")).ShouldBe("50-50");
+        await ExecuteAsync(connection, "INSERT INTO market.basket_fetches (id, basket_id, fetched_at, rows, outcome, added, removed, unmatched, warnings, forced, actor) SELECT '00000000-0000-7000-8000-00000000d001', basket_id, now(), 0, 'failed', 0, 0, 0, '[]', false, 'probe' FROM market.basket_sources LIMIT 1");
+        await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "UPDATE market.basket_fetches SET rows = 1"), PostgresErrorCodes.InsufficientPrivilege);
+        await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "DELETE FROM market.basket_fetches"), PostgresErrorCodes.InsufficientPrivilege);
+        await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "INSERT INTO market.baskets (id, name, colour, purpose, position, created_at, revision, kind, system) VALUES ('00000000-0000-7000-8000-00000000d002', 'Odd', '#112233', 'watch', 0, now(), 0, 'index', false)"), PostgresErrorCodes.CheckViolation);
+        await AsOwnerAsync(connection, "DELETE FROM market.basket_fetches");
     }
 
     private static async Task CheckBasketRulesAsync(NpgsqlConnection connection)

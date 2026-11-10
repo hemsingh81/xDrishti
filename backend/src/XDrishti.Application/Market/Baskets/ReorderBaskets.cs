@@ -32,7 +32,7 @@ internal sealed class ReorderBasketsHandler(
 
         for (var attempt = 0; attempt < BasketChecks.Attempts; attempt++)
         {
-            var active = (await store.ListActiveAsync(cancellationToken)).ToDictionary(b => b.Id);
+            var active = (await store.ListActiveAsync(cancellationToken)).Where(b => !b.IsSystem).ToDictionary(b => b.Id);
             if (active.Count != ids.Value.Length || ids.Value.Any(id => !active.ContainsKey(id)))
             {
                 return Result.Failure(attempt == 0

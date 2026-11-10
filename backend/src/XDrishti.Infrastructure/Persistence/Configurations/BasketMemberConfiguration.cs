@@ -14,12 +14,17 @@ internal sealed class BasketMemberConfiguration : IEntityTypeConfiguration<Baske
             t.HasCheckConstraint("ck_basket_members_dates", "valid_to IS NULL OR valid_to >= valid_from");
             t.HasCheckConstraint("ck_basket_members_removed_by", "(valid_to IS NULL) = (removed_by IS NULL)");
             t.HasCheckConstraint("ck_basket_members_position", "position >= 0");
+            t.HasCheckConstraint("ck_basket_members_provenance", "provenance IN ('fetched', 'imported', 'recomputed', 'derived', 'manual')");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();
         builder.Property(x => x.Position).IsRequired();
         builder.Property(x => x.ValidFrom).IsRequired();
         builder.Property(x => x.ValidTo);
+        builder.Property(x => x.Provenance).HasMaxLength(10).HasDefaultValue(BasketProvenance.Manual).IsRequired();
+        builder.Property(x => x.DetectedAt);
+        builder.Property(x => x.SourceRef);
+        builder.Property(x => x.SourceKind).HasMaxLength(20);
         builder.Property(x => x.Note).HasMaxLength(BasketLimits.MaxNoteLength);
         builder.Property(x => x.AddedBy).HasMaxLength(BasketMember.MaxActorLength).IsRequired();
         builder.Property(x => x.RemovedBy).HasMaxLength(BasketMember.MaxActorLength);

@@ -89,7 +89,7 @@ internal sealed class TransferBasketMembersHandler(
             }
             else
             {
-                var source = await BasketChecks.EditableAsync(store, portfolio, input.FromBasketId, cancellationToken);
+                var source = await BasketChecks.EditableAsync(store, portfolio, input.FromBasketId, cancellationToken, allowSystem: !moving);
                 if (source.IsFailure)
                 {
                     return Result.Failure<TransferResult>(source.Error);

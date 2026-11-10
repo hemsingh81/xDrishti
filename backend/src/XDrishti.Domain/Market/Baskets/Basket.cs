@@ -17,9 +17,11 @@ public sealed class Basket : Entity<Guid>
     private static readonly SearchValues<char> HexDigits = SearchValues.Create("0123456789abcdefABCDEF");
 
     // Parameter names match property names so EF Core can bind this constructor when materialising.
-    private Basket(Guid id, string name, string colour, BasketPurpose purpose, string? description, int position, DateTimeOffset createdAt, DateTimeOffset? archivedAt, int revision)
+    private Basket(Guid id, string name, string colour, BasketPurpose purpose, string? description, int position, DateTimeOffset createdAt, DateTimeOffset? archivedAt, int revision, string kind, bool isSystem)
         : base(id)
     {
+        Kind = kind;
+        IsSystem = isSystem;
         Name = name;
         Colour = colour;
         Purpose = purpose;
@@ -49,6 +51,12 @@ public sealed class Basket : Entity<Guid>
 
     /// <summary>Concurrency token: raised by every change of the basket or of its members.</summary>
     public int Revision { get; private set; }
+
+    /// <summary>manual · index · list · derived (<see cref="BasketKinds"/>); the portfolio buckets are computed, never stored.</summary>
+    public string Kind { get; private set; }
+
+    /// <summary>True for the stored system baskets (kind other than manual): read-only for the owner, membership comes from a source (BK-00).</summary>
+    public bool IsSystem { get; private set; }
 
     public bool IsArchived => ArchivedAt is not null;
 
@@ -103,7 +111,18 @@ public sealed class Basket : Entity<Guid>
     public static Basket Create(BasketDetails details, int position, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(details);
-        return new Basket(Guid.CreateVersion7(now), details.Name, details.Colour, details.Purpose, details.Description, position, now, null, 0);
+        return new Basket(Guid.CreateVersion7(now), details.Name, details.Colour, details.Purpose, details.Description, position, now, null, 0, BasketKinds.Manual, false);
+    }
+
+    /// <summary>A stored system basket (kind index, list or derived): read-only for the owner; its membership comes from a source (BK-00). Normally created by a migration; this is for code and tests that must make one.</summary>
+    public static Basket CreateSystem(string name, string kind, DateTimeOffset now)
+    {
+        if (kind is not (BasketKinds.Index or BasketKinds.List or BasketKinds.Derived))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "A system basket is of kind index, list or derived.");
+        }
+
+        return new Basket(Guid.CreateVersion7(now), name, "#64748b", BasketPurpose.Watch, null, 0, now, null, 0, kind, true);
     }
 
     /// <summary>Applies new attributes; false (and no new revision) when nothing differs. The name is compared exactly, so a change of case counts.</summary>

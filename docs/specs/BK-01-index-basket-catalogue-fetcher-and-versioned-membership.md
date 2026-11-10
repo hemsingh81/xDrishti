@@ -93,6 +93,7 @@ NSE/NSE Indices terms of use and redistribution rights; acceptance of a non-brow
 - **AC 9 retry:** 4 attempts total: immediately, then after 5, 30 and 120 minutes; `basket_sources` gains `next_attempt_at timestamptz null` and `fail_count int not null default 0` (reset on success); 403/429 sets `next_attempt_at` +24 h.
 - **Retired or untracked but still listed:** an instrument retired in the master that NSE still lists stays a member, flagged `unmatched = retired` with its retired date in the fetch record and the members response; membership is never closed silently by the master's retirement, only by a fetch that no longer lists it.
 - **Contract:** `GET /api/baskets` adds `fetchEnabled` and `derivedEnabled` (booleans, owner-visible) so clients know the setting state without a new endpoint.
+- **Moved to BK-04:** `fetchEnabled` and `derivedEnabled` on `GET /api/baskets` (the list stays an array; a new endpoint or envelope is the screen story's call).
 - Size stays 4 d (the additions are small).
 
 ## Review 2026-11-10

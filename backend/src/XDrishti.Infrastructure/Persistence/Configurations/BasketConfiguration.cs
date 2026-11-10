@@ -17,6 +17,8 @@ internal sealed class BasketConfiguration : IEntityTypeConfiguration<Basket>
             t.HasCheckConstraint("ck_baskets_purpose", "purpose IN ('trading', 'long_term', 'watch')");
             t.HasCheckConstraint("ck_baskets_colour", "colour ~ '^#[0-9a-f]{6}$'");
             t.HasCheckConstraint("ck_baskets_position", "position >= 0");
+            t.HasCheckConstraint("ck_baskets_kind", "kind IN ('manual', 'index', 'list', 'derived')");
+            t.HasCheckConstraint("ck_baskets_kind_system", "(kind = 'manual') = (NOT system)");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();
@@ -25,6 +27,8 @@ internal sealed class BasketConfiguration : IEntityTypeConfiguration<Basket>
         builder.Property(x => x.Colour).HasMaxLength(7).IsRequired();
         builder.Property(x => x.Purpose).HasConversion(PurposeCodes).HasMaxLength(16).IsRequired();
         builder.Property(x => x.Description).HasMaxLength(BasketLimits.MaxDescriptionLength);
+        builder.Property(x => x.Kind).HasMaxLength(10).HasDefaultValue(BasketKinds.Manual).IsRequired();
+        builder.Property(x => x.IsSystem).HasColumnName("system").HasDefaultValue(false).IsRequired();
         builder.Property(x => x.Position).IsRequired();
         builder.Property(x => x.CreatedAt).IsRequired();
         builder.Property(x => x.ArchivedAt);

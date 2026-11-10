@@ -88,4 +88,30 @@ public sealed class BasketMemberTests
         BasketMember.CheckNote(new string('a', 500)).IsSuccess.ShouldBeTrue();
         BasketMember.CheckNote(new string('a', 501)).Error.Fields!.Single().Field.ShouldBe("note");
     }
+
+    [Fact]
+    public void A_fetched_member_keeps_its_provenance_detection_instant_and_fetch()
+    {
+        var fetch = Guid.CreateVersion7();
+        var from = new DateTimeOffset(2026, 10, 23, 0, 0, 0, TimeSpan.FromMinutes(330));
+
+        var member = BasketMember.Fetched(Guid.CreateVersion7(), Guid.CreateVersion7(), 3, from, Now, fetch, "system:x");
+
+        (member.Provenance, member.ValidFrom, member.DetectedAt, member.SourceRef, member.SourceKind, member.Position).ShouldBe(("fetched", from, Now, fetch, "fetch", 3));
+    }
+
+    [Fact]
+    public void Valid_to_is_exclusive_of_the_day_it_ends_and_valid_from_is_inclusive()
+    {
+        var oct1 = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromMinutes(330));
+        var old = BasketMember.Fetched(Guid.CreateVersion7(), Guid.CreateVersion7(), 0, oct1.AddYears(-1), Now, Guid.CreateVersion7(), "s");
+        old.Remove("s", oct1);
+        var fresh = BasketMember.Fetched(Guid.CreateVersion7(), Guid.CreateVersion7(), 0, oct1, Now, Guid.CreateVersion7(), "s");
+
+        var sep30 = BasketMember.CutoffAfter(new DateOnly(2026, 9, 30));
+        var oct1Cut = BasketMember.CutoffAfter(new DateOnly(2026, 10, 1));
+
+        (old.WasMemberAt(sep30), fresh.WasMemberAt(sep30)).ShouldBe((true, false));
+        (old.WasMemberAt(oct1Cut), fresh.WasMemberAt(oct1Cut)).ShouldBe((false, true));
+    }
 }

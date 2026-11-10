@@ -4,6 +4,7 @@ using XDrishti.Api.Auth;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Baskets;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Market.Baskets;
 
 namespace XDrishti.Api.Endpoints;
 
@@ -41,6 +42,25 @@ internal sealed class BasketsEndpoints : IEndpointModule
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/system/fetch", FetchSystemAsync)
+            .RequireStepUp()
+            .WithName("FetchSystemBaskets")
+            .WithSummary("Owner act, needs step-up: fetch the index lists now (the given basketIds that are already on, or every enabled source; fetch-now never turns a source on) and return one outcome per file; force overrides only the tripwire and is recorded. 409 baskets.fetch_disabled while Baskets:System:Fetch:Enabled is off (no request is made)")
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapGet("/{id:guid}/source", GetSourceAsync)
+            .WithName("GetBasketSource")
+            .WithSummary("The source of a system basket: file name, state (never, ok, stale, rejected, failed), last checks and its last 20 fetch outcomes (no raw file); 404 baskets.not_found for a basket without one")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPut("/{id:guid}/source", SwitchSourceAsync)
+            .RequireStepUp()
+            .WithName("SwitchBasketSource")
+            .WithSummary("Owner act, needs step-up, both directions: turn the fetch of this system basket's file on or off ({enabled}); audited with the fetch settings, idempotent, makes no request; 400 baskets.invalid without enabled, 404 baskets.not_found for a basket without a source")
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapPut("/{id:guid}", UpdateAsync)
             .WithName("UpdateBasket")
@@ -140,6 +160,44 @@ internal sealed class BasketsEndpoints : IEndpointModule
     {
         var result = await handler.HandleAsync(new ReorderBasketsCommand(input ?? new BasketOrderInput(null), http.GetActor()), cancellationToken);
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Ok<BasketFetchRun>, ProblemHttpResult>> FetchSystemAsync(
+        HttpContext http,
+        ICommandHandler<RunBasketFetchCommand, BasketFetchRun> handler,
+        CancellationToken cancellationToken,
+        [FromBody] FetchNowInput? input = null)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var result = await handler.HandleAsync(new RunBasketFetchCommand(input?.BasketIds, input?.Force ?? false, http.GetActor()), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<BasketSourceView>, ProblemHttpResult>> SwitchSourceAsync(
+        Guid id,
+        HttpContext http,
+        ICommandHandler<SetBasketSourceEnabledCommand, BasketSourceView> handler,
+        CancellationToken cancellationToken,
+        [FromBody] SourceSwitchInput? input = null)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        if (input?.Enabled is not { } enabled)
+        {
+            return ProblemResults.From(BasketErrors.Invalid("enabled", "Send enabled: true or false."), http);
+        }
+
+        var result = await handler.HandleAsync(new SetBasketSourceEnabledCommand(id, enabled, http.GetActor()), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<BasketSourceView>, ProblemHttpResult>> GetSourceAsync(
+        Guid id,
+        HttpContext http,
+        IQueryHandler<GetBasketSourceQuery, Result<BasketSourceView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetBasketSourceQuery(id), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<BasketMembers>, ProblemHttpResult>> GetMembersAsync(

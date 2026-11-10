@@ -12,12 +12,18 @@ public static class BasketErrors
     public const string ConflictCode = "baskets.conflict";
     public const string TooManyMembersCode = "baskets.too_many_members";
     public const string SystemCode = "baskets.system";
+    public const string FetchDisabledCode = "baskets.fetch_disabled";
+    public const string FetchRunningCode = "baskets.fetch_running";
 
     public static readonly Error NotFound = Error.NotFound(NotFoundCode, "The basket does not exist.");
 
     public static readonly Error Archived = Error.Conflict(ArchivedCode, "The basket is archived, so it cannot be changed.");
 
-    public static readonly Error System = Error.Conflict(SystemCode, "A portfolio basket is maintained automatically from the account's holdings, so it cannot be changed here.");
+    public static readonly Error System = Error.Conflict(SystemCode, "A system basket is maintained automatically (from the account's holdings or from a published list), so it cannot be changed here.");
+
+    public static readonly Error FetchDisabled = Error.Conflict(FetchDisabledCode, "Fetching the system baskets is switched off (Baskets:System:Fetch:Enabled).");
+
+    public static readonly Error FetchRunning = Error.Conflict(FetchRunningCode, "A fetch of the system baskets is running already.");
 
     public static readonly Error Conflict = Error.Conflict(ConflictCode, "The basket was changed at the same time. Reload it and try again.");
 

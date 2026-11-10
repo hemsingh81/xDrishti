@@ -32,6 +32,11 @@ internal sealed class ArchiveBasketHandler(
                 return Result.Failure(await portfolio.ExistsAsync(command.Id, cancellationToken) ? BasketErrors.System : BasketErrors.NotFound);
             }
 
+            if (basket.IsSystem)
+            {
+                return Result.Failure(BasketErrors.System);
+            }
+
             var now = clock.GetUtcNow();
             var members = (await store.ListActiveMembersAsync(basket.Id, cancellationToken)).Count;
             if (!basket.Archive(now))
