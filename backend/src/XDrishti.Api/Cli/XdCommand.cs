@@ -199,6 +199,11 @@ internal static class XdCommand
             return await PlanRunCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "auto" && args[1] == "check")
+        {
+            return await AutoCheckCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "exec" && args[1] == "phase-check")
         {
             return await ExecPhaseCheckCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);

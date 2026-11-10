@@ -12,6 +12,7 @@ public static class SettingsCatalogRegistration
         services.AddScoped<IQueryHandler<GetEssentialSettingsQuery, EssentialSettingsView>, GetEssentialSettingsHandler>();
         services.AddScoped<ICommandHandler<ChangeEssentialSettingCommand, EssentialSettingView>, ChangeEssentialSettingHandler>();
         services.AddScoped<ICommandHandler<ResetEssentialSettingCommand, EssentialSettingView>, ResetEssentialSettingHandler>();
+        services.AddScoped<IQueryHandler<XDrishti.Application.Auto.EvaluateAutoProgrammeCheckQuery, XDrishti.Domain.Common.Result<XDrishti.Application.Auto.AutoProgrammeCheckView>>, XDrishti.Application.Auto.EvaluateAutoProgrammeCheckHandler>(); // the AU programme check reads the catalog, so it lives with its source in the Api only (AU-19, ADR 0253)
         return services;
     }
 }
