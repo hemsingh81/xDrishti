@@ -108,6 +108,25 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
         return ExplainScript?.Invoke(input, requests) ?? new ExplainResult(Script?.Invoke(input) ?? Default(input), new Dictionary<string, TradeExplanation>());
     }
 
+    /// <summary>When true the replay with a token spins (CPU bound, no await) until the token is cancelled, as a long real replay does.</summary>
+    public bool SpinUntilCancelled { get; set; }
+
+    public InstrumentReplay ReplayUntilCancelled(IPreparedStrategy strategy, InstrumentReplayInput input, CancellationToken cancellationToken)
+    {
+        if (SpinUntilCancelled)
+        {
+            Replays.Add(input);
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                Thread.SpinWait(100);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        return Replay(strategy, input);
+    }
+
     public InstrumentReplay Replay(IPreparedStrategy strategy, InstrumentReplayInput input)
     {
         Replays.Add(input);

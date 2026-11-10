@@ -36,17 +36,23 @@ public static class InstrumentReplayer
     /// <exception cref="InvalidOperationException">The bars are not strictly ascending (two equal epochs or a descending pair); the message names the instrument.</exception>
     public static InstrumentReplay Replay(PreparedStrategy strategy, InstrumentReplayInput input) => ReplayCore(strategy, input, null);
 
+    /// <summary>As <see cref="Replay"/>, stopping with <see cref="OperationCanceledException"/> when the token is cancelled (checked every few thousand minutes of the scan; AU-12).</summary>
+    public static InstrumentReplay ReplayUntilCancelled(PreparedStrategy strategy, InstrumentReplayInput input, CancellationToken cancellationToken) => ReplayMembersUntilCancelled(strategy, input, null, cancellationToken).Members[0];
+
     /// <summary>
     /// Replays a prepared comparison over the instrument (P4-05): one scan and one replay record for each candidate, each as the replay of that candidate alone would give it except that a swing side is not gated (D4); the number of entries the gate
     /// would have skipped is in <see cref="ComparisonReplay.GatedBlocked"/>. A plain strategy gives one member.
     /// </summary>
     /// <exception cref="ArgumentNullException">An argument is null.</exception>
-    /// <exception cref="ArgumentException">As <see cref="Replay"/>.</exception>
-    /// <exception cref="InvalidOperationException">As <see cref="Replay"/>.</exception>
+    /// <exception cref="ArgumentException">As <see cref="Replay(PreparedStrategy, InstrumentReplayInput)"/>.</exception>
+    /// <exception cref="InvalidOperationException">As <see cref="Replay(PreparedStrategy, InstrumentReplayInput)"/>.</exception>
     public static ComparisonReplay ReplayAll(PreparedStrategy strategy, InstrumentReplayInput input) => ReplayMembers(strategy, input, null);
 
+    /// <summary>As <see cref="ReplayAll"/>, stopping when the token is cancelled.</summary>
+    public static ComparisonReplay ReplayAllUntilCancelled(PreparedStrategy strategy, InstrumentReplayInput input, CancellationToken cancellationToken) => ReplayMembersUntilCancelled(strategy, input, null, cancellationToken);
+
     /// <summary>
-    /// The replay of <see cref="Replay"/> and, for each request whose decision is a candidate of the scan (same decision instant and side), the conditions of the side at that decision with the values they read, taken from the trace the scanner
+    /// The replay of <see cref="Replay(PreparedStrategy, InstrumentReplayInput)"/> and, for each request whose decision is a candidate of the scan (same decision instant and side), the conditions of the side at that decision with the values they read, taken from the trace the scanner
     /// made when it decided (P3-04d, D2): the same frame and the same bar list as the trade, no second evaluation. A request that matches no candidate has no entry.
     /// </summary>
     /// <exception cref="ArgumentNullException">An argument is null.</exception>
@@ -124,7 +130,10 @@ public static class InstrumentReplayer
     internal static InstrumentReplay ReplayCore(PreparedStrategy strategy, InstrumentReplayInput input, Action<IReadOnlyList<Bar>, SimulationResult>? observer) => ReplayMembers(strategy, input, observer).Members[0];
 
     /// <summary>The replay of every candidate of the strategy, with the observer of <see cref="ReplayCore"/> given the result of each candidate's call.</summary>
-    internal static ComparisonReplay ReplayMembers(PreparedStrategy strategy, InstrumentReplayInput input, Action<IReadOnlyList<Bar>, SimulationResult>? observer)
+    internal static ComparisonReplay ReplayMembers(PreparedStrategy strategy, InstrumentReplayInput input, Action<IReadOnlyList<Bar>, SimulationResult>? observer) => ReplayMembersUntilCancelled(strategy, input, observer, CancellationToken.None);
+
+    /// <summary>The replay of every candidate, looking at the token during the scan (see <see cref="ReplayUntilCancelled"/>).</summary>
+    internal static ComparisonReplay ReplayMembersUntilCancelled(PreparedStrategy strategy, InstrumentReplayInput input, Action<IReadOnlyList<Bar>, SimulationResult>? observer, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(strategy);
         ArgumentNullException.ThrowIfNull(input);
@@ -174,7 +183,7 @@ public static class InstrumentReplayer
             return Same(new InstrumentReplay(Record(input, facts, SkipReason.NoRunnableSessions, null, Scanned.None), [], []), count);
         }
 
-        var members = Scan(strategy, input, scan, observer);
+        var members = Scan(strategy, input, scan, observer, cancellationToken);
         var replays = new List<InstrumentReplay>(count);
         foreach (var (scanned, trades, openAtEnd, _) in members)
         {
@@ -252,7 +261,7 @@ public static class InstrumentReplayer
     private static List<AppliedAdjustment> AdjustmentsOf(InstrumentReplayInput input, DateOnly firstBar) =>
         [.. input.Factors.ActionsAfter(firstBar).Select(a => new AppliedAdjustment(a.ExDate, a.Kind, a.Numerator, a.Denominator, a.Factor, input.CsvAdjustedThrough is { } through && a.ExDate <= through))];
 
-    private static List<(Scanned Scanned, List<SimTrade> Trades, List<SimTrade> OpenAtEnd, long Gated)> Scan(PreparedStrategy strategy, InstrumentReplayInput input, SessionScan scan, Action<IReadOnlyList<Bar>, SimulationResult>? observer)
+    private static List<(Scanned Scanned, List<SimTrade> Trades, List<SimTrade> OpenAtEnd, long Gated)> Scan(PreparedStrategy strategy, InstrumentReplayInput input, SessionScan scan, Action<IReadOnlyList<Bar>, SimulationResult>? observer, CancellationToken cancellationToken)
     {
         var bars = ReplayBars.Build(input.RawBars, scan.Ran, input.Factors);
         var fed = bars.Fed;
@@ -285,7 +294,7 @@ public static class InstrumentReplayer
             var from = starts[firstSession];
             var count = starts[endSession] - from;
             IReadOnlyList<Bar> list = firstSession == 0 && endSession == ran.Count ? fed : new BarSegment(fed, from, count);
-            var segmentRun = RunSegment(strategy, instrument, list, input);
+            var segmentRun = RunSegment(strategy, instrument, list, input, cancellationToken);
             var results = segmentRun.Members;
             DateOnly? flaggedDate = s == 0 ? null : ran[firstSession].Date;
             for (var m = 0; m < results.Count; m++)
@@ -386,18 +395,18 @@ public static class InstrumentReplayer
     }
 
     /// <summary>One call of the simulator on a segment: the results of the one candidate of a plain strategy, or of every candidate of a comparison (one scan).</summary>
-    private static ComparisonResult RunSegment(PreparedStrategy strategy, InstrumentRef instrument, IReadOnlyList<Bar> list, InstrumentReplayInput input)
+    private static ComparisonResult RunSegment(PreparedStrategy strategy, InstrumentRef instrument, IReadOnlyList<Bar> list, InstrumentReplayInput input, CancellationToken cancellationToken)
     {
         var context = strategy.ReadsContext ? ContextReader.Of(input.ContextDays) : null;   // the replay has already skipped an instrument whose strategy has no context
         if (strategy.Comparison is { } comparison)
         {
-            var many = comparison.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays, input.TierOn, input.TurnoverOn);
+            var many = comparison.RunUntilCancelled(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays, input.TierOn, input.TurnoverOn, cancellationToken);
             return many.IsFailure
                 ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + many.Error.Code + ": " + many.Error.Message)
                 : many.Value;
         }
 
-        var run = strategy.Simulator.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays, input.TierOn, input.TurnoverOn);
+        var run = strategy.Simulator.RunUntilCancelled(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs), context, input.Events, input.ResultsDays, input.TierOn, input.TurnoverOn, cancellationToken);
         return run.IsFailure
             ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + run.Error.Code + ": " + run.Error.Message)
             : new ComparisonResult([run.Value], run.Value.Scans);

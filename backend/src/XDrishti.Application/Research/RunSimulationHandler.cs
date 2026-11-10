@@ -293,7 +293,7 @@ internal sealed class RunSimulationHandler(
 
             var many = input is null
                 ? new ComparisonReplay(candidates.Select(_ => new InstrumentReplay(InstrumentRun.NotFound(id), [], [])).ToList(), candidates.Select(_ => 0L).ToList())
-                : candidates.Count == 1 ? new ComparisonReplay([engine.Replay(prepared.Value, input)], [0L]) : engine.ReplayComparison(prepared.Value, input);
+                : candidates.Count == 1 ? new ComparisonReplay([engine.ReplayUntilCancelled(prepared.Value, input, cancellationToken)], [0L]) : engine.ReplayComparisonUntilCancelled(prepared.Value, input, cancellationToken);
             replayTime += time.GetElapsedTime(replayStart);
             if (many.Members[0].Record.Skipped is { } reason)
             {
@@ -336,7 +336,8 @@ internal sealed class RunSimulationHandler(
                 costContext is null ? null : CostRecord.Of(costContext),
                 days is null ? null : ContextFingerprint.Of(days, request.To),
                 events is null ? null : new EventFilterRecord(events.Sha256, events.RowCount, events.LagMinutes, EventCalendarSnapshot.RuleVersion),
-                resultsDays is null ? null : new ResultsDaysRecord(resultsDays.Calendar?.Sha256 ?? "-", resultsDays.Calendar?.RowCount ?? 0, resultsDays.FilingsSha256, resultsDays.FilingCount, resultsDays.LagMinutes, ResultsDaySeries.Version, resultsDays.Surprises?.Sha256, resultsDays.Surprises?.Rows ?? 0, resultsDays.Surprises is null ? null : SurpriseInputs.Version, resultsDays.Surprises?.UnverifiedRows ?? 0, resultsDays.Surprises?.Seasons ?? 0, resultsDays.Surprises?.ThinSeasons ?? 0, missed.Missed, missed.Total));
+                resultsDays is null ? null : new ResultsDaysRecord(resultsDays.Calendar?.Sha256 ?? "-", resultsDays.Calendar?.RowCount ?? 0, resultsDays.FilingsSha256, resultsDays.FilingCount, resultsDays.LagMinutes, ResultsDaySeries.Version, resultsDays.Surprises?.Sha256, resultsDays.Surprises?.Rows ?? 0, resultsDays.Surprises is null ? null : SurpriseInputs.Version, resultsDays.Surprises?.UnverifiedRows ?? 0, resultsDays.Surprises?.Seasons ?? 0, resultsDays.Surprises?.ThinSeasons ?? 0, missed.Missed, missed.Total),
+                Purpose: request.Purpose);
             firstHeader ??= header;
             runs.Add(RunAssembler.Assemble(header, replays[k]));
         }

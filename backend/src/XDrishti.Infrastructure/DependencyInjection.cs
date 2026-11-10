@@ -32,6 +32,7 @@ using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.Shadow;
+using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Application.Abstractions.Ticks;
 using XDrishti.Application.Execution;
 using XDrishti.Application.Market.Bars.Dhan;
@@ -173,6 +174,11 @@ public static class DependencyInjection
         services.AddScoped<CapabilityLogStore>(); // the owner's switches of the capabilities, insert-only (P8-18 Part A, ADR 0128)
         services.AddScoped<ICapabilityLog>(sp => sp.GetRequiredService<CapabilityLogStore>());
         services.AddScoped<ICapabilityLogWriter>(sp => sp.GetRequiredService<CapabilityLogStore>());
+        services.AddScoped<ISimAllStore, XDrishti.Infrastructure.SimAll.SimAllStore>(); // the simulate-everything job: its tables are the queue and the progress (AU-12, ADR 0248)
+        services.AddScoped<ISimAllUniverse, XDrishti.Infrastructure.SimAll.SimAllUniverse>();
+        services.AddScoped<ISimAllBackfillGate, XDrishti.Infrastructure.SimAll.SimAllBackfillGate>();
+        services.AddSingleton<IFreeDiskProbe, XDrishti.Infrastructure.SimAll.FreeDiskProbe>();
+        services.AddScoped<ITrainingRunReader, XDrishti.Infrastructure.SimAll.TrainingRunReader>(); // the one NON-evidence reader of training runs (ADR 0243 point 7)
         services.AddScoped<IExperimentJobStore, ExperimentJobStore>(); // the replay jobs the owner started: table is the queue (P8-18 Part B, ADR 0129)
         services.AddScoped<IHeavyJobProbe, LabHeavyJobProbe>();
         services.AddScoped<IReplayStrategySource, StoredReplayStrategySource>();

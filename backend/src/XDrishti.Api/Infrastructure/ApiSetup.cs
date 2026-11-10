@@ -25,6 +25,7 @@ using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Learning.Jobs;
 using XDrishti.Application.Live.Push;
 using XDrishti.Application.SettingsCatalog;
+using XDrishti.Application.SimAll;
 using XDrishti.Strategies.Compilation;
 
 namespace XDrishti.Api.Infrastructure;
@@ -109,6 +110,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, CellsEndpoints>();
         services.AddSingleton<IEndpointModule, ModelsEndpoints>();
         services.AddSingleton<IEndpointModule, ExperimentsEndpoints>();
+        services.AddSingleton<IEndpointModule, SimAllEndpoints>(); // the simulate-everything job: start, progress, pause, resume, cancel (AU-12, ADR 0248); owner session only, writes training runs only
         services.AddSingleton<IEndpointModule, ExperimentJobsEndpoints>(); // the replay job started from the Learning area (P8-18 Part B, ADR 0129): capability off by default, fresh password, never applies
         services.AddSingleton<IEndpointModule, OwnerMovesEndpoints>(); // the lesson, hypothesis and revert moves of the owner-acts forms (P8-19, ADR 0130): capability off by default, fresh password, writes one row
         services.AddSingleton<IEndpointModule, ExportsEndpoints>(); // saving a research table as a file (P8-20, ADR 0131): capability off by default, audited before the file is given, nothing kept
@@ -182,6 +184,7 @@ internal static class ApiSetup
         services.AddLabRuns();
         services.AddConfidence();
         services.AddExperimentJobs();
+        services.AddSimAllJob();
         services.AddLiveHub();
         return services;
     }
@@ -259,6 +262,15 @@ internal static class ApiSetup
         services.AddSingleton<IRunRecordWriter, ExportRunRecordWriter>();
         services.Replace(ServiceDescriptor.Singleton<ILabProgress, HubLabProgress>());
         services.AddHostedService<LabRunService>();
+    }
+
+    /// <summary>The simulate-everything job (AU-12, ADR 0248): the runner of the Application layer in a hosted service of this host, and the <c>Simulate</c> section as settings (a value out of range stops the host at start). No job exists until the owner starts one.</summary>
+    private static void AddSimAllJob(this IServiceCollection services)
+    {
+        services.AddOptions<SimAllSettings>().BindConfiguration(SimAllSettings.Section).ValidateDataAnnotations().ValidateOnStart();
+        services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<SimAllSettings>>().Value));
+        services.AddSimAllRunner();
+        services.AddHostedService<SimAllService>();
     }
 
     /// <summary>

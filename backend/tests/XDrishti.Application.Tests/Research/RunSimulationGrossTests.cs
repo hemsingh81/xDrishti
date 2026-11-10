@@ -35,4 +35,19 @@ public sealed class RunSimulationGrossTests
         CanonicalText.Sha256Hex(keyText).ShouldBe(run.RunKey);
         RunLabels.Of(run, FillRules.Default).Lines[3].ShouldBe("costs: none");
     }
+
+    [Fact]
+    public async Task A_cancelled_token_stops_a_cpu_bound_replay_inside_the_engine()
+    {
+        var fixture = new RunFixture();
+        var abb = fixture.Add("NSE:ABB", RunFixture.ThreeDays());
+        fixture.Engine.SpinUntilCancelled = true;
+        using var cts = new CancellationTokenSource();
+        var run = Task.Run(async () => await fixture.RunAsync(RunFixture.List([abb], RunFixture.D1, RunFixture.D3), cts.Token), CancellationToken.None);
+
+        SpinWait.SpinUntil(() => fixture.Engine.Replays.Count > 0, TimeSpan.FromSeconds(30)).ShouldBeTrue("the replay started");
+        await cts.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(async () => await run.WaitAsync(TimeSpan.FromSeconds(30), Ct));
+    }
 }

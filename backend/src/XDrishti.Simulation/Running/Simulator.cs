@@ -31,6 +31,9 @@ namespace XDrishti.Simulation.Running;
 /// </summary>
 public sealed class Simulator
 {
+    /// <summary>How often (a power of two minus one) the scan looks at the cancellation token.</summary>
+    internal const int CancelMask = 4095;
+
     private static readonly SourceSpan NoText = new(0, 0, 1, 1);
 
     private readonly string _strategyId;
@@ -172,7 +175,11 @@ public sealed class Simulator
     /// <param name="turnoverOn">The 20-day median traded value in rupees on an entry date (CF-05, ADR 0230); read when a side names <c>min_turnover</c>; null or a null answer blocks the entry.</param>
     /// <param name="tierOn">The liquidity tier of the instrument on an entry date (CF-05, D2); read only when the fill rules ask for conservative slippage, and null then excludes every trade.</param>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null)
+    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null) =>
+        RunUntilCancelled(instrument, bars, tick, calendar, quantity, context, events, resultsDays, tierOn, turnoverOn, CancellationToken.None);
+
+    /// <summary>As <c>Run</c>, looking at <paramref name="cancellationToken"/> every few thousand minutes of the scan; a stop raises <see cref="OperationCanceledException"/> (AU-12). A separate overload so that existing callers are unchanged.</summary>
+    public Result<SimulationResult> RunUntilCancelled(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, ScanContext? context, EventCalendarSnapshot? events, ResultsDayInputs? resultsDays, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
@@ -211,6 +218,11 @@ public sealed class Simulator
             var scanner = created.Value;
             for (var i = 0; i < bars.Count; i++)
             {
+                if ((i & CancelMask) == 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested(); // a stop is seen every few thousand minutes, so a long replay can be abandoned (AU-12)
+                }
+
                 scanner.Step(bars[i]);
             }
 
