@@ -1,3 +1,5 @@
+using XDrishti.Domain.Research;
+
 namespace XDrishti.Application.Abstractions.SimAll;
 
 /// <summary>A stored training run as the learning job may see it.</summary>
@@ -14,4 +16,7 @@ public interface ITrainingRunReader
 
     /// <summary>The header of a training run by key, or null (also null for a research run: this reader does not see them).</summary>
     ValueTask<TrainingRunHeader?> FindAsync(string runKey, CancellationToken cancellationToken);
+
+    /// <summary>The closed trades of a training run in stored order (cash trades; none for a research run or an unknown key). Memory-bounded: streamed, one row at a time.</summary>
+    IAsyncEnumerable<RunTrade> StreamTradesAsync(string runKey, CancellationToken cancellationToken);
 }

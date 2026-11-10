@@ -3134,6 +3134,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/simulate-all/{id}/training': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The training from the simulation of a job (AU-13): folds, rows, the out-of-fold score beside the baseline, that the hold-out was not read, and the challenger it registered (never a champion). state not_evaluable names the missing quantity. 404 sim_training.not_found */
+    get: operations['GetSimulateAllTraining'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/simulate-all/pause': {
     parameters: {
       query?: never;
@@ -21464,6 +21481,57 @@ export interface components {
       finishedAt: null | string;
       estimate: null | components['schemas']['SimAllEstimate'];
     };
+    /** @description The out-of-fold score of the model beside the best baseline (log loss and Brier score: lower is better). */
+    SimTrainingScore: {
+      /** Format: double */
+      candidateLogLoss: number;
+      /** Format: double */
+      baselineLogLoss: number;
+      baselineName: string;
+      /** Format: double */
+      candidateBrier: number;
+      /** Format: double */
+      baselineBrier: number;
+    };
+    /** @description The summary card of a training from the simulation (spec AU-13, acceptance 8). */
+    SimTrainingView: {
+      /** Format: uuid */
+      jobId: string;
+      state: string;
+      notEvaluable: null | string;
+      /** Format: int32 */
+      runs: number;
+      /** Format: int32 */
+      runsNotFinished: number;
+      /** Format: int32 */
+      rows: number;
+      /** Format: int32 */
+      sampleEvery: number;
+      /** Format: int32 */
+      foldsUsed: number;
+      /** Format: int32 */
+      foldsTotal: number;
+      /** Format: int32 */
+      embargoSessions: number;
+      /** Format: int32 */
+      embargoDays: number;
+      /** Format: date */
+      windowFrom: string;
+      /** Format: date */
+      windowTo: string;
+      /** Format: date */
+      holdOutStart: string;
+      holdOutRead: boolean;
+      score: null | components['schemas']['SimTrainingScore'];
+      verdict: null | string;
+      /** Format: int64 */
+      modelId: null | number;
+      role: string;
+      alreadyBuilt: boolean;
+      summary: string;
+      /** Format: date-time */
+      createdAt: string;
+    };
     /** @description The owner's skip, with an optional plain-text reason of at most 200 characters. */
     SkipTicketBody: {
       reason: null | string;
@@ -30787,6 +30855,37 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SimAllView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetSimulateAllTraining: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SimTrainingView'];
         };
       };
       /** @description Not Found */

@@ -10590,6 +10590,48 @@
         }
       }
     },
+    "/api/simulate-all/{id}/training": {
+      "get": {
+        "tags": [
+          "Simulate"
+        ],
+        "summary": "The training from the simulation of a job (AU-13): folds, rows, the out-of-fold score beside the baseline, that the hold-out was not read, and the challenger it registered (never a champion). state not_evaluable names the missing quantity. 404 sim_training.not_found",
+        "operationId": "GetSimulateAllTraining",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimTrainingView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/simulate-all/pause": {
       "post": {
         "tags": [
@@ -62748,6 +62790,164 @@
           }
         },
         "description": "Progress of the job, read by the report view while it runs (AU-14, AU-15)."
+      },
+      "SimTrainingScore": {
+        "required": [
+          "candidateLogLoss",
+          "baselineLogLoss",
+          "baselineName",
+          "candidateBrier",
+          "baselineBrier"
+        ],
+        "type": "object",
+        "properties": {
+          "candidateLogLoss": {
+            "type": "number",
+            "format": "double"
+          },
+          "baselineLogLoss": {
+            "type": "number",
+            "format": "double"
+          },
+          "baselineName": {
+            "type": "string"
+          },
+          "candidateBrier": {
+            "type": "number",
+            "format": "double"
+          },
+          "baselineBrier": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "The out-of-fold score of the model beside the best baseline (log loss and Brier score: lower is better)."
+      },
+      "SimTrainingView": {
+        "required": [
+          "jobId",
+          "state",
+          "notEvaluable",
+          "runs",
+          "runsNotFinished",
+          "rows",
+          "sampleEvery",
+          "foldsUsed",
+          "foldsTotal",
+          "embargoSessions",
+          "embargoDays",
+          "windowFrom",
+          "windowTo",
+          "holdOutStart",
+          "holdOutRead",
+          "score",
+          "verdict",
+          "modelId",
+          "role",
+          "alreadyBuilt",
+          "summary",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "notEvaluable": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "runs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "runsNotFinished": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sampleEvery": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "foldsUsed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "foldsTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "embargoSessions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "embargoDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "windowFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "windowTo": {
+            "type": "string",
+            "format": "date"
+          },
+          "holdOutStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "holdOutRead": {
+            "type": "boolean"
+          },
+          "score": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SimTrainingScore"
+              }
+            ]
+          },
+          "verdict": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "modelId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "role": {
+            "type": "string"
+          },
+          "alreadyBuilt": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "The summary card of a training from the simulation (spec AU-13, acceptance 8)."
       },
       "SkipTicketBody": {
         "required": [

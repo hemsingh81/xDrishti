@@ -28,5 +28,8 @@ Approved by delegation (owner, 2026-11-09: unsettled decisions are researched, t
 ## Built in AU-12
 The entry conditions of point 7, the sweep row of point 3 and the job itself are decided in [0248](0248-the-simulate-everything-job-is-a-resumable-table-driven-queue-of-training-chunks-that-yields-to-market-hours-disk-and-the-broker.md).
 
+## Built in AU-13
+The training itself, the cell statistics basis, and the link from a tuned strategy to the sweep it came from (point 5 of AU-11 is now: a sweep of a version a family descends from counts in the honest total) are decided in [0249](0249-training-from-the-simulation-reuses-the-anchored-purged-quarterly-folds-with-a-session-embargo-keeps-the-hold-out-out-whole-and-registers-a-challenger-that-cannot-be-eligible.md).
+
 ## Consequences
 All history is slightly less than all. The job pauses for market hours and low disk, so it may take days.

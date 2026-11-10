@@ -29,12 +29,16 @@ public sealed record TrialsView(
         var judged = MultipleTesting.Effective(TrialCounter.Judged(parts, honestApplied), adjustmentOn);
         var used = MultipleTesting.Factor(judged);
         var c = CultureInfo.InvariantCulture;
-        var text = $"{total.ToString(c)} looks = {parts.RunHashes.ToString(c)} strategy hashes + {parts.SweepPoints.ToString(c)} sweep points + {parts.ExtraExits.ToString(c)} extra exit candidates + {parts.Replans.ToString(c)} re-plans + {parts.NullRows.ToString(c)} nulls; "
+        var text = $"{total.ToString(c)} looks = {parts.RunHashes.ToString(c)} strategy hashes + {parts.SweepPoints.ToString(c)} sweep points + {parts.ExtraExits.ToString(c)} extra exit candidates + {parts.Replans.ToString(c)} re-plans + {parts.NullRows.ToString(c)} nulls{(parts.LinkedSweeps > 0 ? $" + {parts.LinkedSweeps.ToString(c)} linked training sweeps" : string.Empty)}; "
             + $"honest factor {honest.ToString("0.0000", c)}; the gates were tightened by {used.ToString("0.0000", c)} ({(honestApplied ? "the honest count" : $"{parts.DistinctHashes.ToString(c)} distinct hashes, as before; the honest count is shown beside it")}).";
         if (parts.TrainingSweeps > 0)
         {
-            // shown beside the count, never inside it: no link from a tuned strategy to the sweep it came from exists yet, so the deflation cannot be applied honestly (ADR 0243)
-            text += $" {parts.TrainingSweeps.ToString(c)} training sweeps ({parts.TrainingSweepTrials.ToString(c)} variants) are recorded separately and are not in this count, because nothing links a strategy tuned from a sweep to it yet.";
+            // the sweeps of a version this family descends from are in the count (a strategy tuned from the sweep, ADR 0243 point 5); the others are shown beside it
+            var others = parts.TrainingSweeps - parts.LinkedSweeps;
+            text += $" {parts.TrainingSweeps.ToString(c)} training sweeps ({parts.TrainingSweepTrials.ToString(c)} variants) are recorded separately"
+                + (parts.LinkedSweeps > 0
+                    ? $"; {parts.LinkedSweeps.ToString(c)} of a version this family descends from are counted as looks above, {Math.Max(0, others).ToString(c)} others are not in this count."
+                    : " and are not in this count, because no strategy of this family descends from a swept version.");
         }
 
         return new TrialsView(parts.RunHashes, parts.SweepPoints, parts.ExtraExits, parts.Replans, parts.NullRows, total, honest, judged, used, honestApplied, text);

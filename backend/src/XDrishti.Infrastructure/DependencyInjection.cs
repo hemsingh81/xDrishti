@@ -179,6 +179,7 @@ public static class DependencyInjection
         services.AddScoped<ISimAllBackfillGate, XDrishti.Infrastructure.SimAll.SimAllBackfillGate>();
         services.AddSingleton<IFreeDiskProbe, XDrishti.Infrastructure.SimAll.FreeDiskProbe>();
         services.AddScoped<ITrainingRunReader, XDrishti.Infrastructure.SimAll.TrainingRunReader>(); // the one NON-evidence reader of training runs (ADR 0243 point 7)
+        services.AddScoped<ISimTrainingStore, XDrishti.Infrastructure.SimAll.SimTrainingStore>(); // training from the simulation: its record and its training_sim cell statistics (AU-13, ADR 0249)
         services.AddScoped<IExperimentJobStore, ExperimentJobStore>(); // the replay jobs the owner started: table is the queue (P8-18 Part B, ADR 0129)
         services.AddScoped<IHeavyJobProbe, LabHeavyJobProbe>();
         services.AddScoped<IReplayStrategySource, StoredReplayStrategySource>();

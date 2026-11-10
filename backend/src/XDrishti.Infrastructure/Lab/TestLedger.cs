@@ -41,22 +41,27 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger
 
     public async ValueTask<TrialCounts> CountTrialsAsync(string strategyId, CancellationToken cancellationToken)
     {
-        // the hashes of runs and the sweep points that are not also a run's hash add up to the distinct hashes CountVariantsAsync has always counted; re-plan rows share the hash of their run
+        // a training sweep of a version this family is or descends from (the parent hashes of its versions) is a look at the family (ADR 0243 point 5, ADR 0249); the hashes of runs and the sweep points that are not also a run's hash add up to the distinct hashes CountVariantsAsync has always counted; re-plan rows share the hash of their run
         await using var command = dataSource.CreateCommand("""
-            WITH runs AS (SELECT DISTINCT strategy_hash FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'run' AND method <> 'sweep'),
-                 sweeps AS (SELECT DISTINCT strategy_hash FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'run' AND method = 'sweep' AND strategy_hash NOT IN (SELECT strategy_hash FROM runs))
+            WITH RECURSIVE runs AS (SELECT DISTINCT strategy_hash FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'run' AND method <> 'sweep'),
+                 sweeps AS (SELECT DISTINCT strategy_hash FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'run' AND method = 'sweep' AND strategy_hash NOT IN (SELECT strategy_hash FROM runs)),
+                 lineage(hash, parent_hash) AS (
+                     SELECT hash, parent_hash FROM lab.strategy_versions WHERE strategy_id = @id
+                     UNION
+                     SELECT v.hash, v.parent_hash FROM lab.strategy_versions v JOIN lineage l ON v.hash = l.parent_hash)
             SELECT (SELECT count(*) FROM runs),
                    (SELECT count(*) FROM sweeps),
                    (SELECT coalesce(sum(extra_trials), 0) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind <> 'training_sweep'),
                    (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'replan'),
                    (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'null'),
                    (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep'),
-                   (SELECT coalesce(sum(extra_trials), 0) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep')
+                   (SELECT coalesce(sum(extra_trials), 0) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep'),
+                   (SELECT count(*) FROM lab.test_ledger WHERE trial_kind = 'training_sweep' AND strategy_hash IN (SELECT hash FROM lineage))
             """);
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         await reader.ReadAsync(cancellationToken);
-        return new TrialCounts((int)reader.GetInt64(0), (int)reader.GetInt64(1), (int)reader.GetInt64(2), (int)reader.GetInt64(3), (int)reader.GetInt64(4), (int)reader.GetInt64(5), (int)reader.GetInt64(6));
+        return new TrialCounts((int)reader.GetInt64(0), (int)reader.GetInt64(1), (int)reader.GetInt64(2), (int)reader.GetInt64(3), (int)reader.GetInt64(4), (int)reader.GetInt64(5), (int)reader.GetInt64(6), (int)reader.GetInt64(7));
     }
 
     public async ValueTask<bool> HasFullRunAsync(string strategyId, string strategyHash, CancellationToken cancellationToken)

@@ -41,3 +41,6 @@ public sealed record NewSimAllJob(SimAllJob Job, IReadOnlyList<NewSimAllChunk> C
 
 /// <summary>One strategy version of a job: it gets one <c>training_sweep</c> ledger row.</summary>
 public sealed record SimAllSweep(string StrategyId, int Version, string StrategyHash);
+
+/// <summary>The finished chunks of a job: the run keys of the done ones and the number of chunks that did not finish.</summary>
+public sealed record SimAllFinished(IReadOnlyList<string> RunKeys, int NotFinished);

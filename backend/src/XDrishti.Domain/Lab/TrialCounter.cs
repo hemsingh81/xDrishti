@@ -1,7 +1,7 @@
 namespace XDrishti.Domain.Lab;
 
 /// <summary>
-/// The honest number of looks (spec CF-06, D3): N = distinct strategy hashes (sweep points are hashes) + one per extra exit candidate of each hash's first full test + one per re-plan + one per null row. The factor stays the heuristic of <see cref="MultipleTesting"/>; this only makes N honest.
+/// The honest number of looks (spec CF-06, D3): N = distinct strategy hashes (sweep points are hashes) + one per extra exit candidate of each hash's first full test + one per re-plan + one per null row + one per training sweep of a version this family descends from (a strategy tuned from the sweep). The factor stays the heuristic of <see cref="MultipleTesting"/>; this only makes N honest.
 /// </summary>
 public static class TrialCounter
 {
@@ -9,7 +9,7 @@ public static class TrialCounter
     public static int Total(TrialCounts parts)
     {
         ArgumentNullException.ThrowIfNull(parts);
-        return checked(Math.Max(0, parts.RunHashes) + Math.Max(0, parts.SweepPoints) + Math.Max(0, parts.ExtraExits) + Math.Max(0, parts.Replans) + Math.Max(0, parts.NullRows));
+        return checked(Math.Max(0, parts.RunHashes) + Math.Max(0, parts.SweepPoints) + Math.Max(0, parts.ExtraExits) + Math.Max(0, parts.Replans) + Math.Max(0, parts.NullRows) + Math.Max(0, parts.LinkedSweeps));
     }
 
     /// <summary>The extra looks of a first full test with <paramref name="candidates"/> exits: one less than the candidates, never below zero.</summary>

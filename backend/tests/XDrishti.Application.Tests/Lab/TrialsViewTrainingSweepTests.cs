@@ -15,7 +15,19 @@ public sealed class TrialsViewTrainingSweepTests
         withSweeps.Total.ShouldBe(plain.Total);
         withSweeps.HonestFactor.ShouldBe(plain.HonestFactor);
         withSweeps.Text.ShouldStartWith(plain.Text);
-        withSweeps.Text.ShouldContain("3 training sweeps (40 variants) are recorded separately and are not in this count");
+        withSweeps.Text.ShouldContain("3 training sweeps (40 variants) are recorded separately and are not in this count, because no strategy of this family descends from a swept version.");
         plain.Text.ShouldNotContain("training sweeps");
+    }
+
+    [Fact]
+    public void Linked_sweeps_raise_the_total_and_the_factor_and_the_text_says_which_are_counted()
+    {
+        var plain = TrialsView.Of(new TrialCounts(2, 1, 0, 0, 0, 3, 40), true, true);
+        var linked = TrialsView.Of(new TrialCounts(2, 1, 0, 0, 0, 3, 40, 2), true, true);
+
+        linked.Total.ShouldBe(plain.Total + 2);
+        linked.HonestFactor.ShouldBeGreaterThan(plain.HonestFactor);
+        linked.Text.ShouldContain("+ 2 linked training sweeps");
+        linked.Text.ShouldContain("2 of a version this family descends from are counted as looks above, 1 others are not in this count.");
     }
 }
