@@ -1,6 +1,6 @@
 # AU-03 — Multi-day data proof for the end-of-day service
 
-- **Status:** Approved (owner, 2026-11-09, in chat)
+- **Status:** Built 2026-11-09 (ADR 0240). Approved (owner, 2026-11-09, in chat)
 - **Phase / roadmap row:** AU — Automation and simplicity programme, row AU-03 (plan: [AU-00](AU-00-automation-and-simplicity-plan.md))
 - **Size:** 1 agent-days (an estimate, not calibrated) · **Needs:** AU-02
 - **Decisions:** [ADR 0240](../adr/0240-missed-days-are-recovered-by-one-dependency-ordered-pass-and-each-service-declares-how-it-can-be-recovered.md)

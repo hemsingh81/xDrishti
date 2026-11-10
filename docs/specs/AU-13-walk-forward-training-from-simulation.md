@@ -1,6 +1,6 @@
 # AU-13 — Walk-forward training from the simulation
 
-- **Status:** Approved (owner, 2026-11-09, in chat)
+- **Status:** Built 2026-11-10 (ADR 0249). Approved (owner, 2026-11-09, in chat)
 - **Phase / roadmap row:** AU — Automation and simplicity programme, row AU-13 (plan: [AU-00](AU-00-automation-and-simplicity-plan.md))
 - **Size:** 3 agent-days (an estimate, not calibrated) · **Needs:** AU-11, AU-12
 - **Decisions:** [ADR 0243](../adr/0243-simulate-everything-is-training-data-fenced-from-the-hold-out-and-from-scorecard-evidence.md), [ADR 0249](../adr/0249-training-from-the-simulation-reuses-the-anchored-purged-quarterly-folds-with-a-session-embargo-keeps-the-hold-out-out-whole-and-registers-a-challenger-that-cannot-be-eligible.md)

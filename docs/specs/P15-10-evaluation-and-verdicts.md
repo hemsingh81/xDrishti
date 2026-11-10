@@ -1,6 +1,6 @@
 # P15-10 — Evaluation and verdicts: protocols F, X, P and L, ledger rows before results, insert-only verdict records with evidence, the event-filter verdict port, and the honest NOT_EVALUABLE
 
-- **Status:** Approved (owner, 2026-11-02, "consider all is approved and continue in loop")
+- **Status:** Built 2026-11-02 (ADR 0186). Approved (owner, 2026-11-02, "consider all is approved and continue in loop")
 - **Phase / roadmap row:** P15 — slice P15-10 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Evaluation and verdicts"); never cut.
 - **Design refs:** P15-00 "Evaluation protocols" (F, X, P, L), D8-D11 · P13-00 "Evaluation protocol" (the paired comparison, power) · P8-00 D3 (evidence block, honest states) · docs/design/09 §3, 19 §1 · ADR 0059 (ledger), 0067 (validation harness), 0069 (entry-window pattern), 0080 (phase verdict words), 0182 (fail closed; "P15-10 must report the share of entries lost to `no_upcoming_entry`"). New ADR: **next free number at build time**.
 - **Needs:**

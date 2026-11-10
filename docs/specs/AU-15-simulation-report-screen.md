@@ -1,6 +1,6 @@
 # AU-15 — Simulation report screen
 
-- **Status:** Approved (owner, 2026-11-09, in chat)
+- **Status:** Built 2026-11-10. Approved (owner, 2026-11-09, in chat)
 - **Phase / roadmap row:** AU — Automation and simplicity programme, row AU-15 (plan: [AU-00](AU-00-automation-and-simplicity-plan.md))
 - **Size:** 2 agent-days (an estimate, not calibrated) · **Needs:** AU-12, AU-14
 - **Decisions:** [ADR 0243](../adr/0243-simulate-everything-is-training-data-fenced-from-the-hold-out-and-from-scorecard-evidence.md)

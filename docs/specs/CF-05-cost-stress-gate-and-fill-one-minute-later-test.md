@@ -1,6 +1,6 @@
 # CF-05 — Cost stress gate (1x / 1.5x / 2x), conservative slippage tiers and the fill-one-minute-later test
 
-- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
+- **Status:** Built 2026-11-04 to 2026-11-09 (ADRs 0206, 0229, 0230). Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** CF — Confidence programme (a row is added by CF-00; UNVERIFIED, CF-00 not yet written). Touches P5 (Lab verdict and report) and P3 (fill rules, charge sheet).
 - **Design refs:** docs/design/11-strategy-lab.md §3-§5 · 16-configuration.md (`costs`, `strategy_lab`) · docs/research/confidence-edge-realism.md §1 and §4 · ADRs 0038 (fill rules), 0042/0044 (charge sheet, bill check), 0059/0063 (gates, report)
 - **Needs:** P3-03b/c/f (built), P5-03/05/06 (built), CF-00 (settings home and report-only rule). Related: CF-06 (ledger and hold-out), CF-11 (scorecard rows 4, 5, 14).

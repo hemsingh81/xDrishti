@@ -5,7 +5,7 @@
    are the original product-level plan and are not updated per slice. */
 (function () {
   window.XDP = {
-    asOf: "2026-11-10",
+    asOf: "2026-11-11",
     now: "P0–P11, P15 and the new AU programme (automation and simplicity, 19 slices, 2026-11-09/10) are built, every new switch OFF. CF (confidence programme) is built except CF-04 Part B (Dhan 1-minute backfill). P14 is built except the basis pair (P14-14/15). BK (system baskets) is under way: BK-02 built, BK-01 in build. The one open P8 item is still the P8-16 browser matrix (C14 load time and 12 layout-shift cells fail after the 2026-11-09 first-load cut); P8-17 reads MET only after your stopwatch. P10 has nothing running yet: the nightly and paper services are paused, and the P7, paper and AU checks read NOT MET or NOT EVALUABLE until real days, real evidence and your charge-sheet confirmation. P12 (xd-exec) is built in reduced form: semi_auto and auto_live are not values and nothing places a live order. P13 is untouched. Long poles are wall-clock, not code: Dhan and ISP replies, 12+ weeks of paper evidence, 30 semi-auto sessions, recorded data. Nothing places an order.",
     owner: [
       "Switch the nightly, review-cutoff, pre-open, expiry, weekly, paper-capture and paper-review services on in Settings: this starts the clocks (P7's ten unattended sessions and P10's 12 weeks and 60 counted trades count only from then). Auto-approval stays OFF.",
@@ -15,6 +15,7 @@
       "Decide on the Auto switch (AU-17, Settings, password): OFF by default; ON resumes the chain services and gives next-day suggestions only, never orders, and it refuses to turn on while the charge sheet is unconfirmed. Learned settings changes only tighten; loosening or undoing one needs your password (AU-10).",
       "CF switches are report-only or OFF: Gate modes, automatic model rollback and automatic kill-rule demotion stay OFF until you turn them on; record the verify-pack gate result per strategy version (readiness row 15). CF-04 Part A's NSE fetch stays OFF until you fill its allow-list.",
       "Answer 'Track all Nifty 500?' before BK-03 (derived baskets refresh job).",
+      "Answer the 14 questions of the spec review of 2026-11-10 (docs/specs/REVIEW-2026-11-10.md; each has a recommendation): mainly BK order and BK-03 intraday baskets, BK-11 tiers, one capacity share, CF-04 B blocking AU-12, switching on the depth and tick recorders for P13, cutting basis, and how P8-16 measures load time.",
       "Read the ADRs marked Proposed (0065 to 0255; every slice was approved under the standing run instruction, not read by you). The SAFETY slices keep every new setting OFF until a deliberate act of yours.",
       "Run the pinned model fetch script when you want the assistant on (the download stays yours); run the owner probe for the expired-options backfill (P14-03) only if you want that backfill; the recorder, backfill, execution and assistant switches all stay OFF until you turn them on with a fresh password.",
       "Later, only wall-clock and you can give: 8+ live weeks by hand, 30 semi-auto sessions, about 200 labelled announcements (P15), the 5-year backfill (ISS-19), a dedicated Dhan account for execution (P12-00), and your own 3 strategy ideas through the Lab with a trained model (`xd learn phase-check` reads NOT EVALUABLE until then).",
@@ -650,7 +651,7 @@ null,
         ],
       },
       {
-        id: "P13", t: "Tick & depth features", state: "planned", note: "Untouched. Plan only (slices P13-01 to P13-10, about 23 agent-days). Waits for at least 6 months of recorded depth (P7-16, your decision).",
+        id: "P13", t: "Tick & depth features", state: "planned", note: "Only P13-05 is built (ADR 0183). The depth and tick recorders exist (P7-16, P7-16b) but ship OFF; the other nine slices (about 20 agent-days, reviewed 2026-11-10) wait for about 11 months of recordings from the day you switch the recorders on.",
         slices: [
           ["P13-01", "Recording coverage and capacity report", "approved", "", {"d": 2, "s": "P13-00-tick-and-depth-features-plan"}],
           ["P13-02", "Book reader and as-of reconstruction", "approved", "", {"d": 2.5, "s": "P13-00-tick-and-depth-features-plan"}],
@@ -665,7 +666,7 @@ null,
         ],
       },
       {
-        id: "P14", t: "Options & statistical arbitrage", state: "building", note: "Built except the basis pair: P14-01 to P14-13, P14-16 and P14-17 are built (2026-11-01 to 2026-11-09). Option pricing, the expression dimension, the cost model, the option and defined-risk simulators, the IV features, pairs core and study, the reports and the Options and stat-arb tab exist; recorders and backfill stay behind default-off gates. P14-14 and P14-15 (basis data and carry, first to be cut) are not built, so basis:carry-1 reads 'none stored'. `xd options phase-check` reads stored verdicts only and cannot read MET until the archive holds real chains and a family earns a net KEEP. Research only: no order, no margin call.",
+        id: "P14", t: "Options & statistical arbitrage", state: "building", note: "Built except the basis pair: P14-01 to P14-13, P14-16 and P14-17 are built (2026-11-01 to 2026-11-09). Option pricing, the expression dimension, the cost model, the option and defined-risk simulators, the IV features, pairs core and study, the reports and the Options and stat-arb tab exist; recorders and backfill stay behind default-off gates. P14-14 and P14-15 (basis data and carry, first to be cut) are not built, so basis:carry-1 reads 'none stored'. `xd options phase-check` reads stored verdicts only and cannot read MET until the archive holds real chains and a family earns a net KEEP; the exit stays open until basis is cut or built (owner question). Research only: no order, no margin call.",
         slices: [
           ["P14-01", "Option contracts, lot-size history, expiry and rule epochs (built 2026-11-01, inside the master refresh; the rule epochs are seeded unconfirmed)", "built", "0175", {"d": 2, "s": "P14-00-options-and-stat-arb-plan"}],
           ["P14-02", "Chain snapshot recorder (built 2026-11-01, behind three default-off gates; two new allow-listed data-api endpoints; paused service; no reader; Services-page switch built)", "built", "0176", {"d": 3, "o": 1, "s": "P14-00-options-and-stat-arb-plan"}],
@@ -729,7 +730,7 @@ null,
         ],
       },
       {
-        id: "BK", t: "System baskets", state: "building", note: "Under way: BK-02, the pure derived-baskets engine (14 definitions, point in time, versioned params), is built (2026-11-10, ADR 0255); BK-01 (index catalogue and NSE fetcher, OFF) is in build on its own branch. The rest is Approved and not started. NSE fetches (BK-01, BK-05) and the derived-basket job (BK-03) stay OFF until you enable them; BK-08 and BK-10 change the fill and sizing (SAFETY, every limit default OFF, advisory only). Answer 'Track all Nifty 500?' before BK-03.",
+        id: "BK", t: "System baskets", state: "building", note: "Under way: BK-02, the pure derived-baskets engine (14 definitions, point in time, versioned params), is built (2026-11-10, ADR 0255); BK-01 (index catalogue and NSE fetcher, OFF) is in build on its own branch. The rest is Approved and not started. NSE fetches (BK-01, BK-05) and the derived-basket job (BK-03) stay OFF until you enable them; BK-08 and BK-10 change the fill and sizing (SAFETY, every limit default OFF, advisory only). Answer 'Track all Nifty 500?' before BK-03. Review 2026-11-10: about 43 agent-days left; recommended order BK-01, BK-05, BK-03, BK-04, then BK-06 onward.",
         slices: [
           ["BK-00", "Programme plan", "approved", "", {"d": 0.5, "s": "BK-00-system-baskets-plan"}],
           ["BK-01", "Index basket catalogue, NSE fetcher (OFF), versioned membership (in build on branch feature/bk-01, not merged)", "approved", "", {"d": 4, "o": 1, "s": "BK-01-index-basket-catalogue-fetcher-and-versioned-membership"}],

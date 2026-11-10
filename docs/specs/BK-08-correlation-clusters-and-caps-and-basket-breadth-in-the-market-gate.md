@@ -86,3 +86,10 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 - Property test corrected: at every merge the average inter-group rho is at least the cut (not "no pair below the cut", which average linkage does not guarantee).
 - Criterion 11 direction rule: raising `ClusterRho` = loosen (clusters shrink, caps bind less); lowering = tighten; raising/clearing `MaxClusterRiskPct` and any breadth-source change = loosen; `loosen` and `neutral` are two separate recorded values (the value `loosen_or_neutral` is removed).
 - Size unchanged: 5 agent-days.
+
+## Review 2026-11-10
+- **P3-01e is built** (`BreadthCalculator`, the `breadth` columns of `market.context_daily`; ADR 0033). The gate's `tracked` source is that stored value. The first UNVERIFIED is settled.
+- **The P7-12 store is fixed-column:** `AutonomySettings` is one snapshot record of named fields (newest row wins), not key-typed. The sibling table `selection.basket_settings_changes` of the Contract applies.
+- **Settings catalog (ADR 0242, 0246, required):** `gate.breadth_source`, `selection.max_cluster_risk_pct` and `selection.cluster_rho` each get a `Stored` descriptor, tier Advanced, safer direction `none`, not learnable. That is the same as AC 10/11 (password for every change, direction recorded). None is on the ADR 0247 allow-list, so neither Auto nor learning changes them.
+- **Recovery class (ADR 0240):** if the context step is a post-step of the `eod` run (as P3-01e breadth is), it needs no class of its own. If it is a separate service, it declares `Convergent`: rows are insert-once for each missing date and computed from closes up to that date. Either way, add it to `RecoveryClassTableTests` if it is registered.
+- **Auto scope (ADR 0251)** filters candidates before selection, so the cluster cap sees only in-scope candidates plus the open book.

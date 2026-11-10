@@ -68,3 +68,9 @@ Unit: the hand trade, the dividend bound, each verdict row. Property: determinis
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any dividend that makes a KEEP, any gross KEEP, any unavailable price dropped silently)
 - [ ] No migration; ADR only if built
+
+## Review 2026-11-10
+- **Needs:** P13-05 (ADR 0183: `BlockBootstrap`, ledger-first `ExtensionTrial`, the hold-out read once) and P14-07 (ADR 0194: the `Futures` cost line) are built. P14-14 is not.
+- **Phase check, built (ADR 0202):** the family `basis:carry-1` is listed. Unbuilt and uncut, it reads `none stored` (open), so the P14 exit cannot be MET until it is built and resolved or cut with `xd options phase-check --cut basis:carry-1`. The recommended cut is recorded there too.
+- **Hold-out:** "the last 6 expiries, read once" is a family hold-out like the built P14-13 one (ADR 0196: the last six months), not the Lab block of ADR 0207.
+- **Settings:** `Basis:*` sits under the section descriptor P14-14 adds (ADR 0246).

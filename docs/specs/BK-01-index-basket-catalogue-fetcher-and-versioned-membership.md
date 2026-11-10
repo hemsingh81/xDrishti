@@ -94,3 +94,9 @@ NSE/NSE Indices terms of use and redistribution rights; acceptance of a non-brow
 - **Retired or untracked but still listed:** an instrument retired in the master that NSE still lists stays a member, flagged `unmatched = retired` with its retired date in the fetch record and the members response; membership is never closed silently by the master's retirement, only by a fetch that no longer lists it.
 - **Contract:** `GET /api/baskets` adds `fetchEnabled` and `derivedEnabled` (booleans, owner-visible) so clients know the setting state without a new endpoint.
 - Size stays 4 d (the additions are small).
+
+## Review 2026-11-10
+Facts only: the slice is in build on `feature/bk-01` (not merged). The design is unchanged here.
+- **ADR:** the build records it as **ADR 0254** (Proposed until the owner reads the NSE terms). The 0106 reservation of BK-00 was a collision.
+- **As built on the branch (for the later slices):** service `system-baskets`, recovery class `LatestOnly` (pinned in `RecoveryClassTableTests`), starts paused, looks every 5 minutes from 07:30 to 23:00 IST. Each source is asked once a day from `RunAt`, twice a day in a review window, and retried after 5, 30 and 120 minutes (`BackoffMinutes`). `Baskets:System:Fetch` is an Internal section descriptor in the settings catalog. Log event 3500 is `basket.fetch`. `basket_members` gained `provenance`, `detected_at`, `source_ref`, `source_kind` and `note`; `basket_sources` has `cadence` and `fail_count`. `GET /api/baskets` carries `kind`, `system`, `membersKnownSince` and `source { state, lastOkAt, lastCheckedAt, unmatched }`.
+- **Two deviations from this text, recorded by ADR 0254:** `Enabled` is deployment configuration that needs a restart (no runtime owner-act toggle, against review-fix AC 14); `fetchEnabled`/`derivedEnabled` are not in the `GET /api/baskets` view. BK-04 AC 12 depends on the second.

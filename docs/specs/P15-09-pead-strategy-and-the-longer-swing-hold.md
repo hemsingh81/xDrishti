@@ -1,6 +1,6 @@
 # P15-09 — PEAD strategy and the longer swing hold: event sides may hold up to 20 sessions, the `event_exit` overlay runs, surprise buckets with point-in-time breakpoints, and a built-in `PEAD` with its control
 
-- **Status:** Approved (owner, 2026-11-03, "Build P15-09")
+- **Status:** Built 2026-11-03 (ADR 0187). Approved (owner, 2026-11-03, "Build P15-09")
 - **Phase / roadmap row:** P15 — slice P15-09 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("PEAD strategy and the longer swing hold"); on the cut line (after the LLM branch).
 - **Design refs:** docs/design/07 §1, §7 (swing SELL only through futures) · 08 (`EVENT_EXIT`) · 11 §5 (`time_rules.max_hold_sessions` 1 to 5) · P15-00 protocol P, D7, D8 · ADR 0037 (engine version), 0040 (swing walk; amended here), 0043 (a decision at the close rests overnight and fills at the next open), 0181/0182 (the calendar and its fail-closed limit). New ADR: **next free number at build time**, plus amendments to ADR 0040 (hold up to 20 for event sides) and ADR 0037 (engine `sim-9`).
 - **Needs:** P15-05 (frame `days_since_results`, `fu-1` `sue_yoy`, `ev-1` `results_car3`), P15-03 (EPS), P15-06 (built: snapshot). **Not needed to build:** the 5-year history (CF-04); it is needed for a verdict (P15-10). **Needed by:** P15-10 (protocol P).

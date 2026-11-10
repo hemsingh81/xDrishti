@@ -1,6 +1,6 @@
 # CF-09 — Sequential failure test for paper trading (stop for failure only, never pass early)
 
-- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
+- **Status:** Built 2026-11-05 (ADR 0213). Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** CF — Confidence programme (row added by CF-00; UNVERIFIED). Adds a report line beside the P10 phase check (P10-04, P10-06) and a hard-fail input to CF-11.
 - **Design refs:** docs/design/18-roadmap.md (P10 row) · 09-learning-engine.md §9 · docs/research/confidence-learning-and-validation-speed.md §2.3, §2.4, §2.6 · P10-00 D6 and D7 · P6-09 (drift) · ADRs 0083, 0116, 0119
 - **Needs:** CF-08 (the edge series), CF-01 (the design-effect estimator; placeholder rho 0.3 until then), P10-04 (series of the counted trades). Feeds CF-11 (hard fail) and CF-12 (kill rules).

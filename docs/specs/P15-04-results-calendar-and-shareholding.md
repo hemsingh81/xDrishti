@@ -1,6 +1,6 @@
 # P15-04 — Results calendar and shareholding: board-meeting rows with their intimation time, shareholding rows, CSV loaders from the folder drop, `days_to_results`, and `unavailable` for the instrument with no entry
 
-- **Status:** Approved (owner, 2026-11-02: pre-approved in the autonomous loop; open questions resolved with the recommended/safer answers listed in the spec)
+- **Status:** Built 2026-11-02 (ADR 0181). Approved (owner, 2026-11-02: pre-approved in the autonomous loop; open questions resolved with the recommended/safer answers listed in the spec)
 - **Phase / roadmap row:** P15 — slice P15-04 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Calendar and shareholding"; "the calendar gives value early").
 - **Design refs:** docs/design/20 §D · 16 (`exclude.results_within_days`) · 15 (pre-trade checks) · P15-00 risk 8 (look-ahead through the calendar), D3 · ADR 0033 (the date comes from the caller), 0087 (`unavailable` never passes). New ADR: **next free number at build time** (the calendar's own broadcast time, the event-session rule).
 - **Needs:** P15-01 (the CSV drop, `row_level_ts`), P15-02 (`filings.filings`, `filings.calendar`, `filings.shareholding`, `IPointInTimeFilings`). **Needed by:** P15-05 (`ev-1`, `fu-1` features), P15-06 (the event filter and the checks).

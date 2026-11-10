@@ -102,3 +102,12 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 - **Criterion 8 scoped:** the banned-word architecture test applies only to types, members, DTO fields and settings keys added by this slice, with exact patterns (case-insensitive, whole-word or identifier-part): `upsize`, `leverage`, `margin`, `multiplier`. Existing code (for example `ReducedRiskMultiplier`) is excluded by namespace/name allow-list.
 - **Sizing study floor (criterion 11/12):** the study's `floor` parameter is restricted to {0.25, 0.5, 0.75}; each view is recorded as a trial and the response prints "k floors tried" (k from the recorded views); or the study is fixed at the stored setting. Recommended: fixed at the stored setting, the three values only as a labelled sensitivity.
 - Size unchanged: 5 agent-days.
+
+## Review 2026-11-10
+Factual corrections. The status is unchanged; owner questions are in REVIEW-2026-11-10.md.
+- **Volume, resolved:** `ReadDailyBarsAsync` returns `BarRow.Volume`.
+- **The P7-12 store is fixed-column** (`AutonomySettings`), so the sibling tables `selection.sizing_settings_changes` and `selection.basket_risk_budgets` of the Contract apply.
+- **Gate factor:** `SmartRulesOptions.ReducedRiskMultiplier` (0.75) is a configuration value. `PaperConfigKeys` declares it `LowerStricter`. It is not a constant.
+- **Settings catalog (ADR 0242, 0246, required):** `sizing.vol_target.enabled`, `sizing.vol_target.floor`, `sizing.capacity.enabled`, `sizing.capacity.pct` and the basket budget set each get a `Stored` descriptor, tier Advanced, safer direction `none` (every change needs the password, as AC 9 says), not learnable. None is on the ADR 0247 allow-list.
+- **Capacity overlap with CF-05:** the Lab and readiness row 14 count an order above `Confidence:CostStress:CapacityDailyShare` = 0.005 of the 20-session median traded value as a capacity breach (ADR 0223, 0224). This slice's default `CapacityPct` 0.01 would let the plan suggest twice that. Owner question Q-cap; AC 4's numbers depend on the answer.
+- **Sizing study:** reads stored trades only through the fenced research readers (ADR 0243). Its "hold-out halves" are a median split, not the locked hold-out of ADR 0207. `SimTrade` is still schema 5 (`CurrentSchemaVersion` 5).

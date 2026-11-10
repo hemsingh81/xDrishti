@@ -128,6 +128,32 @@
 </tr>
 </tbody></table>
 <p>Skipped: exchange test symbols (<code>*NSETEST*</code>), debt, bonds, mutual-fund units, REITs/InvITs, BSE, MCX, currency, commodity and options (options come with their phase, P14). Futures past their expiry date (India date) are not kept; one that was kept and has expired is retired.</p>
+<p><strong>Option contracts (P14-01, <a href="../adr/0175-option-contracts-of-a-configured-underlying-list-are-kept-from-the-master-refresh-in-their-own-schema-with-a-dated-lot-history-and-dated-rule-epochs-never-in-the-master-list.html">ADR 0175</a>).</strong> Options stay out of the master list, search and baskets. The same single read of the file collects the NSE <code>OPTIDX</code>/<code>OPTSTK</code> rows whose underlying is in the app setting <code>options.underlyings</code> (default, fixed once at the first refresh: NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY and the 30 most traded F&amp;O shares) into schema <code>options</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>What it holds</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>options.contracts</code></td>
+<td>One row per Dhan security id: underlying (index or share of the master list), <code>OPTIDX</code>/<code>OPTSTK</code>, expiry, strike in paise, <code>CE</code>/<code>PE</code>, <code>week</code>/<code>month</code>, lot and tick seen, first/last seen date</td>
+<td>Keyed on (security id, expiry): new rows inserted, <code>last_seen_on</code> advanced only for the very same contract, never deleted (expired contracts stay); a reused id is reported, never rewritten; counts in the log, run warnings only for real problems</td>
+</tr>
+<tr>
+<td><code>options.lot_sizes</code></td>
+<td>The lot of an underlying&#39;s options from a date on: seeds (secondary, unconfirmed) and one <code>scrip_master</code> row per change seen (the nearest unexpired expiry&#39;s lot)</td>
+<td>Insert-only; <code>confirmed</code> only for a value read in the circular, with its address</td>
+</tr>
+<tr>
+<td><code>options.market_epochs</code></td>
+<td>Dated rule changes (one weekly index per exchange, upfront premium, Nifty expiry Tuesday, the 2025-12-30 lot revision, the 2026-04-01 STT raise)</td>
+<td>Insert-only; seeded unconfirmed</td>
+</tr>
+</tbody></table>
+<p>The real file of 2026-11-01 has 81,835 NSE option rows; the list keeps about 18,500 live ones (the four indices 8,979). Lookups &quot;in force on a date&quot; return the value with its <code>confirmed</code> flag, or <code>unavailable</code>.</p>
 <p><strong>Canonical symbols</strong> (exchange-qualified, independent of any broker; every other module uses them):</p>
 <table>
 <thead>
@@ -288,6 +314,7 @@ Dhan historical API (1-minute up to ~5 years, daily since listing), and builds a
 </tr>
 </tbody></table>
 <p>Each basket carries a <code>kind</code> in the API: <code>manual</code> or <code>portfolio</code> today; rule-based and the other system baskets reuse the same field and the <code>baskets.system</code> protection.</p>
+<p><strong>Derived behaviour baskets (BK-02, <a href="../adr/0255-derived-baskets-are-pure-versioned-and-point-in-time.html">ADR 0255</a>).</strong> Fourteen baskets (most volatile, most moving, most liquid, gappers, high beta, momentum 12-1, mean-reverting, trending, near 52-week high, low volatility, high relative volume, opening-range wide, intraday-tradable proxy, return-correlation clusters) are computed by one pure engine in <code>Domain/Baskets/Derived</code> from daily (and, for three, 1-minute) bars as of a date, reading only bars up to <code>as_of</code> (intraday: before the formation time). Every excluded instrument is named (<code>insufficient_history</code>, <code>corporate_action_unresolved</code>, <code>bad_data</code>, <code>not_in_universe_filter</code>, <code>small_cluster</code>), every number is a versioned, hashed parameter with a default, ties break by symbol, and top-k baskets use a 1.5 x k buffer with a 5-session dwell for the slow ones. Reading bars, storing versions and the screen are BK-03 and BK-04.</p>
 <h3 id="32-basket-attributes">3.2 Basket attributes<a class="hash" href="#32-basket-attributes" aria-label="Link to this section">#</a></h3>
 <table>
 <thead>
@@ -563,7 +590,7 @@ basket detail (members, performance by lens, benchmark, open positions).</li>
     <a class="prev" href="05-data-and-brokers.html"><small>← Previous  [</small>05 · Data &amp; brokers</a>
     <a class="next" href="07-strategies.html"><small>Next  ] →</small>07 · Strategies</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/06-instruments-and-baskets.md</code> · 2026-10-27 03:12</footer>
+  <footer class="foot">Generated from <code>docs/06-instruments-and-baskets.md</code> · 2026-11-10 18:35</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-concepts" class="d2">1. Concepts</a>
 <a href="#2-master-list-tracked-instruments" class="d2">2. Master list &amp;amp; tracked instruments</a>

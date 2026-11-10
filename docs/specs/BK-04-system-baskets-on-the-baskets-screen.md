@@ -2,7 +2,7 @@
 
 - **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** BK — system baskets, slice BK-04 of [BK-00](BK-00-system-baskets-plan.md)
-- **Design refs:** docs/design/06-instruments-and-baskets.md §3.1, §3.4 · [ADR 0014](../adr/0014-portfolio-buckets-appear-as-system-baskets.md) · [P1-15a](P1-15a-portfolio-baskets-the-account-buckets-on-the-baskets-page-protected.md) · ISS-22 · frontend rules `frontend/CLAUDE.md` · prototype `docs/prototype/` (Baskets page, match its look)
+- **Design refs:** docs/design/06-instruments-and-baskets.md §3.1, §3.4 · [ADR 0014](../adr/0014-portfolio-buckets-appear-as-system-baskets.md) · [P1-15a](P1-15a-portfolio-baskets-on-the-baskets-page.md) · ISS-22 · frontend rules `frontend/CLAUDE.md` · prototype `docs/prototype/` (Baskets page, match its look)
 - **Needs:** [BK-01](BK-01-index-basket-catalogue-fetcher-and-versioned-membership.md) (API fields `kind`, `system`, `membersKnownSince`, `source`), [BK-03](BK-03-derived-baskets-refresh-job-and-scores.md) for derived cards and versions (without it only index cards appear); [BK-05](BK-05-broker-flag-and-fo-baskets.md) for list cards (cards simply do not appear until their kind exists). Built: the Baskets feature in `frontend/src/features/baskets` (page, members grid, history drawer, copy-out).
 - **Size:** 3 agent-days (cards and groups 1, provenance/as-of/status and version drawer 1, tests, a11y, responsive 1)
 - **Safety:** no. Read-only screen; the only actions are existing copy-out and the two owner-act buttons that call BK-01/03 endpoints (disabled unless their setting is ON).
@@ -75,3 +75,8 @@ The Baskets prototype's exact card layout (prototype page not opened; match at b
 - **Settings state:** the client learns `fetchEnabled` / `derivedEnabled` from `GET /api/baskets` (BK-01 added them); the "no new endpoint, gen-api no-op" claim is withdrawn: types change with BK-01.
 - **AC11 fixture:** MSW fixtures for "Nifty 500 tracked" and "untracked"; the hint shows only in the first.
 - **Size:** 4 agent-days.
+
+## Review 2026-11-10
+- Fixed the broken P1-15a link (the file is `P1-15a-portfolio-baskets-on-the-baskets-page.md`).
+- **Needs as built on `feature/bk-01` (ADR 0254):** `GET /api/baskets` carries `kind`, `system`, `membersKnownSince` and `source { state, lastOkAt, lastCheckedAt, unmatched }`. It does **not** carry `fetchEnabled`/`derivedEnabled` (review fix "Settings state"), and `Baskets:System:Fetch:Enabled` is deployment configuration that needs a restart. AC 12's disabled state therefore comes from the 409 `baskets.fetch_disabled` answer or from fields BK-01/BK-03 must add first; adding them is a contract change of those slices. `BasketKinds` on the branch has `manual`, `portfolio`, `index`, `list` and `derived`.
+- `POST /api/baskets/system/fetch` with `basketIds` also turns those sources on (ADR 0254 §7). The "Fetch now" button is therefore an enabling act, and its text must say so.

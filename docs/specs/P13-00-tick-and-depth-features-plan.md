@@ -126,3 +126,20 @@ Only owner acts. (1) Allow the depth endpoints and the disk budget for P7-16 (P7
 - The embargo is in sessions and the folds are calendar months; `ValidationOptions` (calendar-day embargo, `ExitSelector.Windows`) cannot express that, so P13-05 cuts its own calendar folds and leaves the P6-05 geometry unchanged.
 - The day-block bootstrap is reported with a 5-session block sensitivity; KEEP needs both lower bounds above the margin. Seed 1337, 10,000 draws.
 
+
+## Review 2026-11-10
+Factual corrections. The status is unchanged; owner questions are in REVIEW-2026-11-10.md.
+- **Needs, now built:**
+  - P7-16, the depth recorder (ADR 0135): `market.depth_snapshots`, three gates all OFF (`Depth__Enabled`, the owner's stored switch with a fresh password, the service), service `depth-recorder` with recovery class `TimeBound`.
+  - P7-16b, the trade-tick recorder (ADR 0173): `market.trade_ticks`, service `tick-recorder` `TimeBound`, its own three gates.
+  - P13-05 (ADR 0183): `Domain/Learning/Extensions`, `AddExtensionTables`, `ExtensionHoldOutCheck` read once per family and version.
+  - P10 paper capture (ADR 0116) for P13-07, and P12-03 pre-send checks (ADR 0159) for P13-08.
+  - The "What exists" list of 2026-10-24 is out of date on depth.
+- **Recording clock:** whether the owner has switched the recorders on cannot be seen in the repository. The 11-month clock starts only when he does.
+- **D10 / open question 4 are settled:** P7-16b is built. Ticks carry no aggressor side, and ADR 0173 §4 says P13 classifies volume deltas against the depth snapshot at or before the receive time. So `vol_delta_5m` is computable once both recorders run, by a rule P13-03 must state and count as a trial.
+- **P13-07 vs ADR 0217/0220:** a model may influence a decision only through the one CF-10 gate (`ml.influence.enabled` and its predicate: an unspent hold-out, forward evidence, no calibration alarm). A challenger is promoted only by the ADR 0220 rule. `learning.extensions.md1_in_scoring` is therefore an **extra** condition, never a second path: the `md-1` model reaches scoring only as the champion through ADR 0220 and the ADR 0217 gate, and only while that switch is also ON.
+- **Hold-out:** the built P14 families keep their own family hold-out, read once by the store (P14-13 ADR 0196: the last six months; P13-05). P13-06 follows that precedent: the last 2 recorded months, not the Lab block of ADR 0207. Recordings start after that block's start, so `HoldOut.Reserve(..., fixedStart)` would leave no development rows. P13-06's ADR states this.
+- **Settings catalog (ADR 0246, required):** the `extensions.*` research parameters get a section descriptor (Internal). `learning.extensions.md1_in_scoring` gets a `Stored` descriptor, tier Advanced, default false. Neither is on the ADR 0247 allow-list.
+- **Jobs:** extraction and evaluation stay CLI verbs, so no recovery class is needed. The recorders already declare `TimeBound`.
+- **Training fence (ADR 0243):** candidates and trades come from research-purpose runs only.
+- **Size:** about 24 agent-days in all; with P13-05 built, about 20 remain (P13-01 to 04, 06 to 10).

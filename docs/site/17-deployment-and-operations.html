@@ -126,7 +126,7 @@ power, wired network, small UPS recommended.</li>
 <td><code>xd-feed</code></td>
 <td>.NET 10</td>
 <td>core</td>
-<td>Market hours: Dhan WebSocket for the active set (<strong>built</strong>, P2-10, <a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a>): live prices written into the holdings and <code>market.live_quotes</code>, price alerts on every flush, heartbeat in <code>platform.service_heartbeats</code>; the vault key and the app DB password as secret files, networks <code>back</code> + <code>egress</code>, 256 MB, health check = heartbeat &lt; 60 s old. The quote poll of holdings stays in <code>xd-api</code> (service <code>holdings-quotes</code>); live bars come later. <strong>Depth recorder (P7-16, <a href="../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.html">ADR 0135</a>):</strong> a second loop of this process (own heartbeat row <code>xd-depth</code>), off by default (<code>XD_DEPTH_ENABLED</code>, the owner&#39;s switch, the paused service <code>depth-recorder</code>); it grows <code>market.depth_snapshots</code> by about 0.77 GB a day raw (about 38 GB a year compressed, estimate) inside the VM disk (120 GiB): check <code>podman machine ssh df -h /var</code> shows at least 60 GiB free before switching it on; the disk guard stops it at 40 GB stored or under 20 GB free and deletes nothing; <code>xd-backup</code> must exclude this table&#39;s data</td>
+<td>Market hours: Dhan WebSocket for the active set (<strong>built</strong>, P2-10, <a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a>): live prices written into the holdings and <code>market.live_quotes</code>, price alerts on every flush, heartbeat in <code>platform.service_heartbeats</code>; the vault key and the app DB password as secret files, networks <code>back</code> + <code>egress</code>, 256 MB, health check = heartbeat &lt; 60 s old. The quote poll of holdings stays in <code>xd-api</code> (service <code>holdings-quotes</code>); live bars come later. <strong>Depth recorder (P7-16, <a href="../adr/0135-the-depth-recorder-stores-the-20-level-book-of-up-to-50-shares-about-once-a-second-behind-three-gates-a-disk-guard-and-no-reader.html">ADR 0135</a>):</strong> a second loop of this process (own heartbeat row <code>xd-depth</code>), off by default (<code>XD_DEPTH_ENABLED</code>, the owner&#39;s switch, the paused service <code>depth-recorder</code>); it grows <code>market.depth_snapshots</code> by about 0.77 GB a day raw (about 38 GB a year compressed, estimate) inside the VM disk (120 GiB): check <code>podman machine ssh df -h /var</code> shows at least 60 GiB free before switching it on; the disk guard stops it at 40 GB stored or under 20 GB free and deletes nothing; <code>xd-backup</code> must exclude this table&#39;s data. <strong>Trade-tick recorder (P7-16b, <a href="../adr/0173-the-trade-tick-recorder-stores-last-trade-updates-of-the-depth-set-when-cumulative-volume-rises-on-a-second-quote-socket-behind-three-gates-its-own-cap-and-no-reader.html">ADR 0173</a>):</strong> a third loop (own heartbeat row <code>xd-ticks</code>) and a second Quote-mode socket to the same allowed host <code>api-feed.dhan.co</code> (socket 3 of Dhan&#39;s 5), off by default (<code>XD_TICKS_ENABLED</code>, the owner&#39;s switch, the paused service <code>tick-recorder</code>); it grows <code>market.trade_ticks</code> (estimate 0.29 GB a session raw, about 9 GB a year compressed); its guard stops it at 12 GB stored or under the shared 20 GB free and deletes nothing; with both recorders on keep at least <strong>72 GiB</strong> free; <code>xd-backup</code> must exclude this table&#39;s data too. <strong>Option-chain recorder (P14-02, <a href="../adr/0176-the-option-chain-recorder-stores-five-minute-index-chains-and-a-daily-stock-pass-from-two-new-allow-listed-data-api-endpoints-behind-three-gates-its-own-cap-and-no-reader.html">ADR 0176</a>):</strong> a fourth loop (own heartbeat row <code>xd-options</code>) that sends REST requests of the Data account to <code>POST api.dhan.co/v2/optionchain</code> and <code>/v2/optionchain/expirylist</code> only (two new allow-list rows; at most one request per 3 seconds), off by default (<code>XD_OPTIONS_CHAIN_ENABLED</code>, the owner&#39;s switch, the paused service <code>option-chain-recorder</code>); it grows <code>options.chain_snapshots</code> (estimate 2.7 GB a year raw, about 0.5 GB compressed); its guard stops it at 4 GB stored or under the shared 20 GB free and deletes nothing; with depth, ticks and options all on keep at least <strong>79 GiB</strong> free (enlarge the VM disk to 160 GiB: <code>podman machine set --disk-size</code>, machine stopped); <code>xd-backup</code> must exclude this table&#39;s data too.</td>
 </tr>
 <tr>
 <td><code>xd-sandbox</code></td>
@@ -165,6 +165,18 @@ power, wired network, small UPS recommended.</li>
 <td><strong>Built (P9-02, <a href="../adr/0137-the-assistants-tools-run-in-a-separate-read-only-server-under-two-database-roles-that-can-select-only-from-reviewed-views-and-the-switch-lives-in-the-database.html">ADR 0137</a>), not started by <code>xd-up.sh</code>.</strong> The assistant&#39;s read-only tool server: MCP over Streamable HTTP (stateless, <code>POST /mcp</code>, bearer token per client), four tools (<code>list_tables</code>, <code>describe_table</code>, <code>run_sql</code>, <code>lab_validate</code>); <code>/health</code> is anonymous. Logs in as <code>xd_mcp_read</code> and <code>xd_mcp_sql</code> (the roles of migration <code>AddAiReadAccess</code>: <code>SELECT</code> on schema <code>aiv</code> only; their passwords are set by <code>xd-api migrate</code> from the files below). <code>read_only</code>, <code>cap_drop: [ALL]</code>, <code>no-new-privileges</code>, 512 MB, no published port, network <code>back</code> only, no volume; exactly three secrets: <code>db_mcp_read_password</code> and <code>db_mcp_sql_password</code> (Keychain <code>xdrishti/db/mcp-read</code>, <code>xdrishti/db/mcp-sql</code>) and <code>mcp_token</code> (<code>xdrishti/mcp/token</code>, also given to <code>xd-api</code> as <code>Assistant__Mcp__Token</code>; <code>xd-migrate</code> gets the two passwords as <code>AiRoles__*</code>). Started and stopped with <code>scripts/xd-ai.sh start [--tools-only]</code> / <code>stop</code>; the image is built by <code>xd-up.sh</code> (profile <code>ai</code> only for the build).</td>
 </tr>
 <tr>
+<td><code>xd-mcp-eval</code>, <code>xd-migrate-eval</code>, <code>xd-eval-seed</code>, <code>xd-eval</code></td>
+<td>same images as <code>xd-mcp</code> and <code>xd-api</code></td>
+<td>eval</td>
+<td><strong>Built (P9-09, <a href="../adr/0143-the-eval-grades-the-assistant-by-code-on-a-synthetic-fixture-read-only-with-exact-numbers-intervals-and-an-owner-accepted-baseline.html">ADR 0143</a>)</strong>: the assistant eval. <code>xd-mcp-eval</code> is <code>xd-mcp</code> over the fixture database <code>xdrishti_eval</code> with its own token; <code>xd-migrate-eval</code> and <code>xd-eval-seed</code> are one-shots (migrate without an owner account; seed the synthetic fixture, refusing any other database or one that holds data); <code>xd-eval</code> is the one-shot <code>xd eval ...</code> verb (the only holder of the eval token). No port, <code>back</code> only; started on demand by <code>scripts/xd-eval.sh</code>; <code>xd-api</code> mounts <code>eval/</code> read only and holds no eval token</td>
+</tr>
+<tr>
+<td><code>xd-hermes</code></td>
+<td><code>deploy/hermes/Dockerfile</code> (FROM <code>nousresearch/hermes-agent</code> by tag and digest)</td>
+<td>hermes</td>
+<td><strong>Definition only (P9-10, <a href="../adr/0144-the-hermes-agent-poc-is-a-contained-bench-the-owner-starts-an-isolated-network-two-credentials-a-pinned-image-and-a-default-verdict-of-reject.html">ADR 0144</a>), never started by any stack script; nothing was pulled or run when it was written.</strong> The Hermes Agent PoC: alone on the internal network <code>ai-edge</code> with <code>xd-llm</code>, <code>xd-mcp</code>, <code>xd-mcp-eval</code> (which also stay on <code>back</code>); no published port, no internet, no host mount; non-root 10000, <code>read_only</code>, <code>cap_drop: [ALL]</code>, <code>no-new-privileges</code>, tmpfs <code>/tmp</code> <code>/run</code>, 2 GB (placeholder), 256 pids; volume <code>xd-hermes-data</code> at <code>/opt/data</code>; exactly two secrets, <code>llm_api_key</code> and <code>mcp_token_hermes</code> (Keychain <code>xdrishti/mcp/hermes-token</code>, <code>Mcp:Tokens:Hermes</code>). Run by the owner with <code>scripts/hermes-poc.sh</code> (pin, build, up, check, record).</td>
+</tr>
+<tr>
 <td><code>xd-hermes</code></td>
 <td>Own image, pinned Hermes Agent</td>
 <td>ai (optional)</td>
@@ -173,11 +185,17 @@ power, wired network, small UPS recommended.</li>
 <tr>
 <td><code>xd-exec</code></td>
 <td>.NET 10</td>
-<td>live (later)</td>
-<td>Orders; isolated network; only holder of order-capable tokens</td>
+<td>live</td>
+<td><strong>Built (P12-01b, <a href="../adr/0156-the-execution-record-lives-in-schema-execution-written-only-by-the-role-xd-exec-with-checks-by-trigger-and-the-container-sits-in-profile-live-on-its-own-network.html">ADR 0156</a>); not started by <code>xd-up.sh</code>, only by <code>xd-up.sh --exec</code>.</strong> Heartbeat <code>exec</code> (10 s), settings reader, command poller (500 ms), boot state <code>recovering</code>; its only route out is <code>xd-exec-proxy</code> below, for the two live readiness reads (<a href="../adr/0172-xd-exec-reaches-the-live-broker-only-through-a-host-pinned-forward-proxy-on-its-own-network-for-the-two-readiness-reads-first.html">ADR 0172</a>); it never joins <code>egress</code>. Logs in as the role <code>xd_exec</code> only; its two secrets are that role&#39;s password (<code>Database__Password</code> from <code>db_exec_password</code>, Keychain <code>xdrishti/db/exec</code>, created only by <code>--exec</code>; <code>xd-migrate</code> mounts the same file to give the role its login, empty file = role set NOLOGIN) and the token hand-over key (<code>ExecHandover__Key</code> from <code>exec_handover_key</code>, <a href="../adr/0171-a-live-broker-token-reaches-the-execution-service-only-as-a-per-account-same-day-sealed-hand-over-with-its-own-key-for-the-readiness-reads-first.html">ADR 0171</a>); <code>Execution__ReadinessLiveEnabled</code> from <code>XD_EXEC_READINESS_LIVE</code>, default <code>false</code>; network <code>exec</code> shared with <code>xd-db</code>; no published port; read-only, <code>cap_drop ALL</code>, 256 MB; health check = its heartbeat younger than 45 s. Only with <code>--exec</code> AND <code>XD_EXEC_READINESS_LIVE=true</code>, <code>xd-up.sh</code> also reads <code>deploy/compose.exec-live.yaml</code>, which adds <code>HTTPS_PROXY=http://xd-exec-proxy:8888</code> to <code>xd-exec</code> and starts the proxy; otherwise <code>xd-exec</code> has no proxy variable and the next deploy removes the proxy (<code>--remove-orphans</code>). Environment <code>none</code> unless <code>XD_EXEC_ENVIRONMENT</code> is set. Status: <code>GET /api/execution/status</code> (read only). Joining <code>exec</code> makes <code>xd-db</code> be recreated at the next <code>xd-up.sh</code></td>
+</tr>
+<tr>
+<td><code>xd-exec-proxy</code></td>
+<td>tinyproxy 1.11.2 (Alpine 3.22.2, <code>FROM</code> by tag and digest; built from <code>deploy/exec-proxy/</code>)</td>
+<td>live (overlay <code>compose.exec-live.yaml</code>)</td>
+<td><strong>Built (<a href="../adr/0172-xd-exec-reaches-the-live-broker-only-through-a-host-pinned-forward-proxy-on-its-own-network-for-the-two-readiness-reads-first.html">ADR 0172</a>); started only by <code>xd-up.sh --exec</code> with <code>XD_EXEC_READINESS_LIVE=true</code>.</strong> Host-pinned forward proxy of <code>xd-exec</code>: allows <code>CONNECT</code> only to the <code>host:port</code> lines of <code>deploy/exec-proxy/allowlist.txt</code> (mounted read-only; today only <code>api.dhan.co:443</code>), refuses every other host, port and plain-HTTP forward (403). The config is written from the list at every start; an empty or malformed list stops it. TLS passes through: it sees host names only. Networks <code>exec</code> + <code>egress</code> (the only service on both); no secret, no database, no published port, no environment; read-only (tmpfs <code>/tmp</code>), <code>cap_drop ALL</code>, non-root, 32 MB; health check = <code>nc -z 127.0.0.1 8888</code></td>
 </tr>
 </tbody></table>
-<p>Defined in <code>deploy/compose.yaml</code> with profiles <code>core</code>, <code>ops</code>, <code>ai</code>, <code>live</code>
+<p>Defined in <code>deploy/compose.yaml</code> with profiles <code>core</code>, <code>ops</code>, <code>ai</code>, <code>eval</code>, <code>hermes</code>, <code>live</code>
 (<code>podman compose --profile core --profile ops up -d</code>). Podman Desktop shows them as one application.</p>
 <h2 id="phone-access-owner-security-act-nothing-here-is-done-by-an-agent-or-by-the-repo">Phone access (owner security act; nothing here is done by an agent or by the repo)<a class="hash" href="#phone-access-owner-security-act-nothing-here-is-done-by-an-agent-or-by-the-repo" aria-label="Link to this section">#</a></h2>
 <p>The stack never listens on the LAN: every published port stays on <code>127.0.0.1</code>. The installable app (P8-21, <a href="../adr/0132-the-pwa-is-an-installable-shell-and-an-offline-page-behind-a-capability-its-worker-caches-six-static-files-and-answers-only-failed-page-loads.html">ADR 0132</a>) works on this Mac at <code>http://localhost:8080</code> once you switch <code>pwa</code> on at /owner-acts (a browser treats <code>localhost</code> as a secure context). A phone needs HTTPS, which does not exist yet. If you want it, the researched path (spec P8-21 D1) is a private tailnet in front of the loopback proxy:</p>
@@ -210,11 +228,11 @@ power, wired network, small UPS recommended.</li>
 </tr>
 <tr>
 <td><code>exec</code> (internal)</td>
-<td>exec, db (later)</td>
+<td>exec, db (P12-01b); exec-proxy only when the live readiness route is on (ADR 0172)</td>
 </tr>
 <tr>
 <td>Egress allowed later</td>
-<td>worker, feed, exec (broker/exchange hosts only)</td>
+<td>worker (broker/exchange hosts only). <code>xd-exec</code> never joins <code>egress</code>: its one route is through <code>xd-exec-proxy</code> (on <code>exec</code> + <code>egress</code>), started only by the owner&#39;s <code>xd-up.sh --exec</code> with <code>XD_EXEC_READINESS_LIVE=true</code>, pinned to the hosts of <code>deploy/exec-proxy/allowlist.txt</code></td>
 </tr>
 </tbody></table>
 <p>*<code>xd-sandbox</code> has no egress and no access except its job inputs/outputs.
@@ -278,6 +296,54 @@ published ports, no other member. The network itself does not filter hosts; the 
 <td>20 s, 1 MB; browser-like <code>User-Agent</code> and <code>Accept: application/json</code>, <strong>no cookie</strong> (none is kept or sent, and nothing from a stored secret), no redirects; a refusal is only a warning</td>
 </tr>
 </tbody></table>
+<p><code>xd-exec</code> (P12-02, P12-02b; <a href="../adr/0157-the-dhan-order-adapter-is-a-sandbox-only-guarded-client-inside-the-execution-project-and-the-send-protocol-writes-ahead-and-resolves-unknown-by-lookup-never-by-resend.html">ADR 0157</a>, <a href="../adr/0158-the-send-path-is-composed-only-as-legsender-behind-sandbox-and-a-second-default-off-switch-with-a-persistent-insert-only-audit-and-settings-read-at-every-send.html">0158</a>) is <strong>not</strong> on <code>egress</code>: the <code>exec</code> network is internal. Its order client exists only in the sandbox environment with the second switch <code>Execution__SendEnabled</code> on (and the sandbox has no route out either); the guard (<code>Dhan/ExecutionEndpoints</code>) is the one table below, the sandbox host is <code>sandbox.dhan.co</code> (UNVERIFIED, from a third-party description), and the data-side table above is unchanged. The live environment (<a href="../adr/0172-xd-exec-reaches-the-live-broker-only-through-a-host-pinned-forward-proxy-on-its-own-network-for-the-two-readiness-reads-first.html">ADR 0172</a>) has exactly the two readiness GETs on <code>api.dhan.co</code> (the one live host string, UNVERIFIED until the owner&#39;s smoke), sent only by <code>LiveBrokerFacts</code> through <code>xd-exec-proxy</code>; the order client still cannot be built for live. The route is pinned twice: by this table in the process and by the proxy&#39;s allow-list on the network:</p>
+<table>
+<thead>
+<tr>
+<th>Client</th>
+<th>Reaches only</th>
+<th>Method</th>
+<th>Limits</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Execution (sandbox) place</td>
+<td><code>sandbox.dhan.co</code>: <code>/v2/orders</code></td>
+<td>POST</td>
+<td>10 s (<code>exec.send_timeout_s</code>), connect 5 s; <strong>never retried</strong>; LIMIT, DAY, INTRADAY, NSE_EQ only; the token goes in the <code>access-token</code> header and is never logged or stored</td>
+</tr>
+<tr>
+<td>Execution (sandbox) modify, cancel</td>
+<td><code>/v2/orders/{id}</code> (id a plain token)</td>
+<td>PUT, DELETE</td>
+<td>as above; looked up by our client id first</td>
+</tr>
+<tr>
+<td>Execution (sandbox) lookup</td>
+<td><code>/v2/orders/{id}</code> and <code>/v2/orders/external/{client order id}</code></td>
+<td>GET</td>
+<td>10 s; retried once after 250 ms; a failed lookup is never &quot;absent&quot;</td>
+</tr>
+<tr>
+<td>Execution (sandbox) reads</td>
+<td><code>/v2/orders</code>, <code>/v2/trades</code>, <code>/v2/positions</code>, <code>/v2/fundlimit</code>, no query</td>
+<td>GET</td>
+<td>10 s; retried once; never counted by the send limiter</td>
+</tr>
+<tr>
+<td>Execution readiness reads (sandbox, ADR 0170)</td>
+<td><code>sandbox.dhan.co</code>: <code>/v2/profile</code>, <code>/v2/ip/getIP</code>, no query</td>
+<td>GET</td>
+<td>10 s; retried once (not after 401/DH-901); own limit 5/s; log event 6616</td>
+</tr>
+<tr>
+<td>Execution readiness reads (live, ADR 0172)</td>
+<td><code>api.dhan.co</code>: <code>/v2/profile</code>, <code>/v2/ip/getIP</code>, no query, only through <code>xd-exec-proxy</code></td>
+<td>GET</td>
+<td>as the sandbox reads; the account&#39;s token from the sealed hand-over (ADR 0171) only; no request without the switch, the proxy or a token; every other live path (orders, setIP, modifyIP, RenewToken, killswitch, funds, positions) is refused</td>
+</tr>
+</tbody></table>
+<p>Every other method, path, host, port, scheme, query or redirect is refused before the socket (<code>GuardHandler</code>). Sends are capped by <code>exec.max_orders_per_second/minute/day</code> (2/30/200, counted from the audit table so a restart keeps them).</p>
 <p>Nothing else is needed for the master: no published port, no volume (the file is streamed, never written to disk), no secret; <code>xd-api</code> stays within its 1 GB limit (the 35 MB file is read as a stream). The database image already includes <code>pg_trgm</code>, which the migration enables for the search indexes (created by <code>xd-migrate</code> as <code>xd_owner</code>).</p>
 <h2 id="4-secrets">4. Secrets<a class="hash" href="#4-secrets" aria-label="Link to this section">#</a></h2>
 <ol>
@@ -297,7 +363,9 @@ encrypted with AES-256-GCM (account id + secret name as associated data, key ver
 <code>xdrishti/broker/vault-key</code>: <code>xd-up.sh</code> creates it (32 random characters) only when no such item exists — an item that exists but cannot
 be read stops the start instead of being replaced, because another key makes every stored secret unreadable — and writes the secret file
 <code>broker_vault_key</code>, mounted <strong>only into <code>xd-api</code></strong> as <code>/run/secrets/BrokerVault__Key</code> (the 256-bit key is derived from it with
-HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secrets.sh</code>, <code>secrets/brokers.index</code> and the read-only
+HKDF-SHA256). Back it up with the database. A second key, <code>xdrishti/exec/handover-key</code> (<a href="../adr/0171-a-live-broker-token-reaches-the-execution-service-only-as-a-per-account-same-day-sealed-hand-over-with-its-own-key-for-the-readiness-reads-first.html">ADR 0171</a>), is created by <code>xd-up.sh</code> the same way (file
+<code>exec_handover_key</code>, mounted <strong>only into <code>xd-api</code> and <code>xd-exec</code></strong> as <code>ExecHandover__Key</code>, never <code>xd-feed</code> or <code>xd-worker</code>): the API seals the day&#39;s access token with it into <code>accounts.exec_token_handover</code> at every login, and the
+API refuses to start without it. A changed key only makes the hand-overs unreadable until the next login. The former <code>scripts/broker-secrets.sh</code>, <code>secrets/brokers.index</code> and the read-only
 <code>secrets/brokers</code> mount are gone (<code>xd-up.sh</code> deletes leftover files).
 The three secrets of the tool server (<code>xdrishti/db/mcp-read</code>, <code>xdrishti/db/mcp-sql</code>, <code>xdrishti/mcp/token</code>; 32 random characters each, created once and never replaced by <code>xd-up.sh</code>; files <code>db_mcp_read_password</code>, <code>db_mcp_sql_password</code>, <code>mcp_token</code>) go to <code>xd-mcp</code>; <code>xd-migrate</code> also reads the two passwords (it gives the read-only roles their login, <a href="../adr/0137-the-assistants-tools-run-in-a-separate-read-only-server-under-two-database-roles-that-can-select-only-from-reviewed-views-and-the-switch-lives-in-the-database.html">ADR 0137</a>) and <code>xd-api</code> the token only. Without the password files the roles stay <code>NOLOGIN</code> and migrate still succeeds.
 The key of the local model server (<code>xdrishti/llm/api-key</code>, 32 random characters, created once and never replaced by <code>xd-up.sh</code>; file <code>llm_api_key</code>) is mounted into <code>xd-llm</code> (<code>--api-key-file</code>) and <code>xd-api</code> (<code>Assistant__Llm__ApiKey</code>) only (<a href="../adr/0136-the-local-model-server-runs-in-a-container-on-demand-with-the-measured-qwen3-30b-a3b-as-default-two-pinned-alternatives-and-a-status-the-api-reads-over-http-only.html">ADR 0136</a>).</li>
@@ -388,6 +456,22 @@ The key of the local model server (<code>xdrishti/llm/api-key</code>, 32 random 
 <td>The <code>cost-sheet</code> verb (<code>load</code>, <code>show</code>, <code>check</code>) is not a container service either: <code>scripts/cost-sheet.sh</code> runs it on the host exactly like <code>simulate.sh</code> (the same generic host, the same Keychain item <code>xdrishti/db/app</code>, no vault key and no owner secret; a file argument may be relative, the script makes it absolute before it changes directory). The sheet is one row of <code>platform.app_settings</code>; <code>check</code> reads your original global transaction report files from the host (a container verb such as <code>owner-reset</code> mounts secrets and could not read them) and writes nothing. Since P3-03f every <code>simulate</code> run names <code>--gross</code> or <code>--costs &lt;id&gt;</code>. The migration <code>WidenAppSettingValue</code> (value column 500 to 8,000) is applied by <code>xd-migrate</code> on the next <code>deploy/xd-up.sh</code></td>
 </tr>
 <tr>
+<td>Trade-tick recorder (P7-16b)</td>
+<td>Runbook (<a href="../adr/0173-the-trade-tick-recorder-stores-last-trade-updates-of-the-depth-set-when-cumulative-volume-rises-on-a-second-quote-socket-behind-three-gates-its-own-cap-and-no-reader.html">ADR 0173</a>). <strong>Switch on:</strong> (1) <code>podman machine ssh df -h /var</code> shows at least 72 GiB free with depth also on (32 GiB with ticks alone), else enlarge the VM disk; (2) <code>export XD_TICKS_ENABLED=true</code> and <code>deploy/xd-up.sh</code>; (3) <code>PUT /api/ticks/recorder</code> with <code>{enabled: true, reason, password}</code>; (4) resume <code>tick-recorder</code> on the Services screen. <strong>Check:</strong> <code>GET /api/ticks/recorder</code> lists any reason it is not running; the heartbeat row <code>xd-ticks</code> shows the state and counts; Seq events <code>ticks.*</code> (5341–5370). <strong>Switch off:</strong> the same <code>PUT</code> with <code>enabled: false</code> and the password (or pause the service, or unset the flag and redeploy). <strong>Stopped by the guard</strong> (<code>disk_budget</code>, <code>disk_free</code>): nothing was deleted; free space or raise <code>Ticks__MaxStoredGb</code>, then pause and resume the service. <strong>Pilot (five sessions):</strong> <code>SELECT hypertable_detailed_size(&#39;market.trade_ticks&#39;)</code>, <code>SELECT * FROM hypertable_compression_stats(&#39;market.trade_ticks&#39;)</code>, rows per instrument-day and <code>median(ts - to_timestamp(ltt_epoch))</code>; record the results in the ADR</td>
+</tr>
+<tr>
+<td>Option-chain recorder (P14-02)</td>
+<td>Runbook (<a href="../adr/0176-the-option-chain-recorder-stores-five-minute-index-chains-and-a-daily-stock-pass-from-two-new-allow-listed-data-api-endpoints-behind-three-gates-its-own-cap-and-no-reader.html">ADR 0176</a>). <strong>Switch on:</strong> (1) <code>podman machine ssh df -h /var</code> shows at least 27 GiB free with options alone (39 with ticks, 67 with depth, 79 with everything), else enlarge the VM disk; (2) <code>export XD_OPTIONS_CHAIN_ENABLED=true</code> and <code>deploy/xd-up.sh</code>; (3) <code>PUT /api/options/chain-recorder</code> with <code>{enabled: true, reason, password}</code>; (4) resume <code>option-chain-recorder</code> on the Services screen. <strong>Check:</strong> <code>GET /api/options/chain-recorder</code> lists any reason it is not running; the heartbeat row <code>xd-options</code> shows the state and counts; Seq events <code>options.chain.*</code> (6911-6940); <code>SELECT outcome, count(*) FROM options.chain_requests WHERE slot_ts::date = current_date GROUP BY 1</code> shows the gaps by outcome. <strong>Switch off:</strong> the same <code>PUT</code> with <code>enabled: false</code> and the password (or pause the service, or unset the flag and redeploy). <strong>Stopped by the guard</strong> (<code>disk_budget</code>, <code>disk_free</code>): nothing was deleted; free space or raise <code>Options__Chain__MaxStoredGb</code>, then pause and resume the service. <strong>Rate-limited</strong> (<code>rate_limited</code>, three slots in a row): the run fails so the owner is told and waits 15 minutes; if it repeats, raise <code>Options__Chain__SpacingMs</code>. <strong>Token refused</strong> (<code>DH-901</code>): renew the Data account&#39;s token; it restarts by itself within a minute. <strong>Not subscribed</strong> (<code>DH-902</code>): the Data APIs are not part of the plan; recording ends for the day. <strong>Pilot (five sessions):</strong> requests per slot and gaps by outcome from <code>options.chain_requests</code>, <code>SELECT * FROM hypertable_compression_stats(&#39;options.chain_snapshots&#39;)</code>, bytes per row, one run at 3 s spacing across two underlyings without a <code>DH-904</code>, IV and theta units against one hand-computed Black-Scholes value, bid and ask non-null for at least 90 % of index strikes within +-10 of the money; record the results in the ADR</td>
+</tr>
+<tr>
+<td>Expired-options backfill (P14-03)</td>
+<td>Runbook (<a href="../adr/0177-the-expired-options-backfill-fetches-rolling-atm-offset-bars-from-one-new-allow-listed-data-api-endpoint-at-night-behind-four-gates-after-an-owner-run-probe-its-own-cap-and-no-reader.html">ADR 0177</a>). <strong>Switch on:</strong> (1) run <code>scripts/xd-probe-backfill.sh</code> (at most five requests, nothing stored), fill the probe table of the ADR and set <code>IndexOffsets</code>/<code>StockOffsets</code> from it; (2) <code>PUT /api/options/backfill/probe-acceptance</code> with <code>{note, password}</code>; (3) <code>podman machine ssh df -h /var</code> shows at least 23 GiB free (79 with everything on), else enlarge the VM disk; (4) <code>export XD_OPTIONS_BACKFILL_ENABLED=true</code> and <code>deploy/xd-up.sh</code>; (5) <code>PUT /api/options/backfill</code> with <code>{enabled: true, reason, password}</code>; (6) resume <code>options-backfill</code> on the Services screen. It fetches between 16:30 and 08:30 India time, one request a second, resumable (a done key is never fetched again; three failed attempts leave a key given up and listed). <strong>Check:</strong> <code>GET /api/options/backfill</code> (progress: keys done, empty, given up, left, estimated hours; any reason it is not running); the heartbeat row <code>xd-backfill</code>; Seq events <code>options.backfill.*</code> (6941-6970); <code>SELECT outcome, count(*) FROM options.fetch_log GROUP BY 1</code>. <strong>Switch off:</strong> the same <code>PUT</code> with <code>enabled: false</code> and the password (or pause the service, or unset the flag and redeploy). <strong>Stopped by the guard</strong> (<code>disk_budget</code> at 3 GB, <code>disk_free</code> under 20 GiB): nothing is deleted; make room or raise <code>Options__Backfill__MaxStoredGb</code>, then pause and resume the service. <code>xd-backup</code> must exclude <code>options.rolling_bars</code> data.</td>
+</tr>
+<tr>
+<td>Option archive quality (P14-04)</td>
+<td>Runbook (<a href="../adr/0178-the-option-archive-quality-checks-read-the-recorded-chains-and-rolling-bars-in-bounded-ranges-and-store-insert-only-verdicts-with-an-honest-unavailable-and-no-trading-use.html">ADR 0178</a>). <strong>Nothing to switch on:</strong> the service <code>options-quality</code> (<code>xd-api</code> scheduler) is on, 16:15 India time on trading days, and only reads the archive and writes <code>options.quality_runs</code> / <code>options.quality_results</code> (insert-only, no broker call). <strong>Check:</strong> <code>GET /api/options/coverage?underlying=NSE:NIFTY&amp;from=...&amp;to=...</code> (per session and check: status, value, threshold, reason, <code>usable</code>, and <code>usableChainSessions</code>); Seq events <code>options.quality.*</code> (6971-6973); <code>SELECT trigger, started_at, sessions, results, note FROM options.quality_runs ORDER BY id DESC LIMIT 5</code>. <strong><code>unavailable</code></strong> is a reason, not a pass: <code>not_recorded</code> (no session row), <code>no_two_sided_quote</code> / <code>too_few_points</code>, <code>no_strike_step</code>, <code>out_of_era</code>. <strong>Run again:</strong> &quot;Run now&quot; on the Services screen; a run checks only what has no result yet and stops at its bounds (<code>MaxChainSessionsPerRun</code>, <code>MaxRollingWindowsPerRun</code>, <code>MaxRunMinutes</code>; the 30-minute deadline is the real bound), the next run goes on. After the full backfill (31,444 windows) expect at least 7 daily runs, more if a window takes over 0.36 s: see ADR 0178. No cap and no disk guard (under 0.3 GB a year, UNVERIFIED).</td>
+</tr>
+<tr>
 <td>Dev loop</td>
 <td><code>dotnet watch</code> and Vite dev server on the host against containerised db/llm/ml; same images for &quot;prod&quot;</td>
 </tr>
@@ -418,7 +502,7 @@ The key of the local model server (<code>xdrishti/llm/api-key</code>, 32 random 
 </tr>
 <tr>
 <td>ISP static IP</td>
-<td>Only when automated orders are enabled (P12); decision Q6: later, revisit at the P11 exit</td>
+<td>Only when automated orders are enabled (P12); decision Q6: later, revisit at the P11 exit. The enquiry (ISP lead time, Dhan&#39;s 7-day IP lock) runs from the start of P11: <a href="../research/p11-static-ip-and-sebi-runbook.html">runbook</a>, record in the app (P11-05); the daily login, the token cover, the 09:10 record and the invalid-IP steps are in the <a href="../engineering/execution-runbook.html">execution runbook</a> (P12-11); a static IP is outbound only, no port is opened</td>
 </tr>
 <tr>
 <td>Cloud</td>
@@ -431,7 +515,7 @@ The key of the local model server (<code>xdrishti/llm/api-key</code>, 32 random 
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-27 03:12</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-11-10 18:35</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>

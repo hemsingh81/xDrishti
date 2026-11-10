@@ -83,3 +83,11 @@ One daily file parsed in ≤ 2 s and ≤ 100 MB memory; five years (about 1,250 
 - [ ] `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any network path, any zero for a missing price, any file moved or deleted, any dividend assumed)
 - [ ] Migration `AddFuturesEod` with `Down`
 - [ ] ADR written; docs 05 §7, 20 §C updated
+
+## Review 2026-11-10
+- **P14-08 is built** (ADR 0197; `ExpiryCalendar` with `ExpiryRules` in `Domain/Options/Remark`). It does not read `options.expiries_observed`, so the "later one-line change" of The rules applies: it is a change to built P14-08 code, outside this slice unless the owner adds it.
+- **P14-07 is built** (ADR 0194): `CostSegment` has `Futures` (and `Options`) as optional rates on the owner's sheet, so P14-15's futures charge line exists once the owner enters it.
+- **CF-04 Part A is built** (ADR 0195). Its corporate-actions reader keeps only split and bonus purposes (§9), so dividend ex-dates are still absent, as stated. `market.daily_eod` now holds the official cash close; using it for the spot instead of the last 1-minute close is an owner question.
+- **Settings catalog (ADR 0246, required):** the new `Basis` section gets an Internal section descriptor.
+- **Phase check (ADR 0202):** while basis is neither built nor cut, `basis:carry-1` reads `none stored`, which keeps the P14 exit open. Cutting it is `xd options phase-check --cut basis:carry-1`.
+- No service, so no recovery class; verbs only.

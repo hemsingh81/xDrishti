@@ -194,7 +194,7 @@
 </tr>
 <tr>
 <td>Automation over-reach (system changes too much on its own)</td>
-<td>Autonomy levels; weekly cap on automatic changes; always-ask list (risk increases, new strategies, live execution, accounts); change log with revert; automatic rollback after 60-trade monitoring</td>
+<td>Autonomy levels; weekly cap on automatic changes; always-ask list (risk increases, new strategies, live execution, accounts); change log with revert; automatic rollback after 60-trade monitoring <strong>As built (P12-09, ADR 0167):</strong> <code>AlwaysAskList</code> maps each item to its enforcement point with a probe a test checks; risk increases (stop loosening, adding, re-entry) are refused in every mode, limit raises need the password and a full session, a strategy&#39;s first live use goes to a ticket.</td>
 </tr>
 <tr>
 <td>Overfitting through repeated experiments</td>
@@ -278,10 +278,11 @@
 <li><strong>Personal use only</strong>: one user, own accounts. Sharing or selling recommendations could require SEBI
 Research Analyst / Investment Adviser registration — out of scope by design.</li>
 <li><strong>SEBI retail algo framework</strong> (mandatory since 1 April 2026) applies when orders are placed via broker APIs:
-registered app on a <strong>whitelisted static IP</strong>, daily login/2FA, broker as principal. Own strategies staying
+registered app on a <strong>whitelisted static IP</strong>, daily login/2FA, broker as principal. Operating steps (daily login, token cover, the 09:10:30 record, invalid-IP rejection, the quarterly re-check): <a href="../engineering/execution-runbook.html">execution runbook</a>, P12-11. Own strategies staying
 <strong>≤ 10 orders/second per exchange</strong> are tagged with the broker&#39;s generic algo ID; above that, exchange
 approval is needed. v1 places no orders; Phase 12 caps at 2 orders/s. Re-check circulars before Phase 12.
-Static-IP decision (Q6, 2026-10-09): not needed until Phase 12; ask the ISP and re-check circulars at the P11 exit.</li>
+Static-IP decision (Q6, 2026-10-09): not needed until Phase 12; ask the ISP and re-check circulars at the P11 exit.
+<strong>Update (2026-10-28, P11-05, <a href="../adr/0147-the-compliance-record-is-one-insert-only-owner-written-store-for-the-static-ip-sebi-and-dhan-read-policy-enquiry.html">ADR 0147</a>):</strong> the enquiry starts at the beginning of P11, not at its exit (an ISP lead time and Dhan&#39;s 7-day lock on a set IP would otherwise sit on P12&#39;s path); the deadline stays the P11 exit. The runbook with the questions for Dhan and the ISP is <a href="../research/p11-static-ip-and-sebi-runbook.html"><code>docs/research/p11-static-ip-and-sebi-runbook.md</code></a>; the owner&#39;s answers are written as dated, insert-only records (static IP, SEBI re-check, Dhan&#39;s IP rule for reads) in the Compliance tab of the Live screen, which the P11 phase check reads. <strong>No record has been written yet</strong>, so the decision is still the one above and the facts of the runbook stay <code>UNVERIFIED</code> until the circular texts are read and Dhan answers. Re-check every 90 days while P12 is planned or live.</li>
 <li>Data APIs used within the broker&#39;s terms.</li>
 <li>Forex/CFD trading via offshore platforms (e.g. MT5 brokers) is not part of this system.</li>
 </ul>
@@ -296,7 +297,7 @@ from evidence.</p>
     <a class="prev" href="18-roadmap.html"><small>← Previous  [</small>18 · Roadmap</a>
     <a class="next" href="20-extended-modules.html"><small>Next  ] →</small>20 · Extended modules</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/19-risks-and-compliance.md</code> · 2026-10-27 03:12</footer>
+  <footer class="foot">Generated from <code>docs/19-risks-and-compliance.md</code> · 2026-11-10 18:35</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-research-risks" class="d2">1. Research risks</a>
 <a href="#2-market-risks" class="d2">2. Market risks</a>

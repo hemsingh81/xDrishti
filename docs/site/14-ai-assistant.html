@@ -160,11 +160,15 @@
 <li><code>xd-api</code> assistant endpoint uses <strong>Microsoft.Extensions.AI</strong> with tool calling; streams to React.</li>
 <li>Tools are served by <strong><code>xd-mcp</code></strong> (ModelContextProtocol C# SDK 2.3.0, Streamable HTTP, stateless, a bearer token per client,
 <a href="../adr/0137-the-assistants-tools-run-in-a-separate-read-only-server-under-two-database-roles-that-can-select-only-from-reviewed-views-and-the-switch-lives-in-the-database.html">ADR 0137</a>) under <strong>two read-only DB roles</strong> (<code>xd_mcp_sql</code> for <code>run_sql</code>, <code>xd_mcp_read</code> for the typed tools),
-each able to <code>SELECT</code> only from the reviewed views of schema <code>aiv</code> (35 views; the portfolio ones are empty until the owner turns the
+each able to <code>SELECT</code> only from the reviewed views of schema <code>aiv</code> (36 views; the portfolio ones are empty until the owner turns the
 portfolio context on, in the database itself). <strong>Built (P9-02):</strong> <code>list_tables</code>, <code>describe_table</code>, <code>run_sql(sql, maxRows)</code> over
 <code>aiv</code> (one SELECT, 200 rows, 5 s, labelled &quot;ad-hoc query, not checked by the report engine&quot;), <code>lab_validate(yaml)</code> (stores nothing).
-<strong>Later (P9-05):</strong> <code>get_report(type, filters)</code>, <code>get_plan(date, account)</code>, <code>get_cell(key)</code>, <code>get_portfolio(group_by, as_of)</code>,
-<code>get_basket(name)</code>, <code>make_chart(spec)</code>. <code>lab_run</code> is dropped (P9-00 D9): a run is proposed, never started by the model.</li>
+<strong>Built (P9-05, <a href="../adr/0139-the-ask-your-data-tools-reuse-the-report-engine-and-read-only-views-the-read-role-gets-column-grants-on-four-report-source-tables-and-calc-and-charts-take-no-number-from-the-model.html">ADR 0139</a>):</strong>
+<code>get_report(report, query)</code> (the report engine&#39;s own handlers, gross only, each figure a state), <code>list_runs(kind)</code>, <code>get_plan(date)</code>,
+<code>get_cell(key | strategy, timeframe, side)</code>, <code>get_portfolio(groupBy)</code> (empty until the portfolio context is on), <code>get_basket(name)</code>,
+<code>get_instrument(symbol, bars)</code>, <code>search_notes(query)</code>, <code>get_learning(kind)</code>, <code>get_system_status()</code>, <code>calc(expression)</code> (exact decimals: the only
+source of a derived number) and, inside the API, <code>make_chart(spec)</code> (columns of earlier results of the turn, never numbers). Sixteen tools in all, under
+2,200 tokens of schema. <code>lab_run</code> is dropped (P9-00 D9): a run is proposed, never started by the model.</li>
 <li><strong>The endpoint (P9-03, <a href="../adr/0138-the-assistant-endpoint-runs-the-tool-loop-in-the-application-streams-events-marks-figures-not-found-in-the-tool-results-and-stores-every-turn-insert-only.html">ADR 0138</a>):</strong>
 <code>POST /api/assistant/chat</code> streams <code>turn</code>, <code>status</code>, <code>tool_call</code>, <code>tool_result</code>, <code>token</code>, <code>iteration_discard</code>, <code>ping</code>, <code>done</code>, <code>error</code>. The loop
 (up to the owner&#39;s budget of 1 to 12 tool calls, default 6; history of the last 6 messages with one line per old call, never old results; 10,000
@@ -174,17 +178,17 @@ the body, switching off needs none. <strong>Grounding:</strong> every figure of 
 the tool arguments); unmatched figures are marked, not removed, and the message is <code>ungrounded</code> (a figure computed by the model itself is
 unmatched: derived numbers come from <code>calc</code>). <strong>Audit:</strong> <code>ai.prompts</code>, <code>ai.conversations</code>, <code>ai.messages</code>, <code>ai.tool_calls</code> and <code>ai.model_calls</code>
 are insert-only for the application role; each turn can be replayed from them. One turn at a time; no chat while the nightly run is running.</li>
-<li>Guardrails: numbers only from tool results; no write tools except <code>lab_run</code>; no promotion; no config
+<li>Guardrails: numbers only from tool results; no write tools (a draft is text the model writes for you to read; only your confirm, with the switch on and your password, stores a version or starts a quick test, <a href="0141-a-strategy-draft-is-text-the-model-wrote-for-the-owner-to-read-the-lab-validator-and-four-checks-decide-if-it-is-offered-and-only-the-owners-confirm-with-a-switch-and-a-fresh-password-stores-a-version-or-starts-a-quick-test.html">ADR 0141</a>); no promotion; no config
 changes (only proposed diffs you apply in the Config screen); prompts and tool calls logged in <code>ai.*</code>;
 broker secrets never in context. If the LLM is down, the nightly plan is unaffected.</li>
 </ul>
 <h2 id="4-features">4. Features<a class="hash" href="#4-features" aria-label="Link to this section">#</a></h2>
 <ol>
-<li><strong>Daily briefing</strong> (≤ 300 words): regime, the tickets with one-line rationale, risks, system changes.</li>
+<li><strong>Daily briefing</strong> (≤ 300 words): regime, the tickets with one-line rationale, risks, system changes. Built in P9-06 (<a href="../adr/0140-the-briefing-text-is-phrased-by-the-model-from-app-built-facts-and-a-deterministic-guard-rejects-any-figure-symbol-or-claim-it-cannot-verify-the-fixed-format-text-is-the-fallback.html">ADR 0140</a>): the app builds the facts, the model only phrases, a deterministic guard rejects any number, symbol or claim not in the facts, and a fixed-format text is stored instead; the weekly review works the same way. Both services start paused and the model is used only when the assistant and <code>Assistant:Briefing:UseModel</code> are both on.</li>
 <li><strong>Ask your data</strong>: &quot;Expectancy of 15m SELL setups in high-vol regimes in 2025?&quot; → query + numbers + chart.
 Also portfolio and baskets: &quot;XIRR of MyLongTerm vs Nifty this year?&quot;, &quot;Which basket worked best for 15m setups?&quot;</li>
-<li><strong>Strategy drafting</strong>: English idea → DSL YAML → validation → you confirm → Lab run → summary.</li>
-<li><strong>Hypothesis proposals</strong> for the learning loop (<a href="09-learning-engine.html">doc 09</a> §5).</li>
+<li><strong>Strategy drafting</strong>: English idea → DSL YAML → validation → you confirm → Lab run → summary. Built in P9-07a (<a href="0141-a-strategy-draft-is-text-the-model-wrote-for-the-owner-to-read-the-lab-validator-and-four-checks-decide-if-it-is-offered-and-only-the-owners-confirm-with-a-switch-and-a-fresh-password-stores-a-version-or-starts-a-quick-test.html">ADR 0141</a>): the model writes text, the Lab validator and four checks decide whether it is offered, you confirm with a fresh password and the switch on, and a quick test starts on the universe you pick; the chat tool <code>lab_propose_run</code> only proposes a draft, and the optional auto quick test is off by default and your act with your password.</li>
+<li><strong>Hypothesis and basket proposals</strong> for the learning loop (<a href="09-learning-engine.html">doc 09</a> §5). Built in P9-08 (<a href="0142-a-proposal-is-a-row-the-model-wrote-in-an-inbox-after-the-engine-re-read-its-evidence-and-checked-every-rule-and-only-the-owners-accept-with-a-switch-and-a-fresh-password-writes-a-proposed-hypothesis-or-changes-a-basket.html">ADR 0142</a>): the engine selects a pack, the model proposes up to three items, the engine re-reads the evidence and checks every rule, only what passes lands in the Suggestions inbox, and your accept (switch <code>allow_proposal_accept</code> and a fresh password) writes a proposed hypothesis or changes a basket; the auto option accepts hypotheses only and is off by default. Next-day focus and insight references are not built.</li>
 <li><strong>Event flags</strong> (later): classify announcements for the event-risk filter.</li>
 </ol>
 <h2 id="5-eval-set-re-run-on-every-modelprompt-change">5. Eval set (re-run on every model/prompt change)<a class="hash" href="#5-eval-set-re-run-on-every-modelprompt-change" aria-label="Link to this section">#</a></h2>
@@ -204,7 +208,7 @@ Also portfolio and baskets: &quot;XIRR of MyLongTerm vs Nifty this year?&quot;, 
 <tr>
 <td>Briefing</td>
 <td>10 historical plans</td>
-<td>No numbers absent from input; all tickets covered</td>
+<td>No numbers absent from input; all tickets covered (the guard of P9-06 is the checker; set B measures how many first attempts it accepts)</td>
 </tr>
 <tr>
 <td>Strategy drafting</td>
@@ -217,15 +221,18 @@ Also portfolio and baskets: &quot;XIRR of MyLongTerm vs Nifty this year?&quot;, 
 <td>Precision on &quot;material&quot; ≥ 80%</td>
 </tr>
 </tbody></table>
+<p><strong>Event flags set (P15-07, <a href="../adr/0188-the-announcements-csv-is-a-third-row-level-drop-the-labelling-sample-is-a-seeded-stratified-draw-the-baseline-is-fixed-before-the-labels-and-the-announcement-text-stays-out-of-git.html">ADR 0188</a>):</strong> the 200 announcements are drawn by <code>xd eval announcements sample</code> from the stored, dated announcements (240: 200 main and 40 reserve, half from the categories a pre-registered baseline file calls material), labelled by the owner (<code>material</code>, <code>non_material</code> or <code>unsure</code>; the definition is in <code>eval/README.md</code>) and imported with <code>xd eval announcements import</code>; the text stays in the git-ignored <code>data/eval/</code>, only a manifest of ids and hashes is committed. Until the labels exist set D is <code>not_evaluable</code> (waiting for labels). Precision on the sample is a stratified estimate (half the rows are from material-looking categories); the report prints the population-weighted figure beside it, with weights recomputed from the labelled rows per stratum.</p>
+<p><strong>The flag (P15-08, <a href="../adr/0189-the-llm-announcement-flag-is-one-schema-checked-answer-with-no-tool-over-fenced-untrusted-text-an-order-value-must-be-in-the-text-and-set-d-grades-it-against-the-category-baseline-before-any-use.html">ADR 0189</a>):</strong> <code>xd filings extract</code> gives each stored announcement one answer from the local model: <code>material</code>, a category from a closed list, a short reason and three optional fields. One request, no tool, temperature 0, seed 1337; the announcement sits between random-token fences under a prompt that declares it data; the answer is parsed against a closed schema (anything else is <code>invalid_output</code>, stored as a state and a closed reason, never guessed); an order value is kept only if the text contains it. Rows are insert-only in <code>filings.extractions</code> with the model and prompt hashes; that row is the per-call record, and no <code>ai.model_calls</code> row is written (backfill, set D, hostile set). Set D classifies the labelled rows through the same code and passes only with at least 200 rows, at least 30 predicted material, precision of material at least 0.80 and a better result than the category baseline by the exact sign test (p &lt; 0.05); a pass whose interval reaches under 0.80 is labelled weak evidence. The thresholds <code>min_predicted_material</code> and <code>baseline_sign_p</code> made every earlier accepted run stale. The flag is a stored feature: nothing in selection, planning, checks, simulation, scoring or execution reads it, and <code>llm-1</code> enters protocol X (P15-10) only after the newest accepted run has set D PASS.</p>
+<p>The eval runs with <code>xd eval</code> (<a href="../specs/P9-09-eval-set-and-regression-runner.html">P9-09</a>, <a href="../adr/0143-the-eval-grades-the-assistant-by-code-on-a-synthetic-fixture-read-only-with-exact-numbers-intervals-and-an-owner-accepted-baseline.html">ADR 0143</a>): a synthetic fixture database, graders written as code (no model judge), the pass thresholds in <code>eval/thresholds.json</code> (data 27 of 30; plans raw 8 and repaired 9 of 10 with no escape; ideas first shot 8 and repaired 9 of 10; events precision 0.80 once 200 labelled rows exist), every rate with its Wilson interval, a paired sign test between two runs, and a baseline only the owner accepts. It is re-run on every model, runtime or prompt change; the accepted run goes stale at once when the fingerprint of the model, runtime, prompts, sets, thresholds or fixture changes.</p>
 <h2 id="6-hermes-agent-nous-research-decision">6. Hermes Agent (Nous Research) — decision<a class="hash" href="#6-hermes-agent-nous-research-decision" aria-label="Link to this section">#</a></h2>
 <p><strong>What it is:</strong> open-source (MIT) always-on agent: persistent memory, self-written skills, built-in cron,
 MCP client, messaging gateways (Telegram, WhatsApp…), works with local OpenAI-compatible models.</p>
 <p><strong>Decision:</strong> not part of the core. Build the built-in assistant first. Evaluate Hermes in Phase 9 as an
 <strong>optional front-end</strong> (phone access, scheduled summaries) connected only to <code>xd-llm</code> and <code>xd-mcp</code>.</p>
-<p><strong>Why cautious:</strong> a third-party review (Sept 2026) cites 44 published CVEs including high-severity
+<p><strong>Why cautious:</strong> a third-party review (Sept 2026) cites 44 published CVEs (UNVERIFIED: the figure was not reproduced; several 2026 CVE records exist, see P9-10 D9) including high-severity
 remote-code-execution and supply-chain issues, and an audit found unrestricted shell and credential-file
 access in default config; self-written skills/memory can persist errors or injected instructions; it needs
-≥ 32–64K context.</p>
+≥ 64K context (corrected from &quot;32–64K&quot;: Hermes rejects smaller windows, P9-10 D6). The PoC bench is built (P9-10, <a href="../adr/0144-the-hermes-agent-poc-is-a-contained-bench-the-owner-starts-an-isolated-network-two-credentials-a-pinned-image-and-a-default-verdict-of-reject.html">ADR 0144</a>); the verdict is the owner&#39;s.</p>
 <p><strong>If adopted, mandatory hardening:</strong> own image from a pinned release (no <code>curl | bash</code>); shell, browser,
 web-search, file-system and media tools disabled; only <code>xd-mcp</code> registered; no secrets mounted; egress only
 to <code>xd-llm</code>/<code>xd-mcp</code>; skills git-tracked and memory reviewed weekly; messaging off by default; monthly CVE
@@ -240,7 +247,7 @@ over the built-in assistant.</p>
     <a class="prev" href="13-reports-and-ui.html"><small>← Previous  [</small>13 · Reports &amp; UI</a>
     <a class="next" href="15-smart-insights-and-automation.html"><small>Next  ] →</small>15 · Smart insights &amp; automation</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/14-ai-assistant.md</code> · 2026-10-27 03:12</footer>
+  <footer class="foot">Generated from <code>docs/14-ai-assistant.md</code> · 2026-11-10 18:35</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-roles" class="d2">1. Roles</a>
 <a href="#2-setup" class="d2">2. Setup</a>
