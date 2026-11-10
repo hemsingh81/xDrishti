@@ -224,6 +224,29 @@ public sealed class SystemBasketsApiTests(ApiFactory factory) : BasketsTestBase(
         var source = await response.ReadAsync<BasketSourceView>(Ct);
         source.UnmatchedSymbols.ShouldBe(["ZZ1", "ZZ2", "ZZ3"]);
         (await ListBasketsAsync()).Single(b => b.Id == _basketId).Source!.Unmatched.ShouldBe(3);
+
+        Factory.BasketSources.Serve(File, Csv(1, 50));
+        await FetchAsync();
+
+        using var again = await Client.GetAsync($"/api/baskets/{_basketId}/source", Ct);
+        (await again.ReadAsync<BasketSourceView>(Ct)).UnmatchedSymbols.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_list_carries_the_reason_of_a_rejected_fetch_until_a_later_one_is_ok()
+    {
+        Factory.BasketSources.Enabled = true;
+        Factory.BasketSources.Serve(File, Csv(1, 10));
+        (await FetchAsync()).View.Outcome.ShouldBe("rejected");
+
+        var rejected = (await ListBasketsAsync()).Single(b => b.Id == _basketId).Source!;
+        (rejected.State, rejected.Reason).ShouldBe(("rejected", "row_count"));
+
+        Factory.BasketSources.Serve(File, Csv(1, 50));
+        (await FetchAsync()).View.Outcome.ShouldBe("applied");
+
+        var ok = (await ListBasketsAsync()).Single(b => b.Id == _basketId).Source!;
+        (ok.State, ok.Reason).ShouldBe(("ok", null));
     }
 
     [Fact]

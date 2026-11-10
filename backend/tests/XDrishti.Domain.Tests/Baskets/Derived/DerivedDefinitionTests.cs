@@ -18,6 +18,14 @@ public sealed class DerivedDefinitionTests
     }
 
     [Fact]
+    public void Each_definition_names_the_unit_its_score_is_printed_in()
+    {
+        DerivedCatalogue.All.Where(d => d.Unit == "percent").Select(d => d.Id).ShouldBe([1, 2, 4, 6, 10, 12]);
+        DerivedCatalogue.All.Where(d => d.Unit == "rupees").Select(d => d.Id).ShouldBe([3, 13]);
+        DerivedCatalogue.All.Where(d => d.Unit == "ratio").Select(d => d.Id).ShouldBe([5, 7, 8, 9, 11, 14]);
+    }
+
+    [Fact]
     public void Basket_1_ranks_by_atr_percent_and_names_the_instrument_with_59_bars_insufficient_history()
     {
         var wide = Inst("WIDE", Flat(60, 100, 2));

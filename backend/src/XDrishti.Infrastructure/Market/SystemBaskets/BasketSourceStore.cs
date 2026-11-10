@@ -48,9 +48,10 @@ internal sealed class BasketSourceStore(XDrishtiDbContext db) : IBasketSourceSto
 
     public async ValueTask<IReadOnlyList<string>> UnmatchedSymbolsAsync(Guid basketId, CancellationToken cancellationToken)
     {
-        var warnings = await db.BasketFetches.AsNoTracking()
-            .Where(f => f.BasketId == basketId && f.Unmatched > 0 && (f.Outcome == "applied" || f.Outcome == "rejected"))
-            .OrderByDescending(f => f.FetchedAt).ThenByDescending(f => f.Id).Select(f => f.Warnings).FirstOrDefaultAsync(cancellationToken);
+        // The same fetch the list's count comes from: the newest one that did not fail; none of its rows is unmatched when its count is 0.
+        var latest = await db.BasketFetches.AsNoTracking().Where(f => f.BasketId == basketId && f.Outcome != "failed")
+            .OrderByDescending(f => f.FetchedAt).ThenByDescending(f => f.Id).Select(f => new { f.Unmatched, f.Warnings }).FirstOrDefaultAsync(cancellationToken);
+        var warnings = latest is { Unmatched: > 0 } ? latest.Warnings : null;
         if (warnings is null)
         {
             return [];
