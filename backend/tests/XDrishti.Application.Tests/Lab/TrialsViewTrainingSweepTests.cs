@@ -23,11 +23,11 @@ public sealed class TrialsViewTrainingSweepTests
     public void Linked_sweeps_raise_the_total_and_the_factor_and_the_text_says_which_are_counted()
     {
         var plain = TrialsView.Of(new TrialCounts(2, 1, 0, 0, 0, 3, 40), true, true);
-        var linked = TrialsView.Of(new TrialCounts(2, 1, 0, 0, 0, 3, 40, 2), true, true);
+        var linked = TrialsView.Of(new TrialCounts(2, 1, 0, 0, 0, 3, 40, 2, 1), true, true);
 
         linked.Total.ShouldBe(plain.Total + 2);
         linked.HonestFactor.ShouldBeGreaterThan(plain.HonestFactor);
         linked.Text.ShouldContain("+ 2 linked training sweeps");
-        linked.Text.ShouldContain("2 of a version this family descends from are counted as looks above, 1 others are not in this count.");
+        linked.Text.ShouldContain("2 of a version this family descends from are counted as looks above, 1 of this family's own swept versions are outside that lineage and are not in this count.");
     }
 }

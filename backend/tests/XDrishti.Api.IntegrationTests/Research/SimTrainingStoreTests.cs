@@ -163,14 +163,15 @@ public sealed class SimTrainingStoreTests(ApiFactory factory) : IAsyncLifetime
         string Sweep(string id, string hash) => $"INSERT INTO lab.test_ledger (lab_run_id, run_key, strategy_id, version, strategy_hash, universe_label, window_from, window_to, method, created_at, trial_kind, extra_trials) VALUES (gen_random_uuid(), '{Guid.NewGuid():N}{Guid.NewGuid():N}', '{id}', 1, '{hash}', 'all', '2026-01-01', '2039-10-31', 'training', now(), 'training_sweep', 0);";
         await StoreKit.ExecuteAsync(Db.ConnectionString, Strategy(parentFamily) + Strategy(family) + Strategy(other)
             + Version(parentFamily, 1, H('1'), null) + Version(family, 1, H('2'), H('1')) + Version(family, 2, H('3'), H('2')) + Version(other, 1, H('9'), null)
-            + Sweep(parentFamily, H('1')) + Sweep(family, H('3')) + Sweep(other, H('9')), Ct);
+            + Sweep(parentFamily, H('1')) + Sweep(family, H('3')) + Sweep(family, H('3')) + Sweep(family, H('7')) + Sweep(other, H('9')), Ct);
         using var scope = Db.Host.Services.CreateScope();
         var ledger = scope.ServiceProvider.GetRequiredService<ITestLedger>();
 
         var counts = await ledger.CountTrialsAsync(family, Ct);
 
-        counts.LinkedSweeps.ShouldBe(2, "the sweep of the parent version and the sweep of the family's own version");
-        counts.TrainingSweeps.ShouldBe(1, "the family's own ledger rows, shown as before");
+        counts.LinkedSweeps.ShouldBe(2, "the parent version and the family's own version, each counted once however often it was swept");
+        counts.TrainingSweeps.ShouldBe(3, "the family's own ledger rows, shown as before");
+        counts.UnlinkedSweeps.ShouldBe(1, "the family's own swept hash 7 is not a version of its lineage");
         counts.Total.ShouldBe(2, "linked sweeps are the only looks this family has");
         (await ledger.CountTrialsAsync(other, Ct)).LinkedSweeps.ShouldBe(1);
         (await ledger.CountTrialsAsync("NO_SUCH_FAMILY", Ct)).LinkedSweeps.ShouldBe(0);

@@ -75,30 +75,39 @@ internal sealed class SimTrainingStore(NpgsqlDataSource dataSource) : ISimTraini
             id = inserted;
         }
 
-        foreach (var cell in cells)
+        if (cells.Count > 0)
         {
-            await using var insertCell = new NpgsqlCommand("""
-                INSERT INTO research.training_sim_cell_stats (training_run_id, as_of, cell_key, strategy, timeframe, side, window_code, costed, n, wins, effective_n, win_rate_posterior, win_rate_lower, win_rate_upper, expectancy_r, enough)
-                VALUES (@run, @as_of, @cell_key, @strategy, @timeframe, @side, @window, @costed, @n, @wins, @effective_n, @posterior, @lower, @upper, @expectancy, @enough)
-                """, connection, transaction);
-            var p = insertCell.Parameters;
-            p.AddWithValue("run", NpgsqlDbType.Bigint, id);
-            p.AddWithValue("as_of", NpgsqlDbType.Date, cellsAsOf);
-            p.AddWithValue("cell_key", NpgsqlDbType.Text, cell.CellKey);
-            p.AddWithValue("strategy", NpgsqlDbType.Varchar, cell.Strategy);
-            p.AddWithValue("timeframe", NpgsqlDbType.Varchar, cell.Timeframe);
-            p.AddWithValue("side", NpgsqlDbType.Varchar, cell.Side);
-            p.AddWithValue("window", NpgsqlDbType.Varchar, cell.Window);
-            p.AddWithValue("costed", NpgsqlDbType.Boolean, cell.Costed);
-            p.AddWithValue("n", NpgsqlDbType.Integer, cell.N);
-            p.AddWithValue("wins", NpgsqlDbType.Integer, cell.Wins);
-            p.AddWithValue("effective_n", NpgsqlDbType.Double, cell.EffectiveN);
-            p.AddWithValue("posterior", NpgsqlDbType.Double, cell.WinRatePosterior);
-            p.AddWithValue("lower", NpgsqlDbType.Double, cell.WinRateLower);
-            p.AddWithValue("upper", NpgsqlDbType.Double, cell.WinRateUpper);
-            Value(p, "expectancy", NpgsqlDbType.Double, cell.ExpectancyR);
-            p.AddWithValue("enough", NpgsqlDbType.Boolean, cell.Enough);
-            await insertCell.ExecuteNonQueryAsync(cancellationToken);
+            await using var import = await connection.BeginBinaryImportAsync("COPY research.training_sim_cell_stats (training_run_id, as_of, cell_key, strategy, timeframe, side, window_code, costed, n, wins, effective_n, win_rate_posterior, win_rate_lower, win_rate_upper, expectancy_r, enough) FROM STDIN (FORMAT BINARY)", cancellationToken);
+            foreach (var cell in cells)
+            {
+                await import.StartRowAsync(cancellationToken);
+                await import.WriteAsync(id, NpgsqlDbType.Bigint, cancellationToken);
+                await import.WriteAsync(cellsAsOf, NpgsqlDbType.Date, cancellationToken);
+                await import.WriteAsync(cell.CellKey, NpgsqlDbType.Text, cancellationToken);
+                await import.WriteAsync(cell.Strategy, NpgsqlDbType.Varchar, cancellationToken);
+                await import.WriteAsync(cell.Timeframe, NpgsqlDbType.Varchar, cancellationToken);
+                await import.WriteAsync(cell.Side, NpgsqlDbType.Varchar, cancellationToken);
+                await import.WriteAsync(cell.Window, NpgsqlDbType.Varchar, cancellationToken);
+                await import.WriteAsync(cell.Costed, NpgsqlDbType.Boolean, cancellationToken);
+                await import.WriteAsync(cell.N, NpgsqlDbType.Integer, cancellationToken);
+                await import.WriteAsync(cell.Wins, NpgsqlDbType.Integer, cancellationToken);
+                await import.WriteAsync(cell.EffectiveN, NpgsqlDbType.Double, cancellationToken);
+                await import.WriteAsync(cell.WinRatePosterior, NpgsqlDbType.Double, cancellationToken);
+                await import.WriteAsync(cell.WinRateLower, NpgsqlDbType.Double, cancellationToken);
+                await import.WriteAsync(cell.WinRateUpper, NpgsqlDbType.Double, cancellationToken);
+                if (cell.ExpectancyR is { } expectancy)
+                {
+                    await import.WriteAsync(expectancy, NpgsqlDbType.Double, cancellationToken);
+                }
+                else
+                {
+                    await import.WriteNullAsync(cancellationToken);
+                }
+
+                await import.WriteAsync(cell.Enough, NpgsqlDbType.Boolean, cancellationToken);
+            }
+
+            await import.CompleteAsync(cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);

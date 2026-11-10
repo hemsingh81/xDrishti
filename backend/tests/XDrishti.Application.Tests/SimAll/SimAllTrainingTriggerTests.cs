@@ -77,4 +77,87 @@ public sealed class SimAllTrainingTriggerTests
             throw new InvalidOperationException("boom");
         }
     }
+
+    [Fact]
+    public async Task The_market_opening_cancels_a_training_in_flight_and_releases_it_so_a_later_tick_runs_it_again()
+    {
+        var waiting = new Waiting();
+        var runner = Runner(true, SimAllStates.Completed, waiting);
+
+        var tick = runner.TickAsync(Ct);
+        while (waiting.Started == 0)
+        {
+            await Task.Delay(5, Ct);
+        }
+
+        _time.Advance(TimeSpan.FromHours(14)); // 10:00 IST next morning: the window opened at 09:00 under the training
+        await tick;
+
+        waiting.Cancelled.ShouldBe(1);
+        _time.SetUtcNow(new DateTimeOffset(2026, 11, 11, 14, 30, 0, TimeSpan.Zero)); // the next evening
+        waiting.Release = true;
+        await runner.TickAsync(Ct);
+
+        waiting.Started.ShouldBe(2, "the cancelled attempt was released, so the next evening it ran again");
+    }
+
+    [Fact]
+    public async Task Low_disk_during_training_cancels_it_and_releases_it()
+    {
+        var waiting = new Waiting();
+        var runner = Runner(true, SimAllStates.Completed, waiting);
+
+        var tick = runner.TickAsync(Ct);
+        while (waiting.Started == 0)
+        {
+            await Task.Delay(5, Ct);
+        }
+
+        _disk.Free = 1;
+        while (!tick.IsCompleted)
+        {
+            _time.Advance(TimeSpan.FromSeconds(6));
+            await Task.Delay(5, Ct);
+        }
+
+        await tick;
+        waiting.Cancelled.ShouldBe(1);
+        _disk.Free = 500L * SimAllSettings.Gb;
+        waiting.Release = true;
+        await runner.TickAsync(Ct);
+        waiting.Started.ShouldBe(2);
+    }
+
+    private sealed class Waiting : ICommandHandler<TrainFromSimulationCommand, SimTrainingView>
+    {
+        private int _started;
+        private int _cancelled;
+
+        public int Started => Volatile.Read(ref _started);
+
+        public int Cancelled => Volatile.Read(ref _cancelled);
+
+        public bool Release { get; set; }
+
+        public async ValueTask<Result<SimTrainingView>> HandleAsync(TrainFromSimulationCommand command, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _started);
+            if (Release)
+            {
+                return Result.Failure<SimTrainingView>(SimTrainingErrors.Disabled);
+            }
+
+            try
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                Interlocked.Increment(ref _cancelled);
+                throw;
+            }
+
+            return Result.Failure<SimTrainingView>(SimTrainingErrors.Disabled);
+        }
+    }
 }

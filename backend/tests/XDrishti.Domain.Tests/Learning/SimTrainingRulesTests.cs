@@ -11,18 +11,32 @@ public sealed class SimTrainingRulesTests
 
     [Theory]
     [InlineData(0, 0)]
-    [InlineData(1, 2)]
+    [InlineData(1, 3)]
     [InlineData(5, 7)]
     [InlineData(10, 14)]
     [InlineData(20, 28)]
     public void Sessions_become_calendar_days_rounded_up_and_five_sessions_are_the_seven_days_of_ADR_0067(int sessions, int days) =>
-        SimTrainingRules.EmbargoDays(sessions).ShouldBe(days);
+        SimTrainingRules.EmbargoDays(sessions, new DateOnly(2024, 1, 1), new DateOnly(2024, 12, 31), Weekday).ShouldBe(days);
+
+    private static bool Weekday(DateOnly d) => d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday);
+
+    [Fact]
+    public void A_holiday_week_makes_the_embargo_longer_than_five_calendar_days_a_week()
+    {
+        // Monday 2024-03-25 is a holiday: the fifth session before Monday 2024-04-01 is Friday 2024-03-22, ten days back
+        var holiday = new DateOnly(2024, 3, 25);
+        var plain = SimTrainingRules.EmbargoDays(5, new DateOnly(2024, 3, 1), new DateOnly(2024, 4, 30), Weekday);
+        var withHoliday = SimTrainingRules.EmbargoDays(5, new DateOnly(2024, 3, 1), new DateOnly(2024, 4, 30), d => Weekday(d) && d != holiday);
+
+        plain.ShouldBe(7);
+        withHoliday.ShouldBe(10);
+    }
 
     [Theory]
     [InlineData(-1)]
     [InlineData(21)]
     public void An_embargo_outside_zero_to_twenty_sessions_is_refused(int sessions) =>
-        Should.Throw<ArgumentOutOfRangeException>(() => SimTrainingRules.EmbargoDays(sessions));
+        Should.Throw<ArgumentOutOfRangeException>(() => SimTrainingRules.EmbargoDays(sessions, new DateOnly(2024, 1, 1), new DateOnly(2024, 2, 1), Weekday));
 
     [Fact]
     public void A_trade_whose_exit_reaches_the_hold_out_block_is_left_out_whole_and_the_last_day_before_it_is_in()
@@ -48,9 +62,9 @@ public sealed class SimTrainingRulesTests
     {
         var rows = Rows(new DateOnly(2023, 1, 2), 900, horizonDays: 6).Where(r => SimTrainingRules.Admits(r.TradeDate, r.ResolvedEpochSeconds, new DateOnly(2025, 6, 27), HoldOut)).ToList();
         var recorder = new Recorder();
-        var embargoDays = SimTrainingRules.EmbargoDays(5);
+        var embargoDays = SimTrainingRules.EmbargoDays(5, new DateOnly(2023, 1, 2), new DateOnly(2025, 6, 27), Weekday);
 
-        var report = WalkForwardValidator.Compare(rows, [recorder], SimTrainingRules.Options(5, 1) with { MinTrainTrades = 5 }).Value;
+        var report = WalkForwardValidator.Compare(rows, [recorder], SimTrainingRules.Options(7, 1) with { MinTrainTrades = 5 }).Value;
 
         report.Results.Count.ShouldBeGreaterThanOrEqualTo(4);
         recorder.Folds.Count.ShouldBe(report.Results.Count);
@@ -75,7 +89,7 @@ public sealed class SimTrainingRulesTests
         var long20 = new Recorder();
 
         WalkForwardValidator.Compare(rows, [none], SimTrainingRules.Options(0, 1) with { MinTrainTrades = 5 });
-        WalkForwardValidator.Compare(rows, [long20], SimTrainingRules.Options(20, 1) with { MinTrainTrades = 5 });
+        WalkForwardValidator.Compare(rows, [long20], SimTrainingRules.Options(28, 1) with { MinTrainTrades = 5 });
 
         none.Folds.Count.ShouldBe(long20.Folds.Count);
         none.Folds.Zip(long20.Folds).ShouldAllBe(p => p.Second.Count <= p.First.Count);

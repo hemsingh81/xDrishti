@@ -119,17 +119,28 @@ public sealed class SimAllRunner(IServiceScopeFactory scopes, SimAllSettings set
             return;
         }
 
-        if ((await YieldAsync(services, false, cancellationToken)).Reason is not null)
+        var yield = await YieldAsync(services, false, cancellationToken);
+        if (yield.Reason is not null)
         {
             return;
         }
 
         _trainingAttempted.Add(last.Id);
+
+        // as for a chunk: the market opening is a deadline, and a watcher looks at disk and the bar-history job while training runs; either cancels it and the attempt is released, so it resumes at a later tick
+        using var stop = new CancellationTokenSource();
+        using var deadline = yield.Deadline is { } at ? new CancellationTokenSource(TimeSpan.FromTicks(Math.Max(0, (at - time.GetUtcNow()).Ticks)), time) : new CancellationTokenSource();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token, stop.Token);
+        var watcher = WatchTrainingAsync(stop, linked.Token);
         try
         {
-            await services.GetRequiredService<ICommandHandler<TrainFromSimulationCommand, SimTrainingView>>().HandleAsync(new TrainFromSimulationCommand(last.Id), cancellationToken);
+            await services.GetRequiredService<ICommandHandler<TrainFromSimulationCommand, SimTrainingView>>().HandleAsync(new TrainFromSimulationCommand(last.Id), linked.Token);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            _trainingAttempted.Remove(last.Id); // the market opened or a yield rule says wait: nothing was stored, a later tick tries again
+        }
+        catch (OperationCanceledException)
         {
             _trainingAttempted.Remove(last.Id);
             throw;
@@ -139,6 +150,33 @@ public sealed class SimAllRunner(IServiceScopeFactory scopes, SimAllSettings set
 #pragma warning restore CA1031
         {
             SimTrainingLog.Failed(logger, last.Id, ex);
+        }
+        finally
+        {
+            await linked.CancelAsync();
+            await watcher;
+        }
+    }
+
+    /// <summary>Looks at the yield rules (disk, a running bar-history job) every poll interval while training runs and cancels it when one says wait.</summary>
+    private async Task WatchTrainingAsync(CancellationTokenSource stop, CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await Task.Delay(settings.PollInterval, time, token);
+                await using var scope = scopes.CreateAsyncScope();
+                if ((await YieldAsync(scope.ServiceProvider, false, token)).Reason is not null)
+                {
+                    await stop.CancelAsync();
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // training ended or the host stops
         }
     }
 

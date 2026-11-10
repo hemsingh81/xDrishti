@@ -34,10 +34,9 @@ public sealed record TrialsView(
         if (parts.TrainingSweeps > 0)
         {
             // the sweeps of a version this family descends from are in the count (a strategy tuned from the sweep, ADR 0243 point 5); the others are shown beside it
-            var others = parts.TrainingSweeps - parts.LinkedSweeps;
             text += $" {parts.TrainingSweeps.ToString(c)} training sweeps ({parts.TrainingSweepTrials.ToString(c)} variants) are recorded separately"
                 + (parts.LinkedSweeps > 0
-                    ? $"; {parts.LinkedSweeps.ToString(c)} of a version this family descends from are counted as looks above, {Math.Max(0, others).ToString(c)} others are not in this count."
+                    ? $"; {parts.LinkedSweeps.ToString(c)} of a version this family descends from are counted as looks above, {parts.UnlinkedSweeps.ToString(c)} of this family's own swept versions are outside that lineage and are not in this count."
                     : " and are not in this count, because no strategy of this family descends from a swept version.");
         }
 

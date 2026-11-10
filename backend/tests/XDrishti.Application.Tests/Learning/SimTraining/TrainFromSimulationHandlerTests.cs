@@ -37,7 +37,7 @@ public sealed class TrainFromSimulationHandlerTests
     private readonly IModelTrainer _trainer = Substitute.For<IModelTrainer>();
     private readonly IModelFiles _files = Substitute.For<IModelFiles>();
     private readonly IModelRegistry _registry = Substitute.For<IModelRegistry>();
-    private readonly SimTrainingSettings _settings = new() { Enabled = true, MinRows = 100, MaxRows = 1_000_000 };
+    private readonly SimTrainingSettings _settings = new() { Enabled = true, MinRows = 100, MaxRows = 150_000 };
     private SimAllJob _job = Job(SimAllStates.Completed);
     private SimTrainingRecord? _stored;
     private IReadOnlyList<TrainingSimCell>? _cells;
@@ -47,6 +47,9 @@ public sealed class TrainFromSimulationHandlerTests
 
     private static SimAllJob Job(string state) =>
         new(Guid.Parse("11111111-1111-1111-1111-111111111111"), state, null, First, WindowTo, HoldOut, 2, "owner:me@example.com", DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch);
+
+    private readonly ITradeFeatureExtractor _extractor = Substitute.For<ITradeFeatureExtractor>();
+    private readonly List<TradeFeatureDecision> _extracted = [];
 
     private TrainFromSimulationHandler Handler(IScorerFactory? candidate = null)
     {
@@ -63,8 +66,9 @@ public sealed class TrainFromSimulationHandlerTests
         var calendar = Substitute.For<ITradingCalendar>();
         calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new TradingCalendar());
         var bars = Substitute.For<IBarStore>();
-        bars.ReadAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new List<XDrishti.Domain.Market.Bars.Bar>()); // no stored bars: the stored features of _features are the ones read
-        return new TrainFromSimulationHandler(_jobs, _reader, _store, bars, Substitute.For<IAdjustmentFactors>(), calendar, Substitute.For<ITradeFeatureExtractor>(), _features, _sets, _trainer, _files, _registry, _settings,
+        bars.ReadAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new List<XDrishti.Domain.Market.Bars.Bar> { new(0, 1, 1, 1, 1, 1) }); // one bar: the extractor is asked, and records which decisions it was asked for; the stored features of _features are the ones read
+        _extractor.Extract(Arg.Any<IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>(), Arg.Any<XDrishti.Domain.Market.Actions.AdjustmentFactors>(), Arg.Any<TradingCalendar>(), Arg.Do<IReadOnlyList<TradeFeatureDecision>>(d => _extracted.AddRange(d))).Returns(new Dictionary<string, double[]>());
+        return new TrainFromSimulationHandler(_jobs, _reader, _store, bars, Substitute.For<IAdjustmentFactors>(), calendar, _extractor, _features, _sets, _trainer, _files, _registry, _settings,
             new FakeTimeProvider(new DateTimeOffset(2026, 11, 10, 0, 0, 0, TimeSpan.Zero)), NullLogger<TrainFromSimulationHandler>.Instance);
     }
 
@@ -283,6 +287,68 @@ public sealed class TrainFromSimulationHandlerTests
         result.Value.RunsNotFinished.ShouldBe(3);
         result.Value.Runs.ShouldBe(0);
     }
+
+    [Fact]
+    public async Task Only_admitted_and_sampled_trades_are_extracted_and_nothing_of_the_hold_out_is()
+    {
+        _settings.MaxRows = 300;
+        History(First, new DateOnly(2025, 7, 31));
+
+        var result = await Handler().HandleAsync(Command, Ct);
+
+        result.Value.SampleEvery.ShouldBeGreaterThan(1);
+        _extracted.ShouldNotBeEmpty();
+        _extracted.Count.ShouldBeLessThan(500, "the thinned set, not the 940 trades of the run");
+        _extracted.ShouldAllBe(d => SessionDate(d.DecisionEpochSeconds) <= WindowTo);
+        _trainedOn!.Count.ShouldBeLessThanOrEqualTo(_extracted.Count);
+    }
+
+    [Fact]
+    public async Task Memory_stays_bounded_by_the_row_limit_on_a_large_synthetic_job()
+    {
+        const int Runs = 500;
+        const int PerRun = 800; // 400,000 closed trades in all, streamed and never held by the test
+        _settings.MaxRows = 40_000;
+        var keys = Enumerable.Range(0, Runs).Select(i => i.ToString("x64", System.Globalization.CultureInfo.InvariantCulture)).ToList();
+        var handler = Handler();
+        _jobs.ListFinishedAsync(_job.Id, Ct).Returns(new SimAllFinished(keys, 0));
+        var baseline = GC.GetTotalMemory(true);
+        long peak = 0;
+        var seen = 0;
+        foreach (var key in keys.Select((k, i) => (k, i)))
+        {
+            _reader.FindAsync(key.k, Ct).Returns(new TrainingRunHeader(key.k, "ORB", new string('b', 64), First, WindowTo, 1, 1, PerRun, 0, DateTimeOffset.UnixEpoch));
+            _reader.StreamTradesAsync(key.k, Arg.Any<CancellationToken>()).Returns(_ => Generate(key.i, key.k));
+            _features.ReadAsync(Arg.Is<IReadOnlyList<string>>(l => l.Count == 1 && l[0] == key.k), TradeFeatureCatalog.Version, Ct).Returns(_ => Task.FromResult<IReadOnlyList<TradeFeatureRow>>([]).Result);
+        }
+
+        async IAsyncEnumerable<RunTrade> Generate(int run, string key)
+        {
+            for (var i = 0; i < PerRun; i++)
+            {
+                await Task.Yield();
+                var t = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:R" + run, Side.Buy, First.AddDays(i), i % 3 == 0 ? ExitReason.Target : ExitReason.Stop, rExact: i % 3 == 0 ? 2 : -1, rFilled: i % 3 == 0 ? 2 : -1, fills: FillBasis.Exact);
+                if (++seen % 20_000 == 0)
+                {
+                    peak = Math.Max(peak, GC.GetTotalMemory(true) - baseline);
+                }
+
+                yield return new RunTrade(t, []);
+            }
+        }
+
+        var result = await handler.HandleAsync(Command, Ct);
+        peak = Math.Max(peak, GC.GetTotalMemory(true) - baseline);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : string.Empty);
+        result.Value.SampleEvery.ShouldBeGreaterThanOrEqualTo(10);
+        seen.ShouldBe(Runs * PerRun);
+        _extracted.Count.ShouldBeLessThanOrEqualTo(45_000, "only the thinned trades are ever extracted");
+        TestContext.Current.SendDiagnosticMessage($"MEMORY peak live heap above baseline: {peak / (1024 * 1024)} MiB for {seen} streamed trades, {_extracted.Count} kept, every {result.Value.SampleEvery}.");
+        peak.ShouldBeLessThan(1500L * 1024 * 1024);
+    }
+
+    private static DateOnly SessionDate(long epoch) => XDrishti.Domain.Market.Bars.SessionClock.DateOf(epoch);
 
     private sealed class Half : IScorerFactory
     {

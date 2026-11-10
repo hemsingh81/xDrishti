@@ -18,15 +18,39 @@ public static class SimTrainingRules
     /// <summary>The basis of the cell statistics this path writes; never mixed with the research basis.</summary>
     public const string Basis = "training_sim";
 
-    /// <summary>Calendar days that cover <paramref name="sessions"/> trading sessions: five sessions a week, rounded up (5 sessions = 7 days, 20 = 28).</summary>
-    public static int EmbargoDays(int sessions)
+    /// <summary>
+    /// Calendar days that cover <paramref name="sessions"/> trading sessions, from the trading calendar (holidays and special closures included): the longest span, over the job window, from the session that many sessions before a session to that session.
+    /// With no holiday and a Monday-to-Friday week, 5 sessions are 7 days and 20 are 28; a holiday week is longer. The longest span is used for every fold, so the embargo is never shorter than the asked number of sessions.
+    /// </summary>
+    public static int EmbargoDays(int sessions, DateOnly from, DateOnly to, Func<DateOnly, bool> isSession)
     {
+        ArgumentNullException.ThrowIfNull(isSession);
         if (sessions is < 0 or > MaxEmbargoSessions)
         {
             throw new ArgumentOutOfRangeException(nameof(sessions), sessions, "The embargo is 0 to 20 sessions.");
         }
 
-        return (sessions * 7 + 4) / 5;
+        if (sessions == 0)
+        {
+            return 0;
+        }
+
+        var days = new List<DateOnly>();
+        for (var d = from; d <= to; d = d.AddDays(1))
+        {
+            if (isSession(d))
+            {
+                days.Add(d);
+            }
+        }
+
+        var longest = 0;
+        for (var i = sessions; i < days.Count; i++)
+        {
+            longest = Math.Max(longest, days[i].DayNumber - days[i - sessions].DayNumber);
+        }
+
+        return longest == 0 ? (sessions * 7 + 4) / 5 : longest; // no calendar information (too short a window): five sessions a week
     }
 
     /// <summary>
@@ -35,8 +59,8 @@ public static class SimTrainingRules
     public static bool Admits(DateOnly tradeDate, long exitEpochSeconds, DateOnly windowTo, DateOnly holdOutStart) =>
         tradeDate <= windowTo && SessionClock.DateOf(exitEpochSeconds) < holdOutStart;
 
-    /// <summary>The validation knobs of the path: the doc 16 defaults of ADR 0067 with the embargo from the sessions asked for.</summary>
-    public static ValidationOptions Options(int embargoSessions, int trials) => new(EmbargoDays: EmbargoDays(embargoSessions), Trials: Math.Max(1, trials));
+    /// <summary>The validation knobs of the path: the doc 16 defaults of ADR 0067 with the embargo in calendar days (from <see cref="EmbargoDays"/>).</summary>
+    public static ValidationOptions Options(int embargoDays, int trials) => new(EmbargoDays: embargoDays, Trials: Math.Max(1, trials));
 
     /// <summary>The first missing quantity as words, or null when there is enough to judge a model: rows, then usable folds.</summary>
     public static string? NotEvaluable(int rows, int minRows, int usableFolds, int minFolds, DateOnly? from, DateOnly? to)

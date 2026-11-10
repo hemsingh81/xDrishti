@@ -86,7 +86,7 @@ internal sealed class TrainFromSimulationHandler(
         }
 
         var data = loaded.Value;
-        var embargoDays = SimTrainingRules.EmbargoDays(settings.EmbargoSessions);
+        var embargoDays = SimTrainingRules.EmbargoDays(settings.EmbargoSessions, job.WindowFrom, job.WindowTo, (await calendars.GetAsync(cancellationToken)).IsTradingDay);
         var now = time.GetUtcNow();
         var cells = data.CellStats.Select(r => new TrainingSimCell(r.Cell.Key, r.Cell.Strategy, r.Cell.Timeframe, r.Cell.Side, r.Window.Code(), r.Costed, r.N, r.Wins, r.EffectiveN, r.WinRatePosterior, r.WinRateLower, r.WinRateUpper, r.ExpectancyR, r.Enough)).ToList();
         var common = new Common(job, inputHash, runs.Count, notFinished, sampleEvery, data.HeldOut, embargoDays, now);
@@ -113,7 +113,7 @@ internal sealed class TrainFromSimulationHandler(
         var trainingSetId = training.Id;
         await trainingSets.StoreAsync(new TrainingSetToStore(training, $"sim-all:{c.Job.Id:D}", data.Options, data.Unresolved, data.NoTarget, Actor, c.Now), cancellationToken);
 
-        var validation = SimTrainingRules.Options(settings.EmbargoSessions, 1);
+        var validation = SimTrainingRules.Options(c.EmbargoDays, 1);
         var from = rows.Min(r => r.TradeDate);
         var to = rows.Max(r => r.TradeDate);
         if (SimTrainingRules.NotEvaluable(rows.Count, settings.MinRows, int.MaxValue, 0, from, to) is { } fewRows)
@@ -185,10 +185,12 @@ internal sealed class TrainFromSimulationHandler(
     private async ValueTask<Result<Loaded>> LoadAsync(SimAllJob job, IReadOnlyList<TrainingRunHeader> runs, int sampleEvery, CancellationToken cancellationToken)
     {
         var trades = new List<SimTrade>();
+        var matching = new List<TradeFeatureRow>();
         var heldOut = 0;
         foreach (var run in runs)
         {
-            await ExtractTradeFeaturesHandler.ExtractAsync(reader.StreamTradesAsync(run.RunKey, cancellationToken), run.RunKey, bars, adjustments, calendars, extractor, features, time, cancellationToken);
+            // one run at a time: only the admitted, sampled trades are kept, only their features are extracted, and only this run's stored features are read, so memory is bounded by MaxRows and one run
+            var kept = new List<SimTrade>();
             await foreach (var runTrade in reader.StreamTradesAsync(run.RunKey, cancellationToken))
             {
                 var t = runTrade.Trade;
@@ -200,9 +202,19 @@ internal sealed class TrainFromSimulationHandler(
 
                 if (sampleEvery == 1 || Bucket(t.Key) % sampleEvery == 0)
                 {
-                    trades.Add(t);
+                    kept.Add(t);
                 }
             }
+
+            if (kept.Count == 0)
+            {
+                continue;
+            }
+
+            await ExtractTradeFeaturesHandler.ExtractAsync(Replay(kept), run.RunKey, bars, adjustments, calendars, extractor, features, time, cancellationToken);
+            var decisionOf = kept.ToDictionary(t => t.Key, t => t.DecisionEpochSeconds, StringComparer.Ordinal);
+            matching.AddRange((await features.ReadAsync([run.RunKey], TradeFeatureCatalog.Version, cancellationToken)).Where(f => decisionOf.TryGetValue(f.TradeKey, out var at) && at == f.DecisionEpochSeconds));
+            trades.AddRange(kept);
         }
 
         var options = new CellStatsOptions();
@@ -243,9 +255,6 @@ internal sealed class TrainFromSimulationHandler(
 
         var asks = set.Value.Labels.Select(l => new CellAsk(l.Key, cellOf[l.Key].CellKey, cellOf[l.Key].Date)).ToList();
         var pointInTime = PointInTimeCells.Compute(cellInputs, asks, options);
-        var decisionOf = trades.ToDictionary(t => t.Key, t => t.DecisionEpochSeconds, StringComparer.Ordinal);
-        var stored = await features.ReadAsync(runKeys, TradeFeatureCatalog.Version, cancellationToken);
-        var matching = stored.Where(f => decisionOf.TryGetValue(f.TradeKey, out var at) && at == f.DecisionEpochSeconds).ToList();
         var provenance = string.Create(CultureInfo.InvariantCulture, $"sim-all:{job.Id:D};{settings.KeyText()};{sampleEvery};{options.RecencyHalfLifeDays:R};{options.PriorStrength:R};{options.MinTrades};{options.CredibleLevel:R}");
         var built = TrainingDataBuilder.Build(set.Value, matching, pointInTime, null, provenance);
         if (built.IsFailure)
@@ -257,6 +266,15 @@ internal sealed class TrainFromSimulationHandler(
             .Select(r => new ValidationRow(r.TradeKey, r.Label, r.R, r.TradeDate, r.DecisionEpochSeconds, r.ResolvedEpochSeconds, cellOf[r.TradeKey].CellKey, [.. r.Values]))
             .ToList();
         return Result.Success(new Loaded(validationRows, built.Value, stats, options, heldOut, set.Value.Unresolved, set.Value.NoTarget));
+    }
+
+    private static async IAsyncEnumerable<RunTrade> Replay(List<SimTrade> kept)
+    {
+        foreach (var t in kept)
+        {
+            await Task.Yield();
+            yield return new RunTrade(t, []);
+        }
     }
 
     private string InputHash(SimAllJob job, IReadOnlyList<string> runKeys)

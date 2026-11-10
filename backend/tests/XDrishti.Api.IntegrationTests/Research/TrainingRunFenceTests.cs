@@ -189,7 +189,7 @@ public sealed class TrainingRunFenceTests(ApiFactory factory) : IAsyncLifetime
         (await ledger.CountVariantsAsync(strategy, Ct)).ShouldBe(0);
         (await ledger.HasHashAsync(strategy, hash, Ct)).ShouldBeFalse();
         var counts = await ledger.CountTrialsAsync(strategy, Ct);
-        counts.ShouldBe(new TrialCounts(0, 0, 0, 0, 0, 1, 0));
+        counts.ShouldBe(new TrialCounts(0, 0, 0, 0, 0, 1, 0, 0, 1));
         counts.Total.ShouldBe(0);
         (await CountAsync("SELECT count(*) FROM aiv.test_ledger WHERE strategy_id = @s AND trial_kind = 'training_sweep'", ("s", strategy))).ShouldBe(1);
         (await CountAsync("SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @s AND trial_kind = 'training_sweep'", ("s", strategy))).ShouldBe(1);

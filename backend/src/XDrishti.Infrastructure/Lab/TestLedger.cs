@@ -56,12 +56,13 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger
                    (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'null'),
                    (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep'),
                    (SELECT coalesce(sum(extra_trials), 0) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep'),
-                   (SELECT count(*) FROM lab.test_ledger WHERE trial_kind = 'training_sweep' AND strategy_hash IN (SELECT hash FROM lineage))
+                   (SELECT count(DISTINCT strategy_hash) FROM lab.test_ledger WHERE trial_kind = 'training_sweep' AND strategy_hash IN (SELECT hash FROM lineage)),
+                   (SELECT count(DISTINCT strategy_hash) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep' AND strategy_hash NOT IN (SELECT hash FROM lineage))
             """);
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         await reader.ReadAsync(cancellationToken);
-        return new TrialCounts((int)reader.GetInt64(0), (int)reader.GetInt64(1), (int)reader.GetInt64(2), (int)reader.GetInt64(3), (int)reader.GetInt64(4), (int)reader.GetInt64(5), (int)reader.GetInt64(6), (int)reader.GetInt64(7));
+        return new TrialCounts((int)reader.GetInt64(0), (int)reader.GetInt64(1), (int)reader.GetInt64(2), (int)reader.GetInt64(3), (int)reader.GetInt64(4), (int)reader.GetInt64(5), (int)reader.GetInt64(6), (int)reader.GetInt64(7), (int)reader.GetInt64(8));
     }
 
     public async ValueTask<bool> HasFullRunAsync(string strategyId, string strategyHash, CancellationToken cancellationToken)
