@@ -15,6 +15,7 @@
 #   scripts/xd.sh assistant briefing [--kind daily|weekly] [--subject S] [--store] [--new-version]   (P9-06, ADR 0140: the briefing or weekly review text; prints the fixed-format text, --store keeps it; the model phrases only under both switches)
 #   scripts/xd.sh eval compare|accept|show ...   (P9-09, ADR 0143: the assistant eval; `run` and `grade` need the model and the eval tool server inside the stack: use scripts/xd-eval.sh, which runs this verb in a one-shot container; `accept` is the owner's act)
 #   scripts/xd.sh plan phase-check [--through YYYY-MM-DD]   (P7-18, ADR 0097: the P7 exit criteria from stored plan runs, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
+#   scripts/xd.sh auto check   (AU-19, ADR 0253: the AU programme exit items from stored records, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
 #   scripts/xd.sh exec phase-check [--account ID] [--through YYYY-MM-DD]   (P12-12, ADR 0169: 30 counted semi-auto sessions with zero reconciliation breaks, per account, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
 #   scripts/xd.sh reports options [--cut FAMILY,...] [--json]   (P14-16: the option archive, expression runs, pair formations and every P14 verdict in the P8 states, limits printed; read only)
 #   scripts/xd.sh reports phase-check   (P8-17, ADR 0126: the P8 exit criteria from stored runs, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
@@ -27,6 +28,7 @@ set -euo pipefail
 source "$(dirname "$0")/_env.sh"
 export DOTNET_ENVIRONMENT=Development
 export Models__Folder="$ROOT/data/models"
+export Auto__Check__AdrFolder="$ROOT/docs/adr"
 # the weekly shadow digest log (ADR 0232); XD_SHADOW_DIGEST_DIR is resolved against the repository's deploy/ folder like compose does
 shadow_digest_dir="${XD_SHADOW_DIGEST_DIR:-$ROOT/data/shadow-digest}"
 case "$shadow_digest_dir" in /*) ;; *) shadow_digest_dir="$ROOT/deploy/$shadow_digest_dir" ;; esac

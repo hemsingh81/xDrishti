@@ -111,6 +111,7 @@ public static class DependencyInjection
         services.AddScoped<IServiceHeartbeatStore, ServiceHeartbeatStore>();
         services.AddScoped<IServiceScheduleStore, ServiceScheduleStore>();
         services.AddScoped<IServiceRunStore, ServiceRunStore>();
+        services.AddScoped<XDrishti.Application.Abstractions.Auto.IAutoProgrammeFactsReader>(sp => new XDrishti.Infrastructure.Auto.AutoProgrammeFactsReader(sp.GetRequiredService<NpgsqlDataSource>(), sp.GetRequiredService<IConfiguration>()["Auto:Check:AdrFolder"])); // select-only facts of the AU programme check (AU-19, ADR 0253)
         services.AddScoped<IRecoveryLedger, RecoveryLedger>(); // the ledger of the recovery passes (ADR 0240, AU-02)
         services.AddScoped<IPlatformUnitOfWork, PlatformUnitOfWork>();
         services.AddScoped<IDatabaseInfoProvider, DatabaseInfoProvider>();

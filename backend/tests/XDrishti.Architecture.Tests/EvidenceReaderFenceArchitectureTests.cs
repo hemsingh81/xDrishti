@@ -226,7 +226,8 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
     {
         // AU-12 (ADR 0243 point 7, ADR 0248): the reader of training runs is not evidence. Only its port, its implementation, the registration and the learning side may name it; Lab, Confidence, Selection, Reporting,
         // Planning, Research (the run store) and the readiness scorecard may not. AU-13 added the one handler of the learning side (SimTrainingArchitectureTests pins what it may name).
-        var allowed = new[] { "XDrishti.Application/Abstractions/SimAll/ITrainingRunReader.cs", "XDrishti.Infrastructure/SimAll/TrainingRunReader.cs", "XDrishti.Infrastructure/SimAll/TrainingReportSource.cs", "XDrishti.Infrastructure/DependencyInjection.cs", "XDrishti.Application/Learning/SimTraining/TrainFromSimulationHandler.cs" };
+        // AU-19 (ADR 0253): the programme check reads only the run key and end date of training runs, to prove each finished job stopped before its hold-out; it is a read-only fence check, not evidence, and decides nothing.
+        var allowed = new[] { "XDrishti.Application/Abstractions/SimAll/ITrainingRunReader.cs", "XDrishti.Infrastructure/SimAll/TrainingRunReader.cs", "XDrishti.Infrastructure/SimAll/TrainingReportSource.cs", "XDrishti.Infrastructure/DependencyInjection.cs", "XDrishti.Application/Learning/SimTraining/TrainFromSimulationHandler.cs", "XDrishti.Application/Auto/EvaluateAutoProgrammeCheckHandler.cs" };
         var users = Sources().Where(f => File.ReadAllText(f).Contains("TrainingRunReader", StringComparison.Ordinal)).Select(Rel).Order(StringComparer.Ordinal).ToList();
 
         users.ShouldBe([.. allowed.Order(StringComparer.Ordinal)]);

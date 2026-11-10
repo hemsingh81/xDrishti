@@ -37,6 +37,8 @@ Table test per state.
 ## Open questions
 None.
 
+Built (backend, ADR 0253): `xd auto check` (`scripts/xd.sh auto check`), five items, read-only transactions. Job and fence are read through the SimAll ports and the non-evidence training reader; recovery, switch log and plans by plain select; the removal ADR is a file check of `Auto:Check:AdrFolder` (set by `xd.sh`), NOT EVALUABLE where the folder is not visible.
+
 ## Done when
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
