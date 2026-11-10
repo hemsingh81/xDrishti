@@ -42,7 +42,19 @@ export interface ReportFilter {
 /** The wire names of the filters, each a string the server reads. */
 export type ReportQuery = Partial<
   Record<
-    'runs' | 'basis' | 'strategy' | 'timeframe' | 'side' | 'style' | 'exit' | 'basket' | 'symbol' | 'from' | 'to',
+    | 'runs'
+    | 'basis'
+    | 'strategy'
+    | 'timeframe'
+    | 'side'
+    | 'style'
+    | 'exit'
+    | 'basket'
+    | 'symbol'
+    | 'from'
+    | 'to'
+    | 'purpose'
+    | 'simJob',
     string
   >
 >;

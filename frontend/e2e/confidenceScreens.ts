@@ -4,6 +4,7 @@ import { learningFull } from './learningMounts';
 import type { Screen } from './matrix';
 import { p15Screens } from './p15Screens';
 import { recoveryScreens } from './recoveryScreen';
+import { simulationScreens } from './simulationMounts';
 import { settingsScreens } from './settingsScreen';
 
 /** The CF-12 Learning tabs (Decay and Loop; the Loop tab is also covered in today's all-unavailable state) and the CF-11 Readiness screen. */
@@ -53,4 +54,10 @@ const confidenceScreens: Screen[] = [
 ];
 
 /** The screens added after P8 that the browser runner covers (P15-11, CF-12). */
-export const laterScreens: Screen[] = [...p15Screens, ...confidenceScreens, ...recoveryScreens, ...settingsScreens];
+export const laterScreens: Screen[] = [
+  ...p15Screens,
+  ...confidenceScreens,
+  ...recoveryScreens,
+  ...settingsScreens,
+  ...simulationScreens,
+];

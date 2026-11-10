@@ -26,6 +26,9 @@ export type TradesView = Schemas['TradesView'];
 /** Stored runs are insert-only, so a report stays valid for minutes (P8-08). */
 const staleTime = 5 * 60_000;
 
+/** A training report (AU-15) refreshes only when the owner asks: never by age, focus or reconnect. */
+const staleFor = (query: ReportQuery) => (query.purpose === 'training' ? Infinity : staleTime);
+
 /** The lens each Overview panel groups by. */
 export const lenses = { month: 'month', basket: 'basket', weekday: 'weekday', pivot: 'strategy,timeframe' } as const;
 
@@ -40,7 +43,7 @@ export const summaryQuery = (query: ReportQuery) =>
   queryOptions({
     queryKey: ['reports', 'summary', queryString(query)] as const,
     queryFn: async ({ signal }) => unwrap(await api.GET('/api/reports/summary', { params: { query }, signal })),
-    staleTime,
+    staleTime: staleFor(query),
     retry: false,
   });
 
@@ -49,7 +52,7 @@ export const groupsQuery = (query: ReportQuery, lens: string) =>
     queryKey: ['reports', 'groups', lens, queryString(query)] as const,
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/reports/groups', { params: { query: { ...query, lens } }, signal })),
-    staleTime,
+    staleTime: staleFor(query),
     retry: false,
   });
 
@@ -67,7 +70,7 @@ export const equityQuery = (query: ReportQuery, lens?: string) =>
     queryKey: ['reports', 'equity', lens ?? '', queryString(query)] as const,
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/reports/equity', { params: { query: lens ? { ...query, lens } : query }, signal })),
-    staleTime,
+    staleTime: staleFor(query),
     retry: false,
   });
 
@@ -78,7 +81,7 @@ export const distributionQuery = (query: ReportQuery, lens?: string) =>
       unwrap(
         await api.GET('/api/reports/distribution', { params: { query: lens ? { ...query, lens } : query }, signal }),
       ),
-    staleTime,
+    staleTime: staleFor(query),
     retry: false,
   });
 

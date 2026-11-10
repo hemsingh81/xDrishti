@@ -22,6 +22,7 @@ const WRITER_FEATURES = new Set([
   'readiness',
   'services',
   'settings',
+  'simulation',
   'suggestions',
 ]);
 
