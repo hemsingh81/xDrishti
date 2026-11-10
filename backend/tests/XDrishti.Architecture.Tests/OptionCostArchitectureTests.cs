@@ -37,9 +37,9 @@ public sealed class OptionCostArchitectureTests
         .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))];
 
     private static string WithoutComments(string text) =>
-        Regex.Replace(Regex.Replace(text, "/\\*.*?\\*/", string.Empty, RegexOptions.Singleline, TimeSpan.FromSeconds(5)), "//.*$", string.Empty, RegexOptions.Multiline, TimeSpan.FromSeconds(5));
+        Regex.Replace(Regex.Replace(text, "/\\*.*?\\*/", string.Empty, RegexOptions.Singleline, ScanRegex.Timeout), "//.*$", string.Empty, RegexOptions.Multiline, ScanRegex.Timeout);
 
-    private static string WithoutCommentsAndStrings(string text) => Regex.Replace(WithoutComments(text), "\"(\\\\.|[^\"\\\\])*\"", "\"\"", RegexOptions.None, TimeSpan.FromSeconds(5));
+    private static string WithoutCommentsAndStrings(string text) => Regex.Replace(WithoutComments(text), "\"(\\\\.|[^\"\\\\])*\"", "\"\"", RegexOptions.None, ScanRegex.Timeout);
 
     [Fact]
     public void No_decision_live_recorder_or_execution_code_and_no_other_assembly_references_a_cost_type()
@@ -109,10 +109,10 @@ public sealed class OptionCostArchitectureTests
         text.ShouldContain("SELECT ts, expiry, strike_px, underlying_px, bid_px, ask_px");
         text.ShouldContain("FROM options.chain_snapshots");
         text.ShouldContain("WHERE underlying_id = @u AND ts >= @from AND ts < @to");
-        Regex.Count(text, "FROM\\s+\\w+\\.\\w+", RegexOptions.None, TimeSpan.FromSeconds(2)).ShouldBe(1);
+        Regex.Count(text, "FROM\\s+\\w+\\.\\w+", RegexOptions.None, ScanRegex.Timeout).ShouldBe(1);
         foreach (var column in new[] { "iv", "delta", "gamma", "vega", "oi", "volume", "flags", "security_id", "side", "bid_qty", "ask_qty" })
         {
-            Regex.IsMatch(sql, "\\b" + column + "\\b", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2)).ShouldBeFalse(column);
+            Regex.IsMatch(sql, "\\b" + column + "\\b", RegexOptions.IgnoreCase, ScanRegex.Timeout).ShouldBeFalse(column);
         }
 
         foreach (var write in new[] { "INSERT ", "UPDATE ", "DELETE ", "TRUNCATE ", "COPY ", "ALTER ", "DROP ", "CREATE ", "ExecuteNonQuery", "BeginBinaryImport", "quality_", "market.", "execution.", "trading." })
@@ -135,7 +135,7 @@ public sealed class OptionCostArchitectureTests
         }
 
         var handler = Source("XDrishti.Application", "OptionCosts", "BuildSpreadModelHandler.cs");
-        Regex.Count(handler, "quotes\\.QuotesAsync\\(", RegexOptions.None, TimeSpan.FromSeconds(2)).ShouldBe(1);
+        Regex.Count(handler, "quotes\\.QuotesAsync\\(", RegexOptions.None, ScanRegex.Timeout).ShouldBe(1);
         handler.IndexOf("SessionUsability.IsUsable", StringComparison.Ordinal).ShouldBeLessThan(handler.IndexOf("quotes.QuotesAsync(", StringComparison.Ordinal));
         handler.ShouldContain("foreach (var session in usable)");
     }
@@ -144,7 +144,7 @@ public sealed class OptionCostArchitectureTests
     public void Only_the_spread_store_names_the_two_model_tables_and_only_with_select_and_insert()
     {
         var files = SourceFiles();
-        string[] Naming(string table) => [.. files.Where(f => Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN|DELETE)\\s+research\\." + table + "\\b", RegexOptions.None, TimeSpan.FromSeconds(5))).Select(Path.GetFileName).Order(StringComparer.Ordinal)!];
+        string[] Naming(string table) => [.. files.Where(f => Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN|DELETE)\\s+research\\." + table + "\\b", RegexOptions.None, ScanRegex.Timeout)).Select(Path.GetFileName).Order(StringComparer.Ordinal)!];
 
         Naming("option_spread_models").ShouldBe(["SpreadModelStore.cs"]);
         Naming("option_spread_buckets").ShouldBe(["SpreadModelStore.cs"]);
@@ -164,15 +164,15 @@ public sealed class OptionCostArchitectureTests
         foreach (var file in Directory.GetFiles(Path.Combine(Root, "src", "XDrishti.Domain", "Options", "Costs"), "*.cs"))
         {
             var code = WithoutCommentsAndStrings(File.ReadAllText(file));
-            Regex.IsMatch(code, "\\b\\d+\\.\\d+[mMdDfF]?\\b", RegexOptions.None, TimeSpan.FromSeconds(2)).ShouldBe(Path.GetFileName(file) == "HalfSpreadAccumulator.cs", Path.GetFileName(file)); // the accumulator's 100.0 and 2.0 only
+            Regex.IsMatch(code, "\\b\\d+\\.\\d+[mMdDfF]?\\b", RegexOptions.None, ScanRegex.Timeout).ShouldBe(Path.GetFileName(file) == "HalfSpreadAccumulator.cs", Path.GetFileName(file)); // the accumulator's 100.0 and 2.0 only
         }
 
         var accumulator = WithoutCommentsAndStrings(Source("XDrishti.Domain", "Options", "Costs", "HalfSpreadAccumulator.cs"));
-        Regex.Matches(accumulator, "\\b\\d+\\.\\d+[mMdDfF]?\\b", RegexOptions.None, TimeSpan.FromSeconds(2)).Select(m => m.Value).Distinct().Order(StringComparer.Ordinal).ShouldBe(["100.0", "2.0"]);
+        Regex.Matches(accumulator, "\\b\\d+\\.\\d+[mMdDfF]?\\b", RegexOptions.None, ScanRegex.Timeout).Select(m => m.Value).Distinct().Order(StringComparer.Ordinal).ShouldBe(["100.0", "2.0"]);
 
         // a sheet is built from the owner's text; no source file builds rates from literals
-        SourceFiles().Where(f => Regex.IsMatch(File.ReadAllText(f), "ChargeRates\\.Create\\(", RegexOptions.None, TimeSpan.FromSeconds(5))).Select(Path.GetFileName).ShouldBe(["CostSheetJson.cs"]);
-        Regex.IsMatch(Source("XDrishti.Domain", "Research", "CostSheetJson.cs"), "ChargeRates\\.Create\\([^)]*\\d+(\\.\\d+)?m", RegexOptions.None, TimeSpan.FromSeconds(2)).ShouldBeFalse();
+        SourceFiles().Where(f => Regex.IsMatch(File.ReadAllText(f), "ChargeRates\\.Create\\(", RegexOptions.None, ScanRegex.Timeout)).Select(Path.GetFileName).ShouldBe(["CostSheetJson.cs"]);
+        Regex.IsMatch(Source("XDrishti.Domain", "Research", "CostSheetJson.cs"), "ChargeRates\\.Create\\([^)]*\\d+(\\.\\d+)?m", RegexOptions.None, ScanRegex.Timeout).ShouldBeFalse();
 
         // the settings: the assumed half-spread has no default and no shipped value; the two least counts are not rates
         var options = Source("XDrishti.Infrastructure", "OptionCosts", "OptionCostsOptions.cs");

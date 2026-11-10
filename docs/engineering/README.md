@@ -52,7 +52,7 @@ Rules learnt from flaky tests (ISS-14):
 
 ## 4. Definition of done
 
-1. `scripts/check.sh` passes (build with warnings as errors, all tests, lint, format, type check).
+1. `scripts/check.sh` passes (build with warnings as errors, all tests, lint, format, type check). While iterating, `scripts/check.sh --changed [base]` (base defaults to `main`) runs format and build, then only the backend test projects affected by the change (plus `XDrishti.Architecture.Tests`) and the frontend checks only if `frontend/` changed; it does not record the green fingerprint, and the full run stays required before merge.
 2. New behaviour has tests; bugs get a regression test first.
 3. API changes: contract regenerated (`scripts/gen-api.sh`) and frontend types updated in the same change.
 4. Database changes: an EF Core migration (never edit an applied one); time-series tables reviewed for hypertables.

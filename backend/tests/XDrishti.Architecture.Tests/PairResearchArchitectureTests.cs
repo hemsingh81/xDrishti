@@ -44,7 +44,7 @@ public sealed class PairResearchArchitectureTests
         result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
         foreach (var file in Directory.GetFiles(Src("XDrishti.Domain", "PairResearch"), "*.cs"))
         {
-            Regex.IsMatch(File.ReadAllText(file), @"\b(DateTime(Offset)?\.(UtcNow|Now)|TimeProvider|Random\.Shared|new Random\(|Environment\.|File\.|Stopwatch)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBeFalse(Path.GetFileName(file));
+            Regex.IsMatch(File.ReadAllText(file), @"\b(DateTime(Offset)?\.(UtcNow|Now)|TimeProvider|Random\.Shared|new Random\(|Environment\.|File\.|Stopwatch)", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeFalse(Path.GetFileName(file));
         }
     }
 
@@ -145,7 +145,7 @@ public sealed class PairResearchArchitectureTests
     public void Only_the_store_the_migration_and_the_comments_of_the_port_name_the_two_tables_and_the_migration_is_insert_only_for_the_runtime_role_and_nothing_for_any_other()
     {
         var named = Directory.EnumerateFiles(Src(), "*.cs", SearchOption.AllDirectories)
-            .Where(f => !RepositoryFiles.IsBuildOutput(f) && Regex.IsMatch(File.ReadAllText(f), @"pair_formations|pair_trades", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(5)))
+            .Where(f => !RepositoryFiles.IsBuildOutput(f) && Regex.IsMatch(File.ReadAllText(f), @"pair_formations|pair_trades", RegexOptions.CultureInvariant, ScanRegex.Timeout))
             .Select(f => Path.GetFileName(f)).Order(StringComparer.Ordinal).ToList();
         var migration = File.ReadAllText(Directory.EnumerateFiles(Src("XDrishti.Infrastructure", "Persistence", "Migrations"), "*_AddPairResearch.cs").Single());
 

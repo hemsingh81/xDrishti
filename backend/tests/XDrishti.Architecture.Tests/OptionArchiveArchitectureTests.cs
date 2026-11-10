@@ -80,7 +80,7 @@ public sealed class OptionArchiveArchitectureTests
     {
         var named = Directory.GetFiles(Path.Combine(Root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN)\\s+options\\.(contracts|lot_sizes|market_epochs)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)))
+            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN)\\s+options\\.(contracts|lot_sizes|market_epochs)", System.Text.RegularExpressions.RegexOptions.None, ScanRegex.Timeout))
             .Select(Path.GetFileName).Order().ToList();
 
         // P14-04 (ADR 0178) added exactly one reader of these reference tables, the quality checks' OptionReference (strike step, lot history, rule epochs); P14-08 (ADR 0197) added exactly one more, the re-mark's ContractExpiryReader (the expiry dates of one underlying in a date range). A further file here is a failure.

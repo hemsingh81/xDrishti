@@ -74,9 +74,9 @@ public sealed class ConfirmTicketArchitectureTests
             text.ShouldNotMatch(@"(?is)DELETE\s+FROM");
         }
 
-        System.Text.RegularExpressions.Regex.Matches(exec, @"INSERT INTO ([a-z_.]+)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(2)).Select(m => m.Groups[1].Value).Distinct().Order()
+        System.Text.RegularExpressions.Regex.Matches(exec, @"INSERT INTO ([a-z_.]+)", System.Text.RegularExpressions.RegexOptions.None, ScanRegex.Timeout).Select(m => m.Groups[1].Value).Distinct().Order()
             .ShouldBe(["execution.confirm_tickets", "execution.ticket_outcomes"]);
-        System.Text.RegularExpressions.Regex.Matches(api, @"INSERT INTO ([a-z_.]+)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(2)).Select(m => m.Groups[1].Value).Distinct().Order()
+        System.Text.RegularExpressions.Regex.Matches(api, @"INSERT INTO ([a-z_.]+)", System.Text.RegularExpressions.RegexOptions.None, ScanRegex.Timeout).Select(m => m.Groups[1].Value).Distinct().Order()
             .ShouldBe(["execution.day_unlocks", "execution.ticket_outcomes"]);
     }
 

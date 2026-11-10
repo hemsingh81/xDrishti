@@ -145,7 +145,7 @@ public sealed class OptionBackfillArchitectureTests
     {
         var files = Directory.GetFiles(Path.Combine(Root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal)).ToList();
-        string[] Naming(string table) => [.. files.Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN)\\s+options\\." + table, System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5))).Select(f => Path.GetFileName(f)).Order()];
+        string[] Naming(string table) => [.. files.Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "(FROM|INTO|UPDATE|JOIN)\\s+options\\." + table, System.Text.RegularExpressions.RegexOptions.None, ScanRegex.Timeout)).Select(f => Path.GetFileName(f)).Order()];
 
         // P14-04 (ADR 0178) added exactly one reader: the quality checks' OptionArchiveReader; P14-08 (ADR 0197) added exactly one more, the re-mark's RollingBarReader (one series over one time range, and the fetch-log watermark). A further name here is a failure.
         Naming("rolling_bars").ShouldBe(["OptionArchiveReader.cs", "RollingBarReader.cs", "RollingBarStore.cs"]);
@@ -176,9 +176,9 @@ public sealed class OptionBackfillArchitectureTests
         text.ShouldNotContain("ILogger");
         text.ShouldNotContain("QueryString");
         text.ShouldNotContain("BrokerEndpoints.DhanOptionChain");
-        System.Text.RegularExpressions.Regex.Matches(text, "TryAddWithoutValidation\\(\"([^\"]+)\"", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)).Select(m => m.Groups[1].Value).Order().ShouldBe(["access-token", "client-id"]);
+        System.Text.RegularExpressions.Regex.Matches(text, "TryAddWithoutValidation\\(\"([^\"]+)\"", System.Text.RegularExpressions.RegexOptions.None, ScanRegex.Timeout).Select(m => m.Groups[1].Value).Order().ShouldBe(["access-token", "client-id"]);
         var endpoints = Source("XDrishti.Infrastructure", "Brokers", "BrokerEndpoints.cs");
-        System.Text.RegularExpressions.Regex.Count(endpoints, "new\\(\"https://api\\.dhan\\.co/v2/charts/[^\"]*\"\\)", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)).ShouldBe(2, "intraday and rollingoption, nothing else under /v2/charts");
+        System.Text.RegularExpressions.Regex.Count(endpoints, "new\\(\"https://api\\.dhan\\.co/v2/charts/[^\"]*\"\\)", System.Text.RegularExpressions.RegexOptions.None, ScanRegex.Timeout).ShouldBe(2, "intraday and rollingoption, nothing else under /v2/charts");
         endpoints.ShouldNotContain("charts/historical");
     }
 

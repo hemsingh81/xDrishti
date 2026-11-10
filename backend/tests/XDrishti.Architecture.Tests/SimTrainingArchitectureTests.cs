@@ -14,7 +14,7 @@ public sealed class SimTrainingArchitectureTests
 
     private static IEnumerable<string> FolderSources() => Directory.EnumerateFiles(Folder, "*.cs", SearchOption.AllDirectories);
 
-    private static string Code(string file) => Regex.Replace(Regex.Replace(File.ReadAllText(file), @"/\*.*?\*/", " ", RegexOptions.Singleline, TimeSpan.FromSeconds(2)), @"(?<=^|\s)//[^\n]*", " ", RegexOptions.Multiline, TimeSpan.FromSeconds(2));
+    private static string Code(string file) => Regex.Replace(Regex.Replace(File.ReadAllText(file), @"/\*.*?\*/", " ", RegexOptions.Singleline, ScanRegex.Timeout), @"(?<=^|\s)//[^\n]*", " ", RegexOptions.Multiline, ScanRegex.Timeout);
 
     [Fact]
     public void The_training_folder_cannot_designate_promote_roll_back_or_switch_influence_on()
@@ -58,7 +58,7 @@ public sealed class SimTrainingArchitectureTests
     {
         var offenders = Directory.EnumerateFiles(Src, "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(f => Regex.IsMatch(Code(f), @"sim_training_runs|training_sim_cell_stats", RegexOptions.None, TimeSpan.FromSeconds(2)))
+            .Where(f => Regex.IsMatch(Code(f), @"sim_training_runs|training_sim_cell_stats", RegexOptions.None, ScanRegex.Timeout))
             .Select(f => Path.GetRelativePath(Src, f).Replace('\\', '/'))
             .Order(StringComparer.Ordinal)
             .ToList();
@@ -70,7 +70,7 @@ public sealed class SimTrainingArchitectureTests
         migration.ShouldContain("verdict <> 'Eligible'");
         migration.ShouldContain("basis = 'training_sim'");
         migration.ShouldContain("GRANT SELECT, INSERT ON research.sim_training_runs, research.training_sim_cell_stats TO xd_app");
-        Regex.IsMatch(File.ReadAllText(Path.Combine(Src, "XDrishti.Infrastructure", "SimAll", "SimTrainingStore.cs")), @"\b(UPDATE|DELETE)\b", RegexOptions.None, TimeSpan.FromSeconds(2)).ShouldBeFalse("the training store is insert-only");
+        Regex.IsMatch(File.ReadAllText(Path.Combine(Src, "XDrishti.Infrastructure", "SimAll", "SimTrainingStore.cs")), @"\b(UPDATE|DELETE)\b", RegexOptions.None, ScanRegex.Timeout).ShouldBeFalse("the training store is insert-only");
     }
 
     [Fact]

@@ -23,7 +23,7 @@ public sealed class ExportsArchitectureTests
         "System.IO", "System.Net", "System.Diagnostics.Process", "Microsoft.AspNetCore",
     ];
 
-    private static readonly Regex AccountColumn = new(@"account|client|token|email|balance|holding|quantity_held|password|secret", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    private static readonly Regex AccountColumn = new(@"account|client|token|email|balance|holding|quantity_held|password|secret", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, ScanRegex.Timeout);
 
     private static readonly string[] RouteOrder = ["RefusedWhileOffAsync(", "SessionOwner(", "slot.TryEnter()", "gate.RequireAsync(", "await make()", "RecordAsync(", "TypedResults.File("];
 
@@ -32,7 +32,7 @@ public sealed class ExportsArchitectureTests
     private static List<string> FilesNaming(string folder, string pattern)
     {
         var dir = Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", folder, folder == "Endpoints" ? "ExportsEndpoints.cs" : "ExportCommand.cs"))!;
-        return [.. Directory.GetFiles(dir, "*.cs").Where(f => Regex.IsMatch(File.ReadAllText(f), pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1))).Select(Path.GetFileName).Cast<string>().Order(StringComparer.Ordinal)];
+        return [.. Directory.GetFiles(dir, "*.cs").Where(f => Regex.IsMatch(File.ReadAllText(f), pattern, RegexOptions.CultureInvariant, ScanRegex.Timeout)).Select(Path.GetFileName).Cast<string>().Order(StringComparer.Ordinal)];
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class ExportsArchitectureTests
     {
         var endpoint = Source("Endpoints", "ExportsEndpoints.cs");
 
-        Regex.Count(endpoint, @"\.Map(Post|Put|Delete|Patch|Get)\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBe(1);
+        Regex.Count(endpoint, @"\.Map(Post|Put|Delete|Patch|Get)\(", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBe(1);
         endpoint.ShouldContain(".MapPost(\"/{kind}\"");
         FilesNaming("Endpoints", @"\bExportCommand\b").ShouldBe(["ExportsEndpoints.cs"]);
         FilesNaming("Exports", @"\bExportHandler\b").ShouldBe(["ExportHandler.cs"]);
@@ -90,7 +90,7 @@ public sealed class ExportsArchitectureTests
     {
         var lab = Source("Endpoints", "LabRunsEndpoints.cs");
 
-        Regex.Count(lab, @"ExportDelivery\.DeliverAsync\(", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)).ShouldBe(2);
+        Regex.Count(lab, @"ExportDelivery\.DeliverAsync\(", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBe(2);
         lab.ShouldNotContain("TypedResults.File(");
         lab.ShouldNotContain("TypedResults.Text(");
     }
@@ -101,6 +101,6 @@ public sealed class ExportsArchitectureTests
         var request = Api.GetType("XDrishti.Api.Endpoints.ExportRequest")!;
 
         request.GetProperties().Select(p => p.Name).Order().ShouldBe(["Format", "Query"]);
-        typeof(XDrishti.Application.Reporting.ReportQueryInput).GetProperties().Select(p => p.Name).ShouldNotContain(n => Regex.IsMatch(n, "confirm|sheet|actor|password|file|name", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)));
+        typeof(XDrishti.Application.Reporting.ReportQueryInput).GetProperties().Select(p => p.Name).ShouldNotContain(n => Regex.IsMatch(n, "confirm|sheet|actor|password|file|name", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, ScanRegex.Timeout));
     }
 }

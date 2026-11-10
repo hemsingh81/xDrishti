@@ -119,7 +119,7 @@ public sealed class DepthRecordingArchitectureTests
         var root = Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "XDrishti.slnx"))!;
         var named = Directory.GetFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "\"[^\"\\n]*depth_snapshots", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)))
+            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "\"[^\"\\n]*depth_snapshots", System.Text.RegularExpressions.RegexOptions.None, ScanRegex.Timeout))
             .Select(Path.GetFileName).Order().ToList();
 
         named.ShouldBe(["DepthStore.cs"]);

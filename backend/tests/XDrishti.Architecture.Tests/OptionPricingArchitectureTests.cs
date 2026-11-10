@@ -44,7 +44,7 @@ public sealed class OptionPricingArchitectureTests
         foreach (var file in Directory.GetFiles(Dir, "*.cs"))
         {
             var text = File.ReadAllText(file);
-            Regex.IsMatch(text, @"\b(DateTime(Offset)?\.(UtcNow|Now)|TimeProvider|Random\.Shared|new Random\(|Environment\.|File\.|Stopwatch|static\s+(?!readonly|class|double|bool|int|string)\w+\s+_)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)).ShouldBeFalse(Path.GetFileName(file));
+            Regex.IsMatch(text, @"\b(DateTime(Offset)?\.(UtcNow|Now)|TimeProvider|Random\.Shared|new Random\(|Environment\.|File\.|Stopwatch|static\s+(?!readonly|class|double|bool|int|string)\w+\s+_)", RegexOptions.CultureInvariant, ScanRegex.Timeout).ShouldBeFalse(Path.GetFileName(file));
         }
     }
 

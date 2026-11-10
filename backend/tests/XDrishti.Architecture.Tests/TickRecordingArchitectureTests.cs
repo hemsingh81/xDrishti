@@ -118,7 +118,7 @@ public sealed class TickRecordingArchitectureTests
     {
         var named = Directory.GetFiles(Path.Combine(Root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !RepositoryFiles.IsBuildOutput(f) && !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "\"[^\"\\n]*trade_ticks", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)))
+            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "\"[^\"\\n]*trade_ticks", System.Text.RegularExpressions.RegexOptions.None, ScanRegex.Timeout))
             .Select(Path.GetFileName).Order().ToList();
 
         named.ShouldBe(["TickStore.cs"]);

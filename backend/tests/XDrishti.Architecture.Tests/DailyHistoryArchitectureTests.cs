@@ -25,7 +25,7 @@ public sealed class DailyHistoryArchitectureTests
         string[] declaring = ["AllowedPattern.cs", "MasterDataEndpoints.cs", "MasterDataEndpointGuard.cs"];
         var mentions = SourceFiles().Where(f => File.ReadAllText(f).Contains("AllowedPattern", StringComparison.Ordinal))
             .Select(Path.GetFileName).Where(n => !declaring.Contains(n)).Order(StringComparer.Ordinal).ToList();
-        var guards = SourceFiles().Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), @"new\s+MasterDataEndpointGuard\s*\(\s*[^\s)]", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(5)))
+        var guards = SourceFiles().Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), @"new\s+MasterDataEndpointGuard\s*\(\s*[^\s)]", System.Text.RegularExpressions.RegexOptions.None, ScanRegex.Timeout))
             .Select(Relative).ToList();
 
         mentions.ShouldBeEmpty("the entries are the owner's act (ADR 0010, 0017, 0195): they are added in MasterDataEndpoints.Patterns by hand and by nobody else; this rule is then loosened by the owner");
