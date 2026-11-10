@@ -1,6 +1,6 @@
 # P10-04 — Backtest versus paper (R14) and the two exit statistics: the band and the drawdown
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-26 under the owner's standing run instruction (ADR 0122). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P10 — Paper trading, slice P10-04 of [P10-00](P10-00-paper-trading-plan.md)
 - **Design refs:** docs/design/13 §2 (R14 Backtest vs paper vs live, R15 Monte Carlo), 18 (P10 exit: "positive expectancy after costs within backtest band; drawdown within Monte Carlo 90th pct"), 09 §2, §6 (overfitting guards, Monte Carlo), 19 §6; ADR 0062 (Monte Carlo and its bootstrap), 0064 (cell statistics, snapshots), 0074 (the expectancy band of drift), 0099 (states); P8-00 D1/D3
 - **Needs:** P10-01, P10-02; P6-01 (cell statistics snapshots), P5-05 (Monte Carlo primitives), P8-05 (`Metric`, `MetricState`). ADR: "the paper band and drawdown are a composition-matched bootstrap of the pre-epoch backtest trades" (next free ADR number at build time)

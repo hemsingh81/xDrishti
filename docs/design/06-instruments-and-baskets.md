@@ -123,6 +123,8 @@ Rules of a run:
 
 Each basket carries a `kind` in the API: `manual` or `portfolio` today; rule-based and the other system baskets reuse the same field and the `baskets.system` protection.
 
+**Derived behaviour baskets (BK-02, [ADR 0255](../adr/0255-derived-baskets-are-pure-versioned-and-point-in-time.md)).** Fourteen baskets (most volatile, most moving, most liquid, gappers, high beta, momentum 12-1, mean-reverting, trending, near 52-week high, low volatility, high relative volume, opening-range wide, intraday-tradable proxy, return-correlation clusters) are computed by one pure engine in `Domain/Baskets/Derived` from daily (and, for three, 1-minute) bars as of a date, reading only bars up to `as_of` (intraday: before the formation time). Every excluded instrument is named (`insufficient_history`, `corporate_action_unresolved`, `bad_data`, `not_in_universe_filter`, `small_cluster`), every number is a versioned, hashed parameter with a default, ties break by symbol, and top-k baskets use a 1.5 x k buffer with a 5-session dwell for the slow ones. Reading bars, storing versions and the screen are BK-03 and BK-04.
+
 ### 3.2 Basket attributes
 
 | Attribute | Purpose |

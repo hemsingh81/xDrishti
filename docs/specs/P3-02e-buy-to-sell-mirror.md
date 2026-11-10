@@ -1,6 +1,6 @@
 # P3-02e — BUY to SELL mirror: a closed rewrite table on the syntax tree
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-25 under the owner's standing run instruction (ADR 0107). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P3 — row P3-02e (Later, "before P5"); gates user strategies that list SELL without a `sell:` block (P5-01 validate, P6-17b).
 - **Design refs:** docs/design/11-strategy-lab.md §2 (rules language, strategy file, "SELL auto-mirrored unless a `sell:` block is given") · docs/design/07-strategies.md §3, §7 · docs/design/08-exits-and-risk.md §2 · docs/design/18-roadmap.md (P3-02e row, ISS-24)
 - **Needs:** built: the parser and printer (`XDrishti.Strategies.Syntax`), the binder and catalog, the typed model (P3-02b), the strategy file and loading (P3-02c, P3-02d). ADRs 0034 (rules language; Amendment 8 lags), 0035 (per-session features), 0036 (model), 0037 and 0047 (SELL walk rules, oracle), 0041.

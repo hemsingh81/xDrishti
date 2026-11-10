@@ -1,6 +1,6 @@
 # P8-22 — Audit log screen: a read-only view over the application's insert-only record of who did what
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-26 under the owner's standing run instruction (ADR 0117). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — slice P8-22 of [P8-00](P8-00-reports-and-ui-plan.md) ("Audit log screen (optional)"; wanted before any write slice P8-18 to P8-21 ships). Doc 13 §3: "Audit: logins, configuration changes, approvals, service actions; filterable log".
 - **Design refs:** docs/design/13 §3 · 04 §3-§5 · 03 §5 (`ops.audit_log` named) · 19 §4 · ADR 0083, 0091 (autonomy rows), 0073 (learning changelog), 0098 (honest-state kit). New ADR: **next free ADR number at build time**.
 - **Needs:** P8-01 (`DataTable`, `EvidenceBlock`, honest-state words, bundle guard). `useUrlState` is built (P8-02, `shared/analytics/useUrlState.ts`) and is reused; P8-06 (report endpoints) and P8-15 (plan notices, `GET /api/plans/notices`) are built and untouched by this slice. Optional later source: P7-20's `trading.ticket_notice_acks`.

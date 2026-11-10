@@ -1,6 +1,6 @@
 # P10-05 — Config change governance: a fingerprint, measurement epochs, the frozen-during-measurement rule and the hypothesis queue
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-26 under the owner's standing run instruction (ADR 0119). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P10 — Paper trading, slice P10-05 of [P10-00](P10-00-paper-trading-plan.md)
 - **Design refs:** docs/design/18 (P10 row: "config changes only via hypothesis loop"), 19 §3 ("Tweaking after every loss: changes only via hypothesis loop; versioned config"), 09 §5 (hypothesis loop), 09 §12, 09 §13 (guardrails), 16 (configuration), ADR 0002 (config in the app), 0073 (changelog, the log is the state), 0076 (hypotheses: accepting applies nothing), 0072 (experiments), 0091 (autonomy)
 - **Needs:** P10-01 (epochs table and `IEpochGate`), P10-02; P6-08, P6-10 (built). ADR + design change: "doc 09 §5 and doc 18 P10: a measurement epoch freezes the measured configuration; any frozen change starts a new epoch" (next free ADR number at build time)
