@@ -837,7 +837,8 @@ export interface paths {
     };
     /** The source of a system basket: file name, state (never, ok, stale, rejected, failed), last checks and its last 20 fetch outcomes (no raw file); 404 baskets.not_found for a basket without one */
     get: operations['GetBasketSource'];
-    put?: never;
+    /** Owner act, needs step-up, both directions: turn the fetch of this system basket's file on or off ({enabled}); audited with the fetch settings, idempotent, makes no request; 400 baskets.invalid without enabled, 404 baskets.not_found for a basket without a source */
+    put: operations['SwitchBasketSource'];
     post?: never;
     delete?: never;
     options?: never;
@@ -22034,6 +22035,10 @@ export interface components {
       /** Format: int32 */
       minutes: number;
     };
+    /** @description The body of the switch. */
+    SourceSwitchInput: {
+      enabled: null | boolean;
+    };
     /**
      * @description Spikes: a 1-minute move greater than `spikeMultiple` times the median move and greater than 1 %. One the next bar takes back (at least half) is a spike (a warning); one that is not
      *     taken back is a `largeMove`, a real jump, only reported. `thresholdPercent` is the move a bar needed to count.
@@ -25727,6 +25732,59 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['BasketSourceView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SwitchBasketSource: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['SourceSwitchInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketSourceView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
       /** @description Not Found */

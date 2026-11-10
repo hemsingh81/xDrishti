@@ -384,7 +384,8 @@ public sealed class RunBasketFetchHandlerTests
         var done = await _w.Handler.HandleAsync(new RunBasketFetchCommand(null, false, "system:x"), FetchWorld.Ct);
         _w.Store.Sources[0] = _w.Source(checkedAt: now.AddDays(-1));
         var due = await _w.Handler.HandleAsync(new RunBasketFetchCommand(null, false, "system:x"), FetchWorld.Ct);
-        _w.Clock.Advance(TimeSpan.FromHours(-1)); // 06:30, before the run time
+        _w.On(2026, 10, 23, 6, 30); // before the run time
+        _w.Store.Sources[0] = _w.Source(checkedAt: now.AddDays(-1));
         var early = await _w.Handler.HandleAsync(new RunBasketFetchCommand(null, false, "system:x"), FetchWorld.Ct);
 
         (done.Value.Outcomes.Count, due.Value.Outcomes.Count, early.Value.Outcomes.Count).ShouldBe((0, 1, 0));

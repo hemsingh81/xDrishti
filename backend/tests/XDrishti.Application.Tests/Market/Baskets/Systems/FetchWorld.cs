@@ -125,7 +125,7 @@ internal sealed class FetchWorld
     public FakeTimeProvider Clock { get; private set; } = new(new DateTimeOffset(2026, 10, 23, 7, 30, 0, TimeSpan.FromMinutes(330)));
 
     /// <summary>Moves the clock to 07:30 IST of another day (it can go back: the world is built again).</summary>
-    public void On(int year, int month, int day) => Clock = new FakeTimeProvider(new DateTimeOffset(year, month, day, 7, 30, 0, TimeSpan.FromMinutes(330)));
+    public void On(int year, int month, int day, int hour = 7, int minute = 30) => Clock = new FakeTimeProvider(new DateTimeOffset(year, month, day, hour, minute, 0, TimeSpan.FromMinutes(330)));
 
     public Guid BasketId { get; }
 
