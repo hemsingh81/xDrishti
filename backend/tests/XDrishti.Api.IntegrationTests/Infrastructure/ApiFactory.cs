@@ -76,6 +76,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>The system baskets' files and fetch setting (BK-01): in memory, OFF until a test turns it on, every request counted.</summary>
     public FakeBasketSources BasketSources { get; } = new();
 
+    /// <summary>The derived baskets' setting (BK-03): OFF until a test turns it on.</summary>
+    public FakeDerivedSettings DerivedSettings { get; } = new();
+
     /// <summary>Registered instrument refreshes wait here until a test runs them.</summary>
     public ManualRefreshJobs RefreshJobs { get; } = new();
 
@@ -162,6 +165,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddHttpClient(MasterDataHttpClientNames.NseApi).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
             services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IBasketFetchSettings>(BasketSources);
             services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IBasketSourceFetcher>(BasketSources);
+            services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IDerivedSettings>(DerivedSettings);
             services.AddSingleton<IRefreshJobChannel>(RefreshJobs);
             services.AddSingleton<IDataJobChannel>(DataJobs);
 
@@ -391,6 +395,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         MasterData.Reset();
         BasketSources.Reset();
+        DerivedSettings.Reset();
         RefreshJobs.Clear();
         DataJobs.Clear();
         Dhan.Reset();
@@ -455,6 +460,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.bars_agg;
                 DELETE FROM market.bars_1m;
                 DELETE FROM market.bar_coverage;
+                DELETE FROM market.derived_definitions;
+                DELETE FROM market.basket_param_sets;
+                DELETE FROM market.basket_member_scores;
+                DELETE FROM market.basket_versions;
                 DELETE FROM market.basket_fetches;
                 DELETE FROM market.basket_sources;
                 DELETE FROM market.basket_members;

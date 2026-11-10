@@ -14,6 +14,9 @@ public static class BasketErrors
     public const string SystemCode = "baskets.system";
     public const string FetchDisabledCode = "baskets.fetch_disabled";
     public const string FetchRunningCode = "baskets.fetch_running";
+    public const string DerivedDisabledCode = "baskets.derived_disabled";
+    public const string DerivedRunningCode = "baskets.derived_running";
+    public const string BackfillOverlapCode = "baskets.backfill_overlap";
 
     public static readonly Error NotFound = Error.NotFound(NotFoundCode, "The basket does not exist.");
 
@@ -24,6 +27,12 @@ public static class BasketErrors
     public static readonly Error FetchDisabled = Error.Conflict(FetchDisabledCode, "Fetching the system baskets is switched off (Baskets:System:Fetch:Enabled).");
 
     public static readonly Error FetchRunning = Error.Conflict(FetchRunningCode, "A fetch of the system baskets is running already.");
+
+    public static readonly Error DerivedDisabled = Error.Conflict(DerivedDisabledCode, "The derived baskets are switched off (Baskets:System:Derived:Enabled).");
+
+    public static readonly Error DerivedRunning = Error.Conflict(DerivedRunningCode, "A run of the derived baskets is running already.");
+
+    public static readonly Error BackfillOverlap = Error.Conflict(BackfillOverlapCode, "A backfill covers only dates before the first published version of the basket and never overlaps its current membership.");
 
     public static readonly Error Conflict = Error.Conflict(ConflictCode, "The basket was changed at the same time. Reload it and try again.");
 

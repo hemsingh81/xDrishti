@@ -101,6 +101,20 @@ public sealed class BasketMemberTests
     }
 
     [Fact]
+    public void A_derived_member_is_tied_to_its_version_and_a_backfilled_one_is_closed_when_written()
+    {
+        var version = Guid.CreateVersion7();
+        var from = new DateTimeOffset(2026, 10, 26, 0, 0, 0, TimeSpan.FromMinutes(330));
+        var to = from.AddDays(1);
+
+        var live = BasketMember.Derived(Guid.CreateVersion7(), Guid.CreateVersion7(), 0, from, null, Now, version, BasketProvenance.Derived, "system:x");
+        var closed = BasketMember.Derived(Guid.CreateVersion7(), Guid.CreateVersion7(), 1, from, to, Now, version, BasketProvenance.Recomputed, "owner");
+
+        (live.Provenance, live.SourceKind, live.SourceRef, live.IsActive, live.RemovedBy).ShouldBe(("derived", "version", version, true, null));
+        (closed.Provenance, closed.IsActive, closed.ValidTo, closed.RemovedBy).ShouldBe(("recomputed", false, to, "owner"));
+    }
+
+    [Fact]
     public void Valid_to_is_exclusive_of_the_day_it_ends_and_valid_from_is_inclusive()
     {
         var oct1 = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromMinutes(330));

@@ -81,6 +81,13 @@ public sealed class BasketMember : Entity<Guid>
     public static BasketMember Fetched(Guid basketId, Guid instrumentId, int position, DateTimeOffset validFrom, DateTimeOffset detectedAt, Guid fetchId, string actor) =>
         new(Guid.CreateVersion7(detectedAt), basketId, instrumentId, position, validFrom, null, null, Limit(actor), null, BasketProvenance.Fetched, detectedAt, fetchId, "fetch");
 
+    /// <summary>
+    /// A member of a derived basket (BK-03): effective from <paramref name="validFrom"/> (the start of the India date of the session the version takes effect), tied to the version <paramref name="versionId"/>; <paramref name="validTo"/> is given only for a
+    /// stay that is closed when written (a backfilled version, provenance <c>recomputed</c>).
+    /// </summary>
+    public static BasketMember Derived(Guid basketId, Guid instrumentId, int position, DateTimeOffset validFrom, DateTimeOffset? validTo, DateTimeOffset detectedAt, Guid versionId, string provenance, string actor) =>
+        new(Guid.CreateVersion7(detectedAt), basketId, instrumentId, position, validFrom, validTo, null, Limit(actor), validTo is null ? null : Limit(actor), provenance, detectedAt, versionId, "version");
+
     /// <summary>Ends the stay; false when it has ended already.</summary>
     public bool Remove(string actor, DateTimeOffset now)
     {
