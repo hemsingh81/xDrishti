@@ -1,6 +1,6 @@
 # 0244 — One Auto switch runs the chain and only suggests
 
-- **Status:** Accepted (owner, 2026-11-09, in chat, as part of the AU programme). Not yet built.
+- **Status:** Accepted (owner, 2026-11-09, in chat, as part of the AU programme). Built in AU-17; the final service ids are in [0252](0252-the-auto-switch-resumes-five-chain-services-follows-the-stored-switch-for-the-builder-and-restores-only-what-it-resumed.md).
 - **Date:** 2026-11-09.
 - **Relation to other ADRs:** Applies the owner's rule of 2026-10-23. Independent of [0086](0086-the-fail-closed-nightly-pipeline-gates-one-row-per-attempt-a-null-builder-and-a-paused-service.md)'s lapse default.
 

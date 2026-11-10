@@ -14,7 +14,7 @@ namespace XDrishti.Api.IntegrationTests.Planning;
 /// <summary>Which plan builder the nightly gets (P7-04, ADR 0088): the null builder unless the setting turns the selection builder on.</summary>
 public sealed class PlanBuilderChoiceTests
 {
-    private static IPlanBuilder Resolve(bool? flag)
+    private static IPlanBuilder Resolve(bool? flag, bool withAutoSwitch = false)
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -31,6 +31,11 @@ public sealed class PlanBuilderChoiceTests
             services.AddSingleton<IPlanBuilderSettings>(new Settings(value));
         }
 
+        if (withAutoSwitch)
+        {
+            services.AddSingleton<XDrishti.Application.Abstractions.LearnedSettings.IAutoSwitch>(new AutoSwitch());
+        }
+
         var provider = services.BuildServiceProvider();
         return provider.CreateScope().ServiceProvider.GetRequiredService<IPlanBuilder>();
     }
@@ -43,6 +48,15 @@ public sealed class PlanBuilderChoiceTests
 
     [Fact]
     public void The_selection_builder_is_used_only_when_the_flag_is_on() => Assert.IsType<SelectionPlanBuilder>(Resolve(true));
+
+    [Fact]
+    public void Where_the_auto_switch_can_be_read_the_builder_follows_it_at_build_time_and_the_configured_flag_still_wins() =>
+        (Resolve(false, true).GetType().Name, Resolve(null, true).GetType().Name, Resolve(true, true).GetType().Name).ShouldBe(("SwitchedPlanBuilder", "SwitchedPlanBuilder", "SelectionPlanBuilder"));
+
+    private sealed class AutoSwitch : XDrishti.Application.Abstractions.LearnedSettings.IAutoSwitch
+    {
+        public ValueTask<bool> IsOnAsync(CancellationToken cancellationToken) => ValueTask.FromResult(false);
+    }
 
     private sealed class NoScope : IAutoScopeSource
     {

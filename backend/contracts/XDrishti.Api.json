@@ -47,6 +47,119 @@
         }
       }
     },
+    "/api/auto": {
+      "get": {
+        "tags": [
+          "Auto"
+        ],
+        "summary": "The Auto switch: on or off, the chain of services with which ones Auto resumed, whether the chain is complete, the preconditions (pass, fail or unavailable), the builder, the last night and the recorded changes",
+        "operationId": "GetAuto",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auto/on": {
+      "post": {
+        "tags": [
+          "Auto"
+        ],
+        "summary": "Turn Auto ON as the owner with a fresh password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 409 auto.preconditions_failed names each item that is not a pass; 409 auto.chain_failed leaves nothing changed. Suggestions only, no order is placed",
+        "operationId": "TurnAutoOn",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TurnAutoOnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auto/off": {
+      "post": {
+        "tags": [
+          "Auto"
+        ],
+        "summary": "Turn Auto OFF as the owner (session and CSRF token, no password: the safe direction); pauses only the services the last ON resumed",
+        "operationId": "TurnAutoOff",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auto/scope": {
       "get": {
         "tags": [
@@ -112,7 +225,7 @@
         "tags": [
           "Auto"
         ],
-        "summary": "The next-day suggestions of the newest plan of forDate (or the newest plan): what, why and on what evidence; missing figures read unavailable, tickets without required evidence are listed as not suggested; reserve and rejected stay visible. Suggestion only, no order is placed. 404 auto.no_plan",
+        "summary": "The next-day suggestions of the newest plan of forDate (or the newest plan): what, why and on what evidence; missing figures read unavailable, tickets without required evidence are listed as not suggested; reserve and rejected stay visible. Suggestion only, no order is placed. 404 auto.no_plan; 409 auto.night_failed (the newest night failed closed: no suggestions are shown and the gate and reason are given)",
         "operationId": "GetAutoSuggestions",
         "parameters": [
           {
@@ -164,7 +277,7 @@
         "tags": [
           "Settings"
         ],
-        "summary": "Turn Failure notices (notices.failure) on or off as the owner. Turning it OFF needs the password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 409 settings.not_here for any other key",
+        "summary": "Turn Failure notices (notices.failure) or Auto (auto.enabled) on or off as the owner. Turning Failure notices OFF, or Auto ON, needs the password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 409 settings.not_here for any other key",
         "operationId": "ChangeEssentialSetting",
         "parameters": [
           {
@@ -24076,6 +24189,70 @@
         },
         "description": "The days a response covers (India dates, inclusive)."
       },
+      "AutoChainItemView": {
+        "required": [
+          "serviceId",
+          "name",
+          "enabled",
+          "resumedByAuto"
+        ],
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "resumedByAuto": {
+            "type": "boolean"
+          }
+        },
+        "description": "One service of the chain. `ResumedByAuto` is true when turning Auto ON resumed it (OFF pauses it again)."
+      },
+      "AutoChangeView": {
+        "required": [
+          "id",
+          "kind",
+          "actor",
+          "at",
+          "changed",
+          "snapshot"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "snapshot": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "One recorded change."
+      },
       "AutoEvidenceView": {
         "required": [
           "n",
@@ -24108,6 +24285,64 @@
           }
         },
         "description": "The evidence figures as text; a missing figure reads `unavailable` and is never a pass."
+      },
+      "AutoNightView": {
+        "required": [
+          "state",
+          "forDate",
+          "failedGate",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "forDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "failedGate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The newest nightly run: `no_run`, `published` or `failed_closed` (then no suggestions are shown and `Reason` says why)."
+      },
+      "AutoPreconditionView": {
+        "required": [
+          "id",
+          "label",
+          "status",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "description": "One thing Auto needs. `Status` is `pass`, `fail` or `unavailable`; only `pass` lets Auto turn ON."
       },
       "AutoRefreshView": {
         "required": [
@@ -24350,6 +24585,62 @@
           }
         },
         "description": "What to look at for one session, with the basis and the words that no order is placed."
+      },
+      "AutoView": {
+        "required": [
+          "on",
+          "complete",
+          "note",
+          "builder",
+          "chain",
+          "preconditions",
+          "night",
+          "changes",
+          "noOrderNotice"
+        ],
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "builder": {
+            "type": "string"
+          },
+          "chain": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutoChainItemView"
+            }
+          },
+          "preconditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutoPreconditionView"
+            }
+          },
+          "night": {
+            "$ref": "#/components/schemas/AutoNightView"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutoChangeView"
+            }
+          },
+          "noOrderNotice": {
+            "type": "string"
+          }
+        },
+        "description": "The whole readout. `Complete` is true only when Auto is ON and every chain service is on; with Auto ON and a service paused it is false and `Note` names the service."
       },
       "AutonomyChangeView": {
         "required": [
@@ -67398,6 +67689,21 @@
           }
         },
         "description": "The count of looks at a strategy family with its parts (spec CF-06, D3, AC12), as of the judgement. `HonestFactor` is the factor of the honest total; `FactorUsed` is the one the gates were tightened by, which is the old distinct-hash factor\nuntil the owner turns `Confidence:Registration:CountInFactor` on (`HonestCountApplied`)."
+      },
+      "TurnAutoOnRequest": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The body of `POST /api/auto/on`: the owner's password, typed again for this act."
       },
       "TurnoverExclusionView": {
         "required": [

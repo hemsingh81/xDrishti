@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using XDrishti.Api.Auth;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Auth;
+using XDrishti.Application.AutoSwitch;
 using XDrishti.Application.Planning;
 using XDrishti.Domain.Common;
 
@@ -9,8 +11,11 @@ namespace XDrishti.Api.Endpoints;
 /// <summary>The body of <c>PUT /api/auto/scope</c>: ids of baskets and of individual instruments; at least one in all.</summary>
 internal sealed record SetAutoScopeRequest(IReadOnlyList<Guid>? BasketIds, IReadOnlyList<Guid>? InstrumentIds);
 
+/// <summary>The body of <c>POST /api/auto/on</c>: the owner's password, typed again for this act.</summary>
+internal sealed record TurnAutoOnRequest(string? Password);
+
 /// <summary>
-/// The auto scope and the reasoned next-day suggestions (spec AU-16, ADR 0251): read and set the scope (set as the owner, audited), and read the suggestions of a plan with reasons and evidence.
+/// The Auto switch (spec AU-17, ADR 0252), the auto scope and the reasoned next-day suggestions (spec AU-16, ADR 0251): read and set the scope (set as the owner, audited), and read the suggestions of a plan with reasons and evidence.
 /// A suggestion is not an order and creates no approval or arming; nothing here places, changes or cancels an order.
 /// </summary>
 internal sealed class AutoEndpoints : IEndpointModule
@@ -18,6 +23,21 @@ internal sealed class AutoEndpoints : IEndpointModule
     public void Map(IEndpointRouteBuilder api)
     {
         var group = api.MapGroup("/auto").WithTags("Auto");
+
+        group.MapGet("/", GetAsync)
+            .WithName("GetAuto")
+            .WithSummary("The Auto switch: on or off, the chain of services with which ones Auto resumed, whether the chain is complete, the preconditions (pass, fail or unavailable), the builder, the last night and the recorded changes");
+
+        group.MapPost("/on", TurnOnAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy)
+            .WithName("TurnAutoOn")
+            .WithSummary("Turn Auto ON as the owner with a fresh password in the body (403 auth.step_up_required, 401 auth.invalid_credentials, 423 auth.locked). 409 auto.preconditions_failed names each item that is not a pass; 409 auto.chain_failed leaves nothing changed. Suggestions only, no order is placed")
+            .ProducesRejections(conflict: true, notFound: false);
+
+        group.MapPost("/off", TurnOffAsync)
+            .WithName("TurnAutoOff")
+            .WithSummary("Turn Auto OFF as the owner (session and CSRF token, no password: the safe direction); pauses only the services the last ON resumed")
+            .ProducesRejections(conflict: true, notFound: false);
 
         group.MapGet("/scope", GetScopeAsync)
             .WithName("GetAutoScope")
@@ -30,7 +50,44 @@ internal sealed class AutoEndpoints : IEndpointModule
 
         group.MapGet("/suggestions", GetSuggestionsAsync)
             .WithName("GetAutoSuggestions")
-            .WithSummary("The next-day suggestions of the newest plan of forDate (or the newest plan): what, why and on what evidence; missing figures read unavailable, tickets without required evidence are listed as not suggested; reserve and rejected stay visible. Suggestion only, no order is placed. 404 auto.no_plan");
+            .WithSummary("The next-day suggestions of the newest plan of forDate (or the newest plan): what, why and on what evidence; missing figures read unavailable, tickets without required evidence are listed as not suggested; reserve and rejected stay visible. Suggestion only, no order is placed. 404 auto.no_plan; 409 auto.night_failed (the newest night failed closed: no suggestions are shown and the gate and reason are given)");
+    }
+
+    private static async Task<Ok<AutoView>> GetAsync(IQueryHandler<GetAutoQuery, AutoView> handler, HttpContext http, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        return TypedResults.Ok(await handler.HandleAsync(new GetAutoQuery(), cancellationToken));
+    }
+
+    private static async Task<Results<Ok<AutoView>, ProblemHttpResult>> TurnOnAsync(
+        TurnAutoOnRequest request,
+        HttpContext http,
+        ICommandHandler<StepUpCommand, StepUpResult> passwordCheck,
+        ICommandHandler<TurnAutoOnCommand, AutoView> handler,
+        CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var owner = await OwnerAct.FreshAsync(http, passwordCheck, request.Password, cancellationToken);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new TurnAutoOnCommand(owner.Value, FreshPassword: true), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AutoView>, ProblemHttpResult>> TurnOffAsync(HttpContext http, ICommandHandler<TurnAutoOffCommand, AutoView> handler, CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var owner = OwnerAct.SessionOwner(http);
+        if (owner.IsFailure)
+        {
+            return ProblemResults.From(owner.Error, http);
+        }
+
+        var result = await handler.HandleAsync(new TurnAutoOffCommand(owner.Value), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Ok<AutoScopeView>> GetScopeAsync(IQueryHandler<GetAutoScopeQuery, AutoScopeView> handler, HttpContext http, CancellationToken cancellationToken)

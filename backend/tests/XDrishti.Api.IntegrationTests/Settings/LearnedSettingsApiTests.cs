@@ -173,6 +173,6 @@ public sealed class LearnedSettingsApiTests(ApiFactory factory) : DataTestBase(f
         reset.Status.ShouldBe(HttpStatusCode.OK);
         reset.Body.GetProperty("isDefault").GetBoolean().ShouldBeTrue();
         (await SendAsync(HttpMethod.Post, "/api/settings/essentials/risk.profile/reset", new { password = Factory.OwnerPassword })).Status.ShouldBe(HttpStatusCode.Conflict);
-        (await SendAsync(HttpMethod.Put, "/api/settings/essentials/auto.enabled", new { on = true })).Status.ShouldBe(HttpStatusCode.Conflict);
+        (await SendAsync(HttpMethod.Put, "/api/settings/essentials/auto.enabled", new { on = true })).Status.ShouldBe(HttpStatusCode.Forbidden); // Auto ON needs the fresh password (AU-17)
     }
 }
