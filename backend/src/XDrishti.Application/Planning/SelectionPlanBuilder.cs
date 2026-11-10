@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Filings;
+using XDrishti.Application.Sizing;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Selection;
@@ -25,7 +26,8 @@ internal sealed class SelectionPlanBuilder(
     SmartRulesOptions? smartOptions = null,
     FillConstraints? fillConstraints = null,
     PlanEventFilter? eventFilter = null,
-    IAutoScopeSource? scopeSource = null) : IPlanBuilder
+    IAutoScopeSource? scopeSource = null,
+    ISizingInputs? sizing = null) : IPlanBuilder
 {
     public const string BuilderId = "selection";
 
@@ -108,17 +110,40 @@ internal sealed class SelectionPlanBuilder(
             ctx.Correlations?.Matrix,
             fillConstraints ?? new FillConstraints());
 
+        // BK-10: the down-only scaling, once, after the fill. Without the inputs port (or with nothing to read) nothing changes.
+        IReadOnlyList<FillDecision> taken = fill.Primary;
+        var scaled = new List<ScaledTicket>();
+        var sizedOut = new List<ScaledTicket>();
+        if (sizing is not null && fill.Primary.Count > 0)
+        {
+            var inputs = await sizing.ReadAsync(request.Session, request.ForDate, [.. fill.Primary.Select(d => new ContextInstrument(ids.GetValueOrDefault(d.Candidate.Symbol), d.Candidate.Symbol))], cancellationToken);
+            var all = SizeScaler.Apply([.. fill.Primary.Select(d => (d, drafts[Key(d.Candidate.Ranked.Merged.Winner.Candidate)].IndicativeEntry))], ctx, inputs, smart.RiskMultiplier, (fillConstraints ?? new FillConstraints()).MaxTotalOpenRiskPct);
+            scaled = [.. all.Where(t => !t.IsReserved)];
+            sizedOut = [.. all.Where(t => t.IsReserved)];
+            taken = [.. scaled.Select(t => t.Decision)];
+            var lowered = scaled.Count(t => t.RiskFactor < 1.0);
+            var capped = scaled.Count(t => t.PoolCap is not null);
+            SizingLog.Scaled(logger, request.ForDate, all.Count, lowered, capped, sizedOut.Count);
+        }
+
         var flagCodes = smart.Flags.Select(f => f.Code).Distinct(StringComparer.Ordinal).ToList();
         var items = new List<NewPlanItem>();
-        var wired = PlanWiring.Wire([.. fill.Primary.Select(d => (d.Candidate, drafts[Key(d.Candidate.Ranked.Merged.Winner.Candidate)]))], ctx, smart.RiskMultiplier, events.Active ? (symbol => events.DaysFor(ids.GetValueOrDefault(symbol))) : null);
-        for (var i = 0; i < fill.Primary.Count; i++)
+        var wired = PlanWiring.Wire([.. taken.Select(d => (d.Candidate, drafts[Key(d.Candidate.Ranked.Merged.Winner.Candidate)]))], ctx, smart.RiskMultiplier, events.Active ? (symbol => events.DaysFor(ids.GetValueOrDefault(symbol))) : null, ScaleOf(scaled));
+        for (var i = 0; i < taken.Count; i++)
         {
-            var winner = fill.Primary[i].Candidate.Ranked.Merged.Winner;
-            items.Add(Item(items.Count + 1, TicketGroup.Primary, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, fill.Primary[i].Candidate.Ranked.Caveats, [], fill.Primary[i].Candidate.Ranked.AdvisoryPWin, Applied(always, flagCodes, filled: true, sized: true), [.. wired[i].Standings, PlanWiring.IndicativeEntry, .. (ctx.Book is { Count: 0 } && !ctx.BookFromLedger ? [PlanWording.OpenBookAssumedEmpty] : (string[])[])], wired[i].Allocations));
+            var winner = taken[i].Candidate.Ranked.Merged.Winner;
+            var notApplied = Applied(always, flagCodes, filled: true, sized: true);
+            if (scaled.Count > 0)
+            {
+                notApplied.AddRange(scaled[i].Flags);
+            }
+
+            items.Add(Item(items.Count + 1, TicketGroup.Primary, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, taken[i].Candidate.Ranked.Caveats, scaled.Count > 0 ? scaled[i].Notes : [], taken[i].Candidate.Ranked.AdvisoryPWin, notApplied, [.. wired[i].Standings, PlanWiring.IndicativeEntry, .. (ctx.Book is { Count: 0 } && !ctx.BookFromLedger ? [PlanWording.OpenBookAssumedEmpty] : (string[])[])], wired[i].Allocations));
         }
 
         var reserve = smart.Reserve.Select(r => new ReserveEntry(r.Ranked, [r.Code], false))
             .Concat(fill.Reserve.Select(d => new ReserveEntry(d.Candidate.Ranked, Codes(d), true)))
+            .Concat(sizedOut.Select(t => new ReserveEntry(t.Decision.Candidate.Ranked, t.ReserveReasons!, true)))
             .OrderBy(x => x.Ranked.Rank).ThenBy(x => x.Ranked.Merged.Winner.Candidate.Symbol, StringComparer.Ordinal).ThenBy(x => x.Ranked.Merged.Winner.Candidate.Cell.Key, StringComparer.Ordinal);
         foreach (var (ranked, reasons, filled) in reserve)
         {
@@ -152,9 +177,25 @@ internal sealed class SelectionPlanBuilder(
         var basis = BasisText(smart, ctx, events.Note);
         var plan = new NewPlan(NightlyRules.PlanKey(request.ForDate, BuilderId), request.ForDate, request.ReviewCutoff, 1, Hash(request, basis, items), basis, true, CreatedBy, request.Now, items)
         {
-            BasisFlags = PlanBasisFlags.From(smart, ctx.Book is null ? PlanBasisFlags.OpenBookUnavailable : ctx.Book.Count == 0 && !ctx.BookFromLedger ? PlanBasisFlags.OpenBookAssumedEmpty : PlanBasisFlags.OpenBookKnown, [.. fill.Primary.Select(d => d.Candidate.Ranked)]) with { ScopeHash = scope?.Hash },
+            BasisFlags = PlanBasisFlags.From(smart, ctx.Book is null ? PlanBasisFlags.OpenBookUnavailable : ctx.Book.Count == 0 && !ctx.BookFromLedger ? PlanBasisFlags.OpenBookAssumedEmpty : PlanBasisFlags.OpenBookKnown, [.. taken.Select(d => d.Candidate.Ranked)]) with { ScopeHash = scope?.Hash },
         };
         return Result.Success(plan);
+    }
+
+    private static Func<string, TicketScale?>? ScaleOf(List<ScaledTicket> scaled)
+    {
+        if (scaled.Count == 0)
+        {
+            return null;
+        }
+
+        var bySymbol = new Dictionary<string, TicketScale>(StringComparer.Ordinal);
+        foreach (var t in scaled)
+        {
+            bySymbol.TryAdd(t.Decision.Candidate.Symbol, new TicketScale(t.RiskFactor, t.PoolCap));
+        }
+
+        return symbol => bySymbol.GetValueOrDefault(symbol);
     }
 
     private sealed record ReserveEntry(RankedCandidate Ranked, IReadOnlyList<string> Reasons, bool Filled);

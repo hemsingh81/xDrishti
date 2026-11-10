@@ -19062,6 +19062,293 @@
         }
       }
     },
+    "/api/selection/sizing-settings": {
+      "get": {
+        "tags": [
+          "Selection"
+        ],
+        "summary": "The sizing settings in force (volatility targeting and the capacity cap, both OFF by default, the floor 0.5, the capacity share 0.01) with the version, the newest loosening change and the latest 50 changes (key, old and new value, direction tighten, loosen or neutral, actor, time, hash). Sizing only scales a suggestion down. Read only",
+        "operationId": "GetSizingSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SizingSettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Selection"
+        ],
+        "summary": "The owner changes the sizing settings (volTargetEnabled, floor 0.25 to 1.0, capacityEnabled, capacityPct above 0 and at most 0.10); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row with its direction. 400 selection.invalid, 403 selection.owner_only, 409 selection.stale",
+        "operationId": "ChangeSizingSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SizingSettingsChangeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SizingSettingsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/selection/basket-risk-budgets": {
+      "get": {
+        "tags": [
+          "Selection"
+        ],
+        "summary": "The basket risk budgets in force (a basket's share, 1 to 100 percent, of the day's total open risk limit; a basket with no row has no budget) and the latest 50 changes. Read only",
+        "operationId": "GetBasketRiskBudgets",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketRiskBudgetsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/selection/basket-risk-budgets/{basketId}": {
+      "put": {
+        "tags": [
+          "Selection"
+        ],
+        "summary": "The owner sets one basket's risk budget (budgetPct 1 to 100, or null to remove it) with the password on EVERY change. Raising or removing a budget is recorded as loosen. 400 selection.invalid, 403 selection.owner_only, 404 selection.basket_not_found, 409 selection.stale",
+        "operationId": "ChangeBasketRiskBudget",
+        "parameters": [
+          {
+            "name": "basketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BasketRiskBudgetChangeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketRiskBudgetsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/sizing-study": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "What the stored closed trades of one run (run, the 64-character key) would have done with the down-only volatility scale, on the same trades: cumulative net R, maximum drawdown and total with and without it, the two halves (a half below 30 trades is insufficient), the trades with no scale. Optional from and to (entry dates) and floor (0.25, 0.5 or 0.75 as a labelled sensitivity; left out it is the stored floor). Descriptive, before costs, recommends nothing, writes nothing, never scales above 1. 422 reports.invalid or reports.too_large",
+        "operationId": "GetSizingStudy",
+        "parameters": [
+          {
+            "name": "run",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "floor",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SizingStudyView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/selection/event-filter": {
       "get": {
         "tags": [
@@ -25627,6 +25914,24 @@
         },
         "description": "The buy-and-hold of one basket with the instruments left out."
       },
+      "BasketBudgetView": {
+        "required": [
+          "basketId",
+          "budgetPct"
+        ],
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "budgetPct": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "The budget of one basket: its share of the total open risk limit, in percent."
+      },
       "BasketFetchRun": {
         "required": [
           "outcomes"
@@ -25892,6 +26197,55 @@
           }
         },
         "description": "Every active basket exactly once, in the wanted order."
+      },
+      "BasketRiskBudgetChangeBody": {
+        "required": [
+          "budgetPct",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "budgetPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The owner's change of one basket's risk budget: 1 to 100 percent of the total open risk limit, or null to remove it. The password is needed for every change. The actor is never taken from the body."
+      },
+      "BasketRiskBudgetsView": {
+        "required": [
+          "budgets",
+          "notice",
+          "history"
+        ],
+        "type": "object",
+        "properties": {
+          "budgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BasketBudgetView"
+            }
+          },
+          "notice": {
+            "type": "string"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BudgetChangeView"
+            }
+          }
+        },
+        "description": "The basket budgets in force (a basket with none has no budget) and their history, newest first (the latest 50)."
       },
       "BasketSourceSummary": {
         "required": [
@@ -27556,6 +27910,49 @@
           }
         },
         "description": "One bucket to pick from. IsAccountDefault is true for the automatic default bucket of an account that has the Portfolio role\n(AccountId and AccountName name that account); custom buckets have neither."
+      },
+      "BudgetChangeView": {
+        "required": [
+          "id",
+          "basketId",
+          "budgetPct",
+          "direction",
+          "actor",
+          "changedAt",
+          "hash"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "budgetPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hash": {
+            "type": "string"
+          }
+        },
+        "description": "One change of a basket budget; BudgetPct null means the budget was removed."
       },
       "CalendarDayView": {
         "required": [
@@ -64957,6 +65354,269 @@
         },
         "description": "The summary card of a training from the simulation (spec AU-13, acceptance 8)."
       },
+      "SizingChangeView": {
+        "required": [
+          "id",
+          "key",
+          "oldValue",
+          "newValue",
+          "direction",
+          "actor",
+          "changedAt",
+          "hash"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "key": {
+            "type": "string"
+          },
+          "oldValue": {
+            "type": "string"
+          },
+          "newValue": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hash": {
+            "type": "string"
+          }
+        },
+        "description": "One change of a sizing setting (or a budget) in the history."
+      },
+      "SizingSettingsChangeBody": {
+        "required": [
+          "volTargetEnabled",
+          "floor",
+          "capacityEnabled",
+          "capacityPct",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "volTargetEnabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "floor": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "capacityEnabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "capacityPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The owner's change of the sizing settings. A value left out stays as it is. The password is needed for every change. The actor is never taken from the body."
+      },
+      "SizingSettingsView": {
+        "required": [
+          "volTargetEnabled",
+          "floor",
+          "capacityEnabled",
+          "capacityPct",
+          "version",
+          "notice",
+          "latestLoosening",
+          "history"
+        ],
+        "type": "object",
+        "properties": {
+          "volTargetEnabled": {
+            "type": "boolean",
+            "description": "`sizing.vol_target.enabled`."
+          },
+          "floor": {
+            "type": "number",
+            "description": "`sizing.vol_target.floor`.",
+            "format": "double"
+          },
+          "capacityEnabled": {
+            "type": "boolean",
+            "description": "`sizing.capacity.enabled`."
+          },
+          "capacityPct": {
+            "type": "number",
+            "description": "`sizing.capacity.pct`.",
+            "format": "double"
+          },
+          "version": {
+            "type": "integer",
+            "description": "The newest settings row id (0 when none).",
+            "format": "int64"
+          },
+          "notice": {
+            "type": "string",
+            "description": "Down-only, advisory, no order."
+          },
+          "latestLoosening": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The newest change with direction loosen.",
+                "$ref": "#/components/schemas/SizingChangeView"
+              }
+            ]
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SizingChangeView"
+            },
+            "description": "The changes, newest first."
+          }
+        },
+        "description": "The sizing settings in force with their history (newest first, the latest 50). With no row everything is OFF. SizingChangeView? SizingSettingsView.LatestLoosening is the newest change that can only raise a suggested quantity or remove a limit, or null when none was ever made."
+      },
+      "SizingStudyResult": {
+        "required": [
+          "trades",
+          "unscaledTotalR",
+          "scaledTotalR",
+          "unscaledMaxDrawdownR",
+          "scaledMaxDrawdownR",
+          "drawdownChangePct",
+          "totalChangePct",
+          "halves",
+          "summary"
+        ],
+        "type": "object",
+        "properties": {
+          "trades": {
+            "type": "integer",
+            "description": "Number of trades.",
+            "format": "int32"
+          },
+          "unscaledTotalR": {
+            "type": "number",
+            "description": "Total R as stored.",
+            "format": "double"
+          },
+          "scaledTotalR": {
+            "type": "number",
+            "description": "Total R with each trade's R times its scale.",
+            "format": "double"
+          },
+          "unscaledMaxDrawdownR": {
+            "type": "number",
+            "description": "Largest fall of the cumulative R from a peak (the start is a peak of 0), as stored.",
+            "format": "double"
+          },
+          "scaledMaxDrawdownR": {
+            "type": "number",
+            "description": "The same with the scale.",
+            "format": "double"
+          },
+          "drawdownChangePct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Change of the maximum drawdown in percent of the unscaled one (negative is lower); null when the unscaled one is 0.",
+            "format": "double"
+          },
+          "totalChangePct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Change of the total R in percent of the unscaled one (negative is lower); null when the unscaled one is 0.",
+            "format": "double"
+          },
+          "halves": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudyHalf"
+            },
+            "description": "The first and the second half of the trades in decision order."
+          },
+          "summary": {
+            "type": "string",
+            "description": "The words, for example `max drawdown 20 % lower, total R 40 % lower`."
+          }
+        },
+        "description": "What the same stored trades would have returned with and without the scale (descriptive, before costs). Nothing here is a recommendation."
+      },
+      "SizingStudyView": {
+        "required": [
+          "run",
+          "floor",
+          "floorSource",
+          "withoutScale",
+          "skippedNoNetR",
+          "result",
+          "caveat"
+        ],
+        "type": "object",
+        "properties": {
+          "run": {
+            "type": "string",
+            "description": "The run key."
+          },
+          "floor": {
+            "type": "number",
+            "description": "The floor used.",
+            "format": "double"
+          },
+          "floorSource": {
+            "type": "string",
+            "description": "`setting` (the stored floor) or `sensitivity` (one of 0.25, 0.5, 0.75 asked for)."
+          },
+          "withoutScale": {
+            "type": "integer",
+            "description": "Trades with no scale (too little history): taken at scale 1.",
+            "format": "int32"
+          },
+          "skippedNoNetR": {
+            "type": "integer",
+            "description": "Closed trades with no net R (a gross run): left out.",
+            "format": "int32"
+          },
+          "result": {
+            "description": "The comparison.",
+            "$ref": "#/components/schemas/SizingStudyResult"
+          },
+          "caveat": {
+            "type": "string",
+            "description": "Descriptive, before costs, same trades; nothing here is a recommendation."
+          }
+        },
+        "description": "What the stored trades would have done with the down scale (read only, descriptive, before costs, same trades)."
+      },
       "SkipTicketBody": {
         "required": [
           "reason"
@@ -65938,6 +66598,43 @@
           }
         },
         "description": "One stored version as the library shows it (spec P5-01): the text exactly as it was posted, its hash and lineage, and whether the text is free of errors under the rules of today."
+      },
+      "StudyHalf": {
+        "required": [
+          "trades",
+          "sufficient",
+          "drawdownSign",
+          "totalSign"
+        ],
+        "type": "object",
+        "properties": {
+          "trades": {
+            "type": "integer",
+            "description": "Trades in the half.",
+            "format": "int32"
+          },
+          "sufficient": {
+            "type": "boolean",
+            "description": "True with at least 30 trades; otherwise the figures below are null."
+          },
+          "drawdownSign": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "-1, 0 or 1: the sign of the change of the maximum drawdown, scaled against unscaled (negative is a smaller drawdown).",
+            "format": "int32"
+          },
+          "totalSign": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "-1, 0 or 1: the sign of the change of the total R, scaled against unscaled.",
+            "format": "int32"
+          }
+        },
+        "description": "One half of the sizing study (a median split of the trades in decision order)."
       },
       "SubScoreView": {
         "required": [

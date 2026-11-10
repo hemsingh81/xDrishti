@@ -68,6 +68,7 @@ using XDrishti.Application.Reporting;
 using XDrishti.Application.Selection;
 using XDrishti.Application.Shadow;
 using XDrishti.Application.SimAll;
+using XDrishti.Application.Sizing;
 using XDrishti.Application.Ticks;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Portfolio;
@@ -220,6 +221,11 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(LimitsChangeBody))]
 [JsonSerializable(typeof(ExecutionSettingsView))]
 [JsonSerializable(typeof(ExecutionSettingsChangeBody))]
+[JsonSerializable(typeof(SizingSettingsView))]
+[JsonSerializable(typeof(SizingSettingsChangeBody))]
+[JsonSerializable(typeof(BasketRiskBudgetsView))]
+[JsonSerializable(typeof(BasketRiskBudgetChangeBody))]
+[JsonSerializable(typeof(SizingStudyView))]
 [JsonSerializable(typeof(EventFilterView))]
 [JsonSerializable(typeof(EventFilterChangeBody))]
 [JsonSerializable(typeof(ExecutionDrillsView))]
