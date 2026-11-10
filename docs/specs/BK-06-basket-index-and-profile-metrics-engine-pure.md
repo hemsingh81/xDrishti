@@ -61,7 +61,7 @@ Notation: window [t0, t1]; members M(d) = membership as of d (a function the cal
 14. **Determinism and speed.** The same inputs give identical results (a hash test); the full profile for 50 members × 300 days runs in under 150 ms on the CI machine and 200 members × 300 days (sampled correlation) under 1 s.
 
 ## Contract
-- **Domain (pure):** `BasketAnalytics.Profile(BasketProfileInput, BasketProfileOptions) → BasketProfile`. `BasketProfileInput(Members: IReadOnlyList<MemberSeries>, MembershipAt: Func<DateOnly, IReadOnlySet<string>>, Benchmark: IReadOnlyList<DailyClose>, Regimes: IReadOnlyDictionary<DateOnly, int?>, Window)`; `MemberSeries(Symbol, Closes: IReadOnlyList<DailyClose>, Volumes, IsFno, IsAsmGsm)`. Result types reuse `Metric` / `MetricState` (P8-05) and the `InstrumentSeries` shape (P8-07). Options: `MinVoters` 5, `MinDaysPerRegime` 30, `MinMembersForReturn` 3, `DiscontinuityThreshold` 0.25, `CapacityPct` 0.01, `CorrelationWindow` 60, `MinCommonSessions` 40, `MaxCorrelationMembers` 200. Defaults come from the caller's settings (BK-07 binds them); the domain holds none as a hidden constant.
+- **Domain (pure):** `BasketAnalytics.Profile(BasketProfileInput, BasketProfileOptions) → BasketProfile`. `BasketProfileInput(Members: IReadOnlyList<MemberSeries>, MembershipAt: Func<DateOnly, IReadOnlySet<string>>, MembershipDates: IReadOnlyList<DateOnly> (dates with a snapshot; fewer than two means `single_snapshot`), Benchmark: IReadOnlyList<DailyClose>, Regimes: IReadOnlyDictionary<DateOnly, int?>, Window)`; `MemberSeries(Symbol, Closes: IReadOnlyList<DailyClose>, Volumes, IsFno, IsAsmGsm)`. Result types reuse `Metric` / `MetricState` (P8-05) and the `InstrumentSeries` shape (P8-07). Options: `MinVoters` 5, `MinDaysPerRegime` 30, `MinMembersForReturn` 3, `DiscontinuityThreshold` 0.25, `CapacityPct` 0.01, `CorrelationWindow` 60, `MinCommonSessions` 40, `MaxCorrelationMembers` 200. Defaults come from the caller's settings (BK-07 binds them); the domain holds none as a hidden constant.
 - **API / data / UI / events:** none.
 - **Architecture:** `Domain/Reporting` stays pure; no order-named member; no I/O types; no new project.
 
@@ -115,3 +115,7 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 - Criteria 1 and 2 reworded (day-by-day returns; criterion 2 is a variant of 1). Criterion 7 notes the test passes `MinMembers` 3 and that N_eff is an equal-correlation heuristic.
 - `rule_version` and `IBasketQueries` replaced in the body by `params_hash`, `market.basket_versions`, `members?asOf` (BK-01..05).
 - Size unchanged: 4 agent-days.
+
+## Build notes 2026-11-10
+- Criterion 2 conflicts with the 3-member minimum (N_2 = 2 gives no index point at `MinMembersForReturn` 3): its test passes `MinMembersForReturn` 2. Criterion 5 conflicts with the 10-day capture minimum (2 up days): its test passes `MinCaptureDays` 2.
+- The hold return, contribution and difference to the index rest on the membership in force at the window start (what one could have bought); breadth, dispersion, correlation and capacity use the membership at the last session. Turnover averages only snapshots inside the window plus the one in force at its start.

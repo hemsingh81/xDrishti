@@ -51,11 +51,15 @@ public sealed class BasketAnalyticsPropertyTests
             var changed = Run(Members(m => m with { Closes = [.. m.Closes.Select(c => c.Date > D(k) ? c with { Close = 1.0 } : c)] }), [.. bench.Select(c => c.Date > D(k) ? c with { Close = 7.0 } : c)], k);
             var later = Members(m => m).Append(Walk(new Random(seed + 99), "LATE", 200, start: k + 1)).ToList();
 
+            var longer = Run(Members(m => m), bench, 199);
+            longer.Index.Points.Where(p => p.Date <= D(k)).Select(p => (p.Date, p.Level, p.Return, p.Members)).ShouldBe(PointsOf(cut));
             Digest(cut).ShouldBe(Digest(full));
             Digest(changed).ShouldBe(Digest(full));
             Digest(Run(later, bench, k)).ShouldBe(Digest(full));
         }
     }
+
+    private static List<(DateOnly, double, double, int)> PointsOf(BasketProfile p) => [.. p.Index.Points.Select(x => (x.Date, x.Level, x.Return, x.Members))];
 
     [Fact]
     public void Scaling_every_close_by_a_constant_leaves_the_index_unchanged()
@@ -124,6 +128,7 @@ public sealed class BasketAnalyticsPropertyTests
         var twoHundred = Enumerable.Range(0, 200).Select(i => Walk(rng, $"M{i:D3}", 300)).ToList();
         var bench = Bench(rng, 300);
         Run(fifty, bench, 299);
+        Run(twoHundred, bench, 299);
 
         Digest(Run(fifty, bench, 299)).ShouldBe(Digest(Run(fifty, bench, 299)));
         var watch = Stopwatch.StartNew();

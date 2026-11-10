@@ -33,7 +33,9 @@ public static class BasketAnalytics
         var last = asOf ?? window.To;
         var returns = current.ToDictionary(m => m.Symbol, m => ReturnSeries.FromCloses(m.Closes.Select(c => (c.Date, c.Close)), last), StringComparer.Ordinal);
         var capacity = BasketCapacity.Compute(current, last, options);
-        var contribution = Contribution.Compute(current, window, options);
+        // The hold return is what one could have bought at the window start: the membership in force at From, not today's (survivorship, ISS-22).
+        var startSet = input.MembershipAt(window.From);
+        var contribution = Contribution.Compute([.. members.Where(m => startSet.Contains(m.Symbol))], window, options);
         var indexHold = BuyAndHold.Compute([new InstrumentSeries(Guid.Empty, "index", input.Benchmark)], window.From, window.To, new BuyAndHoldOptions(1, options.HoldMaxGapDays, options.DiscontinuityThreshold)).Return;
 
         return new BasketProfile(

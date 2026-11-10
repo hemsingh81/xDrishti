@@ -25,24 +25,23 @@ public static class MemberTurnover
             return new TurnoverResult(Metric.Unavailable($"membership history starts on {dates[0]:yyyy-MM-dd}"), SingleSnapshot, dates[0], 0, 0);
         }
 
+        // The average rests on the snapshots inside the window and the one in force at its start, not on history outside it.
+        var first = dates[0];
+        var inForce = dates.Where(d => d <= window.From).DefaultIfEmpty(first).Max();
+        var used = dates.Where(d => d >= inForce).ToList();
         int adds = 0, removes = 0;
-        double size = 0;
-        var previous = membershipAt(dates[0]);
-        size += previous.Count;
-        for (var i = 1; i < dates.Count; i++)
+        var previous = membershipAt(used[0]);
+        double size = previous.Count;
+        for (var i = 1; i < used.Count; i++)
         {
-            var current = membershipAt(dates[i]);
+            var current = membershipAt(used[i]);
             size += current.Count;
-            if (dates[i] > window.From)
-            {
-                adds += current.Count(s => !previous.Contains(s));
-                removes += previous.Count(s => !current.Contains(s));
-            }
-
+            adds += current.Count(s => !previous.Contains(s));
+            removes += previous.Count(s => !current.Contains(s));
             previous = current;
         }
 
-        return new TurnoverResult(FromCounts(adds, removes, size / dates.Count), Dated, dates[0], adds, removes);
+        return new TurnoverResult(FromCounts(adds, removes, size / used.Count), Dated, first, adds, removes);
     }
 
     /// <summary>(adds + removes) / average members; not evaluable when the average is zero.</summary>
