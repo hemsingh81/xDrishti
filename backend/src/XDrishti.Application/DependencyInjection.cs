@@ -371,6 +371,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, ReviewCutoffService>(); // lapses unreviewed tickets at the plan's cutoff; the optional auto pass runs only when the owner's setting is ON; starts paused (P7-10)
         services.AddSingleton<IScheduledService, PreOpenService>(); // arms the approved tickets at 09:10 (P7-11); starts paused, no order, no promotion
         services.AddSingleton<IScheduledService, XDrishti.Application.Market.Baskets.SystemBasketsService>(); // BK-01: the index lists' membership at 07:30; starts paused, Baskets:System:Fetch:Enabled OFF, zero requests while off
+        services.AddSingleton<IScheduledService, DerivedBasketsService>(); // BK-03: the derived baskets' versions after the end-of-day run; starts paused, Baskets:System:Derived:Enabled OFF, reads and writes nothing while off
         services.AddSingleton<IScheduledService, PlanExpiryService>(); // expires the day's armed tickets after the close (P7-11); starts paused
         services.AddSingleton<IScheduledService, PaperCaptureService>(); // paper fills of armed tickets after the end-of-day run (P10-01); starts paused, no order
         services.AddSingleton<IScheduledService, ShadowWriteService>(); // the shadow record of every nightly candidate, written before the open (CF-08); starts paused, setting paper.shadow.enabled OFF, no order
@@ -960,6 +961,11 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<XDrishti.Application.Market.Baskets.RunBasketFetchCommand, XDrishti.Application.Market.Baskets.BasketFetchRun>, XDrishti.Application.Market.Baskets.RunBasketFetchHandler>(); // BK-01: fetch, guard and apply the index lists
         services.AddScoped<ICommandHandler<XDrishti.Application.Market.Baskets.SetBasketSourceEnabledCommand, XDrishti.Application.Market.Baskets.BasketSourceView>, XDrishti.Application.Market.Baskets.SetBasketSourceEnabledHandler>(); // BK-01: the owner switches a source on or off
         services.AddScoped<IQueryHandler<XDrishti.Application.Market.Baskets.GetBasketSourceQuery, Result<XDrishti.Application.Market.Baskets.BasketSourceView>>, XDrishti.Application.Market.Baskets.GetBasketSourceHandler>();
+        services.AddScoped<ICommandHandler<RefreshDerivedBasketsCommand, DerivedRun>, RefreshDerivedBasketsHandler>(); // BK-03: form the due derived versions from our own bars
+        services.AddScoped<ICommandHandler<BackfillDerivedBasketCommand, DerivedRun>, BackfillDerivedBasketHandler>(); // BK-03: owner-triggered recomputed versions of a past range
+        services.AddScoped<ICommandHandler<SetDerivedParamsCommand, DerivedDefinitionView>, SetDerivedParamsHandler>(); // BK-03: a new immutable parameter set and the switch
+        services.AddScoped<IQueryHandler<GetBasketVersionsQuery, Result<BasketVersionPage>>, GetBasketVersionsHandler>();
+        services.AddScoped<IQueryHandler<GetBasketScoresQuery, Result<BasketVersionDetail>>, GetBasketScoresHandler>();
         services.AddScoped<IQueryHandler<GetPlanItemChartQuery, Result<TicketChartView>>, GetPlanItemChartHandler>();
         services.AddScoped<ICommandHandler<MoveTicketCommand, TicketMoveOutcome>, MoveTicketHandler>(); // owner decisions and service moves along the ticket table; no path to a broker
         services.AddScoped<ICommandHandler<MovePlanCommand, PlanMoveOutcome>, MovePlanHandler>();

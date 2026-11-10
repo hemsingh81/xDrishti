@@ -2727,6 +2727,323 @@
         }
       }
     },
+    "/api/baskets/system/derived/refresh": {
+      "post": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Owner act, needs step-up: form a version of every enabled derived basket now, from our own daily bars, as of the last closed session (no network); one outcome per basket. 409 baskets.derived_disabled while Baskets:System:Derived:Enabled is off (nothing is read or written), 409 baskets.derived_running while a run is going",
+        "operationId": "RefreshDerivedBaskets",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DerivedRun"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/baskets/system/derived/backfill": {
+      "post": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Owner act, needs step-up: recompute one derived basket for every due date of a closed range (at most MaxBackfillDays trading days) from bars cut at each date, as recomputed versions; never overwrites a published version. 202 with the run and the note that adjustments are today's restated series; 409 baskets.backfill_overlap when the range reaches the first published version, 409 baskets.derived_disabled while off",
+        "operationId": "BackfillDerivedBasket",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DerivedBackfillInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DerivedRun"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/baskets/system/derived/{id}/params": {
+      "put": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Owner act, needs step-up: store a new immutable parameter set (overrides of the defaults, checked against the engine's ranges) for a derived basket and select it, and/or switch the basket on or off; audited with the old and new hash. A basket this build cannot form (13, 4, 12) cannot be switched on (400 baskets.invalid)",
+        "operationId": "SetDerivedBasketParams",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DerivedParamsInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DerivedDefinitionView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/baskets/{id}/versions": {
+      "get": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "The published versions of a derived basket, newest first (skip, take 1 to 200, default 50): as_of, effectiveFrom (the next session), member and universe counts, the parameter hash and the provenance (derived or recomputed); 404 baskets.not_found for a basket without versions",
+        "operationId": "ListBasketVersions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketVersionPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/baskets/{id}/versions/{versionId}": {
+      "get": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "One version of a derived basket: the members and the next non-members with score and rank, the named exclusions, the counts (members + below threshold + excluded = universe) and the parameters it was computed with",
+        "operationId": "GetBasketVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketVersionDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/baskets/{id}/source": {
       "get": {
         "tags": [
@@ -25683,6 +26000,117 @@
         },
         "description": "The source of a system basket and its last 20 fetches (no raw file). `enabled` = the owner has turned this file on."
       },
+      "BasketVersionDetail": {
+        "required": [
+          "version",
+          "belowThreshold",
+          "scores",
+          "excluded",
+          "params"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/BasketVersionSummary"
+          },
+          "belowThreshold": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VersionScoreView"
+            }
+          },
+          "excluded": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VersionExclusionView"
+            }
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        },
+        "description": "One version with its scores, named exclusions (`universeSize = members + belowThreshold + excluded`) and the parameters it was computed with."
+      },
+      "BasketVersionPage": {
+        "required": [
+          "items",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BasketVersionSummary"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "BasketVersionSummary": {
+        "required": [
+          "versionId",
+          "asOf",
+          "effectiveFrom",
+          "formedAt",
+          "memberCount",
+          "universeSize",
+          "paramsHash",
+          "outcome",
+          "provenance"
+        ],
+        "type": "object",
+        "properties": {
+          "versionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date"
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "formedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "memberCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "universeSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "paramsHash": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "provenance": {
+            "type": "string"
+          }
+        },
+        "description": "One version of a derived basket in the list (`outcome`: applied, not_formed; `provenance`: derived or recomputed)."
+      },
       "BasketView": {
         "required": [
           "id",
@@ -33676,6 +34104,172 @@
           }
         },
         "description": "The body of the depth-recorder switch. The owner is never part of it: the actor comes from the signed-in session."
+      },
+      "DerivedBackfillInput": {
+        "required": [
+          "basketId",
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "The body of a backfill request."
+      },
+      "DerivedBasketOutcome": {
+        "required": [
+          "basketId",
+          "name",
+          "outcome",
+          "reason",
+          "members",
+          "universe",
+          "excluded"
+        ],
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "members": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "universe": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "excluded": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What one basket did in a run: `applied`, `unchanged` or `skipped` (with a reason)."
+      },
+      "DerivedDefinitionView": {
+        "required": [
+          "basketId",
+          "name",
+          "definitionNo",
+          "enabled",
+          "paramsHash",
+          "overrides"
+        ],
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "definitionNo": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "paramsHash": {
+            "type": "string"
+          },
+          "overrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        },
+        "description": "The switch and parameters of a derived basket after an owner act."
+      },
+      "DerivedParamsInput": {
+        "required": [
+          "overrides",
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "overrides": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "enabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "description": "The body of a parameter or switch change: new numbers (their overrides of the defaults, a whole new set) and/or the switch."
+      },
+      "DerivedRun": {
+        "required": [
+          "asOf",
+          "baskets",
+          "summary"
+        ],
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date"
+          },
+          "baskets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DerivedBasketOutcome"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The result of a refresh or backfill run."
       },
       "DesignationView": {
         "required": [
@@ -68496,6 +69090,61 @@
           }
         },
         "description": "The daily series PBO was computed from (CF-03 part B): one value per variant per date, so the figure can be recomputed from the stored document. Null when the PBO mode is Off or a daily value was not finite."
+      },
+      "VersionExclusionView": {
+        "required": [
+          "instrumentId",
+          "symbol",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "VersionScoreView": {
+        "required": [
+          "instrumentId",
+          "symbol",
+          "name",
+          "score",
+          "rank",
+          "isMember"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number",
+            "format": "double"
+          },
+          "rank": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isMember": {
+            "type": "boolean"
+          }
+        },
+        "description": "A ranked instrument of a version: members and the next non-members by rank (the \"why\")."
       },
       "VersionSummary": {
         "required": [

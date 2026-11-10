@@ -50,6 +50,38 @@ internal sealed class BasketsEndpoints : IEndpointModule
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapPost("/system/derived/refresh", RefreshDerivedAsync)
+            .RequireStepUp()
+            .WithName("RefreshDerivedBaskets")
+            .WithSummary("Owner act, needs step-up: form a version of every enabled derived basket now, from our own daily bars, as of the last closed session (no network); one outcome per basket. 409 baskets.derived_disabled while Baskets:System:Derived:Enabled is off (nothing is read or written), 409 baskets.derived_running while a run is going")
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/system/derived/backfill", BackfillDerivedAsync)
+            .RequireStepUp()
+            .WithName("BackfillDerivedBasket")
+            .WithSummary("Owner act, needs step-up: recompute one derived basket for every due date of a closed range (at most MaxBackfillDays trading days) from bars cut at each date, as recomputed versions; never overwrites a published version. 202 with the run and the note that adjustments are today's restated series; 409 baskets.backfill_overlap when the range reaches the first published version, 409 baskets.derived_disabled while off")
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPut("/system/derived/{id:guid}/params", SetDerivedParamsAsync)
+            .RequireStepUp()
+            .WithName("SetDerivedBasketParams")
+            .WithSummary("Owner act, needs step-up: store a new immutable parameter set (overrides of the defaults, checked against the engine's ranges) for a derived basket and select it, and/or switch the basket on or off; audited with the old and new hash. A basket this build cannot form (13, 4, 12) cannot be switched on (400 baskets.invalid)")
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/{id:guid}/versions", GetVersionsAsync)
+            .WithName("ListBasketVersions")
+            .WithSummary("The published versions of a derived basket, newest first (skip, take 1 to 200, default 50): as_of, effectiveFrom (the next session), member and universe counts, the parameter hash and the provenance (derived or recomputed); 404 baskets.not_found for a basket without versions")
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/{id:guid}/versions/{versionId:guid}", GetVersionAsync)
+            .WithName("GetBasketVersion")
+            .WithSummary("One version of a derived basket: the members and the next non-members with score and rank, the named exclusions, the counts (members + below threshold + excluded = universe) and the parameters it was computed with")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapGet("/{id:guid}/source", GetSourceAsync)
             .WithName("GetBasketSource")
             .WithSummary("The source of a system basket: file name, state (never, ok, stale, rejected, failed), last checks and its last 20 fetch outcomes (no raw file); 404 baskets.not_found for a basket without one")
@@ -170,6 +202,62 @@ internal sealed class BasketsEndpoints : IEndpointModule
     {
         http.Response.Headers.CacheControl = "no-store";
         var result = await handler.HandleAsync(new RunBasketFetchCommand(input?.BasketIds, input?.Force ?? false, http.GetActor()), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<DerivedRun>, ProblemHttpResult>> RefreshDerivedAsync(
+        HttpContext http,
+        ICommandHandler<RefreshDerivedBasketsCommand, DerivedRun> handler,
+        CancellationToken cancellationToken)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var result = await handler.HandleAsync(new RefreshDerivedBasketsCommand(http.GetActor(), true), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Accepted<DerivedRun>, ProblemHttpResult>> BackfillDerivedAsync(
+        HttpContext http,
+        ICommandHandler<BackfillDerivedBasketCommand, DerivedRun> handler,
+        CancellationToken cancellationToken,
+        [FromBody] DerivedBackfillInput? input = null)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var result = await handler.HandleAsync(new BackfillDerivedBasketCommand(input?.BasketId ?? Guid.Empty, input?.From, input?.To, http.GetActor()), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Accepted((string?)null, result.Value);
+    }
+
+    private static async Task<Results<Ok<DerivedDefinitionView>, ProblemHttpResult>> SetDerivedParamsAsync(
+        Guid id,
+        HttpContext http,
+        ICommandHandler<SetDerivedParamsCommand, DerivedDefinitionView> handler,
+        CancellationToken cancellationToken,
+        [FromBody] DerivedParamsInput? input = null)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        var result = await handler.HandleAsync(new SetDerivedParamsCommand(id, input?.Overrides, input?.Enabled, http.GetActor()), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<BasketVersionPage>, ProblemHttpResult>> GetVersionsAsync(
+        Guid id,
+        HttpContext http,
+        IQueryHandler<GetBasketVersionsQuery, Result<BasketVersionPage>> handler,
+        CancellationToken cancellationToken,
+        int skip = 0,
+        int take = 50)
+    {
+        var result = await handler.HandleAsync(new GetBasketVersionsQuery(id, skip, take), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<BasketVersionDetail>, ProblemHttpResult>> GetVersionAsync(
+        Guid id,
+        Guid versionId,
+        HttpContext http,
+        IQueryHandler<GetBasketScoresQuery, Result<BasketVersionDetail>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetBasketScoresQuery(id, versionId), cancellationToken);
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 

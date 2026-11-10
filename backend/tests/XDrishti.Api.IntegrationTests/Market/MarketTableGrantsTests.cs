@@ -92,7 +92,7 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
 
         await CheckSystemBasketCatalogueAsync(connection);
         await AsOwnerAsync(connection, "DELETE FROM market.basket_members; DELETE FROM market.baskets WHERE name = 'Probe'; DELETE FROM market.tracked_instruments");
-        (await ScalarAsync(connection, "SELECT count(*) FROM market.baskets")).ShouldBe(29L); // the three of the design and the 26 seeded index baskets
+        (await ScalarAsync(connection, "SELECT count(*) FROM market.baskets")).ShouldBe(43L); // the three of the design, the 26 seeded index baskets and the 14 derived ones
         await ExecuteAsync(connection, "DELETE FROM market.instruments");
 
         await InsertRunAsync(connection, "00000000-0000-7000-8000-00000000b001", "running");
@@ -115,11 +115,11 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
         await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "ALTER TABLE market.basket_members ADD COLUMN x int"), PostgresErrorCodes.InsufficientPrivilege);
         await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "CREATE INDEX ix_intruder ON market.baskets (name)"), PostgresErrorCodes.InsufficientPrivilege);
 
-        foreach (var table in new[] { "instruments", "instrument_broker_ids", "master_refreshes", "tracked_instruments", "baskets", "basket_members", "basket_sources", "basket_fetches" })
+        foreach (var table in new[] { "instruments", "instrument_broker_ids", "master_refreshes", "tracked_instruments", "baskets", "basket_members", "basket_sources", "basket_fetches", "basket_versions", "basket_member_scores", "basket_param_sets", "derived_definitions" })
         {
             foreach (var privilege in new[] { "SELECT", "INSERT", "UPDATE", "DELETE" })
             {
-                var expected = table == "basket_fetches" ? privilege is "SELECT" or "INSERT" : privilege != "DELETE" || !KeptTables.Contains(table); // the fetch log is insert-only
+                var expected = table is "basket_fetches" or "basket_versions" or "basket_member_scores" or "basket_param_sets" ? privilege is "SELECT" or "INSERT" : privilege != "DELETE" || !KeptTables.Contains(table); // the fetch log and the derived versions, scores and parameter sets are insert-only
                 (await ScalarAsync(connection, $"SELECT has_table_privilege('xd_app', 'market.{table}', '{privilege}')")).ShouldBe(expected, $"{privilege} on {table}");
             }
         }
@@ -164,7 +164,7 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
         // Baskets as the runtime role: the seeded ones are listed, an add tracks the instrument and saves the membership and both audit entries, then copy, reorder, remove, archive.
         using var seeded = await client.GetAsync("/api/baskets", Ct);
         var baskets = await seeded.ReadAsync<List<XDrishti.Application.Market.Baskets.BasketView>>(Ct);
-        baskets.Count(b => b.System).ShouldBe(26); // the seeded index baskets come first, read-only
+        baskets.Count(b => b.System).ShouldBe(40); // the seeded index baskets (26) and derived baskets (14) come first, read-only
         baskets = [.. baskets.Where(b => !b.System)];
         baskets.Select(b => b.Name).ShouldBe(["MyChoice", "MyLongTerm", "Best stocks"]);
         using var created = await client.PostJsonAsync("/api/baskets", new { name = "Probe", purpose = "watch" }, Ct);
@@ -217,6 +217,15 @@ public sealed class MarketTableGrantsTests(ApiFactory factory)
         await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "DELETE FROM market.basket_fetches"), PostgresErrorCodes.InsufficientPrivilege);
         await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "INSERT INTO market.baskets (id, name, colour, purpose, position, created_at, revision, kind, system) VALUES ('00000000-0000-7000-8000-00000000d002', 'Odd', '#112233', 'watch', 0, now(), 0, 'index', false)"), PostgresErrorCodes.CheckViolation);
         await AsOwnerAsync(connection, "DELETE FROM market.basket_fetches");
+
+        // BK-03: the fourteen derived baskets are seeded with a definition each, every one OFF; the point-in-time record is insert-only for the runtime role.
+        (await ScalarAsync(connection, "SELECT count(*) FROM market.derived_definitions WHERE NOT enabled AND params_set_id IS NULL")).ShouldBe(14L);
+        (await ScalarAsync(connection, "SELECT count(*) FROM market.baskets WHERE kind = 'derived' AND system")).ShouldBe(14L);
+        (await ScalarAsync(connection, "SELECT count(*) FROM market.basket_versions")).ShouldBe(0L);
+        await ExecuteAsync(connection, "INSERT INTO market.basket_param_sets (id, definition_no, params, params_hash, created_at, created_by) VALUES ('00000000-0000-7000-8000-00000000e001', 3, '{}', repeat('a', 64), now(), 'probe')");
+        await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "UPDATE market.basket_param_sets SET params_hash = repeat('b', 64)"), PostgresErrorCodes.InsufficientPrivilege);
+        await ShouldBeRejectedAsync(connection, () => ExecuteAsync(connection, "DELETE FROM market.basket_param_sets"), PostgresErrorCodes.InsufficientPrivilege);
+        await AsOwnerAsync(connection, "DELETE FROM market.basket_param_sets");
     }
 
     private static async Task CheckBasketRulesAsync(NpgsqlConnection connection)

@@ -828,6 +828,91 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/baskets/system/derived/refresh': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Owner act, needs step-up: form a version of every enabled derived basket now, from our own daily bars, as of the last closed session (no network); one outcome per basket. 409 baskets.derived_disabled while Baskets:System:Derived:Enabled is off (nothing is read or written), 409 baskets.derived_running while a run is going */
+    post: operations['RefreshDerivedBaskets'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/baskets/system/derived/backfill': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Owner act, needs step-up: recompute one derived basket for every due date of a closed range (at most MaxBackfillDays trading days) from bars cut at each date, as recomputed versions; never overwrites a published version. 202 with the run and the note that adjustments are today's restated series; 409 baskets.backfill_overlap when the range reaches the first published version, 409 baskets.derived_disabled while off */
+    post: operations['BackfillDerivedBasket'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/baskets/system/derived/{id}/params': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Owner act, needs step-up: store a new immutable parameter set (overrides of the defaults, checked against the engine's ranges) for a derived basket and select it, and/or switch the basket on or off; audited with the old and new hash. A basket this build cannot form (13, 4, 12) cannot be switched on (400 baskets.invalid) */
+    put: operations['SetDerivedBasketParams'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/baskets/{id}/versions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The published versions of a derived basket, newest first (skip, take 1 to 200, default 50): as_of, effectiveFrom (the next session), member and universe counts, the parameter hash and the provenance (derived or recomputed); 404 baskets.not_found for a basket without versions */
+    get: operations['ListBasketVersions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/baskets/{id}/versions/{versionId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One version of a derived basket: the members and the next non-members with score and rank, the named exclusions, the counts (members + below threshold + excluded = universe) and the parameters it was computed with */
+    get: operations['GetBasketVersion'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/baskets/{id}/source': {
     parameters: {
       query?: never;
@@ -7566,6 +7651,40 @@ export interface components {
       expectedMax: number;
       fetches: components['schemas']['FetchOutcomeView'][];
     };
+    /** @description One version with its scores, named exclusions (`universeSize = members + belowThreshold + excluded`) and the parameters it was computed with. */
+    BasketVersionDetail: {
+      version: components['schemas']['BasketVersionSummary'];
+      /** Format: int32 */
+      belowThreshold: number;
+      scores: components['schemas']['VersionScoreView'][];
+      excluded: components['schemas']['VersionExclusionView'][];
+      params: {
+        [key: string]: number;
+      };
+    };
+    BasketVersionPage: {
+      items: components['schemas']['BasketVersionSummary'][];
+      /** Format: int32 */
+      total: number;
+    };
+    /** @description One version of a derived basket in the list (`outcome`: applied, not_formed; `provenance`: derived or recomputed). */
+    BasketVersionSummary: {
+      /** Format: uuid */
+      versionId: string;
+      /** Format: date */
+      asOf: string;
+      /** Format: date */
+      effectiveFrom: string;
+      /** Format: date-time */
+      formedAt: null | string;
+      /** Format: int32 */
+      memberCount: number;
+      /** Format: int32 */
+      universeSize: number;
+      paramsHash: string;
+      outcome: string;
+      provenance: string;
+    };
     /**
      * @description A basket. `purpose`: trading · long_term · watch. `position` = place among the active baskets (0 first; the system baskets count on their own, in their group).
      *     `memberCount` = instruments in it now. `archivedAt` is null for an active basket (archived ones are only listed on request).
@@ -10632,6 +10751,57 @@ export interface components {
       reason: null | string;
       /** @description The owner's password, re-entered for THIS change - ON or OFF. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
       password: null | string;
+    };
+    /** @description The body of a backfill request. */
+    DerivedBackfillInput: {
+      /** Format: uuid */
+      basketId: string;
+      /** Format: date */
+      from: null | string;
+      /** Format: date */
+      to: null | string;
+    };
+    /** @description What one basket did in a run: `applied`, `unchanged` or `skipped` (with a reason). */
+    DerivedBasketOutcome: {
+      /** Format: uuid */
+      basketId: string;
+      name: string;
+      outcome: string;
+      reason: null | string;
+      /** Format: int32 */
+      members: number;
+      /** Format: int32 */
+      universe: number;
+      /** Format: int32 */
+      excluded: number;
+    };
+    /** @description The switch and parameters of a derived basket after an owner act. */
+    DerivedDefinitionView: {
+      /** Format: uuid */
+      basketId: string;
+      name: string;
+      /** Format: int32 */
+      definitionNo: number;
+      enabled: boolean;
+      paramsHash: string;
+      overrides: {
+        [key: string]: number;
+      };
+    };
+    /** @description The body of a parameter or switch change: new numbers (their overrides of the defaults, a whole new set) and/or the switch. */
+    DerivedParamsInput: {
+      overrides: null | {
+        [key: string]: number;
+      };
+      enabled: null | boolean;
+    };
+    /** @description The result of a refresh or backfill run. */
+    DerivedRun: {
+      /** Format: date */
+      asOf: string;
+      baskets: components['schemas']['DerivedBasketOutcome'][];
+      summary: string;
+      note?: null | string;
     };
     /** @description One designation of a model. */
     DesignationView: {
@@ -23476,6 +23646,24 @@ export interface components {
       dates: string[];
       variants: components['schemas']['VariantSeriesRowView'][];
     };
+    VersionExclusionView: {
+      /** Format: uuid */
+      instrumentId: string;
+      symbol: string;
+      reason: string;
+    };
+    /** @description A ranked instrument of a version: members and the next non-members by rank (the "why"). */
+    VersionScoreView: {
+      /** Format: uuid */
+      instrumentId: string;
+      symbol: string;
+      name: string;
+      /** Format: double */
+      score: number;
+      /** Format: int32 */
+      rank: number;
+      isMember: boolean;
+    };
     /** @description A stored version in the list of a family: number, hash, parent hash, note and creation time. */
     VersionSummary: {
       /** Format: int32 */
@@ -25705,6 +25893,232 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RefreshDerivedBaskets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DerivedRun'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  BackfillDerivedBasket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['DerivedBackfillInput'];
+      };
+    };
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DerivedRun'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SetDerivedBasketParams: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['DerivedParamsInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DerivedDefinitionView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListBasketVersions: {
+    parameters: {
+      query?: {
+        skip?: number;
+        take?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketVersionPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetBasketVersion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketVersionDetail'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

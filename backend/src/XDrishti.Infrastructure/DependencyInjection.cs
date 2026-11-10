@@ -464,6 +464,19 @@ public static class DependencyInjection
             .RemoveAllLoggers();
     }
 
+    /// <summary>The derived baskets (BK-03, ADR 0258): our own bars in, dated versions out; no network. <c>Baskets:System:Derived:Enabled</c> defaults to false.</summary>
+    internal static void AddDerivedBaskets(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<XDrishti.Infrastructure.Market.DerivedBaskets.DerivedBasketOptions>()
+            .Bind(configuration.GetSection(XDrishti.Infrastructure.Market.DerivedBaskets.DerivedBasketOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IDerivedSettings, XDrishti.Infrastructure.Market.DerivedBaskets.DerivedSettings>();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IDerivedRunLock, XDrishti.Infrastructure.Market.DerivedBaskets.DerivedRunLock>();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IDerivedUniverseReader, XDrishti.Infrastructure.Market.DerivedBaskets.DerivedUniverseReader>();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IDerivedVersionStore, XDrishti.Infrastructure.Market.DerivedBaskets.DerivedVersionStore>();
+    }
+
     /// <summary>
     /// The system baskets' file fetch (BK-01, ADR 0254). With <c>Baskets:System:Fetch:Enabled</c> off (default) no HTTP client is registered and the fetcher is the one that never reaches the network; the catalogue is only a table.
     /// </summary>
@@ -579,6 +592,7 @@ public static class DependencyInjection
         services.AddScoped<IBasketQueries, BasketQueries>();
         services.AddScoped<IPortfolioBasketSource, PortfolioBasketSource>();
         services.AddSystemBasketSources(configuration);
+        services.AddDerivedBaskets(configuration);
 
         services.AddTransient<MasterDataEndpointGuard>();
         services.AddHttpClient(MasterDataHttpClientNames.Dhan, MasterDataHttp.ConfigureDhan)

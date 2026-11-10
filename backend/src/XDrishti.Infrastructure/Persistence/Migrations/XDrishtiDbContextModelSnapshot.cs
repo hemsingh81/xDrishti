@@ -5119,6 +5119,212 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.DerivedBaskets.BasketMemberScoreRecord", b =>
+                {
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<bool>("IsMember")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_member");
+
+                    b.Property<int>("Rank")
+                        .HasColumnType("integer")
+                        .HasColumnName("rank");
+
+                    b.Property<double>("Score")
+                        .HasColumnType("double precision")
+                        .HasColumnName("score");
+
+                    b.Property<int>("SessionsHeld")
+                        .HasColumnType("integer")
+                        .HasColumnName("sessions_held");
+
+                    b.HasKey("VersionId", "InstrumentId")
+                        .HasName("pk_basket_member_scores");
+
+                    b.HasIndex("InstrumentId")
+                        .HasDatabaseName("ix_basket_member_scores_instrument_id");
+
+                    b.ToTable("basket_member_scores", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_basket_member_scores_rank", "rank >= 0 AND sessions_held >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.DerivedBaskets.BasketParamSetRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("DefinitionNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("definition_no");
+
+                    b.Property<string>("Params")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("params");
+
+                    b.Property<string>("ParamsHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("params_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_basket_param_sets");
+
+                    b.ToTable("basket_param_sets", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_basket_param_sets_no", "definition_no BETWEEN 1 AND 14");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.DerivedBaskets.BasketVersionRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateOnly>("AsOf")
+                        .HasColumnType("date")
+                        .HasColumnName("as_of");
+
+                    b.Property<Guid>("BasketId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("basket_id");
+
+                    b.Property<int>("BelowThreshold")
+                        .HasColumnType("integer")
+                        .HasColumnName("below_threshold");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<string>("Excluded")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("excluded");
+
+                    b.Property<DateTimeOffset?>("FormedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("formed_at");
+
+                    b.Property<int>("MemberCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("member_count");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("Params")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("params");
+
+                    b.Property<string>("ParamsHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("params_hash");
+
+                    b.Property<string>("Provenance")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("provenance");
+
+                    b.Property<int>("UniverseSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("universe_size");
+
+                    b.HasKey("Id")
+                        .HasName("pk_basket_versions");
+
+                    b.HasIndex("BasketId", "AsOf")
+                        .HasDatabaseName("ix_basket_versions_basket_id_as_of");
+
+                    b.ToTable("basket_versions", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_basket_versions_counts", "universe_size >= 0 AND member_count >= 0 AND below_threshold >= 0");
+
+                            t.HasCheckConstraint("ck_basket_versions_dates", "effective_from > as_of");
+
+                            t.HasCheckConstraint("ck_basket_versions_outcome", "outcome IN ('applied', 'unchanged', 'not_formed')");
+
+                            t.HasCheckConstraint("ck_basket_versions_provenance", "provenance IN ('derived', 'recomputed')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.DerivedBaskets.DerivedDefinitionRecord", b =>
+                {
+                    b.Property<Guid>("BasketId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("basket_id");
+
+                    b.Property<string>("Cadence")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("cadence");
+
+                    b.Property<int>("DefinitionNo")
+                        .HasColumnType("integer")
+                        .HasColumnName("definition_no");
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("enabled");
+
+                    b.Property<Guid?>("ParamsSetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("params_set_id");
+
+                    b.HasKey("BasketId")
+                        .HasName("pk_derived_definitions");
+
+                    b.HasIndex("DefinitionNo")
+                        .IsUnique()
+                        .HasDatabaseName("ux_derived_definitions_definition_no");
+
+                    b.HasIndex("ParamsSetId")
+                        .HasDatabaseName("ix_derived_definitions_params_set_id");
+
+                    b.ToTable("derived_definitions", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_derived_definitions_cadence", "cadence IN ('daily', 'weekly', 'monthly', 'frozen_intraday')");
+
+                            t.HasCheckConstraint("ck_derived_definitions_no", "definition_no BETWEEN 1 AND 14");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Market.InstrumentBrokerIdRecord", b =>
                 {
                     b.Property<Guid>("InstrumentId")
@@ -11276,6 +11482,49 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasForeignKey("InstrumentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_csv_files_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.DerivedBaskets.BasketMemberScoreRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Market.InstrumentRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstrumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_basket_member_scores_instruments_instrument_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Market.DerivedBaskets.BasketVersionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_basket_member_scores_basket_versions_version_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.DerivedBaskets.BasketVersionRecord", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Market.Baskets.Basket", null)
+                        .WithMany()
+                        .HasForeignKey("BasketId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_basket_versions_baskets_basket_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.DerivedBaskets.DerivedDefinitionRecord", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Market.Baskets.Basket", null)
+                        .WithOne()
+                        .HasForeignKey("XDrishti.Infrastructure.Market.DerivedBaskets.DerivedDefinitionRecord", "BasketId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_derived_definitions_baskets_basket_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Market.DerivedBaskets.BasketParamSetRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ParamsSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_derived_definitions_basket_param_sets_params_set_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Market.InstrumentBrokerIdRecord", b =>

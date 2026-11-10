@@ -68,6 +68,14 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchRecord> BasketFetches => Set<XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchRecord>();
 
+    internal DbSet<XDrishti.Infrastructure.Market.DerivedBaskets.BasketVersionRecord> BasketVersions => Set<XDrishti.Infrastructure.Market.DerivedBaskets.BasketVersionRecord>();
+
+    internal DbSet<XDrishti.Infrastructure.Market.DerivedBaskets.BasketMemberScoreRecord> BasketMemberScores => Set<XDrishti.Infrastructure.Market.DerivedBaskets.BasketMemberScoreRecord>();
+
+    internal DbSet<XDrishti.Infrastructure.Market.DerivedBaskets.DerivedDefinitionRecord> DerivedDefinitions => Set<XDrishti.Infrastructure.Market.DerivedBaskets.DerivedDefinitionRecord>();
+
+    internal DbSet<XDrishti.Infrastructure.Market.DerivedBaskets.BasketParamSetRecord> BasketParamSets => Set<XDrishti.Infrastructure.Market.DerivedBaskets.BasketParamSetRecord>();
+
     public DbSet<DataJob> DataJobs => Set<DataJob>();
 
     public DbSet<TradingDay> TradingDays => Set<TradingDay>();
