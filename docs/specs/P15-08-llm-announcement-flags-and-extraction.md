@@ -1,6 +1,6 @@
 # P15-08 — LLM announcement flags and field extraction: one schema-checked answer per announcement, no tools, text as data, graded by protocol L before any use
 
-- **Status:** Approved (owner, 2026-11-03, blanket approval of all stories)
+- **Status:** Built 2026-11-03 (ADR 0189). Approved (owner, 2026-11-03, blanket approval of all stories)
 - **Phase / roadmap row:** P15 — slice P15-08 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("LLM announcement flags and field extraction"); LLM branch, on the cut line.
 - **Design refs:** docs/design/14 §1 (the model never decides a trade), §4 item 5, §5 · 20 §D · 19 §1 · P15-00 protocol L, D4, D10 · P9-01 (`IChatClient`), P9-03 (`IChatModel`, `PromptRegistry`), P9-08 D1 (one request, no tools, re-read as data), P9-09 (`AnnouncementGrader`, `PairedComparison`, `Wilson`, thresholds) · ADR 0133 (allow-list), 0143 (the eval). New ADR: **next free number at build time**.
 - **Needs:** P15-07 (the stored announcements and the 200 labels), P9-01, P9-03 and P9-09 (built). **Not** P9-02: no tool is offered (corrects the plan). **Owner acts:** the labels (P15-07), `ai.settings.enabled` ON for the runs, the one-off backfill run (an estimated 26 hours, UNVERIFIED), `xd eval accept` of a passing run. **Needed by:** P15-10 (`llm-1` enters protocol X only after L passes).

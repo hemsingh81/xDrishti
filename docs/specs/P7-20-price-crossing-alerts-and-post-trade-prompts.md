@@ -1,6 +1,6 @@
 # P7-20 — Price-crossing alerts on armed tickets and post-trade prompts (alerts only; no order)
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-26 under the owner's standing run instruction (ADR 0115). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P7 — follow-ups named in ADR 0096 ("alerts on the trigger/stop level are a follow-up") and P7-14 assumption 10 / P7-17 item 13 ("post-trade prompts"). Not a row of the original P7-00 table.
 - **Design refs:** docs/design/15 §4 (price alerts), 04 §4.2 (Armed means watched), 10 §7, 12 §8 (plan link, discretionary), 19 §4-§5 · ADR 0022, 0024, 0093 (journal match key), 0096. New ADR: **next free ADR number at build time**.
 - **Needs:** P7-19 (numeric levels), P7-11, P7-14, P2-09, P2-10 (built). P8-15 (built 2026-10-25, ADR 0101: `GET /api/plans/notices`). Consumed by the follow-up slice **P8-15b** (carry P7-20's items in that endpoint) and P8-22 (optional audit source).

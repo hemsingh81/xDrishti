@@ -1,6 +1,6 @@
 # P8-17 — The phase check
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-26 as P8-17 and P8-17f under the owner's standing run instruction (ADR 0126). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-17 of [P8-00](P8-00-reports-and-ui-plan.md); the exit: "'What works, in which basket, on which TF, with which exit' answered in < 2 min"
 - **Design refs:** docs/design/18-roadmap.md (P8 exit) · P8-00 acceptance criteria 1 to 10, Q10 · P7-18 and ADR 0097 (the pattern: a read-only check of stored records, MET only on real evidence) · ADR 0080 (P6 check, "supplied, never verified" inputs) · P8-06 (endpoints, `ReportsOptions`), P8-08 (the Reports screen and its 3-interaction test), P8-16 (browser evidence) · ADR 0099 (population rule, six states)
 - **Needs:** P8-08 and P8-16 built; P8-01, 05, 06 built. Wall-clock for (b): the owner's stopwatch on the owner's data after the stack runs the P8 build. Reads the screens P8-09 to P8-15 only as "built" flags.

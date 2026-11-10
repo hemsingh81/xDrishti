@@ -1,6 +1,6 @@
 # AU-10 — Learned tightening and password-gated loosening
 
-- **Status:** Approved (owner, 2026-11-09, in chat)
+- **Status:** Built 2026-11-10 (ADR 0247). Approved (owner, 2026-11-09, in chat)
 - **Phase / roadmap row:** AU — Automation and simplicity programme, row AU-10 (plan: [AU-00](AU-00-automation-and-simplicity-plan.md))
 - **Size:** 3 agent-days (an estimate, not calibrated) · **Needs:** AU-08
 - **Decisions:** [ADR 0242](../adr/0242-few-visible-settings-and-learned-changes-tighten-automatically-while-loosening-needs-the-owners-password.md)

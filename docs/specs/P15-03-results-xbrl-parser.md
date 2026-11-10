@@ -1,6 +1,6 @@
 # P15-03 — Results XBRL parser: a pure, hardened parser for stored results filings, facts per span and basis, `unavailable` for every field the file does not carry
 
-- **Status:** Approved (owner, 2026-11-02, "consider all is approved and continue in loop")
+- **Status:** Built 2026-11-02 (ADR 0184). Approved (owner, 2026-11-02, "consider all is approved and continue in loop")
 - **Phase / roadmap row:** P15 — slice P15-03 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Results XBRL parser").
 - **Design refs:** docs/design/20 §D · 05 §10 · 19 §1 · P15-00 D3 (point in time), D4 (XBRL is the source of truth for numbers) · ADR 0179 (untrusted files), 0180 (the store, the supersede chain, "consolidated and standalone are for P15-03 to separate"), 0066 (side-table pattern). New ADR: **next free number at build time** (the fact shape, the span and basis rules, the parser version).
 - **Needs:** P15-02 (built: `filings.filings`, `filings.result_facts`, `IPointInTimeFilings`, the `filings-ingest` run). **Owner act:** five real results filings (XBRL plus the PDF of the same filing, for the hand values), at least one consolidated and one standalone, one annual (audited) and, optionally, one bank. **Needed by:** P15-05 (`fu-1`), P15-06's loss tag already reads envelope times only (unchanged).

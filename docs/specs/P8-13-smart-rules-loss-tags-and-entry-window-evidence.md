@@ -1,6 +1,6 @@
 # P8-13 — Smart-rules, loss-tags and entry-window evidence
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-26 under the owner's standing run instruction (ADRs 0111, 0112). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-13 of [P8-00](P8-00-reports-and-ui-plan.md)
 - **Design refs:** docs/design/13-reports-and-ui.md §2 R34 (loss tags), R35 (smart-rule evidence) · docs/design/09-learning-engine.md §14 (the rules and the honesty rule: a rule that removes half or more of the candidates, or whose skipped trades are not worse, is flagged) · docs/design/15 §1 · ADR 0069 (entry windows), 0071 (loss tags), 0075 (meta policy), 0085 (smart rules in the plan), 0092 (wiring, flags), 0099 (report engine, population) · P8-00 D1, D2, D3, D6
 - **Needs:** P8-02 (built: Learning frame) and **P8-02b** (shared `HeatGrid` and the tab registry; the built page has a hard-coded `tabs` array), P8-06 (the report run set and `Evidence`; names **UNVERIFIED**, re-read), **P8-12** (the `research.learning_reports` table and `ILearningReportStore`; P8-00 did not list it, this slice does). Uses `PlanView.flags` of P8-14 when built, else the item codes (Decisions 2).

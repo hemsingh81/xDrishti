@@ -1,6 +1,6 @@
 # CF-03 — Deflated Sharpe ratio, probability of backtest overfitting, and the block bootstrap
 
-- **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
+- **Status:** Built 2026-11-04 to 2026-11-08 (ADRs 0205, 0228). Approved (owner, 2026-11-03, in chat; written 2026-10-27, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
 - **Phase / roadmap row:** CF programme ([CF-00](CF-00-confidence-programme-plan.md)), slice 3; extends P5 (Lab robustness and verdict)
 - **Design refs:** docs/design/11-strategy-lab.md §3 to §5 · [P5-03](P5-03-test-ledger-and-the-gates.md) (D2: the factor is "not a statistical claim") · [P5-05](P5-05-robustness-sensitivity-monte-carlo-by-year-random-baseline.md) (assumption 6 Monte Carlo, limits) · ADRs 0059, 0062 · research [confidence-data-and-small-sample](../research/confidence-data-and-small-sample.md) §2.4 to §2.6
 - **Needs:** [CF-01](CF-01-effective-sample-size-power-and-minimum-track-record.md) (n_eff for the Sharpe test and the session cluster key). Built: `MultipleTesting`, `VerdictEvaluator`, `MonteCarlo`, `SeededRandom`, `SweepPlan`/`LabRobustness`, `lab.test_ledger`, `lab.lab_results`.

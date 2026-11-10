@@ -1,6 +1,6 @@
 # AU-06 — Remove unused backend code, slice by slice
 
-- **Status:** Approved (owner, 2026-11-09, in chat)
+- **Status:** Built 2026-11-09 (ADR 0245). Approved (owner, 2026-11-09, in chat)
 - **Phase / roadmap row:** AU — Automation and simplicity programme, row AU-06 (plan: [AU-00](AU-00-automation-and-simplicity-plan.md))
 - **Size:** 1 to 3 agent-days (an estimate, not calibrated) · **Needs:** AU-05
 - **Decisions:** [ADR 0241](../adr/0241-code-is-removed-only-from-a-recorded-list-of-unreachable-code-no-spec-plans-to-use.md)

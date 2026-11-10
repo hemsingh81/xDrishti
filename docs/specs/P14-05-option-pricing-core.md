@@ -1,6 +1,6 @@
 # P14-05 — Option pricing core: Black-76 on a forward, Black-Scholes as its spot form, an implied-volatility solver, Greeks, the forward by parity and the labelled fallback, pure and honest
 
-- **Status:** Approved (owner, 2026-11-03, blanket approval of all stories)
+- **Status:** Built 2026-11-03 (ADR 0191). Approved (owner, 2026-11-03, blanket approval of all stories)
 - **Phase / roadmap row:** P14 — slice P14-05 of [P14-00](P14-00-options-and-stat-arb-plan.md) ("Option pricing core (pure)"); phase acceptance criterion 1.
 - **Design refs:** docs/design/20 §C · P14-00 D3 (vendor IV as given; Black-Scholes only as a labelled, counted fallback), D6 (positions exit before expiry: no early-exercise pricing), O.5(e) (a Black-Scholes share above 5 % is INCONCLUSIVE) · ADR 0178 (parity forward, `r` = `Options:Quality:Rate`, `T` in calendar days ÷ 365, European style). New ADR: **next free number at build time** (only if the units below are accepted as a design rule; otherwise doc 20 §C carries them).
 - **Needs:** nothing built (pure code). **Needed by:** P14-07 (half-spread in premium terms), P14-08 (delta for sizing, the fallback price, `T`), P14-10 (spread legs), P14-11 (ATM IV interpolation), the P14-02 pilot (criterion 12: "IV and theta units against one hand-computed value").

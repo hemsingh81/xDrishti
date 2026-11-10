@@ -1,6 +1,6 @@
 # AU-12 — Simulate-everything job, resumable and yielding
 
-- **Status:** Approved (owner, 2026-11-09, in chat)
+- **Status:** Built 2026-11-10 (ADR 0248). Approved (owner, 2026-11-09, in chat)
 - **Phase / roadmap row:** AU — Automation and simplicity programme, row AU-12 (plan: [AU-00](AU-00-automation-and-simplicity-plan.md))
 - **Size:** 3 agent-days (an estimate, not calibrated) · **Needs:** AU-11
 - **Decisions:** [ADR 0243](../adr/0243-simulate-everything-is-training-data-fenced-from-the-hold-out-and-from-scorecard-evidence.md)

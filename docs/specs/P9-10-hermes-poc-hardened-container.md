@@ -1,6 +1,6 @@
 # P9-10 — Hermes Agent PoC: a hardened, network-isolated container, a runnable checklist and an adopt/reject record
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-27 under the owner's standing run instruction (ADR 0144). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P9 — AI assistant and Hermes PoC ("Hermes PoC (doc 14 §6)"; exit: "Hermes adopt/reject decided"); slice of [P9-00](P9-00-ai-assistant-plan.md).
 - **Design refs:** docs/design/14-ai-assistant.md §6 (decision, hardening, PoC pass criteria) · 17 (deployment) · 19 §3, §4 · deploy/CLAUDE.md · ADR 0005 · P9-01 (`xd-llm`), P9-02 (`xd-mcp`, `Mcp:Tokens:<client>`), P9-09 (runner, fixture, grader).
 - **Needs:** P9-01, P9-02, P9-05 (the domain tools Hermes will use; the PoC can start with P9-02's four tools but cannot pass without them), P9-09 (`xd eval grade`, the fixture, `xd-mcp-eval`), P9-06 (`TextGuard`).

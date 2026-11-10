@@ -1,6 +1,6 @@
 # P8-09 — Basket comparison, pivot builder and lenses
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-25 under the owner's standing run instruction (ADR 0105). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-09 of [P8-00](P8-00-reports-and-ui-plan.md)
 - **Design refs:** docs/design/13-reports-and-ui.md §1c (basket comparison, pivot builder), §2 (R20, R27, R28), lens selector paragraph of §1 · docs/design/06-instruments-and-baskets.md §4 · prototype `docs/prototype/assets/app-pages-3.js` (views `baskets` and `pivot`) · P8-00 D3, D4, Q13 · ADR 0099
 - **Needs:** P8-08 (frame, filter bar, `useReportQuery`, `metricFromApi`, `BarList`), P8-06 (built, ADR 0100: `groups`, `pivot`, `equity`, `what-works`, `runs`), P8-07 (benchmarks, for the buy-and-hold column; without it the column is `unavailable` and the rest works), **P8-02b** (extracts `HeatGrid` into `shared/analytics`; the built Learning screen has only its own `Heatmap`/`HeatTile`).

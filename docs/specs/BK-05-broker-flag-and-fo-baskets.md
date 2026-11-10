@@ -94,3 +94,11 @@ Stored names of the Dhan master columns for MTF leverage and any MIS/intraday mu
 - **Bounds:** `expected_min/max` (100..400 for the lots file, ban 0..200) live only in `basket_sources` (the setting `FoUnderlyingBounds` is removed).
 - **Column name:** `source_ref` + `source_kind = 'refresh'` for master-derived lists (replaces `source_version_id`).
 - Size stays 3 d.
+
+## Review 2026-11-10
+Factual corrections. The status is unchanged; owner questions are in REVIEW-2026-11-10.md.
+- **BK-01 as built (`feature/bk-01`, ADR 0254):** the `system-baskets` service looks every 5 minutes from 07:30 to 23:00 IST and each source carries its own cadence and retries (`basket_sources.cadence`, `fail_count`). The 19:00 and 08:30 ban-list times are therefore per-source due times inside that window. The review-fix fallback of two service entries is not needed and no new service is added. Recovery: the Dhan lists run inside `instrument-master` and the NSE lists inside `system-baskets`, both `LatestOnly`. That fits, because a missed day's ban or lot file cannot be fetched later.
+- **F&O flag:** the master stores `FnoEligible` (indexed column, `AddInstrumentMaster`), so the F&O-stocks rule reads it.
+- **Overlap with built P14-01 (ADR 0175):** `options.lot_sizes` already keeps a dated lot history (`effective_from`, `source` in `circular|secondary|scrip_master`, `confirmed`, read by `LotSizeLookup.InForce`), but only for the underlyings in `options.underlyings` (four indices and 30 shares by default). The planned `market.fo_lot_sizes` would be a second dated lot table. Owner question; until it is answered, do not build the new table.
+- **Settings catalog:** `Baskets:System:Lists` gets an Internal section descriptor (ADR 0246).
+- **ADR:** next free number at build, not 0108.

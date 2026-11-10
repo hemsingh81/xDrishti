@@ -267,7 +267,7 @@ exits:                             # the strategy model (P3-02b, P3-02b2) checks
   per_trade_fit: { scale_by_atr: true, snap_to_structure: true, obstacle_check: true,
                    late_entry_target_reduction: { after: &quot;13:30&quot;, factor: 0.7 } }
 
-costs:                             # the broker's charge sheet: effective-dated schedules, every rate present (a zero is written 0, never null); built in P3-03c (ADR 0042); stored since P3-03f (ADR 0044) as one row of `platform.app_settings`, key `research.cost_sheet.&lt;id&gt;` (a new set of rates is a new id), loaded with `scripts/cost-sheet.sh load &lt;file.json&gt;` (`show`, `check` against your original report files; `--replace` overwrites an id), and chosen by every run: `--gross` or `--costs &lt;id&gt; [--capital] [--profile] [--max-cost-r]`; a report or the paper comparison prints figures as net only while **you have confirmed that stored sheet at its current rates** (Settings, tab Charge sheet; ADR 0127: a fresh password per act, switched off until you switch it on, a change of the sheet's rates makes the confirmation stale)
+costs:                             # the broker's charge sheet: effective-dated schedules, every rate present (a zero is written 0, never null); since P14-07 (ADR 0194) a schedule may also carry optional `options` and `futures` objects of the same ten fields, left out when the owner has none (an option leg is then gross and labelled, never charged zero); `shortcut:` the stored sheet text is bounded at 8,000 characters, so a sheet whose schedules carry both new segments holds about seven schedules, not twelve); built in P3-03c (ADR 0042); stored since P3-03f (ADR 0044) as one row of `platform.app_settings`, key `research.cost_sheet.&lt;id&gt;` (a new set of rates is a new id), loaded with `scripts/cost-sheet.sh load &lt;file.json&gt;` (`show`, `check` against your original report files; `--replace` overwrites an id), and chosen by every run: `--gross` or `--costs &lt;id&gt; [--capital] [--profile] [--max-cost-r]`; a report or the paper comparison prints figures as net only while **you have confirmed that stored sheet at its current rates** (Settings, tab Charge sheet; ADR 0127: a fresh password per act, switched off until you switch it on, a change of the sheet's rates makes the confirmation stale)
   id: &quot;?&quot;                          # lower case [a-z0-9][a-z0-9._-]{0,39}; an id starting &quot;test-&quot; is a synthetic sheet for tests and is never stored
   label: &quot;?&quot;
   source: &quot;? where you read the figures, and when&quot;
@@ -375,6 +375,12 @@ strategy_lab:
   # P5-03 reads StrategyLab:Gates (MinOosTrades, MinExpectancyR, MinProfitFactor, MinPositiveFoldsPct, MaxDrawdownR, MaxCalibrationErrorPp; the qualification_gates above are the defaults), StrategyLab:MinFoldsForPass (6; fewer walk-forward folds cap a verdict at MARGINAL) and StrategyLab:MultipleTesting (the switch above); the tightening is 1 + 0.25·log2(variants) (ADR 0059)
   # P5-04 reads StrategyLab:FullExits (array of --exit flags, default [&quot;FIXED_RR:rr=2|1.5|2.5|3&quot;]; must expand to 2 to 16 candidates, the first is the default exit) for the candidate exits of a full test.
   # P5-05 reads StrategyLab:Robustness (SweepParams 1 to 4, SweepSteps 1 to 4 positive factors, default [0.8, 0.9, 1.1, 1.2]; McDraws 100 to 20000, default 1000) for the robust method; the values are in the run key.
+  # CF-01 (ADR 0203) reads the configuration section Confidence: EffectiveN:Mode (Off | ReportOnly | Gate, default ReportOnly; Gate is the owner's switch), EffectiveN:MinSessionsForAutocorr 20 (5..250), EffectiveN:MinTradesForEstimate 5 (3..50), EffectiveN:MinClusters 5 (3..50), Power:Alpha 0.05 (0.001..0.2), Power:Power 0.80 (0.5..0.99), Power:SigmaFloorR 0.5 (0.1..5), Power:TargetEdgeR (unset = the gate's MinExpectancyR; 0.01..5), MinTrl:Confidence 0.95 (0.5..0.999), MinTrl:BenchmarkSr 0 (-1..1); a value out of range stops the host at start
+  # CF-02 (ADR 0204) reads Confidence:Shrinkage: Mode (Off | ReportOnly, default ReportOnly; Gate is refused until the lower bound is validated), TauSquaredFloor 0.01 (0.0001..1), MinTradesForSibling 5 (3..30), MinParentTrades 30 (10..200), StrengthMin 5 and StrengthMax 200 (1..1000), QuantileLevel 0.05 (0.01..0.25), SigmaPoolStrength 30 (1..1000); the existing bayes_prior strength stays the fallback
+  # CF-03 (ADR 0205) reads Confidence:Deflation: Mode (Off | ReportOnly, default ReportOnly; Gate is refused), MinProbability 0.95 (0.5..0.999), AssumedTrialSrSd (unset; 0.001..1), TBasis (NEff | Raw, default NEff); and Confidence:Bootstrap: Mode (Off | ReportOnly), Draws (unset = Robustness McDraws; 100..20000), BlockLength 0 (auto; else 2..60)
+  # CF-05 ([ADR 0206](../adr/0206-the-lab-verdict-shows-a-cost-stress-at-1x-1-5x-and-2x-and-a-fill-one-minute-later-test-beside-the-outcome-in-report-only-mode-and-enforce-is-the-owners-switch.md)) reads Confidence:CostStress: Mode (Off | ReportOnly, default ReportOnly), Enforce (default false: the owner's switch), MidMultiplier 1.5 (&gt;1..5), MidFloorR 0.08 (-1..1), HighMultiplier 2 (&gt;Mid..5), HighFloorR 0 (-1..1), DelayMinutes 1 (1..5), DelayRetention 0.70 (0.1..1), and (S2, [ADR 0223](../adr/0223-the-lab-verdict-counts-each-trades-liquidity-tier-and-capacity-breach-from-day-bars-report-only-and-readiness-row-14-reads-them-with-unavailable-as-a-fail.md)) TierACutCrore 100 (100..100000), TierBCutCrore 20 (at least 20, below the A cut), CapacityFillShare 0.01 and CapacityDailyShare 0.005 (above 0, at most the default): tighten-only, the loose side is refused at start-up; the text and hash of the values are stored with every verdict
+  # CF-06 ([ADR 0207](../adr/0207-a-strategy-version-is-pre-registered-the-ledger-counts-every-extra-look-and-a-locked-hold-out-is-fixed-at-the-first-post-and-read-once-by-an-owner-unlock-with-enforcement-and-the-honest-count-as-the-owners-switches.md)) reads Confidence:Registration: Enforce (default false), CountInFactor (default false); Confidence:HoldOut: Enforce (false), AutoUnlock (false), MinMonths 6 (1..60), SharePercent 20 (5..50), MinTrades 30 (5..1000), Retention 0.5 (0.1..1); the text and hash of the HoldOut values are stored with every unlock
+  # CF-07 ([ADR 0208](../adr/0208-the-lab-verdict-shows-a-random-entry-null-beside-the-sign-flip-in-report-only-mode-and-the-null-is-one-look-in-the-ledger-with-enforce-the-owners-switch.md)) reads Confidence:Nulls: Mode (Off | ReportOnly, default ReportOnly), Enforce (default false: the owner's switch), Draws 1000 (200..5000), Percentile 95 (90..99), Redraws 5 (0..20), Placebos (default true) and MinPlacebos 19 (19..20; CF-07 part B, [ADR 0209](../adr/0209-the-lab-verdict-shows-a-placebo-set-and-a-mirror-gate-beside-the-random-entry-null-in-report-only-mode-and-the-placebo-set-is-a-second-null-look-in-the-ledger.md)); the text and hash of the values are stored with every verdict CF-07 part C ([ADR 0210](../adr/0210-the-lab-verdict-shows-a-plateau-gate-on-the-swept-parameters-read-from-the-stored-in-sample-sweep-in-report-only-mode-with-its-own-enforce-switch-and-no-new-look.md)) reads Confidence:Plateau: Mode (Off | ReportOnly, default ReportOnly), Enforce (default false: its own owner switch), Retention 0.70 (0.50..0.95), MinPoints 3 (3..5).
   assistant_can_run_tests: true
   assistant_can_promote: false
 
@@ -394,6 +400,8 @@ reports: { default_range_days: 90, weekly_pack: true }
 
 # Later-phase modules (doc 20) — disabled until their phase
 execution:     { enabled: false, broker_side_stop_required: true, max_orders_per_second: 2, price_band_pct: 2.0 }
+# As built (P12-09, ADR 0167): auto_live keys exec.auto_live_allow_auto_approved false, exec.auto_live_require_day_unlock true, exec.auto_live_require_attended true,
+# exec.auto_live_attended_min 10 (1..30); the per-account limits sheet is a record (execution.limits), empty by default, and an empty sheet allows nothing.
 feed_recorder: { enabled: false, depth_levels: 20, max_instruments: 50 }
 options:       { enabled: false, underlyings: [NIFTY, BANKNIFTY], structures: [option_buy, debit_spread, credit_spread] }
 fundamentals:  { enabled: false, quality_filter: { min_profit_quarters_of_last_4: 3, max_promoter_pledge_pct: 25 } }</code></pre></div>
@@ -567,6 +575,99 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
   FlushSeconds: 5         # 1–30: how often the queue is written (COPY); rows unwritten for 30 s are dropped, oldest first
   MaxStoredGb: 40         # 1–500: the stored size above which recording stops (the app never deletes data)
   MinFreeGb: 20           # 5–500: free disk space below which recording stops</code></pre></div>
+<h3 id="trade-tick-recorder-ticks-adr-0173-p7-16b">Trade-tick recorder (<code>Ticks:*</code>, <a href="../adr/0173-the-trade-tick-recorder-stores-last-trade-updates-of-the-depth-set-when-cumulative-volume-rises-on-a-second-quote-socket-behind-three-gates-its-own-cap-and-no-reader.html">ADR 0173</a>, P7-16b)<a class="hash" href="#trade-tick-recorder-ticks-adr-0173-p7-16b" aria-label="Link to this section">#</a></h3>
+<p><code>appsettings.json</code> / environment of <code>xd-feed</code> (<code>Ticks__Enabled</code>; compose passes <code>XD_TICKS_ENABLED</code>); bounds are checked at start-up. <strong>Off by default, three gates:</strong> this deployment flag (restart to change), the owner&#39;s stored switch (<code>PUT /api/ticks/recorder</code>, the password typed again for every change, ON and OFF) and the service <code>tick-recorder</code> (starts paused; window 09:14–15:31 on trading days). The day&#39;s set is the depth recorder&#39;s (or built the same way from <code>Depth:*</code> when none is stored by 09:14:30); the free-space floor is the shared <code>Depth:MinFreeGb</code>. Only 09:15:00–15:30:00 is stored, a row only when the cumulative volume rose.</p>
+<div class="code"><pre><code class="language-yaml">Ticks:
+  Enabled: false          # the deployment gate; false = nothing is read, built or opened
+  FlushSeconds: 5         # 1–30: how often the queue is written (COPY); rows unwritten for 30 s are dropped, oldest first
+  MaxStoredGb: 12         # 1–500: the stored size of market.trade_ticks above which recording stops (the app never deletes data)</code></pre></div>
+<h3 id="option-chain-recorder-options-adr-0176-p14-02">Option-chain recorder (<code>Options:*</code>, <a href="../adr/0176-the-option-chain-recorder-stores-five-minute-index-chains-and-a-daily-stock-pass-from-two-new-allow-listed-data-api-endpoints-behind-three-gates-its-own-cap-and-no-reader.html">ADR 0176</a>, P14-02)<a class="hash" href="#option-chain-recorder-options-adr-0176-p14-02" aria-label="Link to this section">#</a></h3>
+<p><code>appsettings.json</code> / environment of <code>xd-feed</code> (<code>Options__Chain__Enabled</code>; compose passes <code>XD_OPTIONS_CHAIN_ENABLED</code>); bounds are checked at start-up. <strong>Off by default, three gates:</strong> this deployment flag (restart to change), the owner&#39;s stored switch (<code>PUT /api/options/chain-recorder</code>, the password typed again for every change, ON and OFF) and the service <code>option-chain-recorder</code> (starts paused; window 09:14-15:31 on trading days; &quot;Run now&quot; refused). The underlyings are the app setting <code>options.underlyings</code> (doc 06 §2.1); the indices asked each slot are those of <code>IndexExpiries</code>, the other listed underlyings are the daily stock pass. The recorder sends at most one request per 3 seconds (Dhan: &quot;one unique request every 3 seconds&quot;, UNVERIFIED whether per user); a larger <code>SpacingMs</code> is allowed, a smaller one is refused at start. A bound <code>IndexExpiries</code> list replaces the default.</p>
+<div class="code"><pre><code class="language-yaml">Options:
+  MinFreeGb: 20           # 5-500: free disk space below which an options recorder stops (the app never deletes data)
+  Chain:
+    Enabled: false        # the deployment gate; false = nothing is read, built or sent
+    IntervalMinutes: 5    # 5-60: the grid of slots from 09:20 to 15:30 (75 at 5)
+    SpacingMs: 3000       # 3000-60000: the gap between any two requests of the process; never below 3000
+    StrikesEachSide: 30   # 5-50: strikes kept either side of the one nearest the underlying (indices)
+    StockStrikesEachSide: 15  # 3-30: the same for the stock chains
+    IndexExpiries:        # empty = the default below; Weekly = the earliest expiries, Monthly = the earliest month-end ones not among them
+      - { Symbol: &quot;NSE:NIFTY&quot;, Weekly: 3, Monthly: 1 }
+      - { Symbol: &quot;NSE:BANKNIFTY&quot;, Weekly: 0, Monthly: 2 }
+    StockExpiries: 2      # 1-3: expiries asked of each share, once a day from 14:30 to 15:25
+    TimeoutSeconds: 10    # 1-15: a request that takes longer is a timeout gap, never retried
+    MaxStoredGb: 4        # 1-100: the stored size of options.chain_snapshots above which recording stops</code></pre></div>
+<h3 id="expired-options-backfill-optionsbackfill-adr-0177-p14-03">Expired-options backfill (<code>Options:Backfill:*</code>, <a href="../adr/0177-the-expired-options-backfill-fetches-rolling-atm-offset-bars-from-one-new-allow-listed-data-api-endpoint-at-night-behind-four-gates-after-an-owner-run-probe-its-own-cap-and-no-reader.html">ADR 0177</a>, P14-03)<a class="hash" href="#expired-options-backfill-optionsbackfill-adr-0177-p14-03" aria-label="Link to this section">#</a></h3>
+<p><code>appsettings.json</code> / environment of <code>xd-feed</code> (<code>Options__Backfill__Enabled</code>; compose passes <code>XD_OPTIONS_BACKFILL_ENABLED</code>); bounds are checked at start-up. <strong>Off by default, four gates:</strong> this deployment flag (restart to change), the owner&#39;s stored switch (<code>PUT /api/options/backfill</code>, the password typed again for every change, ON and OFF), the owner&#39;s acceptance of the probe result (<code>PUT /api/options/backfill/probe-acceptance</code>, password; the probe is <code>scripts/xd-probe-backfill.sh</code>, at most five requests, nothing stored) and the service <code>options-backfill</code> (starts paused; &quot;Run now&quot; refused). It runs only between 16:30 and 08:30 India time, every day. <code>Options:MinFreeGb</code> (above) is the shared free-space floor.</p>
+<div class="code"><pre><code class="language-yaml">Options:
+  Backfill:
+    Enabled: false        # the deployment gate; false = nothing is read, built or sent
+    RequestsPerSecond: 1  # 0.2-2: requests a second for the whole process (Dhan's Data limit is 5 a second, shared with the day's calls)
+    MaxRequestsPerDay: 40000  # 1000-90000: per India day, counted from the fetch log
+    Years: 5              # 1-5: windows of 30 days back from the first of the month
+    StockCount: 20        # 0-30: the best-ranked shares of options.underlyings (by turnover), MONTH 1 at 15 minutes
+    IndexOffsets: 10      # 0-10: NIFTY and BANKNIFTY at ATM-n..ATM+n, 5 minutes (set from the probe)
+    StockOffsets: 3       # 0-3: shares at ATM-n..ATM+n
+    TimeoutSeconds: 15    # 5-60: a request that takes longer is a timeout, tried again up to three times
+    MaxStoredGb: 3        # 1-50: the stored size of options.rolling_bars above which fetching stops (the app never deletes data)</code></pre></div>
+<h3 id="option-archive-quality-optionsquality-adr-0178-p14-04">Option archive quality (<code>Options:Quality:*</code>, <a href="../adr/0178-the-option-archive-quality-checks-read-the-recorded-chains-and-rolling-bars-in-bounded-ranges-and-store-insert-only-verdicts-with-an-honest-unavailable-and-no-trading-use.html">ADR 0178</a>, P14-04)<a class="hash" href="#option-archive-quality-optionsquality-adr-0178-p14-04" aria-label="Link to this section">#</a></h3>
+<p><code>appsettings.json</code> / environment of <code>xd-api</code> (<code>Options__Quality__Rate</code>); bounds are checked at start-up. The service <code>options-quality</code> is <strong>on by default</strong> (it only reads the archive and writes its own result rows); these are the numbers it judges by and the bounds of one run.</p>
+<div class="code"><pre><code class="language-yaml">Options:
+  Quality:
+    Rate: 0.065               # 0-0.2: yearly rate of the put-call parity check (UNVERIFIED; set it if you want another)
+    MaxIv: 300                # 1-1000: IV (percent assumed) at or above which a value is a violation
+    OiJumpPct: 50             # 1-1000: an open-interest change above this percent (and above OiJumpMinLots lots) is counted
+    OiJumpMinLots: 10         # 0-1000
+    OiWarnShare: 0.01         # 0-0.5: jumps over this share of pairs warn (never fail)
+    CoveragePass: 0.95        # 0.5-1: coverage at or above passes
+    CoverageWarn: 0.80        # 0.1-1: at or above warns, below fails
+    ParityPass: 0.90          # 0.5-1
+    ParityWarn: 0.70          # 0.1-1
+    GreeksWarn: 0.02          # 0-0.5: violations over this share of points warn
+    GreeksFail: 0.10          # 0-1: over this share fail
+    TickPaise: 5              # 1-100: one tick in the parity tolerance
+    LookbackDays: 10          # 1-60: days back in which a day with no chain session row is reported as not recorded
+    MaxChainSessionsPerRun: 20    # 1-400
+    MaxRollingWindowsPerRun: 5000  # 1-5000: ceiling of fetch windows checked in one run, oldest first (MaxRunMinutes is the real bound)
+    MaxRunMinutes: 30         # 1-120: a run stops between two units of work after this</code></pre></div>
+<h3 id="option-costs-and-liquidity-optionscosts-optionsliquidity-adr-0194-p14-07">Option costs and liquidity (<code>Options:Costs:*</code>, <code>Options:Liquidity:*</code>, <a href="../adr/0194-the-option-cost-model-takes-optional-option-and-futures-lines-on-the-owners-sheet-a-half-spread-from-usable-chain-sessions-else-his-labelled-assumption-else-unavailable-rupee-liquidity-filters-and-a-lot-feasibility-count-apart-from-the-unit.html">ADR 0194</a>, P14-07)<a class="hash" href="#option-costs-and-liquidity-optionscosts-optionsliquidity-adr-0194-p14-07" aria-label="Link to this section">#</a></h3>
+<p><code>appsettings.json</code> / environment of the host that builds or reads the model (<code>Options__Costs__MinUsableSessions</code>); bounds are checked at start-up. Nothing here sends anything or switches anything; the charge lines themselves are the owner&#39;s, entered with <code>cost-sheet load</code> (see <code>costs</code> above), and <code>xd options spread-model build [--underlying SYMBOL]</code> builds the measured half-spread model (exit 0 with the reason when there is nothing to build; 2 for a bad line).</p>
+<div class="code"><pre><code class="language-yaml">Options:
+  Costs:
+    MinUsableSessions: 60       # 20-250: usable chain sessions (coverage pass, parity pass or warn) an underlying needs before the half-spread is measured
+    MinQuotesPerBucket: 200     # 50-5000: quotes a bucket needs before its own median is used (else the time-merged, then the moneyness-merged pool)
+    AssumedHalfSpreadPct: {}    # per short symbol (NIFTY), 0.01-20: the OWNER's assumed half-spread in percent of the mid for the time before 60 usable sessions. Empty by default and never filled by the repository; without it the spread is unavailable (spread_unavailable)
+  Liquidity:
+    MinOiNotionalCr: 5          # 0-1000: open interest x spot, in crore of rupees, at least (UNVERIFIED starting value)
+    MinBarTurnoverLakh: 25      # 0-10000: the entry bar's volume x spot, in lakh of rupees, at least (UNVERIFIED starting value)</code></pre></div>
+<h3 id="option-re-mark-optionsremark-adr-0197-p14-08">Option re-mark (<code>Options:Remark:*</code>, <a href="../adr/0197-the-option-expression-simulator-re-marks-each-stored-cash-trade-as-one-long-option-on-a-fixed-strike-read-from-the-offsets-with-an-expiry-calendar-of-labelled-derived-dates-a-counted-model-price-fallback-and-every-unpaired-trade-counted-by-reason.html">ADR 0197</a>, P14-08)<a class="hash" href="#option-re-mark-optionsremark-adr-0197-p14-08" aria-label="Link to this section">#</a></h3>
+<p><code>appsettings.json</code> / environment of the host that runs <code>xd options remark</code> (<code>Options__Remark__MaxIvAgeMinutes</code>); bounds are checked at start-up. Research only: nothing here places or plans an order. The charge basis is not a setting: the re-mark follows the stored cash run (a charged run is re-marked net on the same stored sheet, a gross run gross).</p>
+<div class="code"><pre><code class="language-yaml">Options:
+  Remark:
+    MaxIvAgeMinutes: 60       # 5-390: the oldest vendor IV, in minutes before a bar, the Black-76 fallback may use for a bar the archive lacks (no such IV: the trade is strike_left_window)</code></pre></div>
+<h3 id="option-phase-check-optionsphasecheck-adr-0202-p14-17">Option phase check (<code>Options:PhaseCheck:*</code>, <a href="../adr/0202-the-p14-phase-check-reads-stored-verdicts-for-the-current-versions-only-closes-a-family-by-a-net-drop-or-a-hold-out-confirmed-keep-counts-every-expression-dropped-as-met-and-finds-a-non-cash-expression-in-use-by-a-select-of-the-stored-cell-keys.html">ADR 0202</a>, P14-17)<a class="hash" href="#option-phase-check-optionsphasecheck-adr-0202-p14-17" aria-label="Link to this section">#</a></h3>
+<p><code>appsettings.json</code> / environment of the host that runs <code>xd options phase-check</code> (<code>Options__PhaseCheck__StaleAfterDays</code>); bounds are checked at start-up. Read only: nothing here changes a setting, a switch or a verdict, and nothing places an order.</p>
+<div class="code"><pre><code class="language-yaml">Options:
+  PhaseCheck:
+    StaleAfterDays: 90        # 7-730: a stored verdict is stale when the option archive has moved on from the fetch it read (its watermark) by more than this many days, measured against the newest finished fetch, not the clock (a stopped archive does not age a verdict); a stale verdict leaves its family open</code></pre></div>
+<h3 id="pairs-study-pairs-adr-0196-p14-13">Pairs study (<code>Pairs:*</code>, <a href="../adr/0196-the-pairs-study-counts-every-candidate-in-the-ledger-before-any-test-walks-pairs-in-a-separate-pair-1-walker-on-the-simulators-fills-and-judges-them-by-protocol-s-where-a-gross-drop-is-valid-and-a-gross-keep-impossible.html">ADR 0196</a>, P14-13)<a class="hash" href="#pairs-study-pairs-adr-0196-p14-13" aria-label="Link to this section">#</a></h3>
+<p><code>appsettings.json</code> / environment of the host that runs <code>xd pairs run</code> or <code>xd pairs eval</code> (<code>Pairs__PairNotional</code>); bounds are checked at start-up. Research only: nothing here places or plans an order. A run and an evaluation must use the same settings (the stored trades carry a hash of the notional, the charge basis and the fill rules; trades of other settings are counted and not judged).</p>
+<div class="code"><pre><code class="language-yaml">Pairs:
+  PairNotional: 100000      # 10,000-10,000,000: the Y-leg notional in rupees; the X leg is beta times it; whole shares
+  MaxCandidates: 2000       # 100-25,000: the most correlated candidate pairs one formation keeps (every candidate is a trial in the test ledger)
+  CostSheetId: &quot;&quot;           # a stored cost sheet (cost-sheet load) with the intraday equity lines; empty: gross, every trade labelled gross (a gross KEEP is impossible, a gross DROP is valid)</code></pre></div>
+<h3 id="filings-inbox-filings-adr-0179-p15-01">Filings inbox (<code>Filings:*</code>, <a href="../adr/0179-filings-come-from-a-local-inbox-folder-with-a-sidecar-that-carries-the-broadcast-time-the-adapter-is-read-only-and-the-public-page-fetcher-is-a-recorded-decision-not-to-build.html">ADR 0179</a>, P15-01)<a class="hash" href="#filings-inbox-filings-adr-0179-p15-01" aria-label="Link to this section">#</a></h3>
+<p><code>appsettings.json</code> / environment of the host that reads the folder (<code>Filings__InboxPath</code>); bounds are checked at start-up. The inbox is created <code>0700</code> by <code>scripts/filings-drop.sh</code>; the source refuses a folder open to group or others and never changes a mode. <strong>There is no setting that fetches anything:</strong> the key <code>filings.fetch.enabled</code> is only <em>reserved</em> (not built, default false) for a later slice that needs the owner&#39;s reading of the exchange terms first.</p>
+<div class="code"><pre><code class="language-yaml">Filings:
+  InboxPath: data/filings/inbox   # relative = against the host's working directory; a host sets Filings__InboxPath explicitly (container: /data/filings/inbox)
+  MaxFileMb: 20                   # 1-200: a larger file is rejected too_large, unread
+  MaxFiles: 5000                  # 100-50000: files examined per scan; more is reported truncated
+  FilesPath: data/filings/files   # P15-02: the store folder of the ingested files (0700/0600); container: /data/filings/files, set explicitly
+  LagMinutes: 5                   # P15-02, 0-60: minutes after the broadcast until a filing counts as known (deployment setting, never owner-switchable)
+  MaxFilesGb: 5                   # 1-100: cap on the store folder; reaching it stops the ingest (disk_budget), nothing is deleted
+  MinFreeGb: 20                   # 5-500: free space the volume keeps; below it the ingest stops (disk_free)</code></pre></div>
+<p>The ingest is the service <code>filings-ingest</code> of the scheduler in <code>xd-api</code> (<a href="../adr/0180-the-point-in-time-filing-store-keeps-immutable-envelopes-and-answers-what-was-known-at-an-instant-from-the-broadcast-time-plus-a-lag-and-nothing-else.html">ADR 0180</a>, P15-02): registered <strong>paused</strong>, daily 17:05 on trading days, &quot;Run now&quot; allowed (local files only). Compose: <code>XD_FILINGS_LAG_MINUTES</code>, <code>XD_FILINGS_MAX_FILES_GB</code>, <code>XD_FILINGS_MIN_FREE_GB</code>.</p>
+<p><code>exclude.results_within_days</code> (and the same word in the alerts and the pre-trade checks) is read <strong>in trading sessions</strong> counted to the event session of the next results meeting as known at the decision instant (<a href="../adr/0181-the-results-calendar-keeps-each-meeting-row-with-its-own-intimation-time-counts-days-in-trading-sessions-to-an-event-session-and-answers-unavailable-for-an-instrument-with-no-entry.html">ADR 0181</a>, P15-04): a Saturday or holiday meeting counts on the next session, a meeting published after the instant is not known, and an instrument with no entry is <code>unavailable</code>, not &quot;far away&quot;. The same <code>filings-ingest</code> run loads the board-meeting and shareholding csv files (counts per file and per run, no new setting). P15-06 (<a href="../adr/0182-the-event-risk-filter-reads-the-results-calendar-in-the-simulator-and-behind-an-owner-switch-in-the-plan-and-the-results-loss-tag-describes-the-past-and-unavailable-is-never-a-pass.html">ADR 0182</a>) wires the number in behind <code>smart_rules.event_filter.enabled</code> (default OFF; the owner changes it, and <code>results_within_days</code> (default 2, 0 to 10) and <code>approval</code> (<code>manual</code> default, or <code>auto</code>), only with <code>PUT /api/selection/event-filter</code> and a fresh password; every change is a row of <code>filings.event_filter_decisions</code>, the newest row wins, no row or an unreadable table is OFF). ON: the plan selection excludes a candidate with <code>0 &lt;= days &lt;= N</code> and holds one with no entry (unless the owner listed <code>event</code> as optional); the plan check &quot;results within N days&quot; gets its days (its limit 3 is unchanged); the execution check stays <code>unavailable</code>. With <code>approval = auto</code> the system may turn the filter on only from a stored protocol-F KEEP verdict for the current rule version, records it as <code>auto</code> and never as an owner decision, and turns an automatically enabled filter off when the verdict stops being KEEP; until P15-10 supplies a verdict it cannot fire.</p>
 <h2 id="4-most-used-settings">4. Most-used settings<a class="hash" href="#4-most-used-settings" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -632,18 +733,240 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
 <td>30</td>
 </tr>
 <tr>
+<td><code>Confidence:EffectiveN:Mode</code></td>
+<td>How effective n is used: <code>Off</code>, <code>ReportOnly</code> (shown, decides nothing), <code>Gate</code> (the owner&#39;s switch: <code>Enough</code> and gate 1 compare effective n) (CF-01, ADR 0203)</td>
+<td>ReportOnly</td>
+</tr>
+<tr>
+<td><code>Confidence:Shrinkage:Mode</code></td>
+<td>Whether the shrunk expectancy is computed and shown beside the raw one: <code>Off</code>, <code>ReportOnly</code> (shown, decides nothing). <code>Gate</code> is refused until the lower bound is validated (CF-02, ADR 0204)</td>
+<td>ReportOnly</td>
+</tr>
+<tr>
+<td><code>Confidence:Deflation:Mode</code></td>
+<td>Whether the deflated Sharpe ratio is computed and shown beside the factor: <code>Off</code>, <code>ReportOnly</code> (shown, decides nothing). <code>Gate</code> is refused (CF-03, ADR 0205)</td>
+<td>ReportOnly</td>
+</tr>
+<tr>
+<td><code>Confidence:Deflation:MinProbability</code></td>
+<td>The probability the deflated Sharpe ratio is read against, shown beside it</td>
+<td>0.95</td>
+</tr>
+<tr>
+<td><code>Confidence:Deflation:AssumedTrialSrSd</code></td>
+<td>The owner&#39;s assumed spread of trial Sharpe ratios per trade when the stored statistics do not cover the family</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>Confidence:Deflation:TBasis</code></td>
+<td>T in the deflated Sharpe ratio: <code>NEff</code> (effective trades) or <code>Raw</code></td>
+<td>NEff</td>
+</tr>
+<tr>
+<td><code>Confidence:Bootstrap:Mode</code></td>
+<td>Whether the stationary block bootstrap of a robust run is computed: <code>Off</code>, <code>ReportOnly</code></td>
+<td>ReportOnly</td>
+</tr>
+<tr>
+<td><code>Confidence:Bootstrap:Draws</code></td>
+<td>Resamples of the block bootstrap; unset takes <code>Robustness</code> McDraws</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>Confidence:Bootstrap:BlockLength</code></td>
+<td>Mean block length in sessions; 0 is <code>round(k^(1/3))</code>, at least 2</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>Confidence:CostStress:Mode</code></td>
+<td>Whether the cost stress (1x, 1.5x, 2x) and the fill-one-minute-later test are computed and shown beside the outcome: <code>Off</code>, <code>ReportOnly</code> (CF-05, ADR 0206)</td>
+<td>ReportOnly</td>
+</tr>
+<tr>
+<td><code>Confidence:CostStress:Enforce</code></td>
+<td>The owner&#39;s switch: on, a missed stress gate caps a PASS at MARGINAL; off, the figures decide nothing</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>Confidence:CostStress:MidMultiplier</code> / <code>MidFloorR</code></td>
+<td>The middle multiplier of charges and slippage and the least net expectancy at it</td>
+<td>1.5 / 0.08 R</td>
+</tr>
+<tr>
+<td><code>Confidence:CostStress:HighMultiplier</code> / <code>HighFloorR</code></td>
+<td>The high multiplier and the net expectancy that must be exceeded at it</td>
+<td>2 / 0 R</td>
+</tr>
+<tr>
+<td><code>Confidence:CostStress:DelayMinutes</code> / <code>DelayRetention</code></td>
+<td>Minutes the entry fill is delayed and the least share of the base expectancy per signal that must remain</td>
+<td>1 / 0.70</td>
+</tr>
+<tr>
+<td><code>Confidence:CostStress:TierACutCrore</code> / <code>TierBCutCrore</code></td>
+<td>The 20-day median traded value in crore rupees from which a trade is liquidity tier A and tier B; below the B cut is tier C (CF-05 D2, ADR 0223). Tighten-only: a value below the default is refused (raising puts names in lower tiers)</td>
+<td>100 / 20</td>
+</tr>
+<tr>
+<td><code>Confidence:CostStress:CapacityFillShare</code> / <code>CapacityDailyShare</code></td>
+<td>The most an order may be of the fill minute&#39;s traded value (not read from day bars yet, so that cap reads unavailable) and of the 20-day median (CF-05 D4, ADR 0223). Tighten-only: a value above the default is refused</td>
+<td>0.01 / 0.005</td>
+</tr>
+<tr>
+<td>Lab post options <code>slippage</code> / <code>stress</code> (ADR 0229, request fields, not settings)</td>
+<td><code>slippage: conservative</code> prices the fill by the liquidity tier (tier A 3 bps, tier B 8 bps, range share 0.10 are the defaults of the tighten-only settings <code>Confidence:CostStress:TierABps</code> 3..5, <code>TierBBps</code> 8..15 and <code>RangeFraction</code> 0.10..0.20, judgment calls with no authoritative NSE source, to be replaced by measured paper fills (P11-02), ADR 0230; tier C and unavailable are excluded and counted); <code>stress</code> turns the cost stress block on or off for a post</td>
+<td><code>default</code> / on for <code>robust</code>, off for <code>quick</code> and <code>full</code></td>
+</tr>
+<tr>
+<td><code>Confidence:CostStress:MinTurnoverCrore</code> (ADR 0230)</td>
+<td>the filter <code>min_turnover</code> passes only when the 20-day median traded value (close x volume, sessions before the entry date) is at least this many crore; missing bars, under 20 sessions or missing volume block the entry and count it (<code>TurnoverBlocked</code>); tighten-only, 20..50, a judgment call to be replaced by measured paper fills</td>
+<td>20</td>
+</tr>
+<tr>
+<td><code>Confidence:Registration:Enforce</code></td>
+<td>The owner&#39;s switch: on, a full or robust run of an unregistered version is refused (<code>lab.not_registered</code>); off, the report only warns</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>Confidence:Registration:CountInFactor</code></td>
+<td>The owner&#39;s switch: on, the honest count of looks tightens the gates; off, the distinct-hash count judges and the honest count is shown beside it</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>Confidence:HoldOut:Enforce</code></td>
+<td>The owner&#39;s switch: on, an explicit Lab window that reaches the hold-out is refused and a PASS without a kept hold-out is capped at MARGINAL; a default window is always cut</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>Confidence:HoldOut:AutoUnlock</code></td>
+<td>The auto option: on, the one hold-out look runs by itself when every development row is a pass, recorded as <code>auto</code></td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>Confidence:HoldOut:MinMonths</code> / <code>SharePercent</code></td>
+<td>Shortest hold-out and its share of the stored history</td>
+<td>6 / 20 %</td>
+</tr>
+<tr>
+<td><code>Confidence:HoldOut:MinTrades</code> / <code>Retention</code></td>
+<td>Fewest hold-out trades and the share of the development expectancy that must remain</td>
+<td>30 / 0.5</td>
+</tr>
+<tr>
+<td><code>Confidence:Nulls:Mode</code></td>
+<td>Whether the random-entry null of a robust run is computed and shown beside the outcome: <code>Off</code>, <code>ReportOnly</code> (CF-07, ADR 0208)</td>
+<td>ReportOnly</td>
+</tr>
+<tr>
+<td><code>Confidence:Nulls:Enforce</code></td>
+<td>The owner&#39;s switch: on, a random-entry null, placebo set or mirror gate that is a fail or unavailable caps a PASS at MARGINAL; off, the figures decide nothing. <code>Enforce</code> with <code>Mode</code> Off stops the host at start</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>Confidence:Nulls:Placebos</code> / <code>MinPlacebos</code></td>
+<td>Whether the placebo set and the mirror gate are computed beside the null (the 20 shapes are fixed), and the fewest comparable placebos for a conclusive set (19 or 20)</td>
+<td>true / 19</td>
+</tr>
+<tr>
+<td><code>Confidence:Nulls:Draws</code> / <code>Percentile</code> / <code>Redraws</code></td>
+<td>Seeds (each one full set of random-entry trades), the percentile that sets the level of the random-entry test (<code>1 - percentile / 100</code>; the placebo set&#39;s level is fixed at 0.05 whatever it is), and the times a draw that makes no trade is drawn again before it is dropped and counted</td>
+<td>1000 / 95 / 5</td>
+</tr>
+<tr>
+<td><code>Confidence:Plateau:Mode</code> / <code>Enforce</code></td>
+<td>The plateau gate on the swept parameters of a robust run (CF-07 part C, <a href="../adr/0210-the-lab-verdict-shows-a-plateau-gate-on-the-swept-parameters-read-from-the-stored-in-sample-sweep-in-report-only-mode-with-its-own-enforce-switch-and-no-new-look.html">ADR 0210</a>): <code>Off</code> or <code>ReportOnly</code>; <code>Enforce</code> is the owner&#39;s own switch for it (not <code>Nulls:Enforce</code>): on, a gate that is a fail or unavailable caps a PASS at MARGINAL. It is computed inside the nulls block, so <code>Enforce</code> with <code>Plateau:Mode</code> Off or <code>Nulls:Mode</code> Off stops the host at start</td>
+<td>ReportOnly / false</td>
+</tr>
+<tr>
+<td><code>Confidence:Plateau:Retention</code> / <code>MinPoints</code></td>
+<td>The share of the base net expectancy that each of the two points next to the declared value must keep (0.50..0.95), and the fewest valid points of a parameter, the declared value included, for a reading (3..5)</td>
+<td>0.70 / 3</td>
+</tr>
+<tr>
+<td><code>Confidence:Ladder:Mode</code></td>
+<td>Whether the complexity ladder, the events-per-variable cap and the feature stability checks are shown in a model&#39;s validation report: <code>Off</code>, <code>ReportOnly</code>; <code>Gate</code> is refused, nothing here enforces (CF-10 part 10b, <a href="../adr/0215-a-models-complexity-is-shown-against-a-ladder-with-an-events-per-variable-cap-and-its-features-against-a-stability-index-and-a-direction-check-as-evidence-only.html">ADR 0215</a>)</td>
+<td>ReportOnly</td>
+</tr>
+<tr>
+<td><code>Confidence:Ladder:Epv</code> / <code>MaxLogisticFeatures</code> / <code>MinTreeEvents</code> / <code>MinProbability</code></td>
+<td>Events per variable (5..50) and the most features of a logistic model (1..50); the fewest events for trees (10..100000); the probability a rung needs of beating the rung below (0.50..0.999, and not below <code>Confidence:PairedBootstrap:PromisingFrom</code>)</td>
+<td>15 / 8 / 100 / 0.95</td>
+</tr>
+<tr>
+<td><code>Confidence:Ladder:PsiWatch</code> / <code>PsiAlarm</code> / <code>PsiBins</code> / <code>MinRows</code> / <code>MaxFlipShare</code></td>
+<td>The stability index cuts (0 &lt; watch &lt; alarm &lt;= 5), its bins (2..100; fewer on small samples), the fewest rows for an index or a direction (5..100000), and the share of folds in which a feature&#39;s direction may flip (above 0, below 0.5)</td>
+<td>0.10 / 0.25 / 10 / 30 / 1/3</td>
+</tr>
+<tr>
+<td><code>Confidence:PairedBootstrap:Mode</code></td>
+<td>Whether the paired day-cluster bootstrap and the fold sign test are shown beside the ladder in a model&#39;s validation report: <code>Off</code>, <code>ReportOnly</code>; <code>Gate</code> is refused, nothing here enforces (CF-10 part 10c-1, <a href="../adr/0216-the-probability-that-a-model-beats-the-rung-below-comes-from-a-paired-day-cluster-bootstrap-with-a-fold-sign-test-and-sample-uniqueness-as-evidence-only.html">ADR 0216</a>)</td>
+<td>ReportOnly</td>
+</tr>
+<tr>
+<td><code>Confidence:PairedBootstrap:Draws</code> / <code>Level</code> / <code>MinDays</code> / <code>PromisingFrom</code></td>
+<td>Resamples (100..20000), the interval&#39;s coverage (above 0.5, below 1), the fewest trade days for a figure (2..1000; fewer is &quot;not available&quot;), and the probability from which a result reads &quot;promising&quot; (0.50..0.99, not above <code>Confidence:Ladder:MinProbability</code>, the pass bar)</td>
+<td>2000 / 0.90 / 10 / 0.90</td>
+</tr>
+<tr>
+<td><code>Confidence:MlInfluence:HoldOutMinRows</code> / <code>HoldOutMinProbability</code> / <code>ForwardMinCandidates</code> / <code>ForwardMinWeeks</code> / <code>ForwardMaxEcePp</code></td>
+<td>The evidence the <code>MlMayInfluence</code> predicate asks for (CF-10 part 10c-2, <a href="../adr/0217-a-model-may-influence-a-decision-only-through-one-gate-whose-predicate-needs-an-unspent-hold-out-forward-evidence-no-calibration-alarm-and-the-owners-switch.html">ADR 0217</a>): hold-out rows (100..100000), the probability of beating the best no-ML baseline there (0.95..0.999, and not below <code>Confidence:Ladder:MinProbability</code>), graded forward shadow candidates (30..100000), weeks they span (4..520) and the largest rolling calibration error in percentage points (above 0, up to 5). Configuration can only tighten the spec&#39;s proposals until the owner-act settings exist (10d). No mode and no switch: the owner&#39;s switches <code>ml.influence.enabled</code>, <code>ml.auto_promote</code> and <code>ml.auto_rollback</code> are <strong>stored state, not configuration</strong> (CF-10 part 10d-1, <a href="../adr/0220-a-challenger-is-promoted-only-on-the-spec-rule-and-a-champion-is-rolled-back-by-the-p6-09-detectors-behind-three-owner-switches-that-are-all-off-by-default.html">ADR 0220</a>): rows of <code>research.ml_switch_settings</code>, all OFF when there is no row, changed only by the owner through <code>PUT /api/learning/ml-settings</code> (a fresh password to turn influence or auto-promotion ON). The promotion rule reads the same 30 candidates, 4 weeks and 0.95 bars, so tightening them tightens promotion too</td>
+<td>100 / 0.95 / 30 / 4 / 5</td>
+</tr>
+<tr>
+<td><code>Confidence:Decay:WindowTrades</code> / <code>Sigmas</code> / <code>QuarterFloorR</code></td>
+<td>The decay monitor of a strategy&#39;s forward series (CF-12 part 12a, <a href="../adr/0218-the-decay-monitor-the-kill-rule-evaluations-and-the-loop-report-are-read-only-evidence-with-every-input-that-has-no-source-yet-unavailable-and-no-consumer.html">ADR 0218</a>): trades in one non-overlapping window (20..60), the standard errors below the reference mean at which a window alerts (above 0, up to 1.5) and the mean R below which a calendar quarter is weak (-0.05..0). Configuration can only tighten the spec&#39;s proposals. A section of configuration, not the versioned home of ADR 0002 (a stored version is a later part). Report only</td>
+<td>60 / 1.5 / -0.05</td>
+</tr>
+<tr>
+<td><code>Confidence:Kill:StressMultiplier</code> / <code>DrawdownFactor</code></td>
+<td>The kill rules of a strategy&#39;s forward series (CF-12 part 12b, <a href="../adr/0219-a-firing-kill-rule-writes-a-proposal-and-a-notice-the-owner-or-an-automatic-setting-that-is-off-by-default-pauses-the-cells-and-only-the-owner-with-a-fresh-password-ever-re-enables.html">ADR 0219</a>): the multiplier of cost in rule (a) (1.5..3, it can only be raised) and the factor on the 95th percentile of the matched drawdown in rule (b) (1..2, it can only be lowered), so a kill fires no later than the spec says. The trailing 100 trades and the 20 new trades between firings are fixed, not settings. <strong>The automatic setting <code>confidence.kill.auto</code> is not configuration</strong>: it is the owner&#39;s stored switch (<code>confidence.kill_settings</code>, no row means OFF, changed only by <code>PUT /api/confidence/kill-settings</code> with a fresh password). Configuration, not the versioned home of ADR 0002</td>
+<td>1.5 / 2</td>
+</tr>
+<tr>
+<td><code>Confidence:Readiness:MinNEff</code> / <code>MinTradesPerCell</code> / <code>ExpectancyR</code> / <code>TStatistic</code> / <code>MinQuarterShare</code></td>
+<td>The thresholds of the edge checklist that the readiness scorecard judges itself (CF-11 part 1, <a href="../adr/0221-the-readiness-scorecard-is-derived-and-read-only-unavailable-is-a-fail-and-the-owners-enforce-switch-off-by-default-makes-the-two-lifecycle-gates-refuse-instead-of-warn.html">ADR 0221</a>): rows 2, 3, 6 and 10. Each can only be <strong>raised</strong>, so a row fails no less often than the spec says (300..100000 effective trades, 30..10000 per cell, 0.15..2 R, t 2..10, 0.70..1). Stricter is true in both directions of use: the gates then refuse more, never fewer. The rows another slice judges (cost stress, the nulls, the plateau, the hold-out) keep that slice&#39;s settings</td>
+<td>300 / 30 / 0.15 / 2.0 / 0.70</td>
+</tr>
+<tr>
+<td><code>Confidence:Readiness:MaxYearShare</code> / <code>MaxInstrumentShare</code> / <code>DrawdownBudgetR</code></td>
+<td>The ceilings of rows 10 and 11. Each can only be <strong>lowered</strong> (0.20..0.60, 0.02..0.15, 1..20 R)</td>
+<td>0.60 / 0.15 / 20</td>
+</tr>
+<tr>
+<td><code>Confidence:Readiness:BuildingFrom</code> / <code>UsableFrom</code> / <code>ReadyFrom</code></td>
+<td>The cut-offs of the labels &quot;Building&quot;, &quot;Usable with advice&quot; and &quot;Ready for the next phase&quot;. Each can only be <strong>raised</strong> (40..99, 70..99.5, 85..100) and the three must increase, so a score never reads a higher label than the spec gives it. The sub-score anchors are not settings (a change is a code change with an ADR; the rules version is part of every snapshot&#39;s settings text and hash). <strong>The enforce switch <code>confidence.readiness.enforce</code> is not configuration</strong>: it is the owner&#39;s stored switch (<code>readiness.settings</code>, no row means OFF, ON only by <code>PUT /api/confidence/readiness-settings</code> with a fresh password, OFF too (it removes a refusal)). Configuration, not the versioned home of ADR 0002</td>
+<td>40 / 70 / 85</td>
+</tr>
+<tr>
+<td><code>Confidence:Loop:MinDays</code> / <code>Draws</code> / <code>Level</code> / <code>HelpsAt</code></td>
+<td>The three-arm loop test (CF-12 part 12a, <a href="../adr/0218-the-decay-monitor-the-kill-rule-evaluations-and-the-loop-report-are-read-only-evidence-with-every-input-that-has-no-source-yet-unavailable-and-no-consumer.html">ADR 0218</a>): the fewest distinct trade days (20..250; fewer is inconclusive; a trade-off, not a tightening, since more days delay every verdict), bootstrap draws (2000..20000), the interval&#39;s coverage (0.90..0.99) and the probability at which an arm &quot;helps&quot; (0.95..0.999). &quot;Hurts&quot; is fixed at P(worse) of 0.95. Draws, Level and HelpsAt can only be tightened; report only</td>
+<td>20 / 2000 / 0.90 / 0.95</td>
+</tr>
+<tr>
+<td><code>Confidence:Loop:MinSlopePer50Rows</code> / <code>TargetGain</code></td>
+<td>The learning curve: the gain per 50 rows below which a curve is &quot;flat&quot; (above 0, up to 0.1) and the gain the projection aims at (0.001..0.1)</td>
+<td>0.002 / 0.01</td>
+</tr>
+<tr>
+<td><code>Confidence:Loop:SlopeLow</code> / <code>SlopeHigh</code> / <code>SlopeSe</code></td>
+<td>The reliability slope (trailing window fixed at 200 outcomes; with fewer the slope is shown and never alarms): the alarm bars (0.8 up to but not including 1; above 1 up to 1.2) and the standard errors from 1 the slope must also be (1..2). Tighten only</td>
+<td>0.8 / 1.2 / 2</td>
+</tr>
+<tr>
 <td><code>goals.max_drawdown_pct</code></td>
 <td>Halt-and-review threshold</td>
 <td>8%</td>
 </tr>
 </tbody></table>
+<h2 id="visible-settings-planned-au-08-and-au-09-adr-0242">Visible settings (planned, AU-08 and AU-09, <a href="../adr/0242-few-visible-settings-and-learned-changes-tighten-automatically-while-loosening-needs-the-owners-password.html">ADR 0242</a>)<a class="hash" href="#visible-settings-planned-au-08-and-au-09-adr-0242" aria-label="Link to this section">#</a></h2>
+<p>At most eight Essential settings are shown first; the rest stay under <code>Advanced settings</code> or are internal. Each has a validated range and a safer direction. New AU keys (<code>Recovery:*</code>, <code>Simulate:*</code>, <code>Training:*</code>, <code>Learned:WeeklyCap</code>) are not Essential.</p>
 
   </article>
   <nav class="pager" aria-label="Previous and next document">
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-27 03:12</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-11-10 18:35</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>
@@ -656,7 +979,17 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
 <a href="#ticket-alerts-planningticketalerts-adr-0115-p7-20" class="d3">Ticket alerts (Planning:TicketAlerts:*, ADR 0115, P7-20)</a>
 <a href="#live-feed-live-adr-0024-p2-10" class="d3">Live feed (Live:*, ADR 0024, P2-10)</a>
 <a href="#depth-recorder-depth-adr-0135-p7-16" class="d3">Depth recorder (Depth:*, ADR 0135, P7-16)</a>
-<a href="#4-most-used-settings" class="d2">4. Most-used settings</a></aside>
+<a href="#trade-tick-recorder-ticks-adr-0173-p7-16b" class="d3">Trade-tick recorder (Ticks:*, ADR 0173, P7-16b)</a>
+<a href="#option-chain-recorder-options-adr-0176-p14-02" class="d3">Option-chain recorder (Options:*, ADR 0176, P14-02)</a>
+<a href="#expired-options-backfill-optionsbackfill-adr-0177-p14-03" class="d3">Expired-options backfill (Options:Backfill:*, ADR 0177, P14-03)</a>
+<a href="#option-archive-quality-optionsquality-adr-0178-p14-04" class="d3">Option archive quality (Options:Quality:*, ADR 0178, P14-04)</a>
+<a href="#option-costs-and-liquidity-optionscosts-optionsliquidity-adr-0194-p14-07" class="d3">Option costs and liquidity (Options:Costs:*, Options:Liquidity:*, ADR 0194, P14-07)</a>
+<a href="#option-re-mark-optionsremark-adr-0197-p14-08" class="d3">Option re-mark (Options:Remark:*, ADR 0197, P14-08)</a>
+<a href="#option-phase-check-optionsphasecheck-adr-0202-p14-17" class="d3">Option phase check (Options:PhaseCheck:*, ADR 0202, P14-17)</a>
+<a href="#pairs-study-pairs-adr-0196-p14-13" class="d3">Pairs study (Pairs:*, ADR 0196, P14-13)</a>
+<a href="#filings-inbox-filings-adr-0179-p15-01" class="d3">Filings inbox (Filings:*, ADR 0179, P15-01)</a>
+<a href="#4-most-used-settings" class="d2">4. Most-used settings</a>
+<a href="#visible-settings-planned-au-08-and-au-09-adr-0242" class="d2">Visible settings (planned, AU-08 and AU-09, ADR 0242)</a></aside>
 </div>
 <div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
 <script src="assets/search-index.js"></script>

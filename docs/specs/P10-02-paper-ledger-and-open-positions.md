@@ -1,6 +1,6 @@
 # P10-02 — Paper ledger and open positions: equity, open risk, and the plan reads the paper book
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-26 under the owner's standing run instruction (ADR 0118). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P10 — Paper trading, slice P10-02 of [P10-00](P10-00-paper-trading-plan.md)
 - **Design refs:** docs/design/12 §8 (plan link), 10 §5 to §7 (fill constraints, daily loss, equity throttle), 04 §1 (Trading role, paper mode), 15, 16 (risk profiles), 19 §3; ADR 0089 (allocation), 0092 (wiring, open book unavailable by default), 0042/0044 (costs, ISS-25); P7-07, P7-09
 - **Needs:** P10-01; P7-07, P7-09 (built). ADR: "the paper ledger is derived from entries and exits; the plan may read it" (next free ADR number at build time)

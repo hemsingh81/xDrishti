@@ -1,6 +1,6 @@
 # P14-12 — Pairs core: log-price spread, OLS hedge ratio, the Engle-Granger residual test with pinned MacKinnon values, half-life, Benjamini-Hochberg and z-score signals, pure, with hand-worked tables and honest `unavailable`
 
-- **Status:** Approved (owner, 2026-11-03, blanket approval of all stories)
+- **Status:** Built 2026-11-03 (ADR 0192). Approved (owner, 2026-11-03, blanket approval of all stories)
 - **Phase / roadmap row:** P14 — slice P14-12 of [P14-00](P14-00-options-and-stat-arb-plan.md) ("Pairs core (pure)"); protocol S items 2 and 3.
 - **Design refs:** docs/design/20 §C (`PAIRS`) · 19 §1 (multiple testing) · P14-00 protocol S, D10, D11 · ADR 0059 (`MultipleTesting.Factor`). New ADR: **next free number at build time** (the test, its tables, the BH rule and the signal state machine).
 - **Needs:** nothing built (pure code). **Needed by:** P14-13.

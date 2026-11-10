@@ -94,3 +94,10 @@ None that block the build. Owner acts (defaults until then): connect Dhan and tr
 - `data_context_gap` counts sessions inside the stored range that have no record, including an `index_thin` day the job can never fill: such a day keeps the notice raised until the owner decides otherwise (the coverage lists it under the skipped days with its bars).
 - Criterion 9 as implemented: `IContextFigures.AsOfAsync` is unavailable only when nothing is stored, on or before the first stored day, or past the age bound; after the first stored day the figures are returned with nulls for the values that are not ready (they become readable on the dates `GET /api/data/context` prints).
 
+
+## Review 2026-11-10
+Open parts only: the probe (P3-01d0 in JOURNEY) and the conditional P3-01d2 / P3-01d3.
+- **Probe:** still pending; `docs/research/p3-01d-context-probe.md` has every result `pending` and needs the owner's connected Dhan account. Consumers built since read `unavailable` until it is run: P3-01e breadth, P6-02 regime cells (ADR 0146), the P7-06 gate and the CF/AU readers of regime.
+- **Fallback C (P3-01d2):** ADR 0133 makes the allow-list change part of the commit of the slice that uses it. `/v2/charts/historical` is still refused (ADR 0177 kept it so). D12 is consistent.
+- **Fallback D (P3-01d3):** two built patterns now exist and need no new endpoint: the owner-dropped local inbox (ADR 0179, as P14-14 uses it) and the off-by-default NSE fetch behind an owner-edited allow-list (ADR 0195, CF-04 Part A). Which one a VIX/index CSV loader uses is an owner question.
+- Breadth (P3-01e) is built in the same table, with a column-level UPDATE on its six columns.

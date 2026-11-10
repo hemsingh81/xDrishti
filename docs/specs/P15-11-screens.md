@@ -1,6 +1,6 @@
 # P15-11 — Screens: results on plan tickets and Today, a Filings tab under Data, the event-filter switch card, and the P15 verdicts with their evidence
 
-- **Status:** Approved (owner, 2026-11-02, "consider all is approved and continue in loop")
+- **Status:** Built 2026-11-03. Approved (owner, 2026-11-02, "consider all is approved and continue in loop")
 - **Phase / roadmap row:** P15 — slice P15-11 of [P15-00](P15-00-fundamentals-and-events-plan.md) ("Screens"); first on the cut line.
 - **Design refs:** docs/design/13 (reports and UI), 10 (selection), 15 (pre-trade checks) · P8-00 D3 (honest states, evidence block), P8-01 (analytics kit: `EvidenceBlock`, `MetricTile`, `DataTable`), P8-19 (owner-act forms with password) · ADR 0182 (the switch). Prototype: **no screen in `docs/prototype/` shows filings, a results calendar or these verdicts** (search 2026-11-02); the nearest patterns are the Data tabs, the plan ticket checks and the Learning evidence cards, which this slice follows.
 - **Needs:** read endpoints that exist (`/api/filings/coverage`, `/api/filings`, `/api/filings/{id}`, `/api/calendar/results`, `GET/PUT /api/selection/event-filter`), P15-03 (`/api/filings/{id}/facts`), P15-08 (`/api/filings/extractions/coverage`), P15-10 (`/api/research/extensions`), P8-08 and the P8 kit (built). Each part works with the endpoints that exist when it is built; a missing endpoint is a hidden section, never a fake value.

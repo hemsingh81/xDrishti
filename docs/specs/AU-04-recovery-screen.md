@@ -1,6 +1,6 @@
 # AU-04 — Recovery screen
 
-- **Status:** Approved (owner, 2026-11-09, in chat)
+- **Status:** Built 2026-11-09. Approved (owner, 2026-11-09, in chat)
 - **Phase / roadmap row:** AU — Automation and simplicity programme, row AU-04 (plan: [AU-00](AU-00-automation-and-simplicity-plan.md))
 - **Size:** 2 agent-days (an estimate, not calibrated) · **Needs:** AU-02, AU-03
 - **Decisions:** [ADR 0240](../adr/0240-missed-days-are-recovered-by-one-dependency-ordered-pass-and-each-service-declares-how-it-can-be-recovered.md)

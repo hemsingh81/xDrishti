@@ -1,10 +1,10 @@
 # BK-00 — System baskets programme: plan
 
 - **Status:** Approved (owner, 2026-11-03, in chat; written 2026-10-25, decisions researched under the owner's delegation). Owner-only acts named in the spec (terms, allow-list, labelling) are still yours.
-- **Phase / roadmap row:** BK — system baskets (index, derived, list), the base of the basket-leverage uses in [basket-leverage-uses](../research/basket-leverage-uses.md); not yet a roadmap row (the roadmap is not edited by this spec set)
+- **Phase / roadmap row:** BK — system baskets (index, derived, list), the base of the basket-leverage uses in [basket-leverage-uses](../research/basket-leverage-uses.md); roadmap rows BK-01 to BK-12 exist in doc 18 (added after this spec was written; the roadmap is not edited by this spec set)
 - **Design refs:** docs/design/06-instruments-and-baskets.md §2.1, §2.3, §3.1, §3.4 · [ADR 0014](../adr/0014-portfolio-buckets-appear-as-system-baskets.md) · ISS-22 (docs/design/19-risks-and-compliance.md) · research [system-baskets-nse](../research/system-baskets-nse.md), [basket-leverage-uses](../research/basket-leverage-uses.md) · P8-07 / ADR 0102, P8-09 / ADR 0105
 - **Needs:** built P1-15 / P1-15a (baskets, dated members, system protection), the instrument-master service, the services framework (`IScheduledService`), `bars_agg` daily bars.
-- **Size:** BK-01 4 + BK-02 4 + BK-03 4 + BK-04 3 + BK-05 3 = **18 agent-days** for the five slices of this set (BK-06 to BK-12 are specified elsewhere and sized there)
+- **Size:** BK-01 4 + BK-02 5 + BK-03 4 + BK-04 4 + BK-05 3 = **20 agent-days** (corrected 2026-11-10 to the review fix of 2026-10-25, which raised BK-02 and BK-04 by one day each) for the five slices of this set (BK-06 to BK-12 are specified elsewhere and sized there)
 - **Safety:** yes. Network fetches of NSE files are **OFF** until the owner enables them (after reading the terms and recording an ADR); every new setting defaults OFF; no order is ever placed or implied; baskets are read-only inputs.
 
 ## Goal
@@ -54,7 +54,7 @@ They are only *enabled by default as visible cards*, not tuned; enabling the fet
 1. Given the five slice specs, when read in the order above, then each lists only dependencies that are earlier in the order or built.
 2. Given any BK slice, when built, then with every `Baskets:System:*` setting at its default, no outbound network call is made (a test with a counting HTTP handler proves zero calls).
 3. Given the eight pre-registered baskets, then each appears in exactly one spec: 1-3 and 8 in BK-01 (index), 5 = derived #3 and 6 = derived #10 and 7 = derived #6 in BK-02/03, 4 in BK-05 (list).
-4. Given the sizes, then the sum is 18 agent-days (4+4+4+3+3).
+4. Given the sizes, then the sum is 20 agent-days (4+5+4+4+3; was 18 before the review fix of 2026-10-25).
 
 ## Contract
 No API or data here; see BK-01 to BK-05. Shared vocabulary: `kind` in `manual | portfolio | index | list | derived`; **stored** kinds are `manual | index | list | derived` (portfolio is computed from buckets, never stored); `system` is true for `index`, `list`, `derived` (and for the computed portfolio view); `provenance` in `fetched | imported | recomputed | derived | manual`.
@@ -90,7 +90,22 @@ Roadmap row of ISS-22 text; `master_refreshes` table in code; Nifty 500 index se
 - `master_refreshes` and the Dhan columns (`AsmGsmFlag`, `AsmGsmCategory`, `MtfLeverage` decimal(12,6)) are VERIFIED (table above corrected).
 - Elapsed estimate corrected to about 14 to 15 days. Effort now **20 agent-days** (BK-01 4, BK-02 5, BK-03 4, BK-04 4, BK-05 3).
 - **Question order:** "Track all Nifty 500?" must be answered before BK-03 starts (it fixes the universe); moved to question 1 of the build gate. Other questions follow.
-- **Reservations:** ADR 0106 (fetch permission and terms, BK-01), 0107 (derived baskets, BK-02/03), 0108 (list baskets, BK-05); log event id blocks to be reserved in the first BK commit: `basket.fetch`, `basket.derived`, `basket.list` each get one block of 10 from the next free number (written into the logging catalogue at build, not guessed here).
+- **Reservations (superseded 2026-11-10: 0106, 0107 and 0108 were taken by other decisions; BK-01 is ADR 0254, BK-02 is ADR 0255, BK-03 and BK-05 take the next free number at build):** ADR 0106 (fetch permission and terms, BK-01), 0107 (derived baskets, BK-02/03), 0108 (list baskets, BK-05); log event id blocks to be reserved in the first BK commit: `basket.fetch`, `basket.derived`, `basket.list` each get one block of 10 from the next free number (written into the logging catalogue at build, not guessed here).
 - **Migration order:** `AddSystemBaskets` (BK-01, including `kind`, `system`, `note`-capable members, `source_ref uuid` + `source_kind`), `AddDerivedBasketVersions` (BK-03), `AddListBaskets` (BK-05). None edits an applied migration; later ones only add.
 - **Shared column name:** one reference on `basket_members`: `source_ref uuid null` + `source_kind text null` (`fetch|version|refresh`). BK-01/03/05 use it (replaces `source_fetch_id`, `version_id`, `source_version_id`).
 - **Settings state:** `GET /api/baskets` carries `fetchEnabled` and `derivedEnabled` (BK-01 contract).
+
+## Review 2026-11-10
+Checked against what was built after 2026-11-03. Factual corrections only; the status is unchanged.
+- **Built since:** BK-02 (ADR 0255, `Domain/Baskets/Derived`: `DerivedEvaluator.Evaluate(universe, asOf, params, previous?, formationTime?)`, `InstrumentBars`, `DerivedParams.Create(version, overrides)` with a SHA-256 hash, `DerivedResult`). BK-01 is built on `feature/bk-01`, not merged: ADR **0254** (Proposed), migration `AddSystemBaskets`, service `system-baskets` (recovery class `LatestOnly`, starts paused, looks every 5 minutes 07:30 to 23:00 IST), section `Baskets:System:Fetch` registered in the settings catalog, log event 3500.
+- **ADR numbers:** the reserved 0106, 0107, 0108 collide with existing ADRs (report-engine excursions, buy-to-sell mirror, lag on a feature). Real numbers: BK-01 0254, BK-02 0255; BK-03 and BK-05 take the next free number at build. The review-fix line is marked superseded.
+- **Size:** header and AC 4 said 18 while the 2026-10-25 review fix said 20; both now say 20 (BK-01 4, BK-02 5, BK-03 4, BK-04 4, BK-05 3).
+- **Roadmap:** doc 18 now has rows BK-01 to BK-12; the scope line is corrected.
+- **Programme rules from built work (apply to every BK slice):**
+  1. Every new scheduled service declares a recovery class (ADR 0240) and is added to `RecoveryClassTableTests`; `Dated` is refused by a test until AU-02 settles the first-start baseline.
+  2. Every new configuration section gets an Internal section descriptor in `SettingsRegistry`, and every new stored owner switch a `Stored` descriptor of tier Advanced (ADR 0242, 0246; an architecture test fails a bound section without a descriptor). A descriptor with no declared safer direction treats every change as loosening, so it needs the owner's password.
+  3. No BK key is on the learned allow-list of ADR 0247, so learning and the Auto switch change none of them.
+  4. Anything that reads strategy runs or trades reads research-purpose runs only: the AU-11 fence sits at the data access (ADR 0243).
+  5. "Liquidity tier" means CF-05's `LiquidityTiers` (`Domain/Research`: A from Rs 100 crore, B from Rs 20 crore, else C, on the 20-session median traded value; ADR 0229, 0230). The capacity share already used by the Lab and readiness row 14 is `Confidence:CostStress:CapacityDailyShare` (0.005 of that median; ADR 0223, 0224).
+  6. Auto scope (AU-16, ADR 0251) may name a system basket. Its members are expanded at the nightly run (`AutoScopeResolver`, members as of now).
+- **Order note (see BK-03 review):** basket 13 of BK-02 reads ASM/GSM, ban and series flags, and a missing flag is not a pass (ADR 0255 §2). Built in the order BK-03 then BK-05, basket 13 can have no member until BK-05 exists. Owner question in REVIEW-2026-11-10.md.

@@ -89,3 +89,10 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 - The ranking board prints "indicative, pairwise, uncorrected" beside the "not separated" rule (it compares neighbouring pairs, with no multiple-comparison correction).
 - `rule version`/`rule_version`/`RuleVersion`/`IBasketQueries` replaced in the body by `params_hash`, `basket_versions`, `members?asOf`.
 - Size unchanged: 7 agent-days (+0.2 for the new test, absorbed).
+
+## Review 2026-11-10
+- **Volume, resolved:** `IBarQueries.ReadDailyBarsAsync` returns `BarRow` with `Volume`, so capacity (ADV20) needs no new port.
+- **Regimes:** read through `GetRegimeLabels` / `IContextFigures` (P6-02, ADR 0146), not a `context_daily` column.
+- **Settings catalog (ADR 0246, required):** `Reports:BasketProfile` gets an Internal section descriptor. `CapacityPct` waits on owner question Q-cap (one capacity share with CF-05).
+- **Training fence (ADR 0243):** `HoldOutStability` and the strategy panel read trades only through the fenced research readers (the default run set). m23 is a median split of stored trades. It is **not** the locked hold-out of ADR 0207 and never reads the block: default Lab windows end before the block start.
+- BK-01 kinds as built on `feature/bk-01`: `manual`, `portfolio`, `index`, `list`, `derived`.

@@ -1,6 +1,6 @@
 # P8-12 — Journey: the counterfactual stored and shown
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-25 under the owner's standing run instruction (ADR 0110). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-12 of [P8-00](P8-00-reports-and-ui-plan.md)
 - **Design refs:** docs/design/09-learning-engine.md §11 (Journey, "the frozen-model line is what makes progress honest"), §10 (lessons), §15 · docs/design/13-reports-and-ui.md §2 R30 · ADR 0077 (counterfactual), 0078 (lessons), 0073 (changelog), 0070 (registry), 0080 (phase check), 0090 (grading, "simulated on plan prices"), 0094 (digest, insert-only pattern) · P8-00 D1, D3, D6
 - **Needs:** P8-01, P8-02 (built: Learning frame) and **P8-02b** (extracts `HeatGrid` into `shared/analytics` and the tab registry; the built `LearningPage.tsx` has a hard-coded `tabs` array and no registry), P8-03 (lesson and model data already read by the Learning tabs). Feeds P8-13 (it reuses the table and port created here).

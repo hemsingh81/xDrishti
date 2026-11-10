@@ -1,6 +1,6 @@
 # AU-07 — Remove unused frontend code and settings keys
 
-- **Status:** Approved (owner, 2026-11-09, in chat)
+- **Status:** Built 2026-11-09 (ADR 0245). Approved (owner, 2026-11-09, in chat)
 - **Phase / roadmap row:** AU — Automation and simplicity programme, row AU-07 (plan: [AU-00](AU-00-automation-and-simplicity-plan.md))
 - **Size:** 1 to 2 agent-days (an estimate, not calibrated) · **Needs:** AU-05, AU-06
 - **Decisions:** [ADR 0241](../adr/0241-code-is-removed-only-from-a-recorded-list-of-unreachable-code-no-spec-plans-to-use.md)
