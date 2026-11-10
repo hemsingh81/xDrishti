@@ -7,6 +7,7 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Baskets;
+using XDrishti.Domain.Market.Baskets.Lists;
 
 namespace XDrishti.Application.Market.Baskets;
 
@@ -23,6 +24,8 @@ internal sealed class RunBasketFetchHandler(
     IBasketStore baskets,
     IBasketMembershipApplier applier,
     IBasketRunLock runLock,
+    IListSettings listSettings,
+    ListFileProcessor lists,
     TimeProvider clock,
     ILogger<RunBasketFetchHandler> logger) : ICommandHandler<RunBasketFetchCommand, BasketFetchRun>
 {
@@ -30,7 +33,7 @@ internal sealed class RunBasketFetchHandler(
 
     public async ValueTask<Result<BasketFetchRun>> HandleAsync(RunBasketFetchCommand command, CancellationToken cancellationToken)
     {
-        if (!settings.Enabled)
+        if (!settings.Enabled && !listSettings.FetchEnabled)
         {
             return Result.Failure<BasketFetchRun>(BasketErrors.FetchDisabled);
         }
@@ -50,7 +53,7 @@ internal sealed class RunBasketFetchHandler(
         var manual = command.BasketIds is { Count: > 0 };
         var list = await sources.ListAsync(manual ? command.BasketIds : null, cancellationToken);
         var outcomes = new List<FetchOutcomeView>();
-        foreach (var source in list.Where(s => s.Enabled))
+        foreach (var source in list.Where(s => s.Enabled && Allowed(s)))
         {
             if (!manual && !Due(source, clock.GetUtcNow()))
             {
@@ -100,7 +103,8 @@ internal sealed class RunBasketFetchHandler(
             return Done(unchanged);
         }
 
-        if (response.Status != 200 || response.Body is null || !IsCsv(response.ContentType))
+        var listFile = ListBaskets.IsListFile(source.Format);
+        if (response.Status != 200 || response.Body is null || !(listFile ? IsNotHtml(response.ContentType) : IsCsv(response.ContentType)))
         {
             return Done(await RejectAsync(source, enabled, fetch, response.Status == 200 ? "not_csv" : $"http_{response.Status}", now, cancellationToken));
         }
@@ -112,6 +116,11 @@ internal sealed class RunBasketFetchHandler(
             var same = fetch with { Outcome = FetchOutcomes.Unchanged };
             await sources.RecordAsync(Updated(source, enabled, now, ok: true, response.Etag, response.LastModified, sha, null, 0), same, cancellationToken);
             return Done(same);
+        }
+
+        if (listFile)
+        {
+            return Done(await ApplyListFileAsync(source, response, fetch, sha, now, cancellationToken));
         }
 
         var file = IndexCsv.Parse(System.Text.Encoding.UTF8.GetString(response.Body));
@@ -151,12 +160,55 @@ internal sealed class RunBasketFetchHandler(
         return Done(done ? applied : applied with { Outcome = FetchOutcomes.Failed, Error = "concurrent_change", Added = 0, Removed = 0 });
     }
 
-    /// <summary>Whether the schedule asks this source now: after its retry time when one is set, otherwise once a day from the run time (twice a day in a review window).</summary>
+    // The index lists need Baskets:System:Fetch:Enabled, the two NSE F&O files Baskets:System:Lists:FetchEnabled; the lists read from the master are never fetched.
+    private bool Allowed(BasketSourceInfo source) =>
+        source.Format == ListBaskets.IndexFormat ? settings.Enabled : ListBaskets.IsListFile(source.Format) && listSettings.FetchEnabled;
+
+    private async ValueTask<FetchRecord> ApplyListFileAsync(BasketSourceInfo source, SourceResponse response, FetchRecord fetch, string sha, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var plan = await lists.PlanAsync(source, response.Body!, fetch, now, cancellationToken);
+        if (plan.Reject is { } reason)
+        {
+            return await RejectAsync(source, source.Enabled, plan.Fetch, reason, now, cancellationToken);
+        }
+
+        var update = Updated(source, source.Enabled, now, ok: true, response.Etag, response.LastModified, sha, null, 0) with { KnownThrough = plan.TradeDate };
+        if (plan.Change is null)
+        {
+            // The lot file: its summary and warnings are the fetch record; nothing else is stored (the master's lot is primary).
+            var summary = plan.Fetch with { Outcome = FetchOutcomes.Unchanged };
+            await sources.RecordAsync(update, summary, cancellationToken);
+            return summary;
+        }
+
+        if (plan.Change!.Added.Count == 0 && plan.Change.Removed.Count == 0)
+        {
+            var same = plan.Fetch with { Outcome = FetchOutcomes.Unchanged };
+            await sources.RecordAsync(update, same, cancellationToken);
+            return same;
+        }
+
+        var applied = plan.Fetch with { Outcome = FetchOutcomes.Applied };
+        var done = await applier.ApplyAsync(new MembershipApplication(source.BasketId, source.Name, plan.Change, plan.Order!, plan.Effective, now, update, applied, plan.Origin), cancellationToken);
+        return done ? applied : applied with { Outcome = FetchOutcomes.Failed, Error = "concurrent_change", Added = 0, Removed = 0 };
+    }
+
+    /// <summary>Whether the schedule asks this source now: after its retry time when one is set, otherwise once a day from the run time (twice a day in a review window); the NSE F&amp;O files at their own India times.</summary>
     private bool Due(BasketSourceInfo source, DateTimeOffset now)
     {
         if (source.NextAttemptAt is { } next)
         {
             return next <= now;
+        }
+
+        if (source.Format == ListBaskets.BanFormat)
+        {
+            return ListSchedule.IsDue(now, source.LastCheckedAt, listSettings.BanRunTimes);
+        }
+
+        if (source.Format == ListBaskets.LotsFormat)
+        {
+            return ListSchedule.IsDue(now, source.LastCheckedAt, [listSettings.LotSizeRunAt]);
         }
 
         if (TimeOnly.FromDateTime(IndiaTime.ToIst(now).DateTime) < settings.RunAt)
@@ -245,6 +297,9 @@ internal sealed class RunBasketFetchHandler(
 
     private static MasterInstrument Prefer(IEnumerable<MasterInstrument> candidates) =>
         candidates.OrderBy(c => c.RetiredAt is not null).ThenBy(c => c.Symbol, StringComparer.Ordinal).First();
+
+    private static bool IsNotHtml(string? contentType) =>
+        contentType is null || !contentType.Split(';')[0].Trim().Equals("text/html", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsCsv(string? contentType) =>
         contentType is not null && contentType.Split(';')[0].Trim().Equals("text/csv", StringComparison.OrdinalIgnoreCase);

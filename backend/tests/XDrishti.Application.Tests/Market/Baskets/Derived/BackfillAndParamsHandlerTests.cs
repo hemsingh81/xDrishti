@@ -105,7 +105,6 @@ public sealed class BackfillAndParamsHandlerTests
     }
 
     [Theory]
-    [InlineData(13)]
     [InlineData(4)]
     [InlineData(12)]
     public async Task A_basket_this_build_cannot_form_cannot_be_switched_on(int definitionNo)
@@ -118,6 +117,32 @@ public sealed class BackfillAndParamsHandlerTests
 
         result.Error.Code.ShouldBe(BasketErrors.InvalidCode);
         world.Store.Definitions.Single(d => d.BasketId == basket.BasketId).Enabled.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Basket_13_can_be_switched_on_because_its_flags_come_from_the_dated_lists()
+    {
+        var world = DerivedWorld.WithLiquidBasket(1);
+        var basket = new DerivedDefinitionRow(Guid.NewGuid(), "x", 13, false, null, new Dictionary<string, double>());
+        world.Store.Definitions.Add(basket);
+
+        var result = await world.SetParams().HandleAsync(new SetDerivedParamsCommand(basket.BasketId, null, true, "owner"), TestContext.Current.CancellationToken);
+
+        result.IsSuccess.ShouldBeTrue();
+        world.Store.Definitions.Single(d => d.BasketId == basket.BasketId).Enabled.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Basket_13_cannot_be_backfilled_because_the_flags_have_no_history_before_the_first_recorded_refresh()
+    {
+        var world = DerivedWorld.WithLiquidBasket(1);
+        var basket = new DerivedDefinitionRow(Guid.NewGuid(), "x", 13, true, null, new Dictionary<string, double>());
+        world.Store.Definitions.Add(basket);
+
+        var result = await world.Backfill().HandleAsync(new BackfillDerivedBasketCommand(basket.BasketId, From, To, "owner"), TestContext.Current.CancellationToken);
+
+        result.Error.Code.ShouldBe(BasketErrors.InvalidCode);
+        world.Universe.Reads.ShouldBe(0);
     }
 
     [Fact]

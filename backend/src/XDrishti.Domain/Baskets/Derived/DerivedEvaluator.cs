@@ -129,7 +129,7 @@ public sealed class DerivedEvaluator(DerivedDefinition definition) : IDerivedEva
             }
         }
 
-        return flag is { AsmGsm: false, InBan: false } f2 && f2.Series == "EQ";
+        return flag is { Unknown: false, AsmGsm: false, InBan: false } f2 && f2.Series == "EQ";
     }
 
     /// <summary>The number of bars dated at or before <paramref name="asOf"/> (daily arrays are sorted by date).</summary>

@@ -5694,6 +5694,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("host_alt");
 
+                    b.Property<DateOnly?>("KnownThrough")
+                        .HasColumnType("date")
+                        .HasColumnName("known_through");
+
                     b.Property<DateTimeOffset?>("LastCheckedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_checked_at");

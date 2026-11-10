@@ -46,7 +46,7 @@ internal sealed class BasketsEndpoints : IEndpointModule
         group.MapPost("/system/fetch", FetchSystemAsync)
             .RequireStepUp()
             .WithName("FetchSystemBaskets")
-            .WithSummary("Owner act, needs step-up: fetch the index lists now (the given basketIds that are already on, or every enabled source; fetch-now never turns a source on) and return one outcome per file; force overrides only the tripwire and is recorded. 409 baskets.fetch_disabled while Baskets:System:Fetch:Enabled is off (no request is made)")
+            .WithSummary("Owner act, needs step-up: fetch the index lists and the two NSE F&O files (the ban list and the lot sizes) now (the given basketIds that are already on, or every enabled source; fetch-now never turns a source on) and return one outcome per file; force overrides only the tripwire and is recorded. The index lists need Baskets:System:Fetch:Enabled, the F&O files Baskets:System:Lists:FetchEnabled; a file whose setting is off is not requested. 409 baskets.fetch_disabled while both are off (no request is made)")
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status409Conflict);
 

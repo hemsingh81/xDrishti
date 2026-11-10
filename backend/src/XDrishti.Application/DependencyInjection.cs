@@ -959,6 +959,8 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<SetAutoScopeCommand, AutoScopeView>, SetAutoScopeHandler>();
         services.AddScoped<IQueryHandler<GetAutoSuggestionsQuery, Result<AutoSuggestionsView>>, GetAutoSuggestionsHandler>(); // the next-day suggestions read model; no order
         services.AddScoped<ICommandHandler<XDrishti.Application.Market.Baskets.RunBasketFetchCommand, XDrishti.Application.Market.Baskets.BasketFetchRun>, XDrishti.Application.Market.Baskets.RunBasketFetchHandler>(); // BK-01: fetch, guard and apply the index lists
+        services.AddScoped<XDrishti.Application.Market.Baskets.ListFileProcessor>(); // BK-05: plans the ban and lot-size files
+        services.AddScoped<ICommandHandler<XDrishti.Application.Market.Baskets.RefreshFlagListsCommand, XDrishti.Application.Market.Baskets.FlagListRun>, XDrishti.Application.Market.Baskets.RefreshFlagListsHandler>(); // BK-05: the lists read from the master, after its refresh
         services.AddScoped<ICommandHandler<XDrishti.Application.Market.Baskets.SetBasketSourceEnabledCommand, XDrishti.Application.Market.Baskets.BasketSourceView>, XDrishti.Application.Market.Baskets.SetBasketSourceEnabledHandler>(); // BK-01: the owner switches a source on or off
         services.AddScoped<IQueryHandler<XDrishti.Application.Market.Baskets.GetBasketSourceQuery, Result<XDrishti.Application.Market.Baskets.BasketSourceView>>, XDrishti.Application.Market.Baskets.GetBasketSourceHandler>();
         services.AddScoped<ICommandHandler<RefreshDerivedBasketsCommand, DerivedRun>, RefreshDerivedBasketsHandler>(); // BK-03: form the due derived versions from our own bars

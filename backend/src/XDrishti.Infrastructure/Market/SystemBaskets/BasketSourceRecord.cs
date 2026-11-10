@@ -38,4 +38,7 @@ internal sealed class BasketSourceRecord
     public DateTimeOffset? NextAttemptAt { get; set; }
 
     public int FailCount { get; set; }
+
+    /// <summary>The ban list's newest applied or confirmed trade date (BK-05): the flags it gives are known through this date, an empty list included. Null for the other sources.</summary>
+    public DateOnly? KnownThrough { get; set; }
 }

@@ -165,6 +165,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddHttpClient(MasterDataHttpClientNames.NseApi).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
             services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IBasketFetchSettings>(BasketSources);
             services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IBasketSourceFetcher>(BasketSources);
+            services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IListSettings>(BasketSources);
             services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IDerivedSettings>(DerivedSettings);
             services.AddSingleton<IRefreshJobChannel>(RefreshJobs);
             services.AddSingleton<IDataJobChannel>(DataJobs);

@@ -16,6 +16,7 @@ public sealed class RunBasketFetchHandlerTests
     public async Task With_the_setting_off_nothing_is_asked_and_no_request_is_made()
     {
         _w.Settings.Enabled = false;
+        _w.ListSettings.FetchEnabled = false;
         _w.Serve(FetchWorld.Csv(1, 50));
 
         var result = await _w.Handler.HandleAsync(new RunBasketFetchCommand(null, false, "system:system-baskets"), FetchWorld.Ct);
@@ -28,6 +29,7 @@ public sealed class RunBasketFetchHandlerTests
     public async Task The_scheduled_service_ends_as_skipped_disabled_while_the_setting_is_off()
     {
         _w.Settings.Enabled = false;
+        _w.ListSettings.FetchEnabled = false;
         var provider = Substitute.For<IServiceProvider>();
         provider.GetService(typeof(XDrishti.Application.Abstractions.Messaging.ICommandHandler<RunBasketFetchCommand, BasketFetchRun>)).Returns(_w.Handler);
         var scope = Substitute.For<Microsoft.Extensions.DependencyInjection.IServiceScope>();

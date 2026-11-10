@@ -30,8 +30,10 @@ internal sealed class BasketMembershipApplier(XDrishtiDbContext db, BasketSource
         var present = open.Select(m => m.InstrumentId).ToHashSet();
         foreach (var id in application.Change.Added.Where(id => !present.Contains(id)))
         {
-            db.BasketMembers.Add(BasketMember.Fetched(
-                application.BasketId, id, application.IncomingOrder.ToList().IndexOf(id), application.EffectiveFrom, application.DetectedAt, application.Fetch.Id, actor));
+            var position = application.IncomingOrder.ToList().IndexOf(id);
+            db.BasketMembers.Add(application.Origin is { } origin
+                ? BasketMember.Listed(application.BasketId, id, position, application.EffectiveFrom, application.DetectedAt, origin.SourceRef, origin.SourceKind, origin.Provenance, origin.Notes.GetValueOrDefault(id), actor)
+                : BasketMember.Fetched(application.BasketId, id, position, application.EffectiveFrom, application.DetectedAt, application.Fetch.Id, actor));
         }
 
         basket.Touch();

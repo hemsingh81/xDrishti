@@ -7,13 +7,20 @@ namespace XDrishti.Api.IntegrationTests.Infrastructure;
 /// <summary>
 /// The system baskets' file server and settings of the suite: files are served from memory (the network is never reached), the fetch setting is OFF until a test turns it on, and every request is counted so that a test can show zero calls.
 /// </summary>
-public sealed class FakeBasketSources : IBasketSourceFetcher, IBasketFetchSettings
+public sealed class FakeBasketSources : IBasketSourceFetcher, IBasketFetchSettings, IListSettings
 {
     private readonly Dictionary<string, SourceResponse> _files = [];
 
     public int Calls { get; private set; }
 
     public bool Enabled { get; set; }
+
+    /// <summary><c>Baskets:System:Lists:FetchEnabled</c> of the suite: OFF until a test turns it on.</summary>
+    public bool FetchEnabled { get; set; }
+
+    public IReadOnlyList<TimeOnly> BanRunTimes => [new(19, 0), new(8, 30)];
+
+    public TimeOnly LotSizeRunAt => new(8, 50);
 
     public string UserAgent => "xDrishti integration tests (owner@example.invalid)";
 
@@ -42,6 +49,7 @@ public sealed class FakeBasketSources : IBasketSourceFetcher, IBasketFetchSettin
         _files.Clear();
         Calls = 0;
         Enabled = false;
+        FetchEnabled = false;
     }
 
     /// <summary>Serves this answer for the file name (the url's last segment).</summary>

@@ -83,6 +83,11 @@ internal sealed class RefreshDerivedBasketsHandler(
             return Skipped(definition, "invalid_params");
         }
 
+        if (definition.DefinitionNo == 13 && bars.All(b => b.Bars.Flags is null))
+        {
+            return Skipped(definition, "flags_unavailable"); // the dated lists of BK-05 are not all recorded yet: a missing flag is not a pass, and the members stay as they were
+        }
+
         if (await store.ExistsAsync(definition.BasketId, asOf, parameters.Value.Hash, cancellationToken))
         {
             return Row(definition, VersionOutcomes.Unchanged, null, 0, 0, 0);

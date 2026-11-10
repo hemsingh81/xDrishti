@@ -102,3 +102,8 @@ Factual corrections. The status is unchanged; owner questions are in REVIEW-2026
 - **Overlap with built P14-01 (ADR 0175):** `options.lot_sizes` already keeps a dated lot history (`effective_from`, `source` in `circular|secondary|scrip_master`, `confirmed`, read by `LotSizeLookup.InForce`), but only for the underlyings in `options.underlyings` (four indices and 30 shares by default). The planned `market.fo_lot_sizes` would be a second dated lot table. Owner question; until it is answered, do not build the new table.
 - **Settings catalog:** `Baskets:System:Lists` gets an Internal section descriptor (ADR 0246).
 - **ADR:** next free number at build, not 0108.
+
+## Build note 2026-11-11 (ADR 0256)
+- `market.fo_lot_sizes` is **not built**: the lot file is a parser, a master cross-check and a fetch-record summary only, until the owner answers REVIEW-2026-11-10 question 5 (reuse `options.lot_sizes`). AC 7 and 8 are met as records and warnings, not as a dated table.
+- Flags of basket 13 are known only up to the last good check of each list (`basket_sources.known_through` for the ban list); an unknown flag is not a pass.
+- The master-derived catalogue rows have `source_url = ''` (NOT NULL column).

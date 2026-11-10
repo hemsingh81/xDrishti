@@ -7,4 +7,7 @@ internal static partial class BasketLog
 {
     [LoggerMessage(EventId = 3500, Level = LogLevel.Information, Message = "basket.fetch basket {BasketId}: {Outcome}, {Rows} rows, {Added} added, {Removed} removed, {Unmatched} unmatched, {Milliseconds} ms")]
     public static partial void Fetched(ILogger logger, Guid basketId, string outcome, int rows, int added, int removed, int unmatched, long milliseconds);
+
+    [LoggerMessage(EventId = 3530, Level = LogLevel.Information, Message = "basket.list basket {BasketId}: {Outcome}, {Members} members, {Unmatched} unmatched, {Milliseconds} ms")]
+    public static partial void ListRefreshed(ILogger logger, Guid basketId, string outcome, int members, int unmatched, long milliseconds);
 }

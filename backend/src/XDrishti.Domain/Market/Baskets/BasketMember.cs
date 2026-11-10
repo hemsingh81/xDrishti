@@ -81,6 +81,10 @@ public sealed class BasketMember : Entity<Guid>
     public static BasketMember Fetched(Guid basketId, Guid instrumentId, int position, DateTimeOffset validFrom, DateTimeOffset detectedAt, Guid fetchId, string actor) =>
         new(Guid.CreateVersion7(detectedAt), basketId, instrumentId, position, validFrom, null, null, Limit(actor), null, BasketProvenance.Fetched, detectedAt, fetchId, "fetch");
 
+    /// <summary>A member of a list basket (BK-05): <paramref name="provenance"/> <c>derived</c> with <paramref name="sourceKind"/> <c>refresh</c> for the lists read from the master (<paramref name="sourceRef"/> = the fetch row), <c>fetched</c> with <c>fetch</c> for the ban file; <paramref name="note"/> carries the ASM/GSM category.</summary>
+    public static BasketMember Listed(Guid basketId, Guid instrumentId, int position, DateTimeOffset validFrom, DateTimeOffset detectedAt, Guid sourceRef, string sourceKind, string provenance, string? note, string actor) =>
+        new(Guid.CreateVersion7(detectedAt), basketId, instrumentId, position, validFrom, null, note, Limit(actor), null, provenance, detectedAt, sourceRef, sourceKind);
+
     /// <summary>
     /// A member of a derived basket (BK-03): effective from <paramref name="validFrom"/> (the start of the India date of the session the version takes effect), tied to the version <paramref name="versionId"/>; <paramref name="validTo"/> is given only for a
     /// stay that is closed when written (a backfilled version, provenance <c>recomputed</c>).

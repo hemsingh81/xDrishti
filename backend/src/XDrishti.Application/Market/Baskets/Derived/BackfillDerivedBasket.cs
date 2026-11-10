@@ -47,6 +47,11 @@ internal sealed class BackfillDerivedBasketHandler(
             return Result.Failure<DerivedRun>(BasketErrors.Invalid("basketId", $"This basket cannot be formed yet ({why})."));
         }
 
+        if (definition.DefinitionNo == 13)
+        {
+            return Result.Failure<DerivedRun>(BasketErrors.Invalid("basketId", "The flags of this basket are recorded only from the first refresh of the lists (BK-05); there is no history to backfill."));
+        }
+
         var calendar = await tradingCalendar.GetAsync(cancellationToken);
         if (to > calendar.LastClosedSession(clock.GetUtcNow()))
         {

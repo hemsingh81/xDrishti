@@ -492,7 +492,17 @@ public static class DependencyInjection
         services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IBasketRunLock, XDrishti.Infrastructure.Market.SystemBaskets.BasketRunLock>();
         services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IBasketMembershipApplier, XDrishti.Infrastructure.Market.SystemBaskets.BasketMembershipApplier>();
 
-        if (!configuration.GetSection(XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchOptions.SectionName).GetValue<bool>("Enabled"))
+        // BK-05: the lists read from the master (no network), the settings of the two NSE F&O files.
+        services.AddOptions<XDrishti.Infrastructure.Market.SystemBaskets.BasketListOptions>()
+            .Bind(configuration.GetSection(XDrishti.Infrastructure.Market.SystemBaskets.BasketListOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IListSettings, XDrishti.Infrastructure.Market.SystemBaskets.BasketListSettings>();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IListMasterReader, XDrishti.Infrastructure.Market.SystemBaskets.ListMasterReader>();
+
+        // No HTTP client at all while both gates are off: zero requests, and nothing to point at a file.
+        if (!configuration.GetSection(XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchOptions.SectionName).GetValue<bool>("Enabled")
+            && !configuration.GetSection(XDrishti.Infrastructure.Market.SystemBaskets.BasketListOptions.SectionName).GetValue<bool>("FetchEnabled"))
         {
             services.AddSingleton<XDrishti.Application.Abstractions.Market.Baskets.IBasketSourceFetcher, XDrishti.Infrastructure.Market.SystemBaskets.DisabledBasketSourceFetcher>();
             return;
