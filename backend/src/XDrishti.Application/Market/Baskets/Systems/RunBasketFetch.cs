@@ -11,7 +11,7 @@ using XDrishti.Domain.Market.Baskets;
 namespace XDrishti.Application.Market.Baskets;
 
 /// <summary>
-/// Fetches the index lists of the enabled sources (BK-01): <paramref name="BasketIds"/> null = every enabled source that is due; with ids (the owner's "fetch now") those sources, turned on by that act and ignoring a rest after 403/429.
+/// Fetches the index lists of the enabled sources (BK-01): <paramref name="BasketIds"/> null = every enabled source that is due; with ids (the owner's "fetch now") those of them that the owner has turned on, ignoring the schedule and a rest. A fetch never turns a source on.
 /// <paramref name="Force"/> overrides only the tripwire. Fails with <c>baskets.fetch_disabled</c> and makes no request at all while <c>Baskets:System:Fetch:Enabled</c> is off.
 /// </summary>
 public sealed record RunBasketFetchCommand(IReadOnlyList<Guid>? BasketIds, bool Force, string Actor) : ICommand;
@@ -42,11 +42,11 @@ internal sealed class RunBasketFetchHandler(
         var manual = command.BasketIds is { Count: > 0 };
         var list = await sources.ListAsync(manual ? command.BasketIds : null, cancellationToken);
         var outcomes = new List<FetchOutcomeView>();
-        foreach (var source in list.Where(s => manual || s.Enabled))
+        foreach (var source in list.Where(s => s.Enabled))
         {
-            if (!manual && source.NextAttemptAt > clock.GetUtcNow())
+            if (!manual && !Due(source, clock.GetUtcNow()))
             {
-                continue; // resting after a 403 or 429
+                continue; // checked today already, resting after a failure, or before the run time
             }
 
             outcomes.Add(await FetchOneAsync(source, command, manual, cancellationToken));
@@ -59,8 +59,8 @@ internal sealed class RunBasketFetchHandler(
     {
         var started = clock.GetTimestamp();
         var now = clock.GetUtcNow();
-        var enabled = source.Enabled || manual;
-        var response = await fetcher.GetAsync(source, cancellationToken);
+        var enabled = source.Enabled;
+        var response = await fetcher.GetAsync(settings.PreferredHost == "B" && source.HostAlt is { Length: > 0 } alt ? source with { SourceUrl = alt, HostAlt = source.SourceUrl } : source, cancellationToken);
         var fetch = new FetchRecord(
             Guid.CreateVersion7(now), source.BasketId, now, response.Status == 0 ? null : response.Status, response.Etag, response.LastModified, null, 0, FetchOutcomes.Failed, 0, 0, 0, "[]", null,
             command.Force, command.Actor, command.Force ? settings.Snapshot() : null);
@@ -75,9 +75,13 @@ internal sealed class RunBasketFetchHandler(
         // Nothing came back, or the host refuses us: failed; the validators and the members stay as they were.
         if (response.Status is 0 or 403 or 429 or >= 500)
         {
-            var rest = response.Status is 403 or 429 ? now.AddHours(settings.BackoffHours) : (DateTimeOffset?)null;
+            // 403/429 rest the source for the backoff hours; any other failure is tried again after 5, 30 and 120 minutes (the settings), then not before the next day.
+            var tries = TriesToday(source, now) + 1;
+            var rest = response.Status is 403 or 429
+                ? now.AddHours(settings.BackoffHours)
+                : tries <= settings.BackoffMinutes.Count ? now.AddMinutes(settings.BackoffMinutes[tries - 1]) : (DateTimeOffset?)null;
             var failed = fetch with { Outcome = FetchOutcomes.Failed, Error = response.Error ?? $"http_{response.Status}" };
-            await sources.RecordAsync(Updated(source, enabled, now, ok: false, null, null, null, rest, source.FailCount + 1), failed, cancellationToken);
+            await sources.RecordAsync(Updated(source, enabled, now, ok: false, null, null, null, rest, tries), failed, cancellationToken);
             return Done(failed);
         }
 
@@ -139,10 +143,35 @@ internal sealed class RunBasketFetchHandler(
         return Done(done ? applied : applied with { Outcome = FetchOutcomes.Failed, Error = "concurrent_change", Added = 0, Removed = 0 });
     }
 
+    /// <summary>Whether the schedule asks this source now: after its retry time when one is set, otherwise once a day from the run time (twice a day in a review window).</summary>
+    private bool Due(BasketSourceInfo source, DateTimeOffset now)
+    {
+        if (source.NextAttemptAt is { } next)
+        {
+            return next <= now;
+        }
+
+        if (TimeOnly.FromDateTime(IndiaTime.ToIst(now).DateTime) < settings.RunAt)
+        {
+            return false;
+        }
+
+        if (source.LastCheckedAt is not { } last || IndiaTime.Today(last) < IndiaTime.Today(now))
+        {
+            return true;
+        }
+
+        return ReviewWindows.Contains(IndiaTime.Today(now), settings.ReviewMonths, settings.ReviewFromDay, settings.ReviewToDay) && now - last >= TimeSpan.FromHours(12);
+    }
+
+    // The failures of the retry sequence count for one India day.
+    private static int TriesToday(BasketSourceInfo source, DateTimeOffset now) =>
+        source.LastCheckedAt is { } last && IndiaTime.Today(last) == IndiaTime.Today(now) ? source.FailCount : 0;
+
     private async ValueTask<FetchRecord> RejectAsync(BasketSourceInfo source, bool enabled, FetchRecord fetch, string reason, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var rejected = fetch with { Outcome = FetchOutcomes.Rejected, Error = reason };
-        await sources.RecordAsync(Updated(source, enabled, now, ok: false, null, null, null, null, source.FailCount + 1, BasketSourceStates.Rejected), rejected, cancellationToken);
+        await sources.RecordAsync(Updated(source, enabled, now, ok: false, null, null, null, null, TriesToday(source, now) + 1, BasketSourceStates.Rejected), rejected, cancellationToken);
         return rejected;
     }
 

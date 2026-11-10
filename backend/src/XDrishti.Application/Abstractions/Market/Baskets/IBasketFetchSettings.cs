@@ -13,6 +13,15 @@ public interface IBasketFetchSettings
 
     FetchLimits Limits { get; }
 
+    /// <summary>"A" (nsearchives) or "B" (niftyindices): the host asked first when a source has both (default A).</summary>
+    string PreferredHost { get; }
+
+    /// <summary>The India time of day from which a source is asked for the day (default 07:30).</summary>
+    TimeOnly RunAt { get; }
+
+    /// <summary>Minutes to wait before each retry of a failed attempt (default 5, 30, 120: four tries in all).</summary>
+    IReadOnlyList<int> BackoffMinutes { get; }
+
     /// <summary>Days without a successful check after which a source is <c>stale</c> (default 3).</summary>
     int StaleAfterDays { get; }
 

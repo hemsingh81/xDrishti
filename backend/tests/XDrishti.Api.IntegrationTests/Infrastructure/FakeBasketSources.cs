@@ -19,6 +19,12 @@ public sealed class FakeBasketSources : IBasketSourceFetcher, IBasketFetchSettin
 
     public FetchLimits Limits => FetchLimits.Default;
 
+    public string PreferredHost => "A";
+
+    public TimeOnly RunAt => new(7, 30);
+
+    public IReadOnlyList<int> BackoffMinutes => [5, 30, 120];
+
     public int StaleAfterDays => 3;
 
     public int BackoffHours => 24;

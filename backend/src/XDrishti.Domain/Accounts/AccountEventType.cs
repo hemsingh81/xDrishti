@@ -106,4 +106,5 @@ public enum AccountEventType
     SimulateAllResumed,
     SimulateAllCancelled,
     BasketMembershipChanged,
+    BasketSourceSwitched,
 }

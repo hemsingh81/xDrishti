@@ -7,8 +7,8 @@ using XDrishti.Domain.Platform.Services;
 namespace XDrishti.Application.Market.Baskets;
 
 /// <summary>
-/// The system baskets' refresh as a service (<see cref="Id"/>, spec BK-01): every day at 07:30 IST it carries out <see cref="RunBasketFetchCommand"/> for the enabled index lists (one conditional GET per file). It starts <b>paused</b>; while
-/// <c>Baskets:System:Fetch:Enabled</c> is off a run makes no request and ends as skipped (disabled). Three retries (four tries); it cannot place an order.
+/// The system baskets' refresh as a service (<see cref="Id"/>, spec BK-01): it looks every 5 minutes from 07:30 to 23:00 IST and carries out <see cref="RunBasketFetchCommand"/>, which asks each enabled index list once a day from the run time (twice in a review window) and, after a failure, again after 5, 30 and 120 minutes (<c>Baskets:System:Fetch:BackoffMinutes</c>). It starts <b>paused</b>; while
+/// <c>Baskets:System:Fetch:Enabled</c> is off a run makes no request and ends as skipped (disabled). The retries are the sources' own (not the scheduler's); it cannot place an order.
 /// </summary>
 public sealed class SystemBasketsService(IServiceScopeFactory scopes) : IScheduledService
 {
@@ -18,12 +18,12 @@ public sealed class SystemBasketsService(IServiceScopeFactory scopes) : ISchedul
     public static readonly ServiceDefinition Definition = new(
         Id,
         "System baskets",
-        "Every morning at 07:30 reads the official NSE index lists (one conditional request per enabled file) and keeps the index baskets' membership with dates. Fails closed: a file that looks wrong is rejected and the last good list stays. Off by default; it never places an order.",
+        "From 07:30 reads the official NSE index lists (one conditional request per enabled file) and keeps the index baskets' membership with dates. Fails closed: a file that looks wrong is rejected and the last good list stays. Off by default; it never places an order.",
         "xd-api",
-        [ScheduleType.Daily],
-        new ServiceSettings(false, Schedule.Daily(new TimeOnly(7, 30)), 3, 10, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),
+        [ScheduleType.Interval, ScheduleType.Daily],
+        new ServiceSettings(false, Schedule.Interval(5, new TimeOnly(7, 30), new TimeOnly(23, 0), false, Weekdays.EveryDay), 0, 10, false, true, new Dictionary<string, System.Text.Json.JsonElement>()),
         [],
-        new ServiceConstraints { RecoveryClass = RecoveryClass.LatestOnly, CatchUpReach = CatchUpReach.Latest });
+        new ServiceConstraints { RecoveryClass = RecoveryClass.LatestOnly, CatchUpReach = CatchUpReach.SameDay });
 
     ServiceDefinition IScheduledService.Definition => Definition;
 

@@ -958,6 +958,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<SetAutoScopeCommand, AutoScopeView>, SetAutoScopeHandler>();
         services.AddScoped<IQueryHandler<GetAutoSuggestionsQuery, Result<AutoSuggestionsView>>, GetAutoSuggestionsHandler>(); // the next-day suggestions read model; no order
         services.AddScoped<ICommandHandler<XDrishti.Application.Market.Baskets.RunBasketFetchCommand, XDrishti.Application.Market.Baskets.BasketFetchRun>, XDrishti.Application.Market.Baskets.RunBasketFetchHandler>(); // BK-01: fetch, guard and apply the index lists
+        services.AddScoped<ICommandHandler<XDrishti.Application.Market.Baskets.SetBasketSourceEnabledCommand, XDrishti.Application.Market.Baskets.BasketSourceView>, XDrishti.Application.Market.Baskets.SetBasketSourceEnabledHandler>(); // BK-01: the owner switches a source on or off
         services.AddScoped<IQueryHandler<XDrishti.Application.Market.Baskets.GetBasketSourceQuery, Result<XDrishti.Application.Market.Baskets.BasketSourceView>>, XDrishti.Application.Market.Baskets.GetBasketSourceHandler>();
         services.AddScoped<IQueryHandler<GetPlanItemChartQuery, Result<TicketChartView>>, GetPlanItemChartHandler>();
         services.AddScoped<ICommandHandler<MoveTicketCommand, TicketMoveOutcome>, MoveTicketHandler>(); // owner decisions and service moves along the ticket table; no path to a broker

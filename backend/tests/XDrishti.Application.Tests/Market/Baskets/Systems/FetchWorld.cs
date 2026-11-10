@@ -17,6 +17,12 @@ internal sealed class FakeFetchSettings : IBasketFetchSettings
 
     public FetchLimits Limits => FetchLimits.Default;
 
+    public string PreferredHost { get; set; } = "A";
+
+    public TimeOnly RunAt => new(7, 30);
+
+    public IReadOnlyList<int> BackoffMinutes => [5, 30, 120];
+
     public int StaleAfterDays => 3;
 
     public int BackoffHours => 24;
@@ -53,6 +59,18 @@ internal sealed class FakeSourceStore : IBasketSourceStore
     public ValueTask<IReadOnlyList<FetchOutcomeView>> RecentFetchesAsync(Guid basketId, int take, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<FetchOutcomeView>>([.. Recorded.Where(r => r.Fetch.BasketId == basketId).Take(take).Select(r => new FetchOutcomeView(basketId, r.Fetch.FetchedAt, r.Fetch.Outcome, r.Fetch.HttpStatus, r.Fetch.Rows, r.Fetch.Added, r.Fetch.Removed, r.Fetch.Unmatched, r.Fetch.Error, r.Fetch.Forced))]);
 
+    public ValueTask<bool> SetEnabledAsync(Guid basketId, bool enabled, CancellationToken cancellationToken)
+    {
+        var i = Sources.FindIndex(s => s.BasketId == basketId);
+        if (i < 0 || Sources[i].Enabled == enabled)
+        {
+            return ValueTask.FromResult(false);
+        }
+
+        Sources[i] = Sources[i] with { Enabled = enabled };
+        return ValueTask.FromResult(true);
+    }
+
     public ValueTask RecordAsync(SourceUpdate source, FetchRecord fetch, CancellationToken cancellationToken)
     {
         Recorded.Add((source, fetch));
@@ -64,11 +82,14 @@ internal sealed class FakeFetcher : IBasketSourceFetcher
 {
     public int Calls { get; private set; }
 
+    public BasketSourceInfo? LastAsked { get; private set; }
+
     public SourceResponse Response { get; set; } = SourceResponse.Unreachable("none");
 
     public ValueTask<SourceResponse> GetAsync(BasketSourceInfo source, CancellationToken cancellationToken)
     {
         Calls++;
+        LastAsked = source;
         return ValueTask.FromResult(Response);
     }
 }
@@ -131,8 +152,8 @@ internal sealed class FetchWorld
 
     public static string Isin(int i) => $"INE{i:000}A01010";
 
-    public BasketSourceInfo Source(bool enabled = true, DateTimeOffset? lastOk = null, DateTimeOffset? next = null, string? sha = null, string? etag = null) =>
-        new(BasketId, "NSE Nifty 50", "ind_nifty50list.csv", "https://nsearchives.nseindia.com/content/indices/ind_nifty50list.csv", null, 50, 50, enabled, "never", lastOk, null, etag, null, sha, next, 0, Current.Count);
+    public BasketSourceInfo Source(bool enabled = true, DateTimeOffset? lastOk = null, DateTimeOffset? next = null, string? sha = null, string? etag = null, DateTimeOffset? checkedAt = null, int fails = 0, string? alt = null) =>
+        new BasketSourceInfo(BasketId, "NSE Nifty 50", "ind_nifty50list.csv", "https://nsearchives.nseindia.com/content/indices/ind_nifty50list.csv", null, 50, 50, enabled, "never", lastOk, checkedAt, etag, null, sha, next, fails, Current.Count) with { HostAlt = alt };
 
     public RunBasketFetchHandler Handler => new(Settings, Store, Fetcher, Baskets, Applier, Clock, NullLogger<RunBasketFetchHandler>.Instance);
 

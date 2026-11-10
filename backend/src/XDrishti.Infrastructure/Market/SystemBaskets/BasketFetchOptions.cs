@@ -19,6 +19,20 @@ internal sealed class BasketFetchOptions
     [MaxLength(200)]
     public string UserAgent { get; set; } = string.Empty;
 
+    /// <summary>A or B: the file host asked first (default A).</summary>
+    [RegularExpression("^[AB]$")]
+    public string PreferredHost { get; set; } = "A";
+
+    /// <summary>India time of day (HH:mm) from which a source is asked for the day.</summary>
+    [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$")]
+    public string RunAt { get; set; } = "07:30";
+
+    /// <summary>Minutes before each retry of a failed attempt.</summary>
+    [Required]
+    [MinLength(1)]
+    [MaxLength(5)]
+    public int[] BackoffMinutes { get; set; } = [5, 30, 120];
+
     [Range(0.0, 1.0)]
     public double MaxChangeFraction { get; set; } = 0.06;
 
@@ -57,6 +71,12 @@ internal sealed class BasketFetchSettings(IOptions<BasketFetchOptions> options) 
     public string UserAgent => Value.UserAgent.Trim();
 
     public FetchLimits Limits => new((decimal)Value.MaxChangeFraction, Value.ChangeFloor, (decimal)Value.TripwireFraction, (decimal)Value.MaxUnmatchedFraction);
+
+    public string PreferredHost => Value.PreferredHost;
+
+    public TimeOnly RunAt => TimeOnly.ParseExact(Value.RunAt, "HH:mm", CultureInfo.InvariantCulture);
+
+    public IReadOnlyList<int> BackoffMinutes => [.. Value.BackoffMinutes.Select(m => Math.Max(1, m))];
 
     public int StaleAfterDays => Value.StaleAfterDays;
 

@@ -52,11 +52,23 @@ internal sealed class BasketSourceStore(XDrishtiDbContext db) : IBasketSourceSto
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async ValueTask<bool> SetEnabledAsync(Guid basketId, bool enabled, CancellationToken cancellationToken)
+    {
+        var record = await db.BasketSources.FirstOrDefaultAsync(s => s.BasketId == basketId, cancellationToken);
+        if (record is null || record.Enabled == enabled)
+        {
+            return false;
+        }
+
+        record.Enabled = enabled;
+        await db.SaveChangesAsync(cancellationToken); // the audit event the caller recorded is saved with it
+        return true;
+    }
+
     /// <summary>Adds the fetch row and sets the source's new state on the tracked context (saved by the caller, with whatever else belongs to the same transaction).</summary>
     internal void Stage(SourceUpdate source, FetchRecord fetch)
     {
         var record = db.BasketSources.Local.FirstOrDefault(s => s.BasketId == source.BasketId) ?? db.BasketSources.First(s => s.BasketId == source.BasketId);
-        record.Enabled = source.Enabled;
         record.State = source.State;
         record.LastCheckedAt = source.LastCheckedAt;
         record.LastOkAt = source.LastOkAt;

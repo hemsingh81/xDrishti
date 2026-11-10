@@ -447,6 +447,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(BasketSourceView))]
 [JsonSerializable(typeof(BasketFetchRun))]
 [JsonSerializable(typeof(FetchNowInput))]
+[JsonSerializable(typeof(SourceSwitchInput))]
 [JsonSerializable(typeof(FetchOutcomeView))]
 [JsonSerializable(typeof(IReadOnlyList<FetchOutcomeView>))]
 [JsonSerializable(typeof(IReadOnlyList<BasketView>))]

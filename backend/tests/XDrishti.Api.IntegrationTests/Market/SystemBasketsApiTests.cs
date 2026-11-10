@@ -69,6 +69,11 @@ public sealed class SystemBasketsApiTests(ApiFactory factory) : BasketsTestBase(
 
     private async Task<FetchNowOutcome> FetchAsync(object? body = null)
     {
+        using (var on = await Client.PutJsonAsync($"/api/baskets/{_basketId}/source", new { enabled = true }, Ct))
+        {
+            on.StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+
         using var response = await Client.PostJsonAsync("/api/baskets/system/fetch", body ?? new { basketIds = new[] { _basketId } }, Ct);
         response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(Ct));
         var run = await response.ReadAsync<BasketFetchRun>(Ct);
@@ -103,6 +108,32 @@ public sealed class SystemBasketsApiTests(ApiFactory factory) : BasketsTestBase(
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         (await response.ReadProblemAsync(Ct)).Code.ShouldBe("baskets.fetch_disabled");
         Factory.BasketSources.Calls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task The_owner_switches_a_source_on_and_off_with_a_step_up_and_it_is_audited_and_fetch_now_never_does_it()
+    {
+        var plain = await Factory.SignInAsync(Ct);
+        using var withoutStepUp = await plain.Client.PutJsonAsync($"/api/baskets/{_basketId}/source", new { enabled = true }, Ct);
+        Factory.BasketSources.Enabled = true;
+        Factory.BasketSources.Serve(File, Csv(1, 50));
+        using var fetchWhileOff = await Client.PostJsonAsync("/api/baskets/system/fetch", new { basketIds = new[] { _basketId } }, Ct);
+        using var on = await Client.PutJsonAsync($"/api/baskets/{_basketId}/source", new { enabled = true }, Ct);
+        using var onAgain = await Client.PutJsonAsync($"/api/baskets/{_basketId}/source", new { enabled = true }, Ct);
+        using var off = await Client.PutJsonAsync($"/api/baskets/{_basketId}/source", new { enabled = false }, Ct);
+        using var missing = await Client.PutJsonAsync($"/api/baskets/{Guid.NewGuid()}/source", new { enabled = true }, Ct);
+        using var invalid = await Client.PutJsonAsync($"/api/baskets/{_basketId}/source", new { }, Ct);
+
+        withoutStepUp.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        fetchWhileOff.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await fetchWhileOff.ReadAsync<BasketFetchRun>(Ct)).Outcomes.ShouldBeEmpty();
+        Factory.BasketSources.Calls.ShouldBe(0);
+        (await on.ReadAsync<BasketSourceView>(Ct)).Enabled.ShouldBeTrue();
+        onAgain.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await off.ReadAsync<BasketSourceView>(Ct)).Enabled.ShouldBeFalse();
+        (missing.StatusCode, invalid.StatusCode).ShouldBe((HttpStatusCode.NotFound, HttpStatusCode.BadRequest));
+        var events = await Factory.WithDbAsync(db => db.AccountEvents.AsNoTracking().Where(e => e.Event == AccountEventType.BasketSourceSwitched).ToListAsync(Ct));
+        events.Count.ShouldBe(2); // on, off; the repeat changed nothing
     }
 
     [Fact]

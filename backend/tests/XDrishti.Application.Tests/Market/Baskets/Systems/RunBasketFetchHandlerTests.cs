@@ -321,7 +321,7 @@ public sealed class RunBasketFetchHandlerTests
     }
 
     [Fact]
-    public async Task A_timeout_fails_without_a_rest_and_keeps_the_last_good_validators()
+    public async Task A_timeout_fails_retries_in_five_minutes_and_keeps_the_last_good_validators()
     {
         _w.Store.Sources[0] = _w.Source(sha: "good", etag: "\"v0\"", lastOk: _w.Clock.GetUtcNow().AddDays(-1));
         _w.Fetcher.Response = SourceResponse.Unreachable("timeout");
@@ -330,7 +330,7 @@ public sealed class RunBasketFetchHandlerTests
 
         outcome.Error.ShouldBe("timeout");
         var update = _w.Store.Recorded.Single().Source;
-        (update.State, update.NextAttemptAt, update.Sha256, update.Etag, update.FailCount).ShouldBe(("failed", null, "good", "\"v0\"", 1));
+        (update.State, update.NextAttemptAt, update.Sha256, update.Etag, update.FailCount).ShouldBe(("failed", _w.Clock.GetUtcNow().AddMinutes(5), "good", "\"v0\"", 1));
     }
 
     [Fact]
@@ -345,15 +345,77 @@ public sealed class RunBasketFetchHandlerTests
     }
 
     [Fact]
-    public async Task The_owners_fetch_now_turns_the_listed_source_on()
+    public async Task Fetch_now_never_turns_a_source_on_and_asks_nothing_of_a_disabled_one()
     {
         _w.Store.Sources[0] = _w.Source(enabled: false);
         _w.Serve(FetchWorld.Csv(1, 50));
 
-        var outcome = await _w.RunAsync(manual: true);
+        var result = await _w.Handler.HandleAsync(new RunBasketFetchCommand([_w.BasketId], false, "owner:x"), FetchWorld.Ct);
 
-        outcome.Outcome.ShouldBe("applied");
-        _w.Applier.Applied.Single().Source.Enabled.ShouldBeTrue();
+        result.Value.Outcomes.ShouldBeEmpty();
+        (_w.Fetcher.Calls, _w.Store.Sources[0].Enabled, _w.Store.Recorded.Count).ShouldBe((0, false, 0));
+    }
+
+    [Fact]
+    public async Task A_failure_is_retried_after_5_then_30_then_120_minutes_and_then_not_that_day()
+    {
+        _w.Fetcher.Response = SourceResponse.Unreachable("timeout");
+        var waits = new List<TimeSpan?>();
+        BasketSourceInfo source = _w.Source();
+        for (var i = 0; i < 4; i++)
+        {
+            _w.Store.Sources[0] = source;
+            await _w.RunAsync(manual: true);
+            var update = _w.Store.Recorded[^1].Source;
+            waits.Add(update.NextAttemptAt - _w.Clock.GetUtcNow());
+            source = source with { NextAttemptAt = update.NextAttemptAt, FailCount = update.FailCount, LastCheckedAt = update.LastCheckedAt };
+        }
+
+        waits.ShouldBe([TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(120), null]);
+    }
+
+    [Fact]
+    public async Task The_schedule_asks_a_source_once_a_day_from_the_run_time()
+    {
+        var now = _w.Clock.GetUtcNow();
+        _w.Fetcher.Response = new SourceResponse(304, null, null, null, null, null);
+
+        _w.Store.Sources[0] = _w.Source(checkedAt: now.AddHours(-1)); // checked today already
+        var done = await _w.Handler.HandleAsync(new RunBasketFetchCommand(null, false, "system:x"), FetchWorld.Ct);
+        _w.Store.Sources[0] = _w.Source(checkedAt: now.AddDays(-1));
+        var due = await _w.Handler.HandleAsync(new RunBasketFetchCommand(null, false, "system:x"), FetchWorld.Ct);
+        _w.Clock.Advance(TimeSpan.FromHours(-1)); // 06:30, before the run time
+        var early = await _w.Handler.HandleAsync(new RunBasketFetchCommand(null, false, "system:x"), FetchWorld.Ct);
+
+        (done.Value.Outcomes.Count, due.Value.Outcomes.Count, early.Value.Outcomes.Count).ShouldBe((0, 1, 0));
+    }
+
+    [Fact]
+    public async Task In_a_review_window_a_source_is_asked_twice_a_day()
+    {
+        _w.On(2026, 9, 25);
+        var now = _w.Clock.GetUtcNow();
+        _w.Fetcher.Response = new SourceResponse(304, null, null, null, null, null);
+        _w.Store.Sources[0] = _w.Source(checkedAt: now.AddHours(-1));
+        var soon = await _w.Handler.HandleAsync(new RunBasketFetchCommand(null, false, "system:x"), FetchWorld.Ct);
+        _w.Store.Sources[0] = _w.Source(checkedAt: now.AddHours(-13).AddMinutes(-1));
+        _w.Clock.Advance(TimeSpan.FromHours(1));
+        var later = await _w.Handler.HandleAsync(new RunBasketFetchCommand(null, false, "system:x"), FetchWorld.Ct);
+
+        (soon.Value.Outcomes.Count, later.Value.Outcomes.Count).ShouldBe((0, 1));
+    }
+
+    [Fact]
+    public async Task The_preferred_host_b_asks_the_alternate_url_first()
+    {
+        var alt = "https://niftyindices.com/IndexConstituent/ind_nifty50list.csv";
+        _w.Store.Sources[0] = _w.Source(alt: alt);
+        _w.Settings.PreferredHost = "B";
+        _w.Fetcher.Response = new SourceResponse(304, null, null, null, null, null);
+
+        await _w.RunAsync();
+
+        _w.Fetcher.LastAsked!.SourceUrl.ShouldBe(alt);
     }
 
     [Fact]

@@ -4,6 +4,7 @@ using XDrishti.Api.Auth;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Baskets;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Market.Baskets;
 
 namespace XDrishti.Api.Endpoints;
 
@@ -52,6 +53,13 @@ internal sealed class BasketsEndpoints : IEndpointModule
         group.MapGet("/{id:guid}/source", GetSourceAsync)
             .WithName("GetBasketSource")
             .WithSummary("The source of a system basket: file name, state (never, ok, stale, rejected, failed), last checks and its last 20 fetch outcomes (no raw file); 404 baskets.not_found for a basket without one")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPut("/{id:guid}/source", SwitchSourceAsync)
+            .RequireStepUp()
+            .WithName("SwitchBasketSource")
+            .WithSummary("Owner act, needs step-up, both directions: turn the fetch of this system basket's file on or off ({enabled}); audited with the fetch settings, idempotent, makes no request; 400 baskets.invalid without enabled, 404 baskets.not_found for a basket without a source")
+            .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapPut("/{id:guid}", UpdateAsync)
@@ -162,6 +170,23 @@ internal sealed class BasketsEndpoints : IEndpointModule
     {
         http.Response.Headers.CacheControl = "no-store";
         var result = await handler.HandleAsync(new RunBasketFetchCommand(input?.BasketIds, input?.Force ?? false, http.GetActor()), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<BasketSourceView>, ProblemHttpResult>> SwitchSourceAsync(
+        Guid id,
+        HttpContext http,
+        ICommandHandler<SetBasketSourceEnabledCommand, BasketSourceView> handler,
+        CancellationToken cancellationToken,
+        [FromBody] SourceSwitchInput? input = null)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        if (input?.Enabled is not { } enabled)
+        {
+            return ProblemResults.From(BasketErrors.Invalid("enabled", "Send enabled: true or false."), http);
+        }
+
+        var result = await handler.HandleAsync(new SetBasketSourceEnabledCommand(id, enabled, http.GetActor()), cancellationToken);
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
