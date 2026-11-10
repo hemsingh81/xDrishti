@@ -3,7 +3,7 @@
 > **SUPERSEDED (2026-10-25).** This slice was built from [P8-02-learning-screen.md](P8-02-learning-screen.md) (Approved, merged to main) while this Draft was being written. Do not build from this file; keep it only as a second opinion: read its 'Decisions (researched)' and 'Risks' against what was built and open a follow-up spec for anything it adds.
 
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-24 to 2026-10-25 as P8-02 and P8-02b under the owner's standing run instruction. Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-02 of [P8-00](P8-00-reports-and-ui-plan.md)
 - **Design refs:** docs/design/13-reports-and-ui.md §1 (Learning), §1c, §1d, §1e · docs/design/09-learning-engine.md §7 (cell lifecycle), §11 (Making learning visible) · prototype `docs/prototype/assets/app-pages-4.js` (Learning page head and tiles, tabs, "Setups (cells)": heatmap, lifecycle funnel, changed cells) · ADR 0064 (cell statistics), 0073 (changelog and lifecycle), 0080 (overview, "nothing is computed"), 0098 · P8-00 D3, D6, D7, D10
 - **Needs:** P8-01 (built). Endpoints that exist today (no backend change): `GET /api/learning/overview`, `/api/cells`, `/api/cells/{key}`, `/api/changelog`, `/api/changelog/cell-state`, `/api/models`.

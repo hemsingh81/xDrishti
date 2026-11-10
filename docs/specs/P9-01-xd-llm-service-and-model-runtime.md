@@ -1,6 +1,6 @@
 # P9-01 — `xd-llm` service, model runtime and the LLM client
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-27 under the owner's standing run instruction (ADR 0136). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P9 — AI assistant, slice P9-01 of [P9-00](P9-00-ai-assistant-plan.md)
 - **Design refs:** docs/design/14-ai-assistant.md §2, §3 · 17-deployment-and-operations.md §1 to §4 · 19 §4 (LLM down, secrets) · ADR 0005 · docs/research/p0-15-llm-benchmark.md ("Sketch of the `xd-llm` service") · deploy/CLAUDE.md
 - **Needs:** ADR 0005 (Proposed; container runtime assumed), the models already on the host (`main`, `gptoss`, `embed` in `~/Library/Application Support/xDrishti/models`, P0-15)

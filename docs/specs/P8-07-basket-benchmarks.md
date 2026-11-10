@@ -1,6 +1,6 @@
 # P8-07 — Basket benchmarks
 
-- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Status:** Built 2026-10-25 under the owner's standing run instruction (ADR 0102). Before the build it read: Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-07 of [P8-00](P8-00-reports-and-ui-plan.md)
 - **Design refs:** docs/design/13-reports-and-ui.md §2 (R20, R27: "vs basket buy-and-hold & Nifty") · docs/design/06-instruments-and-baskets.md §4 · ISS-22 (survivorship) · ADR 0099 · P8-00 D1, D3, D4, Q13
 - **Needs:** P8-06 (built, ADR 0100: the DTO `MetricView(State, Number, Reason)`, the `from`/`to`/`basket` query names and the `RunSelection` default run set that supplies the default window), P8-05 (built). Uses existing ports only: `IBasketQueries`, `IBarQueries.ReadDailyBarsAsync`, `IPortfolioBenchmark`.
