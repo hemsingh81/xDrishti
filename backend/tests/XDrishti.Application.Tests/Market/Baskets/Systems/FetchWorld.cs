@@ -83,6 +83,9 @@ internal sealed class FakeSourceStore : IBasketSourceStore
     public ValueTask<IReadOnlyList<FetchOutcomeView>> RecentFetchesAsync(Guid basketId, int take, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<FetchOutcomeView>>([.. Recorded.Where(r => r.Fetch.BasketId == basketId).Take(take).Select(r => new FetchOutcomeView(basketId, r.Fetch.FetchedAt, r.Fetch.Outcome, r.Fetch.HttpStatus, r.Fetch.Rows, r.Fetch.Added, r.Fetch.Removed, r.Fetch.Unmatched, r.Fetch.Error, r.Fetch.Forced))]);
 
+    public ValueTask<IReadOnlyList<string>> UnmatchedSymbolsAsync(Guid basketId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<string>>([]);
+
     public ValueTask<bool> SetEnabledAsync(Guid basketId, bool enabled, CancellationToken cancellationToken)
     {
         var i = Sources.FindIndex(s => s.BasketId == basketId);

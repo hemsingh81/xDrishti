@@ -6,6 +6,7 @@ import type { BasketMember } from '@/shared/api';
 import { Grid, type GridRowExtras } from '@/shared/ui/grid';
 import { stateAlpha } from '@/theme';
 import { useBasketDrag } from '../hooks/basketDragContext';
+import { unmatchedMember, withUnmatched } from './unmatchedRows';
 import { editableColumns, lookBackColumns, portfolioColumns, systemColumns } from './memberColumns';
 
 interface MembersGridProps {
@@ -18,6 +19,10 @@ interface MembersGridProps {
   mode: 'edit' | 'lookback' | 'portfolio' | 'system';
   /** Rank and score by instrument (a derived basket): adds the "Why" column. */
   scores?: ReadonlyMap<string, Score>;
+  /** The unit the scores are printed in (`ratio`, `percent` or `rupees`). */
+  scoreUnit?: string;
+  /** Symbols of the source's list that are not in the instrument list: listed last, greyed, with "no data". */
+  unmatched?: readonly string[];
   /** Selection is on when `onSelectionChange` is given. */
   selectedIds?: ReadonlySet<string>;
   onSelectionChange?: (ids: ReadonlySet<string>) => void;
@@ -51,6 +56,8 @@ export function MembersGrid({
   members,
   mode,
   scores,
+  scoreUnit,
+  unmatched = [],
   selectedIds,
   onSelectionChange,
   loading,
@@ -74,12 +81,16 @@ export function MembersGrid({
     [session, dragged, over, ids, mode],
   );
 
-  const systemCols = useMemo(() => systemColumns(scores), [scores]);
+  const systemCols = useMemo(() => withUnmatched(systemColumns(scores, scoreUnit)), [scores, scoreUnit]);
+  const rows = useMemo(
+    () => (unmatched.length > 0 && mode === 'system' ? [...members, ...unmatched.map(unmatchedMember)] : members),
+    [members, unmatched, mode],
+  );
   const grid = (
     <Grid
       label="Basket members"
       columns={mode === 'system' ? systemCols : columns[mode]}
-      rows={members}
+      rows={rows}
       getRowId={getRowId}
       getRowLabel={getRowLabel}
       selectedIds={selectedIds}

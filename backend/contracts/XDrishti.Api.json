@@ -25943,9 +25943,15 @@
           "unmatched": {
             "type": "integer",
             "format": "int32"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "The state of a system basket's file: `state` never · ok · stale · rejected · failed; `unmatched` = members of the last applied or checked list that are not in the instrument list (\"N members not in your instrument list\")."
+        "description": "The state of a system basket's file (`reason` = the short reason of the newest rejected or failed fetch while the state is rejected or failed): `state` never · ok · stale · rejected · failed; `unmatched` = members of the last applied or checked list that are not in the instrument list (\"N members not in your instrument list\")."
       },
       "BasketSourceView": {
         "required": [
@@ -26017,9 +26023,18 @@
             "items": {
               "$ref": "#/components/schemas/FetchOutcomeView"
             }
+          },
+          "unmatchedSymbols": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         },
-        "description": "The source of a system basket and its last 20 fetches (no raw file). `enabled` = the owner has turned this file on."
+        "description": "The source of a system basket and its last 20 fetches (no raw file). `enabled` = the owner has turned this file on; `unmatchedSymbols` = the symbols of the last checked list that are not in the instrument list (the \"N members not in your instrument list\")."
       },
       "BasketVersionDetail": {
         "required": [
@@ -26076,8 +26091,19 @@
           "total": {
             "type": "integer",
             "format": "int32"
+          },
+          "definition": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DerivedDefinitionInfo"
+              }
+            ]
           }
-        }
+        },
+        "description": "The versions of a derived basket, newest first, with the definition they were formed by."
       },
       "BasketVersionSummary": {
         "required": [
@@ -34197,6 +34223,35 @@
           }
         },
         "description": "What one basket did in a run: `applied`, `unchanged` or `skipped` (with a reason)."
+      },
+      "DerivedDefinitionInfo": {
+        "required": [
+          "no",
+          "name",
+          "description",
+          "notThis",
+          "unit"
+        ],
+        "type": "object",
+        "properties": {
+          "no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "notThis": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          }
+        },
+        "description": "What a derived basket is, from the catalogue: its name, the rule in one line, the one-line \"what this basket is NOT\" and the unit of its score\n(`ratio` printed with 2 decimals, `percent` a share printed as \"2.10 %\", `rupees` printed in crore)."
       },
       "DerivedDefinitionView": {
         "required": [

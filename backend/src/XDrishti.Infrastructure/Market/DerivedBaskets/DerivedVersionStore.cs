@@ -169,14 +169,15 @@ internal sealed class DerivedVersionStore(XDrishtiDbContext db, IAccountEventLog
 
     public async ValueTask<BasketVersionPage?> ListVersionsAsync(Guid basketId, int skip, int take, CancellationToken cancellationToken)
     {
-        if (!await db.DerivedDefinitions.AsNoTracking().AnyAsync(d => d.BasketId == basketId, cancellationToken))
+        var definitionNo = await db.DerivedDefinitions.AsNoTracking().Where(d => d.BasketId == basketId).Select(d => (int?)d.DefinitionNo).FirstOrDefaultAsync(cancellationToken);
+        if (definitionNo is not { } no)
         {
             return null;
         }
 
         var query = db.BasketVersions.AsNoTracking().Where(v => v.BasketId == basketId);
         var rows = await query.OrderByDescending(v => v.AsOf).ThenByDescending(v => v.CreatedAt).Skip(skip).Take(take).ToListAsync(cancellationToken);
-        return new BasketVersionPage([.. rows.Select(Summary)], await query.CountAsync(cancellationToken));
+        return new BasketVersionPage([.. rows.Select(Summary)], await query.CountAsync(cancellationToken), DerivedScoreUnits.Info(no));
     }
 
     public async ValueTask<BasketVersionDetail?> GetVersionAsync(Guid basketId, Guid versionId, CancellationToken cancellationToken)

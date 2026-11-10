@@ -21,13 +21,11 @@ const toneIcon: Record<SourceTone, typeof CheckIcon> = {
 
 interface SourceStatusProps {
   basket: Basket;
-  /** Why the last fetch was rejected or failed (from the source), when known. */
-  reason?: string | null;
 }
 
 /** The state of a system basket's source in words and an icon (never colour alone); announced as a status. */
-export function SourceStatus({ basket, reason = null }: SourceStatusProps) {
-  const status = sourceStatus(basket, reason);
+export function SourceStatus({ basket }: SourceStatusProps) {
+  const status = sourceStatus(basket);
   if (!status) return null;
   const Icon = toneIcon[status.tone];
   return (

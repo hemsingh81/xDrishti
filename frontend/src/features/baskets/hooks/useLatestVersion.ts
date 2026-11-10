@@ -24,5 +24,6 @@ export function useLatestVersion(basket: Basket) {
       ),
     [detail.data],
   );
-  return { derived, versions, latest, detail, scores };
+  const definition = versions.data?.definition ?? null;
+  return { derived, versions, latest, detail, scores, definition };
 }

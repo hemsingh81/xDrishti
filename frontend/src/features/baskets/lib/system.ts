@@ -1,6 +1,6 @@
 import type { Basket } from '@/shared/api';
-import type { BasketSource, BasketVersionSummary } from '@/shared/api/systemBasketTypes';
-import { formatDate, formatIstDate } from '@/shared/lib/format';
+import type { BasketVersionSummary } from '@/shared/api/systemBasketTypes';
+import { formatDate, formatIstDate, formatPrice } from '@/shared/lib/format';
 
 /** A portfolio bucket: computed from holdings. Every other system basket (index, list, derived) is stored (BK-01). */
 export const isPortfolio = (basket: Basket): boolean => basket.kind === 'portfolio';
@@ -21,10 +21,14 @@ export const systemMoveTip = 'System baskets cannot be changed';
 const day = (value: string | null | undefined) => (value ? formatIstDate(value) : 'never');
 
 /** AC 2 and 3: the two dates of an index / list basket, or the as-of and effective dates of a derived basket's version. */
-export function asOfLine(basket: Basket, version: BasketVersionSummary | null): string | null {
+export function asOfLine(
+  basket: Basket,
+  version: BasketVersionSummary | null,
+  definitionName?: string | null,
+): string | null {
   if (basket.kind === 'derived') {
     return version
-      ? `Members as of ${formatDate(version.asOf)} (bars to that close) · effective from ${formatDate(version.effectiveFrom)}`
+      ? `Members as of ${formatDate(version.asOf)} (bars to that close) · effective from ${formatDate(version.effectiveFrom)}${definitionName ? ` · ${definitionName}` : ''}`
       : null;
   }
   const lastOk = basket.source?.lastOkAt;
@@ -40,12 +44,15 @@ export interface SourceStatusText {
   text: string;
 }
 
-/** The newest fetch that was rejected or failed: why the source is in that state. */
-export const failureReason = (source: BasketSource | undefined): string | null =>
-  source?.fetches.find((f) => f.outcome === 'rejected' || f.outcome === 'failed')?.error ?? null;
+/** A score in its unit (AC3): ratio 0.0213 prints `0.02`, percent 0.021 prints `2.10 %`, rupees 100,000,000 prints `Rs 10.00 Cr`. */
+export function scoreText(score: number, unit: string): string {
+  if (unit === 'percent') return `${formatPrice(score * 100)} %`;
+  if (unit === 'rupees') return `Rs ${formatPrice(score / 10_000_000)} Cr`;
+  return formatPrice(score);
+}
 
 /** AC 4 and 5: what the status line says for each state of a basket's source. */
-export function sourceStatus(basket: Basket, reason: string | null): SourceStatusText | null {
+export function sourceStatus(basket: Basket): SourceStatusText | null {
   const source = basket.source;
   if (!source) return null;
   switch (source.state) {
@@ -60,7 +67,7 @@ export function sourceStatus(basket: Basket, reason: string | null): SourceStatu
     case 'failed':
       return {
         tone: 'error',
-        text: `${source.state === 'failed' ? 'Failed' : 'Rejected'}: ${reason ?? 'no reason was recorded'}. The last good members are shown`,
+        text: `${source.state === 'failed' ? 'Failed' : 'Rejected'}: ${source.reason ?? 'no reason was recorded'}. The last good members are shown`,
       };
     default:
       return { tone: 'neutral', text: 'Not fetched yet: fetching is off' };

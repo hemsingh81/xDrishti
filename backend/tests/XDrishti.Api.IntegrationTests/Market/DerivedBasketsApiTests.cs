@@ -190,7 +190,12 @@ public sealed class DerivedBasketsApiTests(ApiFactory factory) : BasketsTestBase
         (await StaysAsync()).Count(m => m.ValidTo == null && m.ValidFrom == Midnight(10, 26)).ShouldBe(10); // the newer one wins the same effective date
         (await MembersAsync("2026-10-26")).Count.ShouldBe(10);
         using var list = await Client.GetAsync($"/api/baskets/{_basketId}/versions", Ct);
-        (await list.ReadAsync<BasketVersionPage>(Ct)).Items.Count.ShouldBe(2);
+        var page = await list.ReadAsync<BasketVersionPage>(Ct);
+        page.Items.Count.ShouldBe(2);
+        page.Definition.ShouldNotBeNull();
+        page.Definition.Name.ShouldNotBeNullOrWhiteSpace();
+        page.Definition.NotThis.ShouldStartWith("Not");
+        page.Definition.Unit.ShouldBeOneOf("ratio", "percent", "rupees");
     }
 
     [Fact]

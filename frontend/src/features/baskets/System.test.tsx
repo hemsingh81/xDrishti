@@ -133,6 +133,7 @@ function renderSystem({ stored, search = '', settings, source, hint, memberSymbo
         nextAttemptAt: null,
         expectedMin: 40,
         expectedMax: 60,
+        unmatchedSymbols: [],
         fetches: [
           {
             basketId: basket.id,
@@ -151,9 +152,37 @@ function renderSystem({ stored, search = '', settings, source, hint, memberSymbo
       };
       return HttpResponse.json(full);
     }),
+    http.get('/api/baskets/:id/history', ({ params }) => {
+      if (!byId.has(String(params.id))) return undefined;
+      const entry = (kind: string, symbol: string, at: string, n: number) => ({
+        memberId: id(60 + n),
+        kind,
+        at,
+        instrumentId: id(70 + n),
+        symbol,
+        name: symbol,
+        type: 'share',
+        note: null,
+        by: null,
+      });
+      return HttpResponse.json({
+        items: [
+          entry('removed', 'NSE:INFY', '2026-10-25T04:00:00Z', 1),
+          entry('added', 'NSE:TCS', '2026-10-25T04:00:00Z', 2),
+          entry('added', 'NSE:RELIANCE', '2026-10-24T04:00:00Z', 3),
+        ],
+      });
+    }),
     http.get('/api/baskets/:id/versions', () => {
       const page: BasketVersionPage = {
         total: 1,
+        definition: {
+          no: 1,
+          name: 'Most volatile',
+          description: 'The 50 instruments with the highest ATR as a share of the close.',
+          notThis: "Not an index; not a forecast of tomorrow's range.",
+          unit: 'percent',
+        },
         items: [
           {
             versionId,
@@ -299,33 +328,12 @@ describe('System baskets on the Baskets screen', () => {
   });
 
   it.each([
-    ['rejected', 'Rejected: tripwire. The last good members are shown'],
-    ['failed', 'Failed: http_503. The last good members are shown'],
-  ])('shows a %s source in red text with the reason the API recorded', async (state, text) => {
-    renderSystem({
-      stored: [indexBasket(state)],
-      search: `?basket=${index}`,
-      source: {
-        fetches: [
-          {
-            basketId: index,
-            at: '2026-10-26T04:00:00Z',
-            outcome: state,
-            httpStatus: null,
-            rows: 0,
-            added: 0,
-            removed: 0,
-            unmatched: 0,
-            error: state === 'failed' ? 'http_503' : 'tripwire',
-            forced: false,
-          },
-        ],
-      },
-    });
+    ['rejected', 'tripwire', 'Rejected: tripwire. The last good members are shown'],
+    ['failed', 'http_503', 'Failed: http_503. The last good members are shown'],
+  ])('shows a %s source with the reason the list carries, on the card', async (state, reason, text) => {
+    renderSystem({ stored: [indexBasket(state, { source: summary(state, { reason }) })] });
 
-    await waitFor(() => {
-      expect(screen.getAllByRole('status').some((s) => s.textContent === text)).toBe(true);
-    });
+    expect(within(await card('NSE Nifty 50')).getByRole('status')).toHaveTextContent(text);
   });
 
   it('lists the last good members of a stale basket, read only: only Copy to…, Move disabled with the reason', async () => {
@@ -368,11 +376,15 @@ describe('System baskets on the Baskets screen', () => {
     renderSystem({ stored: [derivedBasket], search: `?basket=${derived}` });
 
     expect(
-      await screen.findByText('Members as of 23 Oct 2026 (bars to that close) · effective from 26 Oct 2026'),
+      await screen.findByText(
+        'Members as of 23 Oct 2026 (bars to that close) · effective from 26 Oct 2026 · Most volatile',
+      ),
     ).toBeInTheDocument();
-    expect(await screen.findByText('Rank 1 · score 0.02')).toBeInTheDocument();
-    expect(screen.getByText('Rank 2 · score 0.01')).toBeInTheDocument();
-    expect(screen.getByText(/^What this basket is NOT:/)).toBeInTheDocument();
+    expect(await screen.findByText('Rank 1 · score 2.13 %')).toBeInTheDocument();
+    expect(screen.getByText('Rank 2 · score 1.19 %')).toBeInTheDocument();
+    expect(
+      screen.getByText("What this basket is NOT: Not an index; not a forecast of tomorrow's range."),
+    ).toBeInTheDocument();
     expect(
       screen.getByText('Ranked on past bars; do not test a strategy on the same window it was ranked on'),
     ).toBeInTheDocument();
@@ -390,15 +402,33 @@ describe('System baskets on the Baskets screen', () => {
     expect(versions).not.toHaveTextContent('abcdef0123');
   });
 
-  it('lists the applied changes of an index basket in the history drawer', async () => {
+  it('lists the days an index basket changed with the symbols added and removed', async () => {
     renderSystem({ stored: [indexBasket()], search: `?basket=${index}` });
 
     await userEvent.click(await screen.findByRole('button', { name: 'History' }));
     const drawer = await screen.findByLabelText('History of NSE Nifty 50');
     const changes = await within(drawer).findByRole('list', { name: 'Changes' });
-    expect(changes).toHaveTextContent('25 Oct 2026');
-    expect(changes).toHaveTextContent('1 added, 1 removed');
-    expect(changes).toHaveTextContent('Added: NSE:TCS, NSE:RELIANCE');
+    const [newest, older] = within(changes).getAllByRole('listitem');
+    expect(newest).toHaveTextContent('25 Oct 2026');
+    expect(newest).toHaveTextContent('1 added, 1 removed');
+    expect(newest).toHaveTextContent('Added: NSE:TCS');
+    expect(newest).toHaveTextContent('Removed: NSE:INFY');
+    expect(older).toHaveTextContent('24 Oct 2026');
+    expect(older).toHaveTextContent('1 added, 0 removed');
+  });
+
+  it('lists the symbols that are not in the instrument list as greyed rows with no data', async () => {
+    renderSystem({
+      stored: [indexBasket('ok', { source: summary('ok', { unmatched: 1 }) })],
+      search: `?basket=${index}`,
+      source: { unmatchedSymbols: ['ZZ1'] },
+    });
+
+    const grid = await screen.findByRole('grid', { name: 'Basket members' });
+    const row = (await within(grid).findByText('ZZ1')).closest('tr');
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getAllByText('no data').length).toBeGreaterThan(0);
+    expect(within(row as HTMLElement).queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('sends asOf for a system basket and, before the known date, says earlier dates use the first members', async () => {

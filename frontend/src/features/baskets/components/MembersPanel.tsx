@@ -1,8 +1,9 @@
 import { Alert, Box, Card, Divider } from '@mui/material';
-import type { UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Basket, BasketMembers } from '@/shared/api';
 import { formatDate } from '@/shared/lib/format';
+import { sourceQuery } from '../api/systemQueries';
 import { useLatestVersion } from '../hooks/useLatestVersion';
 import { basketProblemText } from '../lib/errors';
 import { isPortfolio, isStored } from '../lib/system';
@@ -50,7 +51,8 @@ export function MembersPanel({
   const [history, setHistory] = useState(false);
   const readOnly = basket.system;
   const stored = isStored(basket);
-  const { scores, derived } = useLatestVersion(basket);
+  const { scores, derived, definition } = useLatestVersion(basket);
+  const source = useQuery({ ...sourceQuery(basket.id), enabled: stored && Boolean(basket.source) });
   // Before the first known date a stored basket answers with its first known members: say so instead of looking empty.
   const knownSince = basket.membersKnownSince ?? null;
   const beforeKnown = stored && asOf !== null && knownSince !== null && asOf < knownSince;
@@ -93,6 +95,8 @@ export function MembersPanel({
           members={items}
           mode={isPortfolio(basket) ? 'portfolio' : stored && editable ? 'system' : editable ? 'edit' : 'lookback'}
           scores={derived ? scores : undefined}
+          scoreUnit={definition?.unit}
+          unmatched={source.data?.unmatchedSymbols ?? undefined}
           selectedIds={editable ? selectedIds : undefined}
           onSelectionChange={editable ? onSelectionChange : undefined}
           loading={members.isPending}

@@ -30,10 +30,12 @@ internal sealed class BasketQueries(XDrishtiDbContext db) : IBasketQueries
         var sources = await db.BasketSources.AsNoTracking().Where(s => systemIds.Contains(s.BasketId)).ToDictionaryAsync(s => s.BasketId, cancellationToken);
         var latest = await db.BasketFetches.AsNoTracking().Where(f => systemIds.Contains(f.BasketId) && f.Outcome != "failed")
             .GroupBy(f => f.BasketId).Select(g => new { Id = g.Key, Unmatched = g.OrderByDescending(f => f.FetchedAt).Select(f => f.Unmatched).First() }).ToDictionaryAsync(x => x.Id, x => x.Unmatched, cancellationToken);
+        var reasons = await db.BasketFetches.AsNoTracking().Where(f => systemIds.Contains(f.BasketId) && (f.Outcome == "rejected" || f.Outcome == "failed") && f.Error != null)
+            .GroupBy(f => f.BasketId).Select(g => new { Id = g.Key, Reason = g.OrderByDescending(f => f.FetchedAt).Select(f => f.Error).First() }).ToDictionaryAsync(x => x.Id, x => x.Reason, cancellationToken);
         return [.. rows.Select(r => ToView(
             r,
             firsts.TryGetValue(r.Id, out var first) ? IndiaTime.Today(first) : null,
-            sources.TryGetValue(r.Id, out var src) ? new BasketSourceSummary(src.State, src.LastOkAt, src.LastCheckedAt, latest.GetValueOrDefault(r.Id)) : null))];
+            sources.TryGetValue(r.Id, out var src) ? new BasketSourceSummary(src.State, src.LastOkAt, src.LastCheckedAt, latest.GetValueOrDefault(r.Id), src.State is "rejected" or "failed" ? reasons.GetValueOrDefault(r.Id) : null) : null))];
     }
 
     public async ValueTask<BasketView?> GetAsync(Guid id, CancellationToken cancellationToken) =>

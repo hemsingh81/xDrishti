@@ -46,6 +46,21 @@ internal sealed class BasketSourceStore(XDrishtiDbContext db) : IBasketSourceSto
         return [.. rows.Select(f => new FetchOutcomeView(f.BasketId, f.FetchedAt, f.Outcome, f.HttpStatus, f.Rows, f.Added, f.Removed, f.Unmatched, f.Error, f.Forced))];
     }
 
+    public async ValueTask<IReadOnlyList<string>> UnmatchedSymbolsAsync(Guid basketId, CancellationToken cancellationToken)
+    {
+        var warnings = await db.BasketFetches.AsNoTracking()
+            .Where(f => f.BasketId == basketId && f.Unmatched > 0 && (f.Outcome == "applied" || f.Outcome == "rejected"))
+            .OrderByDescending(f => f.FetchedAt).ThenByDescending(f => f.Id).Select(f => f.Warnings).FirstOrDefaultAsync(cancellationToken);
+        if (warnings is null)
+        {
+            return [];
+        }
+
+        const string prefix = "unmatched:";
+        var items = System.Text.Json.JsonSerializer.Deserialize<List<string>>(warnings) ?? [];
+        return [.. items.Where(w => w.StartsWith(prefix, StringComparison.Ordinal)).Select(w => w[prefix.Length..]).Order(StringComparer.Ordinal)];
+    }
+
     public async ValueTask RecordAsync(SourceUpdate source, FetchRecord fetch, CancellationToken cancellationToken)
     {
         Stage(source, fetch);

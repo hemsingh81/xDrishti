@@ -451,6 +451,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(DerivedBasketOutcome))]
 [JsonSerializable(typeof(IReadOnlyList<DerivedBasketOutcome>))]
 [JsonSerializable(typeof(BasketVersionPage))]
+[JsonSerializable(typeof(DerivedDefinitionInfo))]
 [JsonSerializable(typeof(BasketVersionSummary))]
 [JsonSerializable(typeof(IReadOnlyList<BasketVersionSummary>))]
 [JsonSerializable(typeof(BasketVersionDetail))]

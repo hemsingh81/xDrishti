@@ -2,13 +2,13 @@ import CloseIcon from '@mui/icons-material/Close';
 import { Alert, Box, Button, Chip, Drawer, IconButton, Stack, Typography } from '@mui/material';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import type { Basket, BasketMembers } from '@/shared/api';
-import type { BasketSource, BasketVersionPage } from '@/shared/api/systemBasketTypes';
-import { formatDate, formatIstDate, formatNumber, istDayIso } from '@/shared/lib/format';
+import type { Basket, BasketHistory, BasketHistoryEntry } from '@/shared/api';
+import type { BasketVersionPage } from '@/shared/api/systemBasketTypes';
+import { formatDate, formatNumber, istDayIso } from '@/shared/lib/format';
 import { LoadingState } from '@/shared/ui';
 import { monoFontFamily } from '@/theme';
-import { membersQuery } from '../api/basketsQueries';
-import { sourceQuery, versionsQuery } from '../api/systemQueries';
+import { historyQuery } from '../api/basketsQueries';
+import { versionsQuery } from '../api/systemQueries';
 import { basketProblemText } from '../lib/errors';
 import { shortHash } from '../lib/system';
 
@@ -69,21 +69,27 @@ function Versions({ page }: { page: BasketVersionPage }) {
   );
 }
 
-/** Membership changes of an index / list basket: one entry per applied fetch, with the symbols added that day. */
-function Changes({
-  source,
-  members,
-  since,
-}: {
-  source: BasketSource;
-  members: BasketMembers | undefined;
-  since: string | null | undefined;
-}) {
-  const applied = source.fetches.filter((f) => f.outcome === 'applied');
-  const addedOn = (at: string) =>
-    (members?.items ?? [])
-      .filter((m) => istDayIso(new Date(m.validFrom)) === istDayIso(new Date(at)))
-      .map((m) => m.instrument.symbol);
+interface Day {
+  day: string;
+  added: string[];
+  removed: string[];
+}
+
+/** The history entries grouped by India day, newest first: the symbols added and removed that day. */
+function byDay(entries: readonly BasketHistoryEntry[]): Day[] {
+  const days = new Map<string, Day>();
+  for (const entry of entries) {
+    const day = istDayIso(new Date(entry.at));
+    const found = days.get(day) ?? { day, added: [], removed: [] };
+    (entry.kind === 'added' ? found.added : found.removed).push(entry.symbol);
+    days.set(day, found);
+  }
+  return [...days.values()].sort((a, b) => b.day.localeCompare(a.day));
+}
+
+/** Membership changes of an index / list basket: one entry per day with the count and symbols added and removed. */
+function Changes({ history, since }: { history: BasketHistory; since: string | null | undefined }) {
+  const days = byDay(history.items);
   return (
     <>
       {since && (
@@ -91,19 +97,22 @@ function Changes({
           {`Members are known from ${formatDate(since)}; earlier dates use these members (ISS-22).`}
         </Typography>
       )}
-      {applied.length === 0 && (
-        <Typography color="text.secondary">No membership change has been applied yet.</Typography>
-      )}
+      {days.length === 0 && <Typography color="text.secondary">No membership change has been recorded yet.</Typography>}
       <Box component="ul" aria-label="Changes" sx={{ m: 0, p: 0 }}>
-        {applied.map((f) => (
-          <Box component="li" key={f.at} sx={{ listStyle: 'none', py: 1.25, borderBottom: 1, borderColor: 'divider' }}>
-            <Typography sx={{ fontWeight: 600 }}>{formatIstDate(f.at)}</Typography>
+        {days.map((d) => (
+          <Box component="li" key={d.day} sx={{ listStyle: 'none', py: 1.25, borderBottom: 1, borderColor: 'divider' }}>
+            <Typography sx={{ fontWeight: 600 }}>{formatDate(d.day)}</Typography>
             <Typography variant="body2" color="text.secondary">
-              {`${formatNumber(f.added)} added, ${formatNumber(f.removed)} removed`}
+              {`${formatNumber(d.added.length)} added, ${formatNumber(d.removed.length)} removed`}
             </Typography>
-            {addedOn(f.at).length > 0 && (
+            {d.added.length > 0 && (
               <Typography variant="body2" sx={{ fontFamily: monoFontFamily, overflowWrap: 'anywhere' }}>
-                {`Added: ${addedOn(f.at).join(', ')}`}
+                {`Added: ${d.added.join(', ')}`}
+              </Typography>
+            )}
+            {d.removed.length > 0 && (
+              <Typography variant="body2" sx={{ fontFamily: monoFontFamily, overflowWrap: 'anywhere' }}>
+                {`Removed: ${d.removed.join(', ')}`}
               </Typography>
             )}
           </Box>
@@ -120,8 +129,7 @@ function Changes({
 export function VersionDrawer({ basket, open, onClose }: VersionDrawerProps) {
   const derived = basket.kind === 'derived';
   const versions = useQuery({ ...versionsQuery(basket.id), enabled: open && derived });
-  const source = useQuery({ ...sourceQuery(basket.id), enabled: open && !derived });
-  const members = useQuery({ ...membersQuery(basket.id, null), enabled: open && !derived });
+  const history = useQuery({ ...historyQuery(basket.id), enabled: open && !derived });
   return (
     <Drawer
       anchor="right"
@@ -144,8 +152,8 @@ export function VersionDrawer({ basket, open, onClose }: VersionDrawerProps) {
             {versions.data && <Versions page={versions.data} />}
           </QueryBody>
         ) : (
-          <QueryBody query={source} fallback="The history could not be loaded.">
-            {source.data && <Changes source={source.data} members={members.data} since={basket.membersKnownSince} />}
+          <QueryBody query={history} fallback="The history could not be loaded.">
+            {history.data && <Changes history={history.data} since={basket.membersKnownSince} />}
           </QueryBody>
         )}
       </Box>
