@@ -14,6 +14,7 @@ namespace XDrishti.Indicators;
 /// created (a <see cref="System.Collections.Frozen.FrozenSet{T}"/> is used as given, so one can be shared by many frames). A frame asked for a context feature without <see cref="Context"/>, or for <c>is_expiry_day</c> without <see cref="ExpiryDays"/>, is refused at <see cref="FeatureFrame.Create(IReadOnlyList{FeatureSpec}, FrameOptions?)"/>
 /// (<c>options.context</c>, <c>options.expiryDays</c>); an empty set is valid. Neither is needed for <c>day_of_week</c>. <see cref="ResultsDays"/> (P15-05) is the per-date series of <c>days_to_results</c> and <c>days_since_results</c> of one instrument, built by the caller as of the start of each date; a date it does not hold reads NaN,
 /// and a frame asked for either feature without it is refused on <c>options.resultsDays</c>. Neutral numbers only: this library knows nothing of filings.
+/// <see cref="RelativeStrength"/> (BK-09) holds the stored relative-strength rows of one instrument that <c>mom_rank</c>, <c>rs_vs_index</c> and <c>sector_rs</c> read as of the previous closed session; a frame asked for one without it is refused on <c>options.relativeStrength</c> (an empty set is valid: every read is NaN).
 /// </para>
 /// </summary>
 public sealed record FrameOptions(
@@ -21,7 +22,8 @@ public sealed record FrameOptions(
     int HistoryDepth = FrameOptions.DefaultHistoryDepth,
     MarketContext? Context = null,
     IReadOnlySet<DateOnly>? ExpiryDays = null,
-    IReadOnlyDictionary<DateOnly, ResultsDayValues>? ResultsDays = null)
+    IReadOnlyDictionary<DateOnly, ResultsDayValues>? ResultsDays = null,
+    RelativeStrengthDays? RelativeStrength = null)
 {
     public const int DefaultHistoryDepth = 8;
 

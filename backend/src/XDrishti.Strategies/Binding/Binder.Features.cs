@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.Strength;
 using XDrishti.Indicators;
 using XDrishti.Strategies.Lint;
 using XDrishti.Strategies.Syntax;
@@ -57,6 +58,19 @@ internal sealed partial class Binder
         {
             switch (argument)
             {
+                case PositionalArgument first when positional == 0 && info.Name == "mom_rank":
+                    if (TryBasketArgument(info, first, out var basketCode))
+                    {
+                        values[0] = basketCode;
+                        argumentSpans[0] = first.Span;
+                    }
+                    else
+                    {
+                        valid = false;
+                    }
+
+                    positional++;
+                    break;
                 case PositionalArgument value when positional < info.Parameters.Count:
                     if (TryConstantArgument(info, positional, value.Value, out var number))
                     {
@@ -117,6 +131,26 @@ internal sealed partial class Binder
         }
 
         return new BoundFeature(spec, 0, info.Name == "regime" ? BoundType.Regime : BoundType.Number, !isCall, span);
+    }
+
+    /// <summary>The basket of <c>mom_rank</c> (BK-09): a text that names one of the pre-registered baskets; anything else is refused with the names that are allowed.</summary>
+    private bool TryBasketArgument(IndicatorInfo info, PositionalArgument argument, out int code)
+    {
+        code = 0;
+        var allowed = string.Join(", ", StrengthBaskets.Names.Select(n => "\"" + n + "\""));
+        if (argument.Value is not StringLiteral text)
+        {
+            scope.Error(LintCodes.BadArguments, "Argument 1 (`basket`) of `mom_rank` is the name of a basket in quotes; the allowed baskets are " + allowed + ". " + Describe.Usage(info), argument.Span);
+            return false;
+        }
+
+        if (StrengthBaskets.TryCode(text.Value, out code))
+        {
+            return true;
+        }
+
+        scope.Error(LintCodes.BadArguments, scope.Quoted(text.Span) + " is not a basket that `mom_rank` may rank within; the allowed baskets are " + allowed + " (fixed in advance, so the choice is not tuned). " + Describe.Usage(info), text.Span);
+        return false;
     }
 
     /// <summary>A positional argument of a feature: a number known when the condition is compiled (a literal, a strategy parameter, a constant, or arithmetic on them).</summary>

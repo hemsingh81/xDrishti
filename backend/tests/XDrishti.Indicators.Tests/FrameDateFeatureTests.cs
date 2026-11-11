@@ -16,7 +16,7 @@ public sealed class FrameDateFeatureTests
     {
         Should.Throw<ArgumentOutOfRangeException>(() => new DateFeature((DateFeatureKind)99));
         Should.Throw<ArgumentOutOfRangeException>(() => new DateFeature((DateFeatureKind)(-1)));
-        Enum.GetValues<DateFeatureKind>().Length.ShouldBe(16);
+        Enum.GetValues<DateFeatureKind>().Length.ShouldBe(19);
         foreach (var kind in Enum.GetValues<DateFeatureKind>())
         {
             new DateFeature(kind).Kind.ShouldBe(kind);

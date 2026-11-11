@@ -28,8 +28,8 @@ public sealed class StoredStrategiesLintTests
     }
 
     [Fact]
-    public void There_are_fifteen_stored_strategies()
+    public void There_are_sixteen_stored_strategies()
     {
-        Ids.Count.ShouldBe(15);
+        Ids.Count.ShouldBe(16);
     }
 }

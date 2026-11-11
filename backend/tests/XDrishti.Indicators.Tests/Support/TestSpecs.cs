@@ -35,6 +35,9 @@ internal static class TestSpecs
     /// <summary>The two results-event features (P15-05): date-driven, 1m only, they read the per-date series of <see cref="FrameOptions.ResultsDays"/>.</summary>
     public static IReadOnlyList<string> ResultsNames { get; } = ["days_to_results", "days_since_results", "results_sue_q", "results_car3_q"];
 
+    /// <summary>The three relative-strength features (BK-09): date-driven, 1m only, with parameters, reading <see cref="FrameOptions.RelativeStrength"/>.</summary>
+    public static IReadOnlyList<string> RsNames { get; } = ["mom_rank", "rs_vs_index", "sector_rs"];
+
     /// <summary>The ten names that read the market context (all of <see cref="ContextNames"/> but the two calendar ones).</summary>
     public static IReadOnlyList<string> MarketContextNames { get; } = [.. ContextNames.Skip(2)];
 

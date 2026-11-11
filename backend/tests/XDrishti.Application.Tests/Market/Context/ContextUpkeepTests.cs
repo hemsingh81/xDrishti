@@ -3,6 +3,7 @@ using Microsoft.Extensions.Time.Testing;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Bars.Pipeline;
 using XDrishti.Application.Market.Context;
+using XDrishti.Application.Market.Strength;
 using XDrishti.Application.Tests.Market.Bars;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Bars;
@@ -103,5 +104,28 @@ public sealed class ContextUpkeepTests
 
         breadth.Runs.ShouldBe(1);
         job.Warnings.ShouldBe(["Market context: The context is broken."]);
+    }
+
+    private sealed class FixedStrength(Result<RelativeStrengthComputed> answer) : ICommandHandler<ComputeRelativeStrengthCommand, RelativeStrengthComputed>
+    {
+        public int Runs { get; private set; }
+
+        public ValueTask<Result<RelativeStrengthComputed>> HandleAsync(ComputeRelativeStrengthCommand command, CancellationToken cancellationToken)
+        {
+            Runs++;
+            return ValueTask.FromResult(answer);
+        }
+    }
+
+    [Fact]
+    public async Task The_relative_strength_step_runs_after_the_breadth_and_a_failure_of_it_is_a_warning_of_its_own()
+    {
+        var (reporter, job) = Reporter();
+        var strength = new FixedStrength(Result.Failure<RelativeStrengthComputed>(Error.Validation("strength.broken", "Strength is broken.")));
+
+        await new ContextUpkeep(new OkRefresh(), new FixedBreadth(), NullLogger<ContextUpkeep>.Instance, strength).RunAsync(reporter, Ct);
+
+        strength.Runs.ShouldBe(1);
+        job.Warnings.ShouldBe(["Relative strength: Strength is broken."]);
     }
 }

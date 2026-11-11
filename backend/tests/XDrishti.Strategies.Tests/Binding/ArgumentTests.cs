@@ -12,7 +12,7 @@ namespace XDrishti.Strategies.Tests.Binding;
 /// </summary>
 public sealed class ArgumentTests
 {
-    public static TheoryData<string> NamesWithParameters { get; } = [.. IndicatorCatalog.All.Where(i => i.Parameters.Count > 0).Select(i => i.Name)];
+    public static TheoryData<string> NamesWithParameters { get; } = [.. IndicatorCatalog.All.Where(i => i.Parameters.Count > 0 && !i.RequiresRelativeStrength).Select(i => i.Name)];
 
     public static TheoryData<string> NamesWithoutParameters { get; } = [.. IndicatorCatalog.All.Where(i => i.Parameters.Count == 0).Select(i => i.Name)];
 

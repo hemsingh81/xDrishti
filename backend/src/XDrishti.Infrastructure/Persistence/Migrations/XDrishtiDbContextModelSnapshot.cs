@@ -5549,6 +5549,115 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     NpgsqlEntityTypeBuilderExtensions.IsUnlogged(b, true);
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.Strength.RelativeStrengthRecord", b =>
+                {
+                    b.Property<DateOnly>("AsOf")
+                        .HasColumnType("date")
+                        .HasColumnName("as_of");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<Guid>("BasketId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("basket_id");
+
+                    b.Property<int>("Lookback")
+                        .HasColumnType("integer")
+                        .HasColumnName("lookback");
+
+                    b.Property<int>("Skip")
+                        .HasColumnType("integer")
+                        .HasColumnName("skip");
+
+                    b.Property<string>("MembershipBasis")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("membership_basis");
+
+                    b.Property<int>("NRanked")
+                        .HasColumnType("integer")
+                        .HasColumnName("n_ranked");
+
+                    b.Property<double?>("PctRank")
+                        .HasColumnType("double precision")
+                        .HasColumnName("pct_rank");
+
+                    b.Property<double?>("Score")
+                        .HasColumnType("double precision")
+                        .HasColumnName("score");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("state");
+
+                    b.HasKey("AsOf", "InstrumentId", "BasketId", "Lookback", "Skip")
+                        .HasName("pk_relative_strength_daily");
+
+                    b.HasIndex("BasketId", "AsOf")
+                        .HasDatabaseName("ix_relative_strength_daily_basket_id_as_of");
+
+                    b.HasIndex("InstrumentId", "AsOf")
+                        .HasDatabaseName("ix_relative_strength_daily_instrument_id_as_of");
+
+                    b.ToTable("relative_strength_daily", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_relative_strength_daily_basis", "membership_basis IN ('dated', 'single_snapshot', 'none')");
+
+                            t.HasCheckConstraint("ck_relative_strength_daily_rank", "pct_rank IS NULL OR (pct_rank >= 0 AND pct_rank <= 1)");
+
+                            t.HasCheckConstraint("ck_relative_strength_daily_state", "state IN ('value', 'insufficient', 'not_evaluable', 'unavailable', 'short_history', 'corporate_action_unresolved')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.Strength.SectorStrengthRecord", b =>
+                {
+                    b.Property<DateOnly>("AsOf")
+                        .HasColumnType("date")
+                        .HasColumnName("as_of");
+
+                    b.Property<string>("Sector")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("sector");
+
+                    b.Property<int>("WindowSessions")
+                        .HasColumnType("integer")
+                        .HasColumnName("window_sessions");
+
+                    b.Property<int>("NMembers")
+                        .HasColumnType("integer")
+                        .HasColumnName("n_members");
+
+                    b.Property<int?>("Rank")
+                        .HasColumnType("integer")
+                        .HasColumnName("rank");
+
+                    b.Property<double?>("Ret")
+                        .HasColumnType("double precision")
+                        .HasColumnName("ret");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("state");
+
+                    b.HasKey("AsOf", "Sector", "WindowSessions")
+                        .HasName("pk_sector_strength_daily");
+
+                    b.ToTable("sector_strength_daily", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_sector_strength_daily_rank", "rank IS NULL OR rank >= 1");
+
+                            t.HasCheckConstraint("ck_sector_strength_daily_state", "state IN ('value', 'insufficient', 'not_evaluable', 'unavailable', 'short_history', 'corporate_action_unresolved')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -11549,6 +11658,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_live_quotes_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.Strength.RelativeStrengthRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Market.InstrumentRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstrumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_relative_strength_daily_instruments_instrument_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Market.SystemBaskets.BasketFetchRecord", b =>

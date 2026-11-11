@@ -68,6 +68,7 @@ public static class CompilerWarmup
         new("is_expiry_day == 1 and gap_pct > 0.5 and today.open < today.high and today.low > 0"),
         new("not (days_to_results <= 2) and days_since_results >= 1"),
         new("days_since_results == 0 and results_sue_q == 5 and results_car3_q >= 2 and results_car3_q <= 4"),
+        new("mom_rank(\"Nifty 100\", 126, 21) >= 0.67 and sector_rs(63) <= 3 and rs_vs_index(20) > 0"),
         new("prev_day.open > 0 and prev_day.high > prev_day.low and prev_day.close > 0 and prev_day.volume > 0"),
 
         // the rest of the catalog
@@ -157,7 +158,7 @@ public static class CompilerWarmup
         var context = MarketContext.Create([]);
         if (context.IsSuccess)
         {
-            var options = new FrameOptions { HistoryDepth = plan.HistoryDepth, Context = context.Value, ExpiryDays = new HashSet<DateOnly>(), ResultsDays = new Dictionary<DateOnly, ResultsDayValues>() };
+            var options = new FrameOptions { HistoryDepth = plan.HistoryDepth, Context = context.Value, ExpiryDays = new HashSet<DateOnly>(), ResultsDays = new Dictionary<DateOnly, ResultsDayValues>(), RelativeStrength = RelativeStrengthDays.Empty };
             var frame = FeatureFrame.Create(plan.Features, options);
             if (frame.IsSuccess)
             {
@@ -197,7 +198,7 @@ public static class CompilerWarmup
                 continue;
             }
 
-            var options = new FrameOptions { HistoryDepth = side.HistoryDepth, Context = context.Value, ExpiryDays = new HashSet<DateOnly>(), ResultsDays = new Dictionary<DateOnly, ResultsDayValues>() };
+            var options = new FrameOptions { HistoryDepth = side.HistoryDepth, Context = context.Value, ExpiryDays = new HashSet<DateOnly>(), ResultsDays = new Dictionary<DateOnly, ResultsDayValues>(), RelativeStrength = RelativeStrengthDays.Empty };
             var frame = FeatureFrame.Create(side.Features, options);
             if (frame.IsSuccess)
             {

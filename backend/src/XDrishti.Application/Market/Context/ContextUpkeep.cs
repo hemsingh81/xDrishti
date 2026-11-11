@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Bars.Pipeline;
+using XDrishti.Application.Market.Strength;
 
 namespace XDrishti.Application.Market.Context;
 
@@ -8,7 +9,8 @@ namespace XDrishti.Application.Market.Context;
 internal sealed class ContextUpkeep(
     ICommandHandler<RefreshContextCommand, ContextRefreshed> refresh,
     ICommandHandler<ComputeBreadthCommand, BreadthComputed> breadth,
-    ILogger<ContextUpkeep> logger) : IContextUpkeep
+    ILogger<ContextUpkeep> logger,
+    ICommandHandler<ComputeRelativeStrengthCommand, RelativeStrengthComputed>? strength = null) : IContextUpkeep
 {
     private const string Crashed = "The market context could not be updated. See the API log.";
 
@@ -28,6 +30,12 @@ internal sealed class ContextUpkeep(
             if (computed.IsFailure)
             {
                 await reporter.WarnAsync("Breadth: " + computed.Error.Message, cancellationToken);
+            }
+
+            // The relative strength of the sessions that have none (BK-09): insert-once, OFF by default; a failure is a warning of its own and the rows of earlier days stay.
+            if (strength is not null && await strength.HandleAsync(new ComputeRelativeStrengthCommand(), cancellationToken) is { IsFailure: true } ranked)
+            {
+                await reporter.WarnAsync("Relative strength: " + ranked.Error.Message, cancellationToken);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

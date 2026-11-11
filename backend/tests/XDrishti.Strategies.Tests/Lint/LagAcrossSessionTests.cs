@@ -73,7 +73,7 @@ public sealed class LagAcrossSessionTests
     [Fact]
     public void The_names_written_out_here_are_twelve_of_the_catalogs_sixty()
     {
-        AllFeatureForms.Forms.Count.ShouldBe(61);
+        AllFeatureForms.Forms.Count.ShouldBe(64);
         Restarting.Distinct().Count().ShouldBe(12);
         Restarting.ShouldAllBe(n => AllFeatureForms.Forms.ContainsKey(n));
     }

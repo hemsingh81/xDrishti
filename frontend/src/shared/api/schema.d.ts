@@ -4820,6 +4820,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/market/relative-strength': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored relative-strength rows, newest session first, at most 500: per share and pre-registered basket the volatility-adjusted momentum score and its percent rank (0 to 1) for the lookbacks 126 and 252 skipping the latest 21 sessions, with the number ranked, the state (value, insufficient, not_evaluable, unavailable, short_history, corporate_action_unresolved) and the membership basis (dated, or single_snapshot with survivorship). A rank is a number only for a value. Takes basket (an id or one of the names Nifty 50, Nifty 100, F&O stocks, Most liquid) and asOf (yyyy-MM-dd, the last closed session the row is as of). Read only; the rows are written once by the daily step, which is off until Market:RelativeStrength:Enabled. 400 market.relative_strength.invalid. */
+    get: operations['GetRelativeStrength'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/reports/phase-check': {
     parameters: {
       query?: never;
@@ -20530,6 +20547,33 @@ export interface components {
       window: number;
       return: components['schemas']['MetricView'];
     };
+    /** @description One stored row. `basketId` is the empty id for the index-relative row (lookback 20; `score` is percentage points). */
+    RelativeStrengthRowView: {
+      /** Format: date */
+      asOf: string;
+      /** Format: uuid */
+      instrumentId: string;
+      /** Format: uuid */
+      basketId: string;
+      /** Format: int32 */
+      lookback: number;
+      /** Format: int32 */
+      skip: number;
+      /** Format: double */
+      score: null | number;
+      /** Format: double */
+      pctRank: null | number;
+      /** Format: int32 */
+      nRanked: number;
+      state: string;
+      membershipBasis: string;
+    };
+    /** @description The rows and the cap they were cut at. */
+    RelativeStrengthView: {
+      items: components['schemas']['RelativeStrengthRowView'][];
+      /** Format: int32 */
+      cap: number;
+    };
     /** @description The owner's release of a halt: a reason and the password, checked afresh for this act. */
     ReleaseHaltRequest: {
       reason: null | string;
@@ -36114,6 +36158,38 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetRelativeStrength: {
+    parameters: {
+      query?: {
+        basket?: string;
+        asOf?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RelativeStrengthView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
         headers: {
           [name: string]: unknown;
         };
