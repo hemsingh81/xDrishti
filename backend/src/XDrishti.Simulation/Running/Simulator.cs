@@ -2,6 +2,7 @@ using XDrishti.Domain.Common;
 using XDrishti.Domain.Filings;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
+using XDrishti.Domain.Market.Strength;
 using XDrishti.Domain.Research;
 using XDrishti.Simulation.Scanning;
 using XDrishti.Simulation.Walking;
@@ -68,6 +69,9 @@ public sealed class Simulator
 
     /// <summary>Some side names <c>results_sue_q</c> or <c>results_car3_q</c> (P15-09): the results-days inputs must also carry the surprise numbers, or the quintiles read NaN and nothing enters (a replay skips such an instrument first).</summary>
     public bool ReadsSurprise => _sides.Any(s => ResultsDaysScan.ReadsSurprise(s.Compiled));
+
+    /// <summary>Some side names <c>mom_rank</c>, <c>rs_vs_index</c> or <c>sector_rs</c> (BK-09): <see cref="Run"/> needs the stored rows of the instrument and refuses without them.</summary>
+    public bool ReadsRelativeStrength => _sides.Any(s => RelativeStrengthScan.Reads(s.Compiled));
 
     /// <summary>The sides this simulator runs, Buy first.</summary>
     public IReadOnlyList<Side> Sides => _sides.Select(s => s.Compiled.Side).ToList().AsReadOnly();
@@ -173,13 +177,14 @@ public sealed class Simulator
     /// <param name="events">The results-calendar snapshot the filter <c>not_event_day</c> reads (P15-06); required, with a <paramref name="calendar"/>, when a side names the filter (<see cref="ReadsEvents"/>), ignored otherwise.</param>
     /// <param name="resultsDays">What the features <c>days_to_results</c> and <c>days_since_results</c> read (P15-05); required, with a <paramref name="calendar"/>, when a side names either (<see cref="ReadsResultsDays"/>), ignored otherwise.</param>
     /// <param name="turnoverOn">The 20-day median traded value in rupees on an entry date (CF-05, ADR 0230); read when a side names <c>min_turnover</c>; null or a null answer blocks the entry.</param>
+    /// <param name="relativeStrength">The stored relative-strength rows of the instrument that <c>mom_rank</c>, <c>rs_vs_index</c> and <c>sector_rs</c> read (BK-09); required when a side names one.</param>
     /// <param name="tierOn">The liquidity tier of the instrument on an entry date (CF-05, D2); read only when the fill rules ask for conservative slippage, and null then excludes every trade.</param>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null) =>
-        RunUntilCancelled(instrument, bars, tick, calendar, quantity, context, events, resultsDays, tierOn, turnoverOn, CancellationToken.None);
+    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null, ScanContext? context = null, EventCalendarSnapshot? events = null, ResultsDayInputs? resultsDays = null, Func<DateOnly, LiquidityTier>? tierOn = null, Func<DateOnly, decimal?>? turnoverOn = null, RelativeStrengthInputs? relativeStrength = null) =>
+        RunUntilCancelled(instrument, bars, tick, calendar, quantity, context, events, resultsDays, tierOn, turnoverOn, CancellationToken.None, relativeStrength);
 
     /// <summary>As <c>Run</c>, looking at <paramref name="cancellationToken"/> every few thousand minutes of the scan; a stop raises <see cref="OperationCanceledException"/> (AU-12). A separate overload so that existing callers are unchanged.</summary>
-    public Result<SimulationResult> RunUntilCancelled(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, ScanContext? context, EventCalendarSnapshot? events, ResultsDayInputs? resultsDays, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, CancellationToken cancellationToken)
+    public Result<SimulationResult> RunUntilCancelled(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, ScanContext? context, EventCalendarSnapshot? events, ResultsDayInputs? resultsDays, Func<DateOnly, LiquidityTier>? tierOn, Func<DateOnly, decimal?>? turnoverOn, CancellationToken cancellationToken, RelativeStrengthInputs? relativeStrength = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
@@ -191,6 +196,11 @@ public sealed class Simulator
         if (ReadsContext && context is null)
         {
             return Result.Failure<SimulationResult>(ContextNotGivenError());
+        }
+
+        if (ReadsRelativeStrength && relativeStrength is null)
+        {
+            return Result.Failure<SimulationResult>(Error.Validation(SimulatorCodes.FilterNotAvailable, "The strategy reads mom_rank, rs_vs_index or sector_rs and no stored relative-strength rows were given (BK-09)."));
         }
 
         if (ReadsEvents && (events is null || calendar is null))
@@ -207,9 +217,10 @@ public sealed class Simulator
         var scans = new List<ScanCounters>(_sides.Length);
         var walk = WalkCounters.Empty;
         var series = ReadsResultsDays ? ResultsDaysScan.For(resultsDays!, instrument.Id, bars, calendar!) : null;
+        var strength = relativeStrength is null ? null : RelativeStrengthScan.For(relativeStrength);
         foreach (var side in _sides)
         {
-            var created = EntryScanner.Create(side.Compiled, instrument, calendar, context, series);
+            var created = EntryScanner.Create(side.Compiled, instrument, calendar, context, series, strength);
             if (created.IsFailure)
             {
                 return Result.Failure<SimulationResult>(created.Error);

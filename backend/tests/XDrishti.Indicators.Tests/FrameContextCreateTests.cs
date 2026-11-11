@@ -265,6 +265,6 @@ public sealed class FrameContextCreateTests
             info.Create(info.DefaultSpec()).ShouldBeOfType<DateFeature>();
         }
 
-        IndicatorCatalog.All.Where(i => i.DateDriven).Select(i => i.Name).ShouldBe([.. AllNames, .. TestSpecs.ResultsNames]);
+        IndicatorCatalog.All.Where(i => i.DateDriven).Select(i => i.Name).ShouldBe([.. AllNames, .. TestSpecs.ResultsNames, .. TestSpecs.RsNames]);
     }
 }

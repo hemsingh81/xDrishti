@@ -78,6 +78,27 @@ public static class SimExportJson
     /// </summary>
     private static void WithoutZeroTierExcluded(JsonTypeInfo typeInfo)
     {
+        if (typeInfo.Type == typeof(ScanCounters))
+        {
+            // BK-09: the feature_unknown counter exists only for a run that reads the stored relative-strength features, so every other record text and hash is as before
+            foreach (var property in typeInfo.Properties.Where(p => string.Equals(p.Name, "feature_unknown", StringComparison.Ordinal)))
+            {
+                property.ShouldSerialize = static (_, value) => value is not 0L;
+            }
+
+            return;
+        }
+
+        if (typeInfo.Type == typeof(SimulationRun))
+        {
+            foreach (var property in typeInfo.Properties.Where(p => string.Equals(p.Name, "relative_strength", StringComparison.Ordinal)))
+            {
+                property.ShouldSerialize = static (_, value) => value is not null;
+            }
+
+            return;
+        }
+
         if (typeInfo.Type != typeof(RunFates) && typeInfo.Type != typeof(WalkCounters))
         {
             return;

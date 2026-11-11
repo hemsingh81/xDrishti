@@ -65,6 +65,12 @@ internal sealed class RunFixture
     /// <summary>The CF-05 settings given to the handler; null, as in a host without them (the defaults).</summary>
     public XDrishti.Domain.Confidence.CostStressOptions? CostStress { get; set; }
 
+    /// <summary>The stored relative-strength rows a run reads (BK-09).</summary>
+    public XDrishti.Application.Abstractions.Market.Strength.IRelativeStrengthStore Strength { get; } = Substitute.For<XDrishti.Application.Abstractions.Market.Strength.IRelativeStrengthStore>();
+
+    /// <summary>The sectors of the instruments (none).</summary>
+    public XDrishti.Application.Abstractions.Portfolio.IHoldingClassifications Classifications { get; } = Substitute.For<XDrishti.Application.Abstractions.Portfolio.IHoldingClassifications>();
+
     public FakeTimeProvider Time { get; } = new();
 
     public StructuredLogger<RunSimulationHandler> Log { get; } = new();
@@ -78,9 +84,12 @@ internal sealed class RunFixture
         Actions.ListCsvAdjustedThroughAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns((IReadOnlyDictionary<Guid, DateOnly>)CsvThrough);
         Calendar.GetAsync(Arg.Any<CancellationToken>()).Returns(new TradingCalendar());
         Store.ForbidMerge = true;
+        Strength.ForInstrumentAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns((IReadOnlyList<XDrishti.Application.Abstractions.Market.Strength.StrengthRow>)[]);
+        Strength.SectorRowsAsync(Arg.Any<string>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns((IReadOnlyList<XDrishti.Application.Abstractions.Market.Strength.SectorRow>)[]);
+        Classifications.SectorsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns((IReadOnlyDictionary<Guid, string>)new Dictionary<Guid, string>());
     }
 
-    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, EventSnapshots, FilingTimes, SurpriseReader, Time, Log, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IRandomEntryEngine>(), NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IPlaceboEngine>(), EntryTiers, CostStress is null ? null : new Settings(CostStress));
+    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, ContextDays, EventSnapshots, FilingTimes, SurpriseReader, Time, Log, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IRandomEntryEngine>(), NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Research.IPlaceboEngine>(), EntryTiers, CostStress is null ? null : new Settings(CostStress), new XDrishti.Application.Market.Strength.RelativeStrengthRunReader(Strength, Baskets, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.Baskets.IDerivedVersionStore>(), Classifications));
 
     /// <summary>Registers an instrument with a row (the tick is in paise, as the master has it) and its stored bars.</summary>
     public Guid Add(string symbol, IEnumerable<Bar>? bars = null, decimal? tickPaise = 5m, Guid? id = null)

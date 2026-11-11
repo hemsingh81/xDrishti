@@ -69,6 +69,9 @@ internal static class AllFeatureForms
         ["days_since_results"] = "days_since_results",
         ["results_sue_q"] = "results_sue_q",
         ["results_car3_q"] = "results_car3_q",
+        ["mom_rank"] = "mom_rank(\"Nifty 100\", 126, 21)",
+        ["rs_vs_index"] = "rs_vs_index(20)",
+        ["sector_rs"] = "sector_rs(63)",
     };
 
     /// <summary>A whole condition that reads the form: a comparison with 0 (the regime, which is compared with a name or a code, with 1).</summary>

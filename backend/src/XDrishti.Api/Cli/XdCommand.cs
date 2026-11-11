@@ -279,6 +279,11 @@ internal static class XdCommand
             return await DataEodCommand.RunAsync([.. args.Skip(1)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "market" && args[1] == "rs")
+        {
+            return await MarketRsCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "filings" && args[1] == "extract")
         {
             return await FilingsExtractCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);

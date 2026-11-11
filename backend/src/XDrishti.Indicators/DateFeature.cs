@@ -42,6 +42,14 @@ public sealed class DateFeature : IIndicator
 
     private readonly IReadOnlyDictionary<DateOnly, ResultsDayValues>? _resultsDays;
 
+    private readonly RelativeStrengthDays? _relativeStrength;
+
+    private readonly int _p1;
+
+    private readonly int _p2;
+
+    private readonly int _p3;
+
     private readonly int _warmUp;
 
     private int _cursor;
@@ -57,7 +65,11 @@ public sealed class DateFeature : IIndicator
     /// <param name="expiryDays">The India dates that are expiry days, for <see cref="DateFeatureKind.ExpiryDay"/>; none gives a feature that is never ready. The set is read as given, so it must not change while the
     /// feature is in use (<see cref="FeatureFrame"/> takes its own copy).</param>
     /// <param name="resultsDays">The per-date results numbers of the instrument, for <see cref="DateFeatureKind.DaysToResults"/> and <see cref="DateFeatureKind.DaysSinceResults"/>; none, or a date it lacks, reads NaN.</param>
-    public DateFeature(DateFeatureKind kind, MarketContext? context = null, IReadOnlySet<DateOnly>? expiryDays = null, IReadOnlyDictionary<DateOnly, ResultsDayValues>? resultsDays = null)
+    /// <param name="relativeStrength">The stored relative-strength rows of the instrument, for <see cref="DateFeatureKind.MomRank"/>, <see cref="DateFeatureKind.RsVsIndex"/> and <see cref="DateFeatureKind.SectorRs"/> (BK-09); none reads NaN.</param>
+    /// <param name="p1">The first parameter of the feature spec (the basket code, the window).</param>
+    /// <param name="p2">The second parameter of the feature spec (the lookback).</param>
+    /// <param name="p3">The third parameter of the feature spec (the skip).</param>
+    public DateFeature(DateFeatureKind kind, MarketContext? context = null, IReadOnlySet<DateOnly>? expiryDays = null, IReadOnlyDictionary<DateOnly, ResultsDayValues>? resultsDays = null, RelativeStrengthDays? relativeStrength = null, int p1 = 0, int p2 = 0, int p3 = 0)
     {
         if (!Enum.IsDefined(kind))
         {
@@ -68,6 +80,10 @@ public sealed class DateFeature : IIndicator
         _context = context;
         _expiryDays = expiryDays;
         _resultsDays = resultsDays;
+        _relativeStrength = relativeStrength;
+        _p1 = p1;
+        _p2 = p2;
+        _p3 = p3;
         _warmUp = WarmUpDays(kind, context?.Options ?? DefaultOptions);
     }
 
@@ -103,7 +119,7 @@ public sealed class DateFeature : IIndicator
     }
 
     /// <summary>Whether the feature reads the <see cref="MarketContext"/> (everything but the two calendar features): the catalog sets <see cref="IndicatorInfo.RequiresContext"/> from it.</summary>
-    internal static bool ReadsContext(DateFeatureKind kind) => kind is not (DateFeatureKind.Weekday or DateFeatureKind.ExpiryDay or DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults or DateFeatureKind.ResultsSueQuintile or DateFeatureKind.ResultsCar3Quintile);
+    internal static bool ReadsContext(DateFeatureKind kind) => kind is not (DateFeatureKind.Weekday or DateFeatureKind.ExpiryDay or DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults or DateFeatureKind.ResultsSueQuintile or DateFeatureKind.ResultsCar3Quintile or DateFeatureKind.MomRank or DateFeatureKind.RsVsIndex or DateFeatureKind.SectorRs);
 
     /// <summary>
     /// The context days that must precede the date for the feature to be ready, for a context with no gaps: the average, its slope and the ADX for the trend (the later of the two), the ATR and a full window of its
@@ -115,7 +131,7 @@ public sealed class DateFeature : IIndicator
         var volatility = options.AtrPeriod + options.PercentileWindow - 1;
         return kind switch
         {
-            DateFeatureKind.Weekday or DateFeatureKind.ExpiryDay or DateFeatureKind.Vix or DateFeatureKind.Breadth or DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults or DateFeatureKind.ResultsSueQuintile or DateFeatureKind.ResultsCar3Quintile => 1,
+            DateFeatureKind.Weekday or DateFeatureKind.ExpiryDay or DateFeatureKind.Vix or DateFeatureKind.Breadth or DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults or DateFeatureKind.ResultsSueQuintile or DateFeatureKind.ResultsCar3Quintile or DateFeatureKind.MomRank or DateFeatureKind.RsVsIndex or DateFeatureKind.SectorRs => 1,
             DateFeatureKind.VixChg => 2,
             DateFeatureKind.VixPct => options.PercentileWindow,
             DateFeatureKind.IndexAdx => 2 * options.AdxPeriod,
@@ -144,6 +160,12 @@ public sealed class DateFeature : IIndicator
         if (_kind == DateFeatureKind.ExpiryDay)
         {
             return _expiryDays is null ? double.NaN : _expiryDays.Contains(date) ? 1.0 : 0.0;
+        }
+
+        if (_kind is DateFeatureKind.MomRank or DateFeatureKind.RsVsIndex or DateFeatureKind.SectorRs)
+        {
+            // the newest stored row strictly before the date: the previous closed session, never the date itself (no look-ahead, and no second shift on top of the as_of of the row)
+            return _relativeStrength?.Before(_kind, _p1, _p2, _p3, date) ?? double.NaN;
         }
 
         if (_kind is DateFeatureKind.DaysToResults or DateFeatureKind.DaysSinceResults or DateFeatureKind.ResultsSueQuintile or DateFeatureKind.ResultsCar3Quintile)

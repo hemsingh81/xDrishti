@@ -9,6 +9,7 @@ namespace XDrishti.Domain.Research;
 /// <c>Candidates + LaterTriggers + BlockedByInvalidation + UnknownInvalidation + StopNotReady</c>; the four counts of a setup or trigger condition add up to <c>WindowSteps</c>, those of an invalidate condition to
 /// <c>DecisionSteps − StaleBucketSteps</c>. <c>FullyReadySteps</c> are the window steps at which every feature of every setup and trigger condition had a value at lag 0, whatever the result of the condition.
 /// </para>
+/// <para><c>FeatureUnknown</c> (BK-09): the decision steps (counted once each, however many conditions are unknown) at which a setup, trigger or invalidate condition that names a stored relative-strength feature (<c>mom_rank</c>, <c>rs_vs_index</c>, <c>sector_rs</c>) was not true because a feature was unknown (insufficient, unavailable, no row yet): a <c>feature_unknown</c> step, never a pass. Zero for any other strategy.</para>
 /// </summary>
 public sealed record ScanCounters(
     Side Side,
@@ -27,7 +28,8 @@ public sealed record ScanCounters(
     long InvalidatedDays,
     long StopNotReady,
     long UnknownInvalidation,
-    IReadOnlyList<ConditionCounter> Conditions)
+    IReadOnlyList<ConditionCounter> Conditions,
+    long FeatureUnknown = 0)
 {
     /// <summary>The counters of a side that has seen nothing.</summary>
     public static ScanCounters Empty(Side side) => new(side, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, []);
@@ -77,7 +79,8 @@ public sealed record ScanCounters(
             InvalidatedDays + other.InvalidatedDays,
             StopNotReady + other.StopNotReady,
             UnknownInvalidation + other.UnknownInvalidation,
-            merged.AsReadOnly());
+            merged.AsReadOnly(),
+            FeatureUnknown + other.FeatureUnknown);
     }
 
     /// <summary>Value equality: every figure, and the conditions in order.</summary>
@@ -87,7 +90,7 @@ public sealed record ScanCounters(
         && DecisionSteps == other.DecisionSteps && LostDecisions == other.LostDecisions && StaleBucketSteps == other.StaleBucketSteps
         && OutOfWindowSteps == other.OutOfWindowSteps && WindowSteps == other.WindowSteps && FullyReadySteps == other.FullyReadySteps
         && Candidates == other.Candidates && LaterTriggers == other.LaterTriggers && BlockedByInvalidation == other.BlockedByInvalidation
-        && InvalidatedDays == other.InvalidatedDays && StopNotReady == other.StopNotReady && UnknownInvalidation == other.UnknownInvalidation
+        && InvalidatedDays == other.InvalidatedDays && StopNotReady == other.StopNotReady && UnknownInvalidation == other.UnknownInvalidation && FeatureUnknown == other.FeatureUnknown
         && Conditions.SequenceEqual(other.Conditions);
 
     /// <summary>A hash consistent with <see cref="Equals(ScanCounters?)"/>.</summary>

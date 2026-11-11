@@ -55,6 +55,9 @@ public sealed class PreparedStrategy
     /// <summary>The strategy names <c>results_sue_q</c> or <c>results_car3_q</c> (P15-09): the replay needs the surprise numbers of the run and skips with <c>event_calendar_unavailable</c> when it has none.</summary>
     public bool ReadsSurprise => Simulator.ReadsSurprise;
 
+    /// <summary>The strategy names <c>mom_rank</c>, <c>rs_vs_index</c> or <c>sector_rs</c> (BK-09): the replay needs the stored rows of the instrument and skips with <c>event_calendar_unavailable</c> when it has none.</summary>
+    public bool ReadsRelativeStrength => Simulator.ReadsRelativeStrength;
+
     internal Simulator Simulator { get; }
 
     /// <summary>The strategy is a swing one: its positions are held across sessions and a run gates them (a comparison does not, P4-05 D4).</summary>

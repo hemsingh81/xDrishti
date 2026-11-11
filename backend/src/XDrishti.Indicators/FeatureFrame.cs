@@ -155,6 +155,7 @@ public sealed class FeatureFrame
         List<string>? needContext = null;
         List<string>? needExpiryDays = null;
         List<string>? needResultsDays = null;
+        List<string>? needRelativeStrength = null;
         for (var i = 0; i < specs.Count; i++)
         {
             var spec = specs[i];
@@ -181,6 +182,11 @@ public sealed class FeatureFrame
             {
                 Note(ref needResultsDays, info.Name);
             }
+
+            if (info.RequiresRelativeStrength && options.RelativeStrength is null)
+            {
+                Note(ref needRelativeStrength, info.Name);
+            }
         }
 
         if (needContext is not null)
@@ -196,6 +202,11 @@ public sealed class FeatureFrame
         if (needResultsDays is not null)
         {
             errors.Add("options.resultsDays", "The results-event days are needed by " + NamesText(needResultsDays) + "; give FrameOptions.ResultsDays (an empty series is allowed).");
+        }
+
+        if (needRelativeStrength is not null)
+        {
+            errors.Add("options.relativeStrength", "The stored relative-strength rows are needed by " + NamesText(needRelativeStrength) + "; give FrameOptions.RelativeStrength (an empty set is allowed).");
         }
 
         if (errors.HasErrors)
@@ -234,7 +245,7 @@ public sealed class FeatureFrame
                 }
 
                 placed = (canonical.Timeframe, list.Count);
-                list.Add(info.CreateWith(canonical, options.Context, expiryDays, options.ResultsDays));
+                list.Add(info.CreateWith(canonical, options.Context, expiryDays, options.ResultsDays, options.RelativeStrength));
                 shared.Add(canonical, placed);
                 if (!info.DateDriven && info.RestartsEachSession(canonical))
                 {

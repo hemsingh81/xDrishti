@@ -73,7 +73,8 @@ public sealed class WarmUpPropertyTests
     private static TheoryData<string, Timeframe> Build()
     {
         var data = new TheoryData<string, Timeframe>();
-        foreach (var info in IndicatorCatalog.All)
+        // the three relative-strength features (BK-09) read stored rows of the previous session: FrameRelativeStrengthTests and RelativeStrengthBindingTests cover their readiness
+        foreach (var info in IndicatorCatalog.All.Where(i => !i.RequiresRelativeStrength))
         {
             foreach (var timeframe in Timeframes.All)
             {

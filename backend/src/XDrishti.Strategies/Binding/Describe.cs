@@ -1,5 +1,6 @@
 using System.Globalization;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.Strength;
 using XDrishti.Indicators;
 using XDrishti.Strategies.Syntax;
 
@@ -73,7 +74,11 @@ internal static class Describe
     public static string Usage(IndicatorInfo info)
     {
         var items = info.Parameters
-            .Select(p => "`" + p.Name + "` (" + (p.Kind == ParameterKind.Whole ? "a whole number" : "a number") + " from " + Number(p.Min) + " to " + Number(p.Max) + ", default " + Number(p.Default) + ")")
+            .Select(p => "`" + p.Name + "` (" + (p.Name == "basket"
+                ? "one of " + string.Join(", ", StrengthBaskets.Names.Select(n => "\"" + n + "\"")) + ", default \"" + StrengthBaskets.NameOf((int)p.Default) + "\""
+                : p.Allowed is { } allowed
+                ? "one of " + string.Join(", ", allowed.Select(Number)) + ", default " + Number(p.Default)
+                : (p.Kind == ParameterKind.Whole ? "a whole number" : "a number") + " from " + Number(p.Min) + " to " + Number(p.Max) + ", default " + Number(p.Default)) + ")")
             .ToList();
         if (info.UsesSource)
         {

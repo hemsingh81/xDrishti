@@ -152,6 +152,8 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine, IRandomEntryE
 
         public bool ReadsSurprise => Strategy.ReadsSurprise;
 
+        public bool ReadsRelativeStrength => Strategy.ReadsRelativeStrength;
+
         public IReadOnlyList<FieldError> Warnings { get; } = warnings;
     }
 }

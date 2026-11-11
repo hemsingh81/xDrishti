@@ -32,6 +32,26 @@ public sealed class TierExcludedExportTests
     }
 
     [Fact]
+    public void BK_09_the_feature_unknown_counter_and_the_relative_strength_record_are_absent_for_a_run_that_does_not_read_the_features_and_written_when_it_does()
+    {
+        var run = FabricatedRun.Standard();
+        string Record(SimulationRun r) => Sinks.Render(sink => SimExportJson.WriteRecord(sink, r));
+
+        Record(run).ShouldNotContain("feature_unknown");
+        Record(run).ShouldNotContain("relative_strength");
+        Json(run).ShouldNotContain("feature_unknown");
+        Json(run).ShouldNotContain("relative_strength");
+
+        var read = run with
+        {
+            Instruments = [.. run.Instruments.Select(i => i with { Scans = [.. i.Scans.Select(s => s with { FeatureUnknown = 3 })] })],
+            RelativeStrength = new RelativeStrengthRecord(new string('a', 64), 5, new DateOnly(2026, 3, 4), [new RelativeStrengthBasis(Guid.Empty, "Nifty 100", null, "dated")], "rsf-1", 3),
+        };
+        Record(read).ShouldContain("\"relative_strength\"");
+        Record(read).ShouldContain("\"feature_unknown\":3");
+    }
+
+    [Fact]
     public void The_turnover_blocked_counter_is_left_out_while_it_is_zero_and_written_when_set_ADR_0230()
     {
         var run = FabricatedRun.Standard();

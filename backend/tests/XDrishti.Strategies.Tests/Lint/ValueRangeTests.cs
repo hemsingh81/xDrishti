@@ -15,9 +15,9 @@ public sealed class ValueRangeTests
     }
 
     [Fact]
-    public void Every_range_is_ordered_and_the_table_has_the_twenty_four_rows_of_the_spec_p15_05_and_p15_09()
+    public void Every_range_is_ordered_and_the_table_has_the_rows_of_the_specs_p15_05_p15_09_and_bk_09()
     {
-        ValueRange.Table.Count.ShouldBe(25);
+        ValueRange.Table.Count.ShouldBe(27);
         ValueRange.Table.Values.ShouldAllBe(r => r.Minimum < r.Maximum);
     }
 }
