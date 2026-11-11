@@ -157,10 +157,14 @@ public sealed class DecayLoopArchitectureTests
             .Select(t => t.Name)
             .Distinct().Order(StringComparer.Ordinal).ToList();
 
-        users.ShouldBe(["DependencyInjection"]);
+        // SR-01 part D (ADR 0272) is the one consumer outside the slice: the research-only system-replay pair runner passes LoopOptions to the
+        // frozen-versus-learning comparison; it is fenced from evidence and decisions (ReplayArchitectureTests)
+        users.ShouldBe(["DependencyInjection", "ReplayPairRunner"]);
 
         // Domain: no type outside the slice's calculators names a calculator, and the P6-09 and P6-12 modules and the shared bootstrap name none of the slice's types
-        Types.InAssembly(Domain).That().DoNotHaveNameMatching("^(" + string.Join('|', CalculatorNames) + ")$").Should().NotHaveDependencyOnAny(CalculatorTypes).GetResult().IsSuccessful.ShouldBeTrue();
+        // SR-01 part D (ADR 0272): the research-only replay pair comparison reads ThreeArmLoopTest, so the paired rule is the loop test's own
+        Types.InAssembly(Domain).That().DoNotHaveNameMatching("^(" + string.Join('|', CalculatorNames) + "|ReplayPairComparison)$").Should().NotHaveDependencyOnAny(CalculatorTypes).GetResult().IsSuccessful.ShouldBeTrue();
+        Types.InAssembly(Domain).That().HaveName("ReplayPairComparison").Should().HaveDependencyOn(typeof(ThreeArmLoopTest).FullName!).GetResult().IsSuccessful.ShouldBeTrue();
         const string P6 = "^(CusumDetector|RollingBandDetector|CalibrationDriftDetector|CounterfactualEvaluator|DriftSeries|DriftReplay|PairedDayBootstrap|PairedBootstrapResult|MonteCarlo|BacktestBand)$";
         var frozen = Types.InAssembly(Domain).That().HaveNameMatching(P6);
         frozen.GetTypes().Count().ShouldBe(10);

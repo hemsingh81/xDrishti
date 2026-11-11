@@ -52,4 +52,12 @@
 - **Read side.** `IReplayReads`: a run with completeness (state, sessions done of total, the as-of session, `Complete`, trial number), the list, a pair, sessions by range, one session, the trades and the summary figures from `PaperLedger` over the stored trades. Reads only; the endpoints are part C.
 
 ## Consequences
-Parts C to E add the API, the comparison and the screen on this core. The measured time per session of one year over 100 instruments is in the spec's evidence notes.
+Parts C and E add the API and the screen on this core; part D (below) adds the comparison. The measured time per session of one year over 100 instruments is in the spec's evidence notes.
+
+## Part D: the frozen-versus-learning comparison
+- **Reused, not new.** `ReplayPairComparison` (Domain, pure) pairs the two runs by session, takes the daily return of each (equity over the day before, the first against the start capital) and calls the public `ThreeArmLoopTest.Compare` (the paired day bootstrap of CF-10c, ADR 0216) with learning first and frozen second, using the loop's settings (`LoopOptions`: draws, level, minimum days, helps-at cut, hurts bar). No new defaults and no second rule.
+- **Answer rule** (that of the loop report): Helps is `learning_better` (P(learning better) at or above `HelpsAt`, 0.95); Hurts is `frozen_better` (P(frozen better) at or above `HurtsBar`, 0.95); otherwise `no_measurable_difference`; Inconclusive is `too_little_history`. The result always carries n (paired days), the informative-day count, the mean daily difference, both probabilities, the interval and the cuts; the probabilities and interval are absent only for `too_little_history`. Both directions come from the one seeded call, so the two cannot both be reached.
+- **Informative days.** Equity is capital plus realised result, so a day on which neither run exited a trade (and every day before the first learning update, and every `data_missing` day) has a difference of exactly 0. Fewer than the minimum (20) of days with a non-zero difference is `too_little_history`, however many sessions were paired (3 positive exits in 20 sessions would otherwise read `learning_better`, P about 0.96). `shortcut:` realised-only equity; upgrade to mark-to-market once closes are stored.
+- **Refused, not thrown:** unequal counts, differing or unordered sessions, or a capital or equity not above 0 return `replay.pair_misaligned`.
+- **Deterministic:** the seed key is the first session, the last session and n.
+- **In memory:** `ReplayPairRunner` runs the part-A driver twice on the same parameters (Frozen, Learning) and compares; part C calls it and stores the result.
