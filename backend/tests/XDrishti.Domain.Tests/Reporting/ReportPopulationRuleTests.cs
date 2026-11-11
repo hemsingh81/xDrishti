@@ -266,8 +266,12 @@ public sealed class ReportPopulationRuleTests
         var regime = population.GroupBy([ReportDimension.Regime]);
         var account = population.GroupBy([ReportDimension.Account]);
 
+        var universe = population.GroupBy([ReportDimension.Universe]);
+
         regime.Error.Code.ShouldBe("reports.dimension_unavailable");
         regime.Error.Message.ShouldContain("not a report dimension yet");
+        universe.Error.Code.ShouldBe("reports.dimension_unavailable");   // BK-11: no tier per trade in the report engine; the message names where the tier cells are
+        universe.Error.Message.ShouldContain("/api/cells/universe");
         account.Error.Message.ShouldContain("no account");
         population.Evidence.UnavailableInputs.ShouldContain("style not recorded for run r1");
         population.Evidence.UnavailableInputs.ShouldContain("basket membership not recorded for 3 trades");

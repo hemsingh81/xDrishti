@@ -41,4 +41,7 @@ public enum ReportDimension
 
     /// <summary>The India-time hour of the entry (09 to 15), for intraday runs only; a swing or unlabelled run has no hour.</summary>
     Hour,
+
+    /// <summary>The liquidity tier of the instrument on the decision date (BK-11): unavailable in the report engine, which holds no tier per trade; the tier cells are at <c>GET /api/cells/universe</c>.</summary>
+    Universe,
 }

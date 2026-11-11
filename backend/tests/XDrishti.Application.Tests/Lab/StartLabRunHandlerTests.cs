@@ -61,7 +61,7 @@ public sealed class StartLabRunHandlerTests
     private static LabRun ToRun(NewLabRun n) => new(
         n.Id, n.Key, n.StrategyId, n.Version, n.StrategyHash, n.Universe, n.From, n.To, n.Method, n.ConfigHash, n.EngineVersion, LabRunState.Queued, null, 0, 0, [], null, [], [], n.Labels, null, false, n.CreatedAt, null, null, n.RunOptions);
 
-    private StartLabRunHandler Handler(XDrishti.Domain.Confidence.CostStressOptions? costStress = null, XDrishti.Domain.Confidence.NullOptions? nulls = null, XDrishti.Domain.Confidence.PlateauOptions? plateau = null) => new(_runs, _ledger, _strategies, _resolver, _baskets, _bars, _engine, _sheets, LabSettings.Default, new FakeTimeProvider(new DateTimeOffset(2026, 10, 22, 6, 0, 0, TimeSpan.Zero)), NullLogger<StartLabRunHandler>.Instance, costStress: costStress, nullOptions: nulls, plateauOptions: plateau);
+    private StartLabRunHandler Handler(XDrishti.Domain.Confidence.CostStressOptions? costStress = null, XDrishti.Domain.Confidence.NullOptions? nulls = null, XDrishti.Domain.Confidence.PlateauOptions? plateau = null, XDrishti.Application.Abstractions.Learning.IUniverseSettingsStore? universe = null) => new(_runs, _ledger, _strategies, _resolver, _baskets, _bars, _engine, _sheets, LabSettings.Default, new FakeTimeProvider(new DateTimeOffset(2026, 10, 22, 6, 0, 0, TimeSpan.Zero)), NullLogger<StartLabRunHandler>.Instance, costStress: costStress, nullOptions: nulls, plateauOptions: plateau, universeSettings: universe);
 
     private static ResolveResult Matched(int count) =>
         new([.. Enumerable.Range(1, count).Select(i => new ResolvedInstrument("S" + i, new Guid(i, 0, 0, [0, 0, 0, 0, 0, 0, 0, 1]), "S" + i, "Name " + i, "EQUITY", null, false, true))], [], count, 0);
@@ -180,6 +180,25 @@ public sealed class StartLabRunHandlerTests
 
         _baskets.MembersAsync(id, null, null, Arg.Any<CancellationToken>()).Returns(new BasketMembers(id, "Empty", null, null, 0, []));
         (await Handler().HandleAsync(new StartLabRunCommand("LAB_TEST", null, id, null, "quick", null, null), Ct)).Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+    }
+
+    [Fact]
+    public async Task A_full_test_on_a_basket_outside_the_registered_list_is_refused_naming_the_list_and_a_registered_one_passes_the_check()
+    {
+        var universe = Substitute.For<XDrishti.Application.Abstractions.Learning.IUniverseSettingsStore>();
+        universe.CurrentAsync(Arg.Any<CancellationToken>()).Returns(new XDrishti.Application.Abstractions.Learning.UniverseSettingsState(XDrishti.Domain.Learning.UniverseSettings.Defaults, []));
+        var id = Guid.NewGuid();
+        _baskets.MembersAsync(id, null, null, Arg.Any<CancellationToken>()).Returns(new BasketMembers(id, "My picks", null, null, 0, []));
+        var refused = await Handler(universe: universe).HandleAsync(new StartLabRunCommand("LAB_TEST", null, id, null, "full", null, null), Ct);
+        var quick = await Handler(universe: universe).HandleAsync(new StartLabRunCommand("LAB_TEST", null, id, null, "quick", null, null), Ct);
+        _baskets.MembersAsync(id, null, null, Arg.Any<CancellationToken>()).Returns(new BasketMembers(id, "NSE Nifty 50", null, null, 0, []));
+        var registered = await Handler(universe: universe).HandleAsync(new StartLabRunCommand("LAB_TEST", null, id, null, "full", null, null), Ct);
+
+        refused.Error.Code.ShouldBe(LabErrors.UniverseNotRegisteredCode);
+        refused.Error.Message.ShouldContain("Nifty 100");
+        LabErrors.IsUnprocessable(LabErrors.UniverseNotRegisteredCode).ShouldBeTrue();
+        quick.Error.Code.ShouldBe(LabErrors.InvalidInputCode, "a quick test of an unregistered basket is only exploratory, not refused");
+        registered.Error.Code.ShouldBe(LabErrors.InvalidInputCode, "past the registered check (the empty basket is refused later)");
     }
 
     [Fact]

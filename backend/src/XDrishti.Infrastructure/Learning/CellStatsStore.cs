@@ -19,12 +19,15 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     private const string DependenceColumns = "n_eff, design_effect, n_eff_method, needed_trades, min_detectable_edge_r, min_trl, enough_by_n_eff, span_years, n_eff_mode, n_eff_note, target_edge_r";
 
     // CF-02 (ADR 0204): the shrinkage columns, read after the dependence ones (ordinals 46 to 58); all null in a row written before the migration
-    private const string ShrinkageColumns = "parent_level, parent_mean_r, tau_squared, blend, shrunk_mean_r, shrunk_lower_r, estimated_strength, shrunk_win_rate, tau_source, strength_source, shrink_n, shrink_mode, shrink_note";
+    private const string ShrinkageColumns = "parent_level, parent_mean_r, tau_squared, blend, shrunk_mean_r, shrunk_lower_r, estimated_strength, shrunk_win_rate, tau_source, strength_source, shrink_n, shrink_mode, shrink_note, universe_verdict, universe_first_n, universe_second_n";
 
     // P14-06 (ADR 0193): a cash key has exactly five separators (the six-part text every stored key has). The decision reads choose their snapshot among cash keys only, so a later snapshot that holds only option or pair cells cannot hide the cash snapshot.
     private const string CashKey = "(length(cell_key) - length(replace(cell_key, '|', '')) = 5)";
 
     private const string NewestCash = $"(SELECT snapshot_key FROM research.cell_stats WHERE {CashKey} ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)";
+
+    // BK-11 (ADR 0261): the universe is the seventh key part; a tier cell has regime * and a key of six or more separators with a tier in part seven. The readers that follow the all-shares cells leave the tier cells out.
+    private const string AllShares = "(split_part(cell_key, '|', 7) IN ('', '*'))";
 
     private const string Newest = "(SELECT snapshot_key FROM research.cell_stats ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)";
 
@@ -54,11 +57,11 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
                 INSERT INTO research.cell_stats (snapshot_key, as_of, cell_key, strategy, timeframe, side, style, exit_policy, regime, window_code, costed, n, wins, effective_n, win_rate_raw, prior_rate, win_rate_posterior,
                     win_rate_lower, win_rate_upper, avg_win_r, avg_loss_r, expectancy_r, profit_factor, max_drawdown_r, mae_p50, mae_p90, mfe_p50, mfe_p90, enough, half_life_days, prior_strength, min_trades, credible_level,
                     sources, created_at, created_by, n_eff, design_effect, n_eff_method, needed_trades, min_detectable_edge_r, min_trl, enough_by_n_eff, span_years, n_eff_mode, n_eff_note, target_edge_r,
-                    parent_level, parent_mean_r, tau_squared, blend, shrunk_mean_r, shrunk_lower_r, estimated_strength, shrunk_win_rate, tau_source, strength_source, shrink_n, shrink_mode, shrink_note)
+                    parent_level, parent_mean_r, tau_squared, blend, shrunk_mean_r, shrunk_lower_r, estimated_strength, shrunk_win_rate, tau_source, strength_source, shrink_n, shrink_mode, shrink_note, universe_verdict, universe_first_n, universe_second_n)
                 VALUES (@snapshot_key, @as_of, @cell_key, @strategy, @timeframe, @side, @style, @exit, @regime, @window, @costed, @n, @wins, @effective_n, @raw, @prior, @posterior,
                     @lower, @upper, @avg_win, @avg_loss, @expectancy, @pf, @dd, @mae50, @mae90, @mfe50, @mfe90, @enough, @half_life, @strength, @min_trades, @level,
                     @sources, @created_at, @created_by, @n_eff, @design_effect, @n_eff_method, @needed_trades, @min_detectable_edge_r, @min_trl, @enough_by_n_eff, @span_years, @n_eff_mode, @n_eff_note, @target_edge_r,
-                    @parent_level, @parent_mean_r, @tau_squared, @blend, @shrunk_mean_r, @shrunk_lower_r, @estimated_strength, @shrunk_win_rate, @tau_source, @strength_source, @shrink_n, @shrink_mode, @shrink_note)
+                    @parent_level, @parent_mean_r, @tau_squared, @blend, @shrunk_mean_r, @shrunk_lower_r, @estimated_strength, @shrunk_win_rate, @tau_source, @strength_source, @shrink_n, @shrink_mode, @shrink_note, @universe_verdict, @universe_first_n, @universe_second_n)
                 ON CONFLICT (snapshot_key, cell_key, window_code) DO NOTHING
                 """, connection, transaction);
             var p = insert.Parameters;
@@ -124,6 +127,10 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
             Nullable(p, "shrink_n", sh?.NUsed);
             Text(p, "shrink_mode", sh?.Mode.ToString());
             Text(p, "shrink_note", sh?.Note);
+            var uh = row.UniverseHoldOut;
+            Text(p, "universe_verdict", uh?.Verdict);
+            p.AddWithValue("universe_first_n", NpgsqlDbType.Integer, uh is null ? DBNull.Value : (object)uh.FirstN);
+            p.AddWithValue("universe_second_n", NpgsqlDbType.Integer, uh is null ? DBNull.Value : (object)uh.SecondN);
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -135,7 +142,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
     {
         await using var command = dataSource.CreateCommand($"""
             SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
-            WHERE snapshot_key = {Newest} AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
+            WHERE snapshot_key = {Newest} AND regime = '*' AND {AllShares} AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
         command.Parameters.AddWithValue("strategy", NpgsqlDbType.Text, (object?)strategy ?? DBNull.Value);
@@ -148,6 +155,20 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
         await using var command = dataSource.CreateCommand($"""
             SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
             WHERE snapshot_key = {NewestCash} AND {CashKey} AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
+            ORDER BY cell_key, window_code
+            """);
+        command.Parameters.AddWithValue("strategy", NpgsqlDbType.Text, (object?)strategy ?? DBNull.Value);
+        command.Parameters.AddWithValue("window", NpgsqlDbType.Text, (object?)window ?? DBNull.Value);
+        return await ReadAsync(command, cancellationToken);
+    }
+
+    public async ValueTask<IReadOnlyList<StoredCellStats>> ListUniverseLatestAsync(string? strategy, string? window, CancellationToken cancellationToken)
+    {
+        // BK-11 (ADR 0261): the newest snapshot that holds any tier row; the rows carry their own as-of date and snapshot key
+        await using var command = dataSource.CreateCommand($"""
+            SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
+            WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE split_part(cell_key, '|', 7) LIKE 'liq\_%' ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)
+              AND (split_part(cell_key, '|', 7) LIKE 'liq\_%' OR ({AllShares} AND regime = '*' AND {CashKey})) AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
         command.Parameters.AddWithValue("strategy", NpgsqlDbType.Text, (object?)strategy ?? DBNull.Value);
@@ -180,7 +201,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
         await using var command = dataSource.CreateCommand($"""
             SELECT {Columns}, cell_key, {DependenceColumns}, {ShrinkageColumns} FROM research.cell_stats
             WHERE snapshot_key = (SELECT snapshot_key FROM research.cell_stats WHERE as_of < @before AND {CashKey} ORDER BY as_of DESC, created_at DESC, id DESC LIMIT 1)
-              AND regime = '*' AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
+              AND regime = '*' AND {AllShares} AND (@strategy::text IS NULL OR strategy = @strategy) AND (@window::text IS NULL OR window_code = @window)
             ORDER BY cell_key, window_code
             """);
         command.Parameters.AddWithValue("before", NpgsqlDbType.Date, before);
@@ -288,7 +309,7 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
             var row = new CellStatsRow(
                 cell, window, reader.GetFieldValue<DateOnly>(7), reader.GetBoolean(15), reader.GetInt32(16), reader.GetInt32(17), reader.GetDouble(18), Opt(reader, 19), reader.GetDouble(20), reader.GetDouble(21), reader.GetDouble(22),
                 reader.GetDouble(23), Opt(reader, 24), Opt(reader, 25), Opt(reader, 26), Opt(reader, 27), reader.GetDouble(28), Opt(reader, 29), Opt(reader, 30), Opt(reader, 31), Opt(reader, 32), reader.GetBoolean(33),
-                DependenceOf(reader, reader.GetInt32(16)), ShrinkageOf(reader));
+                DependenceOf(reader, reader.GetInt32(16)), ShrinkageOf(reader), reader.IsDBNull(59) ? null : new UniverseHoldOut(reader.GetString(59), reader.GetInt32(60), reader.GetInt32(61)));
             list.Add(new StoredCellStats(reader.GetString(0), reader.GetFieldValue<DateTimeOffset>(1), options, reader.GetString(6), row));
         }
 

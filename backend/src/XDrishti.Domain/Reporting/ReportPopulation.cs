@@ -507,7 +507,7 @@ public sealed class ReportPopulation
 
         foreach (var dimension in dimensions)
         {
-            if (dimension is ReportDimension.Regime or ReportDimension.Account)
+            if (dimension is ReportDimension.Regime or ReportDimension.Account or ReportDimension.Universe)
             {
                 return Fail<Bucketed>(ReportErrors.DimensionUnavailable(dimension));
             }

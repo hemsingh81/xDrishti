@@ -11,6 +11,9 @@ internal static partial class CellStatsLog
     [LoggerMessage(EventId = 4473, Level = LogLevel.Information, Message = "learning.cells.shrinkage snapshot {SnapshotKey}: {ShrunkRows} rows shrunk, {FloorRows} at the tau-squared floor")]
     public static partial void Shrinkage(ILogger logger, string snapshotKey, int shrunkRows, int floorRows);
 
+    [LoggerMessage(EventId = 4474, Level = LogLevel.Information, Message = "learning.cells.universe snapshot {SnapshotKey}: {TierCells} tier cells, {Tiered} trades tiered, {Unknown} unknown, {Unavailable} unavailable")]
+    public static partial void Universe(ILogger logger, string snapshotKey, int tierCells, int tiered, int unknown, int unavailable);
+
     [LoggerMessage(EventId = 4471, Level = LogLevel.Warning, Message = "learning.cells.refused {Code}")]
     public static partial void Refused(ILogger logger, string code);
 

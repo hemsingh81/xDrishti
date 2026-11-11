@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Messaging;
@@ -10,6 +11,7 @@ using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Confidence;
 using XDrishti.Domain.Lab;
+using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 
@@ -35,7 +37,8 @@ internal sealed class StartLabRunHandler(
     LabHoldOutGuard? holdOut = null,
     CostStressOptions? costStress = null,
     NullOptions? nullOptions = null,
-    PlateauOptions? plateauOptions = null) : ICommandHandler<StartLabRunCommand, StartedLabRun>
+    PlateauOptions? plateauOptions = null,
+    IUniverseSettingsStore? universeSettings = null) : ICommandHandler<StartLabRunCommand, StartedLabRun>
 {
     public async ValueTask<Result<StartedLabRun>> HandleAsync(StartLabRunCommand command, CancellationToken cancellationToken)
     {
@@ -253,6 +256,16 @@ internal sealed class StartLabRunHandler(
             if (basket is null || basket.ArchivedAt is not null)
             {
                 return Result.Failure<LabUniverse>(LabErrors.BasketNotFound(basketId));
+            }
+
+            if (full && universeSettings is not null)
+            {
+                // BK-11 (ADR 0261): a full test of a strategy on a basket is a strategy x basket comparison; the basket must be one of the registered ones (the owner's setting), else the grid of strategies x baskets is the cheapest way to fool oneself
+                var registered = (await universeSettings.CurrentAsync(cancellationToken)).Settings.RegisteredBaskets;
+                if (!UniverseSettingsRules.IsRegistered(basket.Name, registered))
+                {
+                    return Result.Failure<LabUniverse>(LabErrors.UniverseNotRegistered(basket.Name, registered));
+                }
             }
 
             kind = "basket";

@@ -71,8 +71,9 @@ public sealed class CellIdExpressionTests
     [InlineData(Six + "|*|*|cash")]                 // not canonical: cash is never written as an eighth part
     [InlineData(Six + "|*|cash")]                   // not canonical: cash with the default universe is the six-part text
     [InlineData(Six + "|*")]                        // not canonical: a seventh part of * is the six-part text
-    [InlineData(Six + "|liq_high")]                 // a universe that BK-11 has not added
-    [InlineData(Six + "|liq_high|option_buy")]
+    [InlineData(Six + "|liq_extreme")]              // not one of the three tiers
+    [InlineData(Six + "|LIQ_HIGH")]                 // names are exact
+    [InlineData(Six + "|liq_high|cash")]            // cash is never written as an eighth part
     [InlineData(Six + "|*|option_sell")]            // not in the closed set
     [InlineData(Six + "|*|Option_Buy")]             // names are exact
     [InlineData(Six + "|*|option_buy|extra")]       // nine parts
@@ -86,9 +87,10 @@ public sealed class CellIdExpressionTests
     }
 
     [Fact]
-    public void The_reserved_universe_accepts_only_the_default_value()
+    public void The_universe_accepts_the_default_and_the_three_tiers_only()
     {
-        new CellId("ORB", "15m", "BUY", "intraday", "FIXED_RR", Universe: "liq_high").Problems().ShouldHaveSingleItem().ShouldContain("universe");
+        new CellId("ORB", "15m", "BUY", "intraday", "FIXED_RR", Universe: "liq_mid").Problems().ShouldBeEmpty();
+        new CellId("ORB", "15m", "BUY", "intraday", "FIXED_RR", Universe: "liq_extreme").Problems().ShouldHaveSingleItem().ShouldContain("universe");
         new CellId("ORB", "15m", "BUY", "intraday", "FIXED_RR", Universe: "*").Problems().ShouldBeEmpty();
         new CellId("ORB", "15m", "BUY", "intraday", "FIXED_RR", Expression: (Expression)99).Problems().ShouldHaveSingleItem().ShouldContain("expression");
     }

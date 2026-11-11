@@ -484,7 +484,7 @@ internal sealed class RunSimulationHandler(
             known[member.Instrument.Id] = new BarsInstrument(member.Instrument.Id, member.Instrument.Symbol, member.Instrument.Name, member.Instrument.TickSize);
         }
 
-        return Result.Success(new Universe(UniverseKind.Basket, basketId, members.Name, UniverseLabels.MembersAsOfToday, [.. ordered.Select(m => m.Instrument.Id)], known));
+        return Result.Success(new Universe(UniverseKind.Basket, basketId, members.Name, UniverseLabels.Basket(basketId), [.. ordered.Select(m => m.Instrument.Id)], known));
     }
 
     /// <summary>

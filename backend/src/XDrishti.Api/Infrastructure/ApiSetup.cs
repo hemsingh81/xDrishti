@@ -153,6 +153,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, FilingEndpoints>(); // the stored filings as metadata and counts, optionally as of an instant (P15-02): GETs only, no file content
         services.AddSingleton<IEndpointModule, ExtensionEvaluationEndpoints>(); // the stored verdicts of protocols F, X, P and L (P15-10): GETs only; a KEEP is a record
         services.AddSingleton<IEndpointModule, BasketSettingsEndpoints>(); // BK-08: the cluster cap, cluster cut and the gate's breadth source (owner settings, password every change, all OFF by default) and the read-only basket context; places no order
+        services.AddSingleton<IEndpointModule, UniverseSettingsEndpoints>(); // BK-11: the owner's universe settings, password every change; applies no restriction, places no order
         services.AddSingleton<IEndpointModule, SizingEndpoints>(); // BK-10: the down-only size scaling's owner settings, basket risk budgets and the read-only study; password every change; places no order
         services.AddSingleton<IEndpointModule, EventFilterEndpoints>(); // the owner's event-risk switch (P15-06): password every time, recorded as owner; the auto option is inert until a protocol-F verdict exists; places no order
         services.AddSingleton<IEndpointModule, CalendarEndpoints>(); // the results meetings known at an instant and the instruments without an entry (P15-04): one GET, no file content, no estimate

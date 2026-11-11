@@ -63,6 +63,7 @@ public static class ReportErrors
         Error.Validation("reports.dimension_unavailable", dimension switch
         {
             ReportDimension.Regime => "Regime is not a report dimension yet: the regime of a trade is read for the regime cells (GET /api/cells/regimes) and the Lab by_regime block, not for the report engine.",
+            ReportDimension.Universe => "Universe is unavailable: the report engine stores no liquidity tier per trade. The tier cells are read at GET /api/cells/universe (computed with xd learn cells --by-universe), masked below the minimum of trades.",
             ReportDimension.Account => "Account is unavailable: a simulated trade has no account.",
             _ => $"{dimension} is not unavailable.",
         });

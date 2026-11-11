@@ -62,6 +62,32 @@ public sealed class LearnCellsOptionsTests
         output.ShouldContain("regime split: 2 regime cells; 5 of 9 trades have a regime (3 from the index and the VIX, 2 from the index alone); no regime: before_history 4");
     }
 
+    [Fact]
+    public void The_universe_split_is_a_flag_with_no_value_off_by_default_and_not_given_twice()
+    {
+        var (plain, _) = LearnCellsOptions.Parse(["--as-of", "2026-04-30", "--run", $"{Key}:swing:X"]);
+        var (split, errors) = LearnCellsOptions.Parse(["--as-of", "2026-04-30", "--by-universe", "--run", $"{Key}:swing:X"]);
+        var (twice, twiceErrors) = LearnCellsOptions.Parse(["--as-of", "2026-04-30", "--by-universe", "--by-universe", "--run", $"{Key}:swing:X"]);
+
+        plain!.ByUniverse.ShouldBeFalse();
+        errors.ShouldBeEmpty();
+        split!.ByUniverse.ShouldBeTrue();
+        twice.ShouldBeNull();
+        twiceErrors.ShouldContain(e => e.Contains("twice", StringComparison.Ordinal));
+        LearnCellsOptions.Usage.ShouldContain("--by-universe");
+    }
+
+    [Fact]
+    public async Task The_verb_with_the_universe_split_prints_how_the_tiers_came_out()
+    {
+        var outcome = new CellStatsOutcome(new string('c', 64), 2, 12, 9, false, Universe: new XDrishti.Application.Learning.UniverseTally(3, 6, 2, 1));
+
+        var (code, output, _) = await RunAsync(Result.Success(outcome), "--as-of", "2026-04-30", "--by-universe", "--run", $"{Key}:swing:X");
+
+        code.ShouldBe(0);
+        output.ShouldContain("universe split: 3 tier cells; 6 trades in a tier, 2 with no tier");
+    }
+
     [Theory]
     [InlineData("--run", "k:swing")]
     [InlineData("--as-of", "30/04/2026")]

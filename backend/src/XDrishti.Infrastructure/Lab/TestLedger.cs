@@ -6,7 +6,7 @@ using XDrishti.Domain.Lab;
 namespace XDrishti.Infrastructure.Lab;
 
 /// <summary><c>lab.test_ledger</c> behind <see cref="ITestLedger"/> (spec P5-03, ADR 0059): raw SQL, insert and select only (the runtime role has no more). A strategy text is never read or written here.</summary>
-internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger
+internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger, IUniverseTrialSource
 {
     public async ValueTask<bool> AppendAsync(LedgerRow row, CancellationToken cancellationToken)
     {
@@ -63,6 +63,25 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         await reader.ReadAsync(cancellationToken);
         return new TrialCounts((int)reader.GetInt64(0), (int)reader.GetInt64(1), (int)reader.GetInt64(2), (int)reader.GetInt64(3), (int)reader.GetInt64(4), (int)reader.GetInt64(5), (int)reader.GetInt64(6), (int)reader.GetInt64(7), (int)reader.GetInt64(8));
+    }
+
+    /// <summary>The runs of a strategy family whose Lab run named a basket (BK-11): the ledger row joined to its run's universe, evidence kind <c>run</c> only (a training sweep, a null row and a re-plan are not a test of a basket).</summary>
+    public async ValueTask<IReadOnlyList<UniverseTrial>> ListBasketTestsAsync(string strategyId, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("""
+            SELECT DISTINCT l.strategy_hash, (r.universe->>'basketId')::uuid, l.window_from, l.window_to
+            FROM lab.test_ledger l JOIN lab.lab_runs r ON r.id = l.lab_run_id AND l.trial_kind = 'run'
+            WHERE l.strategy_id = @id AND r.universe->>'basketId' IS NOT NULL
+            """);
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var rows = new List<UniverseTrial>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new UniverseTrial(reader.GetString(0).Trim(), reader.GetGuid(1), reader.GetFieldValue<DateOnly>(2), reader.GetFieldValue<DateOnly>(3)));
+        }
+
+        return rows;
     }
 
     public async ValueTask<bool> HasFullRunAsync(string strategyId, string strategyHash, CancellationToken cancellationToken)

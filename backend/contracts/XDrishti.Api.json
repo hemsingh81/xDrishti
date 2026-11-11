@@ -9712,6 +9712,37 @@
         }
       }
     },
+    "/api/lab/strategies/{id}/universe-trials": {
+      "get": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "The baskets a strategy family was tested on, counted from the stored Lab tests (BK-11): the distinct baskets k, the distinct tests and the k - 1 variants they add. An information breakdown only: it feeds no factor or verdict (the honest count of ADR 0207 does). A repeated test of the same version, basket and window counts once",
+        "operationId": "GetUniverseTrials",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UniverseTrialsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/lab/strategies/{id}/versions/{version}/registration": {
       "put": {
         "tags": [
@@ -10884,6 +10915,89 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cells/universe": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The liquidity-tier cells (BK-11): the cells of the newest snapshot computed with the universe split, per tier (liq_high, liq_mid, liq_low) and window, each shrunk toward its all-shares cell, with the enough-evidence flag. Filter by strategy and window; empty before a computation with --by-universe. 422 learning.invalid",
+        "operationId": "ListUniverseCells",
+        "parameters": [
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CellStatsView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cells/universe-links": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Each liquidity-tier cell read against its all-shares parent (BK-11): which cell a reader takes (child_better, no_better_than_parent, child_thin), both lower bounds, and whether the tier is an observation (at least the link minimum of trades). An observation only: it needs the tier read in place of the parent, at least the link minimum of trades and a stable hold-out (both halves of its trades beat the rest of the parent); nothing is applied and no scan scope changes. Filter by strategy; empty before a computation with --by-universe",
+        "operationId": "ListUniverseLinks",
+        "parameters": [
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UniverseLinkView"
+                  }
                 }
               }
             }
@@ -19436,6 +19550,106 @@
           },
           "400": {
             "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/universe/settings": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The universe settings in force (the fewest trades of a tier cell to be read in place of its parent, 30; the fewest trades of a tier to be an observation, 100; the registered basket names a strategy x basket comparison may use) and the latest 50 changes. Read only",
+        "operationId": "GetUniverseSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UniverseSettingsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The owner changes the universe settings (minTradesChild 1 to 1000, linkMinTrades 10 to 10000, registeredBaskets: comma separated names, 1 to 20); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row. expectedVersion (the version of the read) is required. 400 learning.invalid, 403 learning.owner_only, 409 learning.stale",
+        "operationId": "ChangeUniverseSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UniverseSettingsChangeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UniverseSettingsView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -71373,6 +71587,276 @@
         },
         "description": "A figure of the answer that the tool results do not hold: its place in the text (UTF-16 code units, End exclusive) and the text itself."
       },
+      "UniverseLinkView": {
+        "required": [
+          "childKey",
+          "parentKey",
+          "universe",
+          "window",
+          "asOf",
+          "reason",
+          "readKey",
+          "childN",
+          "parentN",
+          "childLower",
+          "parentLower",
+          "observation",
+          "holdOut",
+          "holdOutFirstN",
+          "holdOutSecondN",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "childKey": {
+            "type": "string",
+            "description": "The tier cell's key."
+          },
+          "parentKey": {
+            "type": "string",
+            "description": "The all-shares cell's key."
+          },
+          "universe": {
+            "type": "string",
+            "description": "The tier."
+          },
+          "window": {
+            "type": "string",
+            "description": "The window code."
+          },
+          "asOf": {
+            "type": "string",
+            "description": "The snapshot's as-of date.",
+            "format": "date"
+          },
+          "reason": {
+            "type": "string",
+            "description": "`child_better`, `no_better_than_parent` or `child_thin`."
+          },
+          "readKey": {
+            "type": "string",
+            "description": "The key a reader takes: the child's when it is better, else the parent's."
+          },
+          "childN": {
+            "type": "integer",
+            "description": "Trades of the tier cell.",
+            "format": "int32"
+          },
+          "parentN": {
+            "type": "integer",
+            "description": "Trades of the parent.",
+            "format": "int32"
+          },
+          "childLower": {
+            "type": "number",
+            "description": "The tier cell's lower credible bound of the win rate.",
+            "format": "double"
+          },
+          "parentLower": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The parent's bound without the child's trades; null when the child is thin.",
+            "format": "double"
+          },
+          "observation": {
+            "type": "boolean",
+            "description": "True when the tier is read in place of the parent and has at least the link minimum of trades: an observation to show, never applied."
+          },
+          "holdOut": {
+            "type": "string",
+            "description": "`stable` (the tier's lower bound beats the rest of the parent's in both halves of its trades), `unstable`, `insufficient` (a half has fewer than 30 trades) or `not_evaluated` (a row stored before it); computed when the cells were computed."
+          },
+          "holdOutFirstN": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Tier trades in the first half; null when not evaluated.",
+            "format": "int32"
+          },
+          "holdOutSecondN": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Tier trades in the second half; null when not evaluated.",
+            "format": "int32"
+          },
+          "text": {
+            "type": "string",
+            "description": "The sentence the Setups view shows."
+          }
+        },
+        "description": "One tier cell read against its all-shares parent (BK-11, criteria 5, 6 and 11)."
+      },
+      "UniverseSettingChangeView": {
+        "required": [
+          "id",
+          "key",
+          "oldValue",
+          "newValue",
+          "actor",
+          "changedAt",
+          "hash"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "key": {
+            "type": "string"
+          },
+          "oldValue": {
+            "type": "string"
+          },
+          "newValue": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hash": {
+            "type": "string"
+          }
+        },
+        "description": "One change in the history."
+      },
+      "UniverseSettingsChangeBody": {
+        "required": [
+          "minTradesChild",
+          "linkMinTrades",
+          "registeredBaskets",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "minTradesChild": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "linkMinTrades": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "registeredBaskets": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expectedVersion": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "The body of a change of the universe settings; a value left out stays."
+      },
+      "UniverseSettingsView": {
+        "required": [
+          "minTradesChild",
+          "linkMinTrades",
+          "registeredBaskets",
+          "history",
+          "version",
+          "notice"
+        ],
+        "type": "object",
+        "properties": {
+          "minTradesChild": {
+            "type": "integer",
+            "description": "`learning.universe_min_trades_child`.",
+            "format": "int32"
+          },
+          "linkMinTrades": {
+            "type": "integer",
+            "description": "`learning.universe_link_min_trades`.",
+            "format": "int32"
+          },
+          "registeredBaskets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "`learning.universe_registered_baskets`."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UniverseSettingChangeView"
+            },
+            "description": "The latest 50 changes, newest first."
+          },
+          "version": {
+            "type": "integer",
+            "description": "The newest change id (0 when none); a change names it as `expectedVersion`.",
+            "format": "int64"
+          },
+          "notice": {
+            "type": "string",
+            "description": "What the settings do and do not do."
+          }
+        },
+        "description": "The universe settings in force with their history (BK-11)."
+      },
+      "UniverseTrialsView": {
+        "required": [
+          "strategyId",
+          "baskets",
+          "tests",
+          "extraVariants",
+          "notice"
+        ],
+        "type": "object",
+        "properties": {
+          "strategyId": {
+            "type": "string",
+            "description": "The strategy family."
+          },
+          "baskets": {
+            "type": "integer",
+            "description": "Distinct baskets tested.",
+            "format": "int32"
+          },
+          "tests": {
+            "type": "integer",
+            "description": "Distinct tests (strategy hash, basket, window).",
+            "format": "int32"
+          },
+          "extraVariants": {
+            "type": "integer",
+            "description": "Baskets minus one.",
+            "format": "int32"
+          },
+          "notice": {
+            "type": "string",
+            "description": "Where the number comes from."
+          }
+        },
+        "description": "The baskets a strategy was tested on and how many variants they add (information only, BK-11)."
+      },
       "UnmatchedEntry": {
         "required": [
           "term",
@@ -72014,9 +72498,6 @@
     },
     {
       "name": "Selection"
-    },
-    {
-      "name": "Market"
     },
     {
       "name": "Calendar"

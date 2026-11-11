@@ -16,7 +16,8 @@ public static partial class CashCells
     public static IReadOnlyList<StoredCellStats> Only(IReadOnlyList<StoredCellStats> rows, string path, ILogger? logger)
     {
         ArgumentNullException.ThrowIfNull(rows);
-        var cash = rows.Count == 0 || rows.All(r => r.Row.Cell.IsCash) ? rows : [.. rows.Where(r => r.Row.Cell.IsCash)];
+        // BK-11: a liquidity-tier cell is a cash cell but only an observation; the all-shares (universe *) cells alone reach a decision
+        var cash = rows.Count == 0 || rows.All(Reads) ? rows : [.. rows.Where(Reads)];
         if (cash.Count != rows.Count && logger is not null)
         {
             Skipped(logger, SkippedCode, path, rows.Count - cash.Count);
@@ -24,6 +25,8 @@ public static partial class CashCells
 
         return cash;
     }
+
+    private static bool Reads(StoredCellStats r) => r.Row.Cell is { IsCash: true, Universe: "*" };
 
     /// <summary>Logs one cell of another expression than cash left out of a decision path that works on one ticket at a time.</summary>
     public static void LeftOut(ILogger? logger, string path)

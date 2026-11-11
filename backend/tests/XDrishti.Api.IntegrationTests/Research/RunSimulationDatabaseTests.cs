@@ -289,7 +289,7 @@ public sealed class RunSimulationDatabaseTests(ApiFactory factory) : DataTestBas
 
         first.IsSuccess.ShouldBeTrue(first.IsFailure ? first.Error.Message : string.Empty);
         var run = first.Value;
-        run.Universe.Label.ShouldBe("members as of today");
+        run.Universe.Label.ShouldStartWith(XDrishti.Domain.Research.UniverseLabels.BasketBasis);   // BK-11
         run.Universe.BasketId.ShouldBe(basket);
         run.Universe.Members.Select(m => m.Id).ShouldBe([a, b, c]);
         run.Trades.Count.ShouldBe(3);

@@ -20,8 +20,10 @@ public static class CellStatsCalculator
     /// shrunk toward the same strategy rate; the system and strategy rates are taken from <paramref name="cells"/> alone, so a trade is never counted twice and the rows of <paramref name="cells"/> are the same with and without them.
     /// With <paramref name="confidence"/> (CF-01, ADR 0203) each row also carries its <see cref="CellStatsRow.Dependence"/> (null or Off: no such member and every other field exactly as before); only in the <see cref="ConfidenceMode.Gate"/> mode does <see cref="CellStatsRow.Enough"/> change.
     /// With <paramref name="shrinkage"/> (CF-02, ADR 0204) each row also carries its <see cref="CellStatsRow.Shrinkage"/> (null or Off: no such member); no other field of any row changes.
+    /// With <paramref name="universeCells"/> (BK-11, ADR 0261) the tier cells follow the regime cells; each is shrunk toward the posterior of its own <c>*</c> cell (the parent link, <see cref="CellId.Parent"/>), and the <c>*</c> rows are the same with and without them.
+    /// A tier cell has no <see cref="CellStatsRow.Shrinkage"/> (CF-02 does not yet have it in its chain; owner question 2).
     /// </summary>
-    public static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, DateOnly asOf, CellStatsOptions options, IReadOnlyList<CellInput>? regimeCells = null, ConfidenceOptions? confidence = null, ShrinkageOptions? shrinkage = null)
+    public static IReadOnlyList<CellStatsRow> Compute(IReadOnlyList<CellInput> cells, DateOnly asOf, CellStatsOptions options, IReadOnlyList<CellInput>? regimeCells = null, ConfidenceOptions? confidence = null, ShrinkageOptions? shrinkage = null, IReadOnlyList<CellInput>? universeCells = null)
     {
         ArgumentNullException.ThrowIfNull(cells);
         ArgumentNullException.ThrowIfNull(options);
@@ -84,6 +86,28 @@ public static class CellStatsCalculator
             }
         }
 
+        if (universeCells is not null)
+        {
+            var stars = rows.Where(r => r.Cell.Regime == "*" && r.Cell.Universe == CellId.AllUniverses).ToDictionary(r => (r.Cell, r.Window));
+            var starTrades = cells.ToDictionary(c => c.Cell, c => c.Trades);
+            foreach (var input in universeCells)
+            {
+                foreach (var window in Windows)
+                {
+                    if (input.Cell.Parent() is not { } parent || !stars.TryGetValue((parent, window), out var star))
+                    {
+                        throw new ArgumentException($"The tier cell {input.Cell.Key} has no all-shares cell among the cells.", nameof(universeCells));
+                    }
+
+                    var inWindow = InWindow(input.Trades, asOf, window);
+                    var parentTrades = InWindow(starTrades[parent], asOf, window);
+                    var row = Row(input, window, inWindow, asOf, star.WinRatePosterior, options, confidence);
+                    rows.Add(row with { UniverseHoldOut = UniverseHoldOuts.Evaluate(inWindow, Remainder(parentTrades, inWindow), star.WinRatePosterior, options) });
+                    traded.Add(inWindow);
+                }
+            }
+        }
+
         return shrinkage is { IsOn: true } ? WithShrinkage(rows, traded, asOf, options, confidence, shrinkage) : rows.AsReadOnly();
     }
 
@@ -94,7 +118,7 @@ public static class CellStatsCalculator
         var result = rows.ToArray();
         foreach (var window in Windows)
         {
-            var index = Enumerable.Range(0, rows.Count).Where(i => rows[i].Window == window).ToList();
+            var index = Enumerable.Range(0, rows.Count).Where(i => rows[i].Window == window && rows[i].Cell.Universe == CellId.AllUniverses).ToList();
             var subjects = index.Select(i => new ShrinkSubject(rows[i].Cell, traded[i], rows[i].Dependence?.NEff)).ToList();
             var assessed = CellShrinker.Assess(subjects, asOf, options, shrinkage, floor);
             for (var k = 0; k < index.Count; k++)
@@ -104,6 +128,31 @@ public static class CellStatsCalculator
         }
 
         return result.AsReadOnly();
+    }
+
+    // the parent's trades that are not the tier's, by value: equal trades are interchangeable, so a multiset subtraction is exact
+    private static List<CellTrade> Remainder(List<CellTrade> parent, List<CellTrade> tier)
+    {
+        var counts = new Dictionary<CellTrade, int>();
+        foreach (var t in tier)
+        {
+            counts[t] = counts.GetValueOrDefault(t) + 1;
+        }
+
+        var rest = new List<CellTrade>(parent.Count);
+        foreach (var t in parent)
+        {
+            if (counts.TryGetValue(t, out var left) && left > 0)
+            {
+                counts[t] = left - 1;
+            }
+            else
+            {
+                rest.Add(t);
+            }
+        }
+
+        return rest;
     }
 
     // Trades are ordered by exit date only (stable sort): the order within one day is the order of the input, i.e. by source run then by that run's trade ordinal.

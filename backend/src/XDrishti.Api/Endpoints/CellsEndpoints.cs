@@ -23,6 +23,16 @@ internal sealed class CellsEndpoints : IEndpointModule
             .WithSummary("The regime cells (P6-02): the cells of the newest snapshot that was computed with the regime split, per regime part and window, each with its trades, its Beta-shrunk win rate, the enough-evidence flag and the basis of its regime (index_and_vix or index_only; a cell never mixes the two). A regime below the minimum of trades says so. Filter by strategy and window; empty before a computation with --by-regime. 422 learning.invalid")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
+        cells.MapGet("/universe", ListUniverseAsync)
+            .WithName("ListUniverseCells")
+            .WithSummary("The liquidity-tier cells (BK-11): the cells of the newest snapshot computed with the universe split, per tier (liq_high, liq_mid, liq_low) and window, each shrunk toward its all-shares cell, with the enough-evidence flag. Filter by strategy and window; empty before a computation with --by-universe. 422 learning.invalid")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        cells.MapGet("/universe-links", ListUniverseLinksAsync)
+            .WithName("ListUniverseLinks")
+            .WithSummary("Each liquidity-tier cell read against its all-shares parent (BK-11): which cell a reader takes (child_better, no_better_than_parent, child_thin), both lower bounds, and whether the tier is an observation (at least the link minimum of trades). An observation only: it needs the tier read in place of the parent, at least the link minimum of trades and a stable hold-out (both halves of its trades beat the rest of the parent); nothing is applied and no scan scope changes. Filter by strategy; empty before a computation with --by-universe")
+            .Produces<IReadOnlyList<UniverseLinkView>>();
+
         cells.MapGet("/{key}", GetAsync)
             .WithName("GetCell")
             .WithSummary("One cell (key strategy|tf|side|style|exit|regime, URL-encoded) in its windows from the newest snapshot that holds it. 404 learning.cell_not_found")
@@ -49,6 +59,26 @@ internal sealed class CellsEndpoints : IEndpointModule
     {
         var result = await handler.HandleAsync(new ListRegimeCellsQuery(strategy, window), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<CellStatsView>>, ProblemHttpResult>> ListUniverseAsync(
+        string? strategy,
+        string? window,
+        HttpContext http,
+        IQueryHandler<ListUniverseCellsQuery, Result<IReadOnlyList<CellStatsView>>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ListUniverseCellsQuery(strategy, window), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<IReadOnlyList<UniverseLinkView>>> ListUniverseLinksAsync(
+        string? strategy,
+        IQueryHandler<GetUniverseLinksQuery, Result<IReadOnlyList<UniverseLinkView>>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetUniverseLinksQuery(strategy), cancellationToken);
+        return TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<IReadOnlyList<CellStatsView>>, ProblemHttpResult>> GetAsync(

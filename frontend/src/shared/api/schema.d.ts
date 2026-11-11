@@ -2862,6 +2862,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/lab/strategies/{id}/universe-trials': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The baskets a strategy family was tested on, counted from the stored Lab tests (BK-11): the distinct baskets k, the distinct tests and the k - 1 variants they add. An information breakdown only: it feeds no factor or verdict (the honest count of ADR 0207 does). A repeated test of the same version, basket and window counts once */
+    get: operations['GetUniverseTrials'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/lab/strategies/{id}/versions/{version}/registration': {
     parameters: {
       query?: never;
@@ -3212,6 +3229,40 @@ export interface paths {
     };
     /** The regime cells (P6-02): the cells of the newest snapshot that was computed with the regime split, per regime part and window, each with its trades, its Beta-shrunk win rate, the enough-evidence flag and the basis of its regime (index_and_vix or index_only; a cell never mixes the two). A regime below the minimum of trades says so. Filter by strategy and window; empty before a computation with --by-regime. 422 learning.invalid */
     get: operations['ListRegimeCells'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cells/universe': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The liquidity-tier cells (BK-11): the cells of the newest snapshot computed with the universe split, per tier (liq_high, liq_mid, liq_low) and window, each shrunk toward its all-shares cell, with the enough-evidence flag. Filter by strategy and window; empty before a computation with --by-universe. 422 learning.invalid */
+    get: operations['ListUniverseCells'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cells/universe-links': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Each liquidity-tier cell read against its all-shares parent (BK-11): which cell a reader takes (child_better, no_better_than_parent, child_thin), both lower bounds, and whether the tier is an observation (at least the link minimum of trades). An observation only: it needs the tier read in place of the parent, at least the link minimum of trades and a stable hold-out (both halves of its trades beat the rest of the parent); nothing is applied and no scan scope changes. Filter by strategy; empty before a computation with --by-universe */
+    get: operations['ListUniverseLinks'];
     put?: never;
     post?: never;
     delete?: never;
@@ -5638,6 +5689,24 @@ export interface paths {
     /** The stored daily context of one basket (basket, optional from and to as yyyy-MM-dd; the newest 400 rows, newest first): members, voters, the 20, 50 and 200 day breadth, advance and new-high shares, dispersion, average correlation, state and membership basis (point_in_time or single_snapshot). Descriptive only; read only */
     get: operations['GetBasketContext'];
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/universe/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The universe settings in force (the fewest trades of a tier cell to be read in place of its parent, 30; the fewest trades of a tier to be an observation, 100; the registered basket names a strategy x basket comparison may use) and the latest 50 changes. Read only */
+    get: operations['GetUniverseSettings'];
+    /** The owner changes the universe settings (minTradesChild 1 to 1000, linkMinTrades 10 to 10000, registeredBaskets: comma separated names, 1 to 20); a value left out stays. The password is needed on EVERY change (401 auth.invalid_credentials, 423 auth.locked); each key that changes is appended as a row. expectedVersion (the version of the read) is required. 400 learning.invalid, 403 learning.owner_only, 409 learning.stale */
+    put: operations['ChangeUniverseSettings'];
     post?: never;
     delete?: never;
     options?: never;
@@ -24376,6 +24445,131 @@ export interface components {
       end: number;
       text: string;
     };
+    /** @description One tier cell read against its all-shares parent (BK-11, criteria 5, 6 and 11). */
+    UniverseLinkView: {
+      /** @description The tier cell's key. */
+      childKey: string;
+      /** @description The all-shares cell's key. */
+      parentKey: string;
+      /** @description The tier. */
+      universe: string;
+      /** @description The window code. */
+      window: string;
+      /**
+       * Format: date
+       * @description The snapshot's as-of date.
+       */
+      asOf: string;
+      /** @description `child_better`, `no_better_than_parent` or `child_thin`. */
+      reason: string;
+      /** @description The key a reader takes: the child's when it is better, else the parent's. */
+      readKey: string;
+      /**
+       * Format: int32
+       * @description Trades of the tier cell.
+       */
+      childN: number;
+      /**
+       * Format: int32
+       * @description Trades of the parent.
+       */
+      parentN: number;
+      /**
+       * Format: double
+       * @description The tier cell's lower credible bound of the win rate.
+       */
+      childLower: number;
+      /**
+       * Format: double
+       * @description The parent's bound without the child's trades; null when the child is thin.
+       */
+      parentLower: null | number;
+      /** @description True when the tier is read in place of the parent and has at least the link minimum of trades: an observation to show, never applied. */
+      observation: boolean;
+      /** @description `stable` (the tier's lower bound beats the rest of the parent's in both halves of its trades), `unstable`, `insufficient` (a half has fewer than 30 trades) or `not_evaluated` (a row stored before it); computed when the cells were computed. */
+      holdOut: string;
+      /**
+       * Format: int32
+       * @description Tier trades in the first half; null when not evaluated.
+       */
+      holdOutFirstN: null | number;
+      /**
+       * Format: int32
+       * @description Tier trades in the second half; null when not evaluated.
+       */
+      holdOutSecondN: null | number;
+      /** @description The sentence the Setups view shows. */
+      text: string;
+    };
+    /** @description One change in the history. */
+    UniverseSettingChangeView: {
+      /** Format: int64 */
+      id: number;
+      key: string;
+      oldValue: string;
+      newValue: string;
+      actor: string;
+      /** Format: date-time */
+      changedAt: string;
+      hash: string;
+    };
+    /** @description The body of a change of the universe settings; a value left out stays. */
+    UniverseSettingsChangeBody: {
+      /** Format: int32 */
+      minTradesChild: null | number;
+      /** Format: int32 */
+      linkMinTrades: null | number;
+      registeredBaskets: null | string;
+      password: null | string;
+      /** Format: int64 */
+      expectedVersion?: null | number;
+    };
+    /** @description The universe settings in force with their history (BK-11). */
+    UniverseSettingsView: {
+      /**
+       * Format: int32
+       * @description `learning.universe_min_trades_child`.
+       */
+      minTradesChild: number;
+      /**
+       * Format: int32
+       * @description `learning.universe_link_min_trades`.
+       */
+      linkMinTrades: number;
+      /** @description `learning.universe_registered_baskets`. */
+      registeredBaskets: string[];
+      /** @description The latest 50 changes, newest first. */
+      history: components['schemas']['UniverseSettingChangeView'][];
+      /**
+       * Format: int64
+       * @description The newest change id (0 when none); a change names it as `expectedVersion`.
+       */
+      version: number;
+      /** @description What the settings do and do not do. */
+      notice: string;
+    };
+    /** @description The baskets a strategy was tested on and how many variants they add (information only, BK-11). */
+    UniverseTrialsView: {
+      /** @description The strategy family. */
+      strategyId: string;
+      /**
+       * Format: int32
+       * @description Distinct baskets tested.
+       */
+      baskets: number;
+      /**
+       * Format: int32
+       * @description Distinct tests (strategy hash, basket, window).
+       */
+      tests: number;
+      /**
+       * Format: int32
+       * @description Baskets minus one.
+       */
+      extraVariants: number;
+      /** @description Where the number comes from. */
+      notice: string;
+    };
     /** @description An entry that named no instrument. `reason`: `not_found` · `ambiguous` (an ISIN of several instruments) · `invalid` (too long or with control characters). */
     UnmatchedEntry: {
       term: string;
@@ -31710,6 +31904,28 @@ export interface operations {
       };
     };
   };
+  GetUniverseTrials: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UniverseTrialsView'];
+        };
+      };
+    };
+  };
   GetStrategyRegistration: {
     parameters: {
       query?: never;
@@ -32592,6 +32808,60 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListUniverseCells: {
+    parameters: {
+      query?: {
+        strategy?: string;
+        window?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CellStatsView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListUniverseLinks: {
+    parameters: {
+      query?: {
+        strategy?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UniverseLinkView'][];
         };
       };
     };
@@ -38408,6 +38678,95 @@ export interface operations {
       };
       /** @description Bad Request */
       400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetUniverseSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UniverseSettingsView'];
+        };
+      };
+    };
+  };
+  ChangeUniverseSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UniverseSettingsChangeBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UniverseSettingsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
         headers: {
           [name: string]: unknown;
         };
