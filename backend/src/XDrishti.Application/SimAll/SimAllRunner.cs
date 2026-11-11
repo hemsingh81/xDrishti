@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.Replay;
 using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Application.Learning.SimTraining;
 using XDrishti.Domain.Research.SimAll;
@@ -302,6 +303,12 @@ public sealed class SimAllRunner(IServiceScopeFactory scopes, SimAllSettings set
 
         var gate = services.GetRequiredService<ISimAllBackfillGate>();
         if (await gate.DataJobRunningAsync(cancellationToken))
+        {
+            return new Yield(SimAllPause.DataJob, null);
+        }
+
+        // a system replay (SR-01) in flight: the two jobs read the same bars and do not run side by side. The job pauses under the reason of a data job (a stored reason of its own would need a migration) and goes on when the replay has finished; the replay does not wait for a paused job, so neither waits for the other.
+        if (services.GetService<IReplayReads>() is { } replays && await replays.AnyRunningAsync(cancellationToken))
         {
             return new Yield(SimAllPause.DataJob, null);
         }

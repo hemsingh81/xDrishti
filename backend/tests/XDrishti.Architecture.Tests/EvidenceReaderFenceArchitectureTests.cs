@@ -127,7 +127,7 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
         statements.ShouldNotBeEmpty();
 
         // a read passes only by leaving training sweeps out (<> 'training_sweep') or by naming an evidence kind; "= 'training_sweep'" is the separate count and is not a fence
-        var unfenced = statements.Where(st => st.Split('\n').Where(l => l.Contains("FROM lab.test_ledger", StringComparison.OrdinalIgnoreCase)).Any(l => !(l.Contains("trial_kind <> 'training_sweep'", StringComparison.Ordinal) || Regex.IsMatch(l, "trial_kind = '(run|replan|null)'", RegexOptions.None, ScanRegex.Timeout) || Regex.IsMatch(l, "trial_kind = 'training_sweep'", RegexOptions.None, ScanRegex.Timeout)))).ToList();
+        var unfenced = statements.Where(st => st.Split('\n').Where(l => l.Contains("FROM lab.test_ledger", StringComparison.OrdinalIgnoreCase)).Any(l => !(l.Contains("trial_kind <> 'training_sweep'", StringComparison.Ordinal) || Regex.IsMatch(l, "trial_kind = '(run|replan|null|system_replay)'", RegexOptions.None, ScanRegex.Timeout) || Regex.IsMatch(l, "trial_kind = 'training_sweep'", RegexOptions.None, ScanRegex.Timeout)))).ToList();
         unfenced.Count.ShouldBe(1, "exactly one ledger statement is unfiltered: the listing, which shows training sweeps beside the looks (ADR 0243)");
         unfenced[0].ShouldContain("ORDER BY created_at DESC");
 
@@ -271,5 +271,44 @@ public sealed partial class EvidenceReaderFenceArchitectureTests
         var users = Sources().Where(f => File.ReadAllText(f).Contains("RunPurpose.Training", StringComparison.Ordinal)).Select(Path.GetFileName).Order(StringComparer.Ordinal).ToList();
 
         users.ShouldBe(["RunAssembler.cs", "RunPurposes.cs", "RunStore.Write.cs", "RunToStore.cs", "SimAllChunkExecutor.cs"]);
+    }
+
+    [Fact]
+    public void No_evidence_reader_names_the_replay_tables_or_the_replay_store()
+    {
+        // SR-01 (AC 11, ADR 0272): a replay is research, not evidence. Cell statistics sources, Lab verdicts, the readiness scorecard, the decay monitor and model training read none of its tables. Only the store, its ports, the job and the registrations name them; a reader of the
+        // replay (the API of part C, the comparison of part D) is added to this list on purpose, and never one of the evidence readers.
+        var name = new Regex(@"\bIReplayStore\b|\bIReplayReads\b|\bReplayStore\b|\bReplayRunRow\b|\breplay_(runs|sessions|trades)\b", RegexOptions.CultureInvariant, ScanRegex.Timeout);
+        var users = Sources().Where(f => name.IsMatch(StripComments(File.ReadAllText(f)))).Select(Rel).Order(StringComparer.Ordinal).ToList();
+
+        users.ShouldBe(
+        [
+            "XDrishti.Application/Abstractions/Replay/IReplayStore.cs",
+            "XDrishti.Application/Abstractions/Replay/ReplayModels.cs",
+            "XDrishti.Application/Replay/Job/CancelReplayHandler.cs",
+            "XDrishti.Application/Replay/Job/ReplayRunner.cs",
+            "XDrishti.Application/Replay/Job/StartReplayHandler.cs",
+            "XDrishti.Application/SimAll/SimAllRunner.cs",
+            "XDrishti.Infrastructure/DependencyInjection.cs",
+            "XDrishti.Infrastructure/Replay/ReplayStore.cs",
+        ]);
+        name.IsMatch("FROM research.replay_sessions").ShouldBeTrue("the scan does see a use");
+
+        foreach (var evidence in new[] { "Lab", "Confidence", "Learning", "Reporting", "Selection", "Planning", "Research", "Shadow", "Paper", "Autonomy", "Auto", "LearningPhase" })
+        {
+            foreach (var layer in new[] { "XDrishti.Application", "XDrishti.Infrastructure" })
+            {
+                var dir = Path.Combine(Src, layer, evidence);
+                if (!Directory.Exists(dir))
+                {
+                    continue;
+                }
+
+                foreach (var file in Directory.EnumerateFiles(dir, "*.cs", SearchOption.AllDirectories).Where(f => !RepositoryFiles.IsBuildOutput(f)))
+                {
+                    StripComments(File.ReadAllText(file)).ShouldNotContain("XDrishti.Application.Abstractions.Replay", Case.Sensitive, Rel(file) + " is an evidence reader and must not read the replay (SR-01, AC 11)");
+                }
+            }
+        }
     }
 }

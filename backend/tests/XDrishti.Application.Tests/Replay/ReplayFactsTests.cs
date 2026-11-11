@@ -164,6 +164,30 @@ public sealed class ReplayFactsTests
         secondWeek.Notes.ShouldContain(HindsightLabels.LifecycleAsRecorded);
     }
 
+    [Fact]
+    public async Task Learning_mode_recomputes_from_the_stored_sources_and_a_later_refresh_of_the_statistics_changes_nothing()
+    {
+        var world = new ReplayWorld().WithDefaults("AAA");
+        var trades = new[] { new DateOnly(2026, 10, 6), new DateOnly(2026, 10, 6), new DateOnly(2026, 10, 6) }
+            .Select((d, i) => new RunTrade(FabricatedRun.Trade(ReplayWorld.Ids["AAA"], "AAA", Side.Buy, d, strategy: "S1", rFilled: i % 2 == 0 ? 1.5 : -1.0) with { TriggerTimeframe = Timeframe.D1 }, [])).ToList();
+        world.Runs.FindAsync("run", Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult<XDrishti.Application.Abstractions.Research.StoredRunHeader?>(ReplayWorld.Blank<XDrishti.Application.Abstractions.Research.StoredRunHeader>()));
+        world.Runs.StreamTradesAsync("run", false, Arg.Any<CancellationToken>()).Returns(_ => ToAsync(trades));
+        var p = Params(ReplayMode.Learning);
+        var atStart = world.Facts();
+        var stored = await atStart.LearningSourcesAsync(p, Ct);
+        world.Snapshots.Add((new DateOnly(2026, 10, 11), ReplayWorld.Stats(new DateOnly(2026, 10, 11), snapshot: "weekly") with { Sources = "other:swing:FIXED_RR{rr=2}" })); // the weekly refresh after the start
+
+        var resumed = world.Facts();
+        resumed.BeginRun(new DateOnly(2026, 10, 30), null, null, stored, learningFixed: true);
+        var live = world.Facts();
+        live.BeginRun(new DateOnly(2026, 10, 30), null);
+
+        stored.ShouldBe("run:swing:FIXED_RR{rr=2}");
+        (await resumed.CellsAsync(p, new DateOnly(2026, 10, 13), Ct)).Cells.Single().Stored.Row.N.ShouldBe(3, "the stored sources are read, not today's newest snapshot");
+        (await live.CellsAsync(p, new DateOnly(2026, 10, 13), Ct)).Cells.Single().Stored.Row.N.ShouldBe(40, "without them the run reads the refreshed snapshot and cannot learn from the sources it started with");
+        (await world.Facts().LearningSourcesAsync(Params(), Ct)).ShouldBeNull("frozen mode learns nothing");
+    }
+
     private static async IAsyncEnumerable<RunTrade> ToAsync(IEnumerable<RunTrade> trades)
     {
         foreach (var t in trades)

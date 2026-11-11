@@ -15,7 +15,7 @@ internal sealed class TestLedgerRowConfiguration : IEntityTypeConfiguration<Test
         builder.ToTable("test_ledger", Schemas.Lab, t =>
         {
             t.HasCheckConstraint("ck_test_ledger_hash", "strategy_hash ~ '^[0-9a-f]{64}$' AND window_from <= window_to");
-            t.HasCheckConstraint("ck_test_ledger_trial", "trial_kind IN ('run','replan','null','training_sweep') AND extra_trials >= 0");
+            t.HasCheckConstraint("ck_test_ledger_trial", "trial_kind IN ('run','replan','null','training_sweep','system_replay') AND extra_trials >= 0");
         });
         builder.HasKey(x => x.Id).HasName("pk_test_ledger");
         builder.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");

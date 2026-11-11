@@ -301,6 +301,8 @@ internal static class ApiSetup
         services.Replace(ServiceDescriptor.Singleton(sp => sp.GetRequiredService<IOptions<SimTrainingSettings>>().Value));
         services.AddSimAllRunner();
         services.AddHostedService<SimAllService>();
+        services.AddReplayRunner(); // the system replay job (SR-01 part B, ADR 0272): its own hosted loop, never beside a simulate-everything chunk
+        services.AddHostedService<XDrishti.Api.Lab.ReplayService>();
     }
 
     /// <summary>

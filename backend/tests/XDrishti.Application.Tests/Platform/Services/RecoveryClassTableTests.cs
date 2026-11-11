@@ -78,6 +78,14 @@ public sealed class RecoveryClassTableTests
     }
 
     [Fact]
+    public void The_system_replay_job_is_convergent_and_is_a_hosted_loop_not_a_scheduled_service()
+    {
+        // SR-01 part B (ADR 0272): the job resumes from its cursor, so running it again closes whatever a stop left open. It is hosted like the simulate-everything job and has no service definition, so it is not in the table above.
+        XDrishti.Application.Replay.Job.ReplayRunner.Recovery.ShouldBe(RecoveryClass.Convergent);
+        typeof(XDrishti.Application.Replay.Job.ReplayRunner).GetInterfaces().ShouldNotContain(typeof(XDrishti.Application.Abstractions.Platform.IScheduledService));
+    }
+
+    [Fact]
     public void No_registered_service_is_dated_until_the_first_start_baseline_is_settled()
     {
         // A Dated service would run once per missed session; with no baseline for "registered since" a never-run service would replay the whole reach (AU-02 settles it first).

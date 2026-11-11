@@ -221,6 +221,17 @@ All eight answered by the owner on 2026-11-11 as recommended ("Approve all"); th
 - A start with no frozen cell statistics as of D answers 422 `replay.invalid`.
 - The rolling-window bar load is part B. The latest auto-scope definition is accepted under `settings_now`; part B stores the scope hash.
 
+## Evidence notes (part B, 2026-11-12; ADR 0272, "Part B decisions")
+- **AC 3 (hold-out).** Part A's clamp stands; part B adds that the rolling window never loads past it (`ClampedBarsWindowTests`) and that a start into the hold-out stores nothing (`StartReplayHandlerTests`, `replay.holdout`).
+- **AC 11 (fence).** `EvidenceReaderFenceArchitectureTests.No_evidence_reader_names_the_replay_tables_or_the_replay_store` (no evidence reader, no file outside the store, its ports, the job and the registrations names the replay tables or ports); `ReplayArchitectureTests.The_replay_may_write_only_its_three_tables_and_only_the_one_store_names_them` and `The_job_names_no_execution_project_broker_or_order_and_writes_only_through_the_replay_store_and_the_trial_ledger`; Planning-names-no-Replay and `ExecutionBoundaryArchitectureTests` stay as before.
+- **AC 12 (trials).** `StartReplayHandlerTests`: one `system_replay` ledger row per strategy version with the input hash as its run key; the trial number counts the runs over the same range (`TrialNumber` on the run read). `ReplayStoreTests` proves the ledger accepts the kind.
+- **AC 13 (resumable).** `ReplayRunnerTests.A_run_killed_after_three_sessions_resumes...` (byte-identical records, same result hash, stored sessions not written again); `The_job_does_not_claim_a_run_while_a_yield_rule_says_wait...` for low disk, market hours, a bar-history job or recovery pass, a simulate-everything chunk and an incomplete backfill; `A_run_in_flight_waits_between_sessions...`.
+- **AC 14 (read while running).** `IReplayReads` (run with sessions done of total, as-of session, `Complete`; sessions by range; one session; trades; summary from `PaperLedger`), tested in `ReplayStoreTests`. The endpoints are part C.
+- **AC 15 (cancel).** `A_cancel_stops_the_run_after_the_current_session...` and `A_cancel_of_a_queued_run_never_starts_it`; `ReplayStoreTests` for the states.
+- **AC 16 (deterministic).** `Two_runs_with_the_same_input_hash_give_the_same_result_hash`; `The_input_hash_is_stable_for_the_same_inputs_and_moves_with_each_input`.
+- **AC 17 (no orders).** The job and the store are in the scan for execution, broker and order names.
+- **Speed (non-functional).** The bars are loaded once per run as a rolling window. Measured with the explicit `ReplayBenchmarks` (one year, 100 instruments, in-memory stores, Release): 0.88 s per session, 227.9 s for 259 sessions, live managed memory 609 MiB and peak working set 968 MiB for 100 instruments (bounded chunked window; a 1 GiB container is at its edge, see the ADR); the database read of the bars and a held trade's simulation are not in the figure (ADR 0272). The 8-hour target is not threatened by the engine; the figure on the owner's database is still to be measured.
+
 ## Done when
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors (Opus for parts A and B)

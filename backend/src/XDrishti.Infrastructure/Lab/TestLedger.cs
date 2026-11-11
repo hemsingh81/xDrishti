@@ -34,7 +34,7 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger, IUn
 
     public async ValueTask<int> CountVariantsAsync(string strategyId, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("SELECT count(DISTINCT strategy_hash) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind <> 'training_sweep'");
+        await using var command = dataSource.CreateCommand("SELECT count(DISTINCT strategy_hash) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind <> 'training_sweep' AND trial_kind <> 'system_replay'");
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
         return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
     }
@@ -57,12 +57,13 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger, IUn
                    (SELECT count(*) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep'),
                    (SELECT coalesce(sum(extra_trials), 0) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep'),
                    (SELECT count(DISTINCT strategy_hash) FROM lab.test_ledger WHERE trial_kind = 'training_sweep' AND strategy_hash IN (SELECT hash FROM lineage)),
-                   (SELECT count(DISTINCT strategy_hash) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep' AND strategy_hash NOT IN (SELECT hash FROM lineage))
+                   (SELECT count(DISTINCT strategy_hash) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'training_sweep' AND strategy_hash NOT IN (SELECT hash FROM lineage)),
+                   (SELECT count(DISTINCT substr(lab_run_id::text, 1, 18)) FROM lab.test_ledger WHERE strategy_id = @id AND trial_kind = 'system_replay')
             """);
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         await reader.ReadAsync(cancellationToken);
-        return new TrialCounts((int)reader.GetInt64(0), (int)reader.GetInt64(1), (int)reader.GetInt64(2), (int)reader.GetInt64(3), (int)reader.GetInt64(4), (int)reader.GetInt64(5), (int)reader.GetInt64(6), (int)reader.GetInt64(7), (int)reader.GetInt64(8));
+        return new TrialCounts((int)reader.GetInt64(0), (int)reader.GetInt64(1), (int)reader.GetInt64(2), (int)reader.GetInt64(3), (int)reader.GetInt64(4), (int)reader.GetInt64(5), (int)reader.GetInt64(6), (int)reader.GetInt64(7), (int)reader.GetInt64(8), (int)reader.GetInt64(9));
     }
 
     /// <summary>The runs of a strategy family whose Lab run named a basket (BK-11): the ledger row joined to its run's universe, evidence kind <c>run</c> only (a training sweep, a null row and a re-plan are not a test of a basket).</summary>
@@ -94,7 +95,7 @@ internal sealed class TestLedger(NpgsqlDataSource dataSource) : ITestLedger, IUn
 
     public async ValueTask<bool> HasHashAsync(string strategyId, string strategyHash, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("SELECT 1 FROM lab.test_ledger WHERE strategy_id = @id AND strategy_hash = @hash AND trial_kind <> 'training_sweep' LIMIT 1");
+        await using var command = dataSource.CreateCommand("SELECT 1 FROM lab.test_ledger WHERE strategy_id = @id AND strategy_hash = @hash AND trial_kind <> 'training_sweep' AND trial_kind <> 'system_replay' LIMIT 1");
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, strategyId);
         command.Parameters.AddWithValue("hash", NpgsqlDbType.Char, strategyHash);
         return await command.ExecuteScalarAsync(cancellationToken) is not null;

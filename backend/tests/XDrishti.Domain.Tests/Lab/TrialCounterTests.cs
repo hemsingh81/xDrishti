@@ -70,4 +70,17 @@ public sealed class TrialCounterTests
     {
         new TrialCounts(-5, 2, 0, 0, 0).Total.ShouldBe(2);
     }
+
+    [Fact]
+    public void Each_system_replay_is_one_look_in_the_total_and_not_a_distinct_hash()
+    {
+        // SR-01 (ADR 0272), the stricter choice: repeated whole-system replays are looks. They are in Total, and DistinctHashes (what CountVariantsAsync counts) leaves them out.
+        var parts = new TrialCounts(2, 1, 3, 2, 4, SystemReplays: 5);
+
+        parts.Total.ShouldBe(17);
+        parts.DistinctHashes.ShouldBe(3);
+        TrialCounter.Judged(parts, honest: true).ShouldBe(17);
+        TrialCounter.Judged(parts, honest: false).ShouldBe(3);
+        new TrialCounts(0, 0, 0, 0, 0, SystemReplays: -2).Total.ShouldBe(0);
+    }
 }

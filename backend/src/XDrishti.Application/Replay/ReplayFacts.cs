@@ -8,6 +8,7 @@ using XDrishti.Application.Abstractions.Market.Context;
 using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Abstractions.Replay;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.Selection;
 using XDrishti.Application.Learning;
@@ -56,24 +57,96 @@ internal sealed class ReplayFacts(
     IBasketContextStore? basketContext = null,
     ConfidenceOptions? confidence = null,
     ShrinkageOptions? shrinkage = null,
-    ILogger<ReplayFacts>? logger = null) : IReplayFacts
+    ILogger<ReplayFacts>? logger = null) : IReplayFacts, IReplayInputs
 {
     /// <summary>Calendar days of daily bars read before the close of the session for the correlations (about 60 sessions plus slack), as the live context source reads.</summary>
     public const int ReturnLookbackDays = 120;
 
     private static readonly TimeSpan IndiaOffset = TimeSpan.FromHours(5.5);
 
-    private readonly ClampedBars _bars = new(holdOut, holdOutOptions, minuteBars, seams, dayBars);
+    private readonly ClampedBars _bars = new(holdOut, holdOutOptions, minuteBars, seams, dayBars, options.ReadAheadSessions);
     private readonly Dictionary<string, StoredVersion?> _startVersions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<StoredVersion>> _allVersions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<ChangelogEntry>> _histories = new(StringComparer.Ordinal);
     private readonly Dictionary<DateOnly, IReadOnlyList<StoredCellStats>> _learned = [];
+    private readonly Dictionary<Guid, string?> _symbols = [];
+    private bool _versionsFixed;
+    private bool _learningFixed;
+    private string? _learningSources;
     private IReadOnlyList<StoredCellStats>? _frozen;
     private IReadOnlyList<CellInput>? _learningInputs;
     private ReplaySettingsSnapshot? _settings;
     private TradingCalendar? _calendar;
 
     public ValueTask<DateOnly> LastReadableSessionAsync(CancellationToken cancellationToken) => _bars.LastReadableAsync(cancellationToken);
+
+    public void BeginRun(DateOnly last, ReplaySettingsSnapshot? stored, IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>? versions = null, string? learningSources = null, bool learningFixed = false)
+    {
+        _bars.PlanRange(last);
+        if (learningFixed)
+        {
+            _learningFixed = true;
+            _learningSources = learningSources;
+        }
+
+        _settings = stored ?? _settings;
+        if (versions is not null)
+        {
+            _versionsFixed = true;
+            foreach (var (strategy, list) in versions)
+            {
+                _allVersions[strategy] = list;
+                _startVersions[strategy] = list.MaxBy(v => v.Version);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The strategy versions the run reads, each strategy of its cells: under the <c>Start</c> rule the active version, under <c>AsOf</c> every version written before the close of the last session. Stored with the run and hashed into its input hash; a resumed run uses the stored map.
+    /// </summary>
+    public async ValueTask<IReadOnlyDictionary<string, IReadOnlyList<StoredVersion>>> VersionsAsync(ReplayParams parameters, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        var map = new SortedDictionary<string, IReadOnlyList<StoredVersion>>(StringComparer.Ordinal);
+        var close = BasketMember.CutoffAfter(parameters.To);
+        foreach (var cell in (await CellsAsync(parameters, parameters.From, cancellationToken)).Cells)
+        {
+            var strategy = cell.Stored.Row.Cell.Strategy;
+            if (map.ContainsKey(strategy))
+            {
+                continue;
+            }
+
+            if (parameters.VersionRule == ReplayVersionRule.Start)
+            {
+                map[strategy] = await strategies.GetVersionAsync(strategy, null, cancellationToken) is { } active ? [active] : [];
+            }
+            else
+            {
+                map[strategy] = [.. (await strategies.ListVersionsAsync(strategy, cancellationToken)).Where(v => v.CreatedAt < close).OrderBy(v => v.Version)];
+            }
+        }
+
+        return map;
+    }
+
+    /// <summary>A hash of the day bars (their times, prices, volumes and the count of 1-minute bars in each) of the instruments over the window the run reads, up to its last session: a change in the stored minutes changes it. Read through the clamp.</summary>
+    public async ValueTask<string> BarHashAsync(IReadOnlyList<Guid> instrumentIds, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(instrumentIds);
+        var text = new System.Text.StringBuilder();
+        foreach (var id in instrumentIds.Distinct().Order())
+        {
+            text.Append(id.ToString("N")).Append(" seam=").Append((await seams.SeamOfAsync(id, cancellationToken))?.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "none").Append('\n');
+            foreach (var bar in await _bars.DaysAsync(id, from.AddDays(-ClampedBars.MinuteLookbackDays), to, cancellationToken))
+            {
+                text.Append(bar.Ts.ToUnixTimeSeconds()).Append(' ').Append(bar.Open.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(' ').Append(bar.High.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(' ')
+                    .Append(bar.Low.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(' ').Append(bar.Close.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(' ').Append(bar.Volume).Append(' ').Append(bar.Bars).Append(bar.Complete ? 'c' : 'i').Append('\n');
+            }
+        }
+
+        return ReplayJson.Sha256(text.ToString());
+    }
 
     public async ValueTask<TradingCalendar> CalendarAsync(CancellationToken cancellationToken) => _calendar ??= await calendars.GetAsync(cancellationToken);
 
@@ -136,9 +209,19 @@ internal sealed class ReplayFacts(
 
         foreach (var id in parameters.Scope.InstrumentIds)
         {
-            if (!members.ContainsKey(id) && await instruments.GetAsync(id, cancellationToken) is { } detail)
+            if (members.ContainsKey(id))
             {
-                members[id] = detail.Symbol;
+                continue;
+            }
+
+            if (!_symbols.TryGetValue(id, out var symbol))
+            {
+                _symbols[id] = symbol = (await instruments.GetAsync(id, cancellationToken))?.Symbol; // once for the run, not once per session
+            }
+
+            if (symbol is not null)
+            {
+                members[id] = symbol;
             }
         }
 
@@ -235,9 +318,15 @@ internal sealed class ReplayFacts(
         return session.AddDays(1);
     }
 
-    // shortcut: the 400 calendar days of minute bars are read again for every session (the rolling window of the non-functional section is part B); upgrade when the measured time per session needs it.
     private async ValueTask<StoredVersion?> VersionAsync(ReplayVersionRule rule, string strategy, DateOnly cut, CancellationToken cancellationToken)
     {
+        if (_versionsFixed)
+        {
+            // the run carries its version map: a strategy outside it has no version, and the store is never asked
+            var known = _allVersions.GetValueOrDefault(strategy) ?? [];
+            return rule == ReplayVersionRule.Start ? known.MaxBy(v => v.Version) : known.Where(v => v.CreatedAt < BasketMember.CutoffAfter(cut)).MaxBy(v => v.Version);
+        }
+
         if (rule == ReplayVersionRule.Start)
         {
             if (!_startVersions.TryGetValue(strategy, out var active))
@@ -278,8 +367,7 @@ internal sealed class ReplayFacts(
 
         // The sources of the NEWEST snapshot, not of the frozen one: a run made after the start holds the trades the replay "learns" from, and the calculator's own rule (only trades that exited on or before the as-of date) makes the cut.
         // The strategies were designed on this history, which the data_seen_before label says.
-        var newest = await stats.ListLatestCashAsync(null, CellWindow.All.Code(), cancellationToken);
-        var sourceText = newest.Count > 0 ? newest[0].Sources : first.Sources;
+        var sourceText = _learningFixed ? _learningSources ?? first.Sources : await NewestSourcesAsync(first.Sources, cancellationToken);
         if (CellSource.TryParseList(sourceText) is not { } sources)
         {
             return frozen; // a snapshot whose sources cannot be read keeps its rows: nothing is guessed
@@ -304,6 +392,28 @@ internal sealed class ReplayFacts(
             .Select(r => new StoredCellStats(key, created, first.Options, first.Sources, r))];
         _learned[asOf] = rows;
         return rows;
+    }
+
+    /// <summary>The sources of the newest cash statistics snapshot (today's), or <paramref name="fallback"/> when there is none.</summary>
+    private async ValueTask<string> NewestSourcesAsync(string fallback, CancellationToken cancellationToken)
+    {
+        var newest = await stats.ListLatestCashAsync(null, CellWindow.All.Code(), cancellationToken);
+        return newest.Count > 0 ? newest[0].Sources : fallback;
+    }
+
+    /// <summary>
+    /// The sources learning mode recomputes from, taken once at the start and stored with the run: the sources of the newest snapshot (the closed trades the weekly refresh has by then), or null in frozen mode. A later refresh must not change a run that has started.
+    /// </summary>
+    public async ValueTask<string?> LearningSourcesAsync(ReplayParams parameters, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        if (parameters.Mode != ReplayMode.Learning)
+        {
+            return null;
+        }
+
+        await CellsAsync(parameters, parameters.From, cancellationToken); // takes the frozen rows
+        return _frozen is { Count: > 0 } rows ? await NewestSourcesAsync(rows[0].Sources, cancellationToken) : null;
     }
 
     /// <summary>The Sunday before the week of <paramref name="day"/> (the day the weekly refresh knows trades up to).</summary>
