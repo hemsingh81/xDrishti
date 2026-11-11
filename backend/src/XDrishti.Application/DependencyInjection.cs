@@ -1024,6 +1024,7 @@ public static class DependencyInjection
         services.AddScoped<INightlyGate, QualityGate>();
         services.AddScoped<INightlyGate, SelectionInputsGate>();
         services.AddScoped<NullPlanBuilder>();
+        services.AddSingleton(new XDrishti.Domain.Selection.SmartRules.SmartRulesOptions()); // the one instance of the gate's limits: the selection builder and the stored plan context (basket row age, BK-08) both read it, so they cannot disagree; the code defaults until a settings home binds it
         services.AddScoped<SelectionPlanBuilder>(); // P7-04, ADR 0088: registered, not the default
         // the selection builder when configured on; else, where the Auto switch can be read, the builder follows the switch at build time (AU-17, ADR 0252); else the skeleton
         services.AddScoped<IPlanBuilder>(sp => sp.GetService<IPlanBuilderSettings>()?.UseSelection == true ? sp.GetRequiredService<SelectionPlanBuilder>()
