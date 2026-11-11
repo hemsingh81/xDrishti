@@ -434,7 +434,7 @@ public sealed class PlanReviewApiTests(ApiFactory factory) : DataTestBase(factor
             .Where(e => e.RoutePattern.RawText!.StartsWith("/api/plans", StringComparison.Ordinal) && e.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods.Contains("POST"))
             .ToList();
 
-        endpoints.Count.ShouldBe(8); // five review writes and the three alert acts (P7-20)
+        endpoints.Count.ShouldBe(9); // five review writes, the three alert acts (P7-20) and the loosening dismissal (BK-10b)
         endpoints.ShouldAllBe(e => e.Metadata.GetMetadata<EnableRateLimitingAttribute>()!.PolicyName == "plan-decisions");
     }
 }

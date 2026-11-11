@@ -16,6 +16,7 @@ import {
 import { useDecisions, type Notice } from '../hooks/useDecisions';
 import { decisionError, lapseWording, noOrderWording } from '../lib/planText';
 import { Countdown } from './Countdown';
+import { LooseningBanner } from './LooseningBanner';
 import { PlanBanner } from './PlanBanner';
 import { PlanFlags } from './PlanFlags';
 import { TicketCard } from './TicketCard';
@@ -67,6 +68,7 @@ export function PlanDetail({ planId }: { planId: number }) {
               Plan for {formatWeekdayDate(p.forDate)} (version {p.version})
             </Typography>
             <PlanFlags plan={p} />
+            <LooseningBanner plan={p} />
             {p.flags && <PlanBanner flags={p.flags} planOpen={planOpen} />}
             <Typography variant="body2">{p.notice} Armed or approved means watching only, not protected.</Typography>
             <Typography variant="body2">

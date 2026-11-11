@@ -42,7 +42,7 @@ public static class AuditKinds
             AccountEventType.AccountCreated, AccountEventType.AccountArchived, AccountEventType.TradingUpdated, AccountEventType.PortfolioUpdated, AccountEventType.DataUpdated, AccountEventType.RiskProfileCreated, AccountEventType.RiskProfileUpdated, AccountEventType.RiskProfileDeleted,
             AccountEventType.CapabilityChanged, AccountEventType.BucketAdded, AccountEventType.BucketCreated, AccountEventType.BucketRenamed, AccountEventType.PortfolioRefreshSettingsChanged, AccountEventType.PortfolioBenchmarkChanged, AccountEventType.FirstImportDateChanged, AccountEventType.ComplianceRecorded, AccountEventType.EssentialSettingReset, AccountEventType.EssentialSettingChanged,
         ]),
-        (Selection, [AccountEventType.EventFilterSwitched, AccountEventType.SizingChanged, AccountEventType.BasketSettingsChanged]),
+        (Selection, [AccountEventType.EventFilterSwitched, AccountEventType.SizingChanged, AccountEventType.BasketSettingsChanged, AccountEventType.LooseningDismissed, AccountEventType.LooseningSettingsChanged]),
         (Learning, [AccountEventType.ExperimentJobStarted, AccountEventType.ExperimentJobCancelled, AccountEventType.LessonMoved, AccountEventType.HypothesisMoved, AccountEventType.ChangelogReverted, AccountEventType.ReportExported, AccountEventType.LabHoldOutUnlocked, AccountEventType.LearnedSettingDecided, AccountEventType.SimulateAllStarted, AccountEventType.SimulateAllPaused, AccountEventType.SimulateAllResumed, AccountEventType.SimulateAllCancelled]),
         (Autonomy, [AccountEventType.AutonomySettingsChanged, AccountEventType.RampStepSet, AccountEventType.LiveSettingsChanged, AccountEventType.ExecutionSettingsChanged]),
         (MarketData,

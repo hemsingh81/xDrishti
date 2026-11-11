@@ -44,6 +44,12 @@ public sealed record PlanView(
     IReadOnlyList<PlanEventView> History,
     PlanFlagsView? Flags = null)
 {
+    /// <summary>The loosened limits this plan shows (BK-10b), oldest first: computed on read from the stored change rows, never part of the stored plan or its hash. Empty when none, or in a plan read where they could not be read (see <see cref="LooseningsUnavailable"/>).</summary>
+    public IReadOnlyList<LooseningView> Loosenings { get; init; } = [];
+
+    /// <summary>True when the loosenings could not be read: the screen says so instead of showing nothing.</summary>
+    public bool LooseningsUnavailable { get; init; }
+
     /// <summary>Builds the view from the stored row.</summary>
     public static PlanView Of(PlanRow row, IReadOnlyList<PlanItemView> items, IReadOnlyList<PlanEventView> history)
     {

@@ -5,7 +5,7 @@ using XDrishti.Domain.Common;
 namespace XDrishti.Application.Planning;
 
 /// <summary>Lists the plans (spec P7-03). Read only; an empty list is an answer.</summary>
-internal sealed class ListPlansHandler(IPlanStore store) : IQueryHandler<ListPlansQuery, Result<IReadOnlyList<PlanView>>>
+internal sealed class ListPlansHandler(IPlanStore store, LooseningReader loosenings) : IQueryHandler<ListPlansQuery, Result<IReadOnlyList<PlanView>>>
 {
     public async ValueTask<Result<IReadOnlyList<PlanView>>> HandleAsync(ListPlansQuery query, CancellationToken cancellationToken)
     {
@@ -16,6 +16,7 @@ internal sealed class ListPlansHandler(IPlanStore store) : IQueryHandler<ListPla
         }
 
         var rows = await store.ListAsync(query.Date, query.AccountId, query.Limit, cancellationToken);
-        return Result.Success<IReadOnlyList<PlanView>>([.. rows.Select(r => PlanView.Of(r, [], []))]);
+        var (notices, readable) = await loosenings.ReadAsync(cancellationToken);
+        return Result.Success<IReadOnlyList<PlanView>>([.. rows.Select(r => LooseningReader.With(PlanView.Of(r, [], []), notices, readable))]);
     }
 }

@@ -9,6 +9,8 @@ import { ActionThresholdsCard } from './ActionThresholdsCard';
 const ChargeSheetCard = lazy(() => import('./ChargeSheetCard'));
 // The event-risk filter's switch card (P15-11) loads on demand too.
 const EventFilterCard = lazy(() => import('./EventFilterCard'));
+// The limit settings (sizing, basket budgets, basket settings, the loosening banner; BK-10b) load on demand too.
+const LimitsCard = lazy(() => import('./LimitsCard'));
 // The learned changes panel (AU-10) loads on demand too.
 const LearnedChangesPanel = lazy(() => import('./LearnedChangesPanel'));
 
@@ -18,6 +20,7 @@ const settingsTabs = [
   { key: 'actions', label: 'Action center' },
   { key: 'charge-sheet', label: 'Charge sheet' },
   { key: 'selection', label: 'Selection' },
+  { key: 'limits', label: 'Limits' },
   { key: 'learned', label: 'Learned changes' },
 ] as const;
 
@@ -80,6 +83,14 @@ export function AdvancedSettings() {
             failed={<ReloadAlert label="The event filter" />}
           >
             <EventFilterCard />
+          </LazyBoundary>
+        )}
+        {tab === 'limits' && (
+          <LazyBoundary
+            pending={<LoadingState label="Loading the limit settings" />}
+            failed={<ReloadAlert label="The limit settings" />}
+          >
+            <LimitsCard />
           </LazyBoundary>
         )}
         {tab === 'learned' && (

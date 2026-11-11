@@ -5661,6 +5661,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/plans/loosenings/{noticeId}/dismiss': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Hide one loosened limit (noticeId sizing:{id}, budget:{id} or basket:{id}) on every plan read from now on. Session and CSRF token, no password; insert-only, the owner is the session; repeating it changes nothing (204). The change itself is never edited. 422 plans.invalid (a malformed id or a change that did not loosen), 404 plans.not_found, 401 */
+    post: operations['DismissLoosening'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/plans/loosening-settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The automatic dismissal setting plans.loosening_banner.auto_dismiss (OFF by default; no row means OFF) with the version and the latest 50 changes. When ON, a loosening a published plan already showed is hidden at the build of the next plan, recorded as automatic. Read only */
+    get: operations['GetLooseningSettings'];
+    /** The owner switches the automatic dismissal ON or OFF (autoDismiss, expectedVersion = the version read). The password is needed on EVERY change, ON and OFF alike (403 auth.step_up_required without one, 401 auth.invalid_credentials, 423 auth.locked); a row is appended with the owner as actor. 409 plans.stale when the setting changed meanwhile */
+    put: operations['ChangeLooseningSettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/selection/basket-settings': {
     parameters: {
       query?: never;
@@ -16438,6 +16473,71 @@ export interface components {
       /** @description The words. */
       text: string;
     };
+    /** @description One row of the setting history. */
+    LooseningSettingChangeView: {
+      /** Format: int64 */
+      id: number;
+      autoDismiss: boolean;
+      actor: string;
+      /** Format: date-time */
+      changedAt: string;
+      hash: string;
+    };
+    /** @description The owner's change of the automatic dismissal setting. The actor is never taken from the body. */
+    LooseningSettingsChangeBody: {
+      /** @description The new value of `plans.loosening_banner.auto_dismiss`. */
+      autoDismiss: boolean;
+      /**
+       * Format: int64
+       * @description The version read (0 when no row exists); another change in between is 409 plans.stale.
+       */
+      expectedVersion: number;
+      /** @description The owner's password for THIS change, ON or OFF. Missing: 403 auth.step_up_required. */
+      password: null | string;
+    };
+    /** @description The automatic dismissal setting and its history (newest first, the latest 50). */
+    LooseningSettingsView: {
+      /** @description The value; OFF while no row exists. */
+      autoDismiss: boolean;
+      /**
+       * Format: int64
+       * @description The newest row id; 0 when none.
+       */
+      version: number;
+      /** @description The hash of the newest row. */
+      hash: null | string;
+      /** @description What the setting does, advisory. */
+      notice: string;
+      /** @description The rows. */
+      history: components['schemas']['LooseningSettingChangeView'][];
+    };
+    /** @description One loosened limit a plan shows (BK-10b): computed on read from the stored change rows, never stored in the plan. */
+    LooseningView: {
+      /** @description `sizing:{id}`, `budget:{id}` or `basket:{id}`. */
+      noticeId: string;
+      /** @description sizing, budget or basket. */
+      source: string;
+      /** @description The setting key, or for a budget the basket's name. */
+      key: string;
+      /**
+       * Format: uuid
+       * @description The basket of a budget; null otherwise.
+       */
+      basketId: null | string;
+      /** @description The value before. */
+      oldValue: string;
+      /** @description The value after. */
+      newValue: string;
+      /** @description Who changed it. */
+      actor: string;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      changedAt: string;
+      /** @description The line of the banner. */
+      sentence: string;
+    };
     /** @description A tag on one loss. */
     LossTagDetailView: {
       /** @description The kind. */
@@ -18916,6 +19016,10 @@ export interface components {
       /** @description The trail, oldest first; empty in a list. */
       history: components['schemas']['PlanEventView'][];
       flags?: null | components['schemas']['PlanFlagsView'];
+      /** @description The loosened limits this plan shows (BK-10b), oldest first: computed on read from the stored change rows, never part of the stored plan or its hash. Empty when none, or in a plan read where they could not be read (see bool PlanView.LooseningsUnavailable). */
+      loosenings?: components['schemas']['LooseningView'][];
+      /** @description True when the loosenings could not be read: the screen says so instead of showing nothing. */
+      looseningsUnavailable?: boolean;
     };
     /** @description How the approved ticket lines divide (P8-04). A graded line with a zero or missing planned risk per share is counted under `NoPlanLevels`. */
     PlanVsActualCounts: {
@@ -38547,6 +38651,133 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DismissLoosening: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        noticeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLooseningSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LooseningSettingsView'];
+        };
+      };
+    };
+  };
+  ChangeLooseningSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LooseningSettingsChangeBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LooseningSettingsView'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
         headers: {
           [name: string]: unknown;
         };
