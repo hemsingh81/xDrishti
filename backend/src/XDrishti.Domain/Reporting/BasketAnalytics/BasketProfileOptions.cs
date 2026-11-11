@@ -59,6 +59,6 @@ public sealed record BasketProfileOptions
     /// <summary>Most days a hold may start late or end early (P8-07).</summary>
     public int HoldMaxGapDays { get; init; } = 7;
 
-    /// <summary>Days in the dispersion mean, and in the ADV.</summary>
+    /// <summary>Days in the dispersion mean (the ADV is the fixed 20 sessions of CF-05, <c>LiquidityTiers.Median</c>).</summary>
     public int AveragingDays { get; init; } = 20;
 }

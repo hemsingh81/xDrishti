@@ -321,6 +321,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(PlanPhaseCheckView))]
 [JsonSerializable(typeof(RunsView))]
 [JsonSerializable(typeof(ReportBenchmarksView))]
+[JsonSerializable(typeof(BasketProfileView))]
+[JsonSerializable(typeof(BasketRankingView))]
 [JsonSerializable(typeof(SimReportJobsView))]
 [JsonSerializable(typeof(TrainingCompletenessView))]
 [JsonSerializable(typeof(PlanVsActualView))]

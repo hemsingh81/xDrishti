@@ -18,6 +18,7 @@ using XDrishti.Application.Abstractions.OptionChain;
 using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Abstractions.Selection;
 using XDrishti.Application.Abstractions.Ticks;
@@ -701,6 +702,11 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetReportWhatWorksQuery, Result<WhatWorksView>>, GetReportWhatWorksHandler>();
         services.AddScoped<IQueryHandler<PageReportTradesQuery, Result<TradesView>>, PageReportTradesHandler>();
         services.AddScoped<IQueryHandler<GetReportBenchmarksQuery, Result<ReportBenchmarksView>>, GetReportBenchmarksHandler>();
+        services.AddScoped<ProfileWindowResolver>(); // the window and the index of a basket profile (BK-07, ADR 0262)
+        services.AddScoped<BasketMembershipLoader>();
+        services.AddSingleton<IProfileCache, ProfileCache>(); // in process, bounded, keyed by everything the answer depends on
+        services.AddScoped<IQueryHandler<GetBasketProfileQuery, Result<BasketProfileView>>, GetBasketProfileHandler>();
+        services.AddScoped<IQueryHandler<GetBasketRankingQuery, Result<BasketRankingView>>, GetBasketRankingHandler>();
         services.AddScoped<IQueryHandler<ListSimReportJobsQuery, Result<SimReportJobsView>>, ListSimReportJobsHandler>(); // the jobs a training report can read (AU-14)
         services.AddScoped<IQueryHandler<EvaluateReportsPhaseCheckQuery, Result<ReportsPhaseCheckView>>, EvaluateReportsPhaseCheckHandler>(); // the P8 exit judged from what can be read; MET only on real evidence, read only (P8-17, ADR 0126)
         services.TryAddSingleton<IEndpointCatalogue, NoEndpointCatalogue>(); // a host without a route table says so; the API host replaces it

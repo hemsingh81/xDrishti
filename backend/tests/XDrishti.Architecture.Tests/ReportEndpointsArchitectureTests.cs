@@ -39,7 +39,7 @@ public sealed partial class ReportEndpointsArchitectureTests
         var code = Code(EndpointsSource);
 
         WritingRoute().IsMatch(code).ShouldBeFalse();
-        ReadingRoute().Count(code).ShouldBe(16); // AU-14 added the list of simulation jobs (GET); P8-11 added the trade replay (GET); P8-04 added plan-vs-actual (GET); P8-10 added mae-mfe (GET); P8-10b added comparisons and exit-selections (GET)
+        ReadingRoute().Count(code).ShouldBe(18); // BK-07 added the basket profile and the basket ranking (GET); AU-14 added the list of simulation jobs (GET); P8-11 added the trade replay (GET); P8-04 added plan-vs-actual (GET); P8-10 added mae-mfe (GET); P8-10b added comparisons and exit-selections (GET)
         code.ShouldNotContain("ICommandHandler");
         WritingRoute().IsMatch("reports.MapPost(\"/x\", Handler)").ShouldBeTrue("the scan does see a write route");
         WritingRoute().IsMatch("reports.MapDelete(\"/x\", Handler)").ShouldBeTrue();

@@ -16158,6 +16158,156 @@
         }
       }
     },
+    "/api/reports/baskets/{id}/profile": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "The performance profile of one basket (manual, portfolio or system) from its own stored daily bars against an index: the equal-weight, daily-rebalanced, price-return index rebased to 100 beside the index, volatility, drawdown, beta, alpha (the regression intercept, never a trading result), tracking error, capture, rolling beta, relative strength, breadth, dispersion and correlation inside the basket, contribution, the index by market regime, turnover, ADV20 and capacity, and the median split of the basket's strategy trades. Every figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) with a number only for a value, and the membership basis (dated, or a single snapshot with survivorship) and every instrument left out are named. Takes from and to (default the last 252 sessions ending at the newest stored daily bar of the index; window.source says which), index (instrument id; default the owner's benchmark) and membersAsOf (default the window end). A window under 20 sessions or a basket above the instrument cap is 422 reports.invalid; an unknown or archived basket 404 reports.not_found. Read only; the answer is cached by basket, membership, window, index and newest bar.",
+        "operationId": "GetBasketProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "index",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "membersAsOf",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketProfileView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/baskets/ranking": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Two to twelve baskets side by side on relative strength against an index: the return of the relative strength line over 21, 63, 126 and 252 sessions, its rank (1 = strongest) on the longest window most baskets have a value for, the return over the annualised volatility, and the Jaccard overlap of each pair's members. A basket with no value has its state and no rank; when a gap between neighbours is within its noise (indicative, pairwise, uncorrected) separated is false and no order is to be shown; no basket is labelled best. Takes basket (ids, comma separated), from, to and index as the profile does. Read only. 422 reports.invalid; 404 reports.not_found.",
+        "operationId": "GetBasketRanking",
+        "parameters": [
+          {
+            "name": "basket",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "index",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketRankingView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/plan-vs-actual": {
       "get": {
         "tags": [
@@ -26219,6 +26369,180 @@
         },
         "description": "Every active basket exactly once, in the wanted order."
       },
+      "BasketProfileView": {
+        "required": [
+          "basket",
+          "window",
+          "membersAsOf",
+          "membershipBasis",
+          "membershipFrom",
+          "members",
+          "index",
+          "hold",
+          "series",
+          "risk",
+          "indexDifference",
+          "breadth",
+          "dispersion",
+          "correlation",
+          "contribution",
+          "regime",
+          "turnover",
+          "capacity",
+          "holdOut",
+          "relativeStrength",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "basket": {
+            "description": "Who it is.",
+            "$ref": "#/components/schemas/ProfileBasketView"
+          },
+          "window": {
+            "description": "The window and where each end came from.",
+            "$ref": "#/components/schemas/BenchmarkWindowView"
+          },
+          "membersAsOf": {
+            "type": "string",
+            "description": "The India date of the member list.",
+            "format": "date"
+          },
+          "membershipBasis": {
+            "type": "string",
+            "description": "`dated` (membership history exists) or `single_snapshot` (members as of one date, not as of each trading day; survivorship applies, ISS-22)."
+          },
+          "membershipFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The first date with membership history.",
+            "format": "date"
+          },
+          "members": {
+            "description": "The members counted and the ones left out, named.",
+            "$ref": "#/components/schemas/ProfileMembersView"
+          },
+          "index": {
+            "description": "The index the basket is set against.",
+            "$ref": "#/components/schemas/ProfileIndexView"
+          },
+          "hold": {
+            "description": "The basket's buy-and-hold price return in percent (P8-07).",
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "series": {
+            "description": "The daily series of the charts; the same numbers are in the tables.",
+            "$ref": "#/components/schemas/ProfileSeriesView"
+          },
+          "risk": {
+            "description": "Volatility, drawdown, beta, tracking and capture.",
+            "$ref": "#/components/schemas/ProfileRiskView"
+          },
+          "indexDifference": {
+            "description": "The passive difference to the index; never a trading result and never called alpha (BK-07 review).",
+            "$ref": "#/components/schemas/IndexDifferenceView"
+          },
+          "breadth": {
+            "description": "Breadth inside the basket.",
+            "$ref": "#/components/schemas/ProfileBreadthView"
+          },
+          "dispersion": {
+            "description": "Dispersion of member returns.",
+            "$ref": "#/components/schemas/ProfileDispersionView"
+          },
+          "correlation": {
+            "description": "Average correlation, effective bets and the matrix.",
+            "$ref": "#/components/schemas/ProfileCorrelationView"
+          },
+          "contribution": {
+            "description": "Who made the return.",
+            "$ref": "#/components/schemas/ProfileContributionView"
+          },
+          "regime": {
+            "description": "The index by regime.",
+            "$ref": "#/components/schemas/ProfileRegimeView"
+          },
+          "turnover": {
+            "description": "Member turnover.",
+            "$ref": "#/components/schemas/ProfileTurnoverView"
+          },
+          "capacity": {
+            "description": "Liquidity and capacity.",
+            "$ref": "#/components/schemas/ProfileCapacityView"
+          },
+          "holdOut": {
+            "description": "The median split of the strategy trades of this basket (m23).",
+            "$ref": "#/components/schemas/ProfileHoldOutView"
+          },
+          "relativeStrength": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelativeStrengthReturnView"
+            },
+            "description": "The relative strength returns (m8); the rank is on the ranking board."
+          },
+          "evidence": {
+            "description": "The evidence block.",
+            "$ref": "#/components/schemas/BenchmarkEvidenceView"
+          }
+        },
+        "description": "The performance profile of one basket (BK-07, metrics m1b to m16, m23): its own prices against an index, with every figure a MetricView (a number only for a value) and the basis printed. Nothing here is a trading result and none is a forecast."
+      },
+      "BasketRankingView": {
+        "required": [
+          "window",
+          "index",
+          "rankWindow",
+          "rows",
+          "overlap",
+          "separated",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "window": {
+            "description": "The window and where it came from.",
+            "$ref": "#/components/schemas/BenchmarkWindowView"
+          },
+          "index": {
+            "description": "The index the strengths are against.",
+            "$ref": "#/components/schemas/ProfileIndexView"
+          },
+          "rankWindow": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Sessions of the relative strength return the ranks are on; null when fewer than two baskets have one.",
+            "format": "int32"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RankingRowView"
+            },
+            "description": "One per basket, in the order asked."
+          },
+          "overlap": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverlapView"
+            },
+            "description": "The Jaccard index of the member sets of each pair of baskets at the end of the window."
+          },
+          "separated": {
+            "type": "boolean",
+            "description": "False means \"not separated\": every gap is not larger than its standard error (indicative, pairwise, uncorrected; not a significance test)."
+          },
+          "evidence": {
+            "description": "The evidence block.",
+            "$ref": "#/components/schemas/BenchmarkEvidenceView"
+          }
+        },
+        "description": "Baskets side by side (BK-07): the relative strength return of each over 21, 63, 126 and 252 sessions, its rank (1 = strongest) on `RankWindow` and the return over the annualised volatility. A basket with no value has no rank, only its state. No label \"best\":\nwhen a pair of neighbours is within its noise, `Separated` is false and the screen shows no order."
+      },
       "BasketRiskBudgetChangeBody": {
         "required": [
           "budgetPct",
@@ -27267,6 +27591,34 @@
           }
         },
         "description": "One breach rule that fires now (B1 to B7) or still holds a hold."
+      },
+      "BreadthFigureView": {
+        "required": [
+          "share",
+          "voters",
+          "excluded",
+          "excludedReason"
+        ],
+        "type": "object",
+        "properties": {
+          "share": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "voters": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "excluded": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excludedReason": {
+            "type": "string"
+          }
+        },
+        "description": "One breadth share with the members behind it."
       },
       "BriefingAttemptView": {
         "required": [
@@ -30962,6 +31314,28 @@
         },
         "description": "One day (or VIX leg) the derivation did not use, with the reason code and the bars it had."
       },
+      "ContributionRowView": {
+        "required": [
+          "symbol",
+          "returnPct",
+          "share"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "returnPct": {
+            "type": "number",
+            "format": "double"
+          },
+          "share": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "One member's part of the hold return."
+      },
       "ConversationDetail": {
         "required": [
           "id",
@@ -31173,6 +31547,40 @@
           }
         },
         "description": "A split or bonus issue of an instrument (ADR 0017 §5). `kind`: split · bonus. `numerator:denominator` (`ratio`): for a split old shares : new shares (1:5 is one share into five), for a bonus\nbonus shares : shares held (1:1 is one bonus share for each held). `factor` is the price multiplier for the bars before `exDate` (a 1:5 split 0.2, a 1:1 bonus 0.5). `status`: suggested\n(found by the detection, changes nothing yet) · applied (adjusted reads use it) · ignored (declined, kept so it is not suggested again). `source`: manual · detected · csv.\n`decidedAt` and `decidedBy` are set once the owner decided (not while suggested). `csvAdjustedThrough`: the date the instrument's loaded CSV files reach (their last bar, in India time; null when\nnone is loaded). Those files are already adjusted at source, so an action with an ex-date on or before it would adjust their prices twice."
+      },
+      "CorrelationMatrixView": {
+        "required": [
+          "total",
+          "symbols",
+          "rho"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "symbols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rho": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "null",
+                  "number"
+                ],
+                "format": "double"
+              }
+            }
+          }
+        },
+        "description": "The matrix: `Total` members behind the figure, `Symbols` those drawn (at most 40, the most liquid, in sector order); a pair without enough common sessions is null."
       },
       "CostBatchPage": {
         "required": [
@@ -44048,6 +44456,26 @@
         },
         "description": "The price return of the benchmark index over the same window."
       },
+      "IndexDifferenceView": {
+        "required": [
+          "basket",
+          "index",
+          "difference"
+        ],
+        "type": "object",
+        "properties": {
+          "basket": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "index": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "difference": {
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "The basket's hold return, the index's over the same dates and their difference, all in percent and all passive."
+      },
       "InsightView": {
         "required": [
           "kind",
@@ -52152,6 +52580,28 @@
         },
         "description": "The checked sessions of one underlying in a range and the cumulative count of usable chain sessions up to the end of the range (the number P14-07 compares with 60). Truncated is true when more rolling sessions exist than are listed."
       },
+      "OverlapView": {
+        "required": [
+          "a",
+          "b",
+          "jaccard"
+        ],
+        "type": "object",
+        "properties": {
+          "a": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "b": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "jaccard": {
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "How much two baskets share: the Jaccard index of their member sets."
+      },
       "OverviewAccount": {
         "required": [
           "accountId",
@@ -57001,6 +57451,557 @@
           }
         }
       },
+      "ProfileBasketView": {
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "paramsHash"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "paramsHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The basket: `Kind` is manual, portfolio, index, list or derived; `ParamsHash` only for a derived basket."
+      },
+      "ProfileBreadthView": {
+        "required": [
+          "b20",
+          "b50",
+          "b200",
+          "adShare",
+          "newHighShare",
+          "noBar",
+          "seriesDates",
+          "seriesB20"
+        ],
+        "type": "object",
+        "properties": {
+          "b20": {
+            "$ref": "#/components/schemas/BreadthFigureView"
+          },
+          "b50": {
+            "$ref": "#/components/schemas/BreadthFigureView"
+          },
+          "b200": {
+            "$ref": "#/components/schemas/BreadthFigureView"
+          },
+          "adShare": {
+            "$ref": "#/components/schemas/BreadthFigureView"
+          },
+          "newHighShare": {
+            "$ref": "#/components/schemas/BreadthFigureView"
+          },
+          "noBar": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "seriesDates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "seriesB20": {
+            "type": "array",
+            "items": {
+              "type": [
+                "null",
+                "number"
+              ],
+              "format": "double"
+            }
+          }
+        },
+        "description": "Breadth inside the basket on the last session with a bar; `SeriesB20` is the share above the 20-day average per day (null where too few voted)."
+      },
+      "ProfileCapacityView": {
+        "required": [
+          "medianAdv",
+          "p10Adv",
+          "basketCapacity",
+          "asmGsmShare",
+          "fnoShare",
+          "counted",
+          "shortMembers",
+          "capacityPct"
+        ],
+        "type": "object",
+        "properties": {
+          "medianAdv": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "p10Adv": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "basketCapacity": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "asmGsmShare": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "fnoShare": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "counted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "shortMembers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capacityPct": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "What the basket can absorb: the ADV20 (the CF-05 median of traded value, in rupees) of the members, a share of it as capacity and the flag shares. A member with fewer than 20 sessions of volume is listed, never guessed."
+      },
+      "ProfileContributionView": {
+        "required": [
+          "top3Share",
+          "included",
+          "top",
+          "bottom",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "top3Share": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "included": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "top": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionRowView"
+            }
+          },
+          "bottom": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionRowView"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionRowView"
+            }
+          }
+        },
+        "description": "Who made the return: the five largest and five smallest parts, the share of the three largest and every member (empty unless the shares exist)."
+      },
+      "ProfileCorrelationView": {
+        "required": [
+          "rhoBar",
+          "nEff",
+          "members",
+          "pairs",
+          "sampled",
+          "matrix"
+        ],
+        "type": "object",
+        "properties": {
+          "rhoBar": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "nEff": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "members": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pairs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sampled": {
+            "type": "boolean"
+          },
+          "matrix": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CorrelationMatrixView"
+              }
+            ]
+          }
+        },
+        "description": "Average pairwise correlation, the effective number of bets (a heuristic) and the matrix of the most liquid members (null when there is no correlation figure)."
+      },
+      "ProfileDispersionView": {
+        "required": [
+          "today",
+          "mean20",
+          "iqr",
+          "voters"
+        ],
+        "type": "object",
+        "properties": {
+          "today": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "mean20": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "iqr": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "voters": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Dispersion of member returns on the last session, its mean over 20 sessions and the interquartile range."
+      },
+      "ProfileExclusionView": {
+        "required": [
+          "symbol",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "An instrument left out and why."
+      },
+      "ProfileHoldOutCellView": {
+        "required": [
+          "strategy",
+          "splitDate",
+          "firstN",
+          "secondN",
+          "firstExpectancy",
+          "secondExpectancy",
+          "verdict"
+        ],
+        "type": "object",
+        "properties": {
+          "strategy": {
+            "type": "string"
+          },
+          "splitDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "firstN": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "secondN": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstExpectancy": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "secondExpectancy": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "verdict": {
+            "type": "string"
+          }
+        },
+        "description": "One strategy's cell: the n and the expectancy of each half and the verdict (agrees, disagrees, insufficient, not_evaluable)."
+      },
+      "ProfileHoldOutView": {
+        "required": [
+          "status",
+          "trades",
+          "minPerHalf",
+          "cells"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minPerHalf": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileHoldOutCellView"
+            }
+          }
+        },
+        "description": "The median split of the strategy trades of the basket in the default run set (m23): not the locked hold-out of ADR 0207. `Status` says whether trades could be read."
+      },
+      "ProfileIndexView": {
+        "required": [
+          "id",
+          "symbol",
+          "isDefault"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        },
+        "description": "The index in force: null symbol when there is none."
+      },
+      "ProfileMembersView": {
+        "required": [
+          "total",
+          "counted",
+          "excluded"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "counted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "excluded": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileExclusionView"
+            }
+          }
+        },
+        "description": "Instruments in the basket in the window (`Total`), the ones the figures rest on (`Counted`) and every one left out with its reason (no_bars, starts_late, ends_early, discontinuity, bad_price, too_few_bars)."
+      },
+      "ProfileRegimeView": {
+        "required": [
+          "status",
+          "unknown",
+          "minDays",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "unknown": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RegimeRowView"
+            }
+          }
+        },
+        "description": "The regime panel: `Status` is a value when a regime was recorded, else why not; `Unknown` days sit in no row."
+      },
+      "ProfileRiskView": {
+        "required": [
+          "vol20",
+          "vol60",
+          "vol252",
+          "mdd",
+          "mddDuration",
+          "drawdownOpen",
+          "daysSincePeak",
+          "beta60",
+          "beta252",
+          "alpha",
+          "trackingError",
+          "informationRatio",
+          "upCapture",
+          "downCapture"
+        ],
+        "type": "object",
+        "properties": {
+          "vol20": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "vol60": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "vol252": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "mdd": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "mddDuration": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "drawdownOpen": {
+            "type": "boolean"
+          },
+          "daysSincePeak": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "beta60": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "beta252": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "alpha": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "trackingError": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "informationRatio": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "upCapture": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "downCapture": {
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "Risk figures (fractions, not percent). Alpha, tracking error and information ratio are those of the 252-day window; `Alpha` is the regression intercept against the index, not a trading result."
+      },
+      "ProfileSeriesView": {
+        "required": [
+          "dates",
+          "basket",
+          "index",
+          "relativeStrength",
+          "drawdown",
+          "rollingBeta60"
+        ],
+        "type": "object",
+        "properties": {
+          "dates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "basket": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "index": {
+            "type": "array",
+            "items": {
+              "type": [
+                "null",
+                "number"
+              ],
+              "format": "double"
+            }
+          },
+          "relativeStrength": {
+            "type": "array",
+            "items": {
+              "type": [
+                "null",
+                "number"
+              ],
+              "format": "double"
+            }
+          },
+          "drawdown": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "rollingBeta60": {
+            "type": "array",
+            "items": {
+              "type": [
+                "null",
+                "number"
+              ],
+              "format": "double"
+            }
+          }
+        },
+        "description": "The series of the charts, one entry per index date. The basket and the index are rebased to 100 on the first date; an entry without a value is null (the index has no bar that day), never zero."
+      },
+      "ProfileTurnoverView": {
+        "required": [
+          "turnover",
+          "adds",
+          "removes"
+        ],
+        "type": "object",
+        "properties": {
+          "turnover": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "adds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "removes": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Member turnover over the window."
+      },
       "PromoteModelRequest": {
         "required": [
           "reason",
@@ -58827,6 +59828,51 @@
         },
         "description": "A cell with enough sample in its place in the ranking by the credible lower bound of expectancy."
       },
+      "RankingRowView": {
+        "required": [
+          "basketId",
+          "name",
+          "rsReturn21",
+          "rsReturn63",
+          "rsReturn126",
+          "rsReturn252",
+          "rsRank",
+          "riskAdjusted",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rsReturn21": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "rsReturn63": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "rsReturn126": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "rsReturn252": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "rsRank": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "riskAdjusted": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "description": "One basket on the ranking board."
+      },
       "RateLine": {
         "required": [
           "name",
@@ -59790,6 +60836,44 @@
         },
         "description": "Out-of-sample trades with no regime label, by reason (P6-02)."
       },
+      "RegimeRowView": {
+        "required": [
+          "code",
+          "label",
+          "days",
+          "meanReturn",
+          "vol",
+          "hitRate",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          },
+          "days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "meanReturn": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "vol": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "hitRate": {
+            "$ref": "#/components/schemas/MetricView"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "description": "The index on days that followed one regime of the previous session."
+      },
       "RegimeUnavailableView": {
         "required": [
           "reason",
@@ -59923,6 +61007,23 @@
           }
         },
         "description": "The body of a rejection."
+      },
+      "RelativeStrengthReturnView": {
+        "required": [
+          "window",
+          "return"
+        ],
+        "type": "object",
+        "properties": {
+          "window": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "return": {
+            "$ref": "#/components/schemas/MetricView"
+          }
+        },
+        "description": "The relative strength return over a window of sessions (fraction)."
       },
       "ReleaseHaltRequest": {
         "required": [

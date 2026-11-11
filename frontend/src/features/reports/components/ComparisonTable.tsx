@@ -1,5 +1,6 @@
 import { Box, Button, Chip, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { Link as RouterLink } from 'react-router';
 import {
   DataTable,
   EvidenceBlock,
@@ -125,6 +126,16 @@ export function ComparisonTable({ query, onOpen }: ComparisonTableProps) {
                       </Button>
                       {bestBasket !== undefined && basketOf(g) === bestBasket && (
                         <Chip size="small" label={`Top ranked cell: ${topStrategy}`} sx={{ ml: 0.5 }} />
+                      )}
+                      {basketOf(g) && (
+                        <Button
+                          component={RouterLink}
+                          to={`/baskets/${basketOf(g) ?? ''}/profile`}
+                          size="small"
+                          sx={{ minHeight: 44 }}
+                        >
+                          Performance
+                        </Button>
                       )}
                     </>
                   ),

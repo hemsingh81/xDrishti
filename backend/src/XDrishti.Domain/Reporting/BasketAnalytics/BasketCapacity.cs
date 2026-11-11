@@ -1,7 +1,9 @@
+using XDrishti.Domain.Research;
+
 namespace XDrishti.Domain.Reporting;
 
 /// <summary>
-/// What a basket can absorb (BK-06 m14): ADV20 per member (the median of the last 20 daily traded values, close x volume), the basket median and 10th percentile, a capacity of a share of each ADV20 and the flag shares.
+/// What a basket can absorb (BK-06 m14): ADV20 per member (the CF-05 median, <see cref="LiquidityTiers.Median"/>, of the last 20 daily traded values, close x volume), the basket median and 10th percentile, a capacity of a share of each ADV20 and the flag shares.
 /// A member with fewer sessions than the window is listed, never guessed. Pure.
 /// </summary>
 public static class BasketCapacity
@@ -24,22 +26,24 @@ public static class BasketCapacity
             }
 
             var (dates, closes, _) = BasketStats.Clean(m.Closes, DateOnly.MinValue, asOf);
-            var values = new List<double>();
-            for (var i = dates.Length - 1; i >= 0 && values.Count < options.AveragingDays; i--)
+            // newest first while collecting, oldest first for the CF-05 median
+            var values = new List<decimal>();
+            for (var i = dates.Length - 1; i >= 0 && values.Count < LiquidityTiers.MedianSessions; i--)
             {
                 if (volumes.TryGetValue(dates[i], out var volume))
                 {
-                    values.Add(closes[i] * volume);
+                    values.Add((decimal)closes[i] * (decimal)volume);
                 }
             }
 
-            if (values.Count < options.AveragingDays)
+            values.Reverse();
+            if (LiquidityTiers.Median(values) is { } adv20)
             {
-                shortList.Add(m.Symbol);
+                known.Add((m.Symbol, (double)adv20, m.IsFno, m.IsAsmGsm));
             }
             else
             {
-                known.Add((m.Symbol, BasketStats.Median([.. values]), m.IsFno, m.IsAsmGsm));
+                shortList.Add(m.Symbol);
             }
         }
 

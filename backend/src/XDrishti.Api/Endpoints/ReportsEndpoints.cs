@@ -105,6 +105,18 @@ internal sealed class ReportsEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        reports.MapGet("/baskets/{id}/profile", BasketProfileAsync)
+            .WithName("GetBasketProfile")
+            .WithSummary("The performance profile of one basket (manual, portfolio or system) from its own stored daily bars against an index: the equal-weight, daily-rebalanced, price-return index rebased to 100 beside the index, volatility, drawdown, beta, alpha (the regression intercept, never a trading result), tracking error, capture, rolling beta, relative strength, breadth, dispersion and correlation inside the basket, contribution, the index by market regime, turnover, ADV20 and capacity, and the median split of the basket's strategy trades. Every figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) with a number only for a value, and the membership basis (dated, or a single snapshot with survivorship) and every instrument left out are named. Takes from and to (default the last 252 sessions ending at the newest stored daily bar of the index; window.source says which), index (instrument id; default the owner's benchmark) and membersAsOf (default the window end). A window under 20 sessions or a basket above the instrument cap is 422 reports.invalid; an unknown or archived basket 404 reports.not_found. Read only; the answer is cached by basket, membership, window, index and newest bar.")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        reports.MapGet("/baskets/ranking", BasketRankingAsync)
+            .WithName("GetBasketRanking")
+            .WithSummary("Two to twelve baskets side by side on relative strength against an index: the return of the relative strength line over 21, 63, 126 and 252 sessions, its rank (1 = strongest) on the longest window most baskets have a value for, the return over the annualised volatility, and the Jaccard overlap of each pair's members. A basket with no value has its state and no rank; when a gap between neighbours is within its noise (indicative, pairwise, uncorrected) separated is false and no order is to be shown; no basket is labelled best. Takes basket (ids, comma separated), from, to and index as the profile does. Read only. 422 reports.invalid; 404 reports.not_found.")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         reports.MapGet("/plan-vs-actual", PlanVsActualAsync)
             .WithName("GetPlanVsActual")
             .WithSummary("Where the edge goes between the plan and the fills: the plan's R, then entry slippage, charges, a remainder 'not attributed' (exit slippage and anything else) and the realised R after the charges the sync recorded, as means over the tickets graded on fills; the counts of approved lines (with fills, uncertain, without fills), triggered tickets that had no fill (outside the chain), the parts not decomposed with the reason, per strategy, and the approvals by kind (owner, auto). Each figure below the minimum number of graded tickets is insufficient with no number. Takes from and to (planned sessions, at most 366 days apart). Read only. 422 reports.invalid.")
@@ -225,6 +237,26 @@ internal sealed class ReportsEndpoints : IEndpointModule
         CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(new GetReportBenchmarksQuery(input.Basket, input.From, input.To, input.MembersAsOf, input.Purpose, input.SimJob), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<BasketProfileView>, ProblemHttpResult>> BasketProfileAsync(
+        [AsParameters] BasketProfileParams input,
+        HttpContext http,
+        IQueryHandler<GetBasketProfileQuery, Result<BasketProfileView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetBasketProfileQuery(input.Id, input.From, input.To, input.Index, input.MembersAsOf), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<BasketRankingView>, ProblemHttpResult>> BasketRankingAsync(
+        [AsParameters] BasketRankingParams input,
+        HttpContext http,
+        IQueryHandler<GetBasketRankingQuery, Result<BasketRankingView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetBasketRankingQuery(input.Basket, input.From, input.To, input.Index), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
