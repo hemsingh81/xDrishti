@@ -16,3 +16,6 @@ internal sealed record BasketRankingParams(
     [FromQuery(Name = "from")] string? From = null,
     [FromQuery(Name = "to")] string? To = null,
     [FromQuery(Name = "index")] string? Index = null);
+
+/// <summary>The body of the choice of the basket benchmark (BK-06c): the id of a listed index of the instrument master.</summary>
+internal sealed record SetBasketBenchmarkInput(Guid? InstrumentId);

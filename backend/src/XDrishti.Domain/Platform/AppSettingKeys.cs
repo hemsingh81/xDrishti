@@ -6,6 +6,9 @@ public static class AppSettingKeys
     /// <summary>The master-list instrument (an index) the portfolio is compared with: its id as text (ADR 0020 §2).</summary>
     public const string PortfolioBenchmarkInstrument = "portfolio.benchmark_instrument";
 
+    /// <summary>The index the basket profile and ranking are compared with: an instrument id as text (BK-06c); without a row the default is Nifty 500, never the portfolio benchmark.</summary>
+    public const string BasketBenchmarkInstrument = "reports.basket_benchmark_instrument";
+
     /// <summary>The thresholds of the Action-center rules as a small JSON object (ADR 0022); without the row the documented defaults apply.</summary>
     public const string PortfolioActionThresholds = "portfolio.action_thresholds";
 

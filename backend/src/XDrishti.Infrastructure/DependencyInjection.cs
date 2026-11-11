@@ -586,6 +586,7 @@ public static class DependencyInjection
         services.AddScoped<IPriceAlertStore>(sp => sp.GetRequiredService<PriceAlertStore>());
         services.AddScoped<IPortfolioPrices, PortfolioPrices>();
         services.AddScoped<IPortfolioBenchmark, PortfolioBenchmarkStore>();
+        services.AddScoped<XDrishti.Application.Abstractions.Reporting.IBasketBenchmark, BasketBenchmarkStore>();
         services.AddSingleton<IPortfolioHistoryCache, PortfolioHistoryCache>();
         services.AddScoped<IInstrumentMapper, InstrumentMapper>();
     }

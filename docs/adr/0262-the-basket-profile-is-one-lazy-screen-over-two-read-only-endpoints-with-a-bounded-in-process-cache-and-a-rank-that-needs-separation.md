@@ -26,3 +26,7 @@ A single snapshot is survivorship biased; thin histories leave most 252-day figu
 ## Owner decision 2026-11-11
 
 Given in chat. The default index of the profile and ranking endpoints is **Nifty 500** (spec BK-07 open question 2, via BK-06 question 1). Built in [BK-06c](../specs/BK-06c-nifty-500-default-benchmark-for-the-basket-profile.md). The route `/baskets/:basketId/profile` stays as built.
+
+## Build note BK-06c (2026-11-11)
+
+The default index is the basket setting `reports.basket_benchmark_instrument` (an instrument id; unset means Nifty 500), read through `IBasketBenchmark`; the portfolio benchmark (`portfolio.benchmark_instrument`, Nifty 50) is not read by the profile or the ranking. The index is found by canonical symbol `NSE:NIFTY_500` (`CanonicalSymbol.ForIndex("NIFTY 500")`) or the display name "Nifty 500", case-insensitively. A missing index or one without bars in the window makes every figure against it `unavailable` with the reason; there is no fall-back to Nifty 50, and a stored choice that left the master is reported missing rather than replaced. The cache key already holds the index id, so a change of default is never served from an old answer. `PUT /api/reports/basket-benchmark` (session and CSRF token, no password) stores the choice and audits it as `EssentialSettingChanged`.
