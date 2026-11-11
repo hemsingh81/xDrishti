@@ -4,7 +4,7 @@ One measurement of whether the local model and the current prompts are good enou
 
 | File | What it is |
 |---|---|
-| `fixture/fixture.json` | The whole world of the eval: instruments EVA..EVH2, two stored runs (ORB 15m with 24 trades, VWAP pullback 15m with 16), a plan for 2026-03-03, two holdings, one statistics cell, lessons and hypotheses. Its SHA-256 is the `fixture_hash`. |
+| `fixture/fixture.json` | The whole world of the eval: instruments EVA..EVH2, two stored runs (ORB 15m with 24 trades, VWAP pullback 15m with 16), a plan for 2026-03-03, two holdings, one statistics cell, lessons and hypotheses, and (BK-12b) the Nifty 500 index with 70 sessions of daily bars and the baskets EvalGamma, EvalTwin and EvalQuad of new shares for the basket questions BQ-01/02/04/06. Its SHA-256 is the `fixture_hash`. |
 | `sets/data-questions.jsonl` | The 30 data questions with their expected answers (numbers as exact fractions, grading rounds). |
 | `sets/announcements.schema.json` | The row format of the event set D (200 labelled announcements; until they exist the set is `not_evaluable`). The labelled text is in the git-ignored `data/eval/sets/announcements.jsonl`; only `sets/announcements.manifest.json` (ids and hashes, no text) is committed. |
 | `sets/announcement-baseline.json` | The pre-registered category baseline of set D (P15-07): exchange category to `material` or `non_material`, committed before the first sample. |

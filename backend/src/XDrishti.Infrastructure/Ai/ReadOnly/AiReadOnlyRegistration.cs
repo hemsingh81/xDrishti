@@ -1,13 +1,17 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using XDrishti.Application.Abstractions.Ai;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.SimAll;
 using XDrishti.Application.Ai;
 using XDrishti.Application.Reporting;
+using XDrishti.Domain.Common;
+using XDrishti.Infrastructure.Ai.ReadOnly.BasketApi;
 using XDrishti.Infrastructure.Ai.ReadOnly.DataReader;
 using XDrishti.Infrastructure.Lab;
 using XDrishti.Infrastructure.Research;
@@ -43,6 +47,29 @@ public static class AiReadOnlyRegistration
         services.TryAddSingleton<IHoldingClassifications, ReportClassifications>();
         services.AddAssistantReportTools();
         services.TryAddSingleton<IAiDataReader, AiDataReader>();
+        return services;
+    }
+
+    /// <summary>
+    /// The two basket reports of <c>get_report</c> over the API (BK-12b, ADR 0267): HTTP-backed implementations of the two BK-07 query interfaces, so that <c>BasketReportReader</c> is unchanged. Settings <c>Mcp:Api</c>; with no address or token the handlers answer <c>tool.unavailable</c> and call nothing.
+    /// The one client carries the read-only service token and an allow-list of exactly the two routes.
+    /// </summary>
+    public static IServiceCollection AddAiBasketApi(this IServiceCollection services, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+        services.AddOptions<BasketApiOptions>()
+            .Bind(configuration.GetSection(BasketApiOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(o => o.HasValidUrl(), "Mcp:Api:BaseUrl must be an absolute http(s) address.")
+            .Validate(o => string.IsNullOrEmpty(o.Token) || !configuration.GetSection("Mcp:Tokens").GetChildren().Any(c => string.Equals(c.Value, o.Token, StringComparison.Ordinal)), "Mcp:Api:Token equals a client token of this server; the service token needs a value of its own.")
+            .ValidateOnStart();
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddTransient<BasketApiEndpointGuard>();
+        services.AddHttpClient<BasketApiClient>((sp, client) => client.Timeout = TimeSpan.FromSeconds(sp.GetRequiredService<IOptions<BasketApiOptions>>().Value.TimeoutSeconds))
+            .AddHttpMessageHandler<BasketApiEndpointGuard>();
+        services.TryAddScoped<IQueryHandler<GetBasketProfileQuery, Result<BasketProfileView>>, ApiBasketProfileHandler>();
+        services.TryAddScoped<IQueryHandler<GetBasketRankingQuery, Result<BasketRankingView>>, ApiBasketRankingHandler>();
         return services;
     }
 

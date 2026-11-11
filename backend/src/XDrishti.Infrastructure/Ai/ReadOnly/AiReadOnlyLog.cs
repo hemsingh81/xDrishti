@@ -10,4 +10,8 @@ internal static partial class AiReadOnlyLog
 
     [LoggerMessage(EventId = 6021, Level = LogLevel.Information, Message = "ai.roles_provisioned: the read-only roles have a login")]
     public static partial void RolesProvisioned(this ILogger logger);
+
+    /// <summary>Log event 6124 (BK-12b): one call of the tool server to the API for a basket report. The route name, the status code (0 when no answer came) and the time; never a basket name, a symbol, the query or the token.</summary>
+    [LoggerMessage(EventId = 6124, Level = LogLevel.Information, Message = "mcp.api_call {Route} status={Status} ms={Elapsed}")]
+    public static partial void ApiCall(this ILogger logger, string route, int status, long elapsed);
 }

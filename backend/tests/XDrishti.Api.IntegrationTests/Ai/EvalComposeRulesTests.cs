@@ -46,6 +46,10 @@ public sealed class EvalComposeRulesTests
         { "runner-runtime-role", "xd-eval", "Username=xd_app", "Username=xd_owner" },
         { "runner-reads-eval-files-read-only", "xd-eval", "- ../eval:/data/eval-files:ro", "- ../eval:/data/eval-files" },
         { "eval-token-only-where-designed", "xd-eval-seed", "    secrets:\n      - source: db_owner_password\n        target: Database__Password", "    secrets:\n      - source: db_owner_password\n        target: Database__Password\n      - source: eval_mcp_token\n        target: Eval__Mcp__Token" },
+        { "mcp-eval-reads-the-eval-api", "xd-mcp-eval", "Mcp__Api__BaseUrl: http://xd-api-eval:8080", "Mcp__Api__BaseUrl: http://xd-api:8080" },
+        { "api-eval-isolated", "xd-api-eval", "networks: [back]", "networks: [back, egress]" },
+        { "api-eval-token-only-where-designed", "xd-eval-seed", "    secrets:\n      - source: db_owner_password\n        target: Database__Password", "    secrets:\n      - source: db_owner_password\n        target: Database__Password\n      - source: mcp_api_token_eval\n        target: Api__ServiceTokens__Mcp" },
+        { "production-api-not-reports-only", "xd-api", "Brokers__PublicBaseUrl: http://localhost:${XD_HTTP_PORT:-8080}", "Brokers__PublicBaseUrl: http://localhost:${XD_HTTP_PORT:-8080}\n      Api__ReportsOnly: \"true\"" },
         { "api-has-no-eval-token", "xd-api", "      - source: mcp_token\n        target: Assistant__Mcp__Token", "      - source: mcp_token\n        target: Assistant__Mcp__Token\n      - source: eval_mcp_token\n        target: Eval__Mcp__Token" },
     };
 
@@ -75,6 +79,20 @@ public sealed class EvalComposeRulesTests
         db.ShouldContain("NAME=\"xdrishti_eval\"");
         run.ShouldContain("--no-deps");
         run.ShouldContain("xdrishti-xd-mcp-eval-1");
+    }
+
+    [Fact]
+    public void The_up_script_writes_the_two_read_only_api_tokens_from_the_keychain_and_the_eval_scripts_start_the_eval_api()
+    {
+        var up = File.ReadAllText(FindUp("deploy", "xd-up.sh"));
+        var run = File.ReadAllText(FindUp("scripts", "xd-eval.sh"));
+
+        up.ShouldContain("write_secret mcp_api_token \"xdrishti/mcp/api-token\"");
+        up.ShouldContain("write_secret mcp_api_token_eval \"xdrishti/mcp/api-eval-token\"");
+        up.ShouldNotContain("xd-api-eval"); // the eval API is never started by the plain stack
+        run.ShouldContain("up -d --no-deps --wait --wait-timeout 120 xd-api-eval xd-mcp-eval");
+        Compose.ShouldContain("source: mcp_api_token\n        target: Api__ServiceTokens__Mcp");
+        Compose.ShouldContain("source: mcp_api_token\n        target: Mcp__Api__Token");
     }
 
     [Fact]

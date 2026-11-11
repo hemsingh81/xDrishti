@@ -2,13 +2,13 @@ namespace XDrishti.Api.IntegrationTests.Ai;
 
 /// <summary>
 /// The static rules of the <c>xd-mcp</c> service in <c>deploy/compose.yaml</c> (spec P9-02 AC 14, ADR 0137). Same method as <see cref="AiComposeRules"/>: each rule has a name, <see cref="Violations"/> lists the names that fail, the file is read with a YAML parser. The tool server holds
-/// exactly four secrets (its two database passwords and its two client tokens, Api and Hermes), no volume, no published port, and none of the application's credentials.
+/// exactly five secrets (its two database passwords, its two client tokens, Api and Hermes, and the read-only API token of BK-12b), no volume, no published port, and none of the application's credentials.
 /// </summary>
 internal static class McpComposeRules
 {
     public static readonly string[] All =
     [
-        "profile-ai-only", "no-ports", "network-back-only", "cap-drop-all", "no-new-privileges", "mem-limit", "healthcheck", "read-only-root", "exactly-four-secrets", "no-secret-in-environment", "no-application-role", "no-volumes", "migrate-first", "built-from-target-mcp", "restart-unless-stopped",
+        "profile-ai-only", "no-ports", "network-back-only", "cap-drop-all", "no-new-privileges", "mem-limit", "healthcheck", "read-only-root", "exactly-five-secrets", "api-address", "no-secret-in-environment", "no-application-role", "no-volumes", "migrate-first", "built-from-target-mcp", "restart-unless-stopped",
     ];
 
     public static List<string> Violations(string composeText)
@@ -33,7 +33,8 @@ internal static class McpComposeRules
         Check("mem-limit", AiComposeRules.Text(service, "mem_limit") == "512m");
         Check("healthcheck", service.ContainsKey("healthcheck") && AiComposeRules.Map(service, "healthcheck").ContainsKey("test"));
         Check("read-only-root", AiComposeRules.Text(service, "read_only") == "true");
-        Check("exactly-four-secrets", Secrets(service).Order(StringComparer.Ordinal).SequenceEqual(["db_mcp_read_password", "db_mcp_sql_password", "mcp_token", "mcp_token_hermes"]));
+        Check("exactly-five-secrets", Secrets(service).Order(StringComparer.Ordinal).SequenceEqual(["db_mcp_read_password", "db_mcp_sql_password", "mcp_api_token", "mcp_token", "mcp_token_hermes"]));
+        Check("api-address", AiComposeRules.Text(AiComposeRules.Map(service, "environment"), "Mcp__Api__BaseUrl") == "http://xd-api:8080");
         Check("no-secret-in-environment", !AiComposeRules.EnvironmentLooksSecret(service));
         var environment = AiComposeRules.Map(service, "environment");
         Check("no-application-role", !environment.Values.Any(v => v?.ToString() is { } text && (text.Contains("xd_app", StringComparison.Ordinal) || text.Contains("xd_owner", StringComparison.Ordinal))) && !environment.ContainsKey("Database__ConnectionString"));

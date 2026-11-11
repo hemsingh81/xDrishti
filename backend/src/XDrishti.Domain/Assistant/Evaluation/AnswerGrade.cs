@@ -12,5 +12,8 @@ namespace XDrishti.Domain.Assistant.Evaluation;
 public sealed record AnswerGrade(string CaseId, bool Correct, bool? Grounded, bool HardFail, ValueList<string> Codes, ValueList<string> UngroundedFigures)
 {
     /// <summary>Correct and grounded: both are needed (spec AC 4).</summary>
-    public bool Passed => Correct && Grounded == true;
+    public bool Passed => Correct && Grounded == true && !NotEvaluable;
+
+    /// <summary>A tool of the question answered <c>tool.unavailable</c> (no eval API behind a basket report, BK-12b AC 11): not evaluable, never a pass, whatever the answer says.</summary>
+    public bool NotEvaluable => Codes.Contains(EvalCodes.ToolNotEvaluable);
 }

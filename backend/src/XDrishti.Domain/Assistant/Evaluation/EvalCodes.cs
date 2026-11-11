@@ -14,4 +14,7 @@ public static class EvalCodes
     public const string WithheldNumberGiven = "withheld_number_given";
     public const string UngroundedNumber = "ungrounded_number";
     public const string GroundingNotEvaluable = "grounding_not_evaluable";
+
+    /// <summary>The tool answered <c>tool.unavailable</c> (the basket reports of BK-12b with no API behind them): the question could not be asked of real data, so it is not evaluable and never a pass.</summary>
+    public const string ToolNotEvaluable = "tool_not_evaluable";
 }

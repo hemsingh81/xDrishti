@@ -58,6 +58,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public AdjustableTimeProvider Clock { get; } = new();
 
+    /// <summary>The tool server's read-only service token of this test run (<c>Api:ServiceTokens:Mcp</c>, BK-12b): random, never a real one.</summary>
+    public string ServiceToken { get; } = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
     /// <summary>The broker vault key of this test run (random, never a real one).</summary>
     public string VaultKey { get; } = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
@@ -123,6 +126,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Database:ConnectionString", _database.GetConnectionString());
         builder.UseSetting("BrokerVault:Key", VaultKey);
         builder.UseSetting("ExecHandover:Key", HandoverKey);
+        builder.UseSetting("Api:ServiceTokens:Mcp", ServiceToken);
         builder.UseSetting("Instruments:AutoRefresh:Enabled", "false"); // tests start refreshes themselves
         builder.UseSetting("Portfolio:AutoRefresh:Enabled", "false"); // tests drive the holdings schedule themselves
         builder.UseSetting("Data:Context:Breadth:MinVoters", "3"); // the product default is 50 (unit-tested); the integration fixtures have a handful of shares
@@ -171,7 +175,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddSingleton<IDataJobChannel>(DataJobs);
 
             // The scheduler's own loop is switched off for the suite: tests look at the schedules themselves (ServiceScheduler.TickAsync) with the clock pinned.
-            services.Remove(services.Single(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(ServiceSchedulerHost)));
+            if (services.SingleOrDefault(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(ServiceSchedulerHost)) is { } scheduler)
+            {
+                services.Remove(scheduler); // a reports-only host (BK-12b) has no hosted service at all
+            }
 
             // The Dhan Data API source and the Data account: the real ones answer (over the fake Dhan server above) unless a test puts a fake in (FakeDhan).
             Dhan.Wrap(services);
