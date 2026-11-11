@@ -6,7 +6,8 @@ namespace XDrishti.Domain.Selection;
 /// <param name="Sector">The instrument's sector.</param>
 /// <param name="Baskets">Baskets the symbol belongs to; empty when none.</param>
 /// <param name="HeldLongTerm">True when the instrument is in the long-term holdings.</param>
-public sealed record FillCandidate(RankedCandidate Ranked, double? RiskPct, string? Sector, IReadOnlyList<string>? Baskets, bool? HeldLongTerm)
+/// <param name="ClusterId">The id of its correlation cluster (BK-08); null when unknown (only read when the cluster cap is on, where unknown is unavailable, never a pass).</param>
+public sealed record FillCandidate(RankedCandidate Ranked, double? RiskPct, string? Sector, IReadOnlyList<string>? Baskets, bool? HeldLongTerm, string? ClusterId = null)
 {
     /// <summary>The instrument.</summary>
     public string Symbol => Ranked.Merged.Winner.Candidate.Symbol;

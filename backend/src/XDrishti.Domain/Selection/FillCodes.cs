@@ -42,6 +42,9 @@ public static class FillCodes
     /// <summary>Pair correlation with the book and the picks.</summary>
     public const string Correlation = "correlation";
 
+    /// <summary>Open risk in one correlation cluster (BK-08, only when the owner set a cap).</summary>
+    public const string ClusterCap = "cluster_cap";
+
     /// <summary>Admissible, but the reserve list is full.</summary>
     public const string ReserveFull = "reserve_full";
 }

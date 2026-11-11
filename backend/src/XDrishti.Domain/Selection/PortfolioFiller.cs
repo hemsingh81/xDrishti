@@ -10,7 +10,7 @@ namespace XDrishti.Domain.Selection;
 /// </summary>
 public static class PortfolioFiller
 {
-    private sealed record Holding(string Symbol, string Side, string Style, double? Risk, string? Sector, IReadOnlyList<string>? Baskets);
+    private sealed record Holding(string Symbol, string Side, string Style, double? Risk, string? Sector, IReadOnlyList<string>? Baskets, string? ClusterId);
 
     /// <summary>Runs the fill.</summary>
     /// <param name="candidates">Ranked eligible candidates with their portfolio facts.</param>
@@ -40,7 +40,7 @@ public static class PortfolioFiller
             return new FillResult([], [], [.. ordered.Select(c => new FillDecision(c, FillStatus.Rejected, unknown))]);
         }
 
-        var bookHoldings = book.Select(b => new Holding(b.Symbol, b.Side, b.Style, FiniteOrZero(b.RiskPct), b.Sector, b.Baskets)).ToList();
+        var bookHoldings = book.Select(b => new Holding(b.Symbol, b.Side, b.Style, FiniteOrZero(b.RiskPct), b.Sector, b.Baskets, b.ClusterId)).ToList();
         var held = new List<Holding>(bookHoldings);
         var primary = new List<FillDecision>();
         var notTaken = new List<(FillCandidate Candidate, IReadOnlyList<FillCheck> Checks)>();
@@ -82,7 +82,7 @@ public static class PortfolioFiller
         return new FillResult(primary, reserve, rejected);
     }
 
-    private static Holding ToHolding(FillCandidate c) => new(c.Symbol, c.Side, c.Style, Finite(c.RiskPct), c.Sector, c.Baskets);
+    private static Holding ToHolding(FillCandidate c) => new(c.Symbol, c.Side, c.Style, Finite(c.RiskPct), c.Sector, c.Baskets, c.ClusterId);
 
     // A ticket must carry a positive risk (zero would be a free trade nobody can size). An open position may carry 0 (breakeven or locked stop): that is a known figure, not a gap.
     private static double? Finite(double? v) => v is { } x && double.IsFinite(x) && x > 0 ? x : null;
@@ -122,6 +122,11 @@ public static class PortfolioFiller
         }
 
         checks.Add(Correlation(c, held, correlations, k));
+        if (k.MaxClusterRiskPct is { } clusterCap)
+        {
+            checks.Add(Cluster(c, risk, held, clusterCap));
+        }
+
         return checks;
     }
 
@@ -243,6 +248,26 @@ public static class PortfolioFiller
         }
 
         return worst ?? new FillCheck(FillCodes.Basket, FilterOutcome.Pass, null, null, "in no limited basket");
+    }
+
+    // BK-08: the open risk of one correlation cluster (book plus picks plus this ticket) is at most the cap ("not above"). A known total above the cap fails even when another figure is missing; otherwise a cluster, a risk figure or a cluster of an open position that is not known is unavailable, never a pass.
+    private static FillCheck Cluster(FillCandidate c, double? risk, List<Holding> held, double cap)
+    {
+        if (c.ClusterId is null || risk is not { } r)
+        {
+            return Unavailable(FillCodes.ClusterCap, c.ClusterId is null ? "the correlation cluster of " + c.Symbol + " is not known" : "the ticket's risk is not known");
+        }
+
+        var inCluster = held.Where(h => h.ClusterId is not null && string.Equals(h.ClusterId, c.ClusterId, StringComparison.Ordinal)).ToList();
+        var total = inCluster.Where(h => h.Risk is not null).Sum(h => h.Risk!.Value) + r;
+        if (Math.Round(total, 9) > cap)
+        {
+            return new FillCheck(FillCodes.ClusterCap, FilterOutcome.Fail, total, cap, "open risk in the cluster of " + c.ClusterId + " would be " + N(total) + "%, cap " + N(cap) + "%");
+        }
+
+        return inCluster.Any(h => h.Risk is null) || held.Any(h => h.ClusterId is null)
+            ? new FillCheck(FillCodes.ClusterCap, FilterOutcome.Unavailable, total, cap, "the cluster or the risk of an open position is not known")
+            : new FillCheck(FillCodes.ClusterCap, FilterOutcome.Pass, total, cap, "open risk in the cluster of " + c.ClusterId + " " + N(total) + "%, cap " + N(cap) + "%");
     }
 
     // The correlation that matters is the one of the two bets: corr * side(candidate) * side(held). Opposite sides of positively correlated names are a hedge (effective negative); opposite sides of negatively correlated names are one concentrated bet (effective positive).
