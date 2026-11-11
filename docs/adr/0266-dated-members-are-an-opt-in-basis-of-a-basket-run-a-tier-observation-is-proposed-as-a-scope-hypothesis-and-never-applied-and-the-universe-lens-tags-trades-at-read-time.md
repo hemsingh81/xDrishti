@@ -29,3 +29,7 @@ BK-11 built the tier cells, the read of a tier against its all-shares parent and
 - The `members_as_of` of a `single_snapshot` run is the run date, as the spec states (criteria 4 and 5: the run date for `single_snapshot`, the date in the key line), so the key of such a run changes from one day to the next. That is the spec's choice and is kept: the members of a snapshot are those of that day, and a repeat on another day is another look. A caller that wants a stable key names no basis (the key is then what it always was) or names `dated`.
 - The not-member fate adds a counter to the engine's pinned shapes (`RunFates`, `WalkCounters`, the oracle's counters); it is zero, and not written, for every run that does not use dated members.
 - Down of the migration keeps every row (the narrower setting-key check is added NOT VALID); it fails while a hypothesis of source `universe` or kind `Scope` exists, because hypotheses are never deleted.
+
+## Owner decision 2026-11-11
+
+The owner answered in chat on 2026-11-11: a share that leaves the basket during a dated run keeps its open position to the normal exit (no forced exit); and the web owner-act form to propose a tier observation as a hypothesis stays, beside the CLI.
