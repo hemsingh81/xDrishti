@@ -109,3 +109,4 @@ Factual corrections. The status is unchanged; owner questions are in REVIEW-2026
 - `market.fo_lot_sizes` is **not built**: the lot file is a parser, a master cross-check and a fetch-record summary only, until the owner answers REVIEW-2026-11-10 question 5 (reuse `options.lot_sizes`). AC 7 and 8 are met as records and warnings, not as a dated table.
 - Flags of basket 13 are known only up to the last good check of each list (`basket_sources.known_through` for the ban list); an unknown flag is not a pass.
 - The master-derived catalogue rows have `source_url = ''` (NOT NULL column).
+- **Superseded by BK-05b (2026-11-11):** AC 7 and 8 are now a dated table: [BK-05b](BK-05b-nse-lot-sizes-into-options-lot-sizes.md) writes the NSE lots into `options.lot_sizes` as unconfirmed `nse_mktlots` rows (nearest expiry column, only when the lot changed, in the fetch transaction); `market.fo_lot_sizes` stays unbuilt.

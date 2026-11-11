@@ -53,6 +53,12 @@ internal sealed class FakeMasterReader : IListMasterReader
 
     public int Reads { get; private set; }
 
+    /// <summary>The index instruments of the master by canonical symbol (BK-05b).</summary>
+    public Dictionary<string, Guid> Indices { get; } = [];
+
+    public ValueTask<IReadOnlyDictionary<string, Guid>> ReadIndexIdsAsync(IReadOnlyCollection<string> canonicalSymbols, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyDictionary<string, Guid>>(Indices.Where(i => canonicalSymbols.Contains(i.Key)).ToDictionary(i => i.Key, i => i.Value));
+
     public ValueTask<IReadOnlyList<MasterShare>> ReadSharesAsync(DateOnly today, CancellationToken cancellationToken)
     {
         Reads++;
@@ -134,6 +140,29 @@ internal sealed class FakeRunLock : IBasketRunLock
     }
 }
 
+/// <summary>Stands in for the NSE lot transaction: it keeps the last lot rows it was given, answers the number written (the lots, or null as a failed transaction) and records the fetch row the way the real one does.</summary>
+internal sealed class FakeLotApplier(FakeSourceStore store) : INseLotApplier
+{
+    public List<NseLotApplication> Applied { get; } = [];
+
+    public bool Fails { get; set; }
+
+    public int? Written { get; set; }
+
+    public ValueTask<int?> ApplyAsync(NseLotApplication application, CancellationToken cancellationToken)
+    {
+        Applied.Add(application);
+        if (Fails)
+        {
+            return ValueTask.FromResult<int?>(null); // rolled back: no fetch row either
+        }
+
+        var written = Written ?? application.Lots.Count;
+        store.Recorded.Add((application.Source, application.Fetch(written)));
+        return ValueTask.FromResult<int?>(written);
+    }
+}
+
 internal sealed class FakeApplier : IBasketMembershipApplier
 {
     public List<MembershipApplication> Applied { get; } = [];
@@ -159,6 +188,10 @@ internal sealed class FetchWorld
     public FakeFetcher Fetcher { get; } = new();
 
     public FakeApplier Applier { get; } = new();
+
+    public FakeLotApplier LotApplier => _lotApplier ??= new(Store);
+
+    private FakeLotApplier? _lotApplier;
 
     public FakeRunLock RunLock { get; } = new();
 
@@ -201,7 +234,7 @@ internal sealed class FetchWorld
 
     public FakeMasterReader MasterShares { get; } = new();
 
-    public RunBasketFetchHandler Handler => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, ListSettings, new ListFileProcessor(Store, Baskets, MasterShares), Clock, NullLogger<RunBasketFetchHandler>.Instance);
+    public RunBasketFetchHandler Handler => new(Settings, Store, Fetcher, Baskets, Applier, RunLock, ListSettings, new ListFileProcessor(Store, Baskets, MasterShares), LotApplier, Clock, NullLogger<RunBasketFetchHandler>.Instance);
 
     /// <summary>The members now: instruments 1 to <paramref name="count"/> of the master.</summary>
     public void Members(int from, int count)

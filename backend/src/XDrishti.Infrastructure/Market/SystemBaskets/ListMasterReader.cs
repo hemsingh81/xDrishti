@@ -9,6 +9,16 @@ namespace XDrishti.Infrastructure.Market.SystemBaskets;
 /// <summary>The stored master for the list baskets: the shares with their flags (two queries over the instrument table, no network) and the lot size of each underlying's nearest unexpired future.</summary>
 internal sealed class ListMasterReader(XDrishtiDbContext db) : IListMasterReader
 {
+    public async ValueTask<IReadOnlyDictionary<string, Guid>> ReadIndexIdsAsync(IReadOnlyCollection<string> canonicalSymbols, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(canonicalSymbols);
+        var rows = await db.Instruments.AsNoTracking()
+            .Where(i => i.Type == InstrumentTypeCodes.Index && i.RetiredAt == null && canonicalSymbols.Contains(i.CanonicalSymbol))
+            .Select(i => new { i.Id, i.CanonicalSymbol })
+            .ToListAsync(cancellationToken);
+        return rows.GroupBy(r => r.CanonicalSymbol, StringComparer.Ordinal).Where(g => g.Count() == 1).ToDictionary(g => g.Key, g => g.Single().Id, StringComparer.Ordinal);
+    }
+
     public async ValueTask<IReadOnlyList<MasterShare>> ReadSharesAsync(DateOnly today, CancellationToken cancellationToken)
     {
         var shares = await db.Instruments.AsNoTracking()

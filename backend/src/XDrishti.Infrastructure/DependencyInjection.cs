@@ -503,6 +503,7 @@ public static class DependencyInjection
         services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IBasketSourceStore>(sp => sp.GetRequiredService<XDrishti.Infrastructure.Market.SystemBaskets.BasketSourceStore>());
         services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IBasketRunLock, XDrishti.Infrastructure.Market.SystemBaskets.BasketRunLock>();
         services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.IBasketMembershipApplier, XDrishti.Infrastructure.Market.SystemBaskets.BasketMembershipApplier>();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.Baskets.INseLotApplier, OptionContracts.NseLotApplier>(); // BK-05b: nse_mktlots rows in the fetch transaction, only while the lot file is fetched (OFF by default)
 
         // BK-05: the lists read from the master (no network), the settings of the two NSE F&O files.
         services.AddOptions<XDrishti.Infrastructure.Market.SystemBaskets.BasketListOptions>()

@@ -76,4 +76,30 @@ public sealed class OptionMigrationTests(ApiFactory factory)
 
         (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'options' ORDER BY 1")).ShouldBe(["backfill_probe_ack", "backfill_switch", "chain_recorder_switch", "chain_requests", "chain_sessions", "chain_snapshots", "contracts", "fetch_log", "lot_sizes", "market_epochs", "quality_results", "quality_runs", "rolling_bars"]); // the three of P14-01, the four of P14-02 and the four of P14-03
     }
+
+    [Fact]
+    public async Task The_nse_source_is_allowed_by_the_check_and_down_refuses_while_such_a_row_exists_and_deletes_nothing()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_options_nse_probe", Ct);
+        using var scope = scratch.Host.Services.CreateScope();
+        var migrator = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>().GetService<IMigrator>();
+        await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+        await connection.OpenAsync(Ct);
+        var instrument = Guid.CreateVersion7();
+        await StoreKit.ExecuteAsync(scratch.ConnectionString, $"INSERT INTO market.instruments (id, canonical_symbol, exchange, exchange_segment, type, name, display_name, lot_size, underlying_symbol, fno_eligible, first_seen_at, last_seen_at) VALUES ('{instrument}', 'NSE:NSEDOWN', 'NSE', 'NSE_EQ', 'share', 'NSEDOWN', 'Probe', 1, 'NSEDOWN', false, now(), now())", Ct);
+        await StoreKit.ExecuteAsync(scratch.ConnectionString, $"INSERT INTO options.lot_sizes (underlying_id, effective_from, lot_size, source, source_url, confirmed) VALUES ('{instrument}', '2026-11-12', 500, 'nse_mktlots', 'https://x', false)", Ct);
+
+        await Should.ThrowAsync<Exception>(async () => await migrator.MigrateAsync("20261111070140_AddLooseningDismissals", Ct));
+
+        (await ListAsync(connection, "SELECT source FROM options.lot_sizes")).ShouldBe(["nse_mktlots"]); // refused, nothing deleted
+
+        await StoreKit.ExecuteAsync(scratch.ConnectionString, "DELETE FROM options.lot_sizes", Ct);
+        await migrator.MigrateAsync("20261111070140_AddLooseningDismissals", Ct);
+
+        (await ListAsync(connection, "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_lot_sizes_source'")).Single().ShouldNotContain("nse_mktlots");
+
+        await migrator.MigrateAsync(null, Ct);
+
+        (await ListAsync(connection, "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_lot_sizes_source'")).Single().ShouldContain("nse_mktlots");
+    }
 }
