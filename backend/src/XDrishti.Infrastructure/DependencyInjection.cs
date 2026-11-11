@@ -655,6 +655,13 @@ public static class DependencyInjection
             .RemoveAllLoggers();
         services.AddScoped<XDrishti.Application.Abstractions.Market.Eod.IEodSource, XDrishti.Infrastructure.Market.Eod.NseEodSource>();
         services.AddScoped<XDrishti.Application.Abstractions.Market.Eod.IEodStore, XDrishti.Infrastructure.Market.Eod.EodStore>();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.History.IBackfillCalendar, XDrishti.Infrastructure.Market.Eod.EodStore>(); // the days Part A has a verdict for: the calendar before the 1-minute backfill
+        // CF-04 Part B: the 1-minute backfill's ledger and seams. OFF by default (Data:History:Backfill:Enabled); the settings are bound with the section above.
+        services.AddSingleton<XDrishti.Application.Abstractions.Market.History.IBackfillSettings, XDrishti.Infrastructure.Market.Eod.BackfillSettings>();
+        services.AddScoped<XDrishti.Infrastructure.Market.Eod.BackfillStore>();
+        services.AddScoped<XDrishti.Application.Abstractions.Market.History.IBackfillStore>(sp => sp.GetRequiredService<XDrishti.Infrastructure.Market.Eod.BackfillStore>());
+        services.AddScoped<XDrishti.Application.Abstractions.Market.History.IBackfillSeams>(sp => sp.GetRequiredService<XDrishti.Infrastructure.Market.Eod.BackfillStore>());
+        services.AddScoped<XDrishti.Application.Abstractions.Market.History.IBackfillProgress>(sp => sp.GetRequiredService<XDrishti.Infrastructure.Market.Eod.BackfillStore>());
         services.AddSingleton<XDrishti.Application.Abstractions.Market.Eod.IEodRawFiles, XDrishti.Infrastructure.Market.Eod.EodRawFiles>();
         services.AddScoped<HttpInstrumentSource>();
         services.AddScoped<IInstrumentSource>(sp => sp.GetRequiredService<HttpInstrumentSource>());

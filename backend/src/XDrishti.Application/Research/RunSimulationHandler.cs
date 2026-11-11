@@ -47,12 +47,13 @@ internal sealed class RunSimulationHandler(
     ILogger<RunSimulationHandler> logger,
     IRandomEntryEngine randomEntries,
     IPlaceboEngine placeboEngine,
+    XDrishti.Application.Abstractions.Market.History.IBackfillSeams backfillSeams,
     IEntryTierSource? entryTiers = null,
     ICostStressSettings? costStress = null,
     IRelativeStrengthRunSource? relativeStrength = null,
     IDerivedVersionStore? derivedVersions = null) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, IQueryHandler<RunNullWalkQuery, Result<NullWalkRun>>, IQueryHandler<RunPlaceboWalkQuery, Result<PlaceboWalkRun>>
 {
-    private readonly InstrumentInputReader _reader = new(bars, barQueries, adjustments);
+    private readonly InstrumentInputReader _reader = new(bars, barQueries, adjustments, backfillSeams);
 
     public async ValueTask<Result<SimulationRun>> HandleAsync(RunSimulationQuery query, CancellationToken cancellationToken)
     {

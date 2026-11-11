@@ -20,7 +20,7 @@ internal sealed class UniverseSeriesSource(NpgsqlDataSource dataSource) : IUnive
             FROM market.bars_agg a
             JOIN market.tracked_instruments t ON t.instrument_id = a.instrument_id AND t.active
             JOIN market.instruments i ON i.id = a.instrument_id AND i.retired_at IS NULL AND i.type IN ('share', 'etf')
-            WHERE a.timeframe = '1D' AND a.ts >= @from AND a.ts < @to AND a.volume > 0
+            WHERE a.timeframe = '1D' AND a.ts >= market.backfill_cut(a.instrument_id) AND a.ts >= @from AND a.ts < @to AND a.volume > 0
             ORDER BY a.instrument_id, a.ts
             """);
         command.Parameters.AddWithValue("from", new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).UtcDateTime);

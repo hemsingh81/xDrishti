@@ -22,6 +22,14 @@ internal sealed class HistoryOptions
     [ValidateObjectMembers]
     public QualityOptions Quality { get; set; } = new();
 
+    [Required]
+    [ValidateObjectMembers]
+    public BackfillOptions Backfill { get; set; } = new();
+
+    [Required]
+    [ValidateObjectMembers]
+    public ProbeOptions Probe { get; set; } = new();
+
     internal sealed class NseOptions
     {
         /// <summary><c>Data:History:Nse:Enabled</c>, default false: with it off the job and the probe make no request at all.</summary>
@@ -51,5 +59,51 @@ internal sealed class HistoryOptions
     {
         [Range(0.1, 50)]
         public double DailyVolumeTolerancePct { get; set; } = 2;
+    }
+
+    /// <summary>The 1-minute backfill (CF-04 Part B). OFF by default: with it off nothing is requested.</summary>
+    internal sealed class BackfillOptions
+    {
+        /// <summary><c>Data:History:Backfill:Enabled</c>, default false.</summary>
+        public bool Enabled { get; set; }
+
+        [Range(1, 5)]
+        public int Years { get; set; } = 5;
+
+        [Range(7, 90)]
+        public int ChunkDays { get; set; } = 90;
+
+        [Range(1, 10)]
+        public int MaxRetries { get; set; } = 3;
+
+        [Range(1, 10)]
+        public int DiskHeadroomFactor { get; set; } = 2;
+
+        [Range(1, 1_000)]
+        public int BytesPerRowEstimate { get; set; } = 60;
+
+        /// <summary>The off-hours window of the scheduled run, <c>HH:mm-HH:mm</c> India time (it may cross midnight).</summary>
+        [Required]
+        [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$", MatchTimeoutInMilliseconds = 1000)]
+        public string RunWindow { get; set; } = "20:00-06:00";
+    }
+
+    /// <summary>The overlap probe of the seam (CF-04 Part B, decision 9).</summary>
+    internal sealed class ProbeOptions
+    {
+        [Range(1, 500)]
+        public int Instruments { get; set; } = 20;
+
+        [Range(1, 30)]
+        public int Sessions { get; set; } = 10;
+
+        [Range(0, 1_000)]
+        public double MedianBps { get; set; } = 5;
+
+        [Range(0, 10_000)]
+        public double MaxBps { get; set; } = 50;
+
+        [Range(50, 100)]
+        public double MinWithinMaxPct { get; set; } = 99;
     }
 }

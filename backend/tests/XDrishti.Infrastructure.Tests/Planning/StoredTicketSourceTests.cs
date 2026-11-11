@@ -35,7 +35,7 @@ public sealed class StoredTicketSourceTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private StoredTicketSource Source() => new(_stats, _changelog, _strategies, _baskets, _bars, _calendar);
+    private StoredTicketSource Source() => new(_stats, _changelog, _strategies, _baskets, _bars, NSubstitute.Substitute.For<XDrishti.Application.Abstractions.Market.History.IBackfillSeams>(), _calendar);
 
     private static StoredCellStats Cell(string strategy, string side = "BUY", string style = "swing", string exit = "FIXED_RR")
     {

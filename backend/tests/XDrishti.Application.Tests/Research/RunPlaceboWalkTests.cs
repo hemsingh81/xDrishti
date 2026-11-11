@@ -19,7 +19,7 @@ public sealed class RunPlaceboWalkTests
 
     private RunSimulationHandler Handler() =>
         new(_fixture.Store, _fixture.BarQueries, _fixture.Baskets, _fixture.Factors, _fixture.Actions, _fixture.Calendar, _fixture.Engine, _fixture.Strategies, _fixture.CostSheets, _fixture.ContextDays, _fixture.EventSnapshots, _fixture.FilingTimes, _fixture.SurpriseReader, _fixture.Time, _fixture.Log,
-            Substitute.For<IRandomEntryEngine>(), _engine);
+            Substitute.For<IRandomEntryEngine>(), _engine, new XDrishti.Application.Tests.Market.History.FakeSeams());
 
     private static PlaceboSignal Signal(int id, Guid instrument) => new(id, instrument, RunFixture.D2, Side.Buy, 0.01, 2, CostSegment.IntradayEquity, 1);
 

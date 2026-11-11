@@ -40,7 +40,7 @@ public sealed class RunPairsHandlerTests
         _minutes.ReadAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(call => (IReadOnlyList<Bar>)[]);
     }
 
-    private RunPairsHandler Handler() => new(_universe, _daily, _minutes, _ledger, _store, _simulator, _settings, _sheets, new FakeTimeProvider(new DateTimeOffset(2025, 8, 1, 12, 0, 0, TimeSpan.Zero)), NullLogger<RunPairsHandler>.Instance);
+    private RunPairsHandler Handler() => new(_universe, _daily, _minutes, new XDrishti.Application.Tests.Market.History.FakeSeams(), _ledger, _store, _simulator, _settings, _sheets, new FakeTimeProvider(new DateTimeOffset(2025, 8, 1, 12, 0, 0, TimeSpan.Zero)), NullLogger<RunPairsHandler>.Instance);
 
     private static RunPairsCommand Command() => new(Quarter, Quarter, null);
 

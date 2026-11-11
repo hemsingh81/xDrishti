@@ -23,6 +23,7 @@ internal sealed class StoredTicketSource(
     IStrategyStore strategies,
     IBasketQueries baskets,
     IBarStore bars,
+    XDrishti.Application.Abstractions.Market.History.IBackfillSeams seams,
     ITradingCalendar tradingCalendar,
     ILogger<StoredTicketSource>? logger = null) : ITicketSource
 {
@@ -85,7 +86,7 @@ internal sealed class StoredTicketSource(
         foreach (var (id, symbol) in members)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var minutes = await bars.ReadAsync(id, from, to, cancellationToken);
+            var minutes = await XDrishti.Application.Market.History.SeamAwareBars.ReadAsync(bars, seams, id, from, to, cancellationToken);
             var prepared = TicketBars.Prepare(minutes, session, calendar); // truncated and sorted once for every cell of the instrument
             TicketClassification.Classify(cells, id, symbol, prepared, session, forDate, calendar, found, tally, cancellationToken);
         }

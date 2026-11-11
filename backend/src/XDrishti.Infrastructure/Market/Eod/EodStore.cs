@@ -1,6 +1,7 @@
 using Npgsql;
 using NpgsqlTypes;
 using XDrishti.Application.Abstractions.Market.Eod;
+using XDrishti.Application.Abstractions.Market.History;
 
 namespace XDrishti.Infrastructure.Market.Eod;
 
@@ -8,7 +9,7 @@ namespace XDrishti.Infrastructure.Market.Eod;
 /// <c>market.daily_eod</c> and <c>market.eod_files</c> by plain SQL (nothing maps them in the EF model). A day is written in one transaction with an upsert that skips an identical row, so a re-run changes nothing; there is no DELETE anywhere
 /// (the runtime role has none on these tables). Rows go in as arrays through <c>unnest</c>: one round trip per day.
 /// </summary>
-internal sealed class EodStore(NpgsqlDataSource dataSource) : IEodStore
+internal sealed class EodStore(NpgsqlDataSource dataSource) : IEodStore, IBackfillCalendar
 {
     private const string Upsert = """
         INSERT INTO market.daily_eod (trade_date, series, symbol, isin, open, high, low, close, prev_close, traded_qty, turnover, trades, delivery_qty, delivery_pct, source, file_sha256, loaded_at)
@@ -31,6 +32,15 @@ internal sealed class EodStore(NpgsqlDataSource dataSource) : IEodStore
         command.Parameters.AddWithValue("from", from);
         command.Parameters.AddWithValue("to", to);
         command.Parameters.AddWithValue("recheck", recheckAbsent);
+        return await ReadDatesAsync(command, cancellationToken);
+    }
+
+    /// <summary>The days Part A has a verdict for, loaded or recorded absent: the calendar the 1-minute backfill needs before it starts (CF-04 Part B).</summary>
+    public async ValueTask<IReadOnlySet<DateOnly>> KnownDaysAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT DISTINCT trade_date FROM market.eod_files WHERE kind = 'bhav' AND trade_date BETWEEN @from AND @to");
+        command.Parameters.AddWithValue("from", from);
+        command.Parameters.AddWithValue("to", to);
         return await ReadDatesAsync(command, cancellationToken);
     }
 

@@ -56,9 +56,9 @@ internal static class RemarkShared
     internal static string KeySession(Guid underlyingId, char flag, int code, string side, int interval, int offset, DateOnly date) =>
         string.Create(CultureInfo.InvariantCulture, $"{underlyingId}:{flag}{code}:{offset}:{side}:{interval}|{date:yyyy-MM-dd}");
 
-    internal static async ValueTask<Dictionary<long, int>> SpotAsync(IBarStore minuteBars, Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    internal static async ValueTask<Dictionary<long, int>> SpotAsync(IBarStore minuteBars, XDrishti.Application.Abstractions.Market.History.IBackfillSeams seams, Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
     {
-        var minutes = await minuteBars.ReadAsync(instrumentId, from.ToUniversalTime(), to.ToUniversalTime(), cancellationToken);
+        var minutes = await XDrishti.Application.Market.History.SeamAwareBars.ReadAsync(minuteBars, seams, instrumentId, from.ToUniversalTime(), to.ToUniversalTime(), cancellationToken);
         var map = new Dictionary<long, int>(minutes.Count);
         foreach (var bar in minutes)
         {

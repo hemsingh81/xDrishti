@@ -31,7 +31,7 @@ internal sealed class DailySeries(NpgsqlDataSource dataSource) : IDailySeries
     public async ValueTask<IReadOnlyList<DailyBar>> ReadAsync(Guid instrumentId, DateOnly from, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(
-            "SELECT ts, open, high, low, close, volume FROM market.bars_agg WHERE instrument_id = @id AND timeframe = '1D' AND ts >= @from ORDER BY ts");
+            "SELECT ts, open, high, low, close, volume FROM market.bars_agg WHERE instrument_id = @id AND timeframe = '1D' AND ts >= market.backfill_cut(instrument_id) AND ts >= @from ORDER BY ts");
         command.Parameters.AddWithValue("id", instrumentId);
         command.Parameters.AddWithValue("from", new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).ToUniversalTime());
         var bars = new List<DailyBar>();

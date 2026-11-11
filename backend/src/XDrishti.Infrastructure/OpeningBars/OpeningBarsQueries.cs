@@ -37,7 +37,7 @@ internal sealed class OpeningBarsQueries(NpgsqlDataSource dataSource) : IOpening
             """
             SELECT instrument_id, ts, open::numeric, high::numeric, low::numeric, close::numeric, volume::bigint, 1
             FROM market.bars_1m
-            WHERE instrument_id = ANY(@ids) AND ts >= @from AND ts < @to
+            WHERE instrument_id = ANY(@ids) AND ts >= market.backfill_cut(instrument_id) AND ts >= @from AND ts < @to
               AND (ts AT TIME ZONE 'Asia/Kolkata')::time >= time '09:15' AND (ts AT TIME ZONE 'Asia/Kolkata')::time < time '09:15' + make_interval(mins => @minutes)
             UNION ALL
             SELECT l.instrument_id, l.minute_start, l.o, l.h, l.l, l.c, l.v, l.packets
