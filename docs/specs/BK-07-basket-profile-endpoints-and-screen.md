@@ -79,6 +79,8 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 1. Is the route name `/baskets/:basketId/profile` acceptable, or should the profile live under Reports (`/reports/baskets/:id`)?
 2. Which index is the default for broad baskets (see BK-06 Q1)?
 
+**Answered.** Owner (2026-11-11, in chat): 1. Route as built. 2. Default index = **Nifty 500** ([BK-06c](BK-06c-nifty-500-default-benchmark-for-the-basket-profile.md)).
+
 ## Done when
 - [ ] All acceptance criteria have evidence; `scripts/check.sh` green; reviewer: no blockers/majors
 - [ ] `scripts/gen-api.sh` run; no migration

@@ -33,3 +33,7 @@ Not built here and carried by [BK-11b](../specs/BK-11b-universe-dated-basis-prop
 - The tier is relative to the tracked set (the owner's picks) as it is now: a share is in a date's set from its first stored daily bar. Delisted shares and shares tracked later are not in earlier sets (survivorship, stated).
 - Tier effects may be sector or size effects; with few trades most tier cells say "not enough evidence" or "no better than all shares".
 - Not built: per-day dated membership in the simulator, the `universe` report lens as an available dimension, and the automatic creation of a hypothesis from an observation (the proposer is unchanged; the owner creates the hypothesis).
+
+## Owner decision 2026-11-11
+
+Given in chat. (1) **Equal-thirds tiers** by count, as built (REVIEW-2026-11-10 question 7 answered: not the CF-05 A/B/C tiers). (2) Tier cells are **observation only and not in the CF-02 chain**, as built. (3) The eighth registered basket is **Nifty 500** (the placeholder in `UniverseSettingsRules.DefaultRegisteredBaskets` becomes the answer; no code change).

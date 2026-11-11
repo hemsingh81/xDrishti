@@ -31,3 +31,7 @@ The fourteen derived baskets of ADR 0255 are pure functions. Something has to fe
 - Refresh now forms only baskets that are due on the as_of (a weekly or monthly basket is not formed on another day); the manual flag only names the actor.
 - `PUT .../params` writes owner data (parameter sets, the switch) even while `Baskets:System:Derived:Enabled` is off; nothing runs until the setting is on.
 - Backfilled versions are `recomputed`: retroactively restated adjustments make them differ slightly from what was knowable on the date.
+
+## Owner decision 2026-11-11
+
+Given in chat. Baskets 4 (Gappers) and 12 (Opening-range wide) get **live 1-minute bars recorded from the Dhan live feed**, so they can be frozen at 09:20 and 09:30 IST (BK-03 AC 6). REVIEW-2026-11-10 question 2 (form them after the close) is superseded for these two baskets. Built in [BK-03b](../specs/BK-03b-opening-minute-bars-from-the-live-feed.md); OFF by default; a missed minute makes the formation `not_formed`, never a pass.

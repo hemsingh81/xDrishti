@@ -77,6 +77,8 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 2. Default `max_risk_per_cluster_pct` when the owner first turns it on: recommended 40 % of the total open risk limit; the number is the owner's.
 3. Should tightening also be doable without the password (CLI only)? Recommended no.
 
+**Answered.** Owner (2026-11-11, in chat): 1. Gate breadth basket = **Nifty 500**; the owner sets it himself in the Limits tab. A candidate breaking the cluster cap against the open book alone is **Rejected** (as built, ADR 0084). 2 and 3: as built (ADR 0260).
+
 ## Done when
 - [ ] All acceptance criteria have evidence; `scripts/check.sh` green; reviewer: no blockers/majors (told to look for any path that loosens the gate or a limit without the owner act, and for `unavailable` counted as a pass)
 - [ ] `scripts/gen-api.sh` run; migration added with `Down`; grants test updated

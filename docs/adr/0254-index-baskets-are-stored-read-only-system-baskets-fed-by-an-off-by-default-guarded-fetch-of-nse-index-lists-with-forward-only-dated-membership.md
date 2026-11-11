@@ -31,3 +31,7 @@ Official NSE index constituent lists (Nifty 50, 100, 500, sector and strategy in
 - `fetchEnabled` and `derivedEnabled` on `GET /api/baskets` (spec review fixes) move to BK-04 (the screen); the list stays an array. Built in BK-04 as a small read-only route `GET /api/baskets/system/settings` -> `{ fetchEnabled, listFetchEnabled, derivedEnabled }` (the three switches; no setting can be changed through it).
 - NSE terms and non-browser User-Agent acceptance are UNVERIFIED; Alpha 50 / High Beta 50 files are not seeded (link unknown).
 - The exact retry times (5, 30, 120 minutes) of the spec are the scheduler's retries here (three retries, its own spacing); only the 403/429 rest is kept per source.
+
+## Owner decision 2026-11-11
+
+Given in chat. The owner will enable **Nifty 50 and Nifty 500** first (with the two F&O files of ADR 0256), after reading NSE's terms of use, and sets `Baskets:System:Fetch:UserAgent` himself. These are the owner acts listed above; nothing is enabled by this note.

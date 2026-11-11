@@ -79,6 +79,8 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 2. Terciles by count (100/100/100 of 300) or by fixed top-100 / next-200 / rest? Recommended: terciles.
 3. Which eight baskets are pre-registered (research §6 Q1 suggests Nifty 50, Nifty 100, Midcap 150, F&O, top-100 liquidity, top-100 low volatility, top-100 momentum and one more)?
 
+**Answered.** Owner (2026-11-11, in chat): 1. Liquidity, as built. 2. **Equal thirds** by count, as built (not CF-05 A/B/C); tier cells are observation only and not in CF-02. 3. The eight: Nifty 50, Nifty 100, Nifty Midcap 150, F&O stocks, Most liquid, Low volatility, Momentum and **Nifty 500** (ADR 0261).
+
 ## Done when
 - [ ] All acceptance criteria have evidence; `scripts/check.sh` green; reviewer: no blockers/majors (told to look for look-ahead in the tier and for any path that applies a restriction)
 - [ ] `scripts/gen-api.sh` run; migration (only if columns exist) with `Down`

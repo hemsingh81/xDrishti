@@ -20,3 +20,7 @@ The owner sees every loosening on every plan until they dismiss it; the only aut
 - The existing sizing, budget and basket-settings PUTs do not take an `expectedVersion`; they compare against the stored state inside the handler (409 `selection.stale`). The forms send the password and the values; the version guard exists on the new setting only.
 - The automatic dismissal runs only inside `RunNightlyPlanHandler`, which is the one path that publishes a plan (scheduled and manual runs both go through it); a plan stored any other way would not trigger it. `// shortcut:` the plan read has no timing test (AC 11): it is one query over three small tables.
 - A budget loosening's key reads `basket budget <name>`; its values read `20%` and `off`.
+
+## Owner decision 2026-11-11
+
+Given in chat. (1) Dismissing a loosening line needs **no password** (as built; the P7-20 dismiss pattern). (2) The auto-dismiss option is **kept, OFF** by default.

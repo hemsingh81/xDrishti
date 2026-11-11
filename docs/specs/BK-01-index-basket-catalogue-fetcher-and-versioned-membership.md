@@ -75,6 +75,8 @@ Steady state about 26 conditional GETs per day, mostly 304 (about 1 CPU-second).
 ## Open questions
 1. Owner: permission to fetch (read terms, ADR). 2. Which of the 26 files to enable first (suggest Nifty 50, 100, Midcap 150, Bank = the index ones in the pre-registered eight). 3. Contact string for the User-Agent.
 
+**Answered.** Owner (2026-11-11, in chat): 1 and 3. The owner reads NSE's terms and sets the User-Agent himself. 2. **Nifty 50 and Nifty 500** first (with the two F&O files of BK-05).
+
 ## UNVERIFIED
 NSE/NSE Indices terms of use and redistribution rights; acceptance of a non-browser User-Agent by the CDN; exact announcement lead times; locations of Alpha 50, High Beta 50 and Nifty200 Quality files; `master_refreshes` as a pattern to mirror; existing ADR numbering at build; whether `market.baskets` has other writers that assume no `kind`.
 

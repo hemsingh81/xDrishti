@@ -13,3 +13,7 @@
 
 ## Limits
 A basket with one membership snapshot is constant in time and survivorship biased (ISS-22); the result says so (`MembershipBasis`). Risk-free rate is ignored. The effective number of bets is an equal-correlation heuristic.
+
+## Owner decision 2026-11-11
+
+Given in chat. The default benchmark of the basket profile is **Nifty 500** (not the portfolio's Nifty 50). Built in [BK-06c](../specs/BK-06c-nifty-500-default-benchmark-for-the-basket-profile.md): a basket-only setting, the portfolio benchmark (ADR 0020 §2) unchanged, and an honest `unavailable` state when Nifty 500 has no stored bars (never a silent fall-back to Nifty 50).

@@ -85,6 +85,8 @@ BK-00..BK-05 now exist (Draft). What this slice relies on, as they state it: `ki
 1. Which baskets are the pre-registered rank universes? Recommended: Nifty 100 and the liquid-100 derived basket only (largest, least survivorship noise); F&O as a third.
 2. Should `RS_ROTATION` be tested only once the dated membership has at least 6 months of history (so the rank is point in time), or now with the survivorship label? Recommended: build now, run the Lab study later.
 
+**Answered.** Owner (2026-11-11, in chat): 1. Keep the **four** rank universes: Nifty 50, Nifty 100, F&O stocks, Most liquid (ADR 0263). 2. As built.
+
 ## Done when
 - [ ] All acceptance criteria have evidence; `scripts/check.sh` green; reviewer: no blockers/majors (told to look for look-ahead and for a free parameter)
 - [ ] Migration added with `Down`; `scripts/gen-api.sh` if the read endpoint is kept

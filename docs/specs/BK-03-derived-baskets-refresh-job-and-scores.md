@@ -75,6 +75,8 @@ Daily run for 14 baskets over 500 instruments under 20 s (BK-02 budget 2 s plus 
 ## Open questions
 Track all Nifty 500 (BK-00 q3)? Which derived baskets to enable first? Is backfill wanted at all in the first release (it can be cut: -0.5 day)?
 
+**Answered.** Owner (2026-11-11, in chat): baskets 4 and 12 get **live 1-minute bars recorded from the Dhan live feed** ([BK-03b](BK-03b-opening-minute-bars-from-the-live-feed.md)); this supersedes REVIEW-2026-11-10 question 2 for them. Nifty 500 is the basket the owner enables first (BK-01).
+
 ## UNVERIFIED
 The name and event of the EOD aggregation completion (doc 05, not opened); the trading-calendar port name; live 1m bar-close hook for the intraday freeze (P3/P7 feed, not opened); `IScheduledService` `After` schedule semantics for a dependency on another job (only the list `[Daily, Weekly, After]` in `InstrumentMasterService.cs` was seen).
 

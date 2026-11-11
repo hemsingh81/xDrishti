@@ -75,6 +75,8 @@ Dhan lists add under 200 ms to the master run (set arithmetic on about 120k rows
 ## Open questions
 1. Enable the two NSE list fetches with the BK-01 permission, or Dhan-only first? (suggest Dhan-only first: they need no network.) 2. Does the owner want MIS/MTF as baskets now or wait for P12 (BK-00 q5)? 3. Add the `sec_list.csv` price-band exclusion list later?
 
+**Answered.** Owner (2026-11-11, in chat): 1. The owner enables the two NSE F&O files (with Nifty 50 and Nifty 500, BK-01) himself after reading NSE's terms and sets the User-Agent. REVIEW-2026-11-10 question 5 (spec review Q5): **yes**, NSE lots go into `options.lot_sizes`; slice [BK-05b](BK-05b-nse-lot-sizes-into-options-lot-sizes.md). 2 and 3 not asked; left as written.
+
 ## UNVERIFIED
 Stored names of the Dhan master columns for MTF leverage and any MIS/intraday multiplier; the `ASM_GSM_FLAG` value set beyond `N`; NSE terms for `fo_*` files; whether `fo_mktlots.csv` keeps its header and index-first layout; the F&O underlying count today (213 is from doc 06 as of 2026-10-11); `IScheduledService` ordering of the 08:50 job after the 08:45 master (only the schedule types were seen); the master-refresh id usable as `source_version_id`.
 
