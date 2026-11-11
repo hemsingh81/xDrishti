@@ -79,10 +79,13 @@ internal sealed class FreezeOpeningBasketsHandler(
             }
 
             var started = clock.GetTimestamp();
-            var reason = now > formation + settings.FormBy ? OpeningWindows.Late : OpeningWindows.WholeReason(await bars.ReadEventsAsync(command.Day, cancellationToken), command.Day, formation);
+            var minutes = DerivedSchedule.OpeningMinutes(catalogue, parameters.Value)!.Value;
+            var reason = now > formation + settings.FormBy ? OpeningWindows.Late
+                : formation.AddMinutes(1) > OpeningWindows.At(command.Day, settings.RecordUntil) ? OpeningWindows.WindowTooShort // the recorder closes before the window is over (an OrMinutes override above the recording time)
+                : OpeningWindows.WholeReason(await bars.ReadEventsAsync(command.Day, cancellationToken), command.Day, formation);
             var write = reason is not null
                 ? NotFormed(definition, parameters.Value, asOf, command.Day, formation, reason, now)
-                : await FormAsync(definition, parameters.Value, asOf, command.Day, formation, now, cancellationToken);
+                : await FormAsync(definition, parameters.Value, asOf, command.Day, formation, minutes, now, cancellationToken);
             var written = await store.WriteAsync(write, cancellationToken);
             var members = write.Scores.Count(s => s.IsMember);
             outcomes.Add(Row(definition, written.Outcome == VersionOutcomes.Applied ? write.Outcome : written.Outcome, reason, members, write.UniverseSize, write.ExcludedCount));
@@ -93,12 +96,17 @@ internal sealed class FreezeOpeningBasketsHandler(
         return Result.Success(new OpeningFreezeRun(waiting, outcomes));
     }
 
-    private async ValueTask<DerivedVersionWrite> FormAsync(DerivedDefinitionRow definition, DerivedParams parameters, DateOnly asOf, DateOnly day, DateTimeOffset formation, DateTimeOffset now, CancellationToken cancellationToken)
+    private async ValueTask<DerivedVersionWrite> FormAsync(DerivedDefinitionRow definition, DerivedParams parameters, DateOnly asOf, DateOnly day, DateTimeOffset formation, int minutes, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var all = await universe.ReadAsync(asOf.AddDays(-DerivedComputation.LookbackDays), asOf, cancellationToken);
-        var (kept, cut) = OpeningWindows.Subscribed(DerivedComputation.UniverseOf(all, asOf), settings.MaxInstruments);
+        var (kept, cut) = OpeningWindows.SetOf(all, asOf, settings.MaxInstruments);
         var today = OpeningWindows.Before(await bars.ReadDayAsync(day, cancellationToken), formation).ToLookup(b => b.InstrumentId);
-        var history = (await bars.ReadHistoryAsync([.. kept.Select(k => k.InstrumentId)], asOf.AddDays(-45), asOf, cancellationToken)).ToLookup(b => b.InstrumentId);
+        // A prior day recorded with a gap, a restart, low disk or a clock skew gives no live rows to the history (its minutes may be incomplete or wrong).
+        var historyFrom = asOf.AddDays(-45);
+        var priorEvents = await bars.ReadEventsAsync(historyFrom, asOf, cancellationToken);
+        var badDays = priorEvents.Where(d => OpeningWindows.WholeReason(d.Value, d.Key, OpeningWindows.At(d.Key, OpeningBarsSettings.Open.AddMinutes(minutes))) is not null).Select(d => d.Key).ToList();
+        // shortcut: the history is read from stored 1-minute bars and earlier live rows WITHOUT the corporate-action adjustment the daily bars get (ranges are ratios; a split in the 20 sessions distorts basket 4's volume median until it leaves the window).
+        var history = (await bars.ReadHistoryAsync([.. kept.Select(k => k.InstrumentId)], historyFrom, asOf, minutes, badDays, cancellationToken)).ToLookup(b => b.InstrumentId);
         var extra = cut.Select(c => new VersionExclusion(c.InstrumentId, c.Bars.Symbol, ExclusionReason.NotSubscribed)).ToList();
         var engine = new List<UniverseInstrument>();
         foreach (var instrument in kept)
@@ -111,6 +119,11 @@ internal sealed class FreezeOpeningBasketsHandler(
 
             var intraday = history[instrument.InstrumentId].Concat(today[instrument.InstrumentId]).Select(Convert).ToArray();
             engine.Add(instrument with { Bars = instrument.Bars with { Intraday = intraday } });
+        }
+
+        if (engine.Count == 0)
+        {
+            return NotFormed(definition, parameters, asOf, day, formation, OpeningWindows.NoLiveBars, now); // no bar at all, or no instrument with a complete window: never an applied empty version
         }
 
         var previous = await store.PreviousAsync(definition.BasketId, asOf, cancellationToken);

@@ -7,7 +7,6 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.OpeningBars;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Live;
-using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Domain.Baskets.Derived;
 using XDrishti.Domain.Market;
@@ -92,7 +91,21 @@ internal sealed class OpeningBarsSupervisor(IServiceScopeFactory scopes, Opening
         await using var scope = scopes.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var today = IndiaTime.Today(now);
-        if (_prunedDay != today)
+        // The gates are read first: a gate that cannot be read is a closed gate.
+        var switchOn = false;
+        ServiceSettings? service = null;
+        try
+        {
+            switchOn = await services.GetRequiredService<IOpeningBarsSwitchStore>().IsOnAsync(cancellationToken);
+            service = (await services.GetRequiredService<ServiceSettingsReader>().ReadAsync(OpeningBarsService.Definition, cancellationToken)).Settings;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+        {
+            OpeningBarsLog.Problem(logger, ex.GetType().Name);
+        }
+
+        // The daily retention touches a table, so it needs all three gates open (the deployment flag is gate 1 above), like everything else here; nothing is pruned while the recorder is off.
+        if (switchOn && service is { Enabled: true } && _prunedDay != today)
         {
             _prunedDay = today; // once a day, whatever happens (a failure is tried again tomorrow)
             var removed = await services.GetRequiredService<IOpeningBarsStore>().PruneAsync(settings.KeepDays, cancellationToken);
@@ -106,18 +119,7 @@ internal sealed class OpeningBarsSupervisor(IServiceScopeFactory scopes, Opening
             return;
         }
 
-        var wanted = false;
-        try
-        {
-            var switchOn = await services.GetRequiredService<IOpeningBarsSwitchStore>().IsOnAsync(cancellationToken);
-            var service = (await services.GetRequiredService<ServiceSettingsReader>().ReadAsync(OpeningBarsService.Definition, cancellationToken)).Settings;
-            wanted = switchOn && FeedWindow.Decide(service, calendar, now, null).ShouldBeUp;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
-        {
-            OpeningBarsLog.Problem(logger, ex.GetType().Name); // a gate that cannot be read is a closed gate
-        }
-
+        var wanted = switchOn && service is not null && FeedWindow.Decide(service, calendar, now, null).ShouldBeUp;
         wanted &= now < OpeningWindows.At(today, settings.RecordUntil) && _doneDay != today;
         if (_running is { Task.IsCompleted: true })
         {
@@ -151,7 +153,7 @@ internal sealed class OpeningBarsSupervisor(IServiceScopeFactory scopes, Opening
     {
         var store = services.GetRequiredService<IOpeningBarsStore>();
         var free = await store.FreeBytesAsync(cancellationToken);
-        if (free is { } bytes && bytes < settings.MinFreeBytes)
+        if (free is not { } bytes || bytes < settings.MinFreeBytes) // unreadable free space counts as low
         {
             _lowDiskDay = today; // stays stopped for the day; the day's baskets are not formed, low_disk
             await store.AddEventAsync(today, new OpeningBarsEvent(OpeningBarsEvent.LowDisk, now), cancellationToken);
@@ -186,8 +188,8 @@ internal sealed class OpeningBarsSupervisor(IServiceScopeFactory scopes, Opening
         }
 
         var asOf = calendar.LastClosedSession(OpeningWindows.At(today, new TimeOnly(9, 0)));
-        var all = await services.GetRequiredService<IDerivedUniverseReader>().ReadAsync(asOf.AddDays(-35), asOf, cancellationToken);
-        var (kept, _) = OpeningWindows.Subscribed(DerivedComputation.UniverseOf(all, asOf), settings.MaxInstruments);
+        var all = await services.GetRequiredService<IDerivedUniverseReader>().ReadAsync(asOf.AddDays(-OpeningWindows.SetLookbackDays), asOf, cancellationToken);
+        var (kept, _) = OpeningWindows.SetOf(all, asOf, settings.MaxInstruments);
         var securities = await services.GetRequiredService<IInstrumentSecurities>().FindAsync([.. kept.Select(k => "NSE:" + k.Bars.Symbol)], cancellationToken);
         return [.. kept.Select(k => securities.GetValueOrDefault("NSE:" + k.Bars.Symbol)).Where(s => s is not null && int.TryParse(s.SecurityId, out _)).Select(s => new OpeningSetEntry(s!.InstrumentId, int.Parse(s.SecurityId, System.Globalization.CultureInfo.InvariantCulture), s.Symbol))];
     }
@@ -210,10 +212,11 @@ internal sealed class OpeningBarsSupervisor(IServiceScopeFactory scopes, Opening
 
         var message = result is null
             ? "The opening-minute recorder stopped unexpectedly. See the xd-feed log."
-            : $"{result.End}: {result.Stats.Instruments} instruments, {result.Stats.Bars} bars, {result.Stats.Missing} missing minutes, {result.Stats.Late} late, {result.Stats.Duplicates} duplicates, {result.Stats.Gaps} gaps";
+            : $"{result.End}: {result.Stats.Instruments} instruments, {result.Stats.Bars} bars, {result.Stats.Missing} missing minutes, {result.Stats.Late} late, {result.Stats.Duplicates} duplicates, {result.Stats.Gaps} gaps, {result.Stats.Outside} outside the minutes, median exchange-to-receive skew {result.Stats.SkewSeconds} s";
         switch (result?.End)
         {
             case OpeningSessionEnd.Until:
+            case OpeningSessionEnd.ClockSkew: // not tried again today: the exchange time cannot be trusted
                 _doneDay = running.Day;
                 break;
             case OpeningSessionEnd.LowDisk:

@@ -21,11 +21,14 @@ internal enum OpeningSessionEnd
     /// <summary>The Data account has no usable token.</summary>
     NoToken,
 
+    /// <summary>The median exchange-to-receive skew of the packets was over the limit: the run stopped.</summary>
+    ClockSkew,
+
     /// <summary>Dhan answered 806 (the Data APIs are not part of the plan) or 805 (too many connections), or more than 10 reconnects in 5 minutes.</summary>
     Refused,
 }
 
 /// <summary>What one session recorded: the figures the Services screen shows for the last day.</summary>
-internal sealed record OpeningRunStats(int Instruments, long Packets, long Bars, long Missing, long Late, long Duplicates, int Gaps);
+internal sealed record OpeningRunStats(int Instruments, long Packets, long Bars, long Missing, long Late, long Duplicates, int Gaps, long Outside, int SkewSeconds);
 
 internal sealed record OpeningSessionResult(OpeningSessionEnd End, OpeningRunStats Stats);

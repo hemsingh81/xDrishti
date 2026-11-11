@@ -8,4 +8,7 @@ public sealed record OpeningBarsEvent(string Kind, DateTimeOffset From, DateTime
     public const string Gap = "gap";
 
     public const string LowDisk = "low_disk";
+
+    /// <summary>The exchange time of the packets is far from the receive time (the zone is unverified): the minutes cannot be trusted.</summary>
+    public const string ClockSkew = "clock_skew";
 }

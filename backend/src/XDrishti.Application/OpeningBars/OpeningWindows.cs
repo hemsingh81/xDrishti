@@ -14,6 +14,13 @@ internal static class OpeningWindows
 
     public const string LowDisk = "low_disk";
 
+    public const string ClockSkew = "clock_skew";
+
+    public const string WindowTooShort = "record_until_too_early";
+
+    /// <summary>Calendar days of daily bars the recorder reads for its set (20 sessions plus holidays); the freeze reads more, but the ADV20 is the last 20 bars either way.</summary>
+    public const int SetLookbackDays = 35;
+
     public const string Late = "late";
 
     private static readonly TimeSpan Ist = new(5, 30, 0);
@@ -38,6 +45,11 @@ internal static class OpeningWindows
     public static string? WholeReason(IReadOnlyList<OpeningBarsEvent> events, DateOnly day, DateTimeOffset formation)
     {
         var open = At(day, OpeningBarsSettings.Open);
+        if (events.Any(e => e.Kind == OpeningBarsEvent.ClockSkew && e.From < formation))
+        {
+            return ClockSkew;
+        }
+
         if (events.Any(e => e.Kind == OpeningBarsEvent.LowDisk && e.From < formation))
         {
             return LowDisk;
@@ -49,7 +61,9 @@ internal static class OpeningWindows
             return NoLiveBars;
         }
 
-        if (starts.Count > 1 || starts[0].From > open || events.Any(e => e.Kind == OpeningBarsEvent.Gap && e.From < formation && (e.To ?? DateTimeOffset.MaxValue) > open))
+        // A start after the open (late, or a restart: it leaves a hole) is a gap; a restart before the open is not. An open gap and its later closing row share a start: the closed one counts.
+        var gaps = events.Where(e => e.Kind == OpeningBarsEvent.Gap && e.From < formation).GroupBy(e => e.From).Select(g => g.Any(e => e.To is not null) ? g.Where(e => e.To is not null).Max(e => e.To) : null);
+        if (starts.Any(e => e.From > open) || gaps.Any(to => (to ?? DateTimeOffset.MaxValue) > open))
         {
             return FeedGap;
         }
@@ -66,6 +80,10 @@ internal static class OpeningWindows
         var ordered = universe.OrderByDescending(Adv20).ThenBy(u => u.Bars.Symbol, StringComparer.Ordinal).ToList();
         return (ordered.Take(cap).ToList(), ordered.Skip(cap).ToList());
     }
+
+    /// <summary>The set the recorder subscribes and the freeze reads: the universe of the date, capped (one function for both).</summary>
+    public static (IReadOnlyList<UniverseInstrument> Kept, IReadOnlyList<UniverseInstrument> Cut) SetOf(IReadOnlyList<UniverseInstrument> all, DateOnly asOf, int cap) =>
+        Subscribed(Market.Baskets.DerivedComputation.UniverseOf(all, asOf), cap);
 
     private static double Adv20(UniverseInstrument instrument)
     {

@@ -258,6 +258,31 @@ public sealed class OpeningBarsSupervisorTests
         off.Store.Prunes.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task The_retention_waits_for_all_three_gates_a_closed_switch_or_a_paused_service_prunes_nothing()
+    {
+        var switchOff = new World(switchOn: false);
+        var paused = new World(serviceOn: false);
+
+        await switchOff.TickAsync();
+        await paused.TickAsync();
+
+        switchOff.Store.Prunes.ShouldBeEmpty();
+        paused.Store.Prunes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_free_space_that_cannot_be_read_counts_as_low_disk_never_a_pass()
+    {
+        var world = new World(minFree: 10);
+        world.Store.Free = null;
+
+        await world.TickAsync();
+
+        world.Connector.Calls.ShouldBe(0);
+        world.Store.Events.Select(e => e.Event.Kind).ShouldBe([OpeningBarsEvent.LowDisk]);
+    }
+
     // ---- criterion 10: a non-trading day ----
 
     [Fact]

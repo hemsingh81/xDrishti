@@ -39,7 +39,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     to_at timestamptz NULL,
                     recorded_at timestamptz NOT NULL DEFAULT now(),
                     CONSTRAINT pk_opening_bar_events PRIMARY KEY (id),
-                    CONSTRAINT ck_opening_bar_events_kind CHECK (kind IN ('started', 'gap', 'low_disk')),
+                    CONSTRAINT ck_opening_bar_events_kind CHECK (kind IN ('started', 'gap', 'low_disk', 'clock_skew')),
                     CONSTRAINT ck_opening_bar_events_range CHECK (to_at IS NULL OR from_at <= to_at)
                 )
                 """);

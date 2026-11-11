@@ -11,10 +11,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // BK-03b criterion 8: the daily retention of market.bars_1m_live (OpeningBars:KeepDays). The runtime role stays insert-only on the table; the delete is a function owned by the migration role
-            // (SECURITY DEFINER, fixed search_path) that removes only rows older than the cutoff and that the runtime role may only execute. Not callable by PUBLIC. A keep value under 1 day is refused.
+            // (SECURITY DEFINER, search_path pg_catalog and pg_temp only, every name qualified) that removes only rows older than the cutoff and that the runtime role may only execute. Not callable by PUBLIC. A keep value under 1 day is refused.
             migrationBuilder.Sql("""
                 CREATE FUNCTION market.prune_opening_bars(keep_days integer) RETURNS integer
-                LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, market AS $$
+                LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
                 DECLARE removed integer;
                 BEGIN
                     IF keep_days IS NULL OR keep_days < 1 THEN

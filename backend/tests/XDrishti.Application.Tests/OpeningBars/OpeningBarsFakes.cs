@@ -97,8 +97,19 @@ internal sealed class FakeOpeningQueries : IOpeningBarsQueries
 
     public ValueTask<IReadOnlyList<MinuteBar>> ReadDayAsync(DateOnly day, CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<MinuteBar>>([.. Day]);
 
-    public ValueTask<IReadOnlyList<MinuteBar>> ReadHistoryAsync(IReadOnlyCollection<Guid> instruments, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
-        ValueTask.FromResult<IReadOnlyList<MinuteBar>>([.. History.Where(b => instruments.Contains(b.InstrumentId))]);
+    public List<DateOnly> LastExcluded { get; } = [];
+
+    public Dictionary<DateOnly, List<OpeningBarsEvent>> PriorEvents { get; } = [];
+
+    public ValueTask<IReadOnlyList<MinuteBar>> ReadHistoryAsync(IReadOnlyCollection<Guid> instruments, DateOnly from, DateOnly to, int minutes, IReadOnlyCollection<DateOnly> excludeLiveDays, CancellationToken cancellationToken)
+    {
+        LastExcluded.Clear();
+        LastExcluded.AddRange(excludeLiveDays);
+        return ValueTask.FromResult<IReadOnlyList<MinuteBar>>([.. History.Where(b => instruments.Contains(b.InstrumentId) && !excludeLiveDays.Contains(DateOnly.FromDateTime(b.MinuteStart.ToOffset(TimeSpan.FromMinutes(330)).DateTime)))]);
+    }
+
+    public ValueTask<IReadOnlyDictionary<DateOnly, IReadOnlyList<OpeningBarsEvent>>> ReadEventsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyDictionary<DateOnly, IReadOnlyList<OpeningBarsEvent>>>(PriorEvents.ToDictionary(d => d.Key, d => (IReadOnlyList<OpeningBarsEvent>)[.. d.Value]));
 
     public ValueTask<IReadOnlyList<OpeningBarsEvent>> ReadEventsAsync(DateOnly day, CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<OpeningBarsEvent>>([.. Events]);
 }

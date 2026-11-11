@@ -219,9 +219,11 @@ public sealed class OpeningBarsRecorderTests
         await UntilAsync(() => world.Store.Events.Count(e => e.Event.Kind == OpeningBarsEvent.Started) == 2 && world.Store.Events.Any(e => e.Event.Kind == OpeningBarsEvent.Gap), "events not written");
         await world.StopAsync(run);
 
-        var gap = world.Store.Events.Single(e => e.Event.Kind == OpeningBarsEvent.Gap).Event;
-        gap.To.ShouldNotBeNull();
-        gap.To.Value.ShouldBeGreaterThanOrEqualTo(gap.From);
+        var gaps = world.Store.Events.Where(e => e.Event.Kind == OpeningBarsEvent.Gap).Select(e => e.Event).ToList();
+        gaps.Count.ShouldBe(2, "the open gap is on record from the drop, and a closing row follows");
+        gaps[0].To.ShouldBeNull();
+        gaps[1].From.ShouldBe(gaps[0].From);
+        gaps[1].To.ShouldNotBeNull();
     }
 
     [Fact]
@@ -237,6 +239,44 @@ public sealed class OpeningBarsRecorderTests
         var gap = world.Store.Events.Single(e => e.Event.Kind == OpeningBarsEvent.Gap).Event;
         gap.From.ShouldBe(At(9, 15));
         gap.To.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_silence_is_on_record_while_it_lasts_and_the_minute_it_overlaps_is_never_written_as_complete()
+    {
+        var world = new World(9, 14, OpeningBarsSettings.Off with { Enabled = true, Silence = TimeSpan.FromSeconds(30) });
+        var run = world.Start();
+        var connection = await world.ConnectedAsync();
+        await world.StepAsync(TimeSpan.FromSeconds(70)); // 09:15:10
+        connection.Push(World.Quote(1001, At(9, 15, 5), 100m, 1_000));
+        await UntilAsync(() => world.Recorder.PacketsRead == 1, "packet not read");
+
+        await world.StepAsync(TimeSpan.FromSeconds(75)); // 09:16:25: silent from 09:15:10; the 09:15 minute is over by the grace
+        await UntilAsync(() => world.Store.Events.Any(e => e.Event.Kind == OpeningBarsEvent.Gap && e.Event.To is null), "the open gap was not on record while it lasts");
+        await world.StopAsync(run);
+
+        world.Store.Bars.ShouldNotContain(b => b.MinuteStart == At(9, 15), "a minute a gap overlaps is not complete");
+    }
+
+    [Fact]
+    public async Task A_median_skew_over_five_minutes_between_exchange_and_receive_time_stops_the_run_and_records_clock_skew()
+    {
+        var world = new World();
+        var run = world.Start();
+        var connection = await world.ConnectedAsync();
+        await world.StepAsync(TimeSpan.FromSeconds(75));
+
+        for (var i = 0; i < 12; i++)
+        {
+            connection.Push(World.Quote(1001, At(14, 45, i), 100m, 1_000 + i)); // IST-as-UTC would put 09:15 at 14:45
+        }
+
+        var result = await run;
+
+        result.End.ShouldBe(OpeningSessionEnd.ClockSkew);
+        Math.Abs(result.Stats.SkewSeconds).ShouldBeGreaterThan(300);
+        world.Store.Events.Select(e => e.Event.Kind).ShouldContain(OpeningBarsEvent.ClockSkew);
+        result.Stats.Outside.ShouldBeGreaterThan(0);
     }
 
     [Theory]

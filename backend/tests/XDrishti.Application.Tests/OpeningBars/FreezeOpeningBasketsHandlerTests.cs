@@ -38,7 +38,7 @@ public sealed class FreezeOpeningBasketsHandlerTests
 
         public FakeTimeProvider Clock { get; }
 
-        public OpeningBarsSettings Settings { get; }
+        public OpeningBarsSettings Settings { get; set; }
 
         public FakeDerivedSettings Derived { get; } = new();
 
@@ -254,6 +254,69 @@ public sealed class FreezeOpeningBasketsHandlerTests
 
         without.Baskets.Single().Members.ShouldBe(1);
         w.Store.Versions.Single().Scores.Single(s => s.IsMember).Score.ShouldBe(0.04, 1e-9);
+    }
+
+    [Fact]
+    public async Task With_no_live_bar_at_all_the_day_is_not_formed_no_live_bars_never_an_applied_empty_version()
+    {
+        var w = new World();
+        w.Share("GAP");
+        w.Started(); // the recorder ran, but nothing arrived
+
+        await w.Handler().HandleAsync(new FreezeOpeningBasketsCommand(Monday), Ct);
+
+        var version = w.Store.Versions.Single();
+        version.Outcome.ShouldBe(VersionOutcomes.NotFormed);
+        Excluded(version).Single().Reason.ShouldBe("no_live_bars");
+    }
+
+    [Fact]
+    public async Task When_no_instrument_has_a_complete_window_the_day_is_not_formed_no_live_bars()
+    {
+        var w = new World();
+        var holed = w.Share("HOLED");
+        w.History(holed, 20, 5);
+        w.Today(holed, 5, volume: 200, skip: 2);
+        w.Started();
+
+        await w.Handler().HandleAsync(new FreezeOpeningBasketsCommand(Monday), Ct);
+
+        var version = w.Store.Versions.Single();
+        version.Outcome.ShouldBe(VersionOutcomes.NotFormed);
+        Excluded(version).Single().Reason.ShouldBe("no_live_bars");
+    }
+
+    [Fact]
+    public async Task A_recorder_that_closes_before_the_window_is_over_makes_the_basket_not_formed()
+    {
+        var w = new World(9, 30, 10);
+        var share = w.Share("S");
+        w.History(share, 20, 15);
+        w.Today(share, 15);
+        w.Started();
+        w.Settings = w.Settings with { RecordUntil = new TimeOnly(9, 30) };
+
+        await w.Handler().HandleAsync(new FreezeOpeningBasketsCommand(Monday), Ct);
+
+        var version = w.Store.Versions.Single(v => v.BasketId == w.Wide.BasketId);
+        version.Outcome.ShouldBe(VersionOutcomes.NotFormed);
+        Excluded(version).Single().Reason.ShouldBe("record_until_too_early");
+    }
+
+    [Fact]
+    public async Task Live_rows_of_a_prior_day_recorded_with_a_gap_a_restart_or_low_disk_are_left_out_of_the_history()
+    {
+        var w = new World();
+        var gapper = w.Share("GAP");
+        w.History(gapper, 20, 5);
+        w.Today(gapper, 5, open: 104, high: 104, low: 104, volume: 200);
+        w.Started();
+        w.Queries.PriorEvents[Friday] = [new OpeningBarsEvent(OpeningBarsEvent.Started, At(9, 14).AddDays(-3)), new OpeningBarsEvent(OpeningBarsEvent.Gap, At(9, 17).AddDays(-3))];
+        w.Queries.PriorEvents[Friday.AddDays(-1)] = [new OpeningBarsEvent(OpeningBarsEvent.Started, At(9, 14).AddDays(-4))]; // a clean day
+
+        await w.Handler().HandleAsync(new FreezeOpeningBasketsCommand(Monday), Ct);
+
+        w.Queries.LastExcluded.ShouldBe([Friday]);
     }
 
     // ---- criterion 6: history ----

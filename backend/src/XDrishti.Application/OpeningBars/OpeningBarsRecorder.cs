@@ -22,6 +22,13 @@ internal sealed class OpeningBarsRecorder(IServiceScopeFactory scopes, IOpeningB
     /// <summary>How often the free disk space is looked at while recording.</summary>
     public static readonly TimeSpan DiskInterval = TimeSpan.FromSeconds(30);
 
+    /// <summary>The median exchange-to-receive skew above which the exchange time cannot be trusted.</summary>
+    public static readonly TimeSpan MaxSkew = TimeSpan.FromMinutes(5);
+
+    private const int SkewSamples = 200;
+
+    private const int SkewMinSamples = 10;
+
     private const int NotSubscribedCode = 806;
 
     private const int TooManyConnectionsCode = 805;
@@ -32,8 +39,10 @@ internal sealed class OpeningBarsRecorder(IServiceScopeFactory scopes, IOpeningB
     private MinuteBarBuilder _builder = new(OpeningBarsSettings.Open, OpeningBarsSettings.Off.RecordUntil);
     private DateOnly _day;
     private DateTimeOffset _lastPacket;
-    private DateTimeOffset? _silentFrom;
-    private DateTimeOffset? _downSince;
+    private DateTimeOffset? _gapFrom;
+    private readonly List<(DateTimeOffset From, DateTimeOffset? To)> _gapRanges = [];
+    private readonly List<double> _skews = [];
+    private bool _skewTripped;
     private long _packets;
     private long _bars;
     private long _duplicates;
@@ -93,8 +102,10 @@ internal sealed class OpeningBarsRecorder(IServiceScopeFactory scopes, IOpeningB
         _packets = _bars = _duplicates = 0;
         _gaps = 0;
         _lastPacket = default;
-        _silentFrom = null;
-        _downSince = null;
+        _gapFrom = null;
+        _gapRanges.Clear();
+        _skews.Clear();
+        _skewTripped = false;
         _guardEnd = null;
     }
 
@@ -103,7 +114,50 @@ internal sealed class OpeningBarsRecorder(IServiceScopeFactory scopes, IOpeningB
         var expected = (long)_instruments * Math.Max(0, (int)(Min(until, clock.GetUtcNow()) - OpeningWindows.At(_day, OpeningBarsSettings.Open)).TotalMinutes - 1);
         lock (_gate)
         {
-            return new OpeningRunStats(_instruments, Interlocked.Read(ref _packets), Interlocked.Read(ref _bars), Math.Max(0, expected - Interlocked.Read(ref _bars)), _builder.Late, Interlocked.Read(ref _duplicates), _gaps);
+            return new OpeningRunStats(_instruments, Interlocked.Read(ref _packets), Interlocked.Read(ref _bars), Math.Max(0, expected - Interlocked.Read(ref _bars)), _builder.Late, Interlocked.Read(ref _duplicates), _gaps, _builder.Outside, MedianSkewSeconds());
+        }
+    }
+
+    /// <summary>The median of (receive time minus exchange time) of the recent packets, in seconds (0 with none). Caller holds the gate.</summary>
+    private int MedianSkewSeconds() => _skews.Count == 0 ? 0 : (int)_skews.Order().ElementAt(_skews.Count / 2);
+
+    /// <summary>A gap starts: written as an <b>open</b> event at once (it is on record while it lasts), closed by <see cref="EndGap"/>. Only one is open at a time. Caller holds the gate.</summary>
+    private void BeginGap(DateTimeOffset from)
+    {
+        if (_gapFrom is not null)
+        {
+            return;
+        }
+
+        _gapFrom = from;
+        _gapRanges.Add((from, null));
+        _events.Add((_day, new OpeningBarsEvent(OpeningBarsEvent.Gap, from)));
+        _gaps++;
+    }
+
+    /// <summary>The open gap, if any, ends now (a second event with the end; the open one stays: a reader takes the closed one). Caller holds the gate.</summary>
+    private void EndGap(DateTimeOffset now)
+    {
+        if (_gapFrom is not { } from)
+        {
+            return;
+        }
+
+        _gapRanges[^1] = (from, now);
+        _events.Add((_day, new OpeningBarsEvent(OpeningBarsEvent.Gap, from, now)));
+        _gapFrom = null;
+    }
+
+    /// <summary>Queues the completed bars except those of a minute a gap overlaps: such a minute is incomplete and is never written as complete. Caller holds the gate.</summary>
+    private void Queue(IEnumerable<MinuteBar> bars)
+    {
+        foreach (var bar in bars)
+        {
+            var end = bar.MinuteStart.AddMinutes(1);
+            if (!_gapRanges.Any(g => g.From < end && (g.To ?? DateTimeOffset.MaxValue) > bar.MinuteStart))
+            {
+                _pending.Add(bar);
+            }
         }
     }
 
@@ -153,7 +207,7 @@ internal sealed class OpeningBarsRecorder(IServiceScopeFactory scopes, IOpeningB
 
             if (connected.Connection is not { } connection)
             {
-                _downSince ??= clock.GetUtcNow();
+                MarkDown();
                 continue;
             }
 
@@ -167,7 +221,15 @@ internal sealed class OpeningBarsRecorder(IServiceScopeFactory scopes, IOpeningB
             }
 
             cancellationToken.ThrowIfCancellationRequested(); // a stream that ends because the run was stopped is not a drop
-            _downSince ??= clock.GetUtcNow(); // an ordinary drop: a gap starts and the loop reconnects
+            MarkDown(); // an ordinary drop: a gap starts (on record at once) and the loop reconnects
+        }
+    }
+
+    private void MarkDown()
+    {
+        lock (_gate)
+        {
+            BeginGap(clock.GetUtcNow());
         }
     }
 
@@ -206,13 +268,7 @@ internal sealed class OpeningBarsRecorder(IServiceScopeFactory scopes, IOpeningB
             lock (_gate)
             {
                 _lastPacket = now;
-                if (_downSince is { } down)
-                {
-                    _events.Add((_day, new OpeningBarsEvent(OpeningBarsEvent.Gap, down, now)));
-                    _gaps++;
-                    _downSince = null;
-                }
-
+                EndGap(now); // a drop ends at the new subscription
                 _events.Add((_day, new OpeningBarsEvent(OpeningBarsEvent.Started, now))); // a second start in a day is itself a hole the derived job reads as a gap
             }
 
@@ -262,16 +318,25 @@ internal sealed class OpeningBarsRecorder(IServiceScopeFactory scopes, IOpeningB
         lock (_gate)
         {
             _lastPacket = now;
-            if (_silentFrom is { } silent)
-            {
-                _events.Add((_day, new OpeningBarsEvent(OpeningBarsEvent.Gap, silent, now)));
-                _gaps++;
-                _silentFrom = null;
-            }
-
+            EndGap(now); // a silence ends at the next packet
             if (_builder.Offer(instrument, time, packet.Price, volume) is { } bar)
             {
-                _pending.Add(bar);
+                Queue([bar]);
+            }
+
+            // Dhan's trade-time zone is UNVERIFIED: when the exchange time is far from the receive time the minutes would be wrong, so the run stops and the day is not formed (clock_skew), never guessed.
+            _skews.Add((now - time).TotalSeconds);
+            if (_skews.Count > SkewSamples)
+            {
+                _skews.RemoveAt(0);
+            }
+
+            if (!_skewTripped && _skews.Count >= SkewMinSamples && Math.Abs(MedianSkewSeconds()) > MaxSkew.TotalSeconds)
+            {
+                _skewTripped = true;
+                _guardEnd = OpeningSessionEnd.ClockSkew;
+                _events.Add((_day, new OpeningBarsEvent(OpeningBarsEvent.ClockSkew, now)));
+                _inner?.Cancel();
             }
         }
     }
@@ -308,11 +373,12 @@ internal sealed class OpeningBarsRecorder(IServiceScopeFactory scopes, IOpeningB
                 var now = clock.GetUtcNow();
                 lock (_gate)
                 {
-                    _pending.AddRange(_builder.Flush(now, settings.Grace));
-                    if (_silentFrom is null && _downSince is null && now >= open && now < until && now - (_lastPacket > open ? _lastPacket : open) > settings.Silence)
+                    if (now >= open && now < until && now - (_lastPacket > open ? _lastPacket : open) > settings.Silence)
                     {
-                        _silentFrom = _lastPacket > open ? _lastPacket : open;
+                        BeginGap(_lastPacket > open ? _lastPacket : open); // on record at once, so a freeze during the silence sees it
                     }
+
+                    Queue(_builder.Flush(now, settings.Grace));
                 }
 
                 await WriteAsync(cancellationToken);
@@ -354,7 +420,7 @@ internal sealed class OpeningBarsRecorder(IServiceScopeFactory scopes, IOpeningB
         {
             await using var scope = scopes.CreateAsyncScope();
             var free = await scope.ServiceProvider.GetRequiredService<IOpeningBarsStore>().FreeBytesAsync(cancellationToken);
-            return free is { } bytes && bytes < settings.MinFreeBytes;
+            return free is not { } bytes || bytes < settings.MinFreeBytes; // a free space that cannot be read is a low one, never a pass
         }
         catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
         {
@@ -421,13 +487,7 @@ internal sealed class OpeningBarsRecorder(IServiceScopeFactory scopes, IOpeningB
     {
         lock (_gate)
         {
-            _pending.AddRange(_builder.Flush(clock.GetUtcNow(), TimeSpan.Zero));
-            if ((_silentFrom ?? _downSince) is { } since)
-            {
-                _events.Add((_day, new OpeningBarsEvent(OpeningBarsEvent.Gap, since)));
-                _gaps++;
-                _silentFrom = _downSince = null;
-            }
+            Queue(_builder.Flush(clock.GetUtcNow(), TimeSpan.Zero)); // a gap still open stays open on record (written when it began)
         }
 
         using var wait = new CancellationTokenSource(TimeSpan.FromSeconds(5), clock);

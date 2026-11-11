@@ -85,10 +85,21 @@ public sealed class OpeningBarsDatabaseTests(ApiFactory factory) : DataTestBase(
 
         await WithAsync(p => p.GetRequiredService<IOpeningBarsStore>().AppendAsync([Bar(id, At(8, 9, 16), 555m), Bar(id, At(8, 9, 17), 105m), Bar(id, At(9, 9, 15), 106m)], Ct).AsTask());
 
-        var history = await WithAsync(p => p.GetRequiredService<IOpeningBarsQueries>().ReadHistoryAsync([id], new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 9), Ct).AsTask());
+        var history = await WithAsync(p => p.GetRequiredService<IOpeningBarsQueries>().ReadHistoryAsync([id], new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 9), 15, [], Ct).AsTask());
 
         history.OrderBy(b => b.MinuteStart).Select(b => (b.MinuteStart, b.Open)).ShouldBe([(At(8, 9, 15), 100m), (At(8, 9, 16), 100m), (At(8, 9, 17), 105m), (At(9, 9, 15), 106m)]);
         history.Single(b => b.MinuteStart == At(8, 9, 16)).Volume.ShouldBe(70, "the stored minute bar wins over the live row");
+    }
+
+    [Fact]
+    public async Task The_history_leaves_out_live_rows_of_excluded_days_and_stops_at_the_requested_minutes()
+    {
+        var id = Guid.CreateVersion7();
+        await WithAsync(p => p.GetRequiredService<IOpeningBarsStore>().AppendAsync([Bar(id, At(8, 9, 15)), Bar(id, At(8, 9, 22)), Bar(id, At(9, 9, 15)), Bar(id, At(9, 9, 20))], Ct).AsTask());
+
+        var history = await WithAsync(p => p.GetRequiredService<IOpeningBarsQueries>().ReadHistoryAsync([id], new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 9), 5, [new DateOnly(2026, 10, 8)], Ct).AsTask());
+
+        history.Select(b => b.MinuteStart).ShouldBe([At(9, 9, 15)], "day 8 is excluded and 09:20 is past the five minutes");
     }
 
     [Fact]
