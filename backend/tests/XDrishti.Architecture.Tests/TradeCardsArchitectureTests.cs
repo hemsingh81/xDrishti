@@ -42,7 +42,7 @@ public sealed class TradeCardsArchitectureTests
     {
         ShapeProblems(Handler()).ShouldBeEmpty();
         var ports = Handler().GetConstructors().Single().GetParameters().Select(p => p.ParameterType.Name).ToList();
-        ports.ShouldBe(["IBarStore", "IBarQueries", "IAdjustmentFactors", "ISimulationEngine"]);
+        ports.ShouldBe(["IBarStore", "IBarQueries", "IAdjustmentFactors", "ISimulationEngine", "IBackfillSeams"]); // the last is a read-only port: the second read leaves out the bars before the seam, as the run did (CF-04 Part B, ADR 0270)
     }
 
     [Fact]

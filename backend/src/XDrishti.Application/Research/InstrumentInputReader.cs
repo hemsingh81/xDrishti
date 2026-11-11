@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Domain.Filings;
 using XDrishti.Domain.Market.Actions;
@@ -13,16 +14,25 @@ namespace XDrishti.Application.Research;
 /// The one way a run, and the second read of the trade cards, read an instrument and build what the engine takes (spec P3-04d): the instrument row, the stored bars with the bounds of a run, the adjustment factors, the tick, the
 /// guard against adjusting CSV prices twice, and the <see cref="InstrumentReplayInput"/>. Sharing it is what lets the cards recompute a trade from exactly the input the run had. Holds no state; the list of bars is the caller's.
 /// </summary>
-internal sealed class InstrumentInputReader(IBarStore bars, IBarQueries barQueries, IAdjustmentFactors adjustments)
+internal sealed class InstrumentInputReader(IBarStore bars, IBarQueries barQueries, IAdjustmentFactors adjustments, IBackfillSeams? seams = null)
 {
     /// <summary>The instrument row: from <paramref name="known"/> when the caller resolved it already (a basket), else from the master; null when there is none.</summary>
     public async ValueTask<BarsInstrument?> FindAsync(Guid id, IReadOnlyDictionary<Guid, BarsInstrument>? known, CancellationToken cancellationToken) =>
         known is not null ? known.GetValueOrDefault(id) : await barQueries.FindInstrumentAsync(id, cancellationToken);
 
-    /// <summary>The stored bars from the first stored bar to the end of <paramref name="to"/>, and the factors of the instrument.</summary>
+    /// <summary>
+    /// The stored bars from the first stored bar to the end of <paramref name="to"/>, and the factors of the instrument. Bars before the instrument's seam (the 1-minute backfill of CF-04 Part B: Dhan's raw bars before the first CSV bar) never enter a run:
+    /// they are raw, and the replay adjusts by one predicate, so until the source-aware factors are wired into the replay they are left out for every instrument (<c>seam_unverified</c>, fail closed).
+    /// </summary>
     public async ValueTask<(IReadOnlyList<Bar> Raw, AdjustmentFactors Factors)> ReadAsync(Guid id, DateOnly to, CancellationToken cancellationToken)
     {
         var raw = await bars.ReadAsync(id, SimulationBounds.From, SimulationBounds.Until(to), cancellationToken);
+        if (seams is not null && await seams.SeamOfAsync(id, cancellationToken) is { } seam)
+        {
+            var seamEpoch = seam.ToUnixTimeSeconds();
+            raw = [.. raw.Where(b => b.EpochSeconds >= seamEpoch)];
+        }
+
         var factors = await adjustments.GetAsync(id, cancellationToken);
         return (raw, factors);
     }

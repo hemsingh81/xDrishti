@@ -15,6 +15,7 @@ public sealed class RecoveryClassTableTests
     {
         ["eod"] = RecoveryClass.Convergent,
         ["history-eod"] = RecoveryClass.Convergent,
+        ["history-backfill"] = RecoveryClass.Convergent,
         ["options-backfill"] = RecoveryClass.Convergent,
         ["options-quality"] = RecoveryClass.Convergent,
         ["shadow-grade"] = RecoveryClass.Convergent,

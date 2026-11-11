@@ -47,6 +47,7 @@ internal sealed record XdOptions(
           xd pairs run --from YYYY-MM-DD --to YYYY-MM-DD [--variant E,L]   same-sector cash pairs: form each quarter's pairs on 252 daily closes (every candidate counted in the ledger first), walk them intraday (research only; gross unless Pairs:CostSheetId is set)
           xd pairs eval --family pairs:intraday-1 [--holdout]   protocol S verdict over the stored pair trades (KEEP, DROP, INCONCLUSIVE or NOT_EVALUABLE with the missing quantities named)
           xd data eod-probe|eod-load|eod-actions|eod-universe|eod-check ...   NSE daily files (CF-04 Part A; off by default, see ADR 0195): run xd data eod-probe with no dates for its usage
+          xd data backfill|probe-seam|history ...   the Dhan 1-minute backfill before each instrument's first CSV bar (CF-04 Part B; off by default, see ADR 0270): run xd data backfill --help for its usage
           xd learn features --run RUNKEY [--run ...]
           xd learn phase-check [--replay-seconds X]
           xd learn decay --strategy ID   the decay monitor, the kill-rule evaluations and the open kill proposals of one strategy (read only; unavailable and not_evaluated are never a pass)

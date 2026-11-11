@@ -16,9 +16,9 @@ namespace XDrishti.Application.Research;
 /// basket is never resolved again and nothing is merged. The day bars are adjusted by the rule of the replay (<see cref="AdjustmentFactors.FactorAt"/>, <see cref="AdjustmentFactors.Price"/>, <see cref="AdjustmentFactors.Volume"/>),
 /// re-stated here because the replay's own type is internal to the simulation library (ADR 0039); an equivalence test pins the two together. The trade is not recomputed here (P3-04d does that).
 /// </summary>
-internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQueries, IAdjustmentFactors adjustments, ISimulationEngine engine) : IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>
+internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQueries, IAdjustmentFactors adjustments, ISimulationEngine engine, XDrishti.Application.Abstractions.Market.History.IBackfillSeams? backfillSeams = null) : IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>
 {
-    private readonly InstrumentInputReader _reader = new(bars, barQueries, adjustments);
+    private readonly InstrumentInputReader _reader = new(bars, barQueries, adjustments, backfillSeams);
 
     private const int OpenMinute = SessionClock.OpenMinute;
 
