@@ -15,7 +15,7 @@ NAME="xdrishti_eval"
 
 podman info >/dev/null 2>&1 || { echo "The Podman machine is not running: start it (podman machine start) or run deploy/xd-up.sh." >&2; exit 1; }
 [[ "$(podman inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$DB_CONTAINER" 2>/dev/null || echo none)" == "healthy" ]] || { echo "The database is not running: start the stack with deploy/xd-up.sh first." >&2; exit 1; }
-for f in db_owner_password db_app_password db_mcp_read_password db_mcp_sql_password eval_mcp_token; do
+for f in db_owner_password db_app_password db_mcp_read_password db_mcp_sql_password eval_mcp_token mcp_api_token_eval; do
   [[ -s "$XD_SECRETS_DIR/$f" ]] || { echo "The secret file $f is missing or empty: run deploy/xd-up.sh once." >&2; exit 1; }
 done
 podman image exists "localhost/xdrishti/api:${XD_VERSION:-0.1.0}" || { echo "The API image is missing: run deploy/xd-up.sh (it builds the images)." >&2; exit 1; }

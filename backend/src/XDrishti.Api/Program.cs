@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using XDrishti.Api.Auth;
 using XDrishti.Api.Cli;
 using XDrishti.Api.Context;
@@ -56,7 +57,12 @@ builder.Services
 
 // The API serves the broker vault and seals the execution token hand-over at every login (ADR 0171): it refuses to start without either key. Only the build-time
 // contract generation runs without secrets.
-if (!OpenApiGeneration.IsRunning)
+// The reports-only instance (BK-12b, ADR 0267; xd-api-eval over the eval fixture): no hosted or scheduled service, no vault key and no hand-over key (it holds no broker secret), and only the report routes are mapped.
+if (builder.Configuration.GetValue<bool>(ApiSetup.ReportsOnlyKey))
+{
+    builder.Services.RemoveAll<IHostedService>();
+}
+else if (!OpenApiGeneration.IsRunning)
 {
     builder.Services.RequireBrokerVaultKey().RequireExecHandoverKey();
 }

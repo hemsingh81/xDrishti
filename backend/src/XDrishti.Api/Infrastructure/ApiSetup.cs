@@ -35,6 +35,9 @@ internal static class ApiSetup
 {
     public const string OpenApiRoute = "/api/openapi/{documentName}.json";
 
+    /// <summary>Deployment switch <c>Api:ReportsOnly</c>: serve the report routes only, with no hosted service (the eval's API over the fixture database, BK-12b).</summary>
+    public const string ReportsOnlyKey = "Api:ReportsOnly";
+
     /// <summary>Failed and successful logins together: more than this per minute from one address are refused with 429.</summary>
     public const int LoginAttemptsPerMinute = 10;
 
@@ -355,7 +358,8 @@ internal static class ApiSetup
         app.MapHub<EventsHub>(LiveHubContract.Route, o => o.Transports = HttpTransportType.WebSockets).RequireAuthorization();
 
         var api = app.MapGroup("/api");
-        foreach (var module in app.Services.GetServices<IEndpointModule>())
+        var reportsOnly = app.Configuration.GetValue<bool>(ReportsOnlyKey);
+        foreach (var module in app.Services.GetServices<IEndpointModule>().Where(m => !reportsOnly || m is ReportsEndpoints))
         {
             module.Map(api);
         }
@@ -366,10 +370,21 @@ internal static class ApiSetup
     private static void AddAuth(this IServiceCollection services)
     {
         services.AddAuthentication(SessionAuthentication.Scheme)
-            .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthentication.Scheme, _ => { });
+            .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthentication.Scheme, _ => { })
+            .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ServiceReadAuthenticationHandler>(ServiceReadAuthentication.Scheme, _ => { });
 
-        // Closed by default: any endpoint without its own policy needs a signed-in session.
-        services.AddAuthorization(o => o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+        // The tool server's read-only token (BK-12b, ADR 0267): unset means the scheme accepts nothing; a value equal to another secret stops the host at start.
+        services.AddOptions<ServiceTokenOptions>().BindConfiguration(ServiceTokenOptions.SectionName).ValidateOnStart();
+        services.AddSingleton<IValidateOptions<ServiceTokenOptions>, ServiceTokenOptionsValidator>();
+
+        services.AddAuthorization(o =>
+        {
+            // Closed by default: any endpoint without its own policy needs a signed-in session (the default scheme only, so the service token opens nothing here).
+            o.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+
+            // The two basket report routes alone: an owner session or the tool server's token (the session scheme first: it writes the 401).
+            o.AddPolicy(ServiceReadAuthentication.AssistantBasketReadPolicy, new AuthorizationPolicyBuilder(SessionAuthentication.Scheme, ServiceReadAuthentication.Scheme).RequireAuthenticatedUser().Build());
+        });
 
         // The proxy (Caddy, container network) is trusted to tell the real client address and scheme.
         services.Configure<ForwardedHeadersOptions>(o =>

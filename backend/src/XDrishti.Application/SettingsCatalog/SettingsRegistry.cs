@@ -111,7 +111,7 @@ public static class SettingsRegistry
             "Learned", "Simulate", "Training", "Planning:TicketAlerts", "Reports:PlanVsActual", "Reports:Benchmark", "Reports:BasketProfile", "Reports:Training", "Market:RelativeStrength",
             "Portfolio:Heal", "Portfolio:BrokerHistory", "Portfolio:AutoRefresh", "Instruments:AutoRefresh", "Data", "Data:History", "Baskets:System:Fetch", "Baskets:System:Lists", "Baskets:System:Derived",
             "Assistant:Mcp", "Assistant:Llm", "Assistant:Briefing", "Assistant:Turn", "Assistant:Proposals", "Assistant:Drafts", "AiRoles",
-            "Brokers", "BrokerVault", "ExecHandover", "ExecRole", "Execution", "Execution:Sandbox", "Database", "Auth:Owner",
+            "Brokers", "BrokerVault", "ExecHandover", "ExecRole", "Execution", "Execution:Sandbox", "Database", "Auth:Owner", "Api",
         }.Select(Section),
     ];
 
