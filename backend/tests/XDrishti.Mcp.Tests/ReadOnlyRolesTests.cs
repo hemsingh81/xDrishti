@@ -235,8 +235,8 @@ public sealed class ReadOnlyRolesTests(ReadOnlyDatabase db)
         {
             foreach (var schema in new[] { "accounts", "auth", "platform", "portfolio", "research", "lab", "market", "trading", "workflow", "paper" })
             {
-                // The read role names the four report-source tables of research and lab (column-level grants, migration AddAiToolAccess); the SQL role names nothing.
-                var expected = role == "xd_mcp_read" && schema is "research" or "lab";
+                // The read role names the four report-source tables of research and lab (column-level grants, migration AddAiToolAccess) and names market for the basket context table (AddBasketToolAccess, BK-12); the SQL role names nothing.
+                var expected = role == "xd_mcp_read" && schema is "research" or "lab" or "market";
                 (await HasAsync("has_schema_privilege", role, schema, "USAGE")).ShouldBe(expected, $"{role} USAGE on {schema}");
             }
 

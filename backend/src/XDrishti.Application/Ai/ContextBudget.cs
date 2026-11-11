@@ -9,7 +9,7 @@ namespace XDrishti.Application.Ai;
 public static class ContextBudget
 {
     public const double CharactersPerToken = 3.5;
-    public const int SchemaTokenLimit = 2200;
+    public const int SchemaTokenLimit = 2300; // 2,200 for the 16 tools of P9-05, plus the three basket report values and their words (BK-12 Decision 4)
     public const int HistoryTokenLimit = 1500;
     public const int SummaryArgumentChars = 120;
 

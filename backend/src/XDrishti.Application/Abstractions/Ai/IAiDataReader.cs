@@ -15,6 +15,12 @@ public interface IAiDataReader
 
     Task<AiToolData> GetBasketAsync(string name, CancellationToken cancellationToken);
 
+    /// <summary>The active baskets (id and name, at most 500) for resolving a name or an id in the basket reports (spec BK-12).</summary>
+    Task<IReadOnlyList<AiBasketRef>> GetBasketRefsAsync(CancellationToken cancellationToken);
+
+    /// <summary>The stored context row of a basket on <paramref name="date"/> (spec BK-12 AC 5): never recomputed; a day without a row is <c>empty</c> with the newest earlier date.</summary>
+    Task<AiToolData> GetBasketContextAsync(Guid basketId, DateOnly date, CancellationToken cancellationToken);
+
     Task<AiToolData> GetInstrumentAsync(string symbol, int bars, CancellationToken cancellationToken);
 
     Task<AiToolData> SearchNotesAsync(string query, string? from, string? to, int limit, CancellationToken cancellationToken);

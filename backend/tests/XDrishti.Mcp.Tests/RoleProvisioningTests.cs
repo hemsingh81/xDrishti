@@ -108,6 +108,30 @@ public sealed class RoleProvisioningTests(UnprovisionedDatabase db) : IClassFixt
     }
 
     [Fact]
+    public async Task Basket_tool_access_down_revokes_the_context_columns_and_the_schema_usage_and_up_grants_them_again()
+    {
+        var provider = MigrationHost.Build(db.Owner, null, null, db.Logs);
+        await using (provider)
+        {
+            await using var scope = provider.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>();
+            var migrations = context.Database.GetMigrations().ToList();
+            var index = migrations.FindIndex(m => m.EndsWith("_AddBasketToolAccess", StringComparison.Ordinal));
+            index.ShouldBeGreaterThan(0);
+            var migrator = context.GetService<IMigrator>();
+            const string Granted = "SELECT has_column_privilege('xd_mcp_read', 'market.basket_context_daily', 'b20', 'SELECT') AND has_schema_privilege('xd_mcp_read', 'market', 'USAGE')";
+
+            (await ScalarAsync(db.Owner, Granted)).ShouldBe(true);
+            await migrator.MigrateAsync(migrations[index - 1], Ct);
+
+            (await ScalarAsync(db.Owner, "SELECT has_column_privilege('xd_mcp_read', 'market.basket_context_daily', 'b20', 'SELECT') OR has_schema_privilege('xd_mcp_read', 'market', 'USAGE')")).ShouldBe(false);
+            await migrator.MigrateAsync(null, Ct);
+
+            (await ScalarAsync(db.Owner, Granted)).ShouldBe(true);
+        }
+    }
+
+    [Fact]
     public async Task Down_removes_the_views_the_function_the_table_the_schemas_and_the_roles_and_up_brings_them_back()
     {
         var provider = MigrationHost.Build(db.Owner, null, null, db.Logs);

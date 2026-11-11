@@ -13,7 +13,7 @@ namespace XDrishti.Application.Ai;
 /// The report engine for the assistant's <c>get_report</c> and <c>list_runs</c> (spec P9-05 AC 2 and 3, ADR 0139): it calls the very handlers of the Reports screen and only reshapes their views into rows, data and evidence. It computes nothing itself. Gross basis only: a request for net is
 /// answered <c>reports.net_not_confirmed</c> in words, because the owner's confirmation lives in settings no assistant role may read. The engine's own refusals (<c>reports.*</c>) pass through with their code.
 /// </summary>
-internal sealed class ReportToolReader(IServiceScopeFactory scopes) : IAiReportReader
+internal sealed class ReportToolReader(IServiceScopeFactory scopes, BasketReportReader baskets) : IAiReportReader
 {
     private const string NetWords = "net is not offered by the assistant yet; the report is gross only";
 
@@ -23,6 +23,11 @@ internal sealed class ReportToolReader(IServiceScopeFactory scopes) : IAiReportR
     public async Task<AiToolData> GetReportAsync(string report, IReadOnlyDictionary<string, string> query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
+        if (BasketReportReader.Handles(report))
+        {
+            return await baskets.GetAsync(report, query, cancellationToken); // spec BK-12: the basket screen's own handlers and the stored context row; price returns, no strategy figures, so no basis applies
+        }
+
         if (query.TryGetValue("basis", out var basis) && !string.Equals(basis, "gross", StringComparison.Ordinal))
         {
             return AiToolData.Fail("reports.net_not_confirmed", NetWords);
