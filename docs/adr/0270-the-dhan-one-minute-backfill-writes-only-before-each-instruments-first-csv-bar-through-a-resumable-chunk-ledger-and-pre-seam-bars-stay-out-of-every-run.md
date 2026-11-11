@@ -33,7 +33,7 @@ The owner's CSV history is about 2.1 years. Dhan serves 1-minute bars about five
 ## Consequences
 - A wrong adjustment cannot reach a simulation, training or report: pre-seam bars are excluded for every instrument; the probe and the continuity check are evidence for the later wiring slice.
 - A stopped night resumes where it stopped; a failed chunk is visible and blocks AU-12 until the owner resolves it (more retries after raising `MaxRetries`, or the instrument's probe).
-- The seam read is one indexed lookup per instrument per run (partial index `ix_bars_1m_csv`, migration `AddCsvSeamIndex`).
+- The seam read is one ordered primary-key scan per instrument per run (`ORDER BY ts LIMIT 1` with `source = 'csv'`). No extra index: the primary key is the only index of `bars_1m` by design (a second one slows every load; `DataTableGrantsTests` pins it). After a backfill the scan walks past that instrument's Dhan bars (at most about 270,000) before the first CSV bar; measure it before the backfill is enabled (CF-04d) and add a partial index then if it is slow.
 
 ## What is NOT yet met
 The five-year 1-minute goal, the spec's "closes the data half of ISS-19" and the combinatorial purged cross-validation dependency are **not met**: no run sees a pre-seam bar until roadmap row **CF-04d** (source-aware replay, about 1.5 to 2 d) is built. The History API routes and card are row **CF-04e**.

@@ -289,10 +289,6 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
         await migrator.MigrateAsync(Before, Ct);
 
         (await Count(source)).ShouldBe(0);
-        await using (var index = source.CreateCommand("SELECT count(*) FROM pg_indexes WHERE indexname IN ('ix_bars_1m_csv') OR indexname LIKE 'ix_bars_1m_csv%'"))
-        {
-            Convert.ToInt64(await index.ExecuteScalarAsync(Ct), System.Globalization.CultureInfo.InvariantCulture).ShouldBe(0);
-        }
 
         await migrator.MigrateAsync(null, Ct);
 

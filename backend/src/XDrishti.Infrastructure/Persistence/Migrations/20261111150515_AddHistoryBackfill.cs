@@ -58,6 +58,17 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 AS $$ SELECT coalesce((SELECT s.high_water_at FROM market.backfill_seams s WHERE s.instrument_id = p_instrument), '-infinity'::timestamptz) $$
                 """);
 
+            // As ADR 0267 / AddBasketToolAccess: no function of schema market is executable by PUBLIC or the read roles; the runtime role is the only caller.
+            migrationBuilder.Sql("REVOKE EXECUTE ON FUNCTION market.backfill_cut(uuid) FROM PUBLIC");
+            migrationBuilder.Sql("""
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'xd_app') THEN
+                        GRANT EXECUTE ON FUNCTION market.backfill_cut(uuid) TO xd_app;
+                    END IF;
+                END $$
+                """);
+
             // The runtime role reads, inserts, updates and may delete: both tables are a work ledger, not data (a planned chunk that the plan no longer has is removed). The bars themselves are never deleted (bars_1m keeps its own grant).
             foreach (var table in new[] { "backfill_chunks", "backfill_seams" })
             {
