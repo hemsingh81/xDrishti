@@ -218,6 +218,28 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
     }
 
     [Fact]
+    public async Task The_cut_is_a_high_water_mark_a_seam_that_moves_earlier_never_lowers_it_and_the_sql_function_agrees()
+    {
+        var id = await SeedAsync("ABC");
+        using var scope = Factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IBackfillStore>();
+        var seams = scope.ServiceProvider.GetRequiredService<IBackfillSeams>();
+        (await ScalarAsync<DateTime>("SELECT market.backfill_cut(@id)", ("id", id))).ShouldBe(DateTime.MinValue.ToUniversalTime(), "no row: -infinity reads as the minimum");
+        (await seams.SeamOfAsync(id, Ct)).ShouldBeNull();
+
+        await store.SaveSeamAsync(new SeamRecord(id, Seam.ToUniversalTime(), "none", null, null, null, null, false, null), Ct);
+        await store.SaveSeamAsync(new SeamRecord(id, Seam.AddDays(-30).ToUniversalTime(), "unresolved", null, null, null, null, false, null), Ct); // a CSV import reached 30 days earlier
+
+        (await seams.SeamOfAsync(id, Ct)).ShouldBe(Seam, "the high-water mark stays at the latest seam ever recorded: raw Dhan bars before it are not admitted");
+        (await store.ListSeamsAsync([id], Ct))[id].SeamAt.ShouldBe(Seam.AddDays(-30));
+        (await ScalarAsync<DateTime>("SELECT market.backfill_cut(@id)", ("id", id))).ShouldBe(Seam.UtcDateTime);
+
+        await store.SaveSeamAsync(new SeamRecord(id, Seam.AddDays(10).ToUniversalTime(), "none", null, null, null, null, false, null), Ct);
+
+        (await seams.SeamOfAsync(id, Ct)).ShouldBe(Seam.AddDays(10));
+    }
+
+    [Fact]
     public async Task Down_removes_both_tables_and_up_again_is_clean()
     {
         await using var scratch = await ScratchDatabase.CreateAsync(Factory, "xd_backfill_down_probe", Ct);
@@ -229,10 +251,16 @@ public sealed class HistoryBackfillDatabaseTests(ApiFactory factory) : DataTestB
         await migrator.MigrateAsync(Before, Ct);
 
         (await Count(source)).ShouldBe(0);
+        await using (var index = source.CreateCommand("SELECT count(*) FROM pg_indexes WHERE indexname IN ('ix_bars_1m_csv') OR indexname LIKE 'ix_bars_1m_csv%'"))
+        {
+            Convert.ToInt64(await index.ExecuteScalarAsync(Ct), System.Globalization.CultureInfo.InvariantCulture).ShouldBe(0);
+        }
 
         await migrator.MigrateAsync(null, Ct);
 
         (await Count(source)).ShouldBe(2);
+        await using var present = source.CreateCommand("SELECT count(*) FROM pg_proc WHERE proname = 'backfill_cut'");
+        Convert.ToInt64(await present.ExecuteScalarAsync(Ct), System.Globalization.CultureInfo.InvariantCulture).ShouldBe(1);
 
         static async Task<long> Count(NpgsqlDataSource data)
         {

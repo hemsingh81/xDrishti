@@ -69,7 +69,7 @@ public sealed class RemarkRunHandlerTests
         Usable(true);
     }
 
-    private RemarkRunHandler Handler() => new(_runs, _profiles, _sheets, _reference, _quality, _bars, _contracts, _spreadModels, _spreadSettings, _minutes, _calendar, _settings, _store, NullLogger<RemarkRunHandler>.Instance);
+    private RemarkRunHandler Handler() => new(_runs, _profiles, _sheets, _reference, _quality, _bars, _contracts, _spreadModels, _spreadSettings, _minutes, new XDrishti.Application.Tests.Market.History.FakeSeams(), _calendar, _settings, _store, NullLogger<RemarkRunHandler>.Instance);
 
     /// <summary>The stored verdicts: coverage and stitching pass for every offset, both series codes, each weekday of the range.</summary>
     private void Usable(bool pass) => _quality.RollingResultsAsync(Nifty, Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(call =>

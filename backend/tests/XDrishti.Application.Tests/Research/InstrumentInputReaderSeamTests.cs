@@ -1,7 +1,7 @@
 #pragma warning disable CA2012 // NSubstitute setup on ValueTask members is not awaited
 using NSubstitute;
 using XDrishti.Application.Abstractions.Market.Bars;
-using XDrishti.Application.Abstractions.Market.History;
+using XDrishti.Application.Tests.Market.History;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Research;
 using XDrishti.Application.Tests.Market.Bars;
@@ -27,8 +27,12 @@ public sealed class InstrumentInputReaderSeamTests
         store.Stored[id] = [At(Seam.AddDays(-30)), At(Seam.AddMinutes(-1)), At(Seam), At(Seam.AddMinutes(1))];
         var adjustments = Substitute.For<IAdjustmentFactors>();
         adjustments.GetAsync(id, Arg.Any<CancellationToken>()).Returns(AdjustmentFactors.None);
-        var seams = Substitute.For<IBackfillSeams>();
-        seams.SeamOfAsync(id, Arg.Any<CancellationToken>()).Returns(seam);
+        var seams = new FakeSeams();
+        if (seam is { } cut)
+        {
+            seams.Cuts[id] = cut;
+        }
+
 
         var (raw, _) = await new InstrumentInputReader(store, Substitute.For<IBarQueries>(), adjustments, seams).ReadAsync(id, new DateOnly(2026, 4, 30), Ct);
         return raw.Count;

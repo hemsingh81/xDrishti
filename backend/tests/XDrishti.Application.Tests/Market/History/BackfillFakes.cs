@@ -119,3 +119,12 @@ internal sealed class FakeDisk(long? free) : IFreeDiskProbe
 {
     public long? FreeBytes() => free;
 }
+
+/// <summary>The high-water seams in memory; an instrument without an entry has none (every bar is read).</summary>
+internal sealed class FakeSeams : IBackfillSeams
+{
+    public Dictionary<Guid, DateTimeOffset> Cuts { get; } = [];
+
+    public ValueTask<DateTimeOffset?> SeamOfAsync(Guid instrumentId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<DateTimeOffset?>(Cuts.TryGetValue(instrumentId, out var cut) ? cut : null);
+}

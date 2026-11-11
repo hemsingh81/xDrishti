@@ -34,6 +34,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 CREATE TABLE market.backfill_seams (
                     instrument_id uuid NOT NULL REFERENCES market.instruments (id) ON DELETE CASCADE,
                     seam_at timestamptz NOT NULL,
+                    high_water_at timestamptz NOT NULL,
                     probe_status varchar(10) NOT NULL DEFAULT 'none',
                     probed_at timestamptz NULL,
                     median_bps double precision NULL,
@@ -47,6 +48,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 )
                 """);
 
+            // The cut every research, learning and report read applies: bars before the HIGH-WATER seam (the latest seam ever recorded, never lowered) are Dhan's raw backfill. A seam that moves earlier cannot admit them again. -infinity when
+            // the instrument has no row. The daily readers filter with it in SQL; the 1-minute readers use SeamAwareBars.
+            migrationBuilder.Sql("""
+                CREATE FUNCTION market.backfill_cut(p_instrument uuid)
+                RETURNS timestamptz
+                LANGUAGE sql STABLE
+                SET search_path = pg_catalog, market, pg_temp
+                AS $$ SELECT coalesce((SELECT s.high_water_at FROM market.backfill_seams s WHERE s.instrument_id = p_instrument), '-infinity'::timestamptz) $$
+                """);
+
             // The runtime role reads, inserts, updates and may delete: both tables are a work ledger, not data (a planned chunk that the plan no longer has is removed). The bars themselves are never deleted (bars_1m keeps its own grant).
             foreach (var table in new[] { "backfill_chunks", "backfill_seams" })
             {
@@ -57,6 +68,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS market.backfill_cut(uuid)");
             migrationBuilder.Sql("DROP TABLE IF EXISTS market.backfill_seams");
             migrationBuilder.Sql("DROP TABLE IF EXISTS market.backfill_chunks");
         }

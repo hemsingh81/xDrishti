@@ -55,10 +55,10 @@ internal sealed class BackfillStore(NpgsqlDataSource dataSource) : IBackfillStor
     {
         ArgumentNullException.ThrowIfNull(seam);
         await using var command = dataSource.CreateCommand("""
-            INSERT INTO market.backfill_seams (instrument_id, seam_at, probe_status, probed_at, median_bps, within_max_pct, detail, seam_jump, jump_pct, updated_at)
-            VALUES (@id, @seam, @probe, @probed, @median, @within, @detail, @jump, @jump_pct, now())
+            INSERT INTO market.backfill_seams (instrument_id, seam_at, high_water_at, probe_status, probed_at, median_bps, within_max_pct, detail, seam_jump, jump_pct, updated_at)
+            VALUES (@id, @seam, @seam, @probe, @probed, @median, @within, @detail, @jump, @jump_pct, now())
             ON CONFLICT (instrument_id) DO UPDATE SET
-                seam_at = EXCLUDED.seam_at, probe_status = EXCLUDED.probe_status, probed_at = EXCLUDED.probed_at, median_bps = EXCLUDED.median_bps,
+                seam_at = EXCLUDED.seam_at, high_water_at = GREATEST(market.backfill_seams.high_water_at, EXCLUDED.high_water_at), probe_status = EXCLUDED.probe_status, probed_at = EXCLUDED.probed_at, median_bps = EXCLUDED.median_bps,
                 within_max_pct = EXCLUDED.within_max_pct, detail = EXCLUDED.detail, seam_jump = EXCLUDED.seam_jump, jump_pct = EXCLUDED.jump_pct, updated_at = EXCLUDED.updated_at
             """);
         command.Parameters.AddWithValue("id", seam.InstrumentId);
@@ -153,7 +153,7 @@ internal sealed class BackfillStore(NpgsqlDataSource dataSource) : IBackfillStor
 
     public async ValueTask<DateTimeOffset?> SeamOfAsync(Guid instrumentId, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("SELECT seam_at FROM market.backfill_seams WHERE instrument_id = @id");
+        await using var command = dataSource.CreateCommand("SELECT high_water_at FROM market.backfill_seams WHERE instrument_id = @id");
         command.Parameters.AddWithValue("id", instrumentId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken) ? reader.GetFieldValue<DateTimeOffset>(0) : null;

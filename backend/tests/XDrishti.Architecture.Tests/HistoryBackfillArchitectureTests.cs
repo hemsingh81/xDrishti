@@ -21,13 +21,50 @@ public sealed class HistoryBackfillArchitectureTests
         offenders.ShouldBeEmpty("only BackfillStore.cs (and the migrations, excluded here) may name the backfill tables in SQL");
     }
 
+    // The readers that need every stored bar: the pipeline that writes them, the repair, the quality checks and the backfill itself. Every other caller is a simulation, learning, planning or report path and must read through SeamAwareBars.
+    private static readonly string[] RawReaders =
+    [
+        "XDrishti.Application.Market.Bars.Pipeline.DhanPhaseRunner",
+        "XDrishti.Application.Market.Bars.Repair.RepairBarHolesHandler",
+        "XDrishti.Application.Market.History.ProbeSeamHandler",
+        "XDrishti.Application.Market.History.RunBackfillHandler",
+        "XDrishti.Application.Market.History.SeamAwareBars",
+        "XDrishti.Application.Market.Quality.GetQualityInstrumentHandler",
+        "XDrishti.Application.Market.Quality.QualityPhaseRunner",
+    ];
+
+    [Fact]
+    public void Only_the_pipeline_the_repair_the_quality_checks_and_the_backfill_read_bars_raw_every_other_path_goes_through_the_seam_aware_read()
+    {
+        var assemblies = new[] { typeof(XDrishti.Application.DependencyInjection).Assembly, typeof(XDrishti.Infrastructure.Persistence.DatabaseOptions).Assembly, System.Reflection.Assembly.Load(new System.Reflection.AssemblyName("XDrishti.Api")) };
+        var callers = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var assembly in assemblies)
+        {
+            using var module = Mono.Cecil.ModuleDefinition.ReadModule(assembly.Location);
+            foreach (var type in module.GetTypes())
+            {
+                var root = type;
+                while (root.DeclaringType is not null)
+                {
+                    root = root.DeclaringType;
+                }
+
+                if (type.Methods.Where(m => m.HasBody).SelectMany(m => m.Body.Instructions).Any(i => i.Operand is Mono.Cecil.MethodReference call && call.Name == "ReadAsync" && call.DeclaringType.FullName == "XDrishti.Application.Abstractions.Market.Bars.IBarStore"))
+                {
+                    callers.Add(root.FullName);
+                }
+            }
+        }
+
+        callers.ToList().ShouldBe(RawReaders, ignoreOrder: true, customMessage: "a simulation, learning, planning or report path reads bars through SeamAwareBars (ADR 0270, decision 10)");
+    }
+
     [Fact]
     public void The_one_read_of_a_run_drops_the_bars_before_the_seam()
     {
         var reader = File.ReadAllText(Path.Combine(Src, "XDrishti.Application", "Research", "InstrumentInputReader.cs"));
 
-        reader.ShouldContain("IBackfillSeams", Case.Sensitive, "a run reads no pre-seam bar (ADR 0270, decision 10)");
-        reader.ShouldContain("EpochSeconds >= seamEpoch");
+        reader.ShouldContain("SeamAwareBars.ReadAsync");
     }
 
     [Fact]

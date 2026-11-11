@@ -33,7 +33,7 @@ public interface IBackfillStore
     ValueTask<IReadOnlyList<ChunkCounts>> CountChunksAsync(CancellationToken cancellationToken);
 }
 
-/// <summary>What the simulation reads: where an instrument's backfilled (pre-seam) bars end. Null when it has none.</summary>
+/// <summary>What every simulation, learning and report read applies (<c>SeamAwareBars</c>): the <b>high-water</b> seam, the latest seam ever recorded for the instrument (never lowered, so a seam that moves earlier cannot admit raw Dhan bars). Null when it has no seam row.</summary>
 public interface IBackfillSeams
 {
     ValueTask<DateTimeOffset?> SeamOfAsync(Guid instrumentId, CancellationToken cancellationToken);

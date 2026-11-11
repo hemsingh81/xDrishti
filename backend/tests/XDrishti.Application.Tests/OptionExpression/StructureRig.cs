@@ -81,11 +81,11 @@ internal sealed class StructureRig
         Usable();
     }
 
-    public RemarkDispatchHandler Dispatcher() => new(Profiles, new RemarkRunHandler(Runs, Profiles, Sheets, Reference, Quality, Bars, Contracts, SpreadModels, SpreadSettings, Minutes, Calendar, Settings, Store, Microsoft.Extensions.Logging.Abstractions.NullLogger<RemarkRunHandler>.Instance), Structures());
+    public RemarkDispatchHandler Dispatcher() => new(Profiles, new RemarkRunHandler(Runs, Profiles, Sheets, Reference, Quality, Bars, Contracts, SpreadModels, SpreadSettings, Minutes, new XDrishti.Application.Tests.Market.History.FakeSeams(), Calendar, Settings, Store, Microsoft.Extensions.Logging.Abstractions.NullLogger<RemarkRunHandler>.Instance), Structures());
 
-    public RemarkStructureHandler Structures() => new(Runs, Sheets, Reference, Quality, Bars, Contracts, SpreadModels, SpreadSettings, Minutes, Calendar, Settings, Regime, Store, Microsoft.Extensions.Logging.Abstractions.NullLogger<RemarkStructureHandler>.Instance);
+    public RemarkStructureHandler Structures() => new(Runs, Sheets, Reference, Quality, Bars, Contracts, SpreadModels, SpreadSettings, Minutes, new XDrishti.Application.Tests.Market.History.FakeSeams(), Calendar, Settings, Regime, Store, Microsoft.Extensions.Logging.Abstractions.NullLogger<RemarkStructureHandler>.Instance);
 
-    public SimulateCondorsHandler Condors() => new(Profiles, Sheets, Reference, Quality, Bars, Contracts, SpreadModels, SpreadSettings, Minutes, Calendar, Settings, Regime, Store, Microsoft.Extensions.Logging.Abstractions.NullLogger<SimulateCondorsHandler>.Instance);
+    public SimulateCondorsHandler Condors() => new(Profiles, Sheets, Reference, Quality, Bars, Contracts, SpreadModels, SpreadSettings, Minutes, new XDrishti.Application.Tests.Market.History.FakeSeams(), Calendar, Settings, Regime, Store, Microsoft.Extensions.Logging.Abstractions.NullLogger<SimulateCondorsHandler>.Instance);
 
     public void Register(ExpressionProfile profile) => Profiles.GetAsync(profile.Hash, Arg.Any<CancellationToken>()).Returns(new StoredExpressionProfile(profile, DateTimeOffset.UnixEpoch));
 

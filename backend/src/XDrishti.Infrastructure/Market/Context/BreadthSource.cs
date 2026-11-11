@@ -56,7 +56,7 @@ internal sealed class BreadthSource(NpgsqlDataSource dataSource, ICorporateActio
 
     private async ValueTask<Dictionary<DateOnly, double>> ClosesAsync(Guid instrumentId, DateOnly from, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("SELECT ts, close FROM market.bars_agg WHERE instrument_id = @id AND timeframe = '1D' AND complete AND ts >= @from ORDER BY ts");
+        await using var command = dataSource.CreateCommand("SELECT ts, close FROM market.bars_agg WHERE instrument_id = @id AND timeframe = '1D' AND complete AND ts >= market.backfill_cut(instrument_id) AND ts >= @from ORDER BY ts");
         command.Parameters.AddWithValue("id", instrumentId);
         command.Parameters.AddWithValue("from", new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).AddDays(-1).ToUniversalTime());
         var closes = new Dictionary<DateOnly, double>();

@@ -32,7 +32,7 @@ internal sealed class SimAllUniverse(NpgsqlDataSource dataSource) : ISimAllUnive
 /// <summary>
 /// Backfill is complete when a bar-history job is not running and every instrument the history phase fetches has stored bars (spec AU-12, ADR 0243 point 7). Anything else, including nothing tracked, is not complete: fail closed.
 /// </summary>
-internal sealed class SimAllBackfillGate(IFetchTargets targets, IDataJobStore jobs, IRecoveryLedger recovery, IBackfillProgress? history = null) : ISimAllBackfillGate
+internal sealed class SimAllBackfillGate(IFetchTargets targets, IDataJobStore jobs, IRecoveryLedger recovery, IBackfillProgress history) : ISimAllBackfillGate
 {
     public async ValueTask<string?> IncompleteReasonAsync(CancellationToken cancellationToken)
     {
@@ -42,7 +42,7 @@ internal sealed class SimAllBackfillGate(IFetchTargets targets, IDataJobStore jo
         }
 
         // The 1-minute history backfill (CF-04 Part B) is incomplete while any instrument has a planned or failed chunk: a running backfill is visible here as planned chunks (fail closed); seam_unresolved and seam_jump instruments count as complete.
-        if (history is not null && await history.UnfinishedInstrumentsAsync(cancellationToken) is var unfinished and > 0)
+        if (await history.UnfinishedInstrumentsAsync(cancellationToken) is var unfinished and > 0)
         {
             return $"the 1-minute history backfill has unfinished chunks for {unfinished} instruments.";
         }

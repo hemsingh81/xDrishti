@@ -29,6 +29,8 @@ public sealed class ExtractTradeFeaturesHandlerTests
 
     private readonly IBarStore _bars = Substitute.For<IBarStore>();
 
+    private readonly XDrishti.Application.Tests.Market.History.FakeSeams _seams = new();
+
     private readonly IAdjustmentFactors _factors = Substitute.For<IAdjustmentFactors>();
 
     private readonly ITradingCalendar _calendar = Substitute.For<ITradingCalendar>();
@@ -44,7 +46,7 @@ public sealed class ExtractTradeFeaturesHandlerTests
         _factors.GetAsync(Arg.Any<Guid>(), Ct).Returns(AdjustmentFactors.None);
         _calendar.GetAsync(Ct).Returns(new TradingCalendar());
         _store.StoreAsync(Arg.Do<IReadOnlyList<TradeFeatureRow>>(r => _written = r), Arg.Any<DateTimeOffset>(), Ct).Returns(ci => ci.ArgAt<IReadOnlyList<TradeFeatureRow>>(0).Count);
-        return new ExtractTradeFeaturesHandler(_runs, _bars, _factors, _calendar, _extractor, _store, new FakeTimeProvider(new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero)), NullLogger<ExtractTradeFeaturesHandler>.Instance);
+        return new ExtractTradeFeaturesHandler(_runs, _bars, _seams, _factors, _calendar, _extractor, _store, new FakeTimeProvider(new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero)), NullLogger<ExtractTradeFeaturesHandler>.Instance);
     }
 
     private static StoredRunHeader Header() =>
@@ -88,6 +90,22 @@ public sealed class ExtractTradeFeaturesHandlerTests
         row.Side.ShouldBe("SELL");
         row.Timeframe.ShouldBe("15m");
         row.DecisionEpochSeconds.ShouldBe(trade.DecisionEpochSeconds);
+    }
+
+    [Fact]
+    public async Task Bars_before_the_instruments_seam_never_reach_the_extractor_CF_04_part_B()
+    {
+        var trade = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:A", Side.Buy, Day);
+        Run(trade);
+        _seams.Cuts[FabricatedRun.IdA] = DateTimeOffset.FromUnixTimeSeconds(1_000);
+        _bars.ReadAsync(FabricatedRun.IdA, Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Ct).Returns(new[] { new Bar(500, 1, 1, 1, 1, 1), new Bar(1_000, 1, 1, 1, 1, 1), new Bar(1_060, 1, 1, 1, 1, 1) });
+        IReadOnlyList<Bar>? seen = null;
+        _extractor.Extract(Arg.Do<IReadOnlyList<Bar>>(b => seen = b), Arg.Any<AdjustmentFactors>(), Arg.Any<TradingCalendar>(), Arg.Any<IReadOnlyList<TradeFeatureDecision>>())
+            .Returns(new Dictionary<string, double[]> { [trade.Key] = Values() });
+
+        await Handler().HandleAsync(new ExtractTradeFeaturesCommand(Key), Ct);
+
+        seen.ShouldNotBeNull().Select(b => b.EpochSeconds).ShouldBe([1_000L, 1_060L]);
     }
 
     [Fact]

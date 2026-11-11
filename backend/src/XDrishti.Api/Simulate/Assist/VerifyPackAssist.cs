@@ -47,7 +47,8 @@ internal static class VerifyPackAssist
         var stored = new StoredDays(
             provider.GetRequiredService<IQueryHandler<ResolveInstrumentsQuery, Result<ResolveResult>>>(),
             provider.GetRequiredService<IQueryHandler<GetInstrumentQuery, Result<InstrumentDetail>>>(),
-            provider.GetRequiredService<IBarStore>());
+            provider.GetRequiredService<IBarStore>(),
+            provider.GetRequiredService<XDrishti.Application.Abstractions.Market.History.IBackfillSeams>());
 
         if (gate)
         {

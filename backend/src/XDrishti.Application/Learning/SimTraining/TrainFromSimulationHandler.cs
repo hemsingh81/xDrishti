@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Market.History;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.SimAll;
@@ -26,6 +27,7 @@ internal sealed class TrainFromSimulationHandler(
     ITrainingRunReader reader,
     ISimTrainingStore store,
     IBarStore bars,
+    IBackfillSeams seams,
     IAdjustmentFactors adjustments,
     ITradingCalendar calendars,
     ITradeFeatureExtractor extractor,
@@ -213,7 +215,7 @@ internal sealed class TrainFromSimulationHandler(
                 continue;
             }
 
-            await ExtractTradeFeaturesHandler.ExtractAsync(Replay(kept), run.RunKey, bars, adjustments, calendars, extractor, features, time, cancellationToken);
+            await ExtractTradeFeaturesHandler.ExtractAsync(Replay(kept), run.RunKey, bars, seams, adjustments, calendars, extractor, features, time, cancellationToken);
             var decisionOf = kept.ToDictionary(t => t.Key, t => t.DecisionEpochSeconds, StringComparer.Ordinal);
             matching.AddRange((await features.ReadAsync([run.RunKey], TradeFeatureCatalog.Version, cancellationToken)).Where(f => decisionOf.TryGetValue(f.TradeKey, out var at) && at == f.DecisionEpochSeconds));
             trades.AddRange(kept);

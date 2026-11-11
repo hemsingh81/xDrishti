@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Market.History;
+using XDrishti.Application.Market.History;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
@@ -20,6 +22,7 @@ namespace XDrishti.Application.Learning;
 internal sealed class ExtractTradeFeaturesHandler(
     IRunStore runs,
     IBarStore bars,
+    IBackfillSeams seams,
     IAdjustmentFactors adjustments,
     ITradingCalendar calendars,
     ITradeFeatureExtractor extractor,
@@ -52,7 +55,7 @@ internal sealed class ExtractTradeFeaturesHandler(
         var runKey = command.RunKey;
         try
         {
-            var outcome = await ExtractAsync(runs.StreamTradesAsync(runKey, false, cancellationToken), runKey, bars, adjustments, calendars, extractor, store, time, cancellationToken);
+            var outcome = await ExtractAsync(runs.StreamTradesAsync(runKey, false, cancellationToken), runKey, bars, seams, adjustments, calendars, extractor, store, time, cancellationToken);
             var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
             FeatureLog.Extracted(logger, runKey[..12], outcome.Trades, outcome.Stored, outcome.NoBars, elapsedMs);
             return Result.Success(outcome);
@@ -67,7 +70,7 @@ internal sealed class ExtractTradeFeaturesHandler(
     /// <summary>
     /// The extraction itself, shared with the training from the simulation (AU-13): the trades of one run come from the caller (evidence or training reader), and a trade is described to the extractor by its decision instant, side, stop and target only.
     /// </summary>
-    internal static async ValueTask<TradeFeaturesOutcome> ExtractAsync(IAsyncEnumerable<RunTrade> runTrades, string runKey, IBarStore bars, IAdjustmentFactors adjustments, ITradingCalendar calendars, ITradeFeatureExtractor extractor, ITradeFeatureStore store, TimeProvider time, CancellationToken cancellationToken)
+    internal static async ValueTask<TradeFeaturesOutcome> ExtractAsync(IAsyncEnumerable<RunTrade> runTrades, string runKey, IBarStore bars, IBackfillSeams seams, IAdjustmentFactors adjustments, ITradingCalendar calendars, ITradeFeatureExtractor extractor, ITradeFeatureStore store, TimeProvider time, CancellationToken cancellationToken)
     {
         var trades = new List<SimTradeView>();
         await foreach (var runTrade in runTrades.WithCancellation(cancellationToken))
@@ -82,7 +85,7 @@ internal sealed class ExtractTradeFeaturesHandler(
         foreach (var group in trades.GroupBy(t => t.InstrumentId))
         {
             var last = group.Max(t => SessionClock.DateOf(t.DecisionEpochSeconds));
-            var raw = await bars.ReadAsync(group.Key, SimulationBounds.From, SimulationBounds.Until(last), cancellationToken);
+            var raw = await SeamAwareBars.ReadAsync(bars, seams, group.Key, SimulationBounds.From, SimulationBounds.Until(last), cancellationToken);
             if (raw.Count == 0)
             {
                 noBars += group.Count();

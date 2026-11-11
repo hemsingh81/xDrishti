@@ -18,7 +18,7 @@ public sealed class RunNullWalkTests
     private readonly IRandomEntryEngine _engine = Substitute.For<IRandomEntryEngine>();
 
     private RunSimulationHandler Handler(IRandomEntryEngine engine) =>
-        new(_fixture.Store, _fixture.BarQueries, _fixture.Baskets, _fixture.Factors, _fixture.Actions, _fixture.Calendar, _fixture.Engine, _fixture.Strategies, _fixture.CostSheets, _fixture.ContextDays, _fixture.EventSnapshots, _fixture.FilingTimes, _fixture.SurpriseReader, _fixture.Time, _fixture.Log, engine, Substitute.For<IPlaceboEngine>(), _fixture.EntryTiers);
+        new(_fixture.Store, _fixture.BarQueries, _fixture.Baskets, _fixture.Factors, _fixture.Actions, _fixture.Calendar, _fixture.Engine, _fixture.Strategies, _fixture.CostSheets, _fixture.ContextDays, _fixture.EventSnapshots, _fixture.FilingTimes, _fixture.SurpriseReader, _fixture.Time, _fixture.Log, engine, Substitute.For<IPlaceboEngine>(), new XDrishti.Application.Tests.Market.History.FakeSeams(), _fixture.EntryTiers);
 
     private static NullTradeSpec Spec(int id, Guid instrument, DateOnly date) => new(id, instrument, date, Side.Buy, 0.01, 2, CostSegment.IntradayEquity);
 

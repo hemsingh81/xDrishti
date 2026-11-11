@@ -32,6 +32,7 @@ internal sealed class SimulateCondorsHandler(
     ISpreadModelStore spreadModels,
     ISpreadModelSettings spreadSettings,
     IBarStore minuteBars,
+    XDrishti.Application.Abstractions.Market.History.IBackfillSeams seams,
     ITradingCalendar calendars,
     IRemarkSettings settings,
     IRegimeLabels regime,
@@ -138,7 +139,7 @@ internal sealed class SimulateCondorsHandler(
                 var calls = await GridAsync(underlyingId, code, "CE", interval, from, to, usable, usableKeys, cancellationToken);
                 var puts = await GridAsync(underlyingId, code, "PE", interval, from, to, usable, usableKeys, cancellationToken);
                 watermark = Math.Max(watermark, await barReader.WatermarkAsync(underlyingId, chunkFirst, chunkLast, cancellationToken));
-                var spot = calls.Grid.Times.Count == 0 ? new Dictionary<long, int>() : await RemarkShared.SpotAsync(minuteBars, underlyingId, from - SpotWindowPad, to, cancellationToken);
+                var spot = calls.Grid.Times.Count == 0 ? new Dictionary<long, int>() : await RemarkShared.SpotAsync(minuteBars, seams, underlyingId, from - SpotWindowPad, to, cancellationToken);
                 var context = new RemarkContext
                 {
                     Calendar = calendar,

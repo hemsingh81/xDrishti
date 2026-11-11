@@ -23,6 +23,7 @@ internal sealed class RunPairsHandler(
     IPairUniverseSource universe,
     IBarQueries dailyBars,
     IBarStore minuteBars,
+    XDrishti.Application.Abstractions.Market.History.IBackfillSeams seams,
     ITestLedger ledger,
     IPairResearchStore store,
     IPairSimulator simulator,
@@ -142,7 +143,7 @@ internal sealed class RunPairsHandler(
             {
                 var instant = new DateTimeOffset(start.AddDays(-TradingLookbackDays).ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).ToUniversalTime();
                 var end = new DateTimeOffset(tradeTo.AddDays(1).ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).AddSeconds(-1).ToUniversalTime();
-                barCache[symbol] = await minuteBars.ReadAsync(bySymbol[symbol].Id, instant, end, cancellationToken);
+                barCache[symbol] = await XDrishti.Application.Market.History.SeamAwareBars.ReadAsync(minuteBars, seams, bySymbol[symbol].Id, instant, end, cancellationToken);
             }
 
             foreach (var variant in variants)

@@ -68,7 +68,7 @@ public sealed class TrainFromSimulationHandlerTests
         var bars = Substitute.For<IBarStore>();
         bars.ReadAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new List<XDrishti.Domain.Market.Bars.Bar> { new(0, 1, 1, 1, 1, 1) }); // one bar: the extractor is asked, and records which decisions it was asked for; the stored features of _features are the ones read
         _extractor.Extract(Arg.Any<IReadOnlyList<XDrishti.Domain.Market.Bars.Bar>>(), Arg.Any<XDrishti.Domain.Market.Actions.AdjustmentFactors>(), Arg.Any<TradingCalendar>(), Arg.Do<IReadOnlyList<TradeFeatureDecision>>(d => _extracted.AddRange(d))).Returns(new Dictionary<string, double[]>());
-        return new TrainFromSimulationHandler(_jobs, _reader, _store, bars, Substitute.For<IAdjustmentFactors>(), calendar, _extractor, _features, _sets, _trainer, _files, _registry, _settings,
+        return new TrainFromSimulationHandler(_jobs, _reader, _store, bars, new XDrishti.Application.Tests.Market.History.FakeSeams(), Substitute.For<IAdjustmentFactors>(), calendar, _extractor, _features, _sets, _trainer, _files, _registry, _settings,
             new FakeTimeProvider(new DateTimeOffset(2026, 11, 10, 0, 0, 0, TimeSpan.Zero)), NullLogger<TrainFromSimulationHandler>.Instance);
     }
 

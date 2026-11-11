@@ -23,6 +23,7 @@ internal sealed class GetTradeReplayHandler(
     IRunStore runs,
     ITradeFeatureStore features,
     IBarStore bars,
+    XDrishti.Application.Abstractions.Market.History.IBackfillSeams seams,
     IBarQueries barQueries,
     IAdjustmentFactors adjustments,
     ITradingCalendar calendar,
@@ -59,7 +60,7 @@ internal sealed class GetTradeReplayHandler(
         var trade = stored.Trade;
         var tradingCalendar = await calendar.GetAsync(cancellationToken);
         var window = TradeReplayWindow.Compute(tradingCalendar, trade.TradeDate, SessionClock.DateOf(trade.ExitEpochSeconds), before, after);
-        var raw = await bars.ReadAsync(trade.InstrumentId, DateTimeOffset.FromUnixTimeSeconds(window.FromEpoch), DateTimeOffset.FromUnixTimeSeconds(window.ToEpoch), cancellationToken);
+        var raw = await XDrishti.Application.Market.History.SeamAwareBars.ReadAsync(bars, seams, trade.InstrumentId, DateTimeOffset.FromUnixTimeSeconds(window.FromEpoch), DateTimeOffset.FromUnixTimeSeconds(window.ToEpoch), cancellationToken);
         var factors = await adjustments.GetAsync(trade.InstrumentId, cancellationToken);
         var minutes = ReplayBars.Adjust(raw, factors);
         var viewBars = ReplayBars.Aggregate(minutes, timeframe);
